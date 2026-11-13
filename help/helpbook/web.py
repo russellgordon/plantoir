@@ -10,12 +10,13 @@ help/facts.json -> assistantOnTheWeb is true (decision 12, #804).
 
 from __future__ import annotations
 
+import html
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
-from .checks import readable_texts
 from .folders import build_atomically, folder_size, human_size, place_picture
 from .problems import HelpError
 from .render import CONTENTS_FILE, HelpSource, PageRenderer
@@ -32,24 +33,43 @@ def web_page_ids(source: HelpSource) -> Set[str]:
     return included
 
 
-def search_index(source: HelpSource, included: Set[str]) -> str:
+def searchable_text(page_html: str) -> str:
+    """What a reader of the web page reads, for the search index: the page's
+    <main> as rendered, so menu paths, control labels, shortcuts and contract
+    sentences are in it, without the Windows runs the page hides."""
+    main_start: int = page_html.find("<main>")
+    main_end: int = page_html.find("</main>")
+    text: str = page_html[main_start + len("<main>"):main_end] if main_start >= 0 and main_end > main_start else page_html
+    text = re.sub(r'<div data-platform="windows">.*?<!--/windows--></div>', " ", text, flags=re.DOTALL)
+    # The fixed interface words (the stub box, a placeholder's heading) are not the page's.
+    text = re.sub(r'<div class="being-written".*?</div>', " ", text, flags=re.DOTALL)
+    text = re.sub(r'<p class="placeholder-heading">.*?</p>', " ", text, flags=re.DOTALL)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return " ".join(html.unescape(text).split())
+
+
+def search_index(source: HelpSource, renderer: PageRenderer, included: Set[str]) -> str:
     entries: List[Dict[str, Any]] = []
     for page in source.pages:
         if page.id not in included or not page.indexed:
             continue
-        body: List[str] = []
-        for _line, text in readable_texts(source, page):
-            body.append(text)
         entries.append(
             {
                 "id": page.id,
                 "title": page.title,
                 "description": page.description,
                 "keywords": page.keywords,
-                "text": " ".join(" ".join(body).split()),
+                "text": searchable_text(renderer.pages_html[page.id]),
             }
         )
-    return "window.PLANTOIR_HELP_INDEX = " + json.dumps(entries, ensure_ascii=False, indent=1) + ";\n"
+    words: Dict[str, str] = {
+        "resultsHeading": source.interface["searchResultsHeading"],
+        "noMatch": source.interface["searchNoMatch"],
+    }
+    return (
+        "window.PLANTOIR_HELP_WORDS = " + json.dumps(words, ensure_ascii=False) + ";\n"
+        "window.PLANTOIR_HELP_INDEX = " + json.dumps(entries, ensure_ascii=False, indent=1) + ";\n"
+    )
 
 
 def release_refusals(source: HelpSource, renderer: PageRenderer, included: Set[str]) -> List[str]:
@@ -90,7 +110,7 @@ def build_web(source: HelpSource, renderer: PageRenderer, out: Path, release: bo
         (folder / "assets").mkdir()
         for name in ASSETS_FOR_THE_WEB:
             shutil.copy2(str(assets_dir / name), str(folder / "assets" / name))
-        (folder / "assets" / "search-index.js").write_text(search_index(source, included), encoding="utf-8")
+        (folder / "assets" / "search-index.js").write_text(search_index(source, renderer, included), encoding="utf-8")
         for name in sorted(renderer.pictures_used):
             place_picture(source.help_dir / "pictures" / name, folder / "pictures" / name, old_pictures / name)
 

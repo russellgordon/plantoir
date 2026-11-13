@@ -25,10 +25,15 @@ class Problems:
         return file + ":" + str(line)
 
     def fail(self, file: str, line: Optional[int], message: str) -> None:
-        self.failures.append(self._where(file, line) + ": " + message)
+        # The Mac and web renderings check the same tokens: say each finding once.
+        finding: str = self._where(file, line) + ": " + message
+        if finding not in self.failures:
+            self.failures.append(finding)
 
     def warn(self, file: str, line: Optional[int], message: str) -> None:
-        self.warnings.append(self._where(file, line) + ": " + message)
+        finding: str = self._where(file, line) + ": " + message
+        if finding not in self.warnings:
+            self.warnings.append(finding)
 
     def has_failures(self) -> bool:
         return len(self.failures) > 0

@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Pattern
+from typing import Any, Dict, List, Optional, Pattern
 
 from .problems import HelpError, Problems
 
@@ -40,8 +40,13 @@ QUOTED_RUN_WORDS = 3
 # words by a destination, or "deploy" followed within five words by "page",
 # is the wrong verb. Only the words AFTER the verb count, within one sentence:
 # "publish the pages, then deploy" is right and must pass.
-PUBLISH_WORD = re.compile(r"^publish", re.IGNORECASE)
-DEPLOY_WORD = re.compile(r"^deploy", re.IGNORECASE)
+# The verbs themselves: "publisher" and "deployment" are not them.
+PUBLISH_WORD = re.compile(r"^publish(?:es|ed|ing)?$", re.IGNORECASE)
+DEPLOY_WORD = re.compile(r"^deploy(?:s|ed|ing)?$", re.IGNORECASE)
+# "published" right before one of these is an adjective naming what was
+# marked ("Published pages appear on the site"), not the verb sending a site.
+MARKED_THINGS = ["page", "pages", "class", "classes"]
+PUBLISHED_PAGES = re.compile(r"\bpublished (?:pages?|class(?:es)?)\b", re.IGNORECASE)
 PUBLISH_DESTINATION = re.compile(
     r"\b(sites?|websites?|online|netlify|cloudflare|github pages|(?:a|the|your) folder|"
     r"(?:to|onto) (?:the |a |your |each |this |that )?sections?)\b",
@@ -111,7 +116,7 @@ class WordRules:
                 text = blank_phrase(text, entry["phrase"])
         return text
 
-    def check(self, page_id: str, file: str, line: int, text: str, problems: Problems) -> None:
+    def check(self, page_id: str, file: str, line: Optional[int], text: str, problems: Problems) -> None:
         """Every rule on one piece of readable text (tokens and code already blanked)."""
         readable: str = self._exempt(page_id, text)
         for pattern in self.forbidden_patterns:
@@ -169,6 +174,11 @@ def publish_deploy_problems(text: str) -> List[str]:
             word: str = sentence[index].strip(".,;:()")
             following: str = " ".join(sentence[index + 1:index + 1 + VERB_REACH])
             if PUBLISH_WORD.match(word) is not None:
+                next_word: str = ""
+                if index + 1 < len(sentence):
+                    next_word = sentence[index + 1].strip(".,;:()").lower()
+                if word.lower() == "published" and next_word in MARKED_THINGS:
+                    continue
                 found = PUBLISH_DESTINATION.search(following)
                 if found is not None:
                     messages.append(
@@ -177,7 +187,8 @@ def publish_deploy_problems(text: str) -> List[str]:
                     )
             elif DEPLOY_WORD.match(word) is not None:
                 # "GitHub Pages" and "Cloudflare Pages" are destinations, not pages.
-                destinations_removed: str = PAGES_PRODUCTS.sub(" ", following)
+                # "every published page" is what a deploy carries, not a page deployed on its own.
+                destinations_removed: str = PUBLISHED_PAGES.sub(" ", PAGES_PRODUCTS.sub(" ", following))
                 found = DEPLOY_A_PAGE.search(destinations_removed)
                 if found is not None:
                     messages.append(

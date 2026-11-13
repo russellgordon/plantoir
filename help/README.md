@@ -7,6 +7,60 @@ It is not read by teachers, and it is not where Help's words are written:
 every page, caption and alt text is written by Fable from a fact sheet
 (decision 5 on #839).
 
+## For the writers: read this first
+
+1. **Steps and pictures.** Number steps `1.`, `2.`, `3.`. A picture, a note, a
+   table or a code block may sit between two steps: number the step after it
+   as the next one (`3.`), and the steps count on. Writing `1.` there is
+   refused, and so is a gap (`1.` then `3.`). A heading or a paragraph between
+   starts new steps at `1.`. Mark list items with `1.` or `-` only, indented
+   with spaces; `*`, `+`, `1)` and tabs are refused.
+2. **A picture's `alt:` line** goes on the very next line after
+   `{{picture:<scene>}}`, with no blank line between, and says in one
+   sentence what is shown and what matters in it.
+3. **Name what the app shows with a token**: `{{menu:}}` for a menu path,
+   `{{control:}}` for a button or label, `{{key:}}` for a shortcut,
+   `{{say:}}` for a sentence the app shows. A token is checked against the
+   app and is searchable on the web; a label typed by hand is neither.
+   A sentence the app shows, typed into running prose, is refused. The
+   outline's titles and questions, and your headings, are names and are not
+   held to that rule: "Get ready for the start of the year" is the title of
+   `start-of-year`, though the app says the same words.
+4. **Publish and deploy.** Publish marks a page for students; deploy sends a
+   section's site somewhere. "publish", "published", "publishes" or
+   "publishing" followed within five words by site, website, online, Netlify,
+   Cloudflare, GitHub Pages, a folder or "to a section" is refused; so is
+   "deploy" followed within five words by page or pages. Correct sentences
+   pass: "Published pages appear on the site", "Deploy sends every published
+   page in the section", "a publisher whose site allows embedding". Where a
+   correct sentence still fails, ask for a `tone.json` exemption scoped to the
+   page, with its reason.
+5. **Counts.** A digit within four words of "course" or "code" is refused as
+   a typed count, including "a Grade 9 course" and "Section 2 of the course".
+   Write a count as `{{count:ready_made_ontario}}`; rephrase anything else.
+6. **Machinery words in their teaching sense** are refused too: "model",
+   "script", "feed", "worker", "container", "Python". A page that needs one
+   (Drama's script, a Science model) gets a `tone.json` exemption for that
+   phrase on that page, with its reason.
+7. **Do not write `{{windows}}` runs yet.** A token inside one fails until the
+   Windows side fills its columns.
+8. **Assistants on ordinary pages.** The web copy may not mention an assistant
+   (Claude, Codex, GitHub Copilot, the assistant features) outside the
+   assistant section yet (#804). Put such a sentence or block in an
+   `{{assistant}}` … `{{/assistant}}` run, each marker on a line of its own:
+   it stays in the Mac Help book and is left out of the web copy. An unmarked
+   mention, or a link to an assistant page outside a run, stops `--web` with
+   its file and line (`withheld-on-the-web.json` holds the list).
+9. **Banned**: an em dash, "!", "just", "simply", "easy", "quick" (except in
+   "Quick start"), "best", and the rest of `tone.json`. A quoted run of more
+   than three words in double quotes is refused. En dashes, single-quoted runs
+   and `TODO(fact)` pass the build, but a reviewer flags the first two and F
+   refuses the third at a release.
+10. **Reading the output.** A finding in a paragraph names the paragraph's
+    first line. Each finding is printed once.
+11. **The words around the pages** (the stub box, "Picture to come", the
+    search box) are in `interface-words.json`, by key: reword them there.
+
 ## What is here
 
 | Path | What it holds |
@@ -19,6 +73,8 @@ every page, caption and alt text is written by Fable from a fact sheet
 | `facts.json` | `{{fact:}}` ids with `value`, `read` (a date) and `source`; and `assistantOnTheWeb`, the one switch for the assistant section on the web (decision 12). |
 | `scenes.json` | One entry per picture (schema below). |
 | `tone.json` | The writing brief's banned words and shapes, and exemptions scoped to pages. |
+| `interface-words.json` | The fixed words Help shows around the pages (stub box, placeholder heading, search box and results), by key; checked like page text. |
+| `withheld-on-the-web.json` | What an ordinary page may not say on the web copy while `assistantOnTheWeb` is false (#804), as patterns with reasons; the director may shorten it. |
 | `assets/` | `tokens.css` (the one copy of the colour and type tokens), `help.css`, `search.js`. |
 | `pictures/` | `<scene>-light.webp` and `<scene>-dark.webp`. |
 | `build_help.py`, `helpbook/` | The build and its checks. Standard library only. |
@@ -84,7 +140,7 @@ is indexed. Every `covers` path must exist, because a typo there would quietly
 switch off F's freshness check for that page.
 
 A **stub** (an outline id with no file) renders its title, its question and a
-fixed "This page is being written." box. That sentence and the placeholder
+fixed "being written" box (`interface-words.json` → `stubSentence`). That sentence and the placeholder
 label are fixed strings, not Help prose; `--release-web` and F refuse every
 stub and placeholder, so neither ships.
 
@@ -115,6 +171,7 @@ horizontal rules and other quote blocks are refused with the file and line.
 | `{{count:<name>}}` | a number | counted from `support/` by `helpbook/counts.py` |
 | `{{picture:<scene>}}` + `alt:` line | a picture or its placeholder | the page's outline `sceneIds` and `scenes.json` |
 | `{{mac}}…{{/mac}}`, `{{windows}}…{{/windows}}` | a run for one platform | may not nest |
+| `{{assistant}}…{{/assistant}}` | lines that name an assistant: kept in the Mac book, left out of the web copy while `assistantOnTheWeb` is false | may not nest |
 
 The golden is parsed as `MenuBarTreeTests` writes it: `== <Menu>` opens a
 menu, two spaces of indent per level, tags after two or more spaces (`[⇧⌘N]`
@@ -151,21 +208,32 @@ header.
    true (its menu path is in the golden, its label is in its Swift file). An
    id no page uses is a warning: the integrator of a writing batch commits the
    registry entries before the pages that use them.
-3. **Links.** `page:` names an outline id; `https://` is well formed (never
-   fetched). A link to a page the web copy leaves out keeps its words and
-   loses its link there.
+3. **Links and lists.** `page:` names an outline id; `https://` is well formed
+   (never fetched). A link from an ordinary page to an assistant page must sit
+   in an `{{assistant}}` run (below). Numbered steps count up by one, and the
+   steps after a picture, note, table or code block carry on from the steps
+   above, rendered `<ol start="3">`; a list that restarts at 1 there is
+   refused. The review of P2a found the old behaviour: steps after a picture
+   silently restarted at 1, the shape of most how-to pages. Allowing a picture
+   inside a list item was rejected: it needs indentation rules writers get
+   wrong, and the refusal makes the wrong state impossible instead.
 4. **Words** (`helpbook/words.py`, which #840's P6 will make the site import):
    - `contracts/shared-rules.json` → `userFacingLabelWords.forbidden`, whole
      word and any case, as the app's `UserFacingLabelWordsTests` matches it;
    - the site's `MACHINERY` pattern, copied from `website/build.py`;
    - `tone.json`'s banned words and shapes;
    - **Help's own publish rule.** PUBLISH marks a page for students; DEPLOY
-     sends a section's site somewhere. "publish…" followed within five words
-     (in the same sentence) by site, website, online, Netlify, Cloudflare,
-     GitHub Pages, a folder, or "to a section", is refused; so is "deploy…"
-     followed within five words by page or pages ("GitHub Pages" and
-     "Cloudflare Pages" are destinations, not pages). Only the words after
-     the verb count, so "publish the pages, then deploy the section" passes.
+     sends a section's site somewhere. The check catches the MISUSE: the verb
+     publish (publish, publishes, published, publishing; never "publisher")
+     followed within five words, in the same sentence, by site, website,
+     online, Netlify, Cloudflare, GitHub Pages, a folder, or "to a section";
+     and the verb deploy followed within five words by page or pages. Three
+     correct uses are not misuse and pass: "published" right before page,
+     pages, class or classes is an adjective ("Published pages appear on the
+     site"); "published page(s)" after deploy is what a deploy carries
+     ("Deploy sends every published page in the section"); "GitHub Pages" and
+     "Cloudflare Pages" are destinations, not pages. Only the words after the
+     verb count, so "publish the pages, then deploy the section" passes.
      The site's rule (every "publish" must be on an allowed list) was
      rejected for Help: "publish" is Help's correct verb and a real menu item,
      and that rule failed five approved titles (plan review H1).
@@ -186,8 +254,30 @@ header.
 5. **No contract sentence typed by hand.** Every run of five or more words in
    `contracts/assist-wording.json` (all of `wording`), and in the `sentences`,
    `wording` and `words` values of every other `contracts/*.json`, that appears
-   in a page outside a `{{say:}}` token is refused. A placeholder (`{name}`,
-   `%@`) splits a sentence into the runs around it.
+   in a page's RUNNING PROSE (paragraphs, list items, table cells, alt text,
+   the description) outside a `{{say:}}` token is refused. A placeholder
+   (`{name}`, `%@`) splits a sentence into the runs around it. Titles,
+   questions, headings and keywords are NAMES, not prose, and are not read by
+   this check: the outline's approved title of `start-of-year`, "Get ready
+   for the start of the year", holds the contract run "ready for the start of
+   the year" and is right to (review H2; a test writes a page for every
+   outline id and checks that all 100 build). A name in prose is kept true
+   the other way: it is written as a token, which is checked against the
+   golden, the Swift source or the contract. Applying `tone.json` exemptions
+   to this check was rejected: the title is the outline's, not the writer's,
+   so an exemption per title would only repeat the outline.
+6. **Head fields** of written pages, as above; stubs are exempt. A keyword
+   holds no comma (it would split in `<meta name="keywords">`), and a page's
+   `section` field in the outline is the section that holds it.
+7. **The web copy and the assistant** (`--web` and `--release-web` only; a
+   warning under `--check` and `--mac`, so no Xcode build fails on it). An
+   ordinary page that names a term in `withheld-on-the-web.json` outside an
+   `{{assistant}}` run, or links to an assistant page outside one, stops the
+   web copy with its file and line (#804: plantoir.app never presents
+   Plantoir as needing a paid assistant, and unit planning goes on the site
+   only after GitHub Copilot support has shipped and been verified). With
+   `assistantOnTheWeb` true, the runs are kept (`data-assistant="true"`) and
+   the check is off.
 6. **Head fields** of written pages, as above; stubs are exempt.
 
 ## The Mac book
@@ -260,7 +350,15 @@ and in a folder on the web alike. Once deployed at plantoir.app/help/, each
 `/help/<id>.html` is an address that must never move: a renamed page keeps its
 id. Every page has a search form that sends `?q=` to the contents page, which
 lists the matches with `assets/search.js` (without scripts, the form lands on
-the contents). The assistant section, its pages and its contents heading are
+the contents); only the contents page loads `search-index.js`. The index holds
+each page's text as RENDERED, so menu paths, control labels, shortcuts and
+`{{say:}}` sentences are searchable; hidden Windows runs and the interface
+words are left out. The search stems words (-s, -ed, -ing, -ies), drops small
+words ("how", "do", "I"), lets the last word match as the start of a word,
+matches a key symbol inside a shortcut (⌘P finds ⇧⌘P), and ranks pages by how
+many query words they hold instead of requiring all of them. Measured against
+the fixture: "how do I deploy my site", "deployed", "⌘P", "Coverage tab" and
+"GitHub Copilot" (with the switch on) each find their page. The assistant section, its pages and its contents heading are
 left out, and absent from the search index, while `facts.json` →
 `assistantOnTheWeb` is false. The site's integration (`website/build.py`
 writing `site/help/` and calling `--release-web` before `--deploy`) is #840's

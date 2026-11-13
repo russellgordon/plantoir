@@ -3,6 +3,7 @@
  "entries": {
   "send-section": {"label": "Send the Section", "mac": {"file": "mac-app/QuartzTeachers/Views/FixtureView.swift"}, "windows": null},
   "keep-both": {"label": "Keep Both Copies", "mac": {"wording": "FixtureWording.keepButton"}, "windows": null},
+  "coverage-tab": {"label": "Coverage", "mac": {"file": "mac-app/QuartzTeachers/Views/FixtureView.swift"}, "windows": null},
   "open-browser": {"label": "Open in Browser", "mac": {"say": "shared-rules#fixtureNotice.wording.button"}, "windows": null}
  },
  "keys": {}

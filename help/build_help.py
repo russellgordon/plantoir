@@ -89,6 +89,14 @@ def main(arguments: Optional[List[str]] = None) -> int:
         web_renderer = PageRenderer(source, "web", web_page_ids(source))
         web_renderer.render_all()
         source.registries.report_unused(problems)
+        # What only the web copy may not say stops --web and --release-web, and
+        # is a warning elsewhere, so the Xcode build is never failed by it.
+        building_the_web: bool = options.web is not None or options.release_web is not None
+        for file, line, message in source.web_findings:
+            if building_the_web:
+                problems.fail(file, line, "on the web copy: " + message)
+            else:
+                problems.warn(file, line, "on the web copy: " + message)
     except HelpError as error:
         print_findings(problems)
         print("FAILED: " + str(error))

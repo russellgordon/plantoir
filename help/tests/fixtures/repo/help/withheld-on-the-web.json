@@ -1,0 +1,14 @@
+{
+ "about": "What the web copy may not say on an ORDINARY page (one outside the assistant section) while help/facts.json -> assistantOnTheWeb is false. Ruled 2026-11-12 (#804): plantoir.app never presents Plantoir as needing a paid assistant, and unit planning and Coverage as a planning tool go on the site only after GitHub Copilot support has shipped and been verified. A sentence or block that must say one of these goes in an {{assistant}} ... {{/assistant}} run: it stays in the Mac Help book and is left out of the web copy. --web and --release-web FAIL on an unmarked mention, naming its file and line; --check and --mac print it as a warning. Each term is a case-insensitive regular expression with its reason; the director may shorten the list.",
+ "terms": [
+  {"pattern": "\\bClaude\\b", "why": "an assistant product"},
+  {"pattern": "\\bCodex\\b", "why": "an assistant product"},
+  {"pattern": "\\bCopilot\\b", "why": "an assistant product"},
+  {"pattern": "\\bassistants?\\b", "why": "the assistant features"},
+  {"pattern": "\\bRevise With\\b", "why": "the assistant menu"},
+  {"pattern": "\\bFix With\\b", "why": "the assistant command"},
+  {"pattern": "\\bPlan a Unit\\b", "why": "unit planning (#804)"},
+  {"pattern": "\\bunit plan(?:s|ning)?\\b", "why": "unit planning (#804)"},
+  {"pattern": "\\breport card comments?\\b", "why": "an assistant task"}
+ ]
+}

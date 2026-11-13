@@ -10,6 +10,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import ast  # noqa: E402
+import re  # noqa: E402
 import json  # noqa: E402
 import shutil  # noqa: E402
 import tempfile  # noqa: E402
@@ -47,12 +48,31 @@ class RealRepositoryTests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         shutil.rmtree(cls.temporary)
 
-    def test_the_real_repository_checks_green_with_100_stubs(self) -> None:
+    def test_the_real_repository_checks_green(self) -> None:
+        # What stays true as pages are written: every outline page is written or a stub, nothing fails.
         code, output = run_build(["--check"])
         self.assertEqual(code, 0, output)
-        self.assertIn("Help: 0 pages written, 100 stubs, ", output)
+        found = re.search(r"Help: (\d+) pages written, (\d+) stubs, ", output)
+        self.assertIsNotNone(found, output)
+        ids, _assistant_ids, _sections = outline_ids()
+        self.assertEqual(int(found.group(1)) + int(found.group(2)), len(ids))
         self.assertIn(" 0 failures", output)
         self.assertNotIn("FAILED", output)
+
+    def test_every_outline_page_can_be_written(self) -> None:
+        # A plain written page for EVERY outline id, in a copy of help/, checked against the real
+        # repository: no approved title or question can stop its page building (review H2).
+        copy = Path(self.temporary) / "every-page-help"
+        shutil.copytree(str(HELP_DIR), str(copy), ignore=shutil.ignore_patterns("tests", "__pycache__"))
+        ids, _assistant_ids, _sections = outline_ids()
+        for page_id in ids:
+            (copy / "pages" / (page_id + ".md")).write_text(
+                "---\nid: " + page_id + "\nchecked: 2.0.0\nkeywords:\n- word\ndescription: A page.\n---\nWords.\n",
+                encoding="utf-8",
+            )
+        code, output = run_build(["--check", "--help-dir", str(copy), "--repo", str(REPO)])
+        self.assertEqual(code, 0, output)
+        self.assertIn("Help: " + str(len(ids)) + " pages written, 0 stubs, ", output)
 
     def test_the_real_outline_has_its_counts(self) -> None:
         ids, assistant_ids, assistant_sections = outline_ids()
@@ -93,6 +113,8 @@ class RealRepositoryTests(unittest.TestCase):
                 self.assertTrue((web / (page_id + ".html")).exists(), page_id)
 
     def test_the_real_web_copy_is_not_ready_to_go_live(self) -> None:
+        # RETIRED AT THE CUT: true until every page is written and every picture taken (CF);
+        # delete this test then, when --release-web goes green.
         code, output = run_build(["--release-web", str(Path(self.temporary) / "live")])
         self.assertNotEqual(code, 0, output)
         self.assertIn("is still a stub", output)

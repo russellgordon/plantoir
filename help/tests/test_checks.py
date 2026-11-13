@@ -125,6 +125,19 @@ class StructureTests(unittest.TestCase):
         self.assertEqual(webp_size(lossless), (1200, 800))
         self.assertEqual(webp_size(self.fixture.help_dir / "pictures" / "first-steps-2-light.webp"), (1600, 1000))
 
+    def test_a_page_section_field_must_be_its_section(self) -> None:
+        self.fixture.replace("help/outline.json", '"section": "Working", "assistant": false, "indexed": true, "scenes": 0, "sceneIds": []},\n    {"id": "python-page"', '"section": "Elsewhere", "assistant": false, "indexed": true, "scenes": 0, "sceneIds": []},\n    {"id": "python-page"')
+        self.refused("send-section: its section 'Elsewhere' is not the section that holds it")
+
+    def test_a_keyword_with_a_comma_is_refused(self) -> None:
+        self.fixture.replace("help/pages/send-section.md", "- send\n", "- send, deliver\n")
+        self.refused("a keyword holds no comma")
+
+    def test_a_finding_is_printed_once(self) -> None:
+        self.fixture.page("second-look", "Choose {{menu:nope}}.\n")
+        code, output = self.fixture.run("--check")
+        self.assertEqual(output.count("{{menu:nope}}: no such id"), 1, output)
+
     def test_check_writes_nothing(self) -> None:
         code, output = self.fixture.run("--check")
         self.assertEqual(code, 0, output)

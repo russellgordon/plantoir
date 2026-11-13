@@ -25,7 +25,7 @@
    "purpose": "Planner's words.",
    "assistant": true,
    "pages": [
-    {"id": "helper-page", "anchor": "helper-page", "title": "About the helper", "question": "What does the helper do?", "section": "Optional: with an assistant", "assistant": true, "indexed": true, "scenes": 0, "sceneIds": []}
+    {"id": "helper-page", "anchor": "helper-page", "title": "Use GitHub Copilot here", "question": "What does the helper do?", "section": "Optional: with an assistant", "assistant": true, "indexed": true, "scenes": 0, "sceneIds": []}
    ]
   }
  ]

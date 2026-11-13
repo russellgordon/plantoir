@@ -1,0 +1,11 @@
+{
+ "about": "The fixed words Help itself shows around the pages, by key, so the writer of Help's prose can reword them without touching code. stubSentence and placeholderHeading never ship: --release-web (and F's --release) refuse every stub and placeholder picture. The search words appear in the web copy only. The word check reads every value here.",
+ "words": {
+  "stubSentence": "This page is being written.",
+  "placeholderHeading": "Picture to come",
+  "searchLabel": "Search Help",
+  "searchButton": "Search",
+  "searchResultsHeading": "Search results",
+  "searchNoMatch": "No page matches."
+ }
+}

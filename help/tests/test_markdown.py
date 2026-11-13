@@ -113,6 +113,71 @@ class RefusedThroughTheBuild(unittest.TestCase):
     def test_an_unknown_token_is_refused(self) -> None:
         self.refused("Press {{button:x}}.\n", "unknown token")
 
+    def test_a_wrong_list_marker_is_refused(self) -> None:
+        self.refused("1. One\n* Two\n", "list items start with `1.` or `-`")
+        self.refused("1. One\n2) Two\n", "list items start with `1.` or `-`")
+        self.refused("1. One\n\t- Two\n", "list items start with `1.` or `-`")
+        self.refused("- One\n  * Two\n", "list items start with `1.` or `-`")
+
+    def test_an_html_entity_or_an_unclosed_marker_is_refused(self) -> None:
+        self.refused("Press&nbsp;here.\n", "an HTML entity is printed as typed")
+        self.refused("Select **a section.\n", "a ` or ** is never closed")
+        self.refused("Type `here.\n", "a ` or ** is never closed")
+
+    def test_steps_must_count_up_by_one(self) -> None:
+        self.refused("1. One\n3. Three\n", "step 3 follows step 1")
+        self.refused("2. Two\n", "numbered steps start at 1")
+
+
+class StepsAcrossBlocks(unittest.TestCase):
+    """Numbered steps keep counting across a picture, a note, a table or a code block."""
+
+    BETWEEN = {
+        "picture": "{{picture:first-steps-1}}\nalt: The window, with its sidebar.\n",
+        "note": "> [!note]\n> A note between the steps.\n",
+        "table": "| A | B |\n|---|---|\n| 1 | 2 |\n",
+        "code": "```text wrap\nsome words\n```\n",
+    }
+
+    def setUp(self) -> None:
+        self.fixture = Fixture()
+
+    def tearDown(self) -> None:
+        self.fixture.close()
+
+    def steps_around(self, between: str, second_number: int):
+        body = (
+            "Words.\n\n## Steps\n\n1. Open it.\n2. Look.\n\n" + between + "\n"
+            + str(second_number) + ". Press it.\n" + str(second_number + 1) + ". Wait.\n"
+        )
+        self.fixture.replace("help/pages/first-steps.md", "Open the fixture and look at the window.\n", body)
+        return self.fixture.run("--web", str(self.fixture.out / "web"))
+
+    def test_the_steps_after_each_block_carry_on_at_3(self) -> None:
+        for name in self.BETWEEN:
+            with self.subTest(between=name):
+                fixture = Fixture()
+                self.fixture.close()
+                self.fixture = fixture
+                code, output = self.steps_around(self.BETWEEN[name], 3)
+                self.assertEqual(code, 0, output)
+                html = (self.fixture.out / "web" / "first-steps.html").read_text(encoding="utf-8")
+                self.assertIn('<ol start="3">\n<li>Press it.</li>', html)
+
+    def test_steps_that_restart_at_1_after_a_block_are_refused(self) -> None:
+        for name in self.BETWEEN:
+            with self.subTest(between=name):
+                fixture = Fixture()
+                self.fixture.close()
+                self.fixture = fixture
+                code, output = self.steps_around(self.BETWEEN[name], 1)
+                self.assertNotEqual(code, 0, output)
+                self.assertIn("these steps follow step 2 across a picture, note, table or code block: number this one 3", output)
+
+    def test_a_paragraph_between_starts_new_steps(self) -> None:
+        code, output = self.steps_around("Then a sentence of its own.\n", 1)
+        self.assertEqual(code, 0, output)
+
 
 if __name__ == "__main__":
     unittest.main()

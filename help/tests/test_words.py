@@ -29,6 +29,12 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(publish_deploy_problems("Deploy to GitHub Pages."), [])
         self.assertEqual(publish_deploy_problems("Put your site online with Cloudflare Pages."), [])
 
+    def test_sentences_that_explain_publish_and_deploy_pass(self) -> None:
+        # The review's three (plan review of P2a, M1): correct, and once refused.
+        self.assertEqual(publish_deploy_problems("Published pages appear on the site."), [])
+        self.assertEqual(publish_deploy_problems("Deploy sends every published page in the section."), [])
+        self.assertEqual(publish_deploy_problems("Choose videos from a publisher whose site allows embedding."), [])
+
     def test_deploy_followed_by_page_is_the_wrong_verb(self) -> None:
         self.assertEqual(len(publish_deploy_problems("Deploy the page for Thursday.")), 1)
 
@@ -122,6 +128,20 @@ class WordCheckTests(unittest.TestCase):
 
     def test_the_same_sentence_through_a_say_token_passes(self) -> None:
         self.passes("It says {{say:shared-rules#fixtureNotice.wording.finished}}\n")
+
+    def test_an_outline_title_holding_a_contract_sentence_builds_as_a_written_page(self) -> None:
+        # A title NAMES something (often a menu item's words); it is not a sentence retyped.
+        self.fixture.replace("help/outline.json", '"title": "Have a second look"', '"title": "Ask me to show or hide a class for a section"')
+        self.fixture.replace("help/outline.json", "What else is in the fixture window?", "Can I show or hide a class for a section?")
+        self.passes("Words.\n\n## Show or hide a class for a section\n\nMore words.\n")
+        # The same words in running prose are still refused.
+        self.refused("Words.\n\nAsk me to show or hide a class for a section.\n", "types a sentence the app shows")
+
+    def test_the_interface_words_are_checked(self) -> None:
+        self.fixture.replace("help/interface-words.json", '"Search Help"', '"Search Help seamlessly"')
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("help/interface-words.json: tone: 'seamlessly'", output)
 
     def test_the_title_and_question_of_a_stub_are_read(self) -> None:
         self.fixture.replace("help/outline.json", "What else is in the fixture window?", "What is seamlessly in the window?")

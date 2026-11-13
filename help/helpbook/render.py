@@ -12,7 +12,7 @@ import struct
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from . import BOOK_TITLE, CONTENTS_ANCHOR, LANGUAGE_TAG, PLACEHOLDER_HEADING, STUB_SENTENCE
+from . import BOOK_TITLE, CONTENTS_ANCHOR, LANGUAGE_TAG
 from .frontmatter import read_front_matter
 from .markdown import parse_body, split_inline, walk_blocks
 from .problems import HelpError, Problems
@@ -85,6 +85,17 @@ class HelpSource:
         self.outline: Dict[str, Any] = read_json(help_dir / "outline.json")
         self.registries = Registries(repo, help_dir, self.today)
         self.words = WordRules.load(repo, help_dir)
+        self.interface: Dict[str, str] = read_json(help_dir / "interface-words.json").get("words", {})
+        for key in ("stubSentence", "placeholderHeading", "searchLabel", "searchButton", "searchResultsHeading", "searchNoMatch"):
+            if not isinstance(self.interface.get(key), str) or self.interface[key].strip() == "":
+                raise HelpError("help/interface-words.json -> words needs `" + key + "`")
+        withheld = read_json(help_dir / "withheld-on-the-web.json").get("terms", [])
+        self.withheld_terms: List[Tuple[Any, str]] = []
+        for term in withheld:
+            self.withheld_terms.append((re.compile(term["pattern"], re.IGNORECASE), str(term.get("why", ""))))
+        # Findings that stop only the web copy (#804): failures under --web and
+        # --release-web, warnings under --check and --mac.
+        self.web_findings: List[Tuple[str, Optional[int], str]] = []
         self.pages: List[Page] = []
         self.pages_by_id: Dict[str, Page] = {}
         self.intro: Optional[Page] = None
@@ -210,7 +221,13 @@ class PageRenderer:
                 self.problems.fail(file, line, "links to page:" + page_id + ", which is not in help/outline.json")
                 return inner
             if page_id not in self.included_ids:
-                # Left out of this form (the assistant section on the web): the words stay, the link goes.
+                # Left out of this form (the assistant section on the web): the words stay, the link goes,
+                # and a link to the assistant section from an ordinary page belongs in an {{assistant}} run.
+                if self.form == "web" and not page.assistant:
+                    self.source.web_findings.append(
+                        (file, line, "links to the assistant page " + page_id + " outside an {{assistant}} run: "
+                         "its words would show on the web copy (#804)")
+                    )
                 return inner
             return '<a href="' + page_id + '.html">' + inner + "</a>"
         if re.match(r"^https://[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?::\d+)?(?:[/?#][^\s<>\"]*)?$", target) is not None:
@@ -274,6 +291,15 @@ class PageRenderer:
             elif kind == "platform":
                 run_platform: str = block["platform"]
                 inner_output: List[str] = []
+                if run_platform == "assistant":
+                    # Kept in the Mac book; on the web only once the switch is on (#804).
+                    if self.form == "mac":
+                        self._render_blocks(block["children"], page, platform, page_has_windows, inner_output, heading_ids)
+                        output.extend(inner_output)
+                    elif self.registries.assistant_on_the_web:
+                        self._render_blocks(block["children"], page, platform, page_has_windows, inner_output, heading_ids)
+                        output.append('<div data-assistant="true">\n' + "\n".join(inner_output) + "\n</div>")
+                    continue
                 if self.form == "mac":
                     if run_platform == "mac":
                         self._render_blocks(block["children"], page, "mac", page_has_windows, inner_output, heading_ids)
@@ -288,10 +314,17 @@ class PageRenderer:
                 attributes: str = 'data-platform="' + run_platform + '"'
                 if run_platform == "mac" and not page_has_windows:
                     attributes += ' data-shared="true"'
-                output.append("<div " + attributes + ">\n" + "\n".join(inner_output) + "\n</div>")
+                closing: str = "\n</div>"
+                if run_platform == "windows":
+                    # The marker lets the search index leave hidden Windows runs out.
+                    closing = "\n<!--/windows--></div>"
+                output.append("<div " + attributes + ">\n" + "\n".join(inner_output) + closing)
 
     def list_html(self, block: Dict[str, Any], page: Page, platform: str) -> str:
         tag: str = "ol" if block["ordered"] else "ul"
+        opening: str = "<" + tag + ">"
+        if block["ordered"] and block.get("start", 1) != 1:
+            opening = '<ol start="' + str(block["start"]) + '">'
         items: List[str] = []
         for item in block["items"]:
             texts: List[str] = []
@@ -301,7 +334,7 @@ class PageRenderer:
             if item["children"] is not None:
                 child = "\n" + self.list_html(item["children"], page, platform)
             items.append("<li>" + "\n".join(texts) + child + "</li>")
-        return "<" + tag + ">\n" + "\n".join(items) + "\n</" + tag + ">"
+        return opening + "\n" + "\n".join(items) + "\n</" + tag + ">"
 
     def table_html(self, block: Dict[str, Any], page: Page, platform: str) -> str:
         rows: List[str] = []
@@ -365,7 +398,7 @@ class PageRenderer:
         parts: List[str] = [
             '<figure class="placeholder" aria-label="' + alt + '">',
             '<div class="placeholder-box">',
-            '<p class="placeholder-heading">' + html.escape(PLACEHOLDER_HEADING) + ": <code>" + html.escape(scene_id) + "</code></p>",
+            '<p class="placeholder-heading">' + html.escape(self.source.interface["placeholderHeading"]) + ": <code>" + html.escape(scene_id) + "</code></p>",
         ]
         if shows.strip() == "":
             self.problems.warn(file, line, "scene " + scene_id + " has no `shows` yet: its placeholder shows the scene id only")
@@ -403,16 +436,17 @@ class PageRenderer:
         if self.form == "web":
             parts.append(
                 '<form class="search" role="search" action="' + CONTENTS_FILE + '" method="get">'
-                '<label for="help-search">Search Help</label>'
+                '<label for="help-search">' + html.escape(self.source.interface["searchLabel"]) + "</label>"
                 '<input type="search" id="help-search" name="q">'
-                '<button type="submit">Search</button>'
+                '<button type="submit">' + html.escape(self.source.interface["searchButton"]) + "</button>"
                 "</form>"
             )
         parts.append("</header>")
         return "\n".join(parts)
 
-    def tail(self) -> str:
-        if self.form == "web":
+    def tail(self, contents: bool = False) -> str:
+        # Only the contents page searches; the other pages' form sends ?q= there.
+        if self.form == "web" and contents:
             return (
                 '<script src="assets/search-index.js"></script>\n'
                 '<script src="assets/search.js"></script>\n</body>\n</html>\n'
@@ -436,11 +470,28 @@ class PageRenderer:
         ]
         if page.is_stub:
             parts.append('<p class="question">' + html.escape(page.question) + "</p>")
-            parts.append('<div class="being-written" role="note"><p>' + html.escape(STUB_SENTENCE) + "</p></div>")
+            parts.append('<div class="being-written" role="note"><p>' + html.escape(self.source.interface["stubSentence"]) + "</p></div>")
         else:
             parts.append(self.blocks(page.blocks, page, "mac", self.page_has_windows(page)))
         parts.append("</main>")
         return "\n".join(parts) + "\n" + self.tail()
+
+    def check_withheld(self, page: Page) -> None:
+        """An ordinary page on the web copy that names an assistant outside an
+        {{assistant}} run (help/withheld-on-the-web.json, #804)."""
+        if self.form != "web" or page.assistant or self.registries.assistant_on_the_web:
+            return
+        from .checks import readable_texts
+
+        file: str = self.source.page_file_label(page)
+        for line, text in readable_texts(self.source, page, skip_runs=("assistant", "windows")):
+            for pattern, why in self.source.withheld_terms:
+                found = pattern.search(text)
+                if found is not None:
+                    self.source.web_findings.append(
+                        (file, line, "names " + repr(found.group(0)) + " (" + why + ") outside an {{assistant}} run: "
+                         "the web copy may not say it yet (help/withheld-on-the-web.json, #804)")
+                    )
 
     def render_all(self) -> None:
         """Renders every included page and the contents once, keeping the
@@ -449,6 +500,7 @@ class PageRenderer:
         for page in self.source.pages:
             if page.id in self.included_ids:
                 self.pages_html[page.id] = self.render_page(page)
+                self.check_withheld(page)
         self.contents_html: str = self.render_contents()
 
     def render_contents(self) -> str:
@@ -482,4 +534,4 @@ class PageRenderer:
             parts.append("<ul>\n" + "\n".join(items) + "\n</ul>")
             parts.append("</section>")
         parts.append("</main>")
-        return "\n".join(parts) + "\n" + self.tail()
+        return "\n".join(parts) + "\n" + self.tail(contents=True)

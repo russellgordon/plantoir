@@ -41,6 +41,8 @@ def check_outline(source: HelpSource) -> None:
             if page_id in seen_ids:
                 problems.fail(file, None, "two outline entries have the id " + page_id)
             seen_ids.add(page_id)
+            if "section" in entry and entry.get("section") != section.get("title"):
+                problems.fail(file, None, page_id + ": its section " + repr(entry.get("section")) + " is not the section that holds it")
             if entry.get("anchor") != page_id:
                 problems.fail(file, None, page_id + ": its anchor " + repr(entry.get("anchor")) + " differs from its id")
             for field in ("title", "question"):
@@ -100,6 +102,9 @@ def check_page_fields(source: HelpSource) -> None:
             problems.fail(file, 1, "`checked:` is the version the page was last checked against, like 2.0.0")
         if str(page.fields.get("description", "")).strip() == "":
             problems.fail(file, 1, "`description:` is one sentence for search results")
+        for keyword in page.keywords:
+            if "," in keyword:
+                problems.fail(file, 1, "a keyword holds no comma (" + repr(keyword) + "): give each its own `- item` line")
         if page.indexed and len(page.keywords) == 0:
             problems.fail(file, 1, "a task page carries `keywords:`, the words a teacher would type")
         covers = page.fields.get("covers", [])
@@ -130,18 +135,30 @@ def check_tone_file(source: HelpSource) -> None:
 
 # MARK: what a reader reads
 
-def readable_texts(source: HelpSource, page: Page) -> List[Tuple[int, str]]:
-    """Every piece of text a reader reads on the page, with its line."""
-    texts: List[Tuple[int, str]] = [(1, page.title), (1, page.question)]
+def readable_texts(
+    source: HelpSource, page: Page, include_names: bool = True, skip_runs: Tuple[str, ...] = ()
+) -> List[Tuple[int, str]]:
+    """Every piece of text a reader reads on the page, with its line.
+
+    With include_names=False it is the running prose only: the outline's title
+    and question, headings and keywords are left out. Those NAME things (a
+    title may be a menu item's words, "Get ready for the start of the year"),
+    so the check for contract sentences typed by hand reads prose only."""
+    texts: List[Tuple[int, str]] = []
+    if include_names:
+        texts.append((1, page.title))
+        texts.append((1, page.question))
     if page.is_stub:
         return texts
     texts.append((1, str(page.fields.get("description", ""))))
-    for keyword in page.keywords:
-        texts.append((1, keyword))
-    for block in walk_blocks(page.blocks):
+    if include_names:
+        for keyword in page.keywords:
+            texts.append((1, keyword))
+    for block in walk_blocks(page.blocks, skip_runs):
         kind: str = block["kind"]
         if kind == "heading":
-            texts.append((block["line"], readable_inline(block["text"])))
+            if include_names:
+                texts.append((block["line"], readable_inline(block["text"])))
         elif kind == "paragraph":
             joined: List[str] = []
             for number, text in block["lines"]:
@@ -180,6 +197,8 @@ def _list_items(block: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def check_words(source: HelpSource) -> None:
+    for key in sorted(source.interface):
+        source.words.check("interface-words", "help/interface-words.json", None, source.interface[key], source.problems)
     pages: List[Page] = list(source.pages)
     if source.intro is not None:
         pages.append(source.intro)
@@ -247,7 +266,7 @@ def check_contract_sentences(source: HelpSource) -> None:
     for page in source.pages:
         if page.is_stub:
             continue
-        for line, text in readable_texts(source, page):
+        for line, text in readable_texts(source, page, include_names=False):
             if text.strip() == "":
                 continue
             normalised: str = normalise(text)

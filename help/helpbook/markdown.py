@@ -32,8 +32,16 @@ FENCE = re.compile(r"^```(.*)$")
 LIST_ITEM = re.compile(r"^( *)(\d+\.|-)\s+(.*)$")
 TABLE_SEPARATOR = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$")
 PICTURE = re.compile(r"^\{\{picture:([^{}]*)\}\}\s*$")
-PLATFORM_OPEN = re.compile(r"^\{\{(mac|windows)\}\}\s*$")
-PLATFORM_CLOSE = re.compile(r"^\{\{/(mac|windows)\}\}\s*$")
+# Runs: {{mac}} and {{windows}} keep lines for one platform; {{assistant}}
+# keeps lines that name an assistant out of the web copy while
+# help/facts.json -> assistantOnTheWeb is false (#804).
+PLATFORM_OPEN = re.compile(r"^\{\{(mac|windows|assistant)\}\}\s*$")
+PLATFORM_CLOSE = re.compile(r"^\{\{/(mac|windows|assistant)\}\}\s*$")
+# List markers outside the subset, which would otherwise split a list in two
+# and restart its numbers silently.
+WRONG_LIST_MARKER = re.compile(r"^(?:\s*(?:[*+]|\d+\))\s+\S|\t+\s*(?:\d+\.|-)\s)")
+# Blocks that may sit between numbered steps without ending the list.
+INSIDE_A_LIST = ["picture", "note", "table", "code"]
 FENCE_LANGUAGE = re.compile(r"^[a-z0-9][a-z0-9+#-]*$")
 
 # Inline syntax, tried in this order at each position.
@@ -65,13 +73,19 @@ def check_inline_syntax(file: str, line: int, text: str, problems: Problems) -> 
     for token in re.finditer(r"\{\{([^{}\n]*)\}\}", outside_code):
         inside: str = token.group(1)
         name: str = inside.split(":", 1)[0]
-        if name in ("picture", "mac", "/mac", "windows", "/windows"):
+        if name in ("picture", "mac", "/mac", "windows", "/windows", "assistant", "/assistant"):
             problems.fail(file, line, "`{{" + inside + "}}` goes on a line of its own")
         elif name not in INLINE_TOKENS or ":" not in inside:
             problems.fail(file, line, "unknown token `{{" + inside + "}}`")
     unmatched: str = re.sub(r"\{\{[^{}\n]*\}\}", "", outside_code)
     if "{{" in unmatched or "}}" in unmatched:
         problems.fail(file, line, "a token is not closed with }}")
+    if re.search(r"&(?:[A-Za-z]+|#\d+|#x[0-9A-Fa-f]+);", outside_code) is not None:
+        problems.fail(file, line, "an HTML entity is printed as typed: write the character itself")
+    for kind, value in split_inline(text):
+        if kind == "text" and ("`" in str(value) or "**" in str(value)):
+            problems.fail(file, line, "a ` or ** is never closed on this line")
+            break
 
 
 class Parser:
@@ -92,6 +106,7 @@ class Parser:
             offset += 1
         blocks: List[Dict[str, Any]] = self._parse_lines(numbered, inside_platform=False)
         self._check_heading_order(blocks)
+        self._check_step_numbers(blocks)
         return blocks
 
     # MARK: the block reader
@@ -128,7 +143,7 @@ class Parser:
                 continue
             if PLATFORM_CLOSE.match(stripped) is not None:
                 close_paragraph()
-                self.fail(number, "`" + stripped + "` closes a platform run that is not open")
+                self.fail(number, "`" + stripped + "` closes a run that is not open")
                 index += 1
                 continue
 
@@ -160,6 +175,12 @@ class Parser:
             if stripped.startswith("|"):
                 close_paragraph()
                 index = self._read_table(lines, index, blocks)
+                continue
+
+            if WRONG_LIST_MARKER.match(text) is not None:
+                close_paragraph()
+                self.fail(number, "list items start with `1.` or `-`, indented with spaces (not `*`, `+`, `1)` or a tab)")
+                index += 1
                 continue
 
             if LIST_ITEM.match(text) is not None and (len(paragraph) == 0 or LIST_ITEM.match(text).group(1) == ""):
@@ -214,7 +235,7 @@ class Parser:
     ) -> int:
         number: int = lines[start][0]
         if inside_platform:
-            self.fail(number, "platform runs may not nest")
+            self.fail(number, "runs may not nest, and a note holds none")
         inner: List[Line] = []
         index: int = start + 1
         while index < len(lines):
@@ -227,7 +248,7 @@ class Parser:
                 blocks.append(_block("platform", number, platform=platform, children=children))
                 return index + 1
             if PLATFORM_OPEN.match(stripped) is not None:
-                self.fail(lines[index][0], "platform runs may not nest")
+                self.fail(lines[index][0], "runs may not nest")
                 index += 1
                 continue
             inner.append(lines[index])
@@ -341,7 +362,10 @@ class Parser:
                 if indent == 0:
                     if item_ordered != ordered:
                         break
-                    items.append({"line": number, "lines": [(number, match.group(3).strip())], "children": None})
+                    item_number: int = int(match.group(2)[:-1]) if item_ordered else 0
+                    if item_ordered and len(items) > 0 and item_number != items[-1]["number"] + 1:
+                        self.fail(number, "step " + str(item_number) + " follows step " + str(items[-1]["number"]) + ": numbered steps count up by one")
+                    items.append({"line": number, "number": item_number, "lines": [(number, match.group(3).strip())], "children": None})
                 elif indent <= 4:
                     if len(items) == 0:
                         self.fail(number, "a nested list item needs an item above it")
@@ -353,10 +377,14 @@ class Parser:
                     elif parent["children"]["ordered"] != item_ordered:
                         self.fail(number, "a nested list keeps one kind of marker")
                     parent["children"]["items"].append(
-                        {"line": number, "lines": [(number, match.group(3).strip())], "children": None}
+                        {"line": number, "number": 0, "lines": [(number, match.group(3).strip())], "children": None}
                     )
                 else:
                     self.fail(number, "lists nest one level only")
+                index += 1
+                continue
+            if WRONG_LIST_MARKER.match(text) is not None:
+                self.fail(number, "list items start with `1.` or `-`, indented with spaces (not `*`, `+`, `1)` or a tab)")
                 index += 1
                 continue
             if text.startswith("  ") and len(items) > 0:
@@ -369,8 +397,40 @@ class Parser:
                 index += 1
                 continue
             break
-        blocks.append(_block("list", lines[start][0], ordered=ordered, items=items))
+        start_number: int = 1
+        if ordered and len(items) > 0:
+            start_number = items[0]["number"]
+        blocks.append(_block("list", lines[start][0], ordered=ordered, items=items, start=start_number))
         return index
+
+    def _check_step_numbers(self, blocks: List[Dict[str, Any]]) -> None:
+        """Numbered steps keep counting across a picture, a note, a table or a
+        code block: the list after one starts at the next number. A list that
+        starts at 1 there would restart the steps, and one that starts at any
+        other number must carry on from the list just above it."""
+        previous_last: int = 0
+        for block in blocks:
+            kind: str = block["kind"]
+            if kind == "platform":
+                self._check_step_numbers(block["children"])
+                previous_last = 0
+                continue
+            if kind == "list" and block["ordered"] and len(block["items"]) > 0:
+                first: int = block["start"]
+                if previous_last > 0 and first != previous_last + 1:
+                    self.fail(
+                        block["line"],
+                        "these steps follow step " + str(previous_last) + " across a picture, note, table or code "
+                        "block: number this one " + str(previous_last + 1) + " (or put a heading or a paragraph "
+                        "between to start new steps)",
+                    )
+                elif previous_last == 0 and first != 1:
+                    self.fail(block["line"], "numbered steps start at 1 unless they carry on from steps just above")
+                previous_last = block["items"][-1]["number"]
+                continue
+            if kind in INSIDE_A_LIST and previous_last > 0:
+                continue
+            previous_last = 0
 
     def _check_heading_order(self, blocks: List[Dict[str, Any]]) -> None:
         seen_level_two: bool = False
@@ -383,13 +443,16 @@ class Parser:
                 self.fail(block["line"], "a ### heading comes under a ## heading")
 
 
-def walk_blocks(blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Every block, nested ones included, in reading order."""
+def walk_blocks(blocks: List[Dict[str, Any]], skip_runs: Tuple[str, ...] = ()) -> List[Dict[str, Any]]:
+    """Every block, nested ones included, in reading order; the runs named in
+    skip_runs ("assistant", "windows") are left out with their contents."""
     result: List[Dict[str, Any]] = []
     for block in blocks:
+        if block["kind"] == "platform" and block["platform"] in skip_runs:
+            continue
         result.append(block)
         if block["kind"] in ("platform", "note"):
-            for child in walk_blocks(block["children"]):
+            for child in walk_blocks(block["children"], skip_runs):
                 result.append(child)
     return result
 

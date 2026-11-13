@@ -18,10 +18,8 @@ CONTENTS_ANCHOR = "plantoir-help"
 CS_INDEX_NAME = "Plantoir.cshelpindex"
 LSM_INDEX_NAME = "Plantoir.helpindex"
 
-# Fixed placeholder strings. They are not Help prose: the freshness check at a
-# release refuses every stub and every placeholder picture, so neither ships.
-STUB_SENTENCE = "This page is being written."
-PLACEHOLDER_HEADING = "Picture to come"
+# The fixed words Help shows around its pages (the stub sentence, the
+# placeholder heading, the search box) are data: help/interface-words.json.
 
 # How old a dated fact may be before --check warns (the earlier plan
 # review's number, not a ruling; F makes it a refusal at a release).
