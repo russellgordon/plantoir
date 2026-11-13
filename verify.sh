@@ -6132,6 +6132,12 @@ fi
 mkdir -p "$RENDERED_DIR/courses"
 cp setup.sh preview.sh deploy.sh "$RENDERED_DIR/"
 cp -R support/example_course/EXC2O "$RENDERED_DIR/courses/EXC2O"
+# What the launcher needs to get the Swift blocks ready (resolve_build_context
+# finds a recipe beside it; the Swift image is named by support/swift alone,
+# so it is the image this run already has). The site's own image is --image.
+mkdir -p "$RENDERED_DIR/.toolchain/support"
+cp Dockerfile "$RENDERED_DIR/.toolchain/"
+cp -R support/swift "$RENDERED_DIR/.toolchain/support/swift"
 if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
   skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
 elif ! node browser-checks/lib/test_site_server.mjs >/tmp/verify_rendered_server.log 2>&1; then
@@ -6157,8 +6163,11 @@ else
     node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
       >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
     RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
-    if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
-      pass "the rendered check, every row in every engine on this Mac: $(grep -c '^OK: ' /tmp/verify_rendered_features.log) rows passed - $RENDERED_DONE (browser-checks/rendered_features.mjs, #597, #807)"
+    if [[ "$RENDERED_STATUS" == "3" ]] && ! grep -q '^OK: ' /tmp/verify_rendered_features.log; then
+      # No engine at all: skips only, and no pass line (a SKIP is never a pass).
+      rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
+    elif [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
+      pass "the rendered check, every row in every engine on this Mac: $(grep -c '^OK: ' /tmp/verify_rendered_features.log) row results passed - $RENDERED_DONE (browser-checks/rendered_features.mjs, #597, #807)"
       rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
     else
       fail "the rendered check: a row failed in a browser ($RENDERED_DONE; browser-checks/rendered_features.mjs, #597)"
@@ -6167,13 +6176,13 @@ else
     fi
     # Proven red: only when the rows ran green, since a row already red
     # proves nothing by failing again.
-    if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
+    if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]] && grep -q '^OK: ' /tmp/verify_rendered_features.log; then
       RED_STATUS=0
       node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
         >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
       RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
       if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
-        pass "the rendered check sees: each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) sabotages, one engine at a time, turned its own row red for its own reason and left the page's other rows green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
+        pass "the rendered check sees: in each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) runs, $(grep '^OK: sabotage ' /tmp/verify_rendered_red.log | sed 's/ \[.*//' | sort -u | wc -l | tr -d ' ') sabotages over the engines each applies to, the row aimed at failed for its own reason and the page's other rows stayed green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
         rendered_lines SKIPPED /tmp/verify_rendered_red.log skip
       else
         fail "the rendered check did not see a sabotage, or saw it for the wrong reason ($RED_DONE; browser-checks/lib/sabotage.py, #597)"

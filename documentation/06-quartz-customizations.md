@@ -4955,7 +4955,7 @@ clone), applies one sabotage, serves the copy and runs that page's rows in
 both engines; it passes only when the aimed row FAILS with its own reason's
 words and every other row on the page passes, except those the sabotage's
 `alsoRed` names (a missing file is also a console error, so the clean-page
-row is named there, with its reason). Twenty sabotages run on every gate,
+row is named there, with its reason). Twenty-one sabotages run on every gate,
 three at a time. The one that does not is `geogebra keys`: with the loader's
 hold on Space and Enter dropped, the presses do reset the construction while
 its lines run (Chromium: 0 to 3 of 150 objects through 400 presses), but the
@@ -4967,10 +4967,12 @@ the row's must-fail remains `geogebra_applet.mjs` item 12's against the first
 version of #792 (82 and 75 of 150, Chromium).
 
 **Measured on this Mac (M4 Pro, 2026-11-13), the EXC2O fixture site, both
-engines at once:** the rows in RENDERED_PLAIN_SECONDS s; the twenty
-sabotages in RENDERED_RED_SECONDS s (344 s one at a time, 145 s three at a
-time); the step in `verify.sh`, its own build included, RENDERED_STEP_SECONDS
-s. Cold visits to the isolated Python page: first contentful paint 275 to
+engines at once, four runs of the step:** the rows in 14 to 15 s; the
+sabotages in 118 to 119 s three at a time (344 s one at a time, measured
+before they were run in parallel); the whole step in `verify.sh`, its own
+build of the fixture site included (about 10 s), 142 to 147 s, so about two
+and a half minutes on a run that takes about 25. With no engine on the Mac
+the step takes 9 s and says SKIP twice. Cold visits to the isolated Python page: first contentful paint 275 to
 283 ms. A census of every fixture page in both engines found no console line
 at all and only `fonts.googleapis.com`, `fonts.gstatic.com` and (on a page
 with a diagram) `cdnjs.cloudflare.com` asked of other hosts, which is
