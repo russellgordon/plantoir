@@ -237,12 +237,20 @@ struct CredentialRequest: Equatable {
     /// The username colleagues are asked for before a course's shared unit
     /// plans open (#709). The teacher's own choice, not an account.
     static var unitPlanUsername: CredentialRequest {
+        return unitPlanUsername(machine: MachineWord.onThisPlatform)
+    }
+
+    /// The same request with `machine` where the computer's name goes
+    /// (#863). The contract's readout is written with `MachineWord.placeholder`
+    /// so Windows fills in its own word; this app shows "Mac", so what a
+    /// teacher reads here did not change.
+    static func unitPlanUsername(machine: String) -> CredentialRequest {
         return CredentialRequest(
             name: "unitPlanUsername",
             title: "Choose a Username for These Plans",
             explanation: "Colleagues will be asked for this username and a password before the unit "
                        + "plans open. Choose ones made for them, not the password to your own accounts. "
-                       + "Plantoir keeps them securely on this Mac, so you are asked once.",
+                       + "Plantoir keeps them securely on this \(machine), so you are asked once.",
             steps: [
                 "Type a username of 1 to 32 letters, digits, dots, dashes or underscores.",
                 "Give it, and the password you choose next, to the colleagues you plan with.",
@@ -277,6 +285,13 @@ struct CredentialRequest: Equatable {
 
     /// Every request there is, so a test can walk them.
     static var all: [CredentialRequest] {
+        return all(machine: MachineWord.onThisPlatform)
+    }
+
+    /// Every request, with `machine` where a sentence names the computer:
+    /// `MachineWord.placeholder` for the contract's readout, this platform's
+    /// word for everything a teacher sees.
+    static func all(machine: String) -> [CredentialRequest] {
         return [
             CredentialRequest.netlifyToken,
             CredentialRequest.cloudflareToken,
@@ -285,7 +300,7 @@ struct CredentialRequest: Equatable {
             CredentialRequest.teacherSurname,
             CredentialRequest.siteName,
             CredentialRequest.siteNameConflict,
-            CredentialRequest.unitPlanUsername,
+            CredentialRequest.unitPlanUsername(machine: machine),
             CredentialRequest.unitPlanPassword,
         ]
     }
