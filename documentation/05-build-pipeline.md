@@ -2112,7 +2112,13 @@ touches the marker in between), so it is the filesystem's clock the teacher's
 Save is stamped with, as BUILD_STARTED_MARKER explains; `null` when the marker
 could not be made. A deploy that REUSES the last build (#768) runs no Python,
 so the map stays exactly as the last build that ran left it, with that
-build's start. That is the true answer, because the build was reused for
+build's start, and `about.json`'s `buildId` is still the section's
+`.build-id` (a reuse writes neither), so the tab reads it as the map of the
+build the site came from. Checked against #768 as merged: writing the map does
+not make the course look changed (`.coverage-tab` is never walked:
+`test_coverage_tab.py` → `AReusedBuild`, in the layout where the built output
+sits inside the course folder), and verify.sh reads the record after its last
+folder deploy, which reused the build. That is the true answer, because the build was reused for
 having nothing newer than its start, and nothing ever re-dates an old map. A
 build that wrote the map and then failed in Quartz leaves a map newer than the
 site; a deploy that then reuses the site does so only because nothing changed
@@ -2126,7 +2132,10 @@ clock rule included (the plan review's M1), and never with
 course's built output (`link_course_build_output`: no link, a wrong link,
 archived, restored, replaced) removes it with the site, deliberately: #789
 keeps only `.geogebra-cache` through that clear, and a restored course's map
-could describe pages that are gone. The colour scheme can change after a
+could describe pages that are gone. Checked against #789 as merged: each
+launcher's `clear_built_sites_keeping_copies` takes `section<N>/.coverage-tab`
+with the site and keeps `.geogebra-cache` (`ClearedWithTheSite`, run through
+bash on setup.sh, preview.sh and deploy.sh). The colour scheme can change after a
 build; the map keeps the old colours until the next build, and its record
 says how old it is.
 

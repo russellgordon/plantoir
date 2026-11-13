@@ -927,6 +927,67 @@ class TheBuildThatStartedLastOwnsTheMap(unittest.TestCase):
             self.assertEqual(sorted(os.listdir(folder)), sorted(["about.json", record["page"]]))
 
 
+class AReusedBuild(unittest.TestCase):
+    """#768, as merged: a deploy that reuses the last build runs no Python,
+    so the map is that build's, still true, and reads as this build's
+    against `.build-id`. Writing the map must not itself make the course
+    look changed, or no deploy could ever reuse a build."""
+
+    def setUp(self):
+        use_the_repository_contracts()
+
+    def test_the_map_of_a_reused_build_is_still_that_builds_and_asks_for_no_build(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            # The old layout: the built output INSIDE the course folder, under
+            # its hidden .merged_output, the case where the change walk could
+            # meet the map at all.
+            section_dir = course.course_dir / ".merged_output" / "section1"
+            section_dir.mkdir(parents=True)
+            # In the order a build makes them: everything in the course, then
+            # the build's start, then its site, then (mid-build) the map.
+            build_site._note_the_build_id(section_dir, BUILD_ID)
+            write(section_dir / toolchain_paths.BUILD_STARTED_MARKER_NAME, "started")
+            write(section_dir / "public" / "index.html", "<html>site</html>")
+            course.host_output_dir = section_dir
+            course.write_tab()
+            self.assertIsNone(toolchain_paths.why_the_pages_ask_for_a_build(
+                course.course_dir, section_dir), "the map made the course look changed")
+            # The reuse runs no build: .build-id and the map are untouched.
+            owner = (section_dir / ".build-id").read_text(encoding="utf-8").strip()
+            self.assertEqual(owner, BUILD_ID)
+            self.assertEqual(build_site.coverage_tab_map_state(section_dir, owner), "thisBuild")
+
+
+def a_launchers_clear(launcher: str) -> str:
+    """`clear_built_sites_keeping_copies` and the name it keeps, cut out of
+    a launcher, the way test_build_freshness_reuse.py cuts out its rules."""
+    source = (REPOSITORY_ROOT / launcher).read_text(encoding="utf-8")
+    kept = re.search(r'^KEPT_COPIES_FOLDER="[^"]*"$', source, re.M).group(0)
+    start = source.index("clear_built_sites_keeping_copies() {")
+    end = source.index("\n}\n", start) + 3
+    return kept + "\n" + source[start:end]
+
+
+class ClearedWithTheSite(unittest.TestCase):
+    """#789, as merged: when a course's builds folder is cleared, the map goes
+    with the built site it describes, and the kept GeoGebra copies stay."""
+
+    @unittest.skipUnless(shutil.which("bash"), "the launchers' clear is bash")
+    def test_every_launchers_clear_takes_the_map_and_keeps_the_copies(self):
+        for launcher in ("setup.sh", "preview.sh", "deploy.sh"):
+            with self.subTest(launcher), tempfile.TemporaryDirectory() as temp:
+                target = Path(temp) / "CODE"
+                write(target / "section1" / ".coverage-tab" / "about.json", "{}")
+                write(target / "section1" / ".coverage-tab" / f"map-{BUILD_ID}.html", "a map")
+                write(target / "section1" / "public" / "index.html", "a site")
+                write(target / ".geogebra-cache" / "k.ggb", "a kept copy")
+                script = a_launchers_clear(launcher) + '\nclear_built_sites_keeping_copies "$1"\n'
+                subprocess.run(["bash", "-c", script, "clear", str(target)], check=True)
+                left = sorted(path.relative_to(target).as_posix() for path in target.rglob("*"))
+                self.assertEqual(left, [".geogebra-cache", ".geogebra-cache/k.ggb"])
+
+
 class TheConsoleLine(unittest.TestCase):
 
     def setUp(self):
