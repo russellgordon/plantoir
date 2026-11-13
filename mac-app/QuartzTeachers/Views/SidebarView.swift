@@ -89,7 +89,11 @@ struct SidebarView: View {
     /// installed should be told which of them did not open.
     @State var codexProblem: String?
 
-    /// Why a Revise item refused at the click (#458) — a Claude or Codex session open
+    /// Why a GitHub Copilot session could not be started (#783), for the
+    /// same reason Codex has its own.
+    @State var copilotProblem: String?
+
+    /// Why a Revise item refused at the click (#458) — a Claude, Codex or GitHub Copilot session open
     /// on the course elsewhere, or the in-app assistant open on it — shown
     /// as an alert.
     @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
@@ -516,7 +520,8 @@ struct SidebarView: View {
             Text(removalProblem ?? "")
         }
         .modifier(OutsideAgentAlerts(
-            claudeProblem: $claudeProblem, codexProblem: $codexProblem, reviseRefusal: $reviseRefusal
+            claudeProblem: $claudeProblem, codexProblem: $codexProblem, copilotProblem: $copilotProblem,
+            reviseRefusal: $reviseRefusal
         ))
         .modifier(OutsideSessionHolds(workspace: workspace, addSectionRefusal: $addSectionRefusal))
         .sheet(item: $keepACopyCourse) { course in
@@ -1173,7 +1178,7 @@ struct SidebarView: View {
     }
 
     /// Why structural work on the course — Rename Course, Add Section… —
-    /// must wait: `busyReason`, or a Claude or Codex session open on the course in
+    /// must wait: `busyReason`, or a Claude, Codex or GitHub Copilot session open on the course in
     /// another program (#458), read from the window's snapshot.
     func structuralHoldReason(for course: Course) -> String? {
         guard let workspaceURL = workspace.workspaceURL else {
@@ -1182,7 +1187,8 @@ struct SidebarView: View {
         return CourseActivity.structuralHoldReason(
             folderPath: workspaceURL.path,
             courseCode: course.code,
-            revisedElsewhere: workspace.isRevisedElsewhere(course.code)
+            revisedElsewhere: workspace.isRevisedElsewhere(course.code),
+            revisingAssistant: workspace.revisingAssistant(course.code)
         )
     }
 
@@ -1199,6 +1205,7 @@ struct SidebarView: View {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             revisedElsewhere: workspace.isRevisedElsewhere(course.code),
+            revisingAssistant: workspace.revisingAssistant(course.code),
             active: AssistActivity.active
         )
     }
@@ -1226,6 +1233,7 @@ struct SidebarView: View {
             Menu("Revise With") {
                 reviseWithClaudeItem(course: course, row: row)
                 reviseWithCodexItem(course: course, row: row)
+                reviseWithCopilotItem(course: course, row: row)
                 if let sectionNumber {
                     reviseWithAIItem(course: course, sectionNumber: sectionNumber)
                 }
@@ -1243,6 +1251,9 @@ struct SidebarView: View {
         if ClaudeCodeLauncher.isAvailable || CodexLauncher.isAvailable {
             return true
         }
+        if OutsideAssistantPresence.shared.copilotIsInstalled {
+            return true
+        }
         return sectionNumber != nil && AssistHardwareBudget.current().canRunAssistant
     }
 
@@ -1258,6 +1269,9 @@ struct SidebarView: View {
         }
         if CodexLauncher.isAvailable {
             asked.append(.codex)
+        }
+        if OutsideAssistantPresence.shared.copilotIsInstalled {
+            asked.append(.copilot)
         }
         if sectionNumber != nil && AssistHardwareBudget.current().canRunAssistant {
             asked.append(.localAssistant)
@@ -1630,6 +1644,46 @@ struct SidebarView: View {
         codexProblem = CodexLauncher.couldNotStartSentence(courseCode: course.code)
     }
 
+    /// Opens a GitHub Copilot session in a terminal, connected to this course
+    /// through Plantoir's server: the third door (#783), hidden independently
+    /// of the other two, after Codex.
+    ///
+    /// Drawn from `OutsideAssistantPresence` rather than asking
+    /// `CopilotLauncher.isAvailable` while the menu draws, because finding
+    /// Copilot also checks it is GitHub's program.
+    @ViewBuilder
+    func reviseWithCopilotItem(course: Course, row: SidebarSelection) -> some View {
+        if OutsideAssistantPresence.shared.copilotIsInstalled,
+           !course.isKeptForReference,
+           let folder = workspace.workspaceURL {
+            Button(CopilotLauncher.menuItemTitle, systemImage: "sparkles") {
+                select(row)
+                reviseWithCopilot(course: course, folder: folder)
+            }
+            .disabled(reviseReason(.copilot, course: course, sectionNumber: nil) != nil)
+            .accessibilityIdentifier("reviseWithCopilot-\(course.code)")
+        }
+    }
+
+    func reviseWithCopilot(course: Course, folder: URL) {
+        if let refusal = workspace.reviseRefusal(item: .copilot, courseCode: course.code, sectionNumber: nil) {
+            reviseRefusal = refusal
+            return
+        }
+        if CopilotLauncher.open(
+            workspacePath: folder.path,
+            courseCode: course.code,
+            courseName: course.configuration.courseName,
+            referenceCourses: ClaudeCodeLauncher.referenceCoursesToMention(
+                for: course, among: workspace.courses
+            ),
+            unitPlans: UnitPlans.toMention(for: course)
+        ) {
+            return
+        }
+        copilotProblem = CopilotLauncher.couldNotStartSentence(courseCode: course.code)
+    }
+
     /// Opens the assistant for one section, in a window of its own.
     ///
     /// Offered per SECTION rather than per course because that is the scope
@@ -1657,7 +1711,7 @@ struct SidebarView: View {
             // the row last drew, which is the staleness bug the course
             // activity registry already taught us.
             //
-            // Since #458 a Claude or Codex session open on the course elsewhere greys
+            // Since #458 a Claude, Codex or GitHub Copilot session open on the course elsewhere greys
             // it too; the line saying why is drawn once under all three
             // Revise items (`reviseNotes`), so the same reason is not said
             // three times.
@@ -1992,6 +2046,9 @@ struct SidebarView: View {
             if reviseReason(.codex, course: course, sectionNumber: nil) != nil {
                 blocked.insert(.codex)
             }
+            if reviseReason(.copilot, course: course, sectionNumber: nil) != nil {
+                blocked.insert(.copilot)
+            }
             if let sectionNumber,
                reviseReason(.localAssistant, course: course, sectionNumber: sectionNumber) != nil {
                 blocked.insert(.localAssistant)
@@ -2064,6 +2121,10 @@ struct SidebarView: View {
         case .courseReviseWithCodex, .sectionReviseWithCodex:
             if let course, let folder = workspace.workspaceURL {
                 reviseWithCodex(course: course, folder: folder)
+            }
+        case .courseReviseWithCopilot, .sectionReviseWithCopilot:
+            if let course, let folder = workspace.workspaceURL {
+                reviseWithCopilot(course: course, folder: folder)
             }
         case .sectionReviseWithLocalAssistant:
             if let course, let sectionNumber, let folder = workspace.workspaceURL {
@@ -2571,8 +2632,8 @@ struct CourseCodeField: View {
     }
 }
 
-/// The two outside doors' failure alerts — "Claude didn't open" and "Codex
-/// didn't open" — lifted out of `SidebarView.body`.
+/// The outside doors' failure alerts — "Claude didn't open", "Codex
+/// didn't open" and "GitHub Copilot didn't open" — lifted out of `SidebarView.body`.
 ///
 /// Not a tidy-up. Adding the second alert pushed the sidebar's modifier chain
 /// past what the Swift type-checker will finish, and the build failed with
@@ -2588,6 +2649,8 @@ private struct OutsideAgentAlerts: ViewModifier {
     @Binding var claudeProblem: String?
 
     @Binding var codexProblem: String?
+
+    @Binding var copilotProblem: String?
 
     @Binding var reviseRefusal: WorkspaceModel.ReviseRefusal?
 
@@ -2608,6 +2671,13 @@ private struct OutsideAgentAlerts: ViewModifier {
                 }
             } message: {
                 Text(codexProblem ?? "")
+            }
+            .alert(CopilotLauncher.didNotOpenTitle, isPresented: presentation(of: $copilotProblem)) {
+                Button("OK") {
+                    copilotProblem = nil
+                }
+            } message: {
+                Text(copilotProblem ?? "")
             }
             .alert(
                 reviseRefusal?.title ?? "",
@@ -2642,7 +2712,7 @@ private struct OutsideAgentAlerts: ViewModifier {
     }
 }
 
-/// What the sidebar does about a Claude or Codex session holding a course from another
+/// What the sidebar does about a Claude, Codex or GitHub Copilot session holding a course from another
 /// program (#458): keeps the window's snapshot of held courses fresh, and
 /// says why "Add Section…" refused at the click. A modifier of its own so
 /// the sidebar's body stays small enough to type-check.
@@ -2672,7 +2742,7 @@ private struct OutsideSessionHolds: ViewModifier {
             } message: {
                 Text(addSectionRefusal ?? "")
             }
-            // Which courses a Claude or Codex session elsewhere is holding: read when
+            // Which courses a Claude, Codex or GitHub Copilot session elsewhere is holding: read when
             // the folder is shown, and again whenever Plantoir becomes the
             // active app — a session is opened and closed in Terminal, so
             // coming back is when the answer changes. Every click that acts

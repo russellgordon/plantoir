@@ -58,6 +58,17 @@ program you would apply to in Grade 12. Pick one you found in
 > available and when I have worked before." One of those could be sent
 > to any employer; the other could only be sent to this one.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] Every line of my résumé earns its place against this posting.
+- [ ] My claims are specific situations that someone could check, in my own voice.
+- [ ] My covering message holds something only a person who looked this organisation up could have written.
+- [ ] My explanation compares this opportunity with the one I did not take.
+- [ ] My explanation names the real influences on my choice, not only the flattering ones.
+- [ ] I have shared nothing I should not, and I would be content for them to find my online presence.
+
 %%curriculum-start%%
 ## Curriculum connection
 

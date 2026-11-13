@@ -838,7 +838,11 @@ def main(argv=None) -> int:
     # The app's Cancel ends a share with SIGTERM; a closed terminal sends
     # SIGHUP. Both leave through the same finally as ^C does, so the
     # credential file and its folder go (fix review LOW).
-    for number in (signal.SIGTERM, signal.SIGHUP):
+    # Windows has no SIGHUP, and the tuple itself raised there before the
+    # try below could catch it, so it is asked for by name.
+    for number in (signal.SIGTERM, getattr(signal, "SIGHUP", None)):
+        if number is None:
+            continue
         try:
             signal.signal(number, _leave_on_signal)
         except (ValueError, OSError, AttributeError):

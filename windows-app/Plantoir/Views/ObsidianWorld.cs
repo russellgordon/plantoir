@@ -31,7 +31,16 @@ public sealed class ObsidianWorld : IObsidianWorld
 
     public bool IsRunning() => FolderActions.ObsidianIsRunning;
 
-    public string? RegistryText() => FolderActions.ReadObsidianRegistry();
+    /// <summary>
+    /// Null only when there is no registry file at all; a file that is there
+    /// and cannot be read is the empty text, which reads as cannot tell
+    /// (#815, the mac's <c>ObsidianOpening.readRegistry</c>). Done here rather
+    /// than in <see cref="FolderActions.ReadObsidianRegistry"/>, whose null for
+    /// an unreadable file is what stops <c>RegisterVault</c> writing a list of
+    /// one vault over a list it could not read.
+    /// </summary>
+    public string? RegistryText() =>
+        FolderActions.ReadObsidianRegistry() ?? (File.Exists(FolderActions.ObsidianRegistryPath) ? "" : null);
 
     public string TargetFor(string folder, string vault) => FolderActions.ObsidianTarget(folder, vault);
 
@@ -68,7 +77,7 @@ public sealed class ObsidianWorld : IObsidianWorld
         AutomationProperties.SetAutomationId(dontAsk, "obsidianAddOnsDontAskAgain");
         var message = new TextBlock
         {
-            Text = ObsidianFigureAddOnsWording.OfferText(request.Course.Code, request.CourseIsOpen),
+            Text = ObsidianFigureAddOnsWording.OfferText(request.Course.Code, request.OpenState),
             TextWrapping = TextWrapping.Wrap,
         };
         AutomationProperties.SetAutomationId(message, "obsidianAddOnsOfferMessage");

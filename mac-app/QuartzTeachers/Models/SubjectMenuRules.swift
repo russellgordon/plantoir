@@ -41,6 +41,7 @@ nonisolated enum SubjectMenuRules {
     enum ReviseTarget: String, CaseIterable, Sendable {
         case claude
         case codex
+        case copilot
         case localAssistant
     }
 
@@ -68,6 +69,7 @@ nonisolated enum SubjectMenuRules {
         case restoreFromBackup
         case courseReviseWithClaude
         case courseReviseWithCodex
+        case courseReviseWithCopilot
         case courseReviseWithLocalAssistant
         case courseOpenInObsidian
         case courseShowInFinder
@@ -88,6 +90,7 @@ nonisolated enum SubjectMenuRules {
         case publishPagesLinksLeadTo
         case sectionReviseWithClaude
         case sectionReviseWithCodex
+        case sectionReviseWithCopilot
         case sectionReviseWithLocalAssistant
         case sectionOpenInObsidian
         case sectionShowInFinder
@@ -129,7 +132,7 @@ nonisolated enum SubjectMenuRules {
         /// for reference.
         var keptForReference: Bool = false
         /// Rename and Add Section must wait: previewing, deploying, or a
-        /// Claude or Codex session open on the course (#458).
+        /// Claude, Codex or GitHub Copilot session open on the course (#458).
         var structuralHold: Bool = false
         /// The course is previewing or deploying (Keep a Copy waits).
         var busy: Bool = false
@@ -246,6 +249,9 @@ nonisolated enum SubjectMenuRules {
             if !situation.reviseBlocked.contains(.codex) {
                 enabled.insert(.courseReviseWithCodex)
             }
+            if !situation.reviseBlocked.contains(.copilot) {
+                enabled.insert(.courseReviseWithCopilot)
+            }
             // The local assistant works per SECTION, so it is never live
             // on a course row (Russell, 2026-10-08: greyed, not hidden).
         }
@@ -312,6 +318,9 @@ nonisolated enum SubjectMenuRules {
                 }
                 if !situation.reviseBlocked.contains(.codex) {
                     enabled.insert(.sectionReviseWithCodex)
+                }
+                if !situation.reviseBlocked.contains(.copilot) {
+                    enabled.insert(.sectionReviseWithCopilot)
                 }
                 if !situation.reviseBlocked.contains(.localAssistant) {
                     enabled.insert(.sectionReviseWithLocalAssistant)

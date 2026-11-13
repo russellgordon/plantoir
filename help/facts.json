@@ -1,0 +1,5 @@
+{
+ "about": "Dated facts a page states with {{fact:<id>}}: {\"value\": \u2026, \"read\": \"YYYY-MM-DD\", \"source\": \"<where it was read>\"}. A fact read more than 60 days ago is a warning under --check (F refuses it at a release). assistantOnTheWeb is the one switch that puts the assistant section on the web copy (decision 12): false until Russell says Copilot is verified (#804).",
+ "assistantOnTheWeb": false,
+ "facts": {}
+}

@@ -3,7 +3,7 @@ import Foundation
 /// Starting a Codex session already connected to this working folder's
 /// Plantoir tools.
 ///
-/// The second of the two outside doors. It is the same shape as
+/// The second of the outside doors (GitHub Copilot's is the third, #783). It is the same shape as
 /// `ClaudeCodeLauncher` — find the tool, write a `.command` script, hand it to
 /// a terminal — and it borrows that type's helpers rather than copying them.
 /// Only two things differ, and both are Codex's:
@@ -215,6 +215,8 @@ nonisolated enum CodexLauncher {
         overrides.append(
             "mcp_servers.plantoir.env.\(AssistMCPServer.doorCourseVariable)=\"\(escapeForTOMLString(courseCode))\""
         )
+        // The sixth names which door, so the hold can name it (#783).
+        overrides.append("mcp_servers.plantoir.env.\(AssistMCPServer.doorAssistantVariable)=\"codex\"")
         return overrides
     }
 

@@ -14,7 +14,7 @@ tags:
    I read them to find out what this class already notices
 2. [[The Critical Analysis Process]] — the four stages, labelled in
    your sketchbook as we use them
-3. [[Looking Twice]] in practice
+3. [[Looking Twice]] in practice, then once on paper: [[A Looking Sheet]]
 
 ## Things to do before our next class
 

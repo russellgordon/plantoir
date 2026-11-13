@@ -60,6 +60,16 @@ graph LR
 - **Revision visible.** What changed since the first week, and what changed
   it.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] My requirements, deadlines, and costs are real, and each one has its source.
+- [ ] My destination follows from my profile, and my courses follow from my destination.
+- [ ] A reader could see how my first three steps would happen.
+- [ ] I say what is still uncertain, and how I would resolve it.
+- [ ] I show what changed since the first week, and what changed it.
+
 %%curriculum-start%%
 ## Curriculum connection
 

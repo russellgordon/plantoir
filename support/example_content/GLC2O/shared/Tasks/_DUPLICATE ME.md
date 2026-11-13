@@ -35,6 +35,20 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
+## What earns the marks
+
+- **A quality of the work.** What it looks like when the work has it.
+
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] One box for each line above, worded about the work.
+
+%%
+Keep the heading "Success criteria" exactly: boxes under it are what the My Progress page counts, and the seven tasks that came with this course each have one. Change a box's words before students start ticking, not after: new words clear their ticks.
+%%
+
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.

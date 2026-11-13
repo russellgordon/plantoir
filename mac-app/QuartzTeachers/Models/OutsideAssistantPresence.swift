@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Whether each Revise With item EXISTS on this Mac — Claude installed, Codex
-/// installed, the local assistant able to run — asked at launch and whenever
+/// installed, GitHub Copilot installed (#783), the local assistant able to run — asked at launch and whenever
 /// Plantoir becomes the active app, and read by the menu bar (#457).
 ///
 /// **Presence follows the Mac, enablement follows the selection.** The plan
@@ -27,27 +27,44 @@ final class OutsideAssistantPresence {
 
     private(set) var claudeIsInstalled: Bool = false
     private(set) var codexIsInstalled: Bool = false
+    /// GitHub's Copilot, and only GitHub's (`CopilotLauncher.isGitHubsCopilot`).
+    private(set) var copilotIsInstalled: Bool = false
     private(set) var localAssistantCanRun: Bool = false
 
     // MARK: - Computed properties
 
     /// Whether the Revise With submenu has anything in it at all.
     var anyReviseTargetExists: Bool {
-        return claudeIsInstalled || codexIsInstalled || localAssistantCanRun
+        return OutsideAssistantPresence.anyReviseTargetExists(
+            claude: claudeIsInstalled,
+            codex: codexIsInstalled,
+            copilot: copilotIsInstalled,
+            local: localAssistantCanRun
+        )
     }
 
     // MARK: - Functions
+
+    /// The rule behind `anyReviseTargetExists`, apart from this Mac, so a
+    /// test can ask it with GitHub Copilot alone (#783).
+    nonisolated static func anyReviseTargetExists(claude: Bool, codex: Bool, copilot: Bool, local: Bool) -> Bool {
+        return claude || codex || copilot || local
+    }
 
     /// Asks the Mac again.
     func refresh() {
         let claude: Bool = ClaudeCodeLauncher.isAvailable
         let codex: Bool = CodexLauncher.isAvailable
+        let copilot: Bool = CopilotLauncher.isAvailable
         let local: Bool = AssistHardwareBudget.current().canRunAssistant
         if claude != claudeIsInstalled {
             claudeIsInstalled = claude
         }
         if codex != codexIsInstalled {
             codexIsInstalled = codex
+        }
+        if copilot != copilotIsInstalled {
+            copilotIsInstalled = copilot
         }
         if local != localAssistantCanRun {
             localAssistantCanRun = local

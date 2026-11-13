@@ -123,7 +123,7 @@ final class AssistToolchainWork: AssistSiteWork {
     /// Whether another program's SERVED preview of the course holds a deploy
     /// from here back. True for the in-app assistant (#156, unchanged);
     /// false for an outside assistant (#433, Russell 2026-10-03: "if the
-    /// teacher asks Claude or Codex to deploy, it should be allowed to go
+    /// teacher asks Claude, Codex or GitHub Copilot to deploy, it should be allowed to go
     /// ahead, even if a preview is running"). Either way a site actually
     /// being BUILT elsewhere declines it.
     let aServedPreviewHoldsADeployBack: Bool
