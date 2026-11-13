@@ -6,6 +6,7 @@
   "searchLabel": "Search Help",
   "searchButton": "Search",
   "searchResultsHeading": "Search results",
-  "searchNoMatch": "No page matches."
+  "searchNoMatch": "No page matches.",
+  "searchMore": "{count} more pages match."
  }
 }

@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from . import BOOK_TITLE, CONTENTS_ANCHOR, LANGUAGE_TAG
 from .frontmatter import read_front_matter
-from .markdown import parse_body, split_inline, walk_blocks
+from .markdown import continues_steps, parse_body, split_inline, step_sequence, walk_blocks
 from .problems import HelpError, Problems
 from .tokens import Registries, read_json
 from .words import WordRules
@@ -86,13 +86,20 @@ class HelpSource:
         self.registries = Registries(repo, help_dir, self.today)
         self.words = WordRules.load(repo, help_dir)
         self.interface: Dict[str, str] = read_json(help_dir / "interface-words.json").get("words", {})
-        for key in ("stubSentence", "placeholderHeading", "searchLabel", "searchButton", "searchResultsHeading", "searchNoMatch"):
+        for key in ("stubSentence", "placeholderHeading", "searchLabel", "searchButton", "searchResultsHeading", "searchNoMatch", "searchMore"):
             if not isinstance(self.interface.get(key), str) or self.interface[key].strip() == "":
                 raise HelpError("help/interface-words.json -> words needs `" + key + "`")
         withheld = read_json(help_dir / "withheld-on-the-web.json").get("terms", [])
         self.withheld_terms: List[Tuple[Any, str]] = []
         for term in withheld:
-            self.withheld_terms.append((re.compile(term["pattern"], re.IGNORECASE), str(term.get("why", ""))))
+            try:
+                compiled = re.compile(str(term.get("pattern", "")), re.IGNORECASE)
+            except re.error as error:
+                raise HelpError("help/withheld-on-the-web.json: the pattern " + repr(term.get("pattern")) + " is not a valid pattern (" + str(error) + ")")
+            self.withheld_terms.append((compiled, str(term.get("why", ""))))
+        self.withheld_pages: Set[str] = set()
+        for entry in read_json(help_dir / "withheld-on-the-web.json").get("pages", []):
+            self.withheld_pages.add(str(entry.get("id", "")))
         # Findings that stop only the web copy (#804): failures under --web and
         # --release-web, warnings under --check and --mac.
         self.web_findings: List[Tuple[str, Optional[int], str]] = []
@@ -189,11 +196,36 @@ class PageRenderer:
         self.registries = source.registries
         self.pictures_used: Set[str] = set()
         self.placeholders: List[str] = []
+        self.list_starts: Dict[int, int] = {}
         self.prefix: str = "../" if form == "mac" else ""
 
     # MARK: inline
 
+    def scan_web(self, fragment: str, page: Page, line: Optional[int]) -> None:
+        """The withheld check, on what the web copy SHOWS: rendered text after
+        every token is filled, code, alt text, titles and link targets. So no
+        token, code span or link is a way round it (#804)."""
+        if self.form != "web" or page.assistant or self.registries.assistant_on_the_web:
+            return
+        pieces: List[str] = [html.unescape(re.sub(r"<[^>]+>", " ", fragment))]
+        for value in re.findall(r'\b(?:alt|href|title|aria-label|content)="([^"]*)"', fragment):
+            pieces.append(html.unescape(value))
+        text: str = " ".join(" ".join(pieces).split())
+        file: str = self.source.page_file_label(page)
+        for pattern, why in self.source.withheld_terms:
+            found = pattern.search(text)
+            if found is not None:
+                self.source.web_findings.append(
+                    (file, line, "names " + repr(found.group(0)) + " (" + why + ") outside an {{assistant}} run: "
+                     "the web copy may not say it yet (help/withheld-on-the-web.json, #804)")
+                )
+
     def inline(self, text: str, page: Page, line: int, platform: str) -> str:
+        rendered: str = self._inline(text, page, line, platform)
+        self.scan_web(rendered, page, line)
+        return rendered
+
+    def _inline(self, text: str, page: Page, line: int, platform: str) -> str:
         file: str = self.source.page_file_label(page)
         parts: List[str] = []
         for kind, value in split_inline(text):
@@ -225,8 +257,8 @@ class PageRenderer:
                 # and a link to the assistant section from an ordinary page belongs in an {{assistant}} run.
                 if self.form == "web" and not page.assistant:
                     self.source.web_findings.append(
-                        (file, line, "links to the assistant page " + page_id + " outside an {{assistant}} run: "
-                         "its words would show on the web copy (#804)")
+                        (file, line, "links to " + page_id + ", which the web copy leaves out (#804), outside an "
+                         "{{assistant}} run: its words would show there without it")
                     )
                 return inner
             return '<a href="' + page_id + '.html">' + inner + "</a>"
@@ -237,7 +269,30 @@ class PageRenderer:
 
     # MARK: blocks
 
+    def shown_runs(self) -> Tuple[str, ...]:
+        """The runs this form shows a reader (hidden Windows runs excluded)."""
+        if self.form == "mac" or self.registries.assistant_on_the_web:
+            return ("mac", "assistant")
+        return ("mac",)
+
+    def number_steps(self, blocks: List[Dict[str, Any]]) -> None:
+        """The number each numbered list starts at IN THIS FORM. The source
+        numbers count as the Mac book shows the page; the web copy leaves out
+        an {{assistant}} run while the switch is off, so its steps are counted
+        again here and a web page never shows 1, 2, 4."""
+        counter: int = 0
+        for block, inside_run in step_sequence(blocks, self.shown_runs()):
+            if block["kind"] == "list" and block["ordered"] and len(block["items"]) > 0:
+                start: int = counter + 1 if counter > 0 else block["start"]
+                self.list_starts[id(block)] = start
+                counter = start + len(block["items"]) - 1
+                continue
+            if continues_steps(block, inside_run):
+                continue
+            counter = 0
+
     def blocks(self, blocks: List[Dict[str, Any]], page: Page, platform: str, page_has_windows: bool) -> str:
+        self.number_steps(blocks)
         output: List[str] = []
         heading_ids: Set[str] = set()
         self._render_blocks(blocks, page, platform, page_has_windows, output, heading_ids)
@@ -279,7 +334,9 @@ class PageRenderer:
                 css: str = "language-" + block["language"]
                 if block["wrap"]:
                     css += " wrap"
-                output.append('<pre class="' + css + '"><code>' + html.escape(block["text"], quote=False) + "</code></pre>")
+                code_html: str = '<pre class="' + css + '"><code>' + html.escape(block["text"], quote=False) + "</code></pre>"
+                self.scan_web(code_html, page, line)
+                output.append(code_html)
             elif kind == "table":
                 output.append(self.table_html(block, page, platform))
             elif kind == "note":
@@ -287,7 +344,9 @@ class PageRenderer:
                 self._render_blocks(block["children"], page, platform, page_has_windows, inner, heading_ids)
                 output.append('<aside class="note">' + "\n".join(inner) + "</aside>")
             elif kind == "picture":
-                output.append(self.picture_html(block, page, platform))
+                figure_html: str = self.picture_html(block, page, platform)
+                self.scan_web(figure_html, page, line)
+                output.append(figure_html)
             elif kind == "platform":
                 run_platform: str = block["platform"]
                 inner_output: List[str] = []
@@ -323,8 +382,9 @@ class PageRenderer:
     def list_html(self, block: Dict[str, Any], page: Page, platform: str) -> str:
         tag: str = "ol" if block["ordered"] else "ul"
         opening: str = "<" + tag + ">"
-        if block["ordered"] and block.get("start", 1) != 1:
-            opening = '<ol start="' + str(block["start"]) + '">'
+        start: int = self.list_starts.get(id(block), block.get("start", 1))
+        if block["ordered"] and start != 1:
+            opening = '<ol start="' + str(start) + '">'
         items: List[str] = []
         for item in block["items"]:
             texts: List[str] = []
@@ -460,6 +520,9 @@ class PageRenderer:
         return False
 
     def render_page(self, page: Page) -> str:
+        self.scan_web(self.head(page.title, page.keywords, page.description, page.indexed), page, 1)
+        if page.is_stub:
+            self.scan_web(html.escape(page.question), page, 1)
         parts: List[str] = [
             self.head(page.title, page.keywords, page.description, page.indexed),
             "<body>",
@@ -476,23 +539,6 @@ class PageRenderer:
         parts.append("</main>")
         return "\n".join(parts) + "\n" + self.tail()
 
-    def check_withheld(self, page: Page) -> None:
-        """An ordinary page on the web copy that names an assistant outside an
-        {{assistant}} run (help/withheld-on-the-web.json, #804)."""
-        if self.form != "web" or page.assistant or self.registries.assistant_on_the_web:
-            return
-        from .checks import readable_texts
-
-        file: str = self.source.page_file_label(page)
-        for line, text in readable_texts(self.source, page, skip_runs=("assistant", "windows")):
-            for pattern, why in self.source.withheld_terms:
-                found = pattern.search(text)
-                if found is not None:
-                    self.source.web_findings.append(
-                        (file, line, "names " + repr(found.group(0)) + " (" + why + ") outside an {{assistant}} run: "
-                         "the web copy may not say it yet (help/withheld-on-the-web.json, #804)")
-                    )
-
     def render_all(self) -> None:
         """Renders every included page and the contents once, keeping the
         HTML; rendering is also what checks every token and link."""
@@ -500,7 +546,6 @@ class PageRenderer:
         for page in self.source.pages:
             if page.id in self.included_ids:
                 self.pages_html[page.id] = self.render_page(page)
-                self.check_withheld(page)
         self.contents_html: str = self.render_contents()
 
     def render_contents(self) -> str:
@@ -534,4 +579,11 @@ class PageRenderer:
             parts.append("<ul>\n" + "\n".join(items) + "\n</ul>")
             parts.append("</section>")
         parts.append("</main>")
-        return "\n".join(parts) + "\n" + self.tail(contents=True)
+        contents_html: str = "\n".join(parts) + "\n" + self.tail(contents=True)
+        # The contents page: its section and page titles (the introduction's
+        # blocks were scanned as they rendered).
+        listing_start: int = contents_html.find('<section class="contents-section">')
+        if listing_start >= 0:
+            outline_page = Page({"id": "contents", "title": BOOK_TITLE}, {})
+            self.scan_web(contents_html[listing_start:], outline_page, None)
+        return contents_html

@@ -16,30 +16,44 @@ from helpbook.words import publish_deploy_problems, typed_count_problems  # noqa
 
 
 class RuleTests(unittest.TestCase):
-    def test_publish_followed_by_a_destination_is_the_wrong_verb(self) -> None:
-        self.assertEqual(len(publish_deploy_problems("Publish the site to Netlify.")), 1)
-        self.assertEqual(len(publish_deploy_problems("Publishing it online takes a while.")), 1)
-        self.assertEqual(len(publish_deploy_problems("Publish the class to section 2.")), 1)
-        self.assertEqual(len(publish_deploy_problems("Publish it to a folder on this Mac.")), 1)
+    # The cases of both reviews: correct sentences that explain publish and deploy,
+    # and misuses that must be refused.
+    CORRECT = [
+        "Publish the pages, then deploy the section.",
+        "Publish the class for a date.",
+        "Show or hide pages for a section.",
+        "Deploy to GitHub Pages.",
+        "Put your site online with Cloudflare Pages.",
+        "When the site is ready, publish one class.",
+        "Published pages appear on the site.",
+        "Deploy sends every published page in the section.",
+        "Choose videos from a publisher whose site allows embedding.",
+        "A page you publish today shows on the site once you deploy.",
+        "Pages you have published stay hidden from the site until you deploy.",
+        "Deploy now, and the new pages appear.",
+    ]
+    MISUSE = [
+        "Publish the site to Netlify.",
+        "Publishing it online takes a while.",
+        "Publish the class to section 2.",
+        "Publish it to a folder on this Mac.",
+        "Deploy the page for Thursday.",
+        "Publish to the web when the site is ready.",
+        "Publish it to your school's server.",
+        "The site was published yesterday.",
+        "Deploy Unit 3 so students see it.",
+        "Publish it to GitHub Pages.",
+    ]
 
-    def test_publish_and_deploy_used_rightly_pass(self) -> None:
-        self.assertEqual(publish_deploy_problems("Publish the pages, then deploy the section."), [])
-        self.assertEqual(publish_deploy_problems("Publish the class for a date."), [])
-        self.assertEqual(publish_deploy_problems("Show or hide pages for a section."), [])
-        self.assertEqual(publish_deploy_problems("Deploy to GitHub Pages."), [])
-        self.assertEqual(publish_deploy_problems("Put your site online with Cloudflare Pages."), [])
+    def test_correct_sentences_about_publish_and_deploy_pass(self) -> None:
+        for sentence in self.CORRECT:
+            with self.subTest(sentence=sentence):
+                self.assertEqual(publish_deploy_problems(sentence), [])
 
-    def test_sentences_that_explain_publish_and_deploy_pass(self) -> None:
-        # The review's three (plan review of P2a, M1): correct, and once refused.
-        self.assertEqual(publish_deploy_problems("Published pages appear on the site."), [])
-        self.assertEqual(publish_deploy_problems("Deploy sends every published page in the section."), [])
-        self.assertEqual(publish_deploy_problems("Choose videos from a publisher whose site allows embedding."), [])
-
-    def test_deploy_followed_by_page_is_the_wrong_verb(self) -> None:
-        self.assertEqual(len(publish_deploy_problems("Deploy the page for Thursday.")), 1)
-
-    def test_only_the_words_after_the_verb_count(self) -> None:
-        self.assertEqual(publish_deploy_problems("When the site is ready, publish one class."), [])
+    def test_each_misuse_of_publish_and_deploy_is_refused(self) -> None:
+        for sentence in self.MISUSE:
+            with self.subTest(sentence=sentence):
+                self.assertGreater(len(publish_deploy_problems(sentence)), 0)
 
     def test_a_year_is_not_a_typed_count(self) -> None:
         self.assertEqual(typed_count_problems("The 2026-27 courses start in September."), [])
@@ -123,8 +137,21 @@ class WordCheckTests(unittest.TestCase):
         self.assertIn("warning: help/pages/second-look.md:8: a sentence of 30 words", output)
 
     def test_a_contract_sentence_typed_by_hand_is_refused(self) -> None:
-        self.refused("It says the section was copied into the folder you chose.\n", "types a sentence the app shows")
-        self.refused("Ask me to show or hide a class for a section.\n", "types a sentence the app shows")
+        self.refused("It says the section was copied into the folder you chose.\n", "retypes a whole sentence the app shows")
+        self.refused("Ask me to show or hide a class for a section.\n", "retypes a whole sentence the app shows")
+
+    def test_a_whole_sentence_retyped_with_small_changes_is_still_refused(self) -> None:
+        # A line break in the middle, a changed full stop, a straight quote for a curly one.
+        self.refused("Then the section was copied into the\nfolder you chose; that is all it does.\n", "help/pages/second-look.md:8: retypes a whole sentence")
+        self.refused("The teacher's copy stays on this Mac.\n", "help/pages/second-look.md:8: retypes a whole sentence")
+        self.refused("It shows THE SECTION WAS COPIED INTO THE FOLDER YOU CHOSE\n", "retypes a whole sentence")
+
+    def test_a_fragment_of_a_contract_sentence_is_ordinary_english(self) -> None:
+        self.passes("The section was copied into a new place.\n")
+        self.passes("Pick the folder you chose last time.\n")
+
+    def test_a_contract_sentence_with_a_placeholder_matches_any_words_there(self) -> None:
+        self.refused("Deploying Section 2 to the folder now.\n", "retypes a whole sentence")
 
     def test_the_same_sentence_through_a_say_token_passes(self) -> None:
         self.passes("It says {{say:shared-rules#fixtureNotice.wording.finished}}\n")
@@ -135,7 +162,7 @@ class WordCheckTests(unittest.TestCase):
         self.fixture.replace("help/outline.json", "What else is in the fixture window?", "Can I show or hide a class for a section?")
         self.passes("Words.\n\n## Show or hide a class for a section\n\nMore words.\n")
         # The same words in running prose are still refused.
-        self.refused("Words.\n\nAsk me to show or hide a class for a section.\n", "types a sentence the app shows")
+        self.refused("Words.\n\nAsk me to show or hide a class for a section.\n", "retypes a whole sentence the app shows")
 
     def test_the_interface_words_are_checked(self) -> None:
         self.fixture.replace("help/interface-words.json", '"Search Help"', '"Search Help seamlessly"')

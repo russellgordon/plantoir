@@ -119,6 +119,12 @@ def check_page_fields(source: HelpSource) -> None:
             problems.fail(file, 1, "`authority:` is an https:// address")
 
 
+def check_withheld_file(source: HelpSource) -> None:
+    for page_id in sorted(source.withheld_pages):
+        if page_id not in source.pages_by_id:
+            source.problems.fail("help/withheld-on-the-web.json", None, "pages: " + page_id + " is not in the outline")
+
+
 def check_tone_file(source: HelpSource) -> None:
     families: List[Tuple[str, List[Dict[str, Any]]]] = [
         ("exemptions", source.words.exemptions),
@@ -233,15 +239,28 @@ def _collect_sentence_values(value: Any, into: List[str]) -> None:
             _collect_sentence_values(item, into)
 
 
-def normalise(text: str) -> str:
-    return re.sub(r"\s+", " ", text.replace("’", "'")).strip().casefold()
+def contract_words(text: str) -> List[str]:
+    """A text as the words it holds, for comparing a page with the contract:
+    case folded, curly quotes made straight, dashes and punctuation dropped,
+    white space (line breaks included) ignored."""
+    folded: str = text.casefold()
+    for curly, straight in (("\u2019", "'"), ("\u2018", "'"), ("\u201c", '"'), ("\u201d", '"')):
+        folded = folded.replace(curly, straight)
+    return re.findall(r"[0-9a-z\u00c0-\u024f]+(?:'[0-9a-z\u00c0-\u024f]+)*", folded)
 
 
-def contract_sentences(repo: Path) -> List[str]:
-    """Every run of five or more words the app shows, from the contract files:
-    all of assist-wording.json, and the `sentences`, `wording` and `words`
-    values of the others. A placeholder ({name}, %@) splits a sentence into
-    the runs around it."""
+PLACEHOLDER = re.compile(r"\{[^}]*\}|%@|%d|%\d\$@|\\\([^)]*\)")
+WILDCARD_WORD = "\u0000"
+
+
+def contract_sentences(repo: Path) -> List[Tuple[str, Any]]:
+    """Every WHOLE sentence the app shows of five words or more (one that ends
+    as a sentence does, with . ! ? or …), from the
+    contract files: all of assist-wording.json, and the `sentences`, `wording`
+    and `words` values of the others. A value holding several sentences gives
+    each one; a placeholder ({name}, %@) stands for one to four words. A
+    shorter string, or a fragment of a longer one, is ordinary English and is
+    never matched. Returns (the sentence, its pattern over contract_words)."""
     strings: List[str] = []
     for path in sorted((repo / "contracts").glob("*.json")):
         with path.open(encoding="utf-8") as handle:
@@ -250,31 +269,53 @@ def contract_sentences(repo: Path) -> List[str]:
             _collect_strings(document.get("wording", document), strings)
         else:
             _collect_sentence_values(document, strings)
-    runs: List[str] = []
+    sentences: List[Tuple[str, Any]] = []
     seen: Set[str] = set()
-    for text in strings:
-        for piece in re.split(r"\{[^}]*\}|%@|%d|%\d\$@|\\\([^)]*\)", text):
-            normalised: str = normalise(piece).strip(" .,:;")
-            if len(normalised.split(" ")) >= SENTENCE_MIN_WORDS and normalised not in seen:
-                seen.add(normalised)
-                runs.append(normalised)
-    return runs
+    for value in strings:
+        for sentence in re.split(r"(?<=[.!?\u2026])\s+", value.strip()):
+            # A sentence ends as one; a label or a phrase ("a folder on this computer") does not.
+            if re.search(r"[.!?\u2026][\"'\u201d\u2019)]*$", sentence) is None:
+                continue
+            marked: str = PLACEHOLDER.sub(" " + WILDCARD_WORD + " ", sentence)
+            pieces: List[str] = []
+            real_words: int = 0
+            for chunk in marked.split(WILDCARD_WORD):
+                for word in contract_words(chunk):
+                    pieces.append(re.escape(word))
+                    real_words += 1
+                pieces.append(r"\S+(?: \S+){0,3}")
+            pieces.pop()
+            if real_words < SENTENCE_MIN_WORDS:
+                continue
+            pattern_text: str = "(?:^| )" + " ".join(pieces) + "(?: |$)"
+            if pattern_text in seen:
+                continue
+            seen.add(pattern_text)
+            sentences.append((sentence, re.compile(pattern_text)))
+    return sentences
 
 
 def check_contract_sentences(source: HelpSource) -> None:
-    sentences: List[str] = contract_sentences(source.repo)
-    for page in source.pages:
+    """A whole sentence the app shows, retyped in running prose, would go
+    stale silently when the app's words change: it is refused, and written
+    {{say:<key>}} instead. Titles, questions, headings and keywords are names
+    and are not read."""
+    sentences: List[Tuple[str, Any]] = contract_sentences(source.repo)
+    pages: List[Page] = list(source.pages)
+    if source.intro is not None:
+        pages.append(source.intro)
+    for page in pages:
         if page.is_stub:
             continue
         for line, text in readable_texts(source, page, include_names=False):
             if text.strip() == "":
                 continue
-            normalised: str = normalise(text)
-            for sentence in sentences:
-                if sentence in normalised:
+            prose: str = " ".join(contract_words(text))
+            for sentence, pattern in sentences:
+                if pattern.search(prose) is not None:
                     source.problems.fail(
                         str(page.file), line,
-                        "types a sentence the app shows (" + repr(sentence[:60]) + "): use its {{say:}} token",
+                        "retypes a whole sentence the app shows (" + repr(sentence[:70]) + "): write its {{say:}} token",
                     )
 
 
@@ -284,5 +325,6 @@ def run_structural_checks(source: HelpSource) -> None:
     check_scenes(source)
     check_page_fields(source)
     check_tone_file(source)
+    check_withheld_file(source)
     check_words(source)
     check_contract_sentences(source)

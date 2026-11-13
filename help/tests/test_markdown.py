@@ -8,6 +8,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import shutil  # noqa: E402
 import unittest  # noqa: E402
 
 from helpers import Fixture  # noqa: E402
@@ -172,7 +173,35 @@ class StepsAcrossBlocks(unittest.TestCase):
                 self.fixture = fixture
                 code, output = self.steps_around(self.BETWEEN[name], 1)
                 self.assertNotEqual(code, 0, output)
-                self.assertIn("these steps follow step 2 across a picture, note, table or code block: number this one 3", output)
+                self.assertIn("these steps follow step 2 across a picture, note, table, code block or run: number this one 3", output)
+
+    def test_an_assistant_run_between_steps_keeps_the_numbers_right_in_both_forms(self) -> None:
+        if shutil.which("hiutil") is None:
+            self.skipTest("hiutil is not on this machine")
+        body = (
+            "Words.\n\n## Steps\n\n1. Open it.\n2. Look.\n\n"
+            "{{assistant}}\n3. Ask the helper.\n\nThe helper answers in the window.\n{{/assistant}}\n\n"
+            "4. Press it.\n5. Wait.\n"
+        )
+        self.fixture.replace("help/pages/first-steps.md", "Open the fixture and look at the window.\n", body)
+        code, output = self.fixture.run("--web", str(self.fixture.out / "web"))
+        self.assertEqual(code, 0, output)
+        web = (self.fixture.out / "web" / "first-steps.html").read_text(encoding="utf-8")
+        # The web copy leaves the run out and counts again: 1, 2, then 3 and 4, never 1, 2, 4.
+        self.assertNotIn("Ask the helper", web)
+        self.assertIn('<ol start="3">\n<li>Press it.</li>', web)
+        code, output = self.fixture.run("--mac", str(self.fixture.out / "Plantoir.help"))
+        self.assertEqual(code, 0, output)
+        mac = (self.fixture.out / "Plantoir.help" / "Contents" / "Resources" / "en.lproj" / "first-steps.html").read_text(encoding="utf-8")
+        self.assertIn('<ol start="3">\n<li>Ask the helper.</li>', mac)
+        self.assertIn('<ol start="4">\n<li>Press it.</li>', mac)
+
+    def test_a_misnumbered_step_inside_a_run_says_the_run(self) -> None:
+        body = "Words.\n\n1. Open it.\n\n{{assistant}}\n1. Ask the helper.\n{{/assistant}}\n"
+        self.fixture.replace("help/pages/first-steps.md", "Open the fixture and look at the window.\n", body)
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("these steps (inside a run) follow step 1", output)
 
     def test_a_paragraph_between_starts_new_steps(self) -> None:
         code, output = self.steps_around("Then a sentence of its own.\n", 1)

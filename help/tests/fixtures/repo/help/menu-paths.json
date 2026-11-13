@@ -1,6 +1,7 @@
 {
  "about": "fixture",
  "entries": {
+  "revise-claude": {"mac": "Section ▸ Revise With ▸ Claude…", "windows": null},
   "new-course": {"mac": "File ▸ New Course…", "windows": null},
   "preview": {"mac": "Section ▸ Preview", "windows": null},
   "settings": {"mac": "Plantoir ▸ Settings…", "system": true, "windows": null}

@@ -188,11 +188,54 @@ class WebTests(unittest.TestCase):
         self.build()
         self.assertNotIn("Claude", self.read("second-look.html"))
 
+    def test_every_route_to_an_assistant_name_is_caught_on_the_rendered_page(self) -> None:
+        routes = {
+            "a menu token": ("Choose {{menu:revise-claude}} from the menu.\n", "help/pages/second-look.md:8"),
+            "a code span": ("Type `copilot` in the window.\n", "help/pages/second-look.md:8"),
+            "a fenced block": ("Type this:\n\n```text wrap\ncopilot fix\n```\n", "help/pages/second-look.md:10"),
+            "a link target": ("Read [the vendor's page](https://github.com/features/copilot).\n", "help/pages/second-look.md:8"),
+        }
+        for name in routes:
+            with self.subTest(route=name):
+                body, where = routes[name]
+                self.fixture.page("second-look", body)
+                code, output = self.fixture.run("--web", str(self.web))
+                self.assertNotEqual(code, 0, output)
+                self.assertIn("FAILED: " + where + ": on the web copy: names", output)
+        # The introduction on the contents page.
+        self.fixture.page("second-look", "Words.\n")
+        self.fixture.write("help/pages/index.md", "---\ndescription: Help.\n---\nGitHub Copilot can help too.\n")
+        code, output = self.fixture.run("--web", str(self.web))
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("FAILED: help/pages/index.md:4: on the web copy: names 'Copilot'", output)
+        # A run may wrap a token; then the web copy passes and leaves it out.
+        self.fixture.path("help/pages/index.md").unlink()
+        self.fixture.page("second-look", "Words.\n\n{{assistant}}\nChoose {{menu:revise-claude}}.\n{{/assistant}}\n")
+        code, output = self.fixture.run("--web", str(self.web))
+        self.assertEqual(code, 0, output)
+        self.assertNotIn("Claude", self.read("second-look.html"))
+
+    def test_a_withheld_page_is_left_out_of_the_web_copy(self) -> None:
+        self.fixture.replace("help/withheld-on-the-web.json", '"pages": []', '"pages": [{"id": "python-page", "why": "fixture"}]')
+        self.build()
+        self.assertFalse((self.web / "python-page.html").exists())
+        self.fixture.replace("help/withheld-on-the-web.json", '"id": "python-page"', '"id": "no-such-page"')
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("pages: no-such-page is not in the outline", output)
+
+    def test_a_bad_withheld_pattern_is_a_named_failure(self) -> None:
+        self.fixture.replace("help/withheld-on-the-web.json", '"\\\\bClaude\\\\b"', '"(Claude"')
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("is not a valid pattern", output)
+        self.assertNotIn("Traceback", output)
+
     def test_a_link_to_an_assistant_page_outside_a_run_stops_the_web_copy(self) -> None:
         self.fixture.page("second-look", "Read [this page](page:helper-page).\n")
         code, output = self.fixture.run("--web", str(self.web))
         self.assertNotEqual(code, 0, output)
-        self.assertIn("links to the assistant page helper-page outside an {{assistant}} run", output)
+        self.assertIn("links to helper-page, which the web copy leaves out (#804), outside an", output)
 
     def test_release_web_refuses_stubs_and_placeholders(self) -> None:
         code, output = self.fixture.run("--release-web", str(self.web))

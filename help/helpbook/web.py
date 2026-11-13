@@ -27,8 +27,9 @@ ASSETS_FOR_THE_WEB = ["tokens.css", "help.css", "search.js"]
 def web_page_ids(source: HelpSource) -> Set[str]:
     included: Set[str] = set()
     for page in source.pages:
-        if page.assistant and not source.registries.assistant_on_the_web:
-            continue
+        if not source.registries.assistant_on_the_web:
+            if page.assistant or page.id in source.withheld_pages:
+                continue
         included.add(page.id)
     return included
 
@@ -65,6 +66,7 @@ def search_index(source: HelpSource, renderer: PageRenderer, included: Set[str])
     words: Dict[str, str] = {
         "resultsHeading": source.interface["searchResultsHeading"],
         "noMatch": source.interface["searchNoMatch"],
+        "more": source.interface["searchMore"],
     }
     return (
         "window.PLANTOIR_HELP_WORDS = " + json.dumps(words, ensure_ascii=False) + ";\n"

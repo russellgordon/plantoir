@@ -404,31 +404,34 @@ class Parser:
         return index
 
     def _check_step_numbers(self, blocks: List[Dict[str, Any]]) -> None:
-        """Numbered steps keep counting across a picture, a note, a table or a
-        code block: the list after one starts at the next number. A list that
-        starts at 1 there would restart the steps, and one that starts at any
-        other number must carry on from the list just above it."""
+        """Numbered steps keep counting across a picture, a note, a table, a
+        code block or a run ({{mac}}, {{assistant}}): the list after one starts
+        at the next number. Counted as the Mac book shows the page, so Windows
+        runs are left out (they hold their own steps). A list that starts at 1
+        there would restart the steps, and one that starts at any other number
+        must carry on from the steps just above it."""
         previous_last: int = 0
-        for block in blocks:
+        for block, inside_run in step_sequence(blocks, ("mac", "assistant")):
             kind: str = block["kind"]
-            if kind == "platform":
-                self._check_step_numbers(block["children"])
-                previous_last = 0
-                continue
             if kind == "list" and block["ordered"] and len(block["items"]) > 0:
                 first: int = block["start"]
+                where: str = " (inside a run)" if inside_run else ""
                 if previous_last > 0 and first != previous_last + 1:
                     self.fail(
                         block["line"],
-                        "these steps follow step " + str(previous_last) + " across a picture, note, table or code "
-                        "block: number this one " + str(previous_last + 1) + " (or put a heading or a paragraph "
-                        "between to start new steps)",
+                        "these steps" + where + " follow step " + str(previous_last) + " across a picture, note, "
+                        "table, code block or run: number this one " + str(previous_last + 1)
+                        + " (or put a heading or a paragraph between to start new steps)",
                     )
                 elif previous_last == 0 and first != 1:
-                    self.fail(block["line"], "numbered steps start at 1 unless they carry on from steps just above")
+                    self.fail(
+                        block["line"],
+                        "numbered steps" + where + " start at 1 unless they carry on from steps just above "
+                        "(a picture, note, table, code block or run may sit between steps)",
+                    )
                 previous_last = block["items"][-1]["number"]
                 continue
-            if kind in INSIDE_A_LIST and previous_last > 0:
+            if continues_steps(block, inside_run):
                 continue
             previous_last = 0
 
@@ -441,6 +444,30 @@ class Parser:
                 seen_level_two = True
             elif block["level"] == 3 and not seen_level_two:
                 self.fail(block["line"], "a ### heading comes under a ## heading")
+
+
+def step_sequence(blocks: List[Dict[str, Any]], shown_runs: Tuple[str, ...]) -> List[Tuple[Dict[str, Any], bool]]:
+    """The blocks numbered steps are counted over, in order: a run that this
+    form shows is opened up (its blocks marked as inside a run); a run it does
+    not show is left out, as if it were not there."""
+    result: List[Tuple[Dict[str, Any], bool]] = []
+    for block in blocks:
+        if block["kind"] == "platform":
+            if block["platform"] in shown_runs:
+                for child in block["children"]:
+                    result.append((child, True))
+            continue
+        result.append((block, False))
+    return result
+
+
+def continues_steps(block: Dict[str, Any], inside_run: bool) -> bool:
+    """Whether a block between two numbered lists lets the steps carry on: a
+    picture, note, table or code block does, and so does anything inside a
+    run except a heading (an aside in an {{assistant}} run)."""
+    if block["kind"] in INSIDE_A_LIST:
+        return True
+    return inside_run and block["kind"] != "heading"
 
 
 def walk_blocks(blocks: List[Dict[str, Any]], skip_runs: Tuple[str, ...] = ()) -> List[Dict[str, Any]]:

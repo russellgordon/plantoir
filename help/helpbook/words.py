@@ -35,26 +35,10 @@ COUNT_NOUNS = re.compile(r"^(course|courses|code|codes)$", re.IGNORECASE)
 LONG_SENTENCE_WORDS = 25
 QUOTED_RUN_WORDS = 3
 
-# Help's own publish rule (plan review H1). PUBLISH marks a page for students;
-# DEPLOY sends a section's site somewhere. So "publish" followed within five
-# words by a destination, or "deploy" followed within five words by "page",
-# is the wrong verb. Only the words AFTER the verb count, within one sentence:
-# "publish the pages, then deploy" is right and must pass.
-# The verbs themselves: "publisher" and "deployment" are not them.
-PUBLISH_WORD = re.compile(r"^publish(?:es|ed|ing)?$", re.IGNORECASE)
-DEPLOY_WORD = re.compile(r"^deploy(?:s|ed|ing)?$", re.IGNORECASE)
-# "published" right before one of these is an adjective naming what was
-# marked ("Published pages appear on the site"), not the verb sending a site.
-MARKED_THINGS = ["page", "pages", "class", "classes"]
-PUBLISHED_PAGES = re.compile(r"\bpublished (?:pages?|class(?:es)?)\b", re.IGNORECASE)
-PUBLISH_DESTINATION = re.compile(
-    r"\b(sites?|websites?|online|netlify|cloudflare|github pages|(?:a|the|your) folder|"
-    r"(?:to|onto) (?:the |a |your |each |this |that )?sections?)\b",
-    re.IGNORECASE,
-)
-DEPLOY_A_PAGE = re.compile(r"\bpages?\b", re.IGNORECASE)
+# Help's own publish rule. PUBLISH marks a page for students; DEPLOY sends a
+# section's site somewhere. PUBLISH_DEPLOY_MISUSE below names the shapes that
+# are always wrong; correct sentences that explain the two words pass.
 PAGES_PRODUCTS = re.compile(r"\b(?:github|cloudflare) pages\b", re.IGNORECASE)
-VERB_REACH = 5
 
 WORD = re.compile(r"[A-Za-z0-9(][A-Za-z0-9,.'’()-]*")
 
@@ -167,34 +151,42 @@ def _sentences(text: str) -> List[List[str]]:
     return sentences
 
 
+W = r"[\w'\u2019]+"
+PUBLISH_VERB = r"\bpublish(?:es|ed|ing)?\b"
+SITE_NOUN = r"(?:sites?|websites?)\b"
+# Each pattern is a shape that is ALWAYS wrong: the verb publish used for
+# sending a site somewhere, or deploy used for a page. Words are joined by
+# spaces only, so no pattern reaches across a comma, a full stop or a clause
+# that punctuation separates ("Deploy now, and the new pages appear").
+PUBLISH_DEPLOY_MISUSE = [
+    (re.compile(PUBLISH_VERB + r"\s+(?:the|your|a|this|that|each|every|its|their)?\s*(?:" + W + r"\s+)?" + SITE_NOUN, re.IGNORECASE),
+     "publishes a site: PUBLISH marks a page for students; sending a site somewhere is DEPLOY"),
+    (re.compile(PUBLISH_VERB + r"(?:\s+" + W + r"){0,4}?\s+(?:to|onto)\s+(?:" + W + r"\s+){0,2}?"
+                r"(?:web|servers?|netlify|cloudflare|thatdestination|sites?|websites?|folders?|sections?)\b", re.IGNORECASE),
+     "publishes to a destination: PUBLISH marks a page for students; sending a site somewhere is DEPLOY"),
+    (re.compile(PUBLISH_VERB + r"(?:\s+" + W + r"){0,4}?\s+online\b", re.IGNORECASE),
+     "publishes online: PUBLISH marks a page for students; putting a site online is DEPLOY"),
+    (re.compile(PUBLISH_VERB + r"(?:\s+" + W + r"){0,4}?\s+on\s+(?:netlify|cloudflare|thatdestination|the\s+web)\b", re.IGNORECASE),
+     "publishes on a destination: PUBLISH marks a page for students; sending a site somewhere is DEPLOY"),
+    (re.compile(r"\b" + SITE_NOUN + r"\s+(?:was|were|is|are|has\s+been|have\s+been|gets|got|will\s+be|is\s+being)\s+published\b", re.IGNORECASE),
+     "says a site was published: a site is DEPLOYED; PUBLISH marks a page"),
+    (re.compile(r"\bdeploy(?:s|ed|ing)?\s+(?:the|a|this|that|your|each|its|those|these|one)?\s*(?:" + W + r"\s+)?"
+                r"(?:pages?|class(?:es)?|units?|lessons?)\b(?!\s+sites?\b)", re.IGNORECASE),
+     "deploys a page: a page is PUBLISHED; DEPLOY sends a section's whole site"),
+]
+
+
 def publish_deploy_problems(text: str) -> List[str]:
+    """Help's own publish rule: the misuse shapes above, each always wrong.
+    Measured against the reviews' cases (help/tests/test_words.py): the
+    correct sentences that explain publish and deploy pass."""
+    # "GitHub Pages" and "Cloudflare Pages" are destinations, never pages.
+    # "GitHub Pages" and "Cloudflare Pages" are destinations, never pages.
+    cleaned: str = PAGES_PRODUCTS.sub("ThatDestination", text)
     messages: List[str] = []
-    for sentence in _sentences(text):
-        for index in range(len(sentence)):
-            word: str = sentence[index].strip(".,;:()")
-            following: str = " ".join(sentence[index + 1:index + 1 + VERB_REACH])
-            if PUBLISH_WORD.match(word) is not None:
-                next_word: str = ""
-                if index + 1 < len(sentence):
-                    next_word = sentence[index + 1].strip(".,;:()").lower()
-                if word.lower() == "published" and next_word in MARKED_THINGS:
-                    continue
-                found = PUBLISH_DESTINATION.search(following)
-                if found is not None:
-                    messages.append(
-                        repr(word) + " is followed by " + repr(found.group(0)) + ": PUBLISH marks a page for "
-                        "students; sending a site somewhere is DEPLOY"
-                    )
-            elif DEPLOY_WORD.match(word) is not None:
-                # "GitHub Pages" and "Cloudflare Pages" are destinations, not pages.
-                # "every published page" is what a deploy carries, not a page deployed on its own.
-                destinations_removed: str = PUBLISHED_PAGES.sub(" ", PAGES_PRODUCTS.sub(" ", following))
-                found = DEPLOY_A_PAGE.search(destinations_removed)
-                if found is not None:
-                    messages.append(
-                        repr(word) + " is followed by " + repr(found.group(0)) + ": a page is PUBLISHED; "
-                        "DEPLOY sends a section's whole site"
-                    )
+    for pattern, why in PUBLISH_DEPLOY_MISUSE:
+        for found in pattern.finditer(cleaned):
+            messages.append(repr(found.group(0).replace("ThatDestination", "the Pages destination")) + " " + why)
     return messages
 
 
