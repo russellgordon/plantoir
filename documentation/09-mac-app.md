@@ -4717,8 +4717,9 @@ buttons do it in one click, Russell's ruling 5).
 
 Three skills help a teacher with assessment: `plantoir-test-authoring`
 (#751) writes a unit test and the kit to mark it from, `plantoir-marking`
-(#750) marks papers onto feedback sheets, and a third drafts report
-comments (#752). Neither app reads or writes any file they make. Each
+(#750) marks papers onto feedback sheets, and `plantoir-report-comments`
+(#752) drafts report card comments from the marking. Neither app reads or
+writes any file they make. Each
 reaches a working folder as every skill does, and the contract is
 `shared-rules.json` → `assessment`. This subsection was started by #751;
 #750 and #752 add theirs below.
@@ -5167,7 +5168,9 @@ the trail, because it would be student data.
   direction. Must-fails: a runner that passes every line, or passes
   stderr through, lets the invented names out (`test_marking_guard.py`).
 - **The named step (review H2, M3).** `make_named_copies.py` is the only
-  script that puts a name into anything: the TeX-escaped name into each
+  script that puts a name into anything (since #752 the first names into
+  report comments as well: "The report-comments skill" below): the
+  TeX-escaped name into each
   sheet's one `\studentline{}`, compiled in a temporary folder outside both
   folders with its output captured and thrown away, never `--keep-logs`,
   the PDF alone moved into `Named/`. MEASURED (tectonic 0.17.0): a failed
@@ -5216,6 +5219,109 @@ the trail, because it would be student data.
 NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
 Codex) marking invented scanned papers, which the plan makes the gate that
 matters; it needs the screen-free Mac and is written up for the director.
+
+**The report-comments skill (#752).** The tenth skill,
+`plantoir-report-comments`, drafts report card comments from what
+`plantoir-marking` wrote: three options per student, each complete, so the
+teacher picks or blends. It has a `SKILL.md` and one reference, and no
+scripts of its own: the names go in through `plantoir-marking`'s
+`make_named_copies.py`, which gained three modes, run through the same
+never-adapted runner (`assessment.agentGuidance.reportCommentsSkill.uses`).
+Russell's kit had a separate comments script; REJECTED: a second name
+script, because two copies of the name step drift.
+
+- **What a comment is drawn from.** The marks records of tests marked from
+  scanned papers (`summary`, `strengths`, `focus`, `closing`, `byQuestion`,
+  each point's `studentNote`), the kit and the rulings, once the marks are
+  final; evidence from the records only. No skill marks a coding assignment
+  yet (750b is not built), so the skill says plainly that there is no record
+  of one. It drafts about something no record holds only from the teacher's
+  own notes, written by identifier in `Teacher Notes.md` and read only
+  after `make_named_copies.py --check-file` (through the runner) finds no
+  word of the mapping table in them. That check prints line numbers, never
+  the words, and its clean line says what it cannot find (a nickname, a name
+  the table does not hold).
+- **Whose shape.** The teacher's How I Teach page first, then the school's
+  own report convention, ASKED: the limit and whether the system counts
+  characters or bytes, line breaks, who the comment speaks about and in what
+  tense, the parts, words required or avoided; recorded in `Marking
+  Settings.md`. Russell's shape (formal, past tense, did well, still
+  working on, one next step, written for a parent as well as the student,
+  450 characters) is in `reference/template.md` as the comment shape of the
+  named template, offered with it only to a teacher who has shown the
+  interest it bridges, and shown to anyone else only as one teacher's
+  example when they have no convention and ask for a suggestion (plan review
+  L5). REJECTED: his shape as the default, since report conventions belong
+  to the school or board. Fixed for everyone: three options, kind, plain
+  words, evidence only, within the limit after the names go in, and a
+  separate reviewer checking each option against the records it cites.
+- **Names, and why no pronouns by default.** Drafts write `{first name}` and
+  are written so that no pronoun is needed. The assistant never asks for,
+  guesses or holds a pronoun or gender. Russell's kit had a `gender` column
+  on the assistant's side of its comment rows; REJECTED, because the
+  assistant does not know them and must not hold them. Only when the
+  teacher says the table has a `pronouns` column may a draft use `{they}`,
+  `{them}`, `{their}`, `{theirs}` (capitalised at a sentence's start),
+  filled from that column (`she/her`, `he/him`, `they/them` or four words);
+  a pronoun placeholder with no column, or with an empty value, refuses the
+  run. The first name is the `first name` column, else the part after the
+  comma of "Last, First", and otherwise refused, never guessed from a name
+  with no comma.
+- **A name in a draft.** `--comments` refuses the whole run, writing
+  nothing, when a draft already holds a word from the table before the
+  names go in: in an option (named by option and word number, never the
+  word), in another field of the student's entry such as `cites`, or on a
+  line of `Comments - Drafts.md` beside it. It compares as the runner does
+  (case and accents off; a part of four letters or more as a whole word, six
+  or more inside a word, two or three only beside another part of the same
+  name). This is what catches a comment that quotes a student's work
+  holding their own or a classmate's name. The runner cannot, because the
+  drafts existed before the run and it looks only at what a run writes in
+  the marking folder. An everyday word that is also a name (May, Will) is
+  refused too, the safe direction; the skill says to rewrite the option
+  without it.
+- **Why the length is checked after the names go in.** `{first name}` is 12
+  characters, so a draft that fits can be over with a long name in it, and
+  one that looks over can fit with a short one; only the filled text counts.
+  It is counted in Unicode characters of the NFC text, or UTF-8 bytes with
+  `--count bytes`, because report systems differ and a system that counts
+  bytes counts an accented letter as two. MEASURED (`commentNames.cases`,
+  20, every comment typed and counted by hand): `Zoë` is 3 characters and 4
+  bytes; a table that holds it decomposed (e and a combining diaeresis)
+  counts 3 only after NFC; a 47-character draft for a 14-letter first name
+  is 2 over a limit of 47. `--longest-first-name` prints the longest first
+  name's length in characters and bytes for the budget, never the name. A
+  comment over the limit is still written, marked "OVER THE LIMIT by N" in
+  the teacher's files, and named by identifier and option; the run exits 1.
+  The line saying every comment is within the limit is printed only after
+  each was counted. `Report Comments.csv` is UTF-8 with a byte order mark
+  so a spreadsheet opens the accents; it and `Report Comments.md` go only
+  into the teacher-only folder, with the full name beside the identifier
+  for finding each student in the report system.
+- **Tests.** `scripts/test_marking_comments.py` runs every case directly and
+  through the runner (which must withhold no line and move nothing), checks
+  that no word of the table is printed and nothing new is in the marking
+  folder, and checks the skill's files and pins. Must-fails by copy and
+  restore, each red: counting bytes when no count is given (5 cases), the
+  draft counted before the names go in (8), no look for a name in a draft
+  (the two quoting cases), NFC dropped at both the table read and the
+  filled comment (the decomposed case; dropping either alone stays green,
+  because each covers the other), a pronoun filled with no column, the
+  drafts page not looked at, an over-limit line carrying the name (directly
+  and through the runner), the marking skill without
+  `make_named_copies.py`, and a pinned sentence taken out. `--self-test`
+  now tests the comments always and the named sheets only where tectonic
+  and pdftotext are installed, saying which. Before, a missing tectonic
+  failed it outright, which would have stopped a teacher who only wants
+  comments.
+- **How a teacher finds out.** `plantoir-marking` mentions it once when the
+  marks are final; the root `CLAUDE.md` and `AGENTS.md` name it in one
+  bullet each; it offers nothing after itself, being the last step. Nothing
+  on plantoir.app, no new app text, no trail event (the app does nothing
+  new, and work on student records is never recorded).
+
+NOT MEASURED in this piece: a trial with a real assistant drafting comments
+from invented marks records; it is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

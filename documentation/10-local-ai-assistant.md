@@ -8312,7 +8312,11 @@ can catch up on" (`handoutsSkill.offeredTemplate`) that is OFFERED, never
 applied, and only to a teacher who has shown an interest in both
 constructivist and Thinking Classrooms practice and the reality of a
 school where students often miss class (his ruling on #765, 2026-11-12). The unit-planning skill (#707) already took its lesson
-shape from the page. Why, and what was rejected:
+shape from the page, and the marking (#750) and report-comments (#752)
+skills read it first as well; for report comments the school's own
+convention is asked next, and one teacher's comment shape is shown only as
+an example (`documentation/09-mac-app.md` → "Tests, marking and report
+comments"). Why, and what was rejected:
 `documentation/09-mac-app.md` → "Lesson materials, and whose way of
 teaching (#765, v1.10.0)".
 
