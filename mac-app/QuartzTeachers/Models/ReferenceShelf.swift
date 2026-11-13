@@ -596,6 +596,30 @@ nonisolated enum ReferenceShelf {
         )
     }
 
+    /// True when two arrangements say the same thing about the shelf: the
+    /// same groups in the same order, the same placements, the same no-year
+    /// name, and the same entries kept for another version.
+    static func saysTheSame(_ first: Arrangement, _ second: Arrangement) -> Bool {
+        if first.noYearGroupName != second.noYearGroupName {
+            return false
+        }
+        if first.groups != second.groups || first.placements != second.placements {
+            return false
+        }
+        if first.keptGroupEntries.count != second.keptGroupEntries.count {
+            return false
+        }
+        var firstKept: [String] = []
+        for (folderName, _) in first.keptPlacementEntries {
+            firstKept.append(folderName)
+        }
+        var secondKept: [String] = []
+        for (folderName, _) in second.keptPlacementEntries {
+            secondKept.append(folderName)
+        }
+        return firstKept.sorted() == secondKept.sorted()
+    }
+
     /// The arrangement with the placements nobody needs taken out: those of
     /// a folder that is not there, and those naming a group that is not
     /// there. A folder counts as there while a replace or an import of it is

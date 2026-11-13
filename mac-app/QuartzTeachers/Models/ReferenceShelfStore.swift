@@ -36,7 +36,10 @@ import Foundation
 ///
 /// **Nothing here touches a course folder.** It reads whether a folder is
 /// there, and that is all.
-enum ReferenceShelfStore {
+///
+/// `nonisolated`: it does nothing a window owns, and a removal or a restore
+/// may run it off the main actor.
+nonisolated enum ReferenceShelfStore {
 
     // MARK: - Types
 
@@ -126,6 +129,11 @@ enum ReferenceShelfStore {
         if case .absent = reading, arrangement.isEmpty {
             return .unchanged(arrangement)
         }
+        // Nothing the change or the pruning moved: the file is left exactly
+        // as it is, hand-written layout and all.
+        if case .read = reading, ReferenceShelf.saysTheSame(arrangement, before) {
+            return .unchanged(arrangement)
+        }
         guard let newData = try? ReferenceShelf.encoded(arrangement) else {
             return .refused(ReferenceGroupWording.couldNotSaveGroups)
         }
@@ -162,7 +170,10 @@ enum ReferenceShelfStore {
 
     /// Tells every window on that folder to read the shelf again.
     static func announceChange(inCoursesDirectory coursesDirectoryURL: URL) {
-        NotificationCenter.default.post(name: ReferenceShelfStore.didChange, object: coursesDirectoryURL.path)
+        let path: String = coursesDirectoryURL.path
+        Task { @MainActor in
+            NotificationCenter.default.post(name: ReferenceShelfStore.didChange, object: path)
+        }
     }
 
     // MARK: - What the teacher does
@@ -536,7 +547,7 @@ enum ReferenceShelfStore {
 
 /// A group change the teacher asked for that did not happen, as the sentence
 /// they read.
-struct ReferenceShelfRefusal: Error, Equatable {
+nonisolated struct ReferenceShelfRefusal: Error, Equatable {
 
     // MARK: - Stored properties
 

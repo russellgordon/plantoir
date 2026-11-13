@@ -17,7 +17,7 @@ import Foundation
 /// The LIVE course a teacher is teaching sits in no group at all, so this
 /// year's ICS3U never collides with a reference ICS3U. That is the ordinary
 /// case, not an exception.
-enum ReferenceCourseRule {
+nonisolated enum ReferenceCourseRule {
 
     // MARK: - Types
 

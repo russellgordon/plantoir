@@ -282,13 +282,13 @@ enum ReferenceReplacer {
     /// course sees it: discovery, the backups list, the launchers (which
     /// refuse a dotted name) and Windows (`Workspace.cs` skips any `courses/`
     /// entry beginning with `.`).
-    static let asidePrefix: String = ".plantoir-replacing-"
+    nonisolated static let asidePrefix: String = ".plantoir-replacing-"
 
 
     // MARK: - Functions
 
     /// `.plantoir-replacing-<FOLDER>`.
-    static func asideName(for folderName: String) -> String {
+    nonisolated static func asideName(for folderName: String) -> String {
         return ReferenceReplacer.asidePrefix + folderName
     }
 
