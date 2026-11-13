@@ -807,6 +807,98 @@ class DialogClosingTextPinTests(unittest.TestCase):
             self.assertNotIn(f'box.addEventListener("{kind}"', unguarded)
 
 
+class ResetKeepsTheSketchTextPinTests(unittest.TestCase):
+    """#792: GeoGebra's reset icon puts a sketch back to how it opened.
+
+    Like the class above, a TEXT PIN on the loader's source and nothing more:
+    what the loader does is proved in a real browser by
+    browser-checks/geogebra_applet.mjs (item 11: a real press on the icon of
+    a sketch written as lines and of one from a file, the construction read
+    back, a drag after it, and a must-fail against the old loader). It is
+    the guard the Windows suite can run. Before #792 a reset left a sketch
+    written as lines with only its axes, and removed a sketch from a file,
+    because reset calls appletOnLoad again and the loader took that for a
+    load that had come too late (geogebraFences.reset)."""
+
+    LOADER = DialogClosingTextPinTests.LOADER
+    source = DialogClosingTextPinTests.source
+    function = DialogClosingTextPinTests.function
+
+    def applet_on_load(self):
+        text = self.source()
+        start = text.index("appletOnLoad: (api: Api) => {")
+        return text[start:text.index("\n      },\n", start)]
+
+    def test_a_second_applet_on_load_keeps_the_sketch(self):
+        load = self.applet_on_load()
+        self.assertIn("if (opened) {", load)
+        removal = "if (settled || !samePage()) {"
+        self.assertIn(removal, load)
+        self.assertLess(load.index("if (opened) {"), load.index(removal),
+                        "the loader removes a sketch whose reset called appletOnLoad again, before asking whether it had already opened (#792)")
+        reopened = load[load.index("if (opened) {"):load.index(removal)]
+        self.assertIn("open.set(figure, api)", reopened)
+        self.assertIn("setErrorDialogsActive(false)", reopened)
+        self.assertIn("opened = true", load[load.index(removal):])
+
+    def build_from_lines(self):
+        text = self.source()
+        start = text.index("const buildFromLines = async (")
+        return text[start:text.index("\n  }\n", start)]
+
+    def test_what_the_lines_built_becomes_the_sketch_file(self):
+        keep = self.function("keepAsStart")
+        self.assertIn("file = api.getBase64()", keep)
+        self.assertIn("api.setBase64(file,", keep)
+        # Nothing is kept from an empty file: setBase64("") empties the
+        # sketch and never calls back (#792 review L1).
+        self.assertIn('if (typeof file !== "string" || file === "") {', keep)
+        build = self.build_from_lines()
+        self.assertIn("await keepAsStart(api)", build)
+        load = self.applet_on_load()
+        # "ran" is said only once what the lines built is the sketch's file,
+        # so the browser check's reset cannot come before it.
+        after = load[load.index("void buildFromLines("):]
+        self.assertIn(".then(() => {", after)
+        self.assertLess(after.index(".then(() => {"), after.index('figure.dataset.geogebraCommands = "ran"'))
+
+    def test_only_lines_run_from_start_to_end_are_kept(self):
+        # #792 review M1: a reset while the lines run left a half-built
+        # sketch, and keepAsStart kept that half as its start.
+        build = self.build_from_lines()
+        self.assertIn("markUntouched(api)", build)
+        self.assertIn("!stillUntouched(api)", build)
+        self.assertIn("startFrom(api, file)", build)
+        self.assertIn("whole = ran.complete", build)
+        self.assertIn("if (whole) {", build)
+        self.assertLess(build.index("if (whole) {"), build.index("await keepAsStart(api)"))
+        self.assertIn("unmark(api)", build)
+        run = self.function("runCommands")
+        self.assertIn("return { refused, complete: false }", run)
+
+    def test_presses_are_held_while_the_lines_run_but_not_the_loaders_own_click(self):
+        hold = self.function("holdPresses")
+        self.assertIn("if (!event.isTrusted) {", hold,
+                      "holdPresses would also stop the click() that closes GeoGebra's dialogs, leaving a shade per line (#755)")
+        for kind in ("pointerdown", "mousedown", "touchstart", "keydown", "keyup"):
+            self.assertIn(f'"{kind}"', hold)
+        # Space and Enter press the reset icon from GeoGebra's keyboard
+        # cycle (#792 review M1); every other key, Tab included, goes through.
+        self.assertIn('event.key !== " "', hold)
+        self.assertIn('event.key !== "Enter"', hold)
+        self.assertNotIn('"Tab"', hold)
+        load = self.applet_on_load()
+        self.assertIn("holdPresses(box)", load)
+        self.assertIn(".finally(letPressesThrough)", load)
+
+    def test_the_contract_says_where_the_icon_is(self):
+        icon = rules("reset", "icon")
+        for key in ("fromRight", "fromTop"):
+            self.assertIsInstance(icon[key], (int, float))
+            self.assertGreater(icon[key], 0)
+        self.assertIn("#792", rules("reset", "rule"))
+
+
 if __name__ == "__main__":
     use_the_repository_contract()
     unittest.main()

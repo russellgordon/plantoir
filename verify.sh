@@ -3405,6 +3405,15 @@ open(path, "w", encoding="utf-8").write(text)
 GGBCOMMANDS
 printf -- '---\ntitle: GeoGebra Second\n---\nThe same sketch, from another folder (plantoir-geogebra-second).\n\n```geogebra\nfile: Investigations/GeoGebra Fixture Lines.ggb\nalt: The planted sketch again (plantoir-alt-second).\n```\n\nA sketch from geogebra.org, kept from before:\n\n```geogebra\nmaterial_id: https://www.geogebra.org/m/plantoirvrfy578\nalt: A sketch from geogebra.org (plantoir-alt-material).\n```\n' \
   > "$HIT_COURSE/Discussions/GeoGebra Second.md"
+# #792 review M1: a long sketch written as lines, 150 points, so that its
+# lines run long enough for the browser check (item 12) to press keys while
+# they do. Every line makes one point: the check counts them.
+python3 - "$HIT_COURSE/Discussions/GeoGebra Second.md" <<'GGBLONG'
+import sys
+lines = "".join(f"P_{{{n}}} = ({n % 9 - 4}, {n % 7 - 3})\n" for n in range(150))
+with open(sys.argv[1], "a", encoding="utf-8") as page:
+    page.write("\nA long sketch written as lines:\n\n```geogebra\nalt: One hundred and fifty points (plantoir-alt-long).\n" + lines + "```\n")
+GGBLONG
 # Stage 4: that geogebra.org sketch's SAVED COPY, beside the course's built
 # sites under the fence's key, as an earlier build would have left it - so
 # this build must ask geogebra.org nothing (geogebraFences.cache). The id is
@@ -5825,9 +5834,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
        /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
        /Investigations/Quiz-GeoGebra.html >>/tmp/verify_geogebra_applet.log 2>&1; then
-    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, then no shade of GeoGebra's left on the page, the sketch's own canvas at its centre and its slider moved by a real drag - and the must-fail, a dialog removed the way the loader did before #755, leaving the same drag unmoved (#755), the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, #755, browser-checks/geogebra_applet.mjs)"
+    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, then no shade of GeoGebra's left on the page, the sketch's own canvas at its centre and its slider moved by a real drag - and the must-fail, a dialog removed the way the loader did before #755, leaving the same drag unmoved (#755), GeoGebra's reset icon pressed for real on the commands sketch and the file sketch, each back as it opened and taking a drag again, and real Shift+Tab and Space while a 150-line sketch's lines ran leaving every point (#792), the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, #755, #792, browser-checks/geogebra_applet.mjs)"
   else
-    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, were published twice, or once their lines had run were shaded over or would not take a drag (browser-checks/geogebra_applet.mjs, #578, #755)"
+    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, were published twice, or once their lines had run were shaded over or would not take a drag, or did not come back as they opened after a press on the reset icon, or were left half built by keys pressed while their lines ran (browser-checks/geogebra_applet.mjs, #578, #755, #792)"
     cat /tmp/verify_geogebra_applet.log
   fi
   rm -rf "$GEOGEBRA_SITE"
