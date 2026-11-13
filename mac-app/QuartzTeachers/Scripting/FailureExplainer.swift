@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = sectionIsBeingDeployedExplanation(in: output) {
             return reason
         }
+        if let reason = previewAddressIsAnotherPreviewsExplanation(in: output) {
+            return reason
+        }
         if let refusal = sectionDeployRefusal(in: output) {
             return refusal.sentence
         }
@@ -108,6 +111,28 @@ struct FailureExplainer {
                 continue
             }
             return liftedSentence(from: line)
+        }
+        return nil
+    }
+
+    /// The words a serving preview stops with when another live preview has
+    /// claimed its address in the website builder (#835) —
+    /// `shared-rules.json` → `twoPreviewsOneAddress.sentences.launcher`,
+    /// whose first line carries them.
+    static let previewAddressIsAnotherPreviewsMarker: String = "started somewhere else on this computer is using the same address"
+
+    /// The second line of that refusal, which says what to do.
+    static let previewAddressIsAnotherPreviewsAdvice: String = "Stop that preview, then try again."
+
+    /// The refusal LIFTED, as #381's is: the launcher's first line with the
+    /// cross taken off, then what to do. "Nothing was changed." is left to
+    /// the window. Pinned by `twoPreviewsOneAddress.failureExplanationCases`.
+    static func previewAddressIsAnotherPreviewsExplanation(in output: String) -> String? {
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard line.contains(previewAddressIsAnotherPreviewsMarker) else {
+                continue
+            }
+            return liftedSentence(from: line) + " " + previewAddressIsAnotherPreviewsAdvice
         }
         return nil
     }

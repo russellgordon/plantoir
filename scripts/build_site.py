@@ -1178,6 +1178,168 @@ def stop_preview_serving(output_dir: Path) -> int:
     return stopped
 
 
+# --- Two previews, one address (#835) ---------------------------------------
+# A working folder's previews share its website builder's four addresses
+# (8081-8084 inside it), and the program that starts a preview chooses which
+# one. Each copy of Plantoir, and each assistant's server, chooses on its own,
+# so two of them could hand two previews the same address, and the second's
+# kill_existing_quartz then stopped the first: 3 of 3 measured, 2026-11-13.
+# So a serving run CLAIMS its address for its whole life, under one lock for
+# the builder, and a run whose address another live preview has claimed
+# stops in words before it builds, rather than stopping that preview. A
+# claim is a small file in the builder's temporary folder naming the
+# claiming build's process, WHEN that process started, and its course and
+# section. It is released when that build ends (normally, by Stop's SIGINT,
+# or by SIGTERM or SIGHUP, which are turned into an ordinary exit).
+#
+# A claim counts only when it PROVES its holder is still that run: the
+# process id is alive AND started at the moment the claim recorded. The id
+# alone proves nothing: the builder's /tmp outlives a restart, and after one
+# the builder hands out the same ids again (pid 19 three times of three, the
+# #835 implementation review), so a claim left by a killed preview named a
+# process that was now some other program's, and a preview was refused for
+# one that did not exist. A claim that proves nothing is taken over, and
+# preview.sh writes that on the trail before the build.
+# contracts/shared-rules.json -> twoPreviewsOneAddress; tested by
+# scripts/test_two_previews_one_address.py.
+PREVIEW_ADDRESS_TAKEN_EXIT = 75
+
+
+def _the_preview_claims_folder() -> Path:
+    return Path(os.environ.get("PLANTOIR_PREVIEW_CLAIMS_DIR") or tempfile.gettempdir())
+
+
+def _when_a_process_started(pid: int) -> str:
+    """Something that is the same for one process for its whole life and
+    different for any later process given the same id: the kernel's boot id
+    and the process's start time (field 22 of /proc/<pid>/stat) inside the
+    builder; `ps -o lstart=` where there is no /proc (a Mac, under the tests).
+    "" when it cannot be read, which proves nothing."""
+    if pid <= 0:
+        return ""
+    stat = Path(f"/proc/{pid}/stat")
+    if Path("/proc/self/stat").exists():
+        try:
+            fields = stat.read_text(encoding="utf-8", errors="replace").rsplit(")", 1)[1].split()
+            started = fields[19]
+        except (OSError, IndexError):
+            return ""
+        try:
+            boot = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
+        except OSError:
+            boot = ""
+        return f"proc:{boot}:{started}"
+    try:
+        said = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True,
+                              text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return f"ps:{said}" if said else ""
+
+
+def _the_claim_proves_its_holder(held: dict) -> bool:
+    """True only when the claim's process is alive AND is the one that wrote
+    the claim (it started when the claim says it did)."""
+    pid = held.get("pid") if isinstance(held.get("pid"), int) else 0
+    started = held.get("started") if isinstance(held.get("started"), str) else ""
+    if pid <= 0 or started == "":
+        return False
+    return _when_a_process_started(pid) == started
+
+
+def _the_claim_on(port: int) -> Path:
+    return _the_preview_claims_folder() / f"plantoir-preview-address-{int(port)}.claim"
+
+
+def _read_the_claim(claim: Path):
+    try:
+        held = json.loads(claim.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return held if isinstance(held, dict) else None
+
+
+def a_claim_that_proves_nothing(port: int, course_code: str, section_number: int) -> str | None:
+    """'<course> section <n>' when `port` carries another preview's claim
+    that does not prove its holder (so this run will take it over), else
+    None. preview.sh asks this before the build, for its trail line; the
+    take-over itself is claim_the_preview_address's."""
+    held = _read_the_claim(_the_claim_on(port))
+    if held is None:
+        return None
+    if held.get("course") == course_code and held.get("section") == int(section_number):
+        return None
+    if _the_claim_proves_its_holder(held):
+        return None
+    return f"{held.get('course')} section {held.get('section')}"
+
+
+def _end_normally_when_stopped():
+    """SIGTERM (what a stop sends first) and SIGHUP (a closed terminal)
+    become an ordinary exit, so the claim is given back by atexit. SIGINT
+    already is one (KeyboardInterrupt)."""
+    def _stopped(number, frame):
+        raise SystemExit(128 + number)
+    for name in ("SIGTERM", "SIGHUP"):
+        number = getattr(signal, name, None)
+        if number is None:
+            continue
+        try:
+            if signal.getsignal(number) in (signal.SIG_DFL, None):
+                signal.signal(number, _stopped)
+        except (OSError, ValueError):
+            pass
+
+
+def claim_the_preview_address(port: int, course_code: str, section_number: int) -> str | None:
+    """Claims `port` for this serving run. Returns None when it is ours now,
+    or "<course> section <n>" naming the live preview that holds it."""
+    try:
+        import fcntl
+    except ImportError:
+        return None
+    import atexit
+    folder = _the_preview_claims_folder()
+    mine = {"pid": os.getpid(), "started": _when_a_process_started(os.getpid()),
+            "course": course_code, "section": int(section_number)}
+    claim = _the_claim_on(port)
+    with open(folder / "plantoir-preview-addresses.lock", "a") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        held = _read_the_claim(claim)
+        if held is not None:
+            same = held.get("course") == course_code and held.get("section") == int(section_number)
+            if not same and held.get("pid") != os.getpid() and _the_claim_proves_its_holder(held):
+                return f"{held.get('course')} section {held.get('section')}"
+        writing = _a_private_temporary_beside(claim, ".plantoir-preview-address.")
+        writing.write_text(json.dumps(mine), encoding="utf-8")
+        os.replace(writing, claim)
+
+    def _give_the_address_back():
+        try:
+            with open(folder / "plantoir-preview-addresses.lock", "a") as lock:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+                now = _read_the_claim(claim)
+                if now is not None and now.get("pid") == os.getpid() and now.get("started") == mine["started"]:
+                    claim.unlink()
+        except OSError:
+            pass
+
+    atexit.register(_give_the_address_back)
+    _end_normally_when_stopped()
+    return None
+
+
+def refuse_when_the_preview_address_is_another_previews(port: int, course_code: str, section_number: int):
+    holder = claim_the_preview_address(port, course_code, section_number)
+    if holder is None:
+        return
+    print(f"❌ {course_code} section {section_number} cannot be previewed right now: a preview of "
+          f"{holder} started somewhere else on this computer is using the same address, and starting "
+          f"this one would stop it.")
+    print("   Stop that preview, then try again. Nothing was changed.")
+    sys.exit(PREVIEW_ADDRESS_TAKEN_EXIT)
+
+
 def kill_existing_quartz(port: int = 8081):
     # Only OUR port: several previews can run at once, one per port, and
     # starting one must never take down another window's preview.
@@ -4147,6 +4309,76 @@ def _is_locked(source: Path) -> bool:
     return not os.access(source, os.W_OK)
 
 
+def _the_course_folder_of(page: Path) -> Path | None:
+    """The folder holding course_config.json that `page` is inside, or None."""
+    folder = page.parent
+    for _ in range(64):
+        if (folder / "course_config.json").is_file():
+            return folder
+        if folder.parent == folder:
+            return None
+        folder = folder.parent
+    return None
+
+
+def _the_course_dating_lock(page: Path) -> Path | None:
+    """Where the course's one dating lock lives (#835 F3).
+
+    In the course's built-website folder (`.merged_output`, the builds
+    folder both builds of a working folder see), never among the teacher's
+    files. With no built-website folder yet, a file in the temporary folder
+    named for the course's path: both builds of a working folder run in its
+    one website builder, so they share that folder too."""
+    course = _the_course_folder_of(page)
+    if course is None:
+        return None
+    built = course / ".merged_output"
+    if built.is_dir():
+        return built / ".dating.lock"
+    import hashlib
+    named = hashlib.sha1(str(course.resolve()).encode("utf-8")).hexdigest()[:16]
+    return Path(tempfile.gettempdir()) / f"plantoir-dating-{named}.lock"
+
+
+class _HoldingTheCourseDatingLock:
+    """An exclusive lock around the date pass's last look and its rename.
+
+    Without it the look and the rename are two steps, so two sections dating
+    one shared page at once could each see the page unchanged, and the
+    second rename threw away the first's date while both said "written":
+    100 of 300 trials in a stand-in (2026-11-13). Held, the second sees the
+    first's write and declines, and its next build dates the page again. A
+    platform without fcntl (Windows) or a lock file that cannot be opened
+    goes ahead unlocked, which is how it behaved before #835."""
+
+    def __init__(self, page: Path):
+        self.page = page
+        self.handle = None
+
+    def __enter__(self):
+        try:
+            import fcntl
+        except ImportError:
+            return self
+        where = _the_course_dating_lock(self.page)
+        if where is None:
+            return self
+        try:
+            self.handle = open(where, "a")
+            fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX)
+        except OSError:
+            if self.handle is not None:
+                self.handle.close()
+            self.handle = None
+        return self
+
+    def __exit__(self, *exc):
+        if self.handle is not None:
+            self.handle.close()
+            self.handle = None
+        return False
+
+
 def _replace_the_page_safely(source: Path, original: str, rewritten: str,
                              suffix: str = ".plantoir-dating") -> bool:
     """
@@ -4172,12 +4404,15 @@ def _replace_the_page_safely(source: Path, original: str, rewritten: str,
             handle.flush()
             os.fsync(handle.fileno())
         shutil.copymode(source, temporary)
-        with open(source, "r", encoding="utf-8", newline="") as handle:
-            still_there = handle.read()
-        if still_there != original:
-            temporary.unlink()
-            return False
-        os.replace(temporary, source)
+        # The last look and the rename are one step for the whole course
+        # (#835 F3): another section's build dating the same page waits here.
+        with _HoldingTheCourseDatingLock(source):
+            with open(source, "r", encoding="utf-8", newline="") as handle:
+                still_there = handle.read()
+            if still_there != original:
+                temporary.unlink()
+                return False
+            os.replace(temporary, source)
         return True
     except Exception:
         try:
@@ -7352,26 +7587,98 @@ def discover_section_items(section_dir: Path) -> tuple[list[str], list[str]]:
         print(f"⚠️ Could not scan section root for discovery: {e}")
     return found_folders, found_files
 
+def _a_private_temporary_beside(path: Path, prefix: str) -> Path:
+    """A new, empty file beside `path` whose name nobody else is using.
+
+    Hidden (a leading dot) and ending .tmp, so discovery, the reference lock
+    and a section's fingerprint all leave it alone (#835 F2)."""
+    handle, name = tempfile.mkstemp(dir=str(path.parent), prefix=prefix, suffix=".tmp")
+    os.close(handle)
+    return Path(name)
+
+
+def _replace_with_the_mode_of(temporary: Path, path: Path):
+    """os.replace, keeping the replaced file's permissions (mkstemp makes 0600)."""
+    try:
+        os.chmod(temporary, path.stat().st_mode & 0o7777)
+    except OSError:
+        pass
+    os.replace(temporary, path)
+
+
+# The two prefixes only _atomic_write_json_with_backup uses for its own
+# temporaries, and how old one must be before a later write may remove it.
+_CONFIG_TEMPORARY_PREFIXES = (".course_config.backup.", ".course_config.")
+_A_STALE_CONFIG_TEMPORARY_SECONDS = 60
+
+
+def _remove_stale_config_temporaries(path: Path):
+    """A writer killed mid-write leaves its hidden temporary beside the
+    config, one per kill (#835 review L2). The next write removes those: only
+    names this writer alone makes (`.course_config.<random>.tmp` and
+    `.course_config.backup.<random>.tmp`), and only when older than a minute,
+    so another build's write in progress is never touched. Nothing else in
+    the course folder is looked at twice."""
+    import time
+    now = time.time()
+    try:
+        entries = list(path.parent.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        name = entry.name
+        if not name.endswith(".tmp"):
+            continue
+        ours = False
+        for prefix in _CONFIG_TEMPORARY_PREFIXES:
+            if name.startswith(prefix):
+                ours = True
+        if not ours:
+            continue
+        try:
+            if now - entry.lstat().st_mtime > _A_STALE_CONFIG_TEMPORARY_SECONDS and entry.is_file():
+                entry.unlink()
+        except OSError:
+            pass
+
+
 def _atomic_write_json_with_backup(path: Path, data: dict):
-    """Write JSON atomically and back up original"""
+    """Write JSON atomically and back up original.
+
+    Each write goes through a temporary file of its OWN (#835 F2). Until #835
+    the temporary was one fixed name, course_config.json.tmp, so two builds
+    of a course writing at once (one copy of Plantoir building two sections
+    already can) renamed each other's half-written file into place: in a
+    stand-in of two writers, 224 and 301 reads of the config met a file that
+    was not JSON, and one trial ENDED that way (2026-11-13). The backup is
+    made the same way, copied to a temporary and renamed, so a reader never
+    meets a half-copied backup either."""
+    _remove_stale_config_temporaries(path)
     try:
         if path.exists():
             backup = path.with_suffix(".backup.json")
-            shutil.copy2(path, backup)
+            copying = _a_private_temporary_beside(path, ".course_config.backup.")
+            try:
+                shutil.copy2(path, copying)
+                os.replace(copying, backup)
+            finally:
+                if copying.exists():
+                    copying.unlink()
             print(f"🧾 Backed up course_config.json → {backup.name}")
     except Exception as e:
         print(f"⚠️ Could not create backup: {e}")
-    tmp = path.with_suffix(".json.tmp")
+    tmp = None
     try:
+        tmp = _a_private_temporary_beside(path, ".course_config.")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             f.write("\n")
-        os.replace(tmp, path)
+        _replace_with_the_mode_of(tmp, path)
         print("✅ Updated course_config.json with discovered items.")
     except Exception as e:
         print(f"❌ Failed to write updated course_config.json: {e}")
         try:
-            if tmp.exists():
+            if tmp is not None and tmp.exists():
                 tmp.unlink()
         except Exception:
             pass
@@ -9758,6 +10065,15 @@ def build_section_site(
 
     port: int = 8081,
 ):
+    # A serving run claims its address before it builds anything, and stops
+    # in words if another live preview holds it (#835). In the builder only:
+    # natively (Windows) the port is host-global and is probed again just
+    # before the bind, below.
+    if not build_only and os.name != "nt":
+        # The live-reload address is always port + 1000, so claiming the
+        # site's address claims both.
+        refuse_when_the_preview_address_is_another_previews(port, course_code, section_number)
+
     base_dir = toolchain_paths.COURSES_DIR
     course_dir = base_dir / course_code
     section_name = f"section{section_number}"
