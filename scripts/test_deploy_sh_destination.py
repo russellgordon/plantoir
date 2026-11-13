@@ -311,10 +311,24 @@ class TheSavedDestinationsAreTheContracts(unittest.TestCase):
                 expected.append("REFUSED\t" + leg["kind"] + "\t" + leg["refusal"])
         return expected
 
+    # The one case Windows' Python cannot run through Git Bash, by name (step 0
+    # of v2.0.0, 2026-11-13). Measured with `od -c` on Windows 11 Pro 26200:
+    # the heredoc reader, run by Windows' own Python, prints its lines with
+    # CRLF ("local_folder\t\r\n"), so bash reads an empty path as "\r", which
+    # is not empty, and the leg gets --to-folder instead of the refusal.
+    # No teacher runs deploy.sh on Windows (deploy.ps1 is that platform's
+    # launcher, and its own reader passes this case in test_launcher_rules.ps1);
+    # the Mac and Linux Pythons print "\n", so the case still runs there.
+    _CRLF_FROM_WINDOWS_PYTHON = "an additional folder with no folder is a refused leg, and the others still run"
+
     def _run_every_case(self, path=None):
         self.assertTrue(self.rule["cases"], "the contract carries no cases to run")
         for case in self.rule["cases"]:
             with self.subTest(case=case["name"]):
+                if os.name == "nt" and case["name"] == self._CRLF_FROM_WINDOWS_PYTHON:
+                    self.skipTest("Windows' Python prints the reader's lines with CRLF, so under Git Bash "
+                                  "an empty path reaches deploy.sh as a path of \\r; deploy.sh is the Mac's "
+                                  "launcher and deploy.ps1 passes this case")
                 self.assertEqual(self._legs(case, path), self._expected(case))
 
     @unittest.skipUnless(shutil.which("plutil"), "plutil is the Mac's reader")
