@@ -16090,12 +16090,15 @@ this is the app's half.
   the lease. `QuitConfirmation.Kinds` sorts the publishes into deploys, shares,
   password changes and stops; the question names each part ("sharing the unit
   plans of <CODE>", "changing the password for the unit plans of <CODE>",
-  "stopping sharing the unit plans of <CODE>", or "of N courses"), deploys
+  "stopping the sharing of the unit plans of <CODE>", or "of N courses"), deploys
   first, joined "A and B" or "A, B and C". The message is
   `messageOne`/`messageSeveral` with one clause per part: the class website
-  part way updated, the plans part way shared until shared again or stopped,
-  the new password not saved yet, the plans' address still working until
-  Stop Sharing is run again. Each clause was read off what that run leaves
+  part way updated, the plans part way shared, the new password not saved
+  yet, the plans' address still working. No clause carries its remedy: the
+  share bar already offers Share Again and Stop Sharing, and a remedy in each
+  clause made a two- or three-clause message misparse (the second fix
+  review). A Change Password's console is titled "Changing the password for
+  the … unit plans", not "Sharing". Each clause was read off what that run leaves
   when it stops early (`interruptionCases`, `changePasswordCases`,
   `stopSharing`); deploys alone read exactly as before. The update banner
   borrows the same phrase (`UpdateGate.workUnderWay`). REJECTED, each in the

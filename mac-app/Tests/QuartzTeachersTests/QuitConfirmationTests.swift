@@ -102,8 +102,8 @@ final class QuitConfirmationTests: XCTestCase {
             "stopClause": QuitConfirmation.stopClause,
             "deployMessage": QuitConfirmation.explanation(publishing: true),
             "question": QuitConfirmation.question(about: "{underWay}"),
-            "listSeparator": ", ",
-            "lastSeparator": " and ",
+            "listSeparator": QuitConfirmation.listSeparator,
+            "lastSeparator": QuitConfirmation.lastSeparator,
         ]
         for (key, value) in mine {
             XCTAssertEqual(words[key] as? String, value, key)

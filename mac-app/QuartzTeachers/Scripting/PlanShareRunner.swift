@@ -60,6 +60,11 @@ final class PlanShareRunner {
         if choice == .stop {
             return "Stopping sharing the \(PlanSharing.yearLabel(year)) unit plans"
         }
+        // A Change Password saves a new password and sends nothing (#833),
+        // so its console is not called sharing (#863 review).
+        if choice == .changePassword {
+            return "Changing the password for the \(PlanSharing.yearLabel(year)) unit plans"
+        }
         return "Sharing the \(PlanSharing.yearLabel(year)) unit plans"
     }
 

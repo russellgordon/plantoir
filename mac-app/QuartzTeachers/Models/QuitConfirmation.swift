@@ -237,12 +237,17 @@ enum QuitConfirmation {
     static let sharingSeveral: String = "sharing the unit plans of {n} courses"
     static let changingPasswordOne: String = "changing the password for the unit plans of {course}"
     static let changingPasswordSeveral: String = "changing the password for the unit plans of {n} courses"
-    static let stoppingOne: String = "stopping sharing the unit plans of {course}"
-    static let stoppingSeveral: String = "stopping sharing the unit plans of {n} courses"
+    static let stoppingOne: String = "stopping the sharing of the unit plans of {course}"
+    static let stoppingSeveral: String = "stopping the sharing of the unit plans of {n} courses"
 
     /// The message, with one thing that could be left part way, or several.
     static let messageOne: String = "Quitting now could leave it unfinished, with {clauses}."
     static let messageSeveral: String = "Quitting now could leave them unfinished, with {clauses}."
+
+    /// How the parts of the question and the clauses of the message are
+    /// joined: "A and B", "A, B and C".
+    static let listSeparator: String = ", "
+    static let lastSeparator: String = " and "
 
     /// What each kind of work could leave part way, read off what each one
     /// leaves when it stops early (`unitPlanning.share.interruptionCases`,
@@ -250,11 +255,14 @@ enum QuitConfirmation {
     /// leaves its marker at `sending` and the next share finishes it; a
     /// Change Password sends nothing and may not have saved the password
     /// yet; a Stop Sharing leaves the address answering until it is done.
-    /// None of the three plans' clauses names the class website.
+    /// None of the three plans' clauses names the class website, and none
+    /// carries its remedy: the share bar already offers Share Again or Stop
+    /// Sharing, and a clause with its own "until" made a message of two or
+    /// three clauses misparse.
     static let deployClause: String = "the class website part way updated"
-    static let shareClause: String = "the plans part way shared until you share them again or stop sharing them"
+    static let shareClause: String = "the plans part way shared"
     static let passwordClause: String = "the new password not saved yet"
-    static let stopClause: String = "the plans' address still working until you stop sharing them again"
+    static let stopClause: String = "the plans' address still working"
 
     static let keepWorkingButton: String = "Keep Working"
     static let quitAnywayButton: String = "Quit Anyway"
@@ -415,11 +423,11 @@ enum QuitConfirmation {
         var text: String = ""
         for index in 0..<(parts.count - 1) {
             if index > 0 {
-                text += ", "
+                text += listSeparator
             }
             text += parts[index]
         }
-        return text + " and " + parts[parts.count - 1]
+        return text + lastSeparator + parts[parts.count - 1]
     }
 
     /// The message for the clauses that apply, or nil for none.
