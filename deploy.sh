@@ -400,7 +400,8 @@ say_this_folder_cannot_be_reached() {
 #     program that started this work gone? (the_owners_of_the_work, in the
 #     PREVIEW PORT BLOCK);
 #   - deploy.sh's guard and preview.sh's build-leg guard (#439): is this
-#     section still being deployed by a scheduled script or another deploy.sh?
+#     section still being deployed by a scheduled script or another deploy.sh,
+#     or built by another `preview.sh --build-only` (#729)?
 #     (refuse_while_this_section_deploys, in the DEPLOY WHILE ITS SECTION
 #     DEPLOYS GUARD).
 # All three ask the_launchers_running, below, and each keeps its own POLICY —
@@ -450,8 +451,11 @@ say_this_folder_cannot_be_reached() {
 #            space ("Application Support"), so the word that ends in the
 #            name is looked for, never word 2.
 #   flags    the launcher's OWN words among --stop, --build-only,
-#            --builder-tag, --reset-token, --logout and --help (-h), without
-#            their dashes, ","-joined; "-" when none.
+#            --for-deploy, --builder-tag, --reset-token, --logout and --help
+#            (-h), without their dashes, ","-joined; "-" when none.
+#            --for-deploy (#729) is how a deploy's build leg, `preview.sh C S
+#            --build-only --for-deploy`, is told from the assistant's rebuild,
+#            which is the same line without it.
 #   folder   for a publish set for later, the folder id in its label, or "-"
 #            when the label carries none; "-" for everything else.
 #   places   the 1-based numbers of the PLACES this record is for,
@@ -580,7 +584,7 @@ the_launchers_running() {
           after = ""; flags = ""
           for (a = w + 1; a <= n; a++) {
             after = after " " word[a]
-            if (word[a] ~ /^--(stop|build-only|builder-tag|reset-token|logout|help)$/) {
+            if (word[a] ~ /^--(stop|build-only|for-deploy|builder-tag|reset-token|logout|help)$/) {
               flag = substr(word[a], 3)
               if (index("," flags ",", "," flag ",") == 0) flags = joined(flags, flag)
             } else if (word[a] == "-h" && index("," flags ",", ",help,") == 0) {
@@ -700,7 +704,7 @@ usage() {
   cat <<USAGE
 🧰 Usage:
   ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF] [--non-interactive]
-  ${SELF_CMD} <COURSE_CODE> --plans [--protect|--remove-password] [--change-password] [--include-answer-keys] [--year <YYYY>] [--stop-sharing] [--account <ACCOUNT_ID>] [--image REF] [--non-interactive]
+  ${SELF_CMD} <COURSE_CODE> --plans [--protect|--remove-password] [--change-password [--password-only]] [--include-answer-keys] [--year <YYYY>] [--stop-sharing] [--account <ACCOUNT_ID>] [--image REF] [--non-interactive]
 
 Examples:
   ${SELF_CMD} ICS3U 1
@@ -731,7 +735,8 @@ Notes:
   (courses/<COURSE>/.internal/planning) are shared through Cloudflare Pages as
   a small website of their own for this school year (#709). --protect asks
   for a username and password before any page opens, and stays on until
-  --remove-password; --change-password chooses a new one; --include-answer-keys
+  --remove-password; --change-password chooses a new one (with --password-only
+  it is saved and nothing is shared until the next share); --include-answer-keys
   keeps answer keys in a share without a password; --stop-sharing deletes the
   year's site (--year chooses an earlier school year, by the year it began).
 USAGE
@@ -963,6 +968,10 @@ ACCOUNT_ARG=""
 PLAN_PROTECT="false"
 PLAN_REMOVE_PASSWORD="false"
 PLAN_CHANGE_PASSWORD="false"
+PLAN_PASSWORD_ONLY="false"
+PLAN_KEYS_OPENLY="false"
+PLAN_CRED_ASKED_NOW="false"
+PLAN_CRED_TO_SAVE=""
 PLAN_ANSWER_KEYS="false"
 PLAN_STOP="false"
 PLAN_YEAR=""
@@ -972,7 +981,9 @@ while [[ $# -gt 0 ]]; do
     --protect) PLAN_PROTECT="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --remove-password) PLAN_REMOVE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --change-password) PLAN_CHANGE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --password-only) PLAN_PASSWORD_ONLY="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --include-answer-keys) PLAN_ANSWER_KEYS="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --send-answer-keys-openly) PLAN_KEYS_OPENLY="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --stop-sharing) PLAN_STOP="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --year)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
@@ -1058,6 +1069,17 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   fi
   if [[ -n "$PLAN_YEAR" && ! "$PLAN_YEAR" =~ ^[0-9]{4}$ ]]; then
     echo "❌ --year takes the year a school year began in, such as 2026."
+    exit 1
+  fi
+  # --password-only (#833): Change Password saves the new username and
+  # password and shares nothing; the app then offers Share Again
+  # (unitPlanning.share.changePasswordCases).
+  if [[ "$PLAN_KEYS_OPENLY" == "true" && ( "$PLAN_STOP" == "true" || "$PLAN_PASSWORD_ONLY" == "true" ) ]]; then
+    echo "❌ --send-answer-keys-openly goes with a share, not with --stop-sharing or --password-only."
+    exit 1
+  fi
+  if [[ "$PLAN_PASSWORD_ONLY" == "true" && ( "$PLAN_CHANGE_PASSWORD" != "true" || "$PLAN_STOP" == "true" || "$PLAN_REMOVE_PASSWORD" == "true" || "$PLAN_ANSWER_KEYS" == "true" ) ]]; then
+    echo "❌ --password-only goes with --change-password, and with no flag that shares or stops sharing."
     exit 1
   fi
   # Unit plans go to Cloudflare Pages and nowhere else (Russell, 2026-11-12),
@@ -1289,8 +1311,8 @@ fi
 # is gone, so they read as stale (workLeases.liveness) and nothing else stops a
 # second deploy of the section overlapping it. This is the layer every caller
 # reaches: the window's Deploy and an assistant's deploy (their build leg is
-# `preview.sh --build-only`, then `deploy.sh`), the newly set run's own legs,
-# and a deploy typed in Terminal. The rule and its cases are
+# `preview.sh --build-only --for-deploy`, then `deploy.sh`), the newly set
+# run's own legs, and a deploy typed in Terminal. The rule and its cases are
 # contracts/shared-rules.json -> deployWhileItsSectionDeploys.
 #
 # Asked by deploy.sh (not with --reset-token or --logout, which deploy
@@ -1299,7 +1321,10 @@ fi
 # checked and before anything is changed.
 #
 # What counts, read from the LIVE process table, never a remembered process id
-# or a lease file — so nothing left on disk can refuse a deploy for ever:
+# or a lease file — so nothing left on disk can refuse a deploy for ever.
+# Since #729 (Russell, 2026-11-12) that is ANY second build of the section as
+# well as a deploy: two builds of one section clear and fill the same folder,
+# and the first one fails.
 #   - "later": a deploy set for later of C/S whose SCRIPT is running as the
 #     program (`/bin/bash …/<label>.sh`; the reader's `program` field), with
 #     this folder's id in its label or none (a label from before #237). A label
@@ -1314,6 +1339,17 @@ fi
 #     #381, while `ps -p` still finds it running - one that has ended since
 #     the table was read does not, #737), and not only clearing a token or
 #     printing its help.
+#   - "another" as well: `preview.sh C S --build-only --for-deploy` as the
+#     program, working in this folder by the same lsof and `ps -p` rule. That
+#     is a deploy's build leg, run by a Plantoir app (the window, the in-app
+#     assistant, an outside assistant's deploy_section) before its deploy.sh
+#     starts (#729).
+#   - "building": `preview.sh C S --build-only` WITHOUT --for-deploy, by the
+#     same rule: the assistant's rebuild of the preview, or one typed in
+#     Terminal. It is refused for the same reason as a deploy (#729, the
+#     review's M7), in words that say "built", because it is not a deploy.
+#     Never a serving preview (#381 is that rule, the other way round), and
+#     never `preview.sh --stop`.
 # This run, its ancestors and its descendants never count (the reader's
 # family rule), so a scheduled run's own legs are never refused by its own
 # wrapper, and deploy.sh's own rebuild (`preview.sh --build-only` under a
@@ -1326,11 +1362,13 @@ fi
 # run's own legs, for as long as `ps` fails, which costs more than the rare
 # overlap this guard exists for.
 #
-# Prints "later" or "another" and returns 0 when the section is being
-# deployed; returns 1, printing nothing, otherwise. "later" wins when both are
-# seen: a leftover run's own deploy.sh is in the table beside its script.
+# Prints "later", "another" or "building" and returns 0 when the section is
+# being deployed or built; returns 1, printing nothing, otherwise. "later"
+# wins when more than one is seen: a leftover run's own deploy.sh is in the
+# table beside its script. "another" wins over "building": a deploy.sh's own
+# rebuild is a plain `--build-only` beside the deploy.sh that started it.
 what_is_deploying_this_section() {
-  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd seen=""
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd owner seen=""
   here="$(/bin/pwd -P)"
   folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
   # One place is asked about, so a record for it says "1".
@@ -1344,22 +1382,46 @@ what_is_deploying_this_section() {
           echo "later"
           return 0
         fi ;;
-      deploy.sh)
+      deploy.sh|preview.sh)
         case ",$flags," in
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
+        # A preview.sh counts only while it BUILDS without serving: a
+        # --build-only run that is not a --stop.
+        if [ "$what" = "preview.sh" ]; then
+          case ",$flags," in
+            *,stop,*) continue ;;
+            *,build-only,*) ;;
+            *) continue ;;
+          esac
+        fi
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
-        # Nothing from lsof, and the process has ENDED since the table was
-        # read: skipped (#737). A deploy.sh that exits between the two looks,
-        # in any folder, used to count. One still running whose folder lsof
-        # cannot answer for still counts, as #381 decided. `ps -p`, never
-        # `kill -0`, which also fails for another account's process that is
-        # running, and which this guard must still count.
-        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
-          continue
+        # Nothing from lsof: ask `ps -p` who owns the process. Nobody, so it
+        # has ENDED since the table was read: skipped (#737). A deploy.sh that
+        # exits between the two looks, in any folder, used to count. ANOTHER
+        # ACCOUNT, which is why lsof could not say: skipped too, because a
+        # folder that belongs to another account is not this one (#729 review,
+        # L-a1; until then another account's build of the same course and
+        # section refused this teacher's deploy, in every folder). THIS
+        # account, and lsof still could not say: it counts, as #381 decided,
+        # because a deploy or build of this very section is proved and only
+        # its folder is not. `ps -p`, never `kill -0`, which also fails for
+        # another account's process that is running.
+        if [[ -z "$cwd" ]]; then
+          owner="$(ps -p "$pid" -o uid= 2>/dev/null | tr -d ' ')"
+          if [[ -z "$owner" || "$owner" != "$(id -u)" ]]; then
+            continue
+          fi
         fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
-          seen="another"
+          if [ "$what" = "deploy.sh" ]; then
+            seen="another"
+          else
+            case ",$flags," in
+              *,for-deploy,*) seen="another" ;;
+              *) [ -n "$seen" ] || seen="building" ;;
+            esac
+          fi
         fi ;;
     esac
   done <<< "$records"
@@ -1371,24 +1433,35 @@ what_is_deploying_this_section() {
 }
 
 # refuse_while_this_section_deploys COURSE SECTION LEG — LEG is "deploy"
-# (deploy.sh) or "build" (preview.sh --build-only). The sentences are
+# (deploy.sh), "build" (preview.sh --build-only) or "deploy-build" (preview.sh
+# --build-only --for-deploy, a deploy's own build leg, #729). The sentences are
 # contracts/shared-rules.json -> deployWhileItsSectionDeploys.sentences, and
 # the trail lines that entry's launcherLines — both checked by
 # scripts/test_deploy_while_its_section_deploys.py. Exit 1, as #381's.
 refuse_while_this_section_deploys() {
-  local course="$1" section="$2" leg="$3" who what_stops not_again
+  local course="$1" section="$2" leg="$3" who what_stops not_again not_while_built
   who="$(what_is_deploying_this_section "$course" "$section")" || return 0
-  if [ "$leg" = "build" ]; then
-    what_stops="build"; not_again="built"
+  if [ "$leg" = "build" ] || [ "$leg" = "deploy-build" ]; then
+    what_stops="build"; not_again="built"; not_while_built="built again"
+    # A deploy's own build leg held up by another BUILD says what the
+    # teacher pressed: "cannot be deployed" (#729 review, L-a3).
+    if [ "$leg" = "deploy-build" ]; then
+      not_while_built="deployed"
+    fi
   else
-    what_stops="deploy"; not_again="deployed again"
+    what_stops="deploy"; not_again="deployed again"; not_while_built="deployed"
   fi
   echo ""
-  if [ "$who" = "later" ]; then
-    echo "❌ ${course} section ${section} is still being deployed by a deploy that was set for later, so it cannot be ${not_again} until that has finished."
+  if [ "$who" = "building" ]; then
+    echo "❌ ${course} section ${section} is already being built, so it cannot be ${not_while_built} until that has finished."
     echo "   Nothing was changed."
     echo ""
-    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was still being deployed by a deploy that was set for later"
+    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was already being built"
+  elif [ "$who" = "later" ]; then
+    echo "❌ ${course} section ${section} is still being deployed by a scheduled deploy that is still running, so it cannot be ${not_again} until that has finished."
+    echo "   Nothing was changed."
+    echo ""
+    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was still being deployed by a scheduled deploy that was still running"
   else
     echo "❌ ${course} section ${section} is already being deployed, so it cannot be ${not_again} until that has finished."
     echo "   Nothing was changed."
@@ -2534,7 +2607,19 @@ ask_for_the_plan_credential() {
     IFS= read -rsp "Please choose a password of 8 to 64 letters, digits, spaces or symbols: " password; echo
   done
   PLAN_CRED="${username}:${password}"
-  set_plan_credential_keychain "$PLAN_CRED"
+  # Saved now only by Change Password's --password-only; a share saves it
+  # once the plans' address uses it (#833, review L3), so a first share that
+  # fails leaves no Keychain item behind.
+  PLAN_CRED_TO_SAVE="$PLAN_CRED"
+  if [[ "$PLAN_PASSWORD_ONLY" == "true" ]]; then
+    save_the_plan_credential
+  fi
+}
+
+save_the_plan_credential() {
+  if [[ -z "$PLAN_CRED_TO_SAVE" ]]; then return 0; fi
+  set_plan_credential_keychain "$PLAN_CRED_TO_SAVE"
+  PLAN_CRED_TO_SAVE=""
   echo "✅ Saved the username and password for these unit plans in the macOS Keychain."
 }
 
@@ -2553,6 +2638,7 @@ if [[ "$PLANS_MODE" == "true" ]]; then
       fi
       if [[ -z "$PLAN_CRED" ]]; then
         ask_for_the_plan_credential
+        PLAN_CRED_ASKED_NOW="true"
       fi
     elif [[ "$PLAN_CHANGE_PASSWORD" == "true" ]]; then
       echo "❌ --change-password is for unit plans shared with a password: add --protect."
@@ -4800,11 +4886,69 @@ else
   echo "🚀 Deploying ${COURSE_CODE} S${SECTION_NUM} from: ${SECTION_DIR_IN_CONTAINER}"
 fi
 
-# --- Securely inject token into container without exposing on host CLI ---
+# >>> TOKEN HAND-OFF BLOCK >>> The token reaches the website builder through a
+# pipe into a file only this deploy knows the name of (#835 F1). Until #835 it
+# was one fixed path, /tmp/deploy_pat, in the ONE builder a working folder
+# shares, so two deploys started together (two courses today; two sections
+# once #835 narrows the hold) read each other's token or none: 29 and 6 of 60
+# in a stand-in of these two steps, run in a real builder (2026-11-13). Now
+# each deploy makes a fresh 0700 folder with mktemp and a 0600 file in it, the
+# shape the unit-plan credential already has (#709 review M4). Only the file's
+# NAME crosses into the reading step; the reading step deletes the folder
+# before it does anything else, and an exit before that step is reached
+# deletes it from the EXIT trap. The secret is never in an argument list, a
+# `docker exec -e`, the console or the trail. scripts/test_deploy_token_handoff.py
+# runs this block, two deploys at a time.
+DEPLOY_PAT_FILE=""
+
+# The reading half, run inside the builder as the start of each deploy's own
+# `sh -lc`. It refuses any name that is not one this block makes, so the
+# `rm -rf` can only ever remove a hand-off folder.
+TAKE_THE_TOKEN='case "${PAT_FILE:-}" in /tmp/deploy_pat.*/pat) ;; *) echo "❌ Plantoir could not hand the sign-in to the website builder, so nothing was changed." >&2; exit 1 ;; esac
+    tok=$(cat "$PAT_FILE"); rm -rf "${PAT_FILE%/pat}";
+'
+
+forget_the_token_file() {
+  if [[ -n "$DEPLOY_PAT_FILE" ]]; then
+    docker exec "$CONTAINER_NAME" sh -c 'case "$1" in /tmp/deploy_pat.*/pat) rm -rf "${1%/pat}" ;; esac' forget "$DEPLOY_PAT_FILE" >/dev/null 2>&1 || true
+    DEPLOY_PAT_FILE=""
+  fi
+}
+
+hand_the_token_to_the_builder() {
+  # $1: the token. printf is a builtin, so it is in no process's arguments.
+  DEPLOY_PAT_FILE="$(printf %s "$1" | docker exec -i "$CONTAINER_NAME" sh -c 'umask 077; d="$(mktemp -d /tmp/deploy_pat.XXXXXX)" && cat > "$d/pat" && printf %s "$d/pat"')" || DEPLOY_PAT_FILE=""  # never shown to a teacher: piped into the website builder, never printed
+  if [[ "$DEPLOY_PAT_FILE" != /tmp/deploy_pat.*/pat ]]; then
+    DEPLOY_PAT_FILE=""
+    if [[ "$PLANS_MODE" == "true" ]]; then
+      echo "❌ Plantoir could not hand the sign-in to the website builder, so nothing was shared."
+    else
+      echo "❌ Plantoir could not hand the sign-in to the website builder, so nothing was deployed."
+    fi
+    exit 1
+  fi
+  # Nothing in the trap may fail: under `set -e` a failing command there
+  # becomes the run's exit status.
+  trap 'forget_the_token_file || true; if declare -F give_back_the_ready_turn >/dev/null; then give_back_the_ready_turn || true; fi' EXIT
+  # bash 3.2 (macOS's /bin/bash) does not run the EXIT trap when a
+  # FOREGROUND command dies of SIGINT sent to the whole group (^C typed into
+  # the terminal): measured, the folder was left (#835 review M1). SIGINT is
+  # made an ordinary exit with the status it would have given, so the one
+  # EXIT trap removes the folder.
+  #
+  # SIGTERM and SIGHUP are deliberately NOT trapped. Untrapped, bash ends on
+  # either at once and still runs the EXIT trap (measured: nothing left, to
+  # the group or to bash alone). Trapped, bash defers the trap until the
+  # foreground command finishes, and the app's Stop (ScriptRunner.terminate,
+  # SIGTERM to bash alone) then waited for the whole deploy: 0.0 s untrapped,
+  # 19.7 s trapped against a 20 s command (#835 fix review N1).
+  trap 'exit 130' INT
+}
+# <<< TOKEN HAND-OFF BLOCK <<<
 if [[ "$TARGET" == "cloudflare" ]]; then
-  printf %s "$CF_TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
+  hand_the_token_to_the_builder "$CF_TOKEN"
 else
-  printf %s "$TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
+  hand_the_token_to_the_builder "$TOKEN"
 fi
 
 # ---- Sharing unit plans (#709): share_plan.py, then the Keychain ----------
@@ -4820,7 +4964,7 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   # share_plan.py, never the secret; share_plan.py deletes both on every
   # way out.
   _plan_cred_file=""
-  if [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
+  if [[ "$PLAN_SHARE_PROTECTED" == "true" && "$PLAN_PASSWORD_ONLY" != "true" ]]; then
     _plan_cred_file="$(printf %s "$PLAN_CRED" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; d="$(mktemp -d /tmp/plan_cred.XXXXXX)" && cat > "$d/cred" && printf %s "$d/cred"')"  # never shown to a teacher: piped into the website builder, never printed
     if [[ "$_plan_cred_file" != */plan_cred.*/cred ]]; then
       echo "❌ Plantoir could not hand the username and password to the website builder, so nothing was shared."
@@ -4833,20 +4977,26 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   if [[ -n "$_plan_cred_file" ]]; then _plan_opts+=(--credential-file "$_plan_cred_file"); fi
   if [[ "$PLAN_STOP" == "true" ]]; then
     _plan_opts+=(--stop)
+  elif [[ "$PLAN_PASSWORD_ONLY" == "true" ]]; then
+    # The new password is saved in the Keychain already; share_plan.py only
+    # notes in the year's marker that it waits for a share (#833).
+    _plan_opts+=(--new-password-waiting)
   elif [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
     _plan_opts+=(--protect)
   elif [[ "$PLAN_REMOVE_PASSWORD" == "true" ]]; then
     _plan_opts+=(--remove-password)
   fi
   if [[ "$PLAN_ANSWER_KEYS" == "true" && "$PLAN_STOP" != "true" ]]; then _plan_opts+=(--include-answer-keys); fi
+  if [[ "$PLAN_KEYS_OPENLY" == "true" ]]; then _plan_opts+=(--send-answer-keys-openly); fi
   if [[ "$NON_INTERACTIVE" == "true" ]]; then _plan_opts+=(--non-interactive); fi
   _share_rc=0
   docker exec $_EXEC_TTY \
     -e HOST_TZ_OFFSET="${HOST_TZ_OFFSET}" \
     -e CF_ACCOUNT="${CF_ACCOUNT}" \
     -e PLAN_COURSE="${COURSE_CODE}" \
+    -e PAT_FILE="${DEPLOY_PAT_FILE}" \
     "$CONTAINER_NAME" \
-    sh -lc 'tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
+    sh -lc "$TAKE_THE_TOKEN"'
       CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
         python3 /opt/scripts/share_plan.py --host-os mac --course "$PLAN_COURSE" "$@"' \
     share_plan "${_plan_opts[@]}" || _share_rc=$?
@@ -4859,10 +5009,22 @@ if [[ "$PLANS_MODE" == "true" ]]; then
       # Exactly plans-<year>.json: a marker a reference copy moved aside
       # (plans-<year>.previous-<moment>.json) is not a year still shared.
       for _marker in "courses/${COURSE_CODE}/.cloudflare_sites"/plans-[0-9][0-9][0-9][0-9].json; do
-        [[ -e "$_marker" ]] && _still_shared="true"
+        # A marker with an address: one holding only the teacher's choices
+        # names no site (#833, review L3).
+        [[ -e "$_marker" ]] && grep -q '"address"' "$_marker" 2>/dev/null && _still_shared="true"
       done
       if [[ "$_still_shared" != "true" ]]; then delete_plan_credential_keychain; fi
     fi
+  fi
+  # A password asked for this share is kept once the plans' address may use
+  # it: the share succeeded, or it got as far as giving this year an address
+  # (a proof that did not finish). A share that failed before that keeps
+  # nothing, so no stray Keychain item outlives it (#833, review L3).
+  if [[ -n "$PLAN_CRED_TO_SAVE" ]]; then
+    if [[ "$_share_rc" -eq 0 ]] || { [[ -f "$PLAN_MARKER_HOST" ]] && grep -q '"address"' "$PLAN_MARKER_HOST" 2>/dev/null; }; then
+      save_the_plan_credential
+    fi
+    PLAN_CRED_TO_SAVE=""
   fi
   exit "$_share_rc"
 fi
@@ -4883,9 +5045,9 @@ docker exec $_EXEC_TTY \
   -e TARGET="${TARGET}" \
   -e CF_ACCOUNT="${CF_ACCOUNT}" \
   -e PLANTOIR_PAGES_ALREADY_ASKED=1 \
+  -e PAT_FILE="${DEPLOY_PAT_FILE}" \
   "$CONTAINER_NAME" \
-  sh -lc '
-    tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
+  sh -lc "$TAKE_THE_TOKEN"'
     opts="";
     [ -n "$DIAGNOSE" ]  && opts="$opts $DIAGNOSE";
     # PARSING the flag is not enough — it has to reach the Python, which is

@@ -837,7 +837,7 @@ read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
 only, so the UI test accepts either and says which).
 
 **Coverage, owed (#793).** The mac's section page gained a Coverage tab
-(Website | Coverage | Problems) in v1.10.0, and with it a change Windows owes
+(Website | Coverage | Problems) in v2.0.0, and with it a change Windows owes
 here too: the mac now draws only the chosen tab's content, never one over
 another, because a layered tab left the preview able to take keys and browser
 commands. Windows' collapse of the covered layers already keeps them out of the
@@ -1147,10 +1147,10 @@ line/paragraph separators U+2028/2029 and the bidi overrides — none ends or
 splits a command line (measured) and they are characters a name might carry.
 Whether a control character belongs in a course name at all — it also reaches
 the sidebar, the title and the trail — was the follow-up, and is #780
-(v1.10.0): no, and the name is cleaned where it is READ, by
+(v2.0.0): no, and the name is cleaned where it is READ, by
 `contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
 C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
-Python did their half in v1.10.0;
+Python did their half in v2.0.0;
 this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
 `windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
 lands: a course name will reach it already clean, but it also cleans the page
@@ -1509,6 +1509,16 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   covers them too. A scheduled Cloudflare leg's output goes to a temporary
   file in `scheduledolder-problems` that the wrapper deletes after reading
   one marker from it; it is not redacted, and does not outlive the run.
+  **Two more rules since step 0 of v2.0.0** (2026-11-13, the mac's #709,
+  owed under #824 item 4 and taken early because the difference was live):
+  `urlUserinfo`, before `emailAddress`, which until then took the password
+  and the host from an address with a username and password written into it
+  and left the username in the line, and `basicAuthHeader`, anchored on
+  `Authorization:` so a course called
+  Basic French is left alone; same patterns and order as `LogRedactor.swift`.
+  The contract keeps both cases' credentials in pieces (`assembledFrom`, mac
+  #844), and `LogRedactorTests.Filled` builds the line before redacting it,
+  as `problemReportRedaction.assembledInput.rule` says.
 - **The trail.** `ActivityTrail.Event.DeployRefusedForTheCloudflareAccountId`
   ("deploy refused for the Cloudflare Account ID"), written from that
   refusal before the dialog goes up, by kind, never the ID: "ICS3U/1 · deploy
@@ -1991,12 +2001,13 @@ each case on its own; two Section-menu names against #489) and
 ledgered scenario must still FAIL, checked per case through
 `NamedGapLedger.Holding`/`ClosedMessage`, and
 `TheLedgeredScenariosAreStillInTheContract` checks the other direction; three
-Deploy-question scenarios against #489). The ledger file is the live list, and
-it is **empty**: batch 6 (#514) closed its last two entries the same day, and
+Deploy-question scenarios against #489). The ledger file is the live list. It
+was **empty** from that day: batch 6 (#514) closed its last two entries, and
 mac 1.7.2's sixteen plan-table sentences (#524), held open against #548 on
 2026-10-16, landed with #548's plan table that day ("The plan as a table",
 below); `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
-keeps the rule exercised on made-up entries meanwhile.
+keeps the rule exercised on made-up entries meanwhile. Since 2026-11-13 it
+holds the v2.0.0 run's 86 entries ("Step 0 of v2.0.0", below).
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
 BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
@@ -2040,6 +2051,134 @@ three helpers with no key by design, and the issue asked for the file to be
 the list, not for a second allow-list); searching the whole codebase for each
 sentence's text (a sentence built inline from pieces cannot be found by its
 text, and a text search would call a stale copy present).
+
+### Step 0 of v2.0.0: what the ledger holds and how each entry ends (#787, 2026-11-13)
+
+The v2.0.0 run began with 29 red tests on `origin/dev` 537828fb5 (`Total
+tests: 3463, Passed: 3434, Failed: 29`, 17 min 9 s on this PC, a Lenovo
+20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200), almost all of them the
+mac's v2.0.0 work arriving as requests. Step 0 made the suite a gate again
+so every later piece can be judged by it: it FIXED what Windows owed now
+(#787's sentence, #788's `deploy.ps1` kind, #815 and #843's add-ons offer,
+two `LogRedactor` rules, the restore trail line, five shared Python files'
+Windows-only test faults, one Windows test of the mac's `deploy.sh`) and
+held everything a later piece of the same run builds open BY NAME — 86
+entries, every one on v2.0.0, each against its own open `windows` issue:
+#799 (1), #801 (2), #811 (4), #820 (1), #823 (12), #824 (19, #848's keys
+among them), #826 (3), #827 (11), #828 (23), #854 (10, #835's first part).
+**Each piece deletes its own entries when it lands; the ledger fails,
+naming the entry, the moment a held thing exists here.**
+
+It also wired twelve more lists into the ledger (twelve new area constants
+in `NamedGapLedger.cs`, the rows below), each in one of three shapes. Every
+other key of a hooked list is asserted as before, with three measured
+exceptions: `TheWindowLiftsTheLaunchersLine…` counts its cases as at least
+six rather than exactly four (every case is still walked);
+`ReferenceImportTests.EverySentenceIsTheContracts` compares at least 25 (the
+26 of before less the held `explanation`); and a held row that merely has to
+FAIL can fail for a second reason unseen until its piece lands — narrowed
+where the test can tell: a held prompt must match no request, a held
+deploy-guard row must be "allowed here", a held launcher sentence or trail
+row must be absent from the launcher altogether, and the held workspace
+answer must be today's sentence by key.
+
+| Area (`NamedGapLedger` constant) | Shape | Read by |
+|---|---|---|
+| `AssistWordingSaidDifferently` — a sentence this app HAS and says in older words | held must still DIFFER (`ContractTests.SaidAsTheContract`); also holds the `failureExplanationCases` and the assistant's answer whose sentence it holds | `AssistWording_MatchesContract`, `DeployWhileItsSectionDeploysTests`, `AssistWorkspaceTests.ADeployRefusedWhileItsSectionDeploysSaysSo` |
+| `CredentialPromptCases` (by `prompt`) | collected; a held prompt must match NO request (a wrong request is a second fault) | `AppRules_CredentialPrompts_MatchesContract` |
+| `CredentialRequestNames` | collected; "defined" is any `CredentialRequest` on `CredentialRequests`, by reflection | `AppRules_CredentialRequests_MatchesContract`, `EachCredentialIsHiddenOrShownAsTheContractSays` |
+| `PreviewLauncherFlags`, `DeployLauncherExtras` (name before the space) | collected | `AppRules_LauncherFlags_MatchesContract`, `TheDeployLauncherAcceptsTheExtraFlagsTheContractGivesIt` |
+| `LauncherRefusalSentences` | collected: a marker the app reads, with the right "later" polarity | `EveryLauncherSentenceCarriesAMarkerTheAppReads` |
+| `ShelfCodeCases`, `ShelfWording`, `ImportWording` | collected (the code cases now run them all rather than stopping at the first); wording is held while absent OR different, so a CHANGED sentence closes the day it matches | `ReferenceCourseTests`, `ReferenceImportTests` |
+| `SubjectMenuItems` | collected; a held item is taken out of each case's expected set (sound because the closed-check makes sure it is no enum member) | both `SubjectMenusContractTests` facts |
+| `MachineWordUsedIn` | collected | `EverySentenceTheContractWritesWithTheMachineIsSaidFilled` |
+| `LauncherRunnerRows` (`"<list>\t<name>"`) | the runner's own: see below | `LauncherRulesContractTests` |
+
+**The launcher runner holds rows itself.** `LauncherRulesContractTests`
+hands `test_launcher_rules.ps1` the held rows in
+`PLANTOIR_LEDGERED_LAUNCHER_CASES`, one `<list>\t<name>` per line, the list
+spelled as the runner's `Report` spells it — per launcher
+(`deployWhileItsSectionDeploys/deploy.ps1`, `…/preview.ps1`,
+`deployWhileItsSectionDeploys.sentences/<launcher>`, `activityTrail/<launcher>`)
+— and checks each against the same expansion of the contract the runner
+makes, so a withdrawn case fails before the runner starts. The runner prints
+`ledger: N held pairs read` (asserted equal to the entries), `ledgered [list]
+name - …` for a held row failing in the shape it is held for, `CLOSED [list]
+name - …` for a held row that PASSES (counted as failed, and the test fails
+naming it), and fails a held row it never reported. A deploy-guard row is held
+only as "refused there, not refused at all here": refused by the wrong `who`
+is an ordinary failure, held or not. With the variable unset — a run by hand —
+nothing is held and every row reports as before. Neither held line contains
+the word the test looks for (`FAIL`). A held launcher SENTENCE or trail row
+is held only while the line's words after its last slot appear nowhere in
+that launcher: written there but printed some other way, it fails.
+
+**Proved** by mutation, one run over the hooked tests each: an entry for a key
+that exists here failed 13 areas with the closed message (the eleven new
+areas other than `AssistWordingSaidDifferently`, whose closed case is proved
+on made-up entries below, plus the two older areas
+`ActivityTrailEvents` and `AssistWordingKeys`); an entry for a key the
+contract lacks failed 14 with the withdrawn message (the twelve new areas and
+those two older ones); taking every step-0 entry out brought back all 18 C#
+reds. The mechanism stays proved on
+made-up entries whatever the ledger holds: `NamedGapLedgerTests.
+ACollectedHookHoldsWhileMissingAndFailsOnceItExistsOrIsWithdrawn` and
+`AHeldSentenceMustStillDifferAndIsWithdrawnWithItsKey`, and
+`LauncherRulesContractTests.TheRunnersLedgerHoldsClosesAndCatchesWhatItShould`,
+which runs the runner's real `Report`, `Read-LedgeredRows` and
+`Write-UnreportedLedgerRows` (taken from the file by its syntax tree) on made-up
+rows in about a second instead of the runner's two and a half minutes.
+
+**Not ledgered, and why.** A whole `PythonToolchainTests` row is one file,
+so holding it would hide every passing case in it; the five shared Python
+files red for Windows-only reasons were fixed in the test instead
+("Shared Python tests that must run on Windows", below). The Windows test
+of the mac's `deploy.sh` question guard was wrong about deploy.sh, not
+waiting for anything: `EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`
+now allows a second shape, a function whose first statement after `local`
+lines is `assert_can_ask` and which is only ever called directly (no `$( )`,
+pipe or backticks) — #709's `ask_for_the_plan_credential` — proved both
+ways on copies of deploy.sh (an `echo` before the guard; the call wrapped in
+`$( )`). **Rejected:** a ledger entry per Python FILE (hides passing cases);
+`appliesOn` on any of these (the softening "Named gaps" rejects); and building
+#835's wording now (#854 owns it, on the milestone's do-not-start list —
+the director's ruling).
+
+### Shared Python tests that must run on Windows (step 0 of v2.0.0)
+
+`PythonToolchainTests` runs every `scripts/test_*.py` here, so a shared test
+written only for the mac goes red on Windows for reasons that are not the
+code's. Five did at the start of the v2.0.0 run; each was fixed in the TEST
+with a reason that names the cause, plus one line of product code. Measured
+with the runtime's Python 3.14.10 on Windows 11 Pro 26200. **What the mac
+should know when writing one** (know, not do):
+
+- **A symbolic link** raises `OSError [WinError 1314]` for an account
+  without Developer Mode: skip on that error only, as
+  `test_dates_follow_the_class.py`'s `_link_or_skip` does, so an account
+  that may make links still runs the case.
+- **`bash`** on PATH is `C:\Windows\System32\bash.exe`, the WSL launcher:
+  use `test_deploy_non_interactive._a_bash_that_can_run_deploy_sh()`, which
+  finds Git Bash here, and skip when it returns None.
+- **A signal** that Windows lacks (`SIGHUP`, `SIGKILL`) must be asked for by
+  `getattr(signal, "SIGHUP", None)`: `scripts/share_plan.py` named
+  `signal.SIGHUP` in a tuple, which raised before its own `try`, so the
+  share script could not start here at all.
+- **Bytes compared after a text write**: Windows' text mode writes `\r\n`;
+  compare with CRLF read as LF (as `test_coverage_tab.py`'s stylesheet hash
+  now does) or write with `newline="\n"`.
+- **A line break in a file name** is refused by NTFS (Errno 22), and **a
+  POSIX mode** means nothing here (Windows reports 0o666 whatever `chmod`
+  asked): skip the first, assert the second off Windows only, as
+  `test_share_plan.py` now does. The privacy of a file on Windows comes from
+  where it lives and its ACL, which is #824's design for the unit-plan
+  marker and credential file.
+- **Windows' own Python feeding Git Bash** prints `\r\n` too: deploy.sh's
+  saved-destinations reader, run that way, hands bash an empty path of `\r`,
+  so `test_deploy_sh_destination.py` skips that one case by name on Windows
+  (deploy.sh is the mac's launcher, and deploy.ps1 passes the case). A
+  one-line fix in deploy.sh (`sys.stdout.reconfigure(newline="\n")` in the
+  heredoc, or `${_path%$'\r'}` where it is read) is the mac's to take or not.
 
 ## Driving the real interface
 
@@ -2738,27 +2877,32 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   guide and marking kit, and `scripts/check_kit.py`, which an assistant
   runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
   09 → "Tests, marking and report comments"). Two more skills are kept in
-  the repository and HELD from v1.10.0, so no working folder on either
+  the repository and HELD from v2.0.0, so no working folder on either
   platform gets them: `plantoir-marking` (#750
-  piece 750a, four Python scripts in `scripts/` that an assistant runs
-  against a teacher's scans and the app never does, four templates and two
-  references; `assessment.agentGuidance.markingSkill`, 09 → "Tests,
-  marking and report comments") and `plantoir-report-comments` (#752, a
+  pieces 750a and 750c, five Python scripts in `scripts/` that an assistant
+  runs against a teacher's scans and marks records and the app never does,
+  four templates and three references; `assessment.agentGuidance.markingSkill`
+  and `assessment.results`, 09 → "Tests, marking and report comments") and `plantoir-report-comments` (#752, a
   `SKILL.md` and one reference, no scripts of its own: it uses
   `plantoir-marking`'s `make_named_copies.py --comments` through the
   runner, which needs Python only, neither Poppler nor tectonic;
   `assessment.agentGuidance.reportCommentsSkill`, 09 → the same
   section). Both are in `held/agent_guidance/skills/`, which
   `AgentGuidance.Write` never reads, so the hold needs no Windows code;
-  their Python tests still run in `PythonToolchainTests` from there
-  (`printablePages.agentGuidance.held`, 09 → "Held from v1.10.0"). Not
+  their Python tests still run in `PythonToolchainTests` from there, and
+  `scripts/test_held_skills.py` (#750) checks that neither is in
+  `support/agent_guidance/skills` and that no root file, written skill,
+  greeting, app source (this app's `Plantoir`, `Plantoir.Core` and
+  `Plantoir.Mcp` included) or plantoir.app page names them
+  (`printablePages.agentGuidance.held`, 09 → "Held from v2.0.0"). Not
   measured on Windows: `support\**` is copied with `PreserveNewest`, which
   does not delete a file from `bin\` when it leaves the source, so an
   incremental build of a clone that built them before may still carry the
   two folders; build clean before checking the hold. When
-  they ship (v1.11.0), a Windows teacher marking scans needs
+  they ship (the release after v2.0.0), a Windows teacher marking scans needs
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
-  `pdfseparate`) and tectonic on PATH; which installs work, and how a
+  `pdfseparate`) and tectonic on PATH (the class results need Python only
+  for their tables, and tectonic and `pdftotext` for their PDF); which installs work, and how a
   teacher gets them, is NOT MEASURED here yet and is the `windows` issue
   for 750a's to measure and write down in this section. The
   handouts skill has an assistant write ONE file inside a course,
@@ -5890,6 +6034,22 @@ differs, and why:
 
 Trail: `backups deleted` (`BackupDeleter.TrailLine`). The UI test
 `AllBackupsUiTests` compiles and has never run (the desktop was locked).
+
+**A whole course put back leaves `course restored from a backup`** — since
+step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
+until then a whole-course restore from Backups (Restore…) or from Archived
+wrote no line at all, and only a section's restore did. Noted by
+`SidebarPane.ConfirmRestoreBackup` and `ConfirmRestore` (whole courses only)
+once the restore has happened, never for a refused one, with lines built by
+`CourseRestorer.RestoredTrailLine` and `RestoredFromArchivedTrailLine`: the
+code shown and the folder, the zip's file name, then what became of the
+course as it was — the archive `ArchiveCourseWithoutRemoving` made first, or
+"there was no course in that folder to archive first"; from Archived, "that
+archive is used up", or, because `CourseRestorer.Restore` does not fail when
+its delete does, "that archive could not be removed and is still listed" —
+and whether the course that came back is kept for reference, read from its
+restored settings. The line says what Windows did, never the mac's flow
+(plan review L5). `CourseBackupTests.AWholeCourseRestoreSaysWhatCameBackAndFromWhere`.
 
 ### The scheduled-publish toast (#324)
 
@@ -11253,6 +11413,52 @@ quotes the 1.13.7 label), and a OneDrive-evicted `.md`.
 nothing about Plantoir adding the add-ons; with both platforms adding them now,
 they can say so — together with the mac, not from here.
 
+### What the offer says about an open course (#815, #843; the mac's #742, #834)
+
+Since step 0 of v2.0.0 (2026-11-13) the offer has three answers about whether
+the course is open in Obsidian, `ObsidianFigureAddOnsOffer.CourseOpenState`
+(`openStateCases`): **open** when Obsidian is running and its list marks the
+course's whole folder open; **closed** when Obsidian is not running, when the
+course is not marked open, and — Russell's ruling on #742 — when there is **no
+list at all** (`obsidian.json` missing: Obsidian writes it when a vault opens,
+so with none no vault is open); **cannot tell** when a list is there and is
+not JSON, is cut off mid-write or holds no `vaults` object. `CourseIsOpen` is
+still `state != Closed`. So a list that is there but cannot be read
+(**cannot tell**) behaves as open, as before: nothing is written into the
+course and Add Them goes the reopen way; only its words are new. With **no
+`obsidian.json` at all** what the app does changed: until #815 that counted
+as open (`Vaults(null)`), so the offer said the course was open and Add Them
+closed and reopened Obsidian without writing; now the state is closed, so the
+offer adds no closing sentence, and Add Them writes the add-ons and opens the
+course without closing Obsidian — what Russell's ruling and the contract's
+case "Obsidian is running and has no list of vaults at all" ask. The words
+were also wrong in a second way: they never said that Add Them closes every
+OTHER course open in Obsidian too.
+
+- **The words** (#843, the add-ons part of mac #834): open adds
+  `wording.offerWhileOpen`, cannot tell adds `wording.offerWhileObsidianIsOpen`,
+  and either is followed by the three facts as `Label: value` lines of the
+  message, in `closingRule`'s order (Closes / Opens again / Kept), exactly as
+  the mac's `offerText` and `closingLines` build them; closed adds neither.
+  The offer stays a ContentDialog message with its Don't ask again box (#731),
+  so the facts are lines of the message rather than a form. Both wording walks
+  skip `closingRule` as they skip `note`: it is a rule, and it names "vault".
+- **Reading the list** (`ObsidianWorld.RegistryText`): null only when the file
+  does not exist; a file that is there and cannot be read is the empty text,
+  which reads as cannot tell. Done in the world, not in
+  `FolderActions.ReadObsidianRegistry`, whose null for an unreadable file is
+  what keeps `RegisterVault` from writing a list of one vault over a list it
+  could not read — a REJECTED shortcut, since changing it there would have
+  turned an unreadable registry into a replaced one.
+- **Paths**: `SamePath` folds case and either separator, so the eight cases
+  with no `platform` run here as written (`EveryOpenStateCase`); the six
+  `platform: mac` cases need real folders the mac makes (a link, `/private`)
+  and are skipped by that field. A junction or symbolic-link spelling of the
+  course folder is NOT folded here as the mac's `FolderIdentity.isSameFolder`
+  folds it — known, and unchanged by #815: a course Obsidian has open only
+  under a link's spelling reads as closed here, as it did before, so the
+  add-ons can be written under it and Obsidian's own list write drops them.
+
 ## Node 22, GeoGebra's engine and the npm audit on Windows (#675, #687, #685), v1.9.0
 
 Three runtime pieces the mac landed in the image for v1.9.0 — Node 22.23.4
@@ -12545,4 +12751,24 @@ and `deployArguments.planShareCases`, the three trail events, the two
 moving `plans-*.json` aside, and the plans leg of `verify-deploy.ps1`. The
 `windows` issue for #709 lists them; `NamedGapLedger` holds each open by name
 until done.
+
+**Since #833** the look before a share is two tables, Shared and Not
+shared, before EVERY share, protected ones too, with the Answer Keys folder
+as the rule and the names a hint (`documentation/07-deployment.md` → the
+rulings, items 4 to 8; `documentation/09-mac-app.md` → the share bar).
+Windows inherits the Python free again: the document rule, where each
+document starts, the remembered choices in the year's marker, the refusal
+of a list naming a file no share sends, the advice, `--new-password-waiting`,
+and the new marker lines. It owes the same two tables in WinUI (sortable
+columns, a search box, a Unit choice and Answer Keys Only, drag and drop of
+several rows, a move each way from the keyboard, an announcement of each
+move), the app's write of the settled places into the marker before it
+answers yes, the public-address warning after the tables as labelled rows
+(#834), `deploy.ps1 -ChangePassword -PasswordOnly` and the dialog after it,
+and the contract's `filterCases`, `countCases`, `startingPlace`,
+`rememberedChoices`, `warningSheet`, `changePasswordCases` and
+`unattendedKeys` run by its own suite, and `deploy.ps1`'s
+`-SendAnswerKeysOpenly` with the launcher's rule that a newly asked password
+is kept only once a share used it. It builds on #709's Windows work (#824),
+which is still open. The `windows` issue for #833 lists them.
 

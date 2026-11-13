@@ -54,3 +54,38 @@ struct DetailTabs<Tab: Hashable>: View {
         }
     }
 }
+
+/// The room under a detail view's tabs, given to whichever tab is chosen
+/// (#831, #832): `SectionTabContent` and `CourseDetailContent` put every
+/// tab's content in it.
+///
+/// **Its smallest height is nought, whatever the tab inside asks for.** A
+/// split view sizes its column by asking the content how small it can be,
+/// with almost no width offered, and a column cannot be shorter than the
+/// answer. One wrapping sentence made rigid somewhere inside a tab (on the
+/// Coverage tab, the line saying when the map was made; on the Planning
+/// tab, the share bar's sentence for a teacher whose class sites go to
+/// Netlify) answered about 2,200 and 2,600 points, the column grew past the
+/// window, and the window centred it: the tabs, the header and the share
+/// bar went out of view above and below, and the sidebar with them. With
+/// the smallest height fixed at nought here, no tab can claim more than the
+/// window gives, so the tab bar above stays where it is and a long page
+/// scrolls inside its own web view. Measured in a window the size of
+/// Plantoir's by `DetailTabsLayoutTests`; `documentation/09-mac-app.md` →
+/// "A blank window: when a child claims a size the window cannot give".
+///
+/// Height only: the column's smallest WIDTH still comes from what the tab
+/// needs, so a form never gets narrower than it can be drawn.
+struct TabArea<Content: View>: View {
+
+    // MARK: - Stored properties
+
+    @ViewBuilder let content: () -> Content
+
+    // MARK: - Body
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+}

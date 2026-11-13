@@ -30,6 +30,8 @@ nonisolated enum PlanSharing {
     static let sharedPrefix: String = "PLANTOIR_PLAN_SHARED:"
     static let refusedPrefix: String = "PLANTOIR_PLAN_REFUSED:"
     static let stoppedPrefix: String = "PLANTOIR_PLAN_STOPPED:"
+    /// Printed after Change Password saved a new password (#833).
+    static let passwordSavedPrefix: String = "PLANTOIR_PLAN_PASSWORD_SAVED:"
 
     /// What the teacher chose on the share bar.
     enum Choice: String, CaseIterable {
@@ -76,6 +78,13 @@ nonisolated enum PlanSharing {
         var lastShared: Date?
         var units: Int
         var oldCopies: Int
+        /// How many listed documents the last share sent and held back
+        /// (#833); 0 in a marker written before.
+        var documentsShared: Int = 0
+        var documentsHeldBack: Int = 0
+        /// A new password was saved and no share has proved it yet
+        /// (unitPlanning.share.changePasswordCases).
+        var newPasswordWaiting: Bool = false
 
         // MARK: - Computed properties
 
@@ -178,7 +187,10 @@ nonisolated enum PlanSharing {
             answerKeysLeftOut: object["answerKeysLeftOut"] as? Int ?? 0,
             lastShared: lastShared,
             units: object["units"] as? Int ?? 0,
-            oldCopies: object["oldCopies"] as? Int ?? 0
+            oldCopies: object["oldCopies"] as? Int ?? 0,
+            documentsShared: object["documentsShared"] as? Int ?? 0,
+            documentsHeldBack: object["documentsHeldBack"] as? Int ?? 0,
+            newPasswordWaiting: object["newPasswordWaiting"] as? Bool ?? false
         )
     }
 
@@ -249,8 +261,10 @@ nonisolated enum PlanSharing {
         case .shareProtected, .addPassword:
             arguments.append("--protect")
         case .changePassword:
+            // Saved only (#833): the dialog after it offers Share Again.
             arguments.append("--protect")
             arguments.append("--change-password")
+            arguments.append("--password-only")
         case .removePassword:
             arguments.append("--remove-password")
         case .stop:
@@ -283,11 +297,136 @@ nonisolated enum PlanSharing {
         return PlanSharingWording.floodOpen
     }
 
-    /// The public-address warning, with the answer-key clause only when the
-    /// teacher ticked Include Answer Keys.
-    static func crawlerWarning(includingAnswerKeys: Bool) -> String {
-        let clause: String = includingAnswerKeys ? PlanSharingWording.answerKeysClause : ""
-        return PlanSharingWording.crawlerWarning.replacingOccurrences(of: "{answerKeysClause}", with: clause)
+    /// The public-address warning's rows (unitPlanning.share.warningSheet,
+    /// #834's shape): the answer-key row only when a key sits in Shared, so
+    /// a row whose fact is missing is absent.
+    static func warningRows(shared: Int, heldBack: Int, keysInShared: Int) -> [FactsQuestionRow] {
+        var rows: [FactsQuestionRow] = []
+        rows.append(FactsQuestionRow(label: PlanSharingWording.crawlerRowLabel, value: PlanSharingWording.crawlerRowValue))
+        let documents: String = PlanSharingWording.documentsRowValue
+            .replacingOccurrences(of: "{shared}", with: String(shared))
+            .replacingOccurrences(of: "{heldBack}", with: String(heldBack))
+        rows.append(FactsQuestionRow(label: PlanSharingWording.documentsRowLabel, value: documents))
+        if keysInShared > 0 {
+            let keys: String = PlanSharingWording.answerKeysRowValue.replacingOccurrences(of: "{n}", with: String(keysInShared))
+            rows.append(FactsQuestionRow(label: PlanSharingWording.answerKeysRowLabel, value: keys))
+        }
+        rows.append(FactsQuestionRow(label: PlanSharingWording.passwordRowLabel, value: PlanSharingWording.passwordRowValue))
+        return rows
+    }
+
+    /// The dialog after Change Password (changePasswordCases): the
+    /// earlier-years row only while an earlier year is still shared.
+    static func newPasswordRows(earlierYearShared: Bool) -> [FactsQuestionRow] {
+        var rows: [FactsQuestionRow] = [
+            FactsQuestionRow(label: PlanSharingWording.askedForNowLabel, value: PlanSharingWording.askedForNowValue),
+            FactsQuestionRow(label: PlanSharingWording.whatChangesItLabel, value: PlanSharingWording.whatChangesItValue),
+        ]
+        if earlierYearShared {
+            rows.append(FactsQuestionRow(label: PlanSharingWording.earlierYearsLabel, value: PlanSharingWording.earlierYearsValue))
+        }
+        return rows
+    }
+
+    /// The public-address warning as #834's question: the title asks, one
+    /// sentence, the rows, Cancel the default and Escape.
+    static func warningQuestion(shared: Int, heldBack: Int, keysInShared: Int) -> FactsQuestion {
+        return FactsQuestion(
+            title: PlanSharingWording.crawlerWarningTitle,
+            message: PlanSharingWording.crawlerWarningMessage,
+            rows: warningRows(shared: shared, heldBack: heldBack, keysInShared: keysInShared),
+            action: PlanSharingWording.shareAnyway,
+            cancel: "Cancel"
+        )
+    }
+
+    /// The dialog after Change Password, as #834's question. Its button that
+    /// goes ahead, Share Again, is the default (Russell, 2026-11-13), and
+    /// Later is Escape.
+    static func newPasswordQuestion(earlierYearShared: Bool) -> FactsQuestion {
+        return FactsQuestion(
+            title: PlanSharingWording.newPasswordSavedTitle,
+            message: PlanSharingWording.newPasswordSavedMessage,
+            rows: newPasswordRows(earlierYearShared: earlierYearShared),
+            action: PlanSharingWording.shareAgain,
+            cancel: PlanSharingWording.later
+        )
+    }
+
+    /// What `PLANTOIR_PLAN_PASSWORD_SAVED:` said in a stretch of output:
+    /// "waiting" (the dialog is owed), "notShared", or nil.
+    static func passwordSavedOutcome(in text: String) -> String? {
+        var outcome: String?
+        for line in SiteHealthFinding.linesOf(text) {
+            guard let range = line.range(of: passwordSavedPrefix) else {
+                continue
+            }
+            let words: [Substring] = line[range.upperBound...].split(separator: " ", omittingEmptySubsequences: true)
+            if words.count == 3 {
+                let last: String = String(words[2]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if last == "waiting" || last == "notShared" {
+                    outcome = last
+                }
+            }
+        }
+        return outcome
+    }
+
+    /// Whether the bar says the new password is not in use yet: from the
+    /// marker, so it survives a relaunch, until a share proves the address.
+    static func showsNewPasswordWaiting(_ marker: Marker?) -> Bool {
+        guard let marker = marker else {
+            return false
+        }
+        return marker.newPasswordWaiting
+    }
+
+    /// The year marker's `documents`, the teacher's remembered choices; empty
+    /// for a marker from before #833 or none.
+    static func rememberedChoices(markerURL: URL) -> [String: String] {
+        guard let data = try? Data(contentsOf: markerURL),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let documents = object["documents"] as? [String: String] else {
+            return [:]
+        }
+        return documents
+    }
+
+    /// Writes the teacher's settled places into the year's marker
+    /// (unitPlanning.share.rememberedChoices) before the share's question is
+    /// answered: `documents` replaced, every other key kept as found, by a
+    /// temporary file beside it and a rename. False when it could not be
+    /// written, and the share must then not be told yes.
+    static func writeChoices(_ choices: [String: String], to markerURL: URL) -> Bool {
+        var object: [String: Any] = [:]
+        if let data = try? Data(contentsOf: markerURL) {
+            guard let found = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                // A marker that is not a JSON object is not overwritten.
+                return false
+            }
+            object = found
+        }
+        object["documents"] = choices
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]) else {
+            return false
+        }
+        let folder: URL = markerURL.deletingLastPathComponent()
+        let temporary: URL = folder.appendingPathComponent("." + markerURL.lastPathComponent + ".app.tmp")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: temporary)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+            // rename(2) replaces the marker in one step, as share_plan.py's
+            // os.replace does, so a reader never meets half a file.
+            if rename(temporary.path, markerURL.path) != 0 {
+                try? FileManager.default.removeItem(at: temporary)
+                return false
+            }
+            return true
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            return false
+        }
     }
 
     /// The Stop Sharing alert's message for one year's address.
@@ -332,50 +471,85 @@ nonisolated enum PlanSharing {
     }
 }
 
-/// The two lists an open share prints before it asks (unitPlanning.share
-/// .openShareLists): every file it will share and every file it leaves out,
-/// read ONLY from the launcher's marker lines, never from the console's own.
+/// What a share prints before it asks (unitPlanning.share.openShareLists,
+/// since #833 before EVERY share): the plan's documents, each with where it
+/// starts, read ONLY from the launcher's marker lines, never from the
+/// console's own.
 nonisolated struct PlanShareLists: Equatable {
 
     // MARK: - Stored properties
 
     static let beginMarker: String = "PLANTOIR_PLAN_LISTS_BEGIN:"
-    static let sharedMarker: String = "PLANTOIR_PLAN_LISTS_SHARED:"
-    static let leftOutMarker: String = "PLANTOIR_PLAN_LISTS_LEFT_OUT:"
+    static let documentMarker: String = "PLANTOIR_PLAN_LISTS_DOCUMENT:"
     static let endMarker: String = "PLANTOIR_PLAN_LISTS_END:"
 
-    /// The question the lists come before, without its [y/N] (the console's
-    /// question reader takes that off).
+    /// The questions the lists come before, without their [y/N] (the
+    /// console's question reader takes that off): an open share's, and a
+    /// protected share's.
     static let question: String = "Share these files with anyone who has the address?"
+    static let questionProtected: String = "Share these files with anyone who has the address and the password?"
 
-    var shared: [String] = []
-    var leftOut: [String] = []
+    /// The school year whose marker holds the teacher's choices.
+    var year: Int = 0
+    var isProtected: Bool = false
+    /// Whether Include Answer Keys was ticked for this share.
+    var answerKeysTicked: Bool = false
+    /// The plan's own pages, pictures, stylesheets and fonts, which always go.
+    var ownFiles: Int = 0
+    var documents: [PlanShareDocument] = []
     /// True once the end marker arrived.
     var isComplete: Bool = false
 
     // MARK: - Functions
 
     /// Reads marker lines in order into `lists`, starting afresh at a begin
-    /// marker. Lines that are not one of the four are passed over.
+    /// marker. Lines that are not one of the three, and a document line
+    /// that is not a whole row, are passed over.
     static func read(_ lines: [String], into lists: inout PlanShareLists?) {
         for line in lines {
             let trimmed: String = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed == beginMarker {
-                lists = PlanShareLists()
+            if trimmed.hasPrefix(beginMarker) {
+                lists = begun(String(trimmed.dropFirst(beginMarker.count)))
             } else if trimmed == endMarker {
                 lists?.isComplete = true
-            } else if trimmed.hasPrefix(sharedMarker + " ") {
-                lists?.shared.append(String(trimmed.dropFirst(sharedMarker.count + 1)))
-            } else if trimmed.hasPrefix(leftOutMarker + " ") {
-                lists?.leftOut.append(String(trimmed.dropFirst(leftOutMarker.count + 1)))
+            } else if trimmed.hasPrefix(documentMarker + " ") {
+                let json: String = String(trimmed.dropFirst(documentMarker.count + 1))
+                if let document = PlanShareDocument.from(json: json) {
+                    lists?.documents.append(document)
+                }
             }
         }
     }
 
-    /// Whether a question the console asks is the open share's question,
-    /// which is answered only in the lists' own sheet (fix review H1).
+    /// `<year> protected:<yes|no> tick:<yes|no> ownFiles:<n>`.
+    static func begun(_ rest: String) -> PlanShareLists {
+        var lists: PlanShareLists = PlanShareLists()
+        for word in rest.split(separator: " ", omittingEmptySubsequences: true) {
+            let parts: [Substring] = word.split(separator: ":", maxSplits: 1)
+            if parts.count == 1, let year = Int(parts[0]) {
+                lists.year = year
+            } else if parts.count == 2 {
+                let value: String = String(parts[1])
+                switch parts[0] {
+                case "protected":
+                    lists.isProtected = value == "yes"
+                case "tick":
+                    lists.answerKeysTicked = value == "yes"
+                case "ownFiles":
+                    lists.ownFiles = Int(value) ?? 0
+                default:
+                    break
+                }
+            }
+        }
+        return lists
+    }
+
+    /// Whether a question the console asks is the share's question, which
+    /// is answered only in the two tables' sheet (fix review H1).
     static func isTheListsQuestion(_ question: String) -> Bool {
-        return question.trimmingCharacters(in: .whitespaces).hasPrefix(PlanShareLists.question)
+        let trimmed: String = question.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix(PlanShareLists.question) || trimmed.hasPrefix(PlanShareLists.questionProtected)
     }
 }
 
@@ -402,8 +576,15 @@ nonisolated enum PlanSharingWording {
     static let lastShared: String = "Last shared {when}."
     static let answerKeysLeftOut: String = "{n} answer key(s) left out. Protect the plans with a password, or tick Include Answer Keys, to share them."
     static let crawlerWarningTitle: String = "Share without a password?"
-    static let crawlerWarning: String = "Anyone with the address can open these plans{answerKeysClause}. Plantoir asks search engines and AI crawlers not to read or keep them, but they can ignore that, so treat anything here as possibly searchable. To require a password, choose Protect with a Username and Password."
-    static let answerKeysClause: String = ", including the answer keys you chose to include"
+    static let crawlerWarningMessage: String = "Anyone with the address can open these plans."
+    static let crawlerRowLabel: String = "Search engines and AI crawlers"
+    static let crawlerRowValue: String = "Asked not to read or keep them, but they can ignore that"
+    static let documentsRowLabel: String = "Documents"
+    static let documentsRowValue: String = "{shared} shared, {heldBack} held back"
+    static let answerKeysRowLabel: String = "Answer keys"
+    static let answerKeysRowValue: String = "Includes {n} answer key(s)"
+    static let passwordRowLabel: String = "To require a password"
+    static let passwordRowValue: String = "Choose Protect with a Username and Password"
     static let shareAnyway: String = "Share Without a Password"
     static let floodClosed: String = "If someone floods this address with requests, Cloudflare closes the plans until midnight UTC rather than opening them."
     static let floodOpen: String = "Cloudflare did not accept the setting that keeps the plans closed if this address is flooded with requests. If that happened, anyone with the address could open the plans until midnight UTC. The address ends in random letters, so it is hard to guess."
@@ -419,13 +600,20 @@ nonisolated enum PlanSharingWording {
     static let oldCopyStillThere: String = "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more."
     static let listsSheetTitle: String = "Share these files?"
     static let consoleSheetTitle: String = "Sharing unit plans"
-    static let listsSharedHeading: String = "These files will be shared with anyone who has the address:"
-    static let listsLeftOutHeading: String = "These files are left out:"
-    static let listsNone: String = "(none)"
     static let listsByName: String = "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it."
     static let listsShareButton: String = "Share"
     static let courseBusy: String = "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished."
     static let changePasswordNote: String = "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with."
+    static let newPasswordSavedTitle: String = "Share the plans again with the new password?"
+    static let newPasswordSavedMessage: String = "The new password is not in use yet."
+    static let askedForNowLabel: String = "Asked for now"
+    static let askedForNowValue: String = "The old password"
+    static let whatChangesItLabel: String = "What changes it"
+    static let whatChangesItValue: String = "Sharing these plans again"
+    static let earlierYearsLabel: String = "Earlier years"
+    static let earlierYearsValue: String = "Keep the password they were shared with"
+    static let later: String = "Later"
+    static let newPasswordNotInUse: String = "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
 
     // MARK: - Computed properties
 
@@ -448,8 +636,15 @@ nonisolated enum PlanSharingWording {
             "lastShared": lastShared,
             "answerKeysLeftOut": answerKeysLeftOut,
             "crawlerWarningTitle": crawlerWarningTitle,
-            "crawlerWarning": crawlerWarning,
-            "answerKeysClause": answerKeysClause,
+            "crawlerWarningMessage": crawlerWarningMessage,
+            "crawlerRowLabel": crawlerRowLabel,
+            "crawlerRowValue": crawlerRowValue,
+            "documentsRowLabel": documentsRowLabel,
+            "documentsRowValue": documentsRowValue,
+            "answerKeysRowLabel": answerKeysRowLabel,
+            "answerKeysRowValue": answerKeysRowValue,
+            "passwordRowLabel": passwordRowLabel,
+            "passwordRowValue": passwordRowValue,
             "shareAnyway": shareAnyway,
             "floodClosed": floodClosed,
             "floodOpen": floodOpen,
@@ -463,6 +658,16 @@ nonisolated enum PlanSharingWording {
             "consoleSheetTitle": consoleSheetTitle,
             "lastShareUnfinished": lastShareUnfinished,
             "stopUnconfirmed": stopUnconfirmed,
+            "newPasswordSavedTitle": newPasswordSavedTitle,
+            "newPasswordSavedMessage": newPasswordSavedMessage,
+            "askedForNowLabel": askedForNowLabel,
+            "askedForNowValue": askedForNowValue,
+            "whatChangesItLabel": whatChangesItLabel,
+            "whatChangesItValue": whatChangesItValue,
+            "earlierYearsLabel": earlierYearsLabel,
+            "earlierYearsValue": earlierYearsValue,
+            "later": later,
+            "newPasswordNotInUse": newPasswordNotInUse,
         ]
     }
 }

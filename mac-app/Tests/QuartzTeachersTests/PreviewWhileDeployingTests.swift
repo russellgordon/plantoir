@@ -189,6 +189,22 @@ final class PreviewWhileDeployingTests: XCTestCase {
         XCTAssertTrue(launcher[0].contains(FailureExplainer.sectionIsBeingDeployedMarker))
     }
 
+    /// A serving preview stopped because another live preview had claimed
+    /// its address (#835) reaches the panel as the launcher's own words.
+    func testAPreviewWhoseAddressIsAnotherPreviewsIsExplainedInItsOwnWords() throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["twoPreviewsOneAddress"])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["failureExplanationCases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let output: String = try XCTUnwrap(testCase["output"] as? String)
+            XCTAssertEqual(FailureExplainer.explanation(in: output), testCase["expect"] as? String)
+        }
+        let sentences: [String: Any] = try XCTUnwrap(rule["sentences"] as? [String: Any])
+        let launcher: [String] = try XCTUnwrap(sentences["launcher"] as? [String])
+        XCTAssertTrue(launcher[0].contains(FailureExplainer.previewAddressIsAnotherPreviewsMarker))
+        XCTAssertTrue(launcher[1].contains(FailureExplainer.previewAddressIsAnotherPreviewsAdvice))
+    }
+
     // MARK: - The scheduled deploy's label, as the launchers read it (#388, N5)
 
     /// Every `labelCodeCases` case is what `ScheduledDeploy.sanitizedCode`

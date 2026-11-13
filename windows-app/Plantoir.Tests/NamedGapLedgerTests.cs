@@ -77,6 +77,44 @@ public class NamedGapLedgerTests
         Assert.Single(Problems(new[] { Owed("Windows: parity with mac v1.4.0") }, build));
     }
 
+    // ---- The two kinds of C# hook, proved on made-up entries (step 0 of
+    // v2.0.0, 2026-11-13): an entry fails the day its thing EXISTS here, and
+    // the day it LEAVES the contract, whatever the ledger holds today. The
+    // third kind, the launcher runner's, is proved in
+    // LauncherRulesContractTests.TheRunnersLedgerHoldsClosesAndCatchesWhatItShould.
+
+    private static NamedGapLedger.Entry Made(string area, string key) => new(area, key, 1, "v9.9.9", "made up for this test");
+
+    /// <summary>The collect-then-compare hooks (GapsIn): held while missing, closed once here, withdrawn once gone.</summary>
+    [Fact]
+    public void ACollectedHookHoldsWhileMissingAndFailsOnceItExistsOrIsWithdrawn()
+    {
+        var area = NamedGapLedger.ShelfWording;
+        var entries = new[] { Made(area, "aSentence") };
+        Assert.Equal(new[] { "aSentence" }, NamedGapLedger.GapsIn(area, new[] { "aSentence", "another" }, new[] { "another" }, entries));
+        var closed = Assert.ThrowsAny<Exception>(() => NamedGapLedger.GapsIn(area, new[] { "aSentence" }, new[] { "aSentence" }, entries));
+        Assert.Contains("now EXISTS on this side", closed.Message);
+        var withdrawn = Assert.ThrowsAny<Exception>(() => NamedGapLedger.GapsIn(area, new[] { "another" }, Array.Empty<string>(), entries));
+        Assert.Contains("the contract no longer names it", withdrawn.Message);
+        // Another area's entry holds nothing here.
+        Assert.Empty(NamedGapLedger.GapsIn(NamedGapLedger.ImportWording, new[] { "aSentence" }, Array.Empty<string>(), entries));
+    }
+
+    /// <summary>The held-must-still-fail hook (a sentence said in older words): held while it differs, closed once it matches, withdrawn once gone.</summary>
+    [Fact]
+    public void AHeldSentenceMustStillDifferAndIsWithdrawnWithItsKey()
+    {
+        var area = NamedGapLedger.AssistWordingSaidDifferently;
+        var entries = new[] { Made(area, "aSentence") };
+        var wording = new System.Text.Json.Nodes.JsonObject { ["aSentence"] = "the new words", ["another"] = "kept" };
+        ContractTests.SaidAsTheContract(wording, "aSentence", "the old words", entries: entries);
+        var closed = Assert.ThrowsAny<Exception>(() => ContractTests.SaidAsTheContract(wording, "aSentence", "the new words", entries: entries));
+        Assert.Contains("now EXISTS on this side", closed.Message);
+        Assert.ThrowsAny<Exception>(() => ContractTests.SaidAsTheContract(wording, "another", "changed", entries: entries));
+        var withdrawn = Assert.ThrowsAny<Exception>(() => NamedGapLedger.StillNamed(area, new[] { "another" }, entries));
+        Assert.Contains("the contract no longer names it", withdrawn.Message);
+    }
+
     private static System.Collections.Generic.List<string> Problems(
         System.Collections.Generic.IEnumerable<NamedGapLedger.Entry> entries, Version thisBuild)
     {

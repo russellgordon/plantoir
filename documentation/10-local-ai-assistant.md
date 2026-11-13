@@ -8297,7 +8297,7 @@ before changing it:
   the tools, never before them, for the reason the issue gives.
 - Not done here: Course Settings' row (#360) and MCP `instructions` (mac only).
 
-### The skills read it too (#765, v1.10.0)
+### The skills read it too (#765, v2.0.0)
 
 Since #765 the `plantoir-handouts` skill (section 13) and the
 `plantoir-page-authoring` skill (section 22) tell an assistant to read the
@@ -8313,13 +8313,13 @@ applied, and only to a teacher who has shown an interest in both
 constructivist and Thinking Classrooms practice and the reality of a
 school where students often miss class (his ruling on #765, 2026-11-12). The unit-planning skill (#707) already took its lesson
 shape from the page, and the marking (#750) and report-comments (#752)
-skills read it first as well (both held from v1.10.0 to v1.11.0, so no
+skills read it first as well (both held from v2.0.0 to the release after it, so no
 working folder has them yet); for report comments the school's own
 convention is asked next, and one teacher's comment shape is shown only as
 an example (`documentation/09-mac-app.md` → "Tests, marking and report
 comments"). Why, and what was rejected:
 `documentation/09-mac-app.md` → "Lesson materials, and whose way of
-teaching (#765, v1.10.0)".
+teaching (#765, v2.0.0)".
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 

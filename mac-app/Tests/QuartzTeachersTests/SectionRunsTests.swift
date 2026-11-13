@@ -58,7 +58,7 @@ final class SectionRunsTests: XCTestCase {
         XCTAssertFalse(
             SectionDetailView.deployIsAvailable(
                 run: returning, folderPath: spelledWithoutPrivate.path, courseCode: "EXC2O", sectionNumber: 1,
-                isBeingCopied: false, folderIsGettingReady: false
+                isBeingCopied: false, folderIsGettingReady: false, heldElsewhere: false
             ),
             "Deploy must be unavailable while the section's deploy runs"
         )
@@ -82,14 +82,14 @@ final class SectionRunsTests: XCTestCase {
         XCTAssertFalse(
             SectionDetailView.deployIsAvailable(
                 run: sectionOne, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
-                isBeingCopied: false, folderIsGettingReady: false
+                isBeingCopied: false, folderIsGettingReady: false, heldElsewhere: false
             ),
             "A deploy of this section anywhere in this app makes Deploy unavailable"
         )
         XCTAssertTrue(
             SectionDetailView.deployIsAvailable(
                 run: sectionTwo, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 2,
-                isBeingCopied: false, folderIsGettingReady: false
+                isBeingCopied: false, folderIsGettingReady: false, heldElsewhere: false
             ),
             "Another section's Deploy is left as it was"
         )
@@ -98,7 +98,7 @@ final class SectionRunsTests: XCTestCase {
         XCTAssertTrue(
             SectionDetailView.deployIsAvailable(
                 run: sectionOne, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
-                isBeingCopied: false, folderIsGettingReady: false
+                isBeingCopied: false, folderIsGettingReady: false, heldElsewhere: false
             ),
             "Once it has ended, Deploy is available again"
         )
@@ -124,7 +124,7 @@ final class SectionRunsTests: XCTestCase {
         XCTAssertTrue(
             SectionDetailView.deployIsAvailable(
                 run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
-                isBeingCopied: false, folderIsGettingReady: false
+                isBeingCopied: false, folderIsGettingReady: false, heldElsewhere: false
             ),
             "a finished deploy leaves Deploy available"
         )
@@ -268,7 +268,7 @@ final class SectionRunsTests: XCTestCase {
             let returning: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
             let available: Bool = SectionDetailView.deployIsAvailable(
                 run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
-                isBeingCopied: false, folderIsGettingReady: false
+                isBeingCopied: false, folderIsGettingReady: false, heldElsewhere: false
             )
             let underWay: Bool = SectionDetailView.deployIsUnderWay(
                 run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1
@@ -345,6 +345,47 @@ final class SectionRunsTests: XCTestCase {
         XCTAssertTrue(
             previewBody.contains(".notePreviewStarted(at:"),
             "startPreview must tell the section's run that a preview started"
+        )
+    }
+
+    /// #729: Deploy greys while another program holds the course. The
+    /// button, Section ▸ Deploy… and ⇧⌘D all read `deployButtonIsEnabled`,
+    /// which asks the folder's `LeaseWatcher`; the help and hint come from
+    /// one chooser; the leases are read again when the section appears, when
+    /// the app or its window comes to the front, when the Mac wakes, and when
+    /// the pointer reaches the button; and every window's folder is watched. The cases
+    /// themselves are `LeaseWatcherTests.testEveryHeldElsewhereCase`.
+    func testDeployAsksWhetherAnotherProgramHoldsTheCourse() throws {
+        let view: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
+        XCTAssertTrue(view.contains("heldElsewhere: courseIsHeldElsewhere"), "deployButtonIsEnabled must ask the watcher")
+        XCTAssertTrue(view.contains(".disabled(!deployButtonIsEnabled)"))
+        XCTAssertTrue(view.contains("deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference"),
+                      "the Section menu and its shortcut read the same predicate")
+        XCTAssertTrue(view.contains(".help(SectionDetailView.deployHelp("), "the help comes from the one chooser")
+        XCTAssertTrue(view.contains(".accessibilityHint(courseIsHeldElsewhere"), "VoiceOver hears the same sentence")
+        XCTAssertEqual(view.components(separatedBy: "leaseWatcher?.reread()").count - 1, 5,
+                       "appearing, the app and the window coming to the front, waking from sleep, and the pointer on the button")
+        XCTAssertTrue(view.contains("NSWorkspace.didWakeNotification"))
+        let workspace: String = try readSource("QuartzTeachers/Models/WorkspaceModel.swift")
+        XCTAssertEqual(workspace.components(separatedBy: "watchTheLeasesOfTheOpenFolders()").count - 1, 4,
+                       "its definition, and a window registering, leaving and pointing at a folder")
+        XCTAssertTrue(workspace.contains("LeaseWatchers.shared.follow(folders)"))
+    }
+
+    /// The ordinary help is unchanged, and the folder not being ready still
+    /// wins over everything else.
+    func testTheDeployHelpChooser() {
+        XCTAssertEqual(
+            SectionDetailView.deployHelp(folderReadinessReason: nil, heldElsewhere: false, courseCode: "EXC2O"),
+            "Deploy this section's website"
+        )
+        XCTAssertEqual(
+            SectionDetailView.deployHelp(folderReadinessReason: "Not ready.", heldElsewhere: true, courseCode: "EXC2O"),
+            "Not ready."
+        )
+        XCTAssertEqual(
+            SectionDetailView.deployHelp(folderReadinessReason: nil, heldElsewhere: true, courseCode: "EXC2O"),
+            SectionDetailView.deployIsHeldElsewhere(course: "EXC2O")
         )
     }
 

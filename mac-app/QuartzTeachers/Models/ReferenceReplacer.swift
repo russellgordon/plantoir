@@ -228,7 +228,10 @@ enum ReferenceReplacer {
         let folderName: String
 
         let title: String
-        let message: String
+
+        /// What the sheet asks (#834): the title, one sentence, the facts as
+        /// rows, Replace and Cancel.
+        let question: FactsQuestion
 
         // MARK: - Computed properties
 
@@ -388,26 +391,23 @@ enum ReferenceReplacer {
         let pages: String = ReferenceReplaceWording.pages(counted.pages)
         let size: String = ReferenceImportWording.size(counted.bytes)
 
-        var message: String
+        var date: String?
         let created: Date? = try? old.directoryURL.resourceValues(forKeys: [.creationDateKey]).creationDate
         if let created {
             let formatter: DateFormatter = DateFormatter()
             formatter.dateStyle = .long
             formatter.timeStyle = .none
-            message = ReferenceReplaceWording.body(
-                course: course, group: group, sections: sections, pages: pages, size: size,
-                date: formatter.string(from: created), folder: folderName
-            )
-        } else {
-            message = ReferenceReplaceWording.bodyWithoutADate(
-                course: course, group: group, sections: sections, pages: pages, size: size, folder: folderName
-            )
+            date = formatter.string(from: created)
         }
-        return .warn(Warning(
-            folderName: folderName,
-            title: ReferenceReplaceWording.title(course: course, group: group),
-            message: message
-        ))
+        let title: String = ReferenceReplaceWording.title(course: course, group: group)
+        let question: FactsQuestion = FactsQuestion(
+            title: title,
+            message: ReferenceReplaceWording.message,
+            rows: ReferenceReplaceWording.rows(sections: sections, pages: pages, size: size, date: date, folder: folderName),
+            action: ReferenceReplaceWording.confirmButton,
+            cancel: ReferenceReplaceWording.cancelButton
+        )
+        return .warn(Warning(folderName: folderName, title: title, question: question))
     }
 
     /// How many files and pages the course holds, and how large it is, by

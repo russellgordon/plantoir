@@ -896,11 +896,13 @@ struct NewCourseWizardView: View {
                     adoptSkeletonStructure()
                 }
             }
-            .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchor in
+            .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchors in
                 GeometryReader { proxy in
-                    if courseCodeSuggestionsAreShown, let anchor {
+                    if courseCodeSuggestionsAreShown, let field = anchors.field {
                         CourseCodeSuggestionsOverlay(
-                            fieldFrame: proxy[anchor],
+                            fieldFrame: proxy[field],
+                            // Below the sentence under the field (#832).
+                            rowBottom: rowBottom(of: anchors, in: proxy),
                             province: province,
                             entries: courseCodeSuggestions,
                             onSelect: selectCourseCodeSuggestion,
@@ -1112,6 +1114,12 @@ struct NewCourseWizardView: View {
                     } else {
                         ExampleCaption("Type a code, or type what the course is called — e.g. “chem” finds SCH3U. Or type a club name like CODING.")
                     }
+                }
+                // The field's row with its sentence, which the popup opens
+                // below (#832): a transform, so the field's own anchor
+                // inside it is kept.
+                .transformAnchorPreference(key: CourseCodeFieldAnchorKey.self, value: .bounds) { anchors, row in
+                    anchors.row = row
                 }
                 .padding(.bottom, 8)
                 referenceChoiceRow
@@ -1627,6 +1635,15 @@ struct NewCourseWizardView: View {
 
     // MARK: - Functions
 
+    /// The bottom of the code's row as `proxy` sees it, or nil before the
+    /// row has published its anchor.
+    func rowBottom(of anchors: CourseCodeAnchors, in proxy: GeometryProxy) -> CGFloat? {
+        guard let row = anchors.row else {
+            return nil
+        }
+        return proxy[row].maxY
+    }
+
     /// A row picked from `CourseCodeSuggestionsOverlay` — sets the code
     /// exactly like finishing typing one by hand, then drops focus so
     /// the popup closes.
@@ -1806,6 +1823,20 @@ struct NewCourseWizardView: View {
             return WizardWording.panelWords(isClub: isClub).defaultSiteName
         }
         return name
+    }
+
+    /// A club's short label as the window writes it: cleaned before it is
+    /// trimmed (#822), and empty for a course that is not a club.
+    static func shortLabelToWrite(typed: String, isClub: Bool) -> String {
+        if !isClub {
+            return ""
+        }
+        return OneLineText.cleaned(typed).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// A section's label as the window writes it, cleaned (#822).
+    static func sectionLabelToWrite(chosen: String) -> String {
+        return OneLineText.cleaned(chosen)
     }
 
     static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
@@ -2061,7 +2092,7 @@ struct NewCourseWizardView: View {
         var fontsSectionsMap: [String: Any] = [:]
         for sectionNumber in sectionNumbers {
             let key: String = "section\(sectionNumber)"
-            emojiMap[key] = emoji
+            emojiMap[key] = NewCourseWizardView.sectionLabelToWrite(chosen: emoji)
             markerMap[key] = showsSectionMarker
             gradeMap[key] = showsGradeInTitle
             schemeMap[key] = colourSchemeID
@@ -2155,7 +2186,7 @@ struct NewCourseWizardView: View {
         var config: [String: Any] = [
             "course_code": code,
             "course_name": CourseName.cleaned(name),
-            "custom_short_name": isClubCode ? customShortName.trimmingCharacters(in: .whitespaces) : "",
+            "custom_short_name": NewCourseWizardView.shortLabelToWrite(typed: customShortName, isClub: isClubCode),
             "locale": locale,
             "emojis": ["sections": emojiMap],
             "num_sections": sectionNumbers.count,

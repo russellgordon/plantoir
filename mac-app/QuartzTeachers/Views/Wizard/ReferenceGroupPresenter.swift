@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The sheets and alerts for the groups on the Reference Courses shelf
 /// (#572, third piece): New Group…, Rename Group…, the question before a
-/// group that holds courses is removed, and a change that did not happen.
+/// group that holds courses is removed (a sheet of facts since #834), Start
+/// the Groups Again, and a change that did not happen.
 /// On a view of its own, beside the sidebar's other presenters, so the
 /// sidebar's chain of modifiers stays one the compiler can read.
 ///
@@ -93,37 +94,38 @@ struct ReferenceGroupPresenter: ViewModifier {
             .sheet(item: renameRequest) { group in
                 ReferenceGroupNameSheet(purpose: .rename(group))
             }
-            .alert(
-                ReferenceGroupWording.removeGroupTitle(group: workspace.removeGroupRequest?.title ?? ""),
-                isPresented: isAskingToRemove
-            ) {
-                Button(ReferenceGroupWording.removeButton) {
-                    if let group = workspace.removeGroupRequest {
+            // Sheets since #834: one sentence, then the facts as rows, and
+            // Cancel answering both Return and Escape, which an alert could
+            // not give one button (#832). The action takes no key.
+            .sheet(isPresented: isAskingToRemove) {
+                FactsQuestionSheet(
+                    question: ReferenceGroupWording.removeGroupQuestion(
+                        group: workspace.removeGroupRequest?.title ?? "", courseCount: removeGroupCourseCount
+                    ),
+                    identifier: "removeReferenceGroupQuestion",
+                    goAhead: {
+                        if let group = workspace.removeGroupRequest {
+                            workspace.removeGroupRequest = nil
+                            workspace.removeReferenceGroup(group)
+                        }
+                    },
+                    cancel: {
                         workspace.removeGroupRequest = nil
-                        workspace.removeReferenceGroup(group)
                     }
-                }
-                // Cancel is the default button (the contract's wording.rule),
-                // the shape the replace warning uses.
-                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
-                    workspace.removeGroupRequest = nil
-                }
-                .keyboardShortcut(.defaultAction)
-            } message: {
-                Text(ReferenceGroupWording.removeGroupMessage(courseCount: removeGroupCourseCount))
+                )
             }
-            .alert(ReferenceGroupWording.startAgainTitle, isPresented: isAskingToStartAgain) {
-                Button(ReferenceGroupWording.startAgainButton) {
-                    workspace.isAskingToStartReferenceGroupsAgain = false
-                    workspace.startReferenceGroupsAgain()
-                }
-                // Cancel is the default button here too.
-                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
-                    workspace.isAskingToStartReferenceGroupsAgain = false
-                }
-                .keyboardShortcut(.defaultAction)
-            } message: {
-                Text(ReferenceGroupWording.startAgainMessage)
+            .sheet(isPresented: isAskingToStartAgain) {
+                FactsQuestionSheet(
+                    question: ReferenceGroupWording.startAgainQuestion,
+                    identifier: "startReferenceGroupsAgainQuestion",
+                    goAhead: {
+                        workspace.isAskingToStartReferenceGroupsAgain = false
+                        workspace.startReferenceGroupsAgain()
+                    },
+                    cancel: {
+                        workspace.isAskingToStartReferenceGroupsAgain = false
+                    }
+                )
             }
             .alert(workspace.referenceGroupProblem?.title ?? "", isPresented: isShowingAProblem) {
                 Button("OK") {

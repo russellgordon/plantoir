@@ -32,6 +32,14 @@ final class ContainerIdentifierTripwireTests: XCTestCase {
         "copyPageResult",
         "copyPageChecklist",
         "linksChecklistSheet",
+        // #832: every control inside the Planning tab read back as
+        // "planningTab"; the share bar, the Coverage tab's header and both
+        // tabs' empty states hold identified controls too.
+        "planningTab",
+        "planningEmpty",
+        "planShareBar",
+        "coverageHeader",
+        "coverageEmpty",
     ]
 
     // MARK: - Functions

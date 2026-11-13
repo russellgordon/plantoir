@@ -76,40 +76,62 @@ def bundled_assets_dir() -> Path:
 
 # ---------------------------------------------------------------- answer keys
 
-def is_answer_key(file_name: str) -> bool:
-    """A file whose NAME looks like an answer key (unitPlanning.share
-    .answerKeys), erring toward leaving a file out (the director's ruling on
-    the #709 review, M3): any of the files the rule applies to (a PDF, an
-    image, a text file; never a page or a stylesheet) whose name, in any
-    letter case and with its spaces, dashes of any kind, underscores and
-    other marks taken away, holds "answer", "solution", "markingguide" or
-    "markingscheme", or has "key" or "keys" as a word of its own. Only the
-    name is read, never the file: a key written inside a page or a PDF named
-    something else cannot be caught, which is why the teacher is shown the
-    lists before an open share goes out."""
-    rule = share_rules()["answerKeys"]
-    name = Path(file_name).name
-    suffix = Path(name).suffix.lower()
-    if suffix not in rule["appliesTo"]:
-        return False
-    stem = name[: len(name) - len(suffix)]
-    # Accents folded first, so Corrigé and Réponses read as corrige and
-    # reponses rather than losing their letters.
+def _name_words(stem: str) -> list[str]:
+    """The words of a name: accents folded first (Corrigé reads as corrige,
+    Réponses as reponses), then split at a lower-case letter followed by a
+    capital (AnswerKey) and at every character that is not a letter."""
     folded = unicodedata.normalize("NFKD", stem)
     plain = ""
     for character in folded:
         if not unicodedata.combining(character):
             plain += character
-    stem = plain
-    letters = re.sub(r"[^a-z]", "", stem.lower())
-    for part in rule["anywhere"]:
-        if part in letters:
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", plain)
+    words = []
+    for word in re.split(r"[^a-z]+", spaced.lower()):
+        if word:
+            words.append(word)
+    return words
+
+
+def is_answer_key(file_name: str) -> bool:
+    """The answer-key HINT (unitPlanning.share.answerKeys), for a file
+    outside a unit's Answer Keys folder: a name holding one of `phrases` as
+    words in a row, or one of `atTheEndOrBeside` as its last word or beside
+    one of `besideWords`. Since #833 the folder is the rule and this only
+    catches the obvious names a plan made before it carries, so Dissolution
+    Lab.pdf, Key Ideas.pdf and Answer Sheet.pdf are not caught (Russell,
+    2026-11-13). Only the name is read, never the file."""
+    rule = share_rules()["answerKeys"]
+    name = Path(file_name).name
+    suffix = Path(name).suffix.lower()
+    if suffix not in rule["appliesTo"]:
+        return False
+    words = _name_words(name[: len(name) - len(suffix)])
+    for phrase in rule["phrases"]:
+        length = len(phrase)
+        for index in range(0, len(words) - length + 1):
+            if words[index:index + length] == phrase:
+                return True
+    beside = set(rule["besideWords"])
+    for index, word in enumerate(words):
+        if word not in rule["atTheEndOrBeside"]:
+            continue
+        if index == len(words) - 1:
             return True
-    # Words: split at every mark and at a lower-to-upper step (AnswerKey).
-    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", stem)
-    words = re.split(r"[^a-z]+", spaced.lower())
-    for word in rule["wholeWords"]:
-        if word in words:
+        if index > 0 and words[index - 1] in beside:
+            return True
+        if index + 1 < len(words) and words[index + 1] in beside:
+            return True
+    return False
+
+
+def in_answer_keys_folder(place: str) -> bool:
+    """Whether a place in the plan is inside a folder named Answer Keys, in
+    any letter case, at any depth (unitPlanning.share.answerKeysFolder)."""
+    folder_name = share_rules()["answerKeysFolder"]["name"].lower()
+    parts = Path(place).parts
+    for part in parts[:-1]:
+        if part.lower() == folder_name:
             return True
     return False
 
@@ -403,6 +425,337 @@ def check(planning_dir: Path, assets_dir: Path | None = None) -> list[Problem]:
     return problems
 
 
+# ----------------------------------------------------------------- documents
+
+PICTURE_SUFFIXES = (".png", ".jpg", ".jpeg", ".svg")
+ALWAYS_GO_SUFFIXES = (".html", ".css", ".woff2") + PICTURE_SUFFIXES
+DOCUMENT_SUFFIXES = (".pdf", ".txt")
+SHARED = "shared"
+NOT_SHARED = "notShared"
+
+
+@dataclass
+class Document:
+    """One row of the tables before a share (unitPlanning.share.documents):
+    a file the teacher may hold back, or one listed to say it cannot go."""
+    place: str
+    name: str
+    unit: str
+    unit_order: int
+    folder: str
+    kind: str
+    answer_key: str | None
+    movable: bool
+
+    def line(self, start: str) -> dict:
+        return {"place": self.place, "name": self.name, "unit": self.unit, "unitOrder": self.unit_order,
+                "folder": self.folder, "kind": self.kind, "answerKey": self.answer_key,
+                "movable": self.movable, "start": start}
+
+
+def kind_of(name: str) -> str:
+    """The Kind column (documents.kinds), by extension without case."""
+    suffix = Path(name).suffix.lower()
+    kinds = share_rules()["documents"]["kinds"]
+    if suffix in kinds:
+        return kinds[suffix]
+    if not suffix:
+        return "File"
+    return suffix[1:].upper() + " file"
+
+
+def class_of(place: str, unit_names: set | None = None, loaded: set | None = None) -> str:
+    """documents.rule: document, cannotShare, alwaysGoes or neverListed, for
+    a place the share would consider (not hidden, not a link, not in a
+    folder a backup leaves out). `loaded` is every place a page of the plan
+    loads (`loaded_by_pages`): a picture a page shows is the plan's own and
+    always goes; any other picture is one a teacher attached, a handout or a
+    key, and is a document (review M1). With no `loaded` given, every
+    picture outside the folder and the hint is taken as the plan's own."""
+    relative = Path(place)
+    name = relative.name
+    suffix = relative.suffix.lower()
+    if relative.parts[0] == "assets":
+        return "neverListed"
+    if name in share_rules()["documents"]["neverListed"]:
+        return "neverListed"
+    if len(relative.parts) == 1 and name.lower() == "404.html":
+        return "neverListed"
+    if len(relative.parts) == 1 and name.lower() == "robots.txt":
+        return "alwaysGoes"
+    keys_folder = in_answer_keys_folder(place)
+    if suffix not in ALLOWED_SUFFIXES:
+        return "cannotShare"
+    if keys_folder or suffix in DOCUMENT_SUFFIXES:
+        return "document"
+    if suffix in PICTURE_SUFFIXES and is_answer_key(name):
+        return "document"
+    if suffix in PICTURE_SUFFIXES and loaded is not None and place not in loaded:
+        return "document"
+    return "alwaysGoes"
+
+
+def _srcset_targets(value: str) -> list[str]:
+    targets = []
+    for part in value.split(","):
+        words = part.strip().split()
+        if words:
+            targets.append(words[0])
+    return targets
+
+
+def loaded_by_pages(planning_dir: Path) -> set:
+    """Every place in the plan a page LOADS (an img, a source, a link such
+    as an icon, a style's url()), as the page shows it rather than offers it
+    to be opened: the pictures that are the plan's own. A picture a page only
+    links to (an <a href>) is not among them."""
+    planning_dir = Path(planning_dir)
+    found: set = set()
+    if not planning_dir.is_dir():
+        return found
+    root = planning_dir.resolve()
+    for path, relative in _files_to_share(planning_dir):
+        if path.suffix.lower() != ".html":
+            continue
+        reader = _read_page(path)
+        targets = []
+        for target in reader.loads:
+            # A srcset ("a.png 1x, b.png 2x") names several; a src with a
+            # space in its name names one.
+            if re.search(r"\s\d+(?:\.\d+)?[wx]\s*(?:,|$)", target):
+                targets.extend(_srcset_targets(target))
+            else:
+                targets.append(target)
+        for style in reader.styles:
+            for match in _CSS_LOADS.finditer(style):
+                targets.append(match.group(1) or match.group(2) or "")
+        for target in targets:
+            if not _is_relative(target):
+                continue
+            decoded = unquote(target.split("#", 1)[0].split("?", 1)[0])
+            if not decoded:
+                continue
+            if decoded.startswith("/"):
+                resolved = (planning_dir / decoded.lstrip("/")).resolve()
+            else:
+                resolved = (path.parent / decoded).resolve()
+            try:
+                found.add(resolved.relative_to(root).as_posix())
+            except ValueError:
+                continue
+    return found
+
+
+def answer_key_of(place: str) -> str | None:
+    """folder (inside an Answer Keys folder), hint (outside it, and the name
+    hint matches) or None."""
+    if in_answer_keys_folder(place):
+        return "folder"
+    if is_answer_key(Path(place).name):
+        return "hint"
+    return None
+
+
+def _unit_order(planning_dir: Path, units: list[Path]) -> dict:
+    """Each unit's place in the list of plans: the order the root index.html
+    links them, then the rest by name."""
+    names = []
+    for unit in units:
+        names.append(unit.name)
+    linked: list[str] = []
+    root_index = planning_dir / "index.html"
+    if root_index.is_file():
+        for link in _read_page(root_index).links:
+            if not _is_relative(link):
+                continue
+            path_part = unquote(link.split("#", 1)[0].split("?", 1)[0])
+            while path_part.startswith("./"):
+                path_part = path_part[2:]
+            first = path_part.split("/", 1)[0]
+            if first in names and first not in linked:
+                linked.append(first)
+    for name in sorted(names):
+        if name not in linked:
+            linked.append(name)
+    order = {}
+    for index, name in enumerate(linked):
+        order[name] = index
+    return order
+
+
+@dataclass
+class Listing:
+    documents: list = field(default_factory=list)
+    own_files: int = 0
+
+
+def list_documents(planning_dir: Path, bundled_assets: Path | None = None) -> Listing:
+    """The documents a share lists, sorted by place, and the count of the
+    plan's own files that always go (the app's assets included)."""
+    planning_dir = Path(planning_dir)
+    listing = Listing()
+    units = _unit_folders(planning_dir) if planning_dir.is_dir() else []
+    order = _unit_order(planning_dir, units)
+    unit_names = set(order.keys())
+    if not planning_dir.is_dir():
+        return listing
+    loaded = loaded_by_pages(planning_dir)
+    for path, relative in _files_to_share(planning_dir):
+        place = relative.as_posix()
+        kind = class_of(place, unit_names, loaded)
+        if kind == "alwaysGoes":
+            listing.own_files += 1
+            continue
+        if kind == "neverListed":
+            continue
+        unit = relative.parts[0] if len(relative.parts) > 1 and relative.parts[0] in unit_names else ""
+        inner = relative.parts[1:-1] if unit else relative.parts[:-1]
+        listing.documents.append(Document(
+            place=place, name=relative.name, unit=unit, unit_order=order.get(unit, len(order)),
+            folder="/".join(inner), kind=kind_of(relative.name), answer_key=answer_key_of(place),
+            movable=(kind == "document")))
+    if bundled_assets is not None and Path(bundled_assets).is_dir():
+        for path in Path(bundled_assets).rglob("*"):
+            relative = path.relative_to(bundled_assets)
+            if _hidden(relative) or path.is_symlink() or not path.is_file():
+                continue
+            if path.suffix.lower() in ALLOWED_SUFFIXES:
+                listing.own_files += 1
+    return listing
+
+
+def starting_place(document: Document, protected: bool, include_answer_keys: bool,
+                   remembered: dict | None = None) -> str:
+    """unitPlanning.share.startingPlace: where a listed document starts."""
+    if not document.movable:
+        return NOT_SHARED
+    if remembered and remembered.get(document.place) in (SHARED, NOT_SHARED):
+        return remembered[document.place]
+    if document.answer_key is not None:
+        return SHARED if (protected or include_answer_keys) else NOT_SHARED
+    return SHARED
+
+
+def remembered_choices(marker: dict | None) -> dict:
+    """The marker's `documents`, or {} for a marker from before #833."""
+    if not marker:
+        return {}
+    choices = marker.get("documents")
+    if not isinstance(choices, dict):
+        return {}
+    return choices
+
+
+def refused_choices(choices: dict, listing: Listing, planning_dir: Path | None = None) -> list[str]:
+    """rememberedChoices: the entries the share refuses, a Shared entry for
+    a place it would never send (one listed as cannotShare, a path outside
+    the plan, a hidden one, one in a folder a backup leaves out, or, given
+    `planning_dir`, a link or a place under a linked folder) or a value that
+    is neither of the two. An entry for a place not listed (renamed,
+    deleted, or a page that always goes) is not refused: it is forgotten."""
+    movable = set()
+    listed = set()
+    for document in listing.documents:
+        listed.add(document.place)
+        if document.movable:
+            movable.add(document.place)
+    refused = []
+    for place, value in choices.items():
+        if not isinstance(place, str) or value not in (SHARED, NOT_SHARED):
+            refused.append(str(place))
+            continue
+        if value != SHARED or place in movable:
+            continue
+        if place in listed:
+            refused.append(place)
+            continue
+        relative = Path(place)
+        never_folders = set(unit_planning()["neverFolderNames"])
+        escapes = place.startswith("/") or ".." in relative.parts or place == ""
+        hidden = False
+        for part in relative.parts:
+            if part.startswith(".") or part in never_folders:
+                hidden = True
+        if escapes or hidden:
+            refused.append(place)
+            continue
+        if planning_dir is not None and _is_a_link_in(Path(planning_dir), relative):
+            refused.append(place)
+    return refused
+
+
+def _is_a_link_in(planning_dir: Path, relative: Path) -> bool:
+    """Whether a place, or any folder on the way to it, is a link."""
+    current = Path(planning_dir)
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
+def settle(listing: Listing, protected: bool, include_answer_keys: bool, remembered: dict | None) -> dict:
+    """Every listed document's place: the remembered choice, else the rule."""
+    settled = {}
+    for document in listing.documents:
+        settled[document.place] = starting_place(document, protected, include_answer_keys, remembered)
+    return settled
+
+
+def hold_back_keys_with_nobody_to_look(listing: Listing, settled: dict) -> int:
+    """unitPlanning.share.unattendedKeys: with nobody at the lists, an open
+    share sends no answer key, of either kind, on the strength of a
+    remembered choice or the tick alone. Moves every key settled in Shared
+    to Not shared and returns how many moved."""
+    held = 0
+    for document in listing.documents:
+        if document.answer_key is not None and settled.get(document.place) == SHARED:
+            settled[document.place] = NOT_SHARED
+            held += 1
+    return held
+
+
+def kept_choices(choices: dict, listing: Listing) -> dict:
+    """rememberedChoices pruned: only the entries for movable documents that
+    are listed now, so a renamed or deleted file is forgotten."""
+    kept = {}
+    for document in listing.documents:
+        if document.movable and choices.get(document.place) in (SHARED, NOT_SHARED):
+            kept[document.place] = choices[document.place]
+    return kept
+
+
+def mark_of(document: Document) -> str | None:
+    """startingPlace.mark: what the Note column says beside a name."""
+    if not document.movable:
+        return "cannotShare"
+    if document.answer_key == "folder":
+        return "answerKey"
+    if document.answer_key == "hint":
+        return "mayBeAnswerKey"
+    return None
+
+
+def warns(document: Document, place: str, protected: bool) -> bool:
+    """startingPlace.warns: an answer key in Shared in a share with no
+    password carries the warning."""
+    return document.answer_key is not None and place == SHARED and not protected
+
+
+ADVICE_KIND = "keyOutsideFolder"
+
+
+def advice(planning_dir: Path) -> list[Problem]:
+    """unitPlanning.share.advice: never a refusal. Each file outside an
+    Answer Keys folder whose name the hint matches, to move into it."""
+    found = []
+    words = share_rules()["advice"]["line"]
+    for document in list_documents(planning_dir).documents:
+        if document.answer_key == "hint":
+            found.append(Problem(ADVICE_KIND, document.place, words.replace("{place}", document.place)))
+    return found
+
+
 # --------------------------------------------------------------------- stage
 
 @dataclass
@@ -411,25 +764,11 @@ class Staged:
     left_out: list[str] = field(default_factory=list)
     answer_keys_left_out: int = 0
     answer_keys_left_out_names: list[str] = field(default_factory=list)
+    answer_keys_shared: int = 0
+    documents_shared: int = 0
+    documents_held_back: int = 0
     units: int = 0
     bytes: int = 0
-
-
-def open_share_lists(staged: Staged) -> tuple[list[str], list[str]]:
-    """What an open share shows the teacher before it goes out
-    (unitPlanning.share.openShareLists): EVERY file it will share, pages,
-    images and the stylesheets and fonts included, and every file it leaves
-    out, answer keys and files of other kinds alike, by name and sorted. By
-    name only: nothing here reads a file."""
-    shared_pdfs: list[str] = []
-    for place in staged.files:
-        shared_pdfs.append(place)
-    left_out: list[str] = []
-    for place in staged.answer_keys_left_out_names:
-        left_out.append(place)
-    for place in staged.left_out:
-        left_out.append(place)
-    return sorted(shared_pdfs), sorted(left_out)
 
 
 def not_shared_here_page() -> str:
@@ -442,31 +781,54 @@ def not_shared_here_page() -> str:
 
 
 def stage(planning_dir: Path, out_dir: Path, bundled_assets: Path | None,
-          include_answer_keys: bool) -> Staged:
-    """Copies what is shared into `out_dir`: the allowlisted files, never a
-    hidden one, a link or anything in a folder a backup leaves out; every
-    answer key left out unless `include_answer_keys`; the app's own `assets/`
-    in place of the plan's (left out, the plan's own are copied); and a
-    `404.html`, written last so a teacher's own cannot replace it."""
+          include_answer_keys: bool, settled: dict | None = None) -> Staged:
+    """Copies what is shared into `out_dir`: the plan's own files that always
+    go (pages, pictures, stylesheets, fonts), and each listed document whose
+    place in `settled` is shared; never a hidden file, a link, anything in a
+    folder a backup leaves out, a file of a kind no share takes, or a
+    document `settled` does not name (one that appeared after the teacher
+    saw the lists). With no `settled`, the rule decides with
+    `include_answer_keys` as the only choice (unitPlanning.share.stage).
+    The app's own `assets/` replaces the plan's (left out, the plan's own
+    are copied), and a `404.html` is written last so a teacher's own cannot
+    replace it."""
     planning_dir = Path(planning_dir)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     staged = Staged()
     staged.units = len(_unit_folders(planning_dir))
+    order = _unit_order(planning_dir, _unit_folders(planning_dir))
+    loaded = loaded_by_pages(planning_dir)
+    if settled is None:
+        settled = settle(list_documents(planning_dir), False, include_answer_keys, None)
     for path, relative in _files_to_share(planning_dir):
         place = relative.as_posix()
-        if bundled_assets is not None and relative.parts[0] == "assets":
-            continue
-        if len(relative.parts) == 1 and relative.name.lower() == "404.html":
+        if relative.parts[0] == "assets":
+            # The plan's own stylesheets and fonts: replaced by the app's
+            # copy when there is one, and copied as they are otherwise.
+            if bundled_assets is not None:
+                continue
+            # Only stylesheets, fonts and pictures: a document under assets/
+            # is never listed, so it never goes (review L4).
+            kind = "alwaysGoes" if path.suffix.lower() in (".css", ".woff2") + PICTURE_SUFFIXES else "cannotShare"
+        else:
+            kind = class_of(place, set(order.keys()), loaded)
+        if kind in ("neverListed", "cannotShare"):
             staged.left_out.append(place)
             continue
-        if path.suffix.lower() not in ALLOWED_SUFFIXES:
-            staged.left_out.append(place)
-            continue
-        if is_answer_key(relative.name) and not include_answer_keys:
-            staged.answer_keys_left_out += 1
-            staged.answer_keys_left_out_names.append(place)
-            continue
+        if kind == "document":
+            key = answer_key_of(place)
+            if settled.get(place) != SHARED:
+                staged.documents_held_back += 1
+                if key is not None:
+                    staged.answer_keys_left_out += 1
+                    staged.answer_keys_left_out_names.append(place)
+                else:
+                    staged.left_out.append(place)
+                continue
+            staged.documents_shared += 1
+            if key is not None:
+                staged.answer_keys_shared += 1
         target = out_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
@@ -545,7 +907,7 @@ async function allowed(header) {
 function shared(pathname) {
   let path;
   try { path = decodeURIComponent(pathname); } catch (e) { return false; }
-  path = path.replace(/^\/+/, "");
+  path = path.replace(/^\\/+/, "");
   if (path === "" || path.endsWith("/")) return FILES.has(path + "index.html");
   return FILES.has(path) || FILES.has(path + ".html") || FILES.has(path + "/index.html");
 }

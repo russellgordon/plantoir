@@ -143,6 +143,8 @@ struct PlanningTabView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
+        // A container with its own identifier, keeping its controls' (#832).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("planningTab")
         .task {
             // Reloaded when the tab is drawn again after Settings: the plan
@@ -293,6 +295,8 @@ struct PlanningTabView: View {
                 }
             }
         }
+        // A container with its own identifier, keeping its controls' (#832).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("planningEmpty")
     }
 

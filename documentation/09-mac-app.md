@@ -153,6 +153,54 @@ own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
 from the source, since `SectionDetailView` cannot be mounted in a unit test —
 that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
 
+**A sixth and a seventh shipped to `dev` in v2.0.0, and were caught in the
+real window before the cut** (#831, #832, 2026-11-13). On a section whose last
+build made a coverage map, the Coverage tab's column was laid out **2,194**
+points tall inside a 700-point content area; on a course whose class sites go
+to Netlify (or name no destination, which reads as Netlify), the Planning tab's
+was **2,630** points. Squeezed (`sizeThatFits` at 1 × 0), the section page
+claimed **2,165** and the Planning tab **2,565**, of which the share bar alone
+was **2,529**; with Cloudflare chosen the share bar claimed **35** and the tab
+was laid out correctly, which is how the Netlify sentence was found. The cause
+was this section's rule broken twice more: the Coverage header's lines and
+`PlanShareBar`'s sentences each carried `.fixedSize(horizontal: false,
+vertical: true)`. A `WKWebView` reporting its page's height was suspected and
+ruled out by the same measurement: `PlanWebView.sizeThatFits` returns exactly
+what it is proposed, and the web view was laid out to whatever the column was.
+
+Two fixes, each measured to be enough on its own, and both kept:
+
+- **The modifiers are gone** from `CoverageTabView` and `PlanShareBar`
+  (squeezed: 65 and 39 points). At a real width the sentences still wrap in
+  full: the plan's web view is 507 points tall under the Netlify sentence and
+  541 under the shorter Cloudflare one, in the same window.
+- **`TabArea`** (`DetailTabs.swift`) holds every tab's content, in
+  `SectionTabContent` and `CourseDetailContent`, with `minHeight: 0`: the room
+  under a detail view's tabs claims no height of its own whatever a tab inside
+  it asks for (squeezed: 36 and 0 points with the modifiers still in place).
+  This is the structural half: the next rigid sentence, or the next
+  representable that reports an intrinsic height, inside any tab cannot move
+  the tab bar. Height only: the column's smallest width still comes from what
+  the tab needs, so a form is never drawn narrower than it can be.
+
+**Why the tests did not see it.** `SectionDetailStructureTests` and
+`CourseDetailStructureTests` read what is in the view tree; none of them laid a
+frame out. `DetailTabsLayoutTests` now does: the real `SectionDetailView` and
+the real Planning tab under `DetailTabs` in a `NavigationSplitView` window
+sized as the scene sizes it, at 1100 × 720 and 1440 × 860, with a page taller
+than the window loaded, asserting that the tab bar, the web view and every
+AppKit control (the Unit popup, the share bar's checkboxes) are inside the
+window, that the page is below the bar, and that no view outside a scroll
+view's content is taller than the window. Measured failing on the code before
+the fix (the tab bar at y = 1,417 in a 700-point window) and passing after.
+The same file pins that none of the two tabs' files makes a sentence rigid.
+
+**Rejected:** a `ScrollView` around the tab's content (the page scrolls inside
+its own web view already, and a scroll view's ideal height is its content, the
+first row of the table above); capping the web view's height (the web view was
+never the one claiming); and laying the window out again after the page loads,
+which is a race dressed as a fix.
+
 The fourth is the one to learn from, because the third had already produced a
 rule, a comment and a test file, and the fault still shipped twice more in the
 same window. The comment lived on the view it was written for; the test file
@@ -583,8 +631,13 @@ a folder destination and 3,000 extra pages, so the deploy's build took 32 s):
 on return the window read "No Preview Running" with Deploy enabled. A press
 during the deploy's BUILD leg was worse than the report: it started a second
 `preview.sh --build-only`, and the first deploy's build ended "failed (exit 1)
-after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counts a
-running `deploy.sh`, and the first deploy had not reached it yet. After the
+after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counted a
+running `deploy.sh`, and the first deploy had not reached it yet. (Since #729
+the guard also counts a deploy's build leg, which the app now runs as
+`preview.sh C S --build-only --for-deploy`, and any other `--build-only` of
+the section, so a second program's press during the build leg is refused by
+the launcher in words: [03](03-launcher-scripts.md) → "A section being
+deployed cannot be deployed again (#439)".) After the
 fix, the same steps showed the live progress with Cancel, Deploy greyed, one
 launcher start in total (the press and ⇧⌘D started nothing), and a deploy
 that finished while the teacher was on section 2 showed "Done" on return.
@@ -686,12 +739,12 @@ run exists.
 **Known limits.**
 - The windowless assistant's deploy runs on `AssistSiteWork`'s own runner, so
   a section selected meanwhile greys Deploy but shows nothing in the console.
-- Another PROGRAM's deploy (a deploy set for later, an outside assistant, a
-  command line) does not grey the button. Work leases are per course and on
-  disk, and nothing in the app watches them change, so a button greyed from
-  them would stay grey after that program had finished. A press then is
-  refused in words: by `claimAPublish` (`builtElsewhere`) when that program
-  holds leases, or by the launcher when it holds none.
+- Until #729, another PROGRAM's deploy (a deploy set for later, an outside
+  assistant, a command line) did not grey the button, because nothing in the
+  app watched the leases. Since #729 a program that holds leases greys it
+  ("Deploy waits for another program (#729)", next). A program that holds
+  none, such as a deploy typed in Terminal, still does not: a press then is
+  refused in words by the launcher.
 
 Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
 
@@ -730,6 +783,183 @@ Must-fail, by copy-and-restore:
 
 `QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
 a stub `deploy.sh` that counts its own starts. It is part of no gate.
+
+## Deploy waits for another program (#729)
+
+**What it closes.** #706 greyed Deploy while THIS app deployed a section. A
+deploy set for later, an outside assistant (`Plantoir --mcp-stdio`) or another
+copy of Plantoir left the button pressable, and the press was then refused in
+the "Cannot Deploy Yet" alert (`claimAPublish` → `builtElsewhere`). Russell's
+ruling on #729, 2026-11-12: watch the activity folder so Deploy greys and
+un-greys honestly, and measure what a folder watch can be trusted with before
+relying on it.
+
+**What a teacher sees.**
+- Deploy, Section ▸ Deploy… and ⇧⌘D are greyed on EVERY section of a course
+  another program holds, in this working folder. A lease names the course,
+  never the section, and a press on a sibling section is refused the same way.
+- The button's help and its VoiceOver hint are
+  `returningToASectionMidDeploy.heldElsewhere.help`. The folder not being
+  ready still wins (`folderReadinessReason`). Its third program is "a
+  scheduled deploy that is running now" since #835 (Russell, 2026-11-13). It
+  said "a deploy set for later" until then, and he read that as "having a
+  deploy scheduled stops me deploying", which is false: a schedule that has
+  not fired takes no lease, and only its run, while it works, greys the
+  button. `wording.courseIsBeingBuiltElsewhere` says "a scheduled deploy that
+  is running" (that sentence already says "right now"), and the launchers'
+  refusal for a leftover scheduled run (`laterDeploy`, `laterBuild`) and
+  `wording.deployRefusedWhileALaterDeployWorks` say "a scheduled deploy that
+  is still running".
+- When the other program removes its lease, or its process ends, the button
+  is available again with no click.
+- Another program's PREVIEW greys it too, because a press is refused for one
+  (`WorkLeaseFiles.kindsThatBlockABuild` holds `preview` since #156). This is
+  why the sentence says "previewed or deployed" and promises that Deploy comes
+  back "once that preview is stopped": a preview does not finish by itself
+  (the plan review's M6).
+- An `assist` lease (an outside assistant revising, building nothing) does
+  not grey it.
+
+**The shape.**
+- `Models/LeaseWatcher.swift`:
+  - `LeaseWatcher` is `@MainActor @Observable`, one per working folder. It
+    holds `holdingElsewhere[COURSE]`: what `WorkLeaseFiles.blocking(among:
+    heldElsewhere, asker: .aBuild, claim: nil)` answers. That is exactly the
+    question `deployWillBeRefused` asks at the press, so the grey and the
+    refusal cannot disagree.
+  - `LeaseWatchers.shared` keeps one watcher per folder the app's WINDOWS
+    show. `WorkspaceModel.watchTheLeasesOfTheOpenFolders()` keeps it in step:
+    a window registering or leaving, and `pointAtFolder`. It is never called
+    under the unit-test suite, whose windows sit on pretend folders.
+- `SectionDetailView.deployIsAvailable` gained `heldElsewhere`, and
+  `deployHelp` chooses the help.
+
+**The events. No timer anywhere.**
+- A directory watch on EVERY level of the path that exists: `courses/`,
+  `courses/.internal` and `courses/.internal/activity/`
+  (`ScheduledPublishWatcher.changes`, the permitted GCD use). A change in
+  the activity folder is a re-read. A change at a level above it (a folder
+  made, removed, renamed or replaced) re-arms every level from the path as
+  it is now, then re-reads. A watch is on an open folder, not on a path, so
+  this is what lets it follow `.internal` being made alone first, removed
+  and made again, or renamed away and back. The first build watched only
+  the deepest level that existed and moved down only when the activity
+  folder itself appeared: the implementation review measured it deaf for
+  the rest of the session when `.internal` was made alone first (0 of 20),
+  and its proposed fix (move to the deepest level whenever a deeper one
+  appears) still missed `.internal` renamed away and replaced, which a
+  watch on the old, renamed folder never hears. The watcher CREATES nothing.
+  Creating `courses/.internal` again after something removed it could make
+  that program's own `mv` of a replacement folder fail, since a rename over
+  a folder that is not empty fails.
+- One `ProcessEnding.ends(of:)` per distinct holder's process id. This is
+  what un-greys the button when a holder is killed and leaves its lease
+  behind: the lease then reads as stale (`ProcessLiveness`), and no file
+  event will ever come.
+- `reread()` is also called:
+  - when the section appears;
+  - when the app becomes active;
+  - when a window becomes key;
+  - when the Mac wakes from sleep (`NSWorkspace.didWakeNotification`: an app
+    that was already active does not become active again on wake; the
+    review's L-b2);
+  - when the pointer enters the Deploy button.
+
+  These are the plan review's M4. A stuck grey is the harmful failure,
+  because a disabled button cannot be pressed, and these are the moments the
+  teacher reaches for Deploy. Each is also a chance to re-arm a folder watch
+  that went deaf. Re-arming is always caused by an event; the watch's own
+  last read does not re-arm, so a folder that cannot be opened cannot spin.
+
+**What was measured.** M4 Pro, 12 cores, macOS 26.6, APFS, 2026-11-13,
+re-run in full on the watcher as merged (every level watched). A
+standalone harness compiled the REAL `LeaseWatcher.swift`, `WorkLeaseFiles`,
+`ProcessLiveness` and `ProcessEnding`, plus `changes(at:watching:)` copied
+verbatim. It ran 40 trials each, with holders as real child processes writing
+their own leases.
+
+| Trial | Result |
+|---|---|
+| W1, a lease written with `Data.write(.atomic)` is listed, with a readable name line (the liveness check reads it) | 40/40, slowest 3 ms, exactly 1 folder event per write |
+| W2, the lease removed is cleared | 40/40, 3 ms, 1 event |
+| W3, the holder `kill -9`ed with its lease left on disk | `ProcessEnding` fired 40/40 (3 ms); cleared 40/40 at that read |
+| W4, a lease assembled beside the folder by `bash` and `mv`ed in (Windows' shape, and a future launcher lease's) | 40/40, slowest 24 ms, 1 event |
+| W5, no activity folder (nor `.internal`) at the start; the first lease makes both | listed 40/40 |
+| W6, W1 to W3 again beside 12 `yes` processes, one per core (#417's lesson) | 40/40 each, slowest 15, 20 and 30 ms |
+| W7, a lease naming pid 1 (root's launchd) with its real name and start | listed as held; the process watch armed and stayed silent: 0 re-reads in 2 s, so no spin |
+| W8, a lease written and removed within a few milliseconds | final state clear 40/40 |
+| W9, two holders, one leaves | still held by the other 40/40 |
+| W10, `.internal` removed while watched, then made again by a lease | re-armed and listed 40/40 |
+| W12, switching folders | 40/40 left no descriptor on the old folder (`lsof -p`) and no process watch (3 descriptors while watched, one per level) |
+| W13, `.internal` made alone (a token folder in it), 0.3 s later the first lease | 40/40 (0 of 20 before the fix, the review's R1) |
+| W14, `.internal` removed while watched, made again alone, then a lease | 40/40 (0 of 20 before the fix, the review's R5) |
+| W15, `.internal` renamed away while watched, then a lease into a new one | 40/40 |
+
+W11 (sleep and wake with a holder that ended during sleep) was NOT measured.
+An agent may not sleep the Mac. The process-exit event is queued by the
+kernel and delivered on wake, and the section re-reads on the wake
+notification.
+
+**Why no fallback.** Every pass bar was met, so the 2 s re-read the plan held
+in reserve was not built.
+
+**What is still not seen.**
+- A program that holds no lease: a deploy typed in Terminal, or a leftover
+  run (#439). The launcher's guard refuses its press in words, and #729's
+  first part widened what that guard sees ([03](03-launcher-scripts.md) → "A
+  section being deployed cannot be deployed again (#439)").
+- A holder run by another account (its `Plantoir`, say). W7 shows that a
+  watch on such a process arms without firing at once. That it fires when
+  such a process ends was NOT measured, because no other account's process
+  could be ended here. Liveness is `ProcessLiveness`'s, which errs towards
+  alive, so such a holder can keep Deploy grey until the next event re-reads.
+
+**Rejected.**
+- Reading the process table to grey the button. It needs a timer, since no
+  event says a process started; it runs `ps` per redraw or per interval; and
+  it would copy the launchers' awk into Swift.
+- Polling the folder on a timer. The events exist.
+- `FSEventStream` and `NSFilePresenter`, for `ScheduledPublishWatcher`'s
+  reasons.
+- Leases per section. That is a format both apps and #245's readers share,
+  for a case the press refuses anyway, because `claimAPublish` is per course.
+- A trail line per grey and un-grey (#729 question 3). It is a state, not an
+  act: a refused press is already on the trail.
+- `deploy.sh` taking a lease itself, so a deploy typed in Terminal greys the
+  button. It has real value and is a follow-up (#729 question 2). It touches
+  `ProcessLiveness` (a bash holder's name and start), `workLeases` on both
+  platforms and three launchers.
+- The watcher creating the activity folder (above).
+
+**Tests.**
+- `LeaseWatcherTests`:
+  - every `heldElsewhere` case, through `deployIsAvailable` and `deployHelp`,
+    against real files with `/bin/sleep` holders;
+  - a killed holder un-greys with no file event;
+  - a lease written and removed is seen both ways;
+  - the watch moves down when the activity folder appears;
+  - each order the folders can appear in: `.internal` made alone first;
+    both together; `.internal` removed and made again alone; the activity
+    folder removed and made again; `.internal` renamed away and back. On the
+    first build, three of these fail (alone first, removed then alone,
+    renamed); on the review's proposed fix, one does (renamed). "Both
+    together" and "the activity folder removed" passed on the first build
+    too, and are kept so a later change cannot break them;
+  - stopping lets go of every watch;
+  - the help is the contract's sentence.
+- `SectionRunsTests`: source scans of the button, the menu, the hint, the five
+  re-reads and `WorkspaceModel`'s three calls.
+- Must-fail, by copy-and-restore, each rebuilt and run:
+  - no process watches: 4 failures, including the killed-holder test and its
+    contract case;
+  - `deployIsAvailable` ignoring `heldElsewhere`: 5 failures, the five cases
+    that start greyed.
+- `QuartzTeachersUITests` has no test for this yet. It needs the screen;
+  Russell's hand test covers it, and must check two things no test here
+  can: that hovering over a greyed Deploy reaches `.onHover` on a disabled
+  button, with the window key and with it behind another (a breakpoint on
+  `LeaseWatcher.reread` in a Debug build shows it), and that VoiceOver reads the sentence ONCE: it is both the `.help` and the
+  `.accessibilityHint`, and if it is read twice the hint goes.
 
 ## A section's Problems tab, its marker and its alert (#717)
 
@@ -1052,7 +1282,134 @@ apostrophe in it, the trail line against the contract's, a source scan of
 the view, and the disabled buttons' hint in both states with both buttons
 carrying it (#776).
 
+## Return and Escape in this release's questions (#832)
+
+**In a SwiftUI alert each button carries ONE key**, measured in an offscreen
+window by reading each `NSButton`'s key equivalent and sending the keys:
+
+| the buttons | Return | Escape |
+|---|---|---|
+| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v2.0.0 first used for "Cancel is the default") | Cancel | **nothing** |
+| a plain action, then Cancel `role: .cancel` | the action | Cancel |
+| Cancel listed first, then a plain action | the action | Cancel |
+| an action `role: .destructive`, then Cancel `role: .cancel` | nothing | Cancel |
+| Cancel + `.defaultAction`, the action + `.cancelAction` | Cancel | **the action** |
+
+A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
+a Return given to it later is dropped. So "Cancel is the default" and "Escape
+closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
+kept the first and lost the second without anybody noticing: the structure
+test pinned the modifier, not the key. The questions now use the destructive
+row of the table: **Escape is Cancel, and Return presses neither button**, so
+a Return typed out of habit still removes, replaces, starts again or shares
+nothing. That was #832's answer for Remove Group, Start the Groups Again,
+Replace It… and the public-address warning, whose Share Without a Password
+used to take Return. **Since #834 the first three are sheets, where Cancel
+answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
+below), and so, since #833, is the public-address warning: it comes after
+the two tables before a share and is a `FactsQuestionSheet` too, so its
+Cancel answers Return and Escape.
+`QuestionKeysTests` presses both keys on each, through the real modifiers.
+
+**A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
+(`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives the sheet
+Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
+console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
+own), measured and pinned, not changed.
+
+**Rejected in #832:** turning the questions into sheets only so that Cancel
+could keep Return as well; and Cancel with Return and no Escape, which is what
+shipped to `dev` and what Russell reported. #834 then made three of them
+sheets for a reason of its own (below), and with that Cancel got both keys.
+
+### Questions as one sentence and labelled facts (#834)
+
+**Ruled by Russell, 2026-11-13**, of the Replace It… warning: "This dialog
+reads as a wall of text. Separate pertinent information from the message the
+app is trying to convey." The shape, `FactsQuestionSheet` with a
+`FactsQuestion`: a title that asks; ONE short sentence, the message, under it
+in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
+`Form` (`LabeledContent`, the system's own form styling, scrolling off); then
+the action and Cancel. A fact that is missing is no row, never a blank one
+(Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
+accessibility element, so VoiceOver reads the title, the message, then
+"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
+the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
+the action takes no key.
+
+Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
+`message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
+Group (`referenceCourses.groups.wording.removeGroupSentence`, then where its
+courses go, none, one or many with no "(s)", and that no course is removed or
+changed) and Start the Groups Again (`startAgainSentence`, then why, the
+groups you made, what is kept, and that nothing inside the courses changes).
+The one-paragraph keys (`body`, `bodyWithoutADate`, `removeGroupMessageNone`,
+`…One`, `…Many`, `startAgainMessage`) are retired, not kept beside the new
+ones.
+
+**The form's height is its rows'**, by `.fixedSize(horizontal: false,
+vertical: true)`, which is allowed here because a sheet is hosted at the width
+it sets itself (460 points), unlike the detail column ("A blank window"). The
+first version gave the form a height of 30 points a row plus 40; measured in
+`FactsQuestionTests` (the form's scroll view against what it holds), it cut
+off the last row of every question, by 20 to 61 points, most where a
+value wrapped. The test fails on that version and passes on this one.
+
+**The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
+shape inside its dialog. When Obsidian is running, Add Them closes the whole of
+Obsidian, so any OTHER course open in it closes too, and only this course
+opens again; the sentence said neither. `offerWhileOpen` and
+`offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
+line as "label: value" (`closesLabel`/`closesValue`,
+`opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
+`obsidianAddOnsForFigures.wording.closingRule`). The offer stays a dialog,
+because its Don't ask again box is a dialog suppression toggle presented from
+a view of its own (#731), and a dialog's message holds lines, not a form.
+Rejected by Russell: leaving Obsidian alone and telling the teacher to
+restart it; offering both at that moment.
+
+**The Reference Courses heading has a visible button** (Russell, 2026-11-13):
+`ReferenceShelfHeading` draws the title and a borderless `ellipsis.circle`
+menu button that opens exactly the heading's right-click menu (both draw
+`ReferenceShelfHeadingMenu`): New Reference Course…, New Group…, and Start
+the Groups Again… while the arrangement cannot be read. Its accessibility
+label and help are `headingMenuLabel`. It is never disabled and never
+absent while the heading is drawn, because New Reference Course… always
+applies there (the heading itself is drawn only when the shelf holds a course
+or a group). The borderless menu style is the sidebar footer's own control
+look, so AppKit draws its hover and pressed states, and Tab reaches it with
+keyboard navigation on; neither was measured in a unit test, which cannot
+hover or open a menu. `FactsQuestionTests` measures that the button is drawn
+inside the heading and enabled, and pins that both doors draw one list. A
+row's own group menu (Rename Group…, Remove Group…) and Move to Group stay on
+the rows and in the Course menu: the heading's button is the door for the
+shelf as a whole.
+
+**Identifiers in the two tabs.** The Planning tab, the share bar, the
+Coverage tab's header and both tabs' empty states carried an
+`.accessibilityIdentifier` on their container without `.contain`, so every
+control inside read back as the container's name (#832; the rule of #353 and
+#366). Each now has `.accessibilityElement(children: .contain)` immediately
+before it, and `ContainerIdentifierTripwireTests` names all five.
+
+**The course-code suggestions** in the New Course wizard opened four points
+under the field, over the orange sentence saying the code is already taken
+(and its Replace It… button), until focus left the field. The field's row,
+field and sentence together, now publishes its own anchor beside the field's
+(`CourseCodeAnchors`, a transform so the field's is kept), and the list opens
+below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
+function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
+the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
+a unit test can read a frame from.
+
 ## A section's Coverage tab (#793)
+
+**Its layout (#831, #832).** The tab's content sits in `TabArea`, which
+claims no height of its own, and nothing in the tab makes a sentence rigid, so
+the tab bar and the header keep their place at every window size and a long
+page scrolls inside its web view. Measured and rejected shapes: "A blank
+window: when a child claims a size the window cannot give", the sixth and
+seventh cases.
 
 Every build of a section writes, beside the built site, its curriculum
 coverage map as it would be if every existing page were published (793a, doc
@@ -1108,9 +1465,10 @@ only when `about.json`'s `buildId` equals the section's `.build-id`
 Python does); ids are compared for equality only. The first line is the
 map's own date, said only as far as it is true (the 793b review's M1): "made
 when this section was last built" only when the map IS the latest build's;
-"made by an earlier build … the latest build made no map" when it is
-another build's and nothing is making the map, but only "made by an earlier
-build" while a build is making it, because a build writes `.build-id` as it
+`olderMap` ("this map is from an earlier build … the latest build could not
+make a new one", naming Make the Map Again) when it is another build's and
+nothing is making the map, but only the opening of that sentence
+(`olderMapWhileBuilding`) while a build is making it, because a build writes `.build-id` as it
 starts and the record reads as another build's until its map is written (the
 fix review's M3); and a form with no date, read from the record's own start
 rather than from the walk (LOW 4), when the record has none, because
@@ -1239,9 +1597,26 @@ the preview to the browser.
 
 **Another window's build.** While another window's preview of the section
 builds, it has moved `.build-id` before its map, so this window's tab no
-longer says the latest build made no map: the older map is "made by an
-earlier build", with the line that the section is being previewed in another
-window (LOW 4).
+longer says the latest build could not make a new map: the older map carries
+only `olderMapWhileBuilding`, with the line that the section is being
+previewed in another window (LOW 4).
+
+**An older map is a caution (#831, Russell 2026-11-13).** Russell read the
+first wording of `olderMap` ("Made by an earlier build of this section,
+{when}. The latest build made no map.") and found it said neither why nor
+what to do. It now says the latest build could not make a new one and names
+the button by the label it carries in that state, Make the Map Again. The
+`couldNotMakeAgain` line that used to follow it is left out under `olderMap`
+and `olderMapNoTime`, because it said the same thing again (the stateRule and
+two state cases changed with it). The lines that say the map may be out of
+date (`coverageTab.tab.cautionLines`: `olderMap`, `olderMapNoTime`,
+`changedSince`, `mayBeOutOfDate`) are drawn with an orange caution triangle
+before them, whose accessibility label is `cautionLabel`; every other line,
+`asOf` among them, is plain. The words say it too, so the symbol is never the
+only signal. Before this nothing in the header carried a symbol: the request
+to give the older map the treatment `changedSince` has found `changedSince`
+drawn as plain text, so both became cautions together and read as one
+family. `CoverageTabTests.testAMapThatMayBeOutOfDateIsACaution` pins it.
 
 **A late refusal that waited on Coverage** goes to the section's next page
 when the teacher leaves the section from Coverage, through `SectionCoverage`,
@@ -4043,7 +4418,7 @@ rejected:
 - **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
   (`{folder, teacherSaid, recorded}`), read and written by the assistant
   only. (Since #707 it is one of the places under a dot folder an
-  assistant writes; the other is `.internal/planning/`: "Unit planning (#707)" below. The marking skill's `.internal/marking/marking.json` is a third when that skill ships; it is held from v1.10.0: "Held from v1.10.0" under "Tests, marking and report comments" below.) It sits inside the course so it travels with a backup, an archive
+  assistant writes; the other is `.internal/planning/`: "Unit planning (#707)" below. The marking skill's `.internal/marking/marking.json` is a third when that skill ships; it is held from v2.0.0: "Held from v2.0.0" under "Tests, marking and report comments" below.) It sits inside the course so it travels with a backup, an archive
   and a restore, as `.internal/timetable/` does; a reference import keeps
   `.internal` minus `activity`. It never reaches a site: discovery skips
   dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
@@ -4163,7 +4538,7 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   more room than that. Known, not fixed (#737 review): a guard that asks
   `ps -p` still counts a zombie process in the instant before it is reaped.
 
-**Lettered parts hang, and questions are worded plainly (#754, v1.10.0).**
+**Lettered parts hang, and questions are worded plainly (#754, v2.0.0).**
 Ruled 2026-11-09, written into the skill on 2026-11-12. On a quiz or test a part a), b),
 c) that runs to more than one line hangs under its first word, as a
 numbered question does. `starters/Quiz.tex` gains four macros:
@@ -4201,7 +4576,7 @@ which is not in the repository and, if it was in a working folder's
 `.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
 (`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
 
-**Lesson materials, and whose way of teaching (#765, v1.10.0).** Rules
+**Lesson materials, and whose way of teaching (#765, v2.0.0).** Rules
 settled on 2026-11-10 while building a day's resources (a warmup, task
 cards, a summary, an exercise). The handouts skill gains section 13,
 "Lesson materials", and section 14, "Wording and contexts"; the
@@ -4359,7 +4734,7 @@ still starts with its fixture (`scripts/fixtures/unit_plan/`, CSS only,
 extracted once from the example with Russell's leave), that the tokens and
 dark blocks are identical across the two sheets, and that every class a
 shipped release defined still has a rule (`classes-shipped.json`, whose
-first entry is 1.10.0). A later release adds rules at the end of a sheet and
+first entry is 2.0.0). A later release adds rules at the end of a sheet and
 never removes or renames one, because a plan written today must keep its look.
 REJECTED: one merged sheet (it cannot equal both blocks); one sheet scoped by
 a body class (every selector rewritten and one class more specific, so the
@@ -4388,6 +4763,25 @@ with sections called Section 1, Section 2 and A colleague's section. Only the
 two blocks of CSS came from Russell's example; its lessons, its file names and
 its people did not. Every component of the example is a commented PATTERN in
 the template pages, so an assistant writes each component the same way.
+
+**The reference-courses sentence in the same greeting (#856).** A live
+course whose code has courses kept for reference tells the session they are
+there to read and build on (decision (s), since v1.3.0). The sentence had no
+contract key, so Windows' greeting lacked it and no test noticed. It is now
+`app-rules.json` → `outsideAgents.greetingReferenceCourses`: the template with
+`{course}` and `{courses}`, the separator, how each listed course is made
+(`referenceCoursesToMention`: same code, folder and school year, sorted), where
+it goes, and four cases, run by
+`AppRulesContractTests.testTheReferenceCoursesSentenceIsTheContracts` against
+`ClaudeCodeLauncher.referenceCoursesSentenceTemplate` and
+`referenceCoursesSentence(courseCode:referenceCourses:)`; and seven
+`listCases` (the review's finding), which give a course and its shelf and
+expect the list, run through `referenceCoursesToMention` by
+`testTheReferenceCoursesListIsMadeAsTheContractSays`, so Windows runs how the
+list is made rather than working it out from `eachCourse`. The mac's greeting
+did not move by a byte (the old and new code compiled side by side and compared
+on four inputs), and the greeting is not shown to the local model, whose
+digest is unchanged.
 
 **The reminder in the Revise doors' greeting.** `ClaudeCodeLauncher.greeting`
 gains `unitPlans: [UnitPlans.Plan]?`, and its sentence goes LAST, after the
@@ -4439,7 +4833,7 @@ as `unitPlanning.agentGuidance` is), and copy one of the
 skills by name on either platform. Holding a skill out of a release is the
 reverse: move its folder to `held/agent_guidance/skills/`, take its bullet
 out of each root file, and name it in `printablePages.agentGuidance.held`
-(#750: "Held from v1.10.0" below). Three costs come with it (707a review):
+(#750: "Held from v2.0.0" below). Three costs come with it (707a review):
 every change to the root files' managed section asks again every teacher who
 chose Not Now, so bullets landed in one release ask once; two skill pieces in
 flight both append to the end of `CLAUDE.md` and `AGENTS.md`, a small merge
@@ -4448,6 +4842,13 @@ as `scripts/test_unit_plan_template.py` is for this one, and a `windows` issue
 mirroring its `PrintablePagesTests` case.
 
 ### The course page's Planning tab (#708)
+
+**Its layout (#831, #832).** The tab's content sits in `TabArea`, which
+claims no height of its own, and nothing in the tab makes a sentence rigid, so
+the tab bar and the header keep their place at every window size and a long
+page scrolls inside its web view. Measured and rejected shapes: "A blank
+window: when a child claims a size the window cannot give", the sixth and
+seventh cases.
 
 A course's page has two tabs while Claude Code or Codex is installed:
 Settings, which is what the page has always shown, and Planning, which shows
@@ -4859,23 +5260,30 @@ unit in the popup (Russell, 2026-11-12, as #708 also rejected).
 
 Three skills help a teacher with assessment: `plantoir-test-authoring`
 (#751) writes a unit test and the kit to mark it from, `plantoir-marking`
-(#750) marks papers onto feedback sheets, and `plantoir-report-comments`
+(#750) marks papers onto feedback sheets and builds the class's results
+from them, and `plantoir-report-comments`
 (#752) drafts report card comments from the marking. Neither app reads or
 writes any file they make. Each
 reaches a working folder as every skill does, and the contract is
 `shared-rules.json` → `assessment`. This subsection was started by #751;
 #750 and #752 add theirs below.
 
-**Held from v1.10.0 (#750, 2026-11-13).** `plantoir-marking` and
-`plantoir-report-comments` are kept in the repository and NOT written into
-any working folder in v1.10.0; they move to v1.11.0. Trials with real
-outside assistants found that the marking design as written let an
-assistant list the teacher-only folder on its first command, and the fix
-the plan review settled on is a change of design (the teacher runs the two
-steps that touch names from a file they open themselves, so the assistant
-is never told where the teacher-only folder is) that needs its own trial.
-Report comments put the names in through the marking skill's runner and
-script, so they are held with it. `plantoir-test-authoring` ships
+**Held from v2.0.0 (#750, 2026-11-13).** `plantoir-marking` (its class
+results, 750c, included) and `plantoir-report-comments` are kept in the
+repository and NOT written into any working folder in v2.0.0, on either
+platform; they move to the release after it (2.1 on the roadmap). The
+ruling on #750 deferred both after six rounds of trials and fixes: every
+route found by which a student's name could reach an assistant on a Mac
+was closed, but the last ordinary review still found fixes needed (a
+contract row calling a route closed that the documentation admits a
+deliberately written child process can escape, a stray copy on Windows no
+test can catch, nine smaller items), and Windows has none of the
+protection the step that opens the original scans needs. That work is
+kept, unmerged, on `issue/750d-the-teacher-runs-the-steps-that-touch-names`
+for the later release, with the recommendation recorded on #750: only a
+fixed script shipped with Plantoir runs beside the original scans, and the
+assistant supplies settings, never code. Report comments put the names in
+through the marking skill's runner and script, so they are held with it. `plantoir-test-authoring` ships
 unchanged, and without the marking skill its section 9 says nothing about
 marking and refuses to mark from the kit, which is the behaviour pinned in
 `mustSay`.
@@ -4898,16 +5306,22 @@ What the hold is, so it can be undone by reverting its one merge commit:
 - The contract keeps every block: `printablePages.agentGuidance.held` says
   which skills are held, where (`place`), until when, why, and what was
   rejected; `assessment.held` lists the assessment keys kept for them;
-  the two `mustSay` lists stay. The five `scripts/test_marking_*.py` files
+  the two `mustSay` lists stay. The six `scripts/test_marking_*.py` files
   find the skills through `held.place`, so they still run in `verify.sh`
   and on Windows through `PythonToolchainTests`, and `.gitattributes`' LF
   rule for `run_with_names.py` names the held path.
   `PrintablePagesTests.testHeldSkillsAreNotWrittenAndNothingWrittenNamesThem`
   checks a freshly written folder: neither skill in either home, neither
   root file naming them, and no written file naming them outside
-  `mayStillName`.
+  `mayStillName`. `scripts/test_held_skills.py` checks the same from the
+  source both apps copy, so it runs on Windows too (`PythonToolchainTests`)
+  and in `verify.sh`: every skill in `held.skills` is in `held.place` and
+  not in `support/agent_guidance/skills`, and no file there, nor either
+  root file, names one outside `mayStillName`. The held list is that one
+  key, so bringing a skill back is the folder move and deleting its name
+  from `held.skills`; the test fails if either is done without the other.
 - **A folder that already has them stays as it is.** A development build
-  before the hold wrote `.claude/skills/plantoir-marking`,
+  of 2.0.0 made before the hold wrote `.claude/skills/plantoir-marking`,
   `.claude/skills/plantoir-report-comments` and the same two under
   `.agents/skills`. The next pass rewrites the root files' managed section,
   so those stop naming them, but the four skill folders are left: an app
@@ -5046,7 +5460,7 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
   and a single quiz stays a handout. Changing the managed section asks
   again any teacher who chose Not Now. #751, #750 and #752 were meant to
   land in one release so a teacher is asked once; with marking and report
-  comments held to v1.11.0, a teacher who chose Not Now is asked again when
+  comments held to the release after v2.0.0, a teacher who chose Not Now is asked again when
   their two bullets come back.
 
 MEASURED (2026-11-12, `tectonic` 0.17.0): the Marking Guide template
@@ -5069,12 +5483,13 @@ assistant actually writing a test from this skill (the plan's two trials),
 deferred to the director.
 
 **The marking skill (#750, piece 750a: a test from scanned papers).** Held
-from v1.10.0 (above): what follows describes the skill as kept in
+from v2.0.0 (above): what follows describes the skill as kept in
 `held/agent_guidance/skills/plantoir-marking`. The
 ninth skill, `plantoir-marking`. It marks a test or quiz written on paper
 and scanned, onto a feedback sheet per student, from the kit #751 writes.
-Coding assignments (750b) and results documents (750c) are later pieces;
-until they land the skill says it does not describe marking anything else.
+Coding assignments (750b) are a later piece, held for a ruling; until it
+lands the skill says it does not describe marking anything else. The
+class's results (750c) are below, after the report-comments skill.
 The contract is `assessment.agentGuidance.markingSkill`, `folders`,
 `identifiers`, `scriptPrivacy`, `redaction` and `namedCopies`, and its
 sentences are pinned in `mustSay`. The app does nothing new and records no
@@ -5431,7 +5846,7 @@ NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
 Codex) marking invented scanned papers, which the plan makes the gate that
 matters; it needs the screen-free Mac and is written up for the director.
 
-**The report-comments skill (#752).** Held from v1.10.0 with the marking
+**The report-comments skill (#752).** Held from v2.0.0 with the marking
 skill (above), and kept in `held/agent_guidance/skills/plantoir-report-comments`. The tenth skill,
 `plantoir-report-comments`, drafts report card comments from what
 `plantoir-marking` wrote: three options per student, each complete, so the
@@ -5625,6 +6040,159 @@ script, because two copies of the name step drift.
 
 NOT MEASURED in this piece: a trial with a real assistant drafting comments
 from invented marks records; it is written up for the director.
+
+**Class results (#750, piece 750c).** Held from v2.0.0 with the rest of
+the marking skill (above), in `held/agent_guidance/skills/plantoir-marking`.
+`plantoir-marking` gained a fifth
+script, `scripts/class_results.py`, and a third reference,
+`reference/results.md`; `make_named_copies.py` gained `--document` and
+`--grades`. The contract is `assessment.results` (its `cases`) and
+`namedCopies.resultsRule` with `gradeCases` and `documentCases`, and nine
+sentences are pinned in `mustSay` → `plantoir-marking`, the two about names
+in the results section among them (implementation review M4: removing
+either left every test green before). Nothing in the app changes, no trail
+event (as for 750a), nothing on plantoir.app.
+
+- **What it builds, and from what.** One command, run again after any
+  change to a mark, a level or the settings, writes into the marking folder,
+  identifiers only: `Class Results.tex` and `.pdf` (marks by category per
+  section with the section's means, levels first and revised, the students
+  with no revised level, the marked students with no level record),
+  `Grades - <Assessment>.csv` and `Levels - <Assessment>.csv`. It reads the
+  marks records 750a writes, each passed through #751's `check_kit.py`
+  first, and level records (`Records/Section N/Student A.json`) ONLY IF that
+  folder holds any. 750b, which would write level records for a coding
+  assignment, is not built, so the document says in words, per assessment,
+  which of the two it had none of; an empty `Records/` folder is read as none
+  (review M2).
+- **The trim (750 plan review M7).** The plan's version replaced Russell's
+  eleven-script, twelve-compile chain. REJECTED as toolkit creep: the shipped
+  script builds the totals by category, the grade tables and the two lists;
+  charts, the test beside an assignment and a marking summary with the
+  teacher's own notes are words in `reference/results.md`. His
+  `make_graphics.py`, `grades_summary.py`, `grades_tsv.py`,
+  `make_revision_summary.py`, `update_marking_summary_rows.py` and
+  `check_headings.py` were the models; none is copied. The review's LOW
+  suggested cutting the level-record reader too; KEPT, because the brief
+  makes reading `Records/` when it is there part of this piece, and the
+  second heading check, because the named copy breaks its pages elsewhere.
+- **A voided point counts for no one, on the sheet and in the results
+  (implementation review H1; this changed 750a's merged
+  `build_test_sheet.py`).** MEASURED by the review: a voided point a student
+  had earned gave `T 2/1`, 200 percent in the grade table for the report
+  system, on the sheet and in the results alike, and a category voided
+  entirely gave a section mean of 0 percent. Russell's own builder kept the
+  earned mark and capped each category at 100 percent; the port dropped the
+  cap. Now the point is in neither the mark nor the out of, the sheet shows
+  no mark for it and says it was not counted for anyone, and a category with
+  nothing counted reads "not counted", in the marks line and the tables, and
+  is left out of the means. Both scripts refuse a mark over its out of.
+  REJECTED: the bonus with a cap as the default; it is one teacher's choice,
+  made in the copy.
+- **One percentage, printed and read (review H2).** MEASURED: 35/44 printed
+  80 percent with the level below an 80 cut while the total's 80 percent got
+  the level above. A percentage is now rounded once, by the settings'
+  `- Percentages:` line (whole numbers, half up when there is none; one
+  decimal, half up; whole numbers, down), with fractions so 82.5 is never
+  rounded down by floating point, and every level is read from that printed
+  value; the document prints the rule it used. Cases sit half a percent below
+  each cut of an invented scale and on 73/88.
+- **What stops the build.** A Marks by Question sheet whose marks line gives
+  other totals than its record (both numbers named), names a category the
+  kit does not have, or cannot be read; a sheet with no record beside it; any
+  file or folder in `Marks/` or `Records/` not named `Section N/<identifier>.json`
+  (counted, never named), which catches a rescan saved beside a record, a
+  record named like a person and a class named another way (review M1: each
+  of these gave exit 0 and a document that looked complete); a record that
+  voids other points than the kit (below); a settings line written nearly as
+  one it reads (`- Percentage:`), which was passed over; an
+  assessment with no marks record; a half mark without the settings' yes
+  (yes or no, then at most bracketed words: review L2 found `yes-only-on-part-B`
+  read as yes); a level off the scale, and a scale that names a level or a
+  percent twice, a percent over 100, or is written twice. REMOVED: the check
+  of a total against the categories' sum, which could never fail (review M3,
+  measured by replacing it with `if False:`).
+- **Stale named copies (review H3).** MEASURED: three scales gave one
+  fingerprint, and the named grade table, the file copied into a report
+  system, carried no stamp at all. Now the fingerprint covers the kit, the
+  records, the sheets, `Marking Settings.md` and the identifier pattern;
+  every document and every row of both tables carries the build time and
+  fingerprint (the `built` column), and `--grades` refuses a table without
+  it or with rows of two builds, carries it into the named table and prints
+  it. The skill says to make the named copies again after every run. A
+  build is staged in a hidden folder and put in place only when every
+  document is built, after the last run's are renamed "earlier run, do not
+  use"; a test kills a build while it compiles and finds no finished-looking
+  document. REJECTED: marking a set "incomplete" in place, which leaves a
+  half-written folder for someone to misread.
+- **A point is voided for the whole class, recorded once, in the kit (fix
+  review H1; this changed #751's merged `check_kit.py` and `FORMAT.md`, and
+  750a's `build_test_sheet.py` again).** MEASURED by the fix review: with
+  the ruling held in each record, a ruling reaching only the records marked
+  after it gave two students with the same answers two out-ofs and two
+  levels, with exit 0, while every sheet said "not counted for anyone". The
+  kit now carries an optional `voided` ({point: {reason, intended}}), and
+  `check_kit.py --marks` refuses a record that voids other points
+  (`marks-voided`); the sheet builder takes the list and its reasons from the
+  kit, so its sentence is true of the class; `class_results.py` checks every
+  record against the kit first and stops naming the identifier and the
+  points. A void applies to every version (point IDs are shared). REJECTED:
+  the reviewer's class-wide comparison in `class_results.py` alone, because
+  the sheet builder sees one record and would still print the sentence on
+  one record's word; and the settings file as the one place, because a void
+  is about one test, and the settings are the course's.
+- **One identifier rule (fix review M1).** MEASURED: `--identifiers '.*'`
+  built results from a record named with a full name and printed it in the
+  `.tex`, and a non-default pattern built results the named step then
+  refused. Every script that reads an identifier now carries one block,
+  byte for byte, matched with `fullmatch` (`Student A` to `Student ZZ`); the
+  option is gone from `class_results.py` and from 750a's `redact_scans.py`,
+  and a test fails if the copies differ or the contract's pattern is
+  another. Papers named another way are renamed with `--name-papers`.
+- **What was left, and why (fix review LOWs).** The staging leaves windows
+  of microseconds between the final renames in which a kill leaves some new
+  documents in place beside a hidden PDF; each is the consistent output of
+  one build, so no wrong number results, and it is written here rather
+  than closed with a marker file. A record not fully marked still puts the
+  documents in place with exit 1, the identifier printed and listed in the
+  document; the named grade table names the student with no row. A test
+  with every point voided builds, "not counted" throughout, which is the
+  ruling as given. `build_test_sheet.py --self-test` fails without tectonic,
+  which is the true answer for a script that cannot run without it. Fixed:
+  a near-miss settings line stops the build; a pre-fix sheet's `K 1/0` is
+  named with its own numbers; the feedback sheet says "2 marks in this
+  question are not counted for anyone" once; `class_results.py --self-test`
+  says when the PDF was not tested.
+- **The scale is the teacher's.** Read from `Marking Settings.md`, never
+  filled in by the assistant. REJECTED: Russell's scale, his weighting and
+  his school as defaults, and his scale as a format example (review M5: the
+  refusal message showed its first three steps); every example and fixture
+  scale is invented.
+- **Names, at the end, by the one name step.** The named document and the
+  named grade table are made only by `make_named_copies.py` through the
+  never-adapted runner (unchanged, so its pinned SHA-256 does not move).
+  Every student in the identifier document is `\student{section}{identifier}`;
+  `--document` fails on Missing character, on a student whose name and
+  identifier are not on the page as often as students carry them (review L5:
+  two students of one name were satisfied by one printing), or on a heading
+  left alone at a page's foot once the names make rows taller. `--grades`
+  refuses the whole table when a cell holds a word of the mapping table by
+  #752's one name comparison or more than 16 characters, or a student the
+  table does not hold, and writes the name first, ordered by section and then
+  by name. The plan called it `--table`; REJECTED because `--table` already
+  names the mapping table in every mode.
+- **Measured** (Apple M4 Pro, macOS 26.6, tectonic 0.17.0, Python 3.14.4
+  and 3.9.6): 60 invented records in two sections build in 1.6 s with the
+  PDF and 1.4 s without, most of it the 60 runs of `check_kit.py`.
+  `scripts/test_marking_results.py`: 13 tests, every `results` case (40,
+  each `sheetLine` case also through `build_test_sheet.py`), `gradeCases`
+  (9) directly and through the runner, `documentCases` (5, skipped without
+  tectonic and pdftotext), one case compiled, three scales giving three
+  fingerprints, a build killed half way, both self-tests. Must-fails by copy
+  and restore are listed in the closing comment on #750.
+
+NOT MEASURED in this piece: a trial with a real assistant building results
+from invented records; it is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
@@ -6566,7 +7134,8 @@ it (#627, 2026-10-23): Obsidian does the same here, on 1.13.7 and 1.14.4, and
 **Where the files come from.** Carried, never downloaded on the yes:
 `mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
 SHA-256 and address from `obsidianAddOnsForFigures.addOns` with
-`/usr/bin/plutil` (21 ms on the 1.7 MB contract) and carries no pin of its own
+`/usr/bin/jq` (see "Why the fetch reads the contract with jq (#864)" below)
+and carries no pin of its own
 (`ObsidianFigureAddOnsTests.testTheFetchScriptCarriesNoPinOfItsOwn`); a
 mismatch installs nothing; its cache is outside the repository like
 fetch-helpers.sh's. `project.yml` carries `Vendor/obsidian-addons` as
@@ -6579,6 +7148,50 @@ JavaScript and CSS, so nothing to sign beyond the app's seal. Not in
 `support/`: everything there is hashed into the image tag and mirrored into
 `.toolchain/`. At install time the app hashes the files it is about to write
 against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
+
+**Why the fetch reads the contract with jq (#864).** The script read the
+contract with `/usr/bin/plutil -extract` until 2026-11-13. plutil refuses a
+whole JSON file that holds an escaped NUL anywhere in it ("Unsupported
+escaped (unicode) null"), and #780's cases put eight `\u0000` escapes into
+`shared-rules.json` on 2026-11-12, where they stay because they are what
+those cases test. From then on the script read nothing, said the contract
+had no `obsidianAddOnsForFigures.addOns`, and exited 1. That stopped a fresh
+clone or worktree (no `Vendor/obsidian-addons`, so `xcodegen generate`
+fails) and also every machine that already had the folder, because the
+"already in place" check reads the pins first: `publish.sh` runs the script
+under `set -e` before it generates the project, so a release build stopped
+there too. No suite ran the script, so no suite saw it. Measured on macOS
+26.6: of the ten contract files, `plutil -convert json` refuses only
+`shared-rules.json`. Both plutil and jq refuse a lone surrogate escape
+(`\ud800`), which no contract holds; the test below would catch one.
+
+The reader is now `/usr/bin/jq` (jq-1.7.1-apple, in the system volume),
+which macOS has shipped since macOS 15; the Xcode this project builds with
+(26 or later, `mac-app/README.md`) needs macOS 15.6 or later. It reads the escaped NUL as JSON says, 29 ms a
+read on the contract against plutil's 21 ms; all seven pins in about one
+second. `--print-pins` runs the reading step alone and prints what it read,
+one tab-separated line per file, fetching and installing nothing.
+`scripts/test_fetch_obsidian_addons.py` runs it against the real contract
+and compares every line with Python's own reading of the file, so the next
+character a reader refuses fails a suite rather than a new machine; it
+skips where there is no `/usr/bin/jq`, Windows included. Rejected:
+
+- **`sed 's/\\u0000/\\u0001/g' | plutil … -`** works on any macOS and keeps
+  the JSON valid whatever the escapes stand next to, but it edits the text
+  before reading it, fixes only the one character met so far, and leaves a
+  reader that is not reading the file as written.
+- **`/usr/bin/python3`** is only a stub until the developer tools are
+  installed, and the script's rule is that nothing but macOS is needed.
+- **`perl -MJSON::PP`** is on every Mac and reads the file, but at 0.67 s a
+  read it would take most of a minute across the script's reads.
+- **`osascript -l JavaScript`** was ruled out before measuring: osascript
+  is not run on this machine during unattended work.
+
+Windows' `fetch-obsidian-addons.ps1` reads the same file with
+`ConvertFrom-Json` (PowerShell 7) or `JavaScriptSerializer` (5.1). Neither
+was run here, since this Mac has no PowerShell. Both are documented to
+decode `\u0000` into a character rather than refuse it, so no Windows issue
+was opened; a Windows run of the script on the current contract confirms it.
 
 **The sequence** (`obsidianAddOnsForFigures.sequence`, the route
 `WorkspaceModel.openInObsidian(course:sectionNumber:)` in
@@ -9858,12 +10471,14 @@ real courses; nor does the assistant, which has no tool for it.
 Replace It… first asks whether the course can be replaced at all (it must be
 a reference course, not previewing or being copied, and not open in
 Obsidian), and says why not where the door says its other problems. Then the
-warning: title `wording.title`, body `wording.body`, which gives the
-sections, pages and size, the day the folder was made, the name the backup
-will have in Backups (the folder's), and that restoring that backup puts the
-old course back in place of the new one (plan review M9). Cancel is the
-default button. Composed by `ReferenceReplacer.offer`; the alert is the
-shared `ReplaceReferenceCourseAlert`.
+warning, a facts sheet since #834: title `wording.title`, the sentence
+`wording.message`, and rows for the sections, pages and size, the day the
+folder was made (absent when it cannot be read), the name the backup will
+have in Backups (the folder's), and that restoring that backup undoes it
+(plan review M9). Cancel is the default and answers Return and Escape (see
+"Questions as one sentence and labelled facts (#834)"). Composed by
+`ReferenceReplacer.offer`; presented by the shared
+`ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
 **The order is the design.** `ReferenceReplacer.replace`:
 
@@ -10053,7 +10668,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (Cancel the default). It MOVES the unreadable file aside to
+read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by
@@ -10163,7 +10778,9 @@ Persian and override cases failed; Start the Groups Again deleting instead of
 moving, the kept copy was missing; moving a newer version's file, the newer
 case failed; the duplicate-id entry left in place, removing "Kept" brought
 "Twice" back; the year shape limited to today's years, "2027–28" was
-allowed; Cancel without the default key, the structure test failed; each of
+allowed; (since #832 the keys are pressed for real in `QuestionKeysTests`, and
+the old structure test, which pinned a shape that left Escape doing nothing,
+is replaced); each of
 import, Keep a Copy and a backup restored where its course is gone without
 `recordArrival`, its real test kept the stale group.
 
@@ -12484,6 +13101,55 @@ never the transcript, and the server writes nothing to stdout but its
 replies. Windows' `plantoir-mcp` relays progress lines and a kept tail,
 which is why it redacts that output too (documentation/12-windows-app.md).
 
+**What a redaction fixture may hold (#844).** On 2026-11-13 GitGuardian
+emailed Russell about a "Basic Auth String exposed on GitHub" in this
+repository. It was two of #709's cases: an `Authorization: Basic` header
+whose base64 decoded to an invented username and password, and an address
+with that pair written into it, on a `pages.dev` host that does not resolve.
+Nothing real leaked and nothing needed rotating. But a scanner cannot tell
+an invented pair from a live one, and an alert nobody can tell apart from a
+real one teaches people to dismiss the next. From then on:
+
+- **No case stores a username and password pair in either shape.** A case
+  that needs one carries `assembledFrom` (`user` and `password`, words that
+  say what they are: `example-user`, `example-password`) and an `input`
+  template; the test fills `{user}`, `{password}` and `{basic}` (the base64
+  of `user:password`) before it redacts
+  (`problemReportRedaction.assembledInput`,
+  `SharedRulesContractTests.assembledRedactionInput`). The redactor is run
+  against exactly the string a browser would send, so the case is as strong
+  as before. Measured with `LogRedactor.swift` compiled on its own: with
+  `basicAuthHeader` taken out the Basic case fails, and with `urlUserinfo`
+  taken out the address comes back as
+  `https://example-user:[removed: email address]/`, which is the ordering
+  against the email rule that the case exists to prove. Read unfilled, the
+  template still fails without either rule but no longer proves that
+  ordering: with `urlUserinfo` moved after the email rule, an unfilled
+  reader stays green (measured by the review). So a third assembled case,
+  `Signed in as {user}` expecting `Signed in as example-user`, holds no
+  credential and fails any reader that does not fill the template.
+- **An address in a fixture uses a reserved example host** (`plans.example`)
+  unless the rule under test reads the host. `urlUserinfo` does not.
+- **A prefixed token** (`nfp_`, `ghp_`, `github_pat_`, `AKIA`, `xox?-`, a
+  private key block) appears only where the rule under test keys on the
+  prefix, made of an obviously invented run (the alphabet), and is named in
+  `scripts/test_no_stored_credentials.py`'s `ALLOWED` by its SHA-256 with
+  where it is and why. That test fails on any other stored pair or prefixed
+  token in a tracked file, and on an `ALLOWED` entry that no longer matches
+  anything. Unprefixed fixtures (the 40-character run `secretLength` needs,
+  `CLOUDFLARE_API_TOKEN=abc123XYZ_super-secret-value`, the JWT-shaped
+  `Bearer` value with `abc.def` for its body) are left as they are: they
+  carry no provider's prefix for a detector to key on, and the rules they
+  prove need that shape.
+
+REJECTED: rewriting history to remove the two old strings. They were never
+secrets, a rewrite gives every commit since #709 a new hash on a repository
+two platforms work from, and the scanner's alert is closed in GitGuardian
+(as a test credential, a false positive) rather than in Git. Also rejected:
+storing the base64 of the example pair, which the issue first suggested. It
+is still a stored pair to a scanner that does not read the words, and the
+test that builds it is four lines.
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
@@ -12695,7 +13361,7 @@ file, which is exactly how the mac lost lines.
 
 ### One line per entry: the trail is cleaned and redacted (#780)
 
-Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+Since v2.0.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
 `ProblemReportStore.appendActivityLine` passes every line through
 `ProblemReportStore.safeTrailLine` before the append described above, which
 cleans it with `OneLineText.cleaned` (the course name's rule,
@@ -15459,40 +16125,128 @@ this is the app's half.
   `words.lastShareUnfinished` (the plans may be open), and one in state
   `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
   (`PlanSharing.barStatus`, `barCases`).
-- **Before an open share goes out** the launcher lists every file it will
-  share and every file it leaves out, by name, and asks. The app reads the
-  lists from their marker lines (`PlanShareLists`, kept out of the console)
-  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
-  scrolling, the by-name sentence, Share and Cancel with Cancel the default
-  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
-  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **Before EVERY share (#833)** the launcher lists the plan's documents, each
+  with where it starts, and asks. The app reads one JSON marker line per
+  document (`PlanShareLists`, `PlanShareDocument`, kept out of the console)
+  and answers ONLY in `PlanShareListsSheet` (`TaskProgressView
+  .questionSurface`; fix review H1): two `NSTableView`s side by side
+  (`PlanShareDocumentTable`), Shared and Not shared, each with Name, Unit,
+  Folder, Kind and Note columns, the system's sort indicator (each table
+  sorts on its own; by unit in the plan's order, then name, at first),
+  alternating rows, type-to-select and multiple selection. **Moving a
+  document**: drag one row or several to the other table (the whole table is
+  the drop target); the chevron buttons between the tables; ⌘→ and ⌘←; or
+  the context menu's Don't Share or Share, which shows the same keys. Every
+  move is said to VoiceOver (`PlanShareAnnouncer`, an announcement request).
+  A file of a kind no share takes cannot be dragged or moved. An answer key
+  in Shared in a share with no password carries a warning symbol and words
+  in its Note, never colour alone. **Filtering**: a standard `NSSearchField`
+  (⌘F) filters both tables by name, unit and kind, with a Unit popup and
+  Answer Keys Only (a popup for a choice of one, a checkbox for yes or no);
+  the headers read "Shared (3 of 12)" while anything is hidden, and the
+  sentence by Share gives the full counts (`PlanShareTablesModel`). Cancel is
+  the default and Escape. On Share the app writes the settled places into
+  the year's marker (`PlanSharing.writeChoices`: a temporary file and
+  rename(2), every other key kept) and only then answers y; a marker it
+  cannot write is answered n.
+
+  **Why `NSTableView`.** Dragging SEVERAL selected rows and dropping on the
+  table rather than on a row are its own data-source calls, and
+  `PlanShareTablesTests.testDraggingSeveralRowsToTheOtherTableMovesThemAll`
+  drives them against two real tables and a private pasteboard. SwiftUI's
+  `Table` was rejected: multi-row drag between two tables could be proved
+  only by driving the window, which no gate allows. **Why the keys are
+  watched rather than hung on buttons:** `KeyEquivalentPlacementScanTests`
+  keeps character shortcuts off buttons in views (#457), so the search
+  field's coordinator watches its own window's key presses for ⌘F, ⌘→ and
+  ⌘← (passing ⌘→ and ⌘← through while the cursor is in a text field) and
+  removes the watcher with the field; the context menu shows the arrows so
+  the keys can be found. Not measured: the drag itself by hand, VoiceOver's
+  reading, and the sheet's look; those are for the director's look at the
+  window.
 - **A plan's password** is sent from the credential sheet exactly as typed
   (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
-- **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
-  comes before a choice exactly when `PlanSharing.warns` says
-  (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
-  nothing and runs nothing.
+- **The warning** is owed exactly when `PlanSharing.warns` says
+  (`warningCases`), and since #833 it comes AFTER the tables: their Share
+  opens #834's `FactsQuestionSheet` with `PlanSharing.warningQuestion` (the
+  title asks, one sentence, then the rows from `PlanSharing.warningRows`, the
+  answer-key row only when a key sits in Shared): Cancel answers Return and
+  Escape and goes back to the tables. The one-
+  paragraph `crawlerWarning` and `answerKeysClause` are retired. Cancel at
+  the Stop Sharing alert writes nothing and runs nothing.
+- **Change Password** (#833, `changePasswordCases`) runs `--change-password
+  --password-only`: the console asks for the new password, nothing is
+  shared, and when the run printed `PLANTOIR_PLAN_PASSWORD_SAVED: … waiting`
+  (`ScriptRunner.planPasswordSaved`) the console sheet asks
+  `PlanSharing.newPasswordQuestion` on the same `FactsQuestionSheet`, with
+  `goAheadIsTheDefault`: Share Again takes Return (Russell's choice; it goes
+  through `PlanShareRunner.shareAgain`, the bar's own path, the tables first)
+  and Later takes Escape. `goAheadIsTheDefault` is false for every other
+  question, which keeps Cancel on Return and Escape.
+  The bar shows `words.newPasswordNotInUse` while the marker says
+  `newPasswordWaiting`, so a relaunch, a failed share or a declined one
+  keeps it; `changePasswordNote` stays as the button's tooltip, no longer the
+  only place the fact is said.
 - **The run** is `PlanShareRunner`: `deploy.sh` with
   `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
   `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so
   the Cloudflare token and the plans' username and password are asked the way
   a section's deploy asks (`CredentialRequest.unitPlanUsername`,
   `unitPlanPassword`). No argument ever carries a username or a password.
+  The username's explanation names the computer, so since #863 it is built by
+  `CredentialRequest.unitPlanUsername(machine:)` and the contract's readout
+  (`app-rules.json` → `credentialRequests`) is written with `{machine}`
+  (`specialNames.platformWording.machine.usedIn`); this app fills in "Mac", so
+  the sentence a teacher reads here did not change. REJECTED: "on this
+  computer", as the token explanations say, which would have changed the mac's
+  sentence for no reader's benefit when the placeholder keeps both.
 - **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
   under section 0 (`PlanSharing.leaseSection`), which no section has: a
   section's own deploy is never refused by it, while the course reads as busy
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. A new lease kind was rejected: `publish` already
+  a share builds no section. **Since #863 a run of the plans' launcher has
+  its own words on quit** (Russell, 2026-11-13), in the contract so Windows
+  says the same ones: `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`,
+  `words` and fourteen cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`,
+  with every fragment pinned key by key by
+  `testEveryShareFragmentIsTheContractsKeyByKey`. The lease is the same for
+  a share, a Change Password and a Stop Sharing, so `PlanShareRunner.start`
+  records what the run was started to do beside it
+  (`CourseActivity.beginPlanWork`, `PlanWork.of(choice)`), and removes it with
+  the lease. `QuitConfirmation.Kinds` sorts the publishes into deploys, shares,
+  password changes and stops; the question names each part ("sharing the unit
+  plans of <CODE>", "changing the password for the unit plans of <CODE>",
+  "stopping the sharing of the unit plans of <CODE>", or "of N courses"), deploys
+  first, joined "A and B" or "A, B and C". The message is
+  `messageOne`/`messageSeveral` with one clause per part: the class website
+  part way updated, the plans part way shared, the new password not saved
+  yet, the plans' address still working. No clause carries its remedy: the
+  share bar already offers Share Again and Stop Sharing, and a remedy in each
+  clause made a two- or three-clause message misparse (the second fix
+  review). A Change Password's console is titled "Changing the password for
+  the … unit plans", not "Sharing". Each clause was read off what that run leaves
+  when it stops early (`interruptionCases`, `changePasswordCases`,
+  `stopSharing`); deploys alone read exactly as before. The update banner
+  borrows the same phrase (`UpdateGate.workUnderWay`). REJECTED, each in the
+  block's `rejected`: the deploy's message for a share (the first commit's
+  recording of the mac's old words); "anyone with the address could still
+  open the plans" (the first fix round), untrue for protected plans re-shared
+  with their password, a first share stopped before anything was sent, a
+  Change Password and a Stop Sharing; calling the latter two "sharing"
+  because they share a lease; and one fixed sentence per combination, which
+  would be ten sentences for these fourteen cases. A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
-  "unit plans shared", "unit plan share refused", "unit plan sharing stopped".
-  Never the address, whose suffix is a line of defence, and never a username
-  or a password. The plan asked for the share line to say whether the
-  warning had been shown and the password changed; the markers do not carry
-  either, so the line does not, and that is a known gap for a later piece.
+  "unit plans shared" (since #833 with how many documents went and how many
+  were held back), "unit plan share refused", "unit plan sharing stopped",
+  and "unit plan password changed" (#833). Never the address, whose suffix
+  is a line of defence, never a file's name, and never a username or a
+  password. Whether the warning was shown is still not on the share line:
+  the marker does not carry it.
 - **A reference copy** of the course renames every year's marker aside
   (`PlanSharing.releasePlanMarkers`, called by
   `ReferenceCopier.makeIntoAReferenceCourse` beside `releaseSite`), so the

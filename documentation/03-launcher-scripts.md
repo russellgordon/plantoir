@@ -2035,8 +2035,13 @@ and it would add files to whatever syncs the course); keeping
   `--port N` (container port 8081–8084, which IS passed on to `build_site.py`),
   `--image REF`, `--non-interactive` (nobody is watching this build; refuse
   rather than ask — see `deploy.sh` below, where the flag is explained in
-  full), and `--stop`. The last three are handled entirely by the launcher and
-  never reach `build_site.py`.
+  full), `--for-deploy` (only with `--build-only`: this build is a deploy's
+  first step; #729, below) and `--stop`. The last four are handled entirely
+  by the launcher and never reach `build_site.py`. `--for-deploy` changes
+  nothing the build does: it is a word in the process table, so the other
+  launchers' guards can tell a deploy's build leg from the assistant's
+  rebuild. Alone it is refused ("❌ --for-deploy goes with --build-only.",
+  exit 1). It is `app-rules.json` → `launcherFlags.preview`.
 - Checks host-side that the course is set up (`course_config.json` exists)
   and whether the section folder is there (it only warns if it is not). The
   requested section is checked against `section_numbers` by `build_site.py`,
@@ -2219,16 +2224,24 @@ reader of the process table"); what counts is decided here:
   folder's deploy; a label from before #237 names no folder and counts for
   any.
 
-**Not a deploy: `preview.sh C S --build-only`.** It is a publish's build leg,
-and it is also exactly what the assistant's "rebuild the preview" runs
-(`AssistSiteWork.rebuildPreview`); nothing on the command line tells the two
-apart, so counting it — the #378 plan's first shape, rejected by its review
-(S3) — would refuse every preview of the section while the assistant
-refreshed it, with a sentence that is false. The window refuses its own build
-leg from its publish record. **The gap that leaves**, named in the contract's
-`knownLimits`: a preview typed in Terminal while ANOTHER program is in the
-build leg of its deploy. A `--for-deploy` flag on the build leg would close
-it; that is a `launcherFlags` change and was not made.
+- a deploy's build leg, since #729: `preview.sh C S --build-only
+  --for-deploy` as the program, in this folder by the same `lsof` and `ps -p`
+  rule as `deploy.sh`. A Plantoir app (the window, the in-app assistant, an
+  outside assistant's `deploy_section`) builds before its `deploy.sh` starts,
+  and passes `--for-deploy` on that leg only
+  (`MultiDestinationDeployRunner.buildArguments(…, forADeploy: true)`).
+
+**Not a deploy: `preview.sh C S --build-only` without `--for-deploy`.** That
+is the assistant's "rebuild the preview" (`AssistSiteWork.rebuildPreview`,
+which passes `forADeploy: false`), or a build typed in Terminal. Counting it,
+the #378 plan's first shape, rejected by its review (S3), would refuse every
+preview of the section while the assistant refreshed it, with a sentence that
+is false. Until #729 a deploy's build leg was the same line, so a preview
+typed in Terminal during ANOTHER program's build leg was let through; the
+flag closed that. **The gap left**, in the contract's `knownLimits`: a
+preview typed in Terminal while another program REBUILDS the section. A
+Plantoir program rebuilding holds a build work lease, which a preview typed
+in Terminal does not read.
 
 **N5: the label's course code, settled by pinning (#388).** Swift's
 `ScheduledDeploy.sanitizedCode` keeps any letter or digit (`isLetter ||
@@ -2339,8 +2352,8 @@ build and upload the section on top of it.
 SECTION DEPLOYS GUARD` markers, identical in `deploy.sh` and `preview.sh`
 (`scripts/test_deploy_while_its_section_deploys.py` holds the copies equal).
 `deploy.sh` asks on every run that deploys (not `--reset-token`, `--logout` or
-`--help`); `preview.sh` asks on a `--build-only` run only — a deploy's build
-leg — and never on a serving run, which is #381's guard above. Both ask after
+`--help`); `preview.sh` asks on a `--build-only` run only (a deploy's build
+leg or a rebuild) and never on a serving run, which is #381's guard above. Both ask after
 the arguments are checked and before anything changes, and both exit 1.
 
 **What counts**, read from the live process table through the one reader
@@ -2363,6 +2376,25 @@ the arguments are checked and before anything changes, and both exit 1.
   of one that is still running, not counted when it has ended since the table
   was read (#737, below), and not counted when it only clears a token or
   prints its help.
+- **another BUILD of the section, since #729** (Russell's ruling on #729,
+  2026-11-12, and the director's answer to the plan review's M7 the same
+  day): `preview.sh C S --build-only` as the program, in this folder by the
+  same `lsof` and `ps -p` rule, and not `--stop`. Two builds of one section
+  clear and fill the same folder and the first one fails; that was the
+  failure #706's reproduction measured. `--for-deploy` decides only the
+  WORDS. With it the record is a deploy's build leg and counts as "another"
+  ("already being deployed"); without it, it counts as "building" ("already
+  being built", `sentences.launcher.buildingDeploy` and `.buildingBuild`).
+  "later" wins over both, and "another" over "building", so a `deploy.sh`
+  beside its own rebuild (which carries no `--for-deploy`) is said as a
+  deploy. A serving preview's build is NOT counted: the table cannot tell a
+  preview still building from one serving, and counting every open preview
+  would refuse the window's own Deploy whenever the section's preview was
+  open (`knownLimits`). Two builds started by the SAME app are counted: the
+  window's deploy and the in-app assistant's rebuild are both children of
+  the one app, brothers rather than ancestor and descendant, so the family
+  rule does not hide one from the other (the case "two builds started by the
+  same app are not one family").
 - **Never this run itself or its ancestors.** A scheduled run's own legs are
   its script's children, and a folder deploy reruns `preview.sh --build-only`
   under its own `deploy.sh`; the reader's `mine` walk leaves both out. A
@@ -2413,15 +2445,27 @@ leases do NOT cover a leftover run — that is the fault): failing closed would
 refuse every deploy, and every scheduled run's own legs, for as long as `ps`
 fails.
 
-**What a teacher reads.** "❌ {course} section {section} is still being
-deployed by a deploy that was set for later, so it cannot be deployed again
-until that has finished." (or "…already being deployed…" for the Terminal
-pair; "…cannot be built…" from the build leg), then "Nothing was changed."
+**What a teacher reads.** `deployWhileItsSectionDeploys.sentences.launcher`
+→ `laterDeploy` when a scheduled deploy's run is in the way (`laterBuild`
+from the build leg), `anotherDeploy` / `anotherBuild` for the Terminal pair
+and a deploy's build leg, and since #729 `buildingDeploy` / `buildingBuild`
+when another build is in the way; each is followed by "Nothing was changed."
 It names WHAT is deploying because after a re-set the app shows only the new
-time. The window lifts that line into its failure explanation
+time. Since #835 (Russell, 2026-11-13) it names it as "a scheduled deploy
+that is still running", and the trail line as one that "was still running".
+Until then it said "a deploy that was set for later", and Russell read the
+same phrase on the greyed Deploy as "having a deploy scheduled stops me
+deploying". A schedule that has not fired holds nothing and refuses
+nothing: only its run, while it works, is in the way, so every sentence that
+names it says that it is running. `scripts/test_deploy_while_its_section_deploys.py`
+→ `AScheduledDeployIsNamedAsRunning` checks each of them in the contract and
+that neither launcher still prints "set for later". Rejected: keeping "set
+for later" (the reading Russell met) and "is being deployed right now"
+(false after a re-set). The window lifts that line into its failure explanation
 (`FailureExplainer.sectionDeployRefusal`); the in-app and outside assistants
-say `deployRefusedWhileALaterDeployWorks` or
-`deployRefusedWhileItsSectionDeploys` instead of "did not finish" when every
+say `deployRefusedWhileALaterDeployWorks`,
+`deployRefusedWhileItsSectionDeploys`, or (#729, another build in the way)
+`deployRefusedWhileItsSectionIsBeingBuilt` instead of "did not finish" when every
 leg that ran was refused this way, and instead of "could not be built" when the
 build leg was (a refused `--build-only` run exits 1 like a broken build, so
 `MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish` asks for the
@@ -2434,7 +2478,62 @@ lifts it, and never "the output is in that section's window"
 since 2026-10-08 — Windows first, the mac the same day
 ([10](10-local-ai-assistant.md) → "A rebuild the launcher refused is said as
 the refusal, on the mac too"). The launcher writes its own trail line, under
-"build declined, course busy elsewhere".
+"build declined, course busy elsewhere" (`launcherLineWhenItsSectionIsAlreadyBeingBuilt`
+since #729 for another build).
+
+**What #729 measured and rejected.** Measured on this Mac (M4 Pro, macOS
+26.6, 2026-11-13) against the real guard cut out of both launchers, with a
+pretend `ps` and `lsof`: the old guard let all four new refusing shapes
+through (a deploy's build leg refusing a deploy and a build leg, a rebuild
+refusing a deploy and a build) and the new one refuses each with the right
+words in both copies; a run listed with exactly its own words (`preview.sh
+ICS4U 2 --build-only --for-deploy`, parent the app) is never refused by
+itself; a build that ends between the table and `lsof` is skipped. Rejected
+(`deployWhileItsSectionDeploys.rejected`): counting only a deploy's build leg
+and letting a plain rebuild through (the plan's first shape), because a
+`deploy.sh` typed in Terminal holds no lease and its build broke the
+rebuild's; an environment variable instead of an argument, because `ps -Ao
+args` does not show the environment; passing `--for-deploy` from the
+scheduled wrapper, whose own script is already in the table and counts as
+"later". On a Mac where two copies of Plantoir of different ages open the
+same folder (a developer's Debug build beside an installed copy; CLAUDE.md,
+Trap 2), the newer copy's `--for-deploy` can meet the older copy's
+`preview.sh`, which answers "Unknown option"; a teacher has one copy.
+
+**After the #729 implementation review.** Three changes, each with cases
+that fail on the code before them.
+
+- **Another account's work never counts (L-a1).** `ps -Ao` lists every
+  account's processes, and `lsof` cannot read another account's working
+  folder. Until this change the guard read "folder unknown" as "counts", so
+  another account's build or deploy of the same course code and section
+  refused this teacher's, in every folder. The reviewer measured that with a
+  pretend table. Now, when `lsof` says nothing, the guard asks `ps -p <pid>
+  -o uid=`. Nobody: the process has ended (#737), skipped. Another uid: its
+  folder is another account's, skipped. This account: it still counts, as
+  #381 decided, because a deploy or build of this very section is proved and
+  only its folder is not (`lsof` can fail for a process in the middle of an
+  `exec`, for example). All three guard copies say so; the three PROCESS
+  TABLE BLOCKs are unchanged. Tests: `otherAccount` in the pretend table
+  (`test_another_accounts_work_never_refuses_this_one`, and the #381 guard's
+  twin), and `test_this_accounts_work_whose_folder_cannot_be_read_still_counts`.
+- **Two builds at the same instant both refuse (L-a2).** Measured by the
+  reviewer with real processes (each run the guard, then a 2 s sleep), M4
+  Pro: started together, BOTH refused 20 of 20; started 50, 100, 200, 400 or
+  800 ms apart, exactly one refused, 10 of 10 at each. The overlap never gets
+  through. What a teacher sees is the refusal ("…is already being built…" or
+  "…already being deployed…"), and a second press goes ahead once the other
+  is gone. No tie-break was added: a provably right one needs an order both
+  runs agree on, and the process table gives none (a start time ties at the
+  same second, a process id wraps). Two `deploy.sh` runs had this shape
+  before (#439). `deployWhileItsSectionDeploys.knownLimits` says so.
+- **A deploy's build leg says "deployed" (L-a3).** `preview.sh` with
+  `--for-deploy` asks the guard with the leg `deploy-build`. When another
+  BUILD is in the way it prints `buildingDeploy` ("…cannot be deployed until
+  that has finished.") rather than "cannot be built again", because the
+  teacher pressed Deploy. With a deploy or a deploy set for later in the way
+  it keeps the build leg's words (`anotherBuild`, `laterBuild`), and its trail
+  line says `build`. Two `launcherCases` pin it.
 
 **Rejected** (`deployWhileItsSectionDeploys.rejected`): leases naming the
 script's process id (misses Terminal, leaves a gap, touches a shared format);
@@ -2447,8 +2546,11 @@ in Terminal (its legs are refused and it is recorded as stopped).
 
 **Windows (#467).** The same guard is in `deploy.ps1` and in `preview.ps1`'s
 build leg, asked at the same points and printing the same lines, from
-`Win32_Process`. All 23 `launcherCases` run there (`test_launcher_rules.ps1`
-section 5). The four cases once marked `appliesOn: ["mac"]` hold on Windows as
+`Win32_Process`. All 23 `launcherCases` of #467 run there
+(`test_launcher_rules.ps1` section 5); the 13 #729 added, and the one it
+changed ("a preview being served, or being stopped, is not a build", which
+held a plain `--build-only` until then), are owed by the Windows issue for
+#729. The four cases once marked `appliesOn: ["mac"]` hold on Windows as
 written. Windows' run has the mac's split as well: Task Scheduler starts
 `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
 course and THEN runs its wrapper as `powershell.exe -File`. And a task set
@@ -2656,7 +2758,19 @@ all XNU compares).
   (`containerized-quartz-unit-plan`, account `<folder id>/<CODE>`), and pipes
   them into a fresh 0600 file in a 0700 folder made for each share inside the
   website builder, passing only its name (`--credential-file`), never the
-  secret in argv. Both questions are read without echo, exactly as typed. Protection is sticky: with
+  secret in argv. Both questions are read without echo, exactly as typed.
+  `--change-password --password-only` (#833) saves the new username and
+  password and shares nothing: no credential file is made, and
+  `share_plan.py --new-password-waiting` notes in the year's marker that the
+  new password waits for a share; `--password-only` without
+  `--change-password`, or with a flag that shares or stops sharing, is
+  refused. A password asked for a share is saved in the Keychain only once
+  that share succeeded or gave the year an address, so a first share that
+  fails keeps none (#833, review L3); `--password-only` saves it at once.
+  `--send-answer-keys-openly` (#833, review M2) lets a share with no
+  password and nobody at the lists (`--non-interactive`) send the answer
+  keys the lists settle in Shared, which it otherwise holds back; it is
+  refused with `--stop-sharing` or `--password-only`. Protection is sticky: with
   neither `--protect` nor `--remove-password` the launcher reads the year's
   marker (`the_plans_were_protected`). The school year is worked out on the
   Mac's clock and always passed to `share_plan.py` as `--year`. A share
@@ -3219,6 +3333,125 @@ address on that same server and loads whichever answers. REJECTED: a
 already does, on two platforms. The page is remembered by the app from the
 teacher's navigations in its own pane, so a stop needs to capture nothing: a
 `--stop` still ends what it always ended.
+
+## Two at once in one website builder (#835)
+
+A working folder has ONE website builder, and #835 lets two programs work on
+two sections of one course at the same moment (one copy of Plantoir already
+does). Its measurement (63 real paired runs of EXC2O's two sections, 2026-11-13)
+found two things the launchers share that could collide. Both were reachable
+before #835, between two COURSES of one folder.
+
+**The deploy token (F1).** `deploy.sh` piped the Netlify or Cloudflare token
+into one fixed path inside the builder, `/tmp/deploy_pat`, and the next
+`docker exec` read and removed it. Two deploys started together read each
+other's token or none: in a stand-in of those two steps run in a real builder,
+29 of 60 got the other's and 6 none (the measurer); 26 and 4 when re-run
+against the old two steps by `scripts/test_deploy_token_handoff.py`'s real
+builder class. Now the `TOKEN HAND-OFF BLOCK` in `deploy.sh`:
+
+- pipes the token into a fresh `mktemp -d /tmp/deploy_pat.XXXXXX` folder (0700)
+  and a `pat` file in it (0600), the shape the unit-plan credential already had
+  (#709 review M4), and keeps only the file's NAME, in `DEPLOY_PAT_FILE`;
+- hands the NAME to the reading `docker exec` as `PAT_FILE`; the reading step
+  (`TAKE_THE_TOKEN`, the start of both the deploy's and the plan share's
+  `sh -lc`) refuses any name the block did not make, reads the token, and
+  removes the folder before it does anything else;
+- removes the folder from the EXIT trap when the run ends before the reading
+  step, and stops in words ("could not hand the sign-in to the website
+  builder") if the hand-off itself fails. SIGINT alone is trapped as an
+  ordinary exit (130) so that the EXIT trap runs: macOS's `/bin/bash` 3.2
+  skips the EXIT trap when a FOREGROUND command dies of SIGINT sent to the
+  whole group, and the #835 implementation review measured the folder left
+  that way. The first version of this section said SIGINT was measured
+  clean; that was measured only with a command in the background
+  (`sleep & wait`), a shape `deploy.sh` does not have.
+
+  What the app sends, and where it lands. Cancel (`ScriptRunner.cancelByUser`)
+  types ^C into the run's terminal, then, if the run is still going two
+  seconds later, `ScriptRunner.terminate` sends SIGTERM to bash ALONE; Stop,
+  quit and `PlanShareRunner.cancel` send that SIGTERM straight away. The ^C
+  reaches the whole group as SIGINT only while no `docker exec -it` holds the
+  terminal. While one does (the deploy's and the plan share's own steps), its
+  raw mode passes the ^C into the builder, to the command running there, and
+  bash sees no signal at all: that command ends, the exec returns its status,
+  and `set -e` ends the run through the EXIT trap.
+
+  SIGTERM and SIGHUP are deliberately NOT trapped. The fix round traps them
+  too, and the fix review (N1) measured the cost: a trapped signal waits for
+  the foreground command to finish, so SIGTERM to bash alone against a 20 s
+  command ended the run in 19.7 s with the trap and 0.0 s without it, and
+  the app's Stop waited for the whole deploy. Untrapped, bash 3.2 ends at
+  once and still runs the EXIT trap. Measured under `/bin/bash` 3.2 with
+  `sleep 20` in the foreground, the old block (cbc50a2ec) and the new one
+  alike: SIGTERM and SIGHUP, to the group or to bash alone, end the run in
+  0.0 s and leave no folder. SIGINT to the group ends it in 0.0 s (old: the
+  folder left; new: none). SIGINT to bash alone waits for the command, in
+  both (19.7 s), and leaves no folder; nothing in the app sends that. A
+  signal to bash alone leaves the foreground command running after bash has
+  gone, as it did before #835. `test_deploy_token_handoff.py` sends each
+  signal to the group, and SIGTERM and SIGHUP to bash alone with a 1 s limit
+  (the trapped block took the test's 5 s cap for both).
+
+  A known limit, in the old block and the new alike: a stop while the
+  WRITING step runs (the `docker exec -i` that makes the folder and fills
+  it) leaves the folder, because its name has not come back to
+  `DEPLOY_PAT_FILE` yet and the EXIT trap has nothing to remove. It stays in
+  the builder's `/tmp` until the builder is recreated (a new toolchain, or a
+  container recreated for its mounts), the same as after SIGKILL below.
+  The window is the length of one `docker exec`.
+
+  Nothing in the EXIT trap may fail: under `set -e` a failing command there
+  becomes the run's exit status (`test_deploy_sh_plans.py` met it).
+
+The secret is never in an argument list, a `docker exec -e`, the console or
+the trail; `test_deploy_token_handoff.py` feeds made-up tokens and searches
+all four. What this protects against is two deploys crossing, and no more:
+every `docker exec` in the builder runs as root, so any process inside it
+can list and read `/tmp/deploy_pat.*` while a deploy holds one. Inside the builder the token still reaches `deploy.py` as
+`NETLIFY_AUTH_TOKEN` or `CLOUDFLARE_API_TOKEN` in the environment of that one
+command, as before: wrangler reads it from there. A run killed with SIGKILL
+between the hand-off and the reading step leaves its 0700 folder in the
+builder's `/tmp` until the builder is recreated; nothing sweeps `/tmp/deploy_pat.*`,
+because a sweep could remove a hand-off another deploy is about to read, the
+fault this replaced. Rejected: a lock around the old fixed file (it would have to
+be held from the write in one `docker exec` to the read in the next, across two
+processes; a file of its own needs no lock), and handing the token over as
+`docker exec -e` (it is then in the Mac's process table).
+Measured with stand-ins only: no credential of the teacher's was used. Windows
+deploys natively with the token in its own process's environment and has no
+shared file.
+
+**Two previews on one address.** A serving preview chooses one of the
+builder's four addresses (8081-8084), and each program chooses on its own
+(mac: `PreviewLeases`, one process), so two programs could hand two previews
+the same one, and the second's `kill_existing_quartz` stopped the first (3 of
+3). `build_site.py` now CLAIMS the address at the start of a serving run, under
+one `flock` for the builder, for as long as its build runs; a run whose address
+another live preview claimed exits 75 before it builds anything, with
+`shared-rules.json` → `twoPreviewsOneAddress.sentences.launcher`, and
+`preview.sh` writes `launcherLineWhenItsAddressIsAnotherPreviews` on the trail.
+The same course and section started again takes its claim over. A claim
+counts only when it PROVES its holder: the process id is alive AND that
+process started when the claim recorded (the kernel's boot id and field 22
+of `/proc/<pid>/stat` in the builder). The id alone proved nothing: the
+builder's `/tmp` outlives a restart and the builder hands out the same ids
+again after one (pid 19 three times of three), so the first version refused
+a preview, with exit 75, for one that did not exist (the #835 implementation
+review's reproduction; `test_two_previews_one_address.py` →
+`AfterARestartInARealBuilder` repeats it in a real builder when
+`PLANTOIR_PREVIEW_CLAIM_IMAGE` names an image: the first version failed it
+two runs of three, the third skipped because the id did not come back; the
+new code passed three of three). A claim that proves nothing is taken over,
+and `preview.sh` asks `a_claim_that_proves_nothing` before the build so the
+trail says so (`launcherLineWhenALeftClaimIsTakenOver`). The claim is given
+back when its build ends, by Stop's SIGINT, or by SIGTERM (what a stop sends
+first) or SIGHUP (a closed terminal), each made an ordinary exit; SIGKILL
+leaves it for the next run to take over. Rejected: moving the second preview
+to a free address, because `preview.sh` announces the address before the build
+and the app opens that one. #835's per-section leases name each preview's
+address, so the app avoids a taken one and this refusal stays rare.
+`scripts/test_two_previews_one_address.py`.
 
 ## A course kept for reference is refused in the launcher, early
 

@@ -700,7 +700,7 @@ nonisolated enum CoverageTabDisplay {
         // latest build's, and never an empty date.
         // While a build is making the map, the record is another build's
         // because the new build has already written .build-id: "the latest
-        // build made no map" would then be false (the fix review's M3).
+        // build could not make a new one" would then be false (the fix review's M3).
         let hasATime: Bool = facts.startKnown
         var lines: [String] = []
         if facts.record == .thisBuild {
@@ -716,8 +716,16 @@ nonisolated enum CoverageTabDisplay {
                 lines.append("browserReload")
             }
         } else {
+            // Under olderMap the first line already says the latest build
+            // could not make a new one, and names the button: saying it
+            // twice is left out (#831, Russell 2026-11-13).
+            let firstLineSaysItFailed: Bool = lines.contains("olderMap") || lines.contains("olderMapNoTime")
             if failed {
-                lines.append(hasAMap ? "couldNotMakeAgain" : "couldNotMake")
+                if !hasAMap {
+                    lines.append("couldNotMake")
+                } else if !firstLineSaysItFailed {
+                    lines.append("couldNotMakeAgain")
+                }
                 if refusedReason {
                     lines.append("refusedReason")
                 }
@@ -774,10 +782,12 @@ nonisolated enum CoverageTabWording {
     static let tabCoverage: String = "Coverage"
     static let asOf: String = "Made when this section was last built, {when}."
     static let asOfNoTime: String = "Made when this section was last built."
-    static let olderMap: String = "Made by an earlier build of this section, {when}. The latest build made no map."
-    static let olderMapNoTime: String = "Made by an earlier build of this section. The latest build made no map."
-    static let olderMapWhileBuilding: String = "Made by an earlier build of this section, {when}."
-    static let olderMapWhileBuildingNoTime: String = "Made by an earlier build of this section."
+    static let olderMap: String =
+        "This map is from an earlier build, {when}. The latest build could not make a new one. Make the Map Again to try once more."
+    static let olderMapNoTime: String =
+        "This map is from an earlier build. The latest build could not make a new one. Make the Map Again to try once more."
+    static let olderMapWhileBuilding: String = "This map is from an earlier build, {when}."
+    static let olderMapWhileBuildingNoTime: String = "This map is from an earlier build."
     static let making: String = "Making the map again with a new build of this section…"
     static let makingWithThePreview: String =
         "Making the map again with a new build of this section… Its preview starts again when the build is done, at the page you were last reading."
@@ -809,6 +819,14 @@ nonisolated enum CoverageTabWording {
     static let cannotShowTitle: String = "The Map Can’t Be Shown"
     static let cannotShowDescription: String =
         "Plantoir could not get ready to show the map on this {machine}. Quitting Plantoir and opening it again may be enough."
+
+    /// What VoiceOver says for the caution symbol before a line that says
+    /// the map may be out of date (`coverageTab.tab.cautionRule`, #831).
+    static let cautionLabel: String = "Caution"
+
+    /// The lines drawn as a caution (`coverageTab.tab.cautionLines`): each
+    /// says the map on screen may be out of date.
+    static let cautionLines: Set<String> = ["olderMap", "olderMapNoTime", "changedSince", "mayBeOutOfDate"]
 
     // MARK: - Functions
 
@@ -880,6 +898,8 @@ nonisolated enum CoverageTabWording {
             text = cannotShowTitle
         case "cannotShowDescription":
             text = cannotShowDescription
+        case "cautionLabel":
+            text = cautionLabel
         default:
             text = ""
         }

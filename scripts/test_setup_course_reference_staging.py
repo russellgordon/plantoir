@@ -126,7 +126,17 @@ class SetupIntoStaging(unittest.TestCase):
             real.mkdir()
             (real / "course_config.json").write_text(
                 json.dumps(reference_settings(case["code"])), encoding="utf-8")
-            (courses / folder_name).symlink_to(real, target_is_directory=True)
+            try:
+                (courses / folder_name).symlink_to(real, target_is_directory=True)
+            except OSError as error:
+                # Windows lets an ordinary account make a symbolic link only
+                # with Developer Mode on (WinError 1314, measured on Windows 11
+                # Pro 26200): this machine's setting, not the launcher's
+                # behaviour. The case still runs on the mac and in the container.
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("this Windows account may not make symbolic links (WinError 1314, "
+                                  "Developer Mode off); the case runs on the mac and in the container")
+                raise
             return
         staging = courses / folder_name
         if staging.exists():

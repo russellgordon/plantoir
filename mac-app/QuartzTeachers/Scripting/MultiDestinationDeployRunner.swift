@@ -323,7 +323,8 @@ class MultiDestinationDeployRunner {
                 runner.run(
                     scriptNamed: "preview.sh",
                     arguments: MultiDestinationDeployRunner.buildArguments(
-                        courseCode: course.code, sectionNumber: sectionNumber, unattended: unattended
+                        courseCode: course.code, sectionNumber: sectionNumber, unattended: unattended,
+                        forADeploy: true
                     ),
                     workingDirectory: workingDirectory
                 )
@@ -454,10 +455,27 @@ class MultiDestinationDeployRunner {
 
     /// The build step's arguments: `preview.sh C S --build-only`, and
     /// `--non-interactive` for a caller nobody is watching (#378).
-    static func buildArguments(courseCode: String, sectionNumber: Int, unattended: Bool) -> [String] {
+    ///
+    /// `forADeploy` adds `--for-deploy` (#729): true for a deploy's build
+    /// leg, false for the assistant's rebuild. It changes nothing the build
+    /// does; it is how the other launchers' guards tell the two apart in the
+    /// process table, saying "already being deployed" for the first and
+    /// "already being built" for the second (`shared-rules.json` →
+    /// `deployWhileItsSectionDeploys`, `app-rules.json` →
+    /// `launcherFlags.preview`). Required, with no default, so a caller that
+    /// was missed does not compile rather than silently saying the wrong one.
+    static func buildArguments(
+        courseCode: String,
+        sectionNumber: Int,
+        unattended: Bool,
+        forADeploy: Bool
+    ) -> [String] {
         var arguments: [String] = [courseCode, String(sectionNumber), "--build-only"]
         if unattended {
             arguments.append("--non-interactive")
+        }
+        if forADeploy {
+            arguments.append("--for-deploy")
         }
         return arguments
     }
@@ -516,13 +534,19 @@ class MultiDestinationDeployRunner {
     }
 
     /// The sentence for a deploy refused because its section was still being
-    /// deployed (#439): which one depends on whether a deploy set for later
-    /// is the one working.
+    /// deployed (#439), or built by something else (#729): which one depends
+    /// on what was working.
     static func refusalAnswer(
         course: String,
         section: String,
         refusal: FailureExplainer.SectionDeployRefusal
     ) -> AssistSiteWorkResult {
+        if refusal.byAnotherBuild {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.deployRefusedWhileItsSectionIsBeingBuilt(course: course, section: section)
+            )
+        }
         if refusal.byALaterDeploy {
             return AssistSiteWorkResult(
                 succeeded: false,

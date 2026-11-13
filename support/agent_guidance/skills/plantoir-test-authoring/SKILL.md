@@ -66,10 +66,13 @@ Everything I draft here (each question, each answer and each mark) is a suggesti
   not onto a page. Everything there that is not a page is copied to the
   class website. The one place under `courses/` where copies of the test's
   PDFs (each version's PDF and its solutions' PDF, never the Marking Guide
-  or the kit) may go is a unit plan's own folder,
-  `courses/<CODE>/.internal/planning/<unit>/pdfs/`, as the
+  or the kit) may go is a unit plan's own folder: each version's PDF into
+  `courses/<CODE>/.internal/planning/<unit>/pdfs/`, and each solutions PDF
+  into that unit's `Answer Keys` folder,
+  `courses/<CODE>/.internal/planning/<unit>/Answer Keys/`, as the
   `plantoir-unit-planning` skill's section 6 says: that folder is never
-  built into a class website. Never a `.tex` file or the kit there. A
+  built into a class website, and a share of the plans holds back what is
+  in `Answer Keys` unless the teacher chooses otherwise. Never a `.tex` file or the kit there. A
   practice test may go on the class website (section 8); a test's
   solutions and kit never do.
 

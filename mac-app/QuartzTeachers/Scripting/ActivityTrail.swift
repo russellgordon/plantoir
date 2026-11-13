@@ -1148,6 +1148,11 @@ nonisolated enum ActivityTrail {
         /// Stop Sharing on a school year's unit plans, and how it ended:
         /// deleted, already gone, or failed with the address still working.
         case unitPlanSharingStopped = "unit plan sharing stopped"
+        /// Change Password saved a new password for a course's unit plans
+        /// and shared nothing (#833): the school year, and whether the new
+        /// password now waits for a share or nothing was shared yet. Never
+        /// the username, the password or the address.
+        case unitPlanPasswordChanged = "unit plan password changed"
         /// A preview's address was held by something else on this Mac
         /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
         /// signed in). Carries where the preview was for, the address — a

@@ -53,7 +53,7 @@ DEFINED_EXCEPTIONS = ["studentNote"]
 
 # ---------- The keys the format defines, per place ----------
 KIT_KEYS = ["kit", "test", "course", "categories", "parts", "questions", "points",
-            "versions", "strengths", "topics"]
+            "versions", "strengths", "topics", "voided"]
 CATEGORY_KEYS = ["key", "title"]
 PART_KEYS = ["key", "title", "category"]
 QUESTION_KEYS = ["id", "part", "skill", "topics"]
@@ -101,7 +101,7 @@ def looks_like_a_person(key, is_map_key=False):
 # Where a key is data rather than a field: a path of keys from the top of
 # the file, "*" standing for any key.
 KIT_MAP_PLACES = [("topics",), ("versions",), ("versions", "*", "answers"),
-                  ("versions", "*", "answers", "*", "misconceptions")]
+                  ("versions", "*", "answers", "*", "misconceptions"), ("voided",)]
 MARKS_MAP_PLACES = [("points",), ("voided",), ("feedback",)]
 
 
@@ -389,10 +389,20 @@ def check_kit(kit, problems):
                 question_counts[category] = question_counts.get(category, 0) + 1
                 counts[category] += 1
         per_question.append((question_id, question_counts))
-    return point_ids, list(versions.keys()), counts, per_question, part_keys
+    # A point voided for the whole class (#750, 750c fix review H1): the teacher's ruling, recorded ONCE here,
+    # and every marks record must void exactly these points.
+    voided = kit.get("voided", {})
+    if not isinstance(voided, dict):
+        problems.append("voided must map point IDs to {reason, intended} [voided]")
+        voided = {}
+    for point_id in voided:
+        if point_id not in point_ids:
+            problems.append(f"the kit voids {point_id}, which is not a point [voided]")
+        check_keys(voided[point_id], VOIDED_KEYS, f"the kit's voided {point_id}", problems)
+    return point_ids, list(versions.keys()), counts, per_question, part_keys, list(voided.keys())
 
 
-def check_marks(marks, point_ids, version_keys, part_keys, problems):
+def check_marks(marks, point_ids, version_keys, part_keys, problems, kit_voided=()):
     walk_every_key(marks, (), MARKS_MAP_PLACES, "the marks record", problems)
     check_keys(marks, MARKS_KEYS, "the marks record", problems)
     for key in ["summary", "closing"]:
@@ -424,6 +434,14 @@ def check_marks(marks, point_ids, version_keys, part_keys, problems):
             if point_id not in point_ids:
                 problems.append(f"the marks record voids {point_id}, which is not in the kit [marks-points]")
             check_keys(voided[point_id], VOIDED_KEYS, f"the marks record's voided {point_id}", problems)
+        # A point is voided for the whole class or for nobody: the record voids exactly what the kit voids.
+        for point_id in voided:
+            if point_id in point_ids and point_id not in kit_voided:
+                problems.append(f"the marks record voids {point_id}, which the kit does not void; a point is voided for "
+                                "the whole class, in the kit's voided [marks-voided]")
+        for point_id in kit_voided:
+            if point_id not in voided:
+                problems.append(f"the kit voids {point_id} for the whole class, and the marks record does not [marks-voided]")
     points = marks.get("points")
     if not isinstance(points, dict):
         problems.append("the marks record has no points [marks-points]")
@@ -578,11 +596,11 @@ def main(arguments):
     checked = ["the kit"]
     if kit is not None:
         try:
-            point_ids, version_keys, counts, per_question, part_keys = check_kit(kit, problems)
+            point_ids, version_keys, counts, per_question, part_keys, kit_voided = check_kit(kit, problems)
             if options["marks"] is not None:
                 marks = load(options["marks"], problems)
                 if marks is not None:
-                    check_marks(marks, point_ids, version_keys, part_keys, problems)
+                    check_marks(marks, point_ids, version_keys, part_keys, problems, kit_voided)
                 checked.append("the marks record")
             for version_key, path in options["papers"]:
                 check_paper(version_key, path, version_keys, counts, per_question, problems)

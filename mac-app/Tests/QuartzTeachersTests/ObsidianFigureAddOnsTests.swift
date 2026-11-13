@@ -639,8 +639,10 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         let message: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerMessage, course: "ADA1O")
         let certain: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileOpen, course: "ADA1O")
         let known: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileObsidianIsOpen, course: "ADA1O")
-        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .open), message + "\n\n" + certain)
-        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .cannotTell), message + "\n\n" + known)
+        let facts: String = ObsidianFigureAddOnsWording.closingLines(course: "ADA1O")
+        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .open), message + "\n\n" + certain + "\n" + facts)
+        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .cannotTell), message + "\n\n" + known + "\n" + facts)
+        XCTAssertFalse(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .closed).contains(facts))
         XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .closed), message)
         XCTAssertFalse(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .cannotTell).contains(certain))
     }
@@ -812,6 +814,8 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         let ours: [String: String] = ObsidianFigureAddOnsTests.ourWords()
         var contractKeys: Set<String> = Set(wording.keys)
         contractKeys.remove("note")
+        // The rule for the closing facts (#834), not a sentence.
+        contractKeys.remove("closingRule")
         XCTAssertEqual(contractKeys, Set(ours.keys), "the contract and the app name the same words")
         for (key, words) in ours {
             XCTAssertEqual(wording[key] as? String, words, key)
@@ -824,6 +828,19 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             ObsidianFigureAddOnsWording.offerText(course: "MPM2D", openState: .open),
             ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerMessage, course: "MPM2D") + "\n\n"
                 + ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileOpen, course: "MPM2D")
+                + "\n" + ObsidianFigureAddOnsWording.closingLines(course: "MPM2D")
+        )
+        // #834 (Russell on #742): the facts say that every OTHER course open
+        // in Obsidian closes too and only this one opens again, one line
+        // each, labelled, in the contract's order.
+        let rows: [FactsQuestionRow] = ObsidianFigureAddOnsWording.closingRows(course: "MPM2D")
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0].label, try XCTUnwrap(wording["closesLabel"] as? String))
+        XCTAssertEqual(rows[1].label, try XCTUnwrap(wording["opensAgainLabel"] as? String))
+        XCTAssertEqual(rows[2].label, try XCTUnwrap(wording["keptLabel"] as? String))
+        XCTAssertEqual(
+            ObsidianFigureAddOnsWording.closingLines(course: "MPM2D").components(separatedBy: "\n").count, 3,
+            "one fact a line"
         )
     }
 
@@ -1223,6 +1240,12 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             "offerMessage": ObsidianFigureAddOnsWording.offerMessage,
             "offerWhileOpen": ObsidianFigureAddOnsWording.offerWhileOpen,
             "offerWhileObsidianIsOpen": ObsidianFigureAddOnsWording.offerWhileObsidianIsOpen,
+            "closesLabel": ObsidianFigureAddOnsWording.closesLabel,
+            "closesValue": ObsidianFigureAddOnsWording.closesValue,
+            "opensAgainLabel": ObsidianFigureAddOnsWording.opensAgainLabel,
+            "opensAgainValue": ObsidianFigureAddOnsWording.opensAgainValue,
+            "keptLabel": ObsidianFigureAddOnsWording.keptLabel,
+            "keptValue": ObsidianFigureAddOnsWording.keptValue,
             "offerAdd": ObsidianFigureAddOnsWording.offerAdd,
             "offerNotNow": ObsidianFigureAddOnsWording.offerNotNow,
             "dontAskAgain": ObsidianFigureAddOnsWording.dontAskAgain,

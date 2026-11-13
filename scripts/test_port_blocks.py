@@ -486,6 +486,44 @@ class TheOneReaderOfTheProcessTable(unittest.TestCase):
         preview = launcher_text("preview.sh")
         self.assertLess(preview.find(TABLE_START), preview.find("\n  refuse_a_preview_while_its_section_deploys\n"))
 
+    @unittest.skipUnless(HAS_BASH, "needs a bash that can run a program")
+    def test_the_reader_names_a_deploys_build_leg(self):
+        """#729: `--for-deploy` is one of the launcher's own words the reader
+        reports, so the guards can tell a deploy's build leg from a rebuild.
+        Run through EACH launcher's copy with a pretend ps (the guard tests'
+        own), not read as text."""
+        from test_preview_while_deploying import PretendMac as GuardMac
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                with tempfile.TemporaryDirectory() as scratch:
+                    mac = GuardMac(Path(scratch))
+                    mac.lay_out({"processes": [
+                        [700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --non-interactive --for-deploy"],
+                        [701, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only"],
+                        [702, 1, "/bin/bash ./preview.sh ICS4U 2 --for-deployment --build-only"]]})
+                    script = "\n".join([
+                        "set -uo pipefail",
+                        between(launcher_text(launcher), TABLE_START, TABLE_END),
+                        "export THIS_RUN=$$",
+                        "the_launchers_running 'ICS4U 2'",
+                    ])
+                    environment = dict(os.environ)
+                    environment["PATH"] = f"{mac.bin}:{environment.get('PATH', '/usr/bin:/bin')}"
+                    environment["FAKE"] = str(mac.fake)
+                    environment["HOME"] = str(mac.home)
+                    environment["PREVIEWED"] = "ICS4U 2"
+                    result = subprocess.run([BASH, "-c", script], cwd=mac.here, env=environment,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    flags = {}
+                    for line in result.stdout.splitlines():
+                        fields = line.split()
+                        flags[fields[0]] = fields[4]
+                    self.assertEqual(flags.get("700"), "build-only,for-deploy", result.stdout)
+                    self.assertEqual(flags.get("701"), "build-only", result.stdout)
+                    # A longer word is not the flag.
+                    self.assertEqual(flags.get("702"), "build-only", result.stdout)
+
     def test_the_block_prints_nothing_a_teacher_reads(self):
         block = between(launcher_text("setup.sh"), TABLE_START, TABLE_END)
         for line in block.splitlines():

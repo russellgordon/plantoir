@@ -1307,38 +1307,10 @@ struct SidebarView: View {
                     }
                 }
             } header: {
-                Text(ReferenceWording.groupTitle)
-                    // The shelf's own door to the New Course wizard (#572),
-                    // opening it with the reference choice already made.
-                    // The shelf is drawn only when it holds a course or a
-                    // group, so the wizard's own toggle is the door for a
-                    // teacher with neither.
-                    .contextMenu {
-                        Button(ReferenceCreationWording.newReferenceCourseMenuItem, systemImage: "plus") {
-                            workspace.newCourseWizardIsForReference = true
-                            workspace.isShowingNewCourseWizard = true
-                        }
-                        .accessibilityIdentifier("newReferenceCourse")
-                        Button(ReferenceGroupWording.newGroupMenuItem, systemImage: "folder.badge.plus") {
-                            workspace.newGroupThenMove = nil
-                            workspace.isMakingAReferenceGroup = true
-                        }
-                        .disabled(!workspace.referenceGroupsMayChange)
-                        .accessibilityIdentifier("newReferenceGroup")
-                        // An arrangement that cannot be read is not a dead
-                        // end: the way out is here, said in a sentence.
-                        // A newer version's arrangement is left as it is.
-                        if let refusal = workspace.referenceShelf.refusal {
-                            Divider()
-                            Text(refusal)
-                            if workspace.referenceShelf.mayStartAgain {
-                                Button(ReferenceGroupWording.startAgainMenuItem) {
-                                    workspace.isAskingToStartReferenceGroupsAgain = true
-                                }
-                                .accessibilityIdentifier("startReferenceGroupsAgain")
-                            }
-                        }
-                    }
+                // The heading, with a visible button for its menu (#834,
+                // Russell 2026-11-13): a teacher who never right-clicks finds
+                // the groups. The right-click and the Course menu stay.
+                ReferenceShelfHeading()
             }
         }
     }

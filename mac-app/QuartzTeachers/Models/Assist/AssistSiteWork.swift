@@ -197,8 +197,10 @@ final class AssistToolchainWork: AssistSiteWork {
         // back until the Mac was restarted.
         runner.run(
             scriptNamed: "preview.sh",
+            // Not a deploy (#729): the launchers' guards say "already being
+            // built", never "already being deployed", for this one.
             arguments: MultiDestinationDeployRunner.buildArguments(
-                courseCode: course.code, sectionNumber: sectionNumber, unattended: true
+                courseCode: course.code, sectionNumber: sectionNumber, unattended: true, forADeploy: false
             ),
             workingDirectory: workspaceURL
         )

@@ -10,6 +10,54 @@ import XCTest
 @MainActor
 final class MultiDestinationDeployRunnerTests: XCTestCase {
 
+    // MARK: - The build leg says whether it is a deploy's (#729)
+
+    /// A deploy's build leg carries `--for-deploy`; the assistant's rebuild
+    /// does not. The flag is what lets the other launchers' guards say
+    /// "already being deployed" for one and "already being built" for the
+    /// other (`shared-rules.json` → `deployWhileItsSectionDeploys`).
+    func testOnlyADeploysBuildLegSaysForDeploy() {
+        XCTAssertEqual(
+            MultiDestinationDeployRunner.buildArguments(
+                courseCode: "ICS4U", sectionNumber: 2, unattended: false, forADeploy: true
+            ),
+            ["ICS4U", "2", "--build-only", "--for-deploy"]
+        )
+        XCTAssertEqual(
+            MultiDestinationDeployRunner.buildArguments(
+                courseCode: "ICS4U", sectionNumber: 2, unattended: true, forADeploy: true
+            ),
+            ["ICS4U", "2", "--build-only", "--non-interactive", "--for-deploy"]
+        )
+        XCTAssertEqual(
+            MultiDestinationDeployRunner.buildArguments(
+                courseCode: "ICS4U", sectionNumber: 2, unattended: true, forADeploy: false
+            ),
+            ["ICS4U", "2", "--build-only", "--non-interactive"]
+        )
+    }
+
+    /// The two callers pass what they are: the deploy's run says it is a
+    /// deploy, the assistant's rebuild says it is not. Read from the source,
+    /// because the run itself needs a real launcher.
+    func testTheDeployAndTheRebuildEachSayWhatTheyAre() throws {
+        let repository: URL = FolderIdentityTests.repositoryRoot()
+        let runner: String = try String(
+            contentsOf: repository.appendingPathComponent(
+                "mac-app/QuartzTeachers/Scripting/MultiDestinationDeployRunner.swift"
+            ),
+            encoding: .utf8
+        )
+        let rebuild: String = try String(
+            contentsOf: repository.appendingPathComponent("mac-app/QuartzTeachers/Models/Assist/AssistSiteWork.swift"),
+            encoding: .utf8
+        )
+        XCTAssertEqual(runner.components(separatedBy: "forADeploy: true").count - 1, 1)
+        XCTAssertEqual(runner.components(separatedBy: "forADeploy: false").count - 1, 0)
+        XCTAssertEqual(rebuild.components(separatedBy: "forADeploy: false").count - 1, 1)
+        XCTAssertEqual(rebuild.components(separatedBy: "forADeploy: true").count - 1, 0)
+    }
+
     // MARK: - Refusal, checked against every configured destination
 
     func testRefusesOnAnAdditionalCloudflareTargetWithNoAccountID() {

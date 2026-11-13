@@ -27,34 +27,41 @@ nonisolated enum ReferenceReplaceWording {
         return "Replace \(course) in \(group)?"
     }
 
-    /// The warning's body: what the course on the shelf holds and when it
-    /// was kept, then what Plantoir does first and how to get it back (plan
-    /// review M9: the backup's name, where it is, and what restoring it
-    /// does).
-    static func body(
-        course: String,
-        group: String,
-        sections: String,
-        pages: String,
-        size: String,
-        date: String,
-        folder: String
-    ) -> String {
-        return "\(course) in \(group) holds \(sections), \(pages) and \(size), and was kept on \(date). "
-             + ReferenceReplaceWording.whatHappensFirst(course: course, folder: folder)
+    /// The warning's one sentence (#834): what happens if the teacher goes
+    /// ahead. The facts are rows under it.
+    static let message: String = "The new course takes its place on the Reference Courses shelf."
+
+    /// The rows' labels.
+    static let beingReplacedLabel: String = "Being replaced"
+    static let keptOnLabel: String = "Kept on"
+    static let backedUpLabel: String = "Backed up first as"
+    static let toUndoLabel: String = "To undo"
+
+    /// What the course on the shelf holds.
+    static func beingReplacedValue(sections: String, pages: String, size: String) -> String {
+        return "\(sections), \(pages), \(size)"
     }
 
-    /// The same body when the day it was kept cannot be read.
-    static func bodyWithoutADate(
-        course: String,
-        group: String,
-        sections: String,
-        pages: String,
-        size: String,
-        folder: String
-    ) -> String {
-        return "\(course) in \(group) holds \(sections), \(pages) and \(size). "
-             + ReferenceReplaceWording.whatHappensFirst(course: course, folder: folder)
+    /// The backup's name, as its row in Backups carries it, and where it is
+    /// (plan review M9).
+    static func backedUpValue(folder: String) -> String {
+        return "\(folder), in Backups in the sidebar"
+    }
+
+    /// How to get the course back (plan review M9).
+    static let toUndoValue: String = "Restore that backup"
+
+    /// The warning's rows. "Kept on" is absent when the day the course was
+    /// kept cannot be read: a fact that is missing is no row (#834).
+    static func rows(sections: String, pages: String, size: String, date: String?, folder: String) -> [FactsQuestionRow] {
+        var rows: [FactsQuestionRow] = []
+        rows.append(FactsQuestionRow(label: beingReplacedLabel, value: beingReplacedValue(sections: sections, pages: pages, size: size)))
+        if let date {
+            rows.append(FactsQuestionRow(label: keptOnLabel, value: date))
+        }
+        rows.append(FactsQuestionRow(label: backedUpLabel, value: backedUpValue(folder: folder)))
+        rows.append(FactsQuestionRow(label: toUndoLabel, value: toUndoValue))
+        return rows
     }
 
     /// "1 section" or "3 sections".
@@ -124,12 +131,5 @@ nonisolated enum ReferenceReplaceWording {
     /// Said once a replace has happened, where a sheet stays up to say so.
     static func replacedNote(course: String, group: String, folder: String) -> String {
         return "The \(course) in \(group) was replaced. Its backup is in Backups in the sidebar as \(folder)."
-    }
-
-    // MARK: - Private helpers
-
-    private static func whatHappensFirst(course: String, folder: String) -> String {
-        return "Plantoir backs it up first, and the backup is listed in Backups in the sidebar as \(folder). "
-             + "Restoring that backup puts this \(course) back in place of the new one."
     }
 }

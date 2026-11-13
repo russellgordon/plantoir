@@ -40,15 +40,18 @@ and a file written here is lost). Copy from it instead.
 - **Plantoir shares it, never you.** The teacher shares the plans with
   colleagues from the Share bar at the foot of the course's Planning tab,
   as a small website of their own for the school year, open to anyone with
-  the address or protected by a username and password. A share without a
-  password leaves out every file whose name looks like an answer key (one
-  holding "answer", "solution", "marking guide" or "marking scheme", or the
-  word "key") unless the teacher ticks Include Answer Keys, so name answer
-  keys that way, as `… - Answers.pdf` or `… - Solutions.pdf`, and never put
-  answers inside a plan page or a PDF named something else: Plantoir reads
-  names, not files, and shows the teacher both lists before an open share. If
-  the teacher asks you to share the plans, tell them where the Share bar is;
-  never share or deploy them yourself.
+  the address or protected by a username and password. Before every share
+  the teacher sees the plan's documents in two tables, Shared and Not
+  shared, and can move any of them. **Every answer key, solutions file and
+  marking guide goes into the unit's `Answer Keys` folder**
+  (`<unit-slug>/Answer Keys/`), never into `pdfs/`: a share without a
+  password starts everything in that folder in Not shared unless the
+  teacher ticks Include Answer Keys. Never put answers inside a plan page or
+  a handout outside that folder: Plantoir reads names and folders, never the
+  files. In a plan the teacher already has, a key outside the folder is one
+  to mention, and to move only when they say yes; never move a teacher's
+  file into it unasked. If the teacher asks you to share the plans, tell
+  them where the Share bar is; never share or deploy them yourself.
 
 ## 2. Gather, agree, then build
 
@@ -167,9 +170,10 @@ house style and in the course's handouts folder, which it reads from
   assessment from it. Then a separate agent reviews it for fit and solves
   every question again from scratch, and a last pass checks the two
   versions, the answer key and the plan agree. Fix what each finds.
-- **Copy the PDFs into the plan.** Copy each PDF (the student copy and its
-  solutions or answers) into `<unit-slug>/pdfs/` under its real name, and
-  link it from the assessment's card. Copy them again after every change,
+- **Copy the PDFs into the plan.** Copy each student copy into
+  `<unit-slug>/pdfs/` and each solutions or answers PDF into the unit's
+  `Answer Keys` folder (`<unit-slug>/Answer Keys/`), under its real name,
+  and link each from the assessment's card where it is. Copy them again after every change,
   so the plan never links an old copy. Never copy a `.tex` file into the
   planning folder.
 
@@ -197,10 +201,12 @@ and the gaps.
 
 - **One day at a time, and only on a go.** Make a day's handouts when the
   teacher asks for that day, through `plantoir-handouts`, and copy the PDFs
-  into `<unit-slug>/pdfs/`.
+  into `<unit-slug>/pdfs/`, with each answer key into
+  `<unit-slug>/Answer Keys/`.
 - **Linked from the day's section.** Each handout is a card in that day's
   section, its Files row linking the PDFs. A link is written only once its
-  PDF is in `pdfs/`.
+  PDF is in `pdfs/` (an answer key's, in `Answer Keys/`, written
+  `Answer%20Keys/`).
 - **The "✓ reviewed" mark** goes on a lesson's card and on a day's heading
   only after that day's materials have been reviewed and the teacher has
   agreed them. Never before.
@@ -217,6 +223,7 @@ courses/<CODE>/.internal/planning/
     correlation.html  the unit's curriculum correlation (from template/unit/correlation.html)
     plan.json         the unit's facts, read by Plantoir
     pdfs/             copies of the unit's handouts, under their real names
+    Answer Keys/      every answer key, solutions file and marking guide, and nothing else
 ```
 
 - **Write only inside `.internal/planning/`**, apart from the course's
@@ -256,8 +263,11 @@ courses/<CODE>/.internal/planning/
 ## 10. Check it before you hand it over
 
 - Every relative link on every page opens a file or a place on a page that
-  is there: each PDF in `pdfs/`, `correlation.html`, `../index.html`, and
-  every `#day…` or `#l…` a cell or card points at.
+  is there: each PDF in `pdfs/` or `Answer Keys/`, `correlation.html`,
+  `../index.html`, and every `#day…` or `#l…` a cell or card points at.
+- Every answer key, solutions file and marking guide is in the unit's
+  `Answer Keys` folder, and no file outside it has a name that looks like
+  one: before a share, Plantoir names any such file as one to move.
 - Every page has `<meta name="robots" content="noindex, nofollow">` in its
   head, as the template's pages do.
 - No page loads anything from the internet: no address beginning `http`
@@ -281,7 +291,9 @@ A teacher may already keep a plan site of their own made in this same
 style, in a folder outside the course. Offer to adopt it when they mention
 one; never do it unasked.
 
-- Copy its pages and its `pdfs/` folder into a new unit folder.
+- Copy its pages and its `pdfs/` folder into a new unit folder, with its
+  answer keys in the unit's `Answer Keys` folder, the links changed to match,
+  and say which files went there.
 - In each page, replace the `<link>` to an internet font service and the
   page's own `<style>` block with one `<link>` to the matching stylesheet
   in `../assets/` (`plan.css` for the plan page, `correlation.css` for the

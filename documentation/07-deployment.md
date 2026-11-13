@@ -1062,7 +1062,10 @@ names its Netlify calls and runs a no-flag deploy over two saved folders
 (both written; then a first leg that fails, and the run still writes the
 second and ends with exit 1). The rules, sentences and eighteen cases were
 proposed from Windows (four more were added from the mac by #771) as `contracts/app-rules.json` → `savedDestinations`,
-run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. `deploy.py`
+run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. Since
+v2.0.0 (#788) `deploy.ps1` turns a tab, a carriage return or a line break in
+a KIND into a space as it already did in a path, so both launchers refuse an
+unknown kind on one line; no deploy goes anywhere new. `deploy.py`
 is unchanged (it does one destination per call). The new-course default, its
 sentences and every case are `contracts/app-rules.json` →
 `publishingDestinations`; the Swift is `PublishingDestinations`.
@@ -1744,35 +1747,123 @@ and the credential item (the `windows` issue for #709).
    the bar lists each earlier year with its own Stop Sharing.
 3. **A random suffix on every plan site**, open or protected, so the address
    never changes when a password is added or removed.
-4. **Answer keys** are left out of a share without a password unless the
-   teacher ticks Include Answer Keys; a protected share includes them. The
-   rule (`answerKeys`) reads NAMES only and errs toward leaving out (the
-   director's ruling on the implementation review, M3): a PDF, image or text
-   file whose name, with case, dashes of every kind, underscores and spaces
-   taken away, holds "answer", "solution", "markingguide" or
-   "markingscheme", or has "key" as a word. The first rule knew only the
-   skills' own endings, and teachers name their own files (`Quiz 1
-   Answers.pdf`, `Answer Key.pdf`, `Quiz 1 – Solutions.pdf`, `Test KEY.pdf`
-   were all shared). A false positive such as `Dissolution Lab.pdf` costs a
-   PDF the teacher can still include; the other way costs a key a class can
-   read. No rule on names can see a key written inside a page or a PDF named
-   something else, so **before every open share the teacher is shown every
-   file that will be shared and every file left out, by name, and the share
-   goes only on their yes** (`openShareLists`); the sentence says the lists
-   are by name and that Plantoir has not read the files. In the app the
-   question is answered ONLY in a sheet of its own showing both lists in
-   full, with Cancel the default (fix review H1: the plain question alert
-   showed the `[y/N]` line alone, with the lists behind Show Details, so the
-   look the ruling relies on never happened). The app reads the lists from
-   marker lines `share_plan.py` prints beside the human ones
-   (`openShareLists.markers`), never from the console's text. Under
-   `--non-interactive` the lists are printed and the rule decides. Widened
-   again on the fix review: Mark Scheme, Soln, Ans, and the French Corrigé and
-   Réponses, with accents folded before the letters are read.
-5. **The public-address warning** comes before the first share without a
+4. **Answer keys.** Since #833 (Russell, 2026-11-13) **the `Answer Keys`
+   folder is the rule** (`answerKeysFolder`): everything inside a folder of
+   that name in a unit, at any depth and in any letter case, is an answer key,
+   and the two skills that make plans and tests write every key, solutions
+   file and marking guide there. The name rule from #709 shrank back to a
+   HINT (`answerKeys`): the obvious names only (answer key, answers, marking
+   guide or scheme, the French corrigé and réponses, "solutions to",
+   "solution to" and "solution set", and solution, soln or key as a name's
+   last word or beside test, quiz, exam, worksheet, homework, review,
+   practice or assignment), so a plan made before the folder keeps its keys
+   out of an open share until they are moved. The implementation review (M1)
+   measured the first shrink missing `Solutions to Quiz 3.png`, `Lab 2
+   Solution Set`, `Test Solns` and `Unit 2 Soln`, which #709 caught, and the
+   phrases above were added back; `Solutions to Global Warming.pdf` is the
+   accepted false hit, and "ans" stays out (in French it means years). The widened rule the #709 fix
+   review ruled (anything holding "answer", "solution" or "key") is
+   REJECTED: it held back `Dissolution Lab.pdf`, `Answering Questions.pdf`,
+   `Key Terms.pdf` and `Solutions and Mixtures.pdf`, ordinary handouts, and
+   Russell ruled it out in favour of the folder. `check` names a hint match
+   outside the folder as ADVICE ("move it into its unit's Answer Keys
+   folder"), printed before the lists; advice never refuses a share
+   (`advice`). Nothing moves a teacher's file for them.
+5. **Two tables before EVERY share** (#833; protected shares too, which #709
+   did not ask). The launcher lists the plan's DOCUMENTS only (`documents`):
+   PDFs, text files, everything in an Answer Keys folder, a picture whose
+   name the hint matches, and **a picture no page of the plan loads**, all
+   movable. The plan's own pictures are told from a teacher's by the pages:
+   a picture a page LOADS (an `<img src>` or srcset, a `<source>`, a
+   `<link>` such as an icon, a style's `url()`, resolved from that page) is
+   the plan's own and always goes; one a page only links (`<a href>`) or
+   never names is one a teacher attached, a handout or a key, and is listed
+   like a PDF (review M1: with pictures never listed, an answer-key picture
+   the hint missed went out in an open share listed nowhere); a file of a kind no share takes
+   (a `.docx`, a `.tex`) listed in Not shared and not movable, with
+   `wordsForTheTables.noteCannotShare`; pages, pictures, stylesheets and fonts
+   never listed (they always go, counted in `ownFilesLine`); `plan.json` and
+   a teacher's own `_headers`, `_worker.js` and the like never listed and
+   never sent. Each document starts where `startingPlace` puts it: a
+   remembered choice first, then an answer key of either kind in Shared when
+   the share is protected or Include Answer Keys is ticked and in Not shared
+   otherwise, then Shared. The Answer Keys folder ruling says a hint match
+   "starts in Not shared"; it is read for an open share without the tick,
+   and a protected or ticked share treats it as any key (Shared), because
+   ruling 5 puts every key in Shared there. **The teacher's choices are
+   remembered per file** in the year's marker (`documents`, place to
+   `shared` or `notShared`, names only; `rememberedChoices`). Only MOVES are
+   recorded, with every earlier choice of a file still listed: recording
+   every file's place was rejected, because a protected share would then
+   fix every key in Shared for the next open share. A renamed or deleted
+   file is forgotten, and a new name starts from the rule. A successful Stop
+   Sharing removes the marker, the choices with it: a marker kept for the
+   choices alone would read to `deploy.sh` as a year still shared, and the
+   Keychain item would never go.
+
+   **How the choice reaches the share.** The app writes the settled places
+   into the year's marker (a temporary file and a rename, every other key
+   kept) while `share_plan.py` waits on its question, and only then answers
+   yes; `share_plan.py` re-reads them, refuses (`listNotShareable`) a list
+   that marks Shared a file it would never send (a cannot-be-moved one, a
+   hidden one, a path outside the plan) or holds another value, and stages
+   exactly the documents it LISTED that settle in Shared: a document that
+   appeared after the lists were printed is held back. Rejected: a choice
+   file under `/tmp` named on the command line (the share runs inside the
+   website builder, which shares only `courses/` with the app), and the
+   names on the question's answer line (a line break in a name ends the
+   answer, and the terminal echoes it). The app reads the rows from one
+   JSON marker line per document (`openShareLists.markers.document`, ASCII
+   only); the #709 `shared` and `leftOut` lines are no longer printed. The
+   by-name sentence is kept: Plantoir reads names and folders, never files,
+   so a key written inside a page or a PDF outside the folder is shared with
+   it. Under `--non-interactive` the remembered choices and the rule decide
+   and the lists are printed, with one exception, the director's ruling on
+   the review (M2, `unattendedKeys`): **with nobody to look, a share with no
+   password sends no answer key** on the strength of a remembered choice or
+   the tick alone. Every key is held back, and
+   `openShareLists.keysHeldBackUnattended` says how many and that
+   `--send-answer-keys-openly` sends them on purpose. Russell ruled the case
+   with a person present (M2): a key the teacher dragged into Shared stays
+   there, marked, even after Remove Password, since the tables still open
+   for the look; and (M3) a hint match starts in Shared in a protected or
+   ticked share, keeping its "may be an answer key" mark. A FIRST share that
+   fails leaves no marker (a marker with no project name names no site) and
+   no Keychain item: `deploy.sh` saves a newly asked password only once the
+   share succeeded or gave the year an address (review L3), and reads a year
+   as still shared only from a marker with an address.
+
+   **Sort and filter** (Russell, 2026-11-13): each table sorts on its own
+   (by unit in the plan's order, then by name, at first); one search field
+   filters both by name, unit and kind, every word matching with case and
+   accents folded (`filterCases`); a Unit popup and Answer Keys Only narrow
+   further. A filter changes what is SHOWN, never what is shared: a hidden
+   document keeps its place, each header counts what is showing against its
+   total ("Shared (3 of 12)", `countCases`), the sentence by Share gives the
+   full counts, and a move acts only on rows that are both selected and
+   showing. The trail's "unit plans shared" line says how many documents
+   went and how many were held back, never a name.
+6. **The public-address warning** is owed at the first share without a
    password and again when a password is removed; never when protected, and
-   there is no tick to silence it (`warningCases`).
-6. **Fail closed**, set through the API and read back, with no flood test.
+   there is no tick to silence it (`warningCases`). Since #833 it comes
+   AFTER the two tables, when the teacher presses Share there, because only
+   then does it know what goes, and since #834 it is a small sheet of
+   labelled rows rather than a paragraph (`warningSheet`): one sentence,
+   then what search engines and AI crawlers are asked, how many documents
+   go and are held back, how many answer keys go (only when one does), and
+   how to require a password. Cancel goes back to the tables.
+7. **Change Password saves, then asks** (#833, `changePasswordCases`).
+   `--change-password --password-only` saves the new password and shares
+   nothing; `share_plan.py --new-password-waiting` sets `newPasswordWaiting`
+   in the marker of a year with an address, and the app's dialog offers
+   Share Again (the default, through the tables) or Later. The marker keeps
+   the flag through every share that does not PROVE the address, so the bar's
+   line survives a relaunch, a failed share and a declined one. Until #833
+   the fact was a tooltip and Change Password shared at once.
+8. **The verb is Share** (Russell, 2026-11-13, `theVerbIsShare`): Share Unit
+   Plans, Share Again, Stop Sharing. Deploy is for class websites; a test
+   reads every sentence in the share's words for "deploy" and "publish".
+9. **Fail closed**, set through the API and read back, with no flood test.
    The weaker sentence (`words.floodOpen`) is shown only when the setting
    could not be made.
 
@@ -2155,7 +2246,11 @@ before building, matched by the section's own build directory.
 
 **It was written by PORT first, and that was wrong — do not go back to it.**
 `kill_existing_quartz(port)` looked like the obvious tool and is the right one
-for the SERVE path, where the port is known and leased. A build-only run is
+for the SERVE path, where the port is known and leased. (Leased in ONE
+process: since #835 a serving run also claims its address in the builder
+before it builds, and stops in words rather than kill another program's
+preview on the same address; `documentation/03-launcher-scripts.md` → "Two at
+once in one website builder (#835)".) A build-only run is
 never given a port: `preview.sh` defaults it to 8081 and the app's deploy
 passes no `--port` at all. So the first version killed whatever was serving on
 8081 — the first section to have previewed in that working folder, which is
@@ -2335,7 +2430,7 @@ destinations before #665. Windows measured 0–1 s typically and under two minut
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 
-**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740, the retry below) in about 25 s,
+**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740 and #869, the retries below) in about 75 s,
 with no credentials, no Docker and nothing borrowed from any folder: a stub
 server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
 and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
@@ -2381,8 +2476,9 @@ every 5 s from the moment the site answered got 24 of 24 HTTP 200, with the
 right type and COEP, in the same minute. The plain run against the long-lived
 sites was 174/0/0. That is a site seconds old whose edges do not yet agree,
 not the build. (The 2026-10-31 first-publish run's one failure, a 404 on a
-page link, was the same thing. `check_page_links` is not retried, because its
-fetches run inside the Python program that Windows reads out of this script.)
+page link, was the same thing. Until #869, below, `check_page_links` was not
+retried, because its fetches run inside the Python program that Windows reads
+out of this script.)
 
 Rejected: *a fixed sleep after the site is made*, which is a guessed duration
 for a race. Also, the edges disagree file by file, so "long enough" for one
@@ -2406,6 +2502,95 @@ called from `Check-Engine` for the same fetches, with the same five
 retry taken out, 4 of the 5 fail there too (`documentation/12-windows-app.md`
 → "wrangler 4.156.0, a brand-new site's files asked again, and the loopback
 guard").
+
+**A brand-new site's pages, asked again too (#869, 2026-11-13).** #740 covered
+the per-file fetches only. Measured at #835 part 2's gate (2026-11-13, two
+`--first-publish` runs): both runs failed the same two checks, "page of
+runnable code answered HTTP … or carries no runnable block" and "… carries
+no Swift program". Run 1 got a 404 from the new Netlify site and run 2 a 522
+from the new Cloudflare project, seconds after each went live. The same page
+passed on the next leg of the same run, and in run 2 a file one line earlier
+needed #740's retry and got it. The Swift-program check reads the page that
+the first check fetched, so one bad answer failed both.
+
+Every fetch in first-publish mode that judged a brand-new site on one answer
+now goes through `fetch_headers`, which gained three wants that follow
+redirects: `page` (final answer 200), `runner` (that, with the body carrying
+`class="plantoir-runner"`) and `isolated` (that, with COOP `same-origin` and
+COEP `require-corp`). They are listed here because each one was found by
+reading every fetch in the script:
+
+- the page of runnable code, wanting its runnable block (the two failed checks);
+- the same page's COOP and COEP: proved one-answer by the self-test on
+  `origin/dev`'s code, where it failed alongside the two above;
+- the front page's "no COEP" check and the page's "CSP names no CDN" check.
+  Both check that a header is ABSENT, so a 404 or a 522 used to pass them
+  without the page ever being read. Now the header is judged on a 200
+  whenever one comes within the deadline, and since #869's review an answer
+  that is not 200 is a FAILURE that says the header could not be judged, on
+  every run, plain ones included: a negative check passes only on a real
+  answer;
+- in `check_page_links`, the two pages it starts from (retried until they
+  load) and every link (retried while it answers 404, a 5xx or nothing; a
+  redirect is a settled answer that the check judges by its class, so
+  Netlify's expected `/index` and `%2C` redirects are never asked again).
+  The Cloudflare control, a lower-case address that is meant to fail, is
+  asked once. The Python carries the same rule as `asked_again`, writing the
+  same `↻` line and the same four-column log. The Result block gains one
+  line per call, "<site>, a brand-new site's page links (#869): N page(s)
+  or link(s) needed asking again, …", and `check_engine`'s line now reads
+  "files and pages (#740, #869)".
+
+**One deadline per call as well (#869 review).** NS_WAIT is per fetch, so a
+genuinely broken new site would cost 60 s for every fetch that never
+settles: the test course's 18 same-site links alone would be 18 minutes a
+`check_page_links` call, and a first-publish run makes six such calls. Each
+`check_engine` and each `check_page_links` call therefore also has one
+deadline, `NS_CALL_WAIT` (180 s, `VERIFY_DEPLOY_NS_CALL_WAIT`), after which a
+fetch that does not settle is asked once and judged. A broken call so takes
+at most about 180 s plus one answer for each fetch left (each `curl` is
+capped at 30 s), and a healthy one is unaffected. The page-links program
+takes it as its seventh argument, optional like the rest.
+
+Already asked again, and left alone: `check_url` (40 tries 5 s apart, every
+run), the Cloudflare production wait and the new-address wait above, and the
+unit-plans leg's `plans_expect` (15 tries 2 s apart, every run). That leg's
+`plan_header` and `robots.txt` fetches are single answers on a project that
+is new on every run, plain runs included. They are outside first-publish
+mode, so they were not changed. The local preview is never asked again.
+
+**Windows' two arguments.** `verify-deploy.ps1` reads `check_page_links`' program
+out of this file (`Get-PageLinksProgram`) and runs it with the base address
+and the host kind only. The four new arguments (first publish, poll, wait,
+retry log) are therefore optional, and without them the program asks once, as
+before. A self-test case extracts the program with the `.ps1`'s own regular
+expression and runs it with two arguments, so a change that breaks Windows
+fails here first.
+
+`check_engine` and `check_page_links` moved above `run_self_test` (a move, no
+change of their own beyond the above), so the self-test runs the real checks
+against a whole stub site on 127.0.0.1 (`whole.py`). That stub serves every
+engine file at its type with COEP, the page with its block, program and
+isolation, and a front page with one more link. Twelve cases: a control that
+passes every check at once; the page answering 404, 522 or a placeholder
+without its block twice, then passing, with the count in the Result block;
+a page that never comes (still both checks' failure, judged on the last
+answer, at least 12 s for its three fetches, measured 12 to 28 s); the front
+page and a link answering 404 at first; the program as Windows reads it; a front page that never answers failing
+the no-COEP check, and a page that never answers failing the CSP check,
+rather than passing them; the call deadline in `check_engine` (of the page's
+three fetches only the first is asked again) and in `check_page_links` (the
+link fetched after the deadline is asked once); and a plain run judging the
+page and a link once. Measured: 25 passed, 0 failed, in about 75 s, three
+runs in a row. The four review cases and the new page-links wording fail on
+247be1336's functions (20 passed, 5 failed). Proved must-fail with the new self-test
+over `origin/dev`'s `fetch_headers`, `check_engine`, `check_page_links` and
+`measure_new_site_retries`: 5 of the 8 fail; the control, the two-argument
+case and the plain run pass either way. Rejected: retrying in the caller with a loop of its own (a
+second rule to keep in step with #740's), and a single long wait before
+`check_engine` (a guessed duration; the two runs show the edges disagree
+request by request). **Windows owes the same** for `verify-deploy.ps1
+-FirstPublish` (#743's counterpart): the windows issue says what.
 
 **This checkout's recipe, mirrored first (#665).** The checks read the
 CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the
@@ -4489,6 +4674,13 @@ three parts:**
   spaced path). A record landing in the microseconds between the look and
   the move is still replaced.
 
+Since #729 the same guard also refuses while the section is being BUILT by
+another `preview.sh --build-only` in this folder: a deploy's build leg (which
+the apps mark `--for-deploy`, said as "already being deployed") or a rebuild
+(said as "already being built"), so a second deploy can no longer clear the
+folder a first one's build is filling ([03](03-launcher-scripts.md) → "A
+section being deployed cannot be deployed again (#439)").
+
 The same refusal reaches an assistant's rebuild, publish and unpublish
 through the build leg, and since #471 those answers say it as the launcher's
 line too — [10](10-local-ai-assistant.md) → "A rebuild the launcher refused
@@ -4559,8 +4751,10 @@ Windows — but the guard and the wait do.
 them needs anything done on the mac.
 
 - **The launchers' guard is there too.** `deploy.ps1` and `preview.ps1`'s
-  build leg run all 23 `launcherCases` (see [03](03-launcher-scripts.md) →
-  "A section still being deployed is not deployed again").
+  build leg run all 23 `launcherCases` of #467 (see [03](03-launcher-scripts.md) →
+  "A section still being deployed is not deployed again"). #729 added 13 more
+  (a deploy's build leg, `--for-deploy`, and any other build of the section)
+  and changed one; those are owed by its Windows issue.
 - **Windows has the mac's split.** The task runs
   `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
   course and then runs its wrapper as `powershell.exe -File`. A task set since

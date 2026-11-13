@@ -4170,7 +4170,7 @@ way: the write was never the fault. In the check, reading the Mac's
 pasteboard (`pbpaste`): it would make the gate depend on, and overwrite,
 whatever the person at the Mac copied.
 
-### P8. The guidance makes it the rule (#758, v1.10.0)
+### P8. The guidance makes it the rule (#758, v2.0.0)
 
 Russell, 2026-11-10: "make every text block fence wrap", "Not code blocks,
 just text blocks", and prompts and commit messages always in a text block,
@@ -4578,7 +4578,7 @@ reads, for Russell to decide, not a hotfix); calling the engine's internal
 close (scrambled names, one pin only). **Not measured:** why the issue saw
 the sketch look fine from `file://`; a class site is always served over HTTP.
 
-**The reset icon puts a sketch back to how it opened (#792, v1.10.0).**
+**The reset icon puts a sketch back to how it opened (#792, v2.0.0).**
 Every sketch is made with `showResetIcon`, GeoGebra's two arrows in a circle
 at the top right of the graphics view. Russell found on 2026-11-12, in
 Safari on an iPad, that pressing it on a sketch written as lines left an

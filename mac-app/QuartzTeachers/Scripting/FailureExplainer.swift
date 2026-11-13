@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = sectionIsBeingDeployedExplanation(in: output) {
             return reason
         }
+        if let reason = previewAddressIsAnotherPreviewsExplanation(in: output) {
+            return reason
+        }
         if let refusal = sectionDeployRefusal(in: output) {
             return refusal.sentence
         }
@@ -112,6 +115,28 @@ struct FailureExplainer {
         return nil
     }
 
+    /// The words a serving preview stops with when another live preview has
+    /// claimed its address in the website builder (#835) —
+    /// `shared-rules.json` → `twoPreviewsOneAddress.sentences.launcher`,
+    /// whose first line carries them.
+    static let previewAddressIsAnotherPreviewsMarker: String = "started somewhere else on this computer is using the same address"
+
+    /// The second line of that refusal, which says what to do.
+    static let previewAddressIsAnotherPreviewsAdvice: String = "Stop that preview, then try again."
+
+    /// The refusal LIFTED, as #381's is: the launcher's first line with the
+    /// cross taken off, then what to do. "Nothing was changed." is left to
+    /// the window. Pinned by `twoPreviewsOneAddress.failureExplanationCases`.
+    static func previewAddressIsAnotherPreviewsExplanation(in output: String) -> String? {
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard line.contains(previewAddressIsAnotherPreviewsMarker) else {
+                continue
+            }
+            return liftedSentence(from: line) + " " + previewAddressIsAnotherPreviewsAdvice
+        }
+        return nil
+    }
+
     /// The launcher's line as a sentence: everything before its first ASCII
     /// letter or digit taken off, then trimmed.
     ///
@@ -132,7 +157,8 @@ struct FailureExplainer {
     }
 
     /// What `deploy.sh`, or `preview.sh --build-only`, refused with while
-    /// the same section was still being deployed (GitHub #439) —
+    /// the same section was still being deployed (GitHub #439), or was
+    /// being built by another `preview.sh --build-only` (#729) —
     /// `shared-rules.json` → `deployWhileItsSectionDeploys`.
     struct SectionDeployRefusal: Equatable {
 
@@ -147,19 +173,30 @@ struct FailureExplainer {
         /// The launcher's first line with the cross taken off: the sentence
         /// the window shows.
         let sentence: String
+
+        /// True when what was in the way is another BUILD of the section,
+        /// not a deploy: the assistant's rebuild, or a build typed in
+        /// Terminal (#729, the "building" sentences).
+        var byAnotherBuild: Bool = false
     }
 
-    /// The words the launchers' #439 refusal always carries, one pair per
-    /// leg. `sentences.launcher` in the contract is the source; the test
-    /// pins these to it.
+    /// The words the launchers' #439 and #729 refusals always carry, one
+    /// per sentence shape. `sentences.launcher` in the contract is the
+    /// source; the test pins these to it.
     static let sectionDeployRefusalMarkers: [String] = [
         "so it cannot be deployed again until that has finished.",
-        "so it cannot be built until that has finished."
+        "so it cannot be built until that has finished.",
+        "is already being built, so it cannot be deployed until that has finished.",
+        "is already being built, so it cannot be built again until that has finished."
     ]
 
     /// The part of the first line that says the deploy set for later was
     /// the reason, rather than another deploy of the section.
-    static let laterDeployMarker: String = "is still being deployed by a deploy that was set for later"
+    static let laterDeployMarker: String = "is still being deployed by a scheduled deploy that is still running"
+
+    /// The part of the first line that says another build of the section
+    /// was the reason, rather than a deploy (#729).
+    static let anotherBuildMarker: String = "is already being built"
 
     /// The launcher refused a deploy, or its build leg, because that same
     /// section was still being deployed. LIFTED, as #381's refusal is: the
@@ -179,7 +216,8 @@ struct FailureExplainer {
             let sentence: String = liftedSentence(from: line)
             return SectionDeployRefusal(
                 byALaterDeploy: sentence.contains(laterDeployMarker),
-                sentence: sentence
+                sentence: sentence,
+                byAnotherBuild: sentence.contains(anotherBuildMarker)
             )
         }
         return nil

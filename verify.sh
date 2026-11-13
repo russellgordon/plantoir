@@ -339,6 +339,13 @@ else
   cat /tmp/verify_deploy_sh_destination_test.log
 fi
 
+if (cd scripts && python3 test_fetch_obsidian_addons.py) >/tmp/verify_fetch_obsidian_addons_test.log 2>&1; then
+  pass "mac-app/Vendor/fetch-obsidian-addons.sh reads every pin out of the real contract, the escaped NULs #780 keeps in it included (scripts/test_fetch_obsidian_addons.py, #864)"
+else
+  fail "mac-app/Vendor/fetch-obsidian-addons.sh reads every pin out of the real contract (scripts/test_fetch_obsidian_addons.py, #864)"
+  cat /tmp/verify_fetch_obsidian_addons_test.log
+fi
+
 if (cd scripts && python3 test_setup_course_deploy_target.py) >/tmp/verify_setup_deploy_target_test.log 2>&1; then
   pass "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
 else
@@ -702,19 +709,32 @@ fi
 # the plan review measured and three everyday ones, each stopped with CHECK
 # or blanked with no name ink left, against the committed blank tests.
 # Report comments (#752): every commentNames case, directly and through the
-# runner, and the plantoir-report-comments skill's files. Stdlib only.
-# Both skills are HELD from v1.10.0 (#750, shared-rules.json ->
+# runner, and the plantoir-report-comments skill's files. Class results
+# (#750, 750c): every results case through class_results.py, and the named
+# grade tables and documents (gradeCases, documentCases). Stdlib only.
+# Both skills are HELD from v2.0.0 (#750, shared-rules.json ->
 # printablePages.agentGuidance.held): their folders are in
 # held/agent_guidance/skills, which neither app copies into a working folder,
 # and these tests find them there through the contract's held.place.
-for marking_test in redact names guard sheets comments; do
+for marking_test in redact names guard sheets comments results; do
   if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
-    pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a; comments #752)"
+    pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a and 750c; comments #752)"
   else
-    fail "marking: scripts/test_marking_${marking_test}.py (#750, 750a; comments #752)"
+    fail "marking: scripts/test_marking_${marking_test}.py (#750, 750a and 750c; comments #752)"
     cat "/tmp/verify_marking_${marking_test}_test.log"
   fi
 done
+
+# Held skills (#750, 2026-11-13): marking and report comments are deferred from
+# v2.0.0. A held skill is not where both apps copy skills from, and nothing a
+# working folder receives, no greeting or sentence, neither app and not the
+# website names it (shared-rules.json -> printablePages.agentGuidance.held).
+if (cd scripts && python3 -B test_held_skills.py) >/tmp/verify_held_skills_test.log 2>&1; then
+  pass "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
+else
+  fail "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
+  cat /tmp/verify_held_skills_test.log
+fi
 
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
@@ -797,6 +817,19 @@ else
   cat /tmp/verify_social_card_fonts_test.log
 fi
 
+# No tracked file stores a credential-shaped literal (GitHub #844): an address
+# with a username and password in it whose host is not a reserved example
+# name, a Basic header whose base64 decodes to a pair, or a prefixed token
+# (Netlify, GitHub, AWS, Slack, a private key) not named by its SHA-256 in the
+# test's allow-list. A secret scanner flagged two invented #709 fixtures on
+# 2026-11-13; this fails first. Pure stdlib.
+if (cd scripts && python3 test_no_stored_credentials.py) >/tmp/verify_no_stored_credentials_test.log 2>&1; then
+  pass "no tracked file stores a credential-shaped literal (scripts/test_no_stored_credentials.py, #844)"
+else
+  fail "no tracked file stores a credential-shaped literal (scripts/test_no_stored_credentials.py, #844)"
+  cat /tmp/verify_no_stored_credentials_test.log
+fi
+
 # A course's name is cleaned of control characters where it is read (GitHub
 # #780): every contract case, and the three readers (the landing title, the
 # sharing card, setup_course's saved name). Pure stdlib apart from the card,
@@ -828,6 +861,19 @@ else
   fail "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
   cat /tmp/verify_deploy_token_refusal_test.log
 fi
+
+# Two deploys, two writers, two previews at once (GitHub #835): each deploy's
+# token reaches the website builder through a file of its own; the course's
+# config and its shared pages survive two builds writing them together; and a
+# serving preview never stops another one handed the same address.
+for _two_at_once in test_deploy_token_handoff test_shared_writes_two_at_once test_two_previews_one_address; do
+  if (cd scripts && python3 "${_two_at_once}.py") >"/tmp/verify_${_two_at_once}.log" 2>&1; then
+    pass "two at once: scripts/${_two_at_once}.py (#835)"
+  else
+    fail "two at once: scripts/${_two_at_once}.py (#835)"
+    cat "/tmp/verify_${_two_at_once}.log"
+  fi
+done
 
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"

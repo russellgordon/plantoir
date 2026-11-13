@@ -52,6 +52,7 @@ category's), the key is `title`.
 | `versions` | An object, one entry per version (`"A"`, `"B"`): `{source, solutions, answers}`. `source` and `solutions` are the file names of the version and its solutions. `answers` has one entry per point ID. |
 | `strengths` | Optional. A list of `{sentence, halves}`, each half `{points, sentence}`: a concept the feedback sheet names as a strength. See below. |
 | `topics` | Optional. An object of `{when, pages}`, each page `{title, path, anchor}`: the course pages a marker may point a student to. See below. |
+| `voided` | Optional, added at marking time. The points the teacher has removed from the count for the WHOLE class (a question that did not work), each `{reason, intended}`: the ruling is recorded once, here, and every marks record of the test must void exactly these points (`check_kit.py --marks` refuses one that does not). A voided point counts for no one, on every version: it is in neither the mark nor the out of. |
 
 Keys that start with an underscore (`_about`) are notes, and are ignored.
 
@@ -122,7 +123,7 @@ identifier (`Student A.json`), and fills it in. It has every point of
 | `identifier` | The paper's identifier, such as `Student A`. Never a name. |
 | `section`, `version` | The section, and the version written at the top of the paper. |
 | `points` | One entry per point ID: `{earned, seen, note, studentNote}`. `earned` is `null` until marked, then `0` or `1`; `0.5` only where the teacher's marking settings allow a half mark. `seen` is what is on the paper, briefly. `note` is the reason when a mark is withheld or a judgement was made. `studentNote` is one sentence to the student about a lost mark. |
-| `voided` | Points the teacher has removed from the count (a question that did not work), each `{reason, intended}`. |
+| `voided` | The points the kit's `voided` removes from the count, each `{reason, intended}`: exactly those, no more and no fewer. After the teacher voids a point, it is added to the kit and to every record, and every sheet and the class results are built again. |
 | `checks` | Things for the teacher to look at, each starting with its question. A name seen on a paper is written here only as "NAME VISIBLE page N", never the name. |
 | `summary`, `byQuestion`, `strengths`, `focus`, `closing`, `feedback` | What the feedback sheet says, written by the marker. `plantoir-marking` (#750) defines what is inside them; the checker only refuses a key there that looks like it holds a person, and a `feedback` key that is not a part. |
 
