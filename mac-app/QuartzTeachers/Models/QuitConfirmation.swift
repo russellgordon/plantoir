@@ -10,7 +10,9 @@ import Foundation
 ///
 /// **What counts as "under way", and what deliberately does not.** A publish
 /// recorded in `CourseActivity` does, and so — since issue #232 — does a
-/// preview still being BUILT; a preview that is merely OPEN does not. The
+/// preview still being BUILT, and since #855 an outside assistant being set
+/// up; a preview that is merely OPEN does not, and neither does a download
+/// of the local assistant's model. The
 /// reason is what each fact can actually tell us.
 /// `CourseActivity.activePublishes` is process-wide and lasts exactly as long
 /// as the publish, so it means what it says; `activePreviewBuilds` is the same
@@ -264,6 +266,18 @@ enum QuitConfirmation {
     static let passwordClause: String = "the new password not saved yet"
     static let stopClause: String = "the plans' address still working"
 
+    /// What the question names for an outside assistant being set up
+    /// (#855, Russell 2026-11-13: quitting part way through a set-up asks
+    /// first), and the message under it. Contract keys in
+    /// `quittingWhileWorkIsUnderWay.whileAnAssistantIsSetUp.words`. Quit
+    /// Anyway stops the set-up (`AssistantSetUpCentre.stopEverySetUp`), and
+    /// the next launch completes it or takes away what it had added
+    /// (`settleInterruptedSetUps`), which is what the message promises.
+    static let settingUpOne: String = "setting up {tool}"
+    static let settingUpSeveral: String = "setting up {n} assistants"
+    static let settingUpMessage: String =
+        "Quitting now stops it. The next time Plantoir opens, it finishes the set-up or takes away what it had added."
+
     static let keepWorkingButton: String = "Keep Working"
     static let quitAnywayButton: String = "Quit Anyway"
 
@@ -293,7 +307,8 @@ enum QuitConfirmation {
             previews: PreviewLeases.active,
             previewBuilds: CourseActivity.activePreviewBuilds,
             copies: CourseActivity.activeCopies,
-            planWork: CourseActivity.activePlanWork
+            planWork: CourseActivity.activePlanWork,
+            setUps: SetUpsUnderWay.names
         )
     }
 
@@ -316,7 +331,8 @@ enum QuitConfirmation {
         previews: [PreviewLeases.Lease],
         previewBuilds: [CourseActivity.PreviewBuildRecord] = [],
         copies: [CourseActivity.CopyRecord] = [],
-        planWork: [CourseActivity.PlanWorkRecord] = []
+        planWork: [CourseActivity.PlanWorkRecord] = [],
+        setUps: [String] = []
     ) -> String? {
         _ = previews
         // A run of the unit plans' launcher is held as a publish under
@@ -341,6 +357,14 @@ enum QuitConfirmation {
         }
         if copies.count > 1 {
             return "saving \(copies.count) copies"
+        }
+        // An outside assistant being set up (#855): named last, because
+        // nothing a student sees depends on it.
+        if setUps.count == 1 {
+            return settingUpOne.replacingOccurrences(of: "{tool}", with: setUps[0])
+        }
+        if setUps.count > 1 {
+            return settingUpSeveral.replacingOccurrences(of: "{n}", with: String(setUps.count))
         }
         return nil
     }
@@ -410,6 +434,12 @@ enum QuitConfirmation {
         )
         if let message = kinds.message() {
             return message
+        }
+        let onlySettingUp: Bool = CourseActivity.activePreviewBuilds.isEmpty
+            && CourseActivity.activeCopies.isEmpty
+            && !SetUpsUnderWay.names.isEmpty
+        if onlySettingUp {
+            return settingUpMessage
         }
         return explanation(publishing: false)
     }

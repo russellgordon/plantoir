@@ -1164,6 +1164,32 @@ nonisolated enum ActivityTrail {
         /// folder was not found, nothing was deployed there, no address on
         /// this computer was free, or the browser did not open it.
         case deployedFolderCouldNotBeOpened = "deployed folder could not be opened"
+        /// Setting up an outside assistant was opened (#855): from where (the
+        /// Settings pane, the Help menu, Revise With), so a report shows how
+        /// the teacher got there.
+        case outsideAssistantSetUpOpened = "outside assistant set-up opened"
+        /// A set-up of Claude Code, Codex or GitHub Copilot started, on the
+        /// teacher's Download and Set Up (#855).
+        case outsideAssistantSetUpStarted = "outside assistant set-up started"
+        /// A set-up finished: the program is in place and is its maker's,
+        /// with how many seconds it took (#855).
+        case outsideAssistantSetUpFinished = "outside assistant set up"
+        /// A set-up did not finish, and why: no connection (with the host),
+        /// the set-up could not be fetched, its exit status, a program it
+        /// left missing or not its maker's, stopped, or too long (#855).
+        /// Never the set-up's output, which names the home folder.
+        case outsideAssistantSetUpFailed = "outside assistant could not be set up"
+        /// A set-up cut short by a quit, a crash or a power cut, settled at
+        /// the next launch: completed, or what it added taken away (#855).
+        case outsideAssistantSetUpSettled = "outside assistant set-up settled"
+        /// The maker's sign-in window was opened (#855).
+        case outsideAssistantSignInOpened = "outside assistant sign-in opened"
+        /// A sign-in was checked: the sign-in's exit code and the maker's
+        /// signed-in question's exit code, never the account (#855).
+        case outsideAssistantSignInChecked = "outside assistant sign-in checked"
+        /// The copy Plantoir set up was removed: counts of what was taken
+        /// away, and whether anything was left (#855).
+        case outsideAssistantRemoved = "outside assistant removed"
         /// Change Password saved a new password for a course's unit plans
         /// and shared nothing (#833): the school year, and whether the new
         /// password now waits for a share or nothing was shared yet. Never

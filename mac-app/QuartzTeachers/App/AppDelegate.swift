@@ -118,6 +118,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // at all — never twice for one version, never offline, never in a
             // headless run — and never blocks the window.
             BuilderWarmUp.shared.startIfItShould(arguments: CommandLine.arguments)
+            // An outside assistant's set-up that a quit or a crash cut short
+            // (#855): completed if what it needed is there and its maker's,
+            // otherwise what it had added is taken away. Reads one small
+            // record and does nothing more when no set-up was cut short.
+            Task { @MainActor in
+                await AssistantSetUpCentre.shared.settleInterruptedSetUps()
+            }
         }
     }
 
@@ -274,6 +281,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A deployed folder open in the browser (#850) ends with the app,
         // and says so on the trail. Never asked about: nothing can be lost.
         DeployedFolderShows.shared.stopEverything()
+
+        // An outside assistant being set up (#855) is stopped, not left to
+        // run on unseen: the teacher was asked first, and its record stays
+        // `installing` for the next launch to settle.
+        AssistantSetUpCentre.shared.stopEverySetUp()
 
         // This app's work leases come down with it (#156) — tidiness
         // rather than safety: a lease whose process has gone is ignored

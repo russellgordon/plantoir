@@ -1252,6 +1252,54 @@
         "carries": "the course and the section, and why: the folder was not found, nothing deployed there, no address on this computer was free, or the browser did not open it.",
         "line": "could not open the deployed folder in the web browser — {the folder was not found | nothing deployed there | no address on this computer was free | the browser did not open it}",
         "why": "#850. Each arrives as 'Open in Browser did nothing', and only the trail can say which."
+      },
+      {
+        "event": "outside assistant set-up opened",
+        "carries": "where setting up another assistant was opened from: the Settings pane, the Help menu or Revise With.",
+        "line": "opened setting up another assistant (from {the Settings pane | the Help menu | Revise With})",
+        "why": "#855 (plan review L6). A report of 'it offered me something I did not ask for' is answered by where the teacher opened it. Nothing is offered unasked, so there is no line for an offer."
+      },
+      {
+        "event": "outside assistant set-up started",
+        "carries": "which assistant, by the name a teacher reads. Written only on the teacher's Download and Set Up.",
+        "line": "started setting up {tool}",
+        "why": "#855. The start of every set-up story; a set-up that was never confirmed leaves no line, which is the never-unasked rule made visible."
+      },
+      {
+        "event": "outside assistant set up",
+        "carries": "which assistant, that its programs are in place and signed by its maker, and how many seconds the set-up took.",
+        "line": "set up {tool}: in place and made by {maker}, in {seconds} s",
+        "why": "#855. The seconds from a teacher's own network are what the next decision about the time limit needs."
+      },
+      {
+        "event": "outside assistant could not be set up",
+        "carries": "which assistant, why (setUp.outcomes' trail words: no connection to a named host, the set-up could not be fetched, its exit status, a program missing or not signed by its maker, stopped, too long, or the record could not be written) and how many seconds it ran. Never the set-up's output, which names the home folder, and never an account.",
+        "line": "could not set up {tool}: {why}, in {seconds} s",
+        "why": "#855. Every one of these reaches support as 'it said it couldn't set it up'; only the trail says which, and an exit status of 128 or more is a school's security software ending it."
+      },
+      {
+        "event": "outside assistant set-up settled",
+        "carries": "which assistant, and whether the set-up a quit or a crash cut short was found complete and its maker's (and completed), or not (and what it had added was taken away).",
+        "line": "finished a set-up of {tool} that was cut short: {it was in place and made by {maker} | it was not complete, and what it had added was taken away}",
+        "why": "#855 (plan review M3). Without it a program that appears after a quit is a mystery, and so is one that disappears."
+      },
+      {
+        "event": "outside assistant sign-in opened",
+        "carries": "which assistant's sign-in window was opened.",
+        "line": "opened {tool}’s sign-in window",
+        "why": "#855. 'It never asked me to sign in' is answered here."
+      },
+      {
+        "event": "outside assistant sign-in checked",
+        "carries": "which assistant, and exit codes only: the sign-in window's and the maker's signed-in question's (setUp.agents' signedInCheck). Never the account, an email, a plan or a token, and never the question's output.",
+        "line": "checked {tool}’s sign-in: {signed in | the sign-in finished | not confirmed (the check answered {code}) | not confirmed (the sign-in ended with {code})}",
+        "why": "#855 (neverProbedForSignIn, as narrowed). Signed in is not the same as able to use it (plan review M6); the line keeps the two apart."
+      },
+      {
+        "event": "outside assistant removed",
+        "carries": "which assistant, how many items and start-up blocks Plantoir took away, how many blocks it left because the teacher had changed them, and whether anything could not be taken away. Counts only, never a path.",
+        "line": "removed the copy of {tool} Plantoir set up ({items} items, {blocks} start-up blocks[, {n} left because the teacher had changed them][, not everything could be taken away])",
+        "why": "#855 (ruling 4). Removing Codex takes away the start-up line its set-up added, which can change what a teacher's own Terminal finds; the trail says it happened."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",

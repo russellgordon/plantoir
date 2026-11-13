@@ -153,6 +153,8 @@ enum SettingsPane: String {
     /// Obsidian's add-ons for diagrams and graphs (#495).
     case obsidian
     case deploying
+    /// Claude Code, Codex and GitHub Copilot, set up from inside Plantoir (#855).
+    case otherAssistants
 
     // MARK: - Stored properties
 
