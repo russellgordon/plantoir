@@ -14763,7 +14763,7 @@
   "quittingWhileWorkIsUnderWay": {
     "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, of building a preview, or (since #351) of saving a copy of a course, and never asks when the Mac itself is logging out, restarting or shutting down.",
     "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
-    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website. And, since #351 (2026-09-27), a copy of a course being ZIPPED - a backup, or the archive made before a restore or a removal - counted from a third record of the same kind, while the zip runs; named after a publish or a preview build when more than one is under way.",
+    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website. And, since #351 (2026-09-27), a copy of a course being ZIPPED - a backup, or the archive made before a restore or a removal - counted from a third record of the same kind, while the zip runs; named after a publish or a preview build when more than one is under way. And, since #855 (Russell, 2026-11-13: quitting part way through a set-up asks first), an outside assistant being SET UP (Settings > Other Assistants), counted from the app's own record of set-ups under way and named last, after everything above. A download of the local assistant's model still does not ask.",
     "whatDoesNotCount": "A preview that is merely OPEN. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for work that can still be lost. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest. The record of a preview BUILD is a different fact from the port, and it is the one that counts: it ends when the page first answers, so a preview being read is never asked about. It is NOT the preview's address either - the launcher prints the address before it starts building, so the address is known for almost the whole build.",
     "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
@@ -15098,6 +15098,15 @@
         }
       ]
     },
+    "whileAnAssistantIsSetUp": {
+      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with the usual two buttons (keepWorking finishes the set-up; quitAnyway stops it). Quit Anyway ends the set-up's whole process group, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
+      "words": {
+        "settingUpOne": "setting up {tool}",
+        "settingUpSeveral": "setting up {n} assistants",
+        "message": "Quitting now stops it. The next time Plantoir opens, it finishes the set-up or takes away what it had added."
+      },
+      "how": "{tool} is the assistant's displayName, {n} how many. The question is the usual 'Plantoir is still {underWay}.'; message is used when nothing but set-ups is under way, and otherwise the message of what is named first."
+    },
     "cases": [
       {
         "name": "nothing is happening",
@@ -15218,6 +15227,32 @@
         },
         "expectAsk": false,
         "why": "#850 (Russell, 2026-11-13: it runs until Stop or quitting Plantoir). Nothing is built, copied or written while a deployed folder is shown, so nothing can be lost: like an open preview, quitting ends it, and the trail says Plantoir quit. deployedFoldersShown is 0 when a case leaves it out."
+      },
+      {
+        "name": "an outside assistant is being set up",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "assistantsBeingSetUp": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "why": "#855 (Russell, 2026-11-13). A set-up stopped part way can leave a half-written program in the home folder; the teacher is asked, and Quit Anyway stops it for the next launch to settle. assistantsBeingSetUp is 0 when a case leaves it out."
+      },
+      {
+        "name": "an outside assistant is being set up while the Mac logs out",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "assistantsBeingSetUp": 1,
+          "quitReason": "theMacIsLoggingOutOrShuttingDown"
+        },
+        "expectAsk": false,
+        "why": "The rule that must never bend, for a set-up too: the next launch settles it."
       }
     ]
   },

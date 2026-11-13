@@ -7018,9 +7018,11 @@ Three properties matter more than the mechanism:
 - **The item is hidden when the tool is not installed**, and hidden
   independently per door, in the order Claude, Codex, GitHub Copilot. Not greyed out: a menu that teaches teachers to stop
   reading it is worse than a shorter menu.
-- **Plantoir never installs one, and never offers to.** These are developer
-  tools with accounts and their own update paths. A teacher who wants one
-  installs it themselves and Plantoir finds it.
+- **Plantoir sets one up only when asked** (since #855; until then this said
+  Plantoir never installs one and never offers to). The door itself still
+  opens onto whatever copy the search finds; setting one up is Settings ▸
+  Other Assistants, described under "Setting up an outside assistant
+  (#855)" below.
 
 **The course reaches the session through the GREETING, and nowhere else.** The
 server is given the WORKING FOLDER (`--mcp-stdio <folder>`), so every course in
@@ -7525,8 +7527,8 @@ recording nothing) and `started Codex for <CODE>`, both `assistant opened`.
 
 **Start-up was NOT measured here**: Codex is not installed on this PC (`where
 codex`: not found; `%USERPROFILE%\.local\bin` holds only `claude.exe`;
-`%APPDATA%\npm` has no `codex.cmd`). Plantoir never installs it, and neither did
-this piece. The 60 s start-up timeout is still the mac's guess; re-measure on a
+`%APPDATA%\npm` has no `codex.cmd`). This piece did not install it (#855
+later added a set-up on the mac, on the teacher's request only). The 60 s start-up timeout is still the mac's guess; re-measure on a
 Windows machine that has Codex, with its hardware, before trusting it there.
 
 ### On the mac (#458, 2026-10-07): both doors hold their course, as Windows' Claude door does
@@ -7999,8 +8001,9 @@ auto-updated, unsigned JavaScript package from
 GitHub's, not every byte it runs, and a GitHub binary altered after signing
 still passes because its pages are not hashed. This is a
 check of which program it is, never of sign-in (`neverProbedForSignIn`
-still holds; Copilot has no status command to probe with), and #855 calls
-the same function after it installs Copilot.
+still holds; Copilot has no status command to probe with). #855's set-up
+checks the same identifier and team after it sets Copilot up, with the full
+Developer ID requirement and every page hashed (`DeveloperIDCheck`).
 
 **Folder trust, sign-in, a school's policy.** The first start in a folder
 asks whether to trust it; Plantoir does not answer for the teacher. A
@@ -9488,3 +9491,131 @@ client, and the tool surface did not move for #709 (`scripts/test_tool_surface_d
 stays green). Sharing is the teacher's act, from the Planning tab's share bar,
 and the `plantoir-unit-planning` skill tells an outside assistant to point the
 teacher there and never to share or deploy a plan itself.
+
+## Setting up an outside assistant (#855)
+
+**What it is.** Settings ▸ Other Assistants lists GitHub Copilot, Claude Code
+and Codex (in that order: GitHub's plans page says every plan includes
+Copilot), each with what is true of it now and one next step. It is reached
+three ways (ruling 3): the pane's own tab, Help ▸ Set Up an Assistant…, and
+Revise With ▸ Set Up Another Assistant…, last in every Revise With submenu.
+The two menu items open the pane and set up nothing themselves. **Revise With
+is now always drawn** (ruling, 2026-11-13): a teacher with no assistant at all
+sees it holding the one set-up item. Until #855 a teacher with none saw no
+sign that any existed (`outsideAgents.hiddenWhenNotInstalledWhy`, rewritten).
+Each door's own item is still hidden while its tool is missing. On a course
+kept for reference the row's context menu still draws no Revise With.
+
+The contract is `contracts/app-rules.json` → `outsideAgents.setUp`: the three
+recipes, the child's environment, the record, every sentence, the state cases
+and the never-cases. `installedOnlyWhenAsked` replaced `neverInstalled`, and
+`neverProbedForSignIn` was narrowed (the door still never asks; the pane asks
+after a set-up, after a sign-in and on Check Again, keeping the exit code
+only). The quit rule is `shared-rules.json` →
+`quittingWhileWorkIsUnderWay.whileAnAssistantIsSetUp` and its two cases.
+
+**How a set-up runs** (`SetUpRunner`, `mac-app/QuartzTeachers/Models/SetUp/`):
+
+1. Every host the set-up downloads from is asked first (an HTTPS HEAD; any
+   answer counts, a failure to connect does not), so no connection is told
+   apart from every other failure without reading any output (plan review
+   M2). The sentence names a school network, because on a filtered network
+   Safari works and "check your connection" reads as false.
+2. The maker's own documented set-up is fetched by Plantoir through
+   `URLSession` (so the Mac's proxy settings apply), following redirects only
+   to HTTPS on the hosts the recipe names (review L4). All three documented
+   addresses redirect (measured 2026-11-13).
+3. Before anything runs, Plantoir looks at the home folder (which of the
+   recipe's `removes`, and the folders above them, exist; the bytes of every
+   shell start-up file) and writes the record with state `installing` and
+   that snapshot (review M3). A quit, a crash or a power cut then leaves a
+   record the next launch settles: complete and the maker's, it is
+   completed; otherwise what it added is taken away.
+4. It runs with an environment Plantoir builds from nothing (`HOME`, `USER`,
+   `LOGNAME`, `TMPDIR`, `LANG`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, `SHELL`
+   from the account record, plus Codex's `CODEX_NON_INTERACTIVE=1`), in a
+   session of its own (`POSIX_SPAWN_SETSID`) so there is no controlling
+   terminal, with standard input, output and error on `/dev/null` and every
+   inherited file closed (review H3). The output is never read or kept.
+5. Afterwards it looks again and records what appeared and, for each start-up
+   file, the exact block appended at its end (or that it changed in place,
+   which Remove never edits). Then every program the recipe names is checked
+   against the maker's full Developer ID requirement (identifier, team, and
+   the two Developer ID certificate fields), every page hashed. Any failure
+   takes away exactly what that run added.
+
+**What the check proves** (review M1), so nobody later writes "verified before
+it ran": it runs AFTER the maker's set-up, and for Claude Code after the
+maker's own program has run (its bootstrap downloads the program, checks a
+SHA-256 from the same host and runs `claude install`). GitHub's script
+installs with no checksum at all when its checksum file fails to download.
+So the signature check is the one check every route gets, and it proves the
+program Plantoir then offers is the maker's and unaltered.
+
+**Remove** takes away only what the record lists and the recipe's `removes`
+allow (a damaged record never deletes anything else; tested), never `keeps`
+(sign-ins and settings), writes a start-up file back through a link so a
+dotfile manager's link survives, and takes away created folders only when
+empty. Removing Codex takes away its start-up line, which may be what made
+`claude` or `copilot` work in the teacher's own Terminal; Plantoir itself is
+unaffected (it searches `~/.local/bin`), and Plantoir adds no start-up line
+it was not asked to add (review H4). Help says so.
+
+**Sign-in** is the maker's own, in a window opened the way the doors open
+theirs (a `.command` handed to iTerm or Terminal through LaunchServices). The
+script writes the sign-in's exit code, and nothing else, to
+`sign-in-<key>.result`; Check Again reads it and, for Claude Code (`claude auth
+status`) and Codex (`codex login status`), asks the maker's signed-in
+question, keeping its exit code. GitHub documents no such question, so
+GitHub Copilot's ready sentence says its sign-in finished, not that the
+account can use it (review M6).
+
+**Measured, 2026-11-13, this Mac (Apple silicon), with stand-ins only** (the
+owner's own tools are installed here, so no maker's set-up was run): a
+stand-in shaped like Codex's set-up, run through the real runner (compiled
+standalone in a scratch home, and as `SetUpRunnerTests`), with
+`GITHUB_TOKEN`, `PREFIX`, `VERSION`, `CODEX_INSTALL_DIR` and `ZDOTDIR` set in
+the parent: the child saw only the built names (plus the shell's own `PWD`,
+`SHLVL`, `_`), found no terminal even under a real one, and every case
+passed (zsh, bash, empty shell, a linked `.zprofile`, a block already there, a
+failure, an unsigned program, a set-up that left nothing, too long (stopped at
+2.0 s with its background child gone), Stop (1.0 s), no connection, a damaged
+record). **Must-fail:** the same runner with `POSIX_SPAWN_SETSID` removed, run
+under a real terminal, opened `/dev/tty` and was still waiting after 20 s;
+with it, the child found no terminal and went on at once. A Swift compiler
+crash met on the way: the `async` form of
+`urlSession(_:task:willPerformHTTPRedirection:newRequest:)` crashed SILGen
+(Xcode 27), so the guard uses the completion-handler form.
+
+**Not established, and only a hand test shows:** a real set-up of each on a
+clean macOS account; each real sign-in; what each sign-in window asks; a
+school network (a child `curl` does not use macOS's proxy settings or a PAC
+file, and whether it trusts a school's TLS-inspection root is unknown); an
+Intel Mac; security software that ends a program on its first run (it reaches
+the teacher as `failedOther`, with the exit status on the trail).
+
+**Rejected:** downloading the programs into Plantoir's own folder (Claude
+Code's updater installs into `~/.local/share/claude` anyway, and pins mean a
+release a week); bundling them (Claude Code's licence grants no
+redistribution; about 650 MB); typing the command into a terminal (an
+Automation prompt, focus stolen, polling); a managed setting for school IT
+(Russell: no); parsing the set-up's output; checking the signature on every
+activation (up to 2.3 s each time Plantoir comes to the front); npm routes
+(the Mac carries no Node, and two of the three npm packages only fetch the
+same native program).
+
+**Reusable.** `SetUpRecipe`, `SetUpRunner`, `SetUpRecord` and
+`ProgramIdentityChecking` know nothing about assistants: the two programs a
+printed handout needs, which Russell ruled Plantoir sets up too, are planned
+to run through them with recipes of their own (the record's `kind` keeps them
+apart). Sign-in, the pane and the wording are the assistant layer
+(`AssistantSetUp`, `AssistantSetUpCentre`, `AssistantSetUpWording`).
+
+**The trail:** `outside assistant set-up opened` (from where),
+`… set-up started`, `outside assistant set up` (with seconds),
+`outside assistant could not be set up` (why, with seconds),
+`… set-up settled`, `… sign-in opened`, `… sign-in checked` (exit codes
+only), `outside assistant removed` (counts). No path, account or output.
+
+**The local assistant and the MCP surface are unchanged**: no tool, schema,
+description or prompt byte moved, and no tool can set up or sign in.
