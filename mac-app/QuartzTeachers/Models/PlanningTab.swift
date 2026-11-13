@@ -66,13 +66,16 @@ nonisolated enum PlanningTab {
         return result
     }
 
-    /// `choiceCases` → `startsOn`: the choice the popup starts on. The plans
-    /// are put in `UnitPlans.namedFirst` order for `today` (the plan covering
-    /// today, then the next to start, then the last to end; the greeting's
-    /// own order, so there is one ordering and not two), and the first of
-    /// them is chosen when it has a date. A course whose offered plans have
-    /// no dates starts on All Plans, or on its first plan when there is no
-    /// All Plans. Nil only when there is nothing to offer.
+    /// `choiceCases` → `startsOn`: the choice the popup starts on (#803).
+    /// The offered plan covering `today` (`UnitPlans.covers`, both ends
+    /// included), the earliest first class when two do; otherwise All
+    /// Plans, the list of every unit, because a teacher between units, before
+    /// the first or after the last is better served by the list than by a
+    /// guess at which unit they meant (#708 started on the next unit to
+    /// begin). With no All Plans page, the plans in `UnitPlans.namedFirst`
+    /// order for `today` (the greeting's own order, so there is one ordering
+    /// and not two) and the first of them. Nil only when there is nothing to
+    /// offer.
     static func startingChoice(plans: [UnitPlans.Plan], choices: [Choice], today: CalendarDay) -> Choice? {
         var offered: [UnitPlans.Plan] = []
         for plan in plans {
@@ -81,11 +84,14 @@ nonisolated enum PlanningTab {
             }
         }
         let ordered: [UnitPlans.Plan] = UnitPlans.namedFirst(offered, today: today)
-        if let first = ordered.first, first.firstClass != nil || first.lastClass != nil {
+        if let first = ordered.first, UnitPlans.covers(first, today: today) {
             return .unit(first.slug)
         }
         if choices.contains(.allPlans) {
             return .allPlans
+        }
+        if let first = ordered.first {
+            return .unit(first.slug)
         }
         return choices.first
     }
@@ -311,6 +317,214 @@ nonisolated enum PlanNavigation {
             }
         }
         return parts
+    }
+}
+
+/// Open in Browser on the Planning tab (#803): the page the plan is showing,
+/// opened in the teacher's default web browser from its `file:` address, so a
+/// plan can be read, printed or kept open with Plantoir closed. The planning
+/// folder is hidden in Finder, so this button is how a teacher reaches it.
+///
+/// `contracts/shared-rules.json` → `unitPlanning.tab.openInBrowser`: which
+/// page is opened (`pageToOpen`), what kind of page the trail calls it
+/// (`kind`), and the words, pinned by `PlanningTabTests`. Only a file inside
+/// the course's planning folder is ever handed to the browser; anything else
+/// is refused here, before the browser is asked.
+nonisolated enum PlanInTheBrowser {
+
+    /// Which kind of page was opened, for the trail: never its name or
+    /// anything written on it.
+    enum Kind: String {
+        /// The planning folder's own `index.html`, All Plans.
+        case allPlans
+        /// A unit's plan page, `<unit>/index.html`.
+        case plan
+        /// A unit's curriculum correlation page, `<unit>/correlation.html`.
+        case correlation
+        /// Anything else in the planning folder: a PDF, a picture.
+        case file
+    }
+
+    /// Why nothing can be opened.
+    enum Refusal: String {
+        /// No page is showing and none is chosen, or the address is a
+        /// folder rather than a page.
+        case nothingToOpen
+        /// The address is not a file inside the course's planning folder.
+        case outsideThePlan
+        /// The page was inside the planning folder and is not there now.
+        case pageIsGone
+    }
+
+    /// What the button would open, or why it cannot.
+    struct Answer: Equatable {
+
+        // MARK: - Stored properties
+
+        let page: URL?
+        let refusal: Refusal?
+    }
+
+    // MARK: - Stored properties
+
+    /// A unit's correlation page, beside its plan.
+    static let correlationPageName: String = "correlation.html"
+
+    /// `words.openInBrowser` and its help and refusal sentences.
+    static let buttonTitle: String = "Open in Browser"
+    static let help: String = "Open this page in your web browser"
+    static let nothingToOpen: String = "There is no page to open in your browser yet."
+    static let outsideThePlan: String = "Only a page from this course’s unit plans can be opened in your browser."
+    static let pageIsGone: String = "This page is no longer in the course’s unit plans. Reload to see what is there now."
+    static let couldNotOpenTitle: String = "Can’t Open in Your Browser"
+    static let couldNotOpen: String = "Your Mac could not open this page in your web browser."
+
+    /// `activityTrail.mustRecord` → "opened a unit plan in the browser".
+    static let trailLine: String = "opened {what} in the browser"
+    static let couldNotOpenTrailLine: String = "could not open {what} in the browser"
+    static let allPlansWhat: String = "the list of plans"
+    static let planWhat: String = "a unit's plan"
+    static let correlationWhat: String = "a unit's correlation page"
+    static let fileWhat: String = "a file from a unit's plan"
+
+    // MARK: - Functions
+
+    /// `openInBrowser.cases`: the page the web view is ON (`onScreen`,
+    /// which follows a link the teacher clicked inside the plan), or, before
+    /// the first page has loaded, the page chosen in the popup. Opened only
+    /// when it is a `file:` address inside `planningFolder` once `..` and
+    /// every link on the way are followed (`PlanNavigation.isInside`), and
+    /// a file that is there. Its `#` part is kept, so a correlation page
+    /// opens where the plan was.
+    static func pageToOpen(onScreen: URL?, chosen: URL?, planningFolder: URL) -> Answer {
+        guard let candidate = onScreen ?? chosen else {
+            return Answer(page: nil, refusal: .nothingToOpen)
+        }
+        if !candidate.isFileURL {
+            return Answer(page: nil, refusal: .outsideThePlan)
+        }
+        if !PlanNavigation.isInside(candidate, folder: planningFolder) {
+            return Answer(page: nil, refusal: .outsideThePlan)
+        }
+        let resolved: String = PlanNavigation.resolvedPath(candidate.standardizedFileURL.path)
+        var isFolder: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: resolved, isDirectory: &isFolder) {
+            return Answer(page: nil, refusal: .pageIsGone)
+        }
+        if isFolder.boolValue {
+            return Answer(page: nil, refusal: .nothingToOpen)
+        }
+        return Answer(page: candidate, refusal: nil)
+    }
+
+    /// The kind of page `page` is, by where it sits in the planning folder.
+    static func kind(of page: URL, planningFolder: URL) -> Kind {
+        let pageParts: [String] = PlanNavigation.pathComponents(
+            of: PlanNavigation.resolvedPath(page.standardizedFileURL.path)
+        )
+        let folderParts: [String] = PlanNavigation.pathComponents(
+            of: PlanNavigation.resolvedPath(planningFolder.standardizedFileURL.path)
+        )
+        if pageParts.count <= folderParts.count {
+            return .file
+        }
+        let rest: [String] = Array(pageParts[folderParts.count...])
+        if rest == [PlanningTab.pageName] {
+            return .allPlans
+        }
+        if rest.count == 2 && rest[1] == PlanningTab.pageName {
+            return .plan
+        }
+        if rest.count == 2 && rest[1] == correlationPageName {
+            return .correlation
+        }
+        return .file
+    }
+
+    /// The button's help: what it does, or why it is dimmed.
+    static func helpText(for answer: Answer) -> String {
+        guard let refusal = answer.refusal else {
+            return help
+        }
+        return sentence(for: refusal)
+    }
+
+    /// The sentence a teacher reads for a refusal.
+    static func sentence(for refusal: Refusal) -> String {
+        switch refusal {
+        case .nothingToOpen:
+            return nothingToOpen
+        case .outsideThePlan:
+            return outsideThePlan
+        case .pageIsGone:
+            return pageIsGone
+        }
+    }
+
+    /// The trail's words for a kind of page.
+    static func what(_ kind: Kind) -> String {
+        switch kind {
+        case .allPlans:
+            return allPlansWhat
+        case .plan:
+            return planWhat
+        case .correlation:
+            return correlationWhat
+        case .file:
+            return fileWhat
+        }
+    }
+
+    /// The trail's line once the browser has the page: the course and the
+    /// kind of page, never its name or anything on it.
+    static func trailText(courseCode: String, kind: Kind) -> String {
+        return courseCode + UnitPlans.trailSeparator + trailLine.replacingOccurrences(of: "{what}", with: what(kind))
+    }
+
+    /// The trail's line when the Mac could not open it.
+    static func couldNotOpenTrailText(courseCode: String, kind: Kind) -> String {
+        return courseCode + UnitPlans.trailSeparator
+            + couldNotOpenTrailLine.replacingOccurrences(of: "{what}", with: what(kind))
+    }
+}
+
+/// Acting on Open in Browser: the rule first, then the browser, then the
+/// trail. `opener` is the Mac's default browser in the app
+/// (`PlanBrowserOpener.openInTheDefaultBrowser`); a test hands in one that
+/// records what it was given, so a refused page is proved never to reach it.
+extension PlanInTheBrowser {
+
+    // MARK: - Functions
+
+    /// Opens what `pageToOpen` allows, and once the browser has answered
+    /// writes the trail line and calls `finished` with whether it opened.
+    /// Returns the answer, so a refusal can be shown at once.
+    @MainActor
+    @discardableResult
+    static func open(
+        onScreen: URL?,
+        chosen: URL?,
+        planningFolder: URL,
+        courseCode: String,
+        opener: @MainActor (URL, @escaping @MainActor (Bool) -> Void) -> Void,
+        finished: @escaping @MainActor (Bool) -> Void
+    ) -> Answer {
+        let answer: Answer = pageToOpen(onScreen: onScreen, chosen: chosen, planningFolder: planningFolder)
+        guard let page = answer.page else {
+            return answer
+        }
+        let pageKind: Kind = kind(of: page, planningFolder: planningFolder)
+        opener(page) { (opened: Bool) in
+            if opened {
+                ActivityTrail.note(.openedAUnitPlanInTheBrowser, trailText(courseCode: courseCode, kind: pageKind))
+            } else {
+                ActivityTrail.note(
+                    .openedAUnitPlanInTheBrowser, couldNotOpenTrailText(courseCode: courseCode, kind: pageKind)
+                )
+            }
+            finished(opened)
+        }
+        return answer
     }
 }
 

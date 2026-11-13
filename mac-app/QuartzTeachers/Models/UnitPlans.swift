@@ -127,6 +127,26 @@ nonisolated enum UnitPlans {
         return toMention(courseDirectory: course.directoryURL, isKeptForReference: course.isKeptForReference)
     }
 
+    /// Whether `plan` covers `today`: its first class is on or before
+    /// today and its last class on or after, both days included. A plan
+    /// with only one of its two dates is read as starting and ending on
+    /// that day; a plan with neither covers no day. One rule for the
+    /// greeting's order (`namedFirst`) and for the day the Planning tab
+    /// starts on (`PlanningTab.startingChoice`, #803).
+    static func covers(_ plan: Plan, today: CalendarDay) -> Bool {
+        guard let start = plan.firstClass ?? plan.lastClass,
+              let end = plan.lastClass ?? plan.firstClass else {
+            return false
+        }
+        if today < start {
+            return false
+        }
+        if end < today {
+            return false
+        }
+        return true
+    }
+
     /// The order for a course with more plans than the greeting names: the
     /// plans covering `today` first (by first class), then the upcoming ones
     /// soonest first, then the past ones most recent first, then the
@@ -143,12 +163,12 @@ nonisolated enum UnitPlans {
                 undated.append(plan)
                 continue
             }
-            if end < today {
+            if covers(plan, today: today) {
+                current.append(plan)
+            } else if end < today {
                 past.append(plan)
             } else if today < start {
                 upcoming.append(plan)
-            } else {
-                current.append(plan)
             }
         }
         var ordered: [Plan] = sortedForTheGreeting(current)

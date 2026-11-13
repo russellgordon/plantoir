@@ -85,7 +85,7 @@ final class PlanningTabTests: XCTestCase {
 
     func testThePopupOffersAndStartsAsTheContractSays() throws {
         let choiceCases: [[String: Any]] = try cases("choiceCases")
-        XCTAssertGreaterThanOrEqual(choiceCases.count, 14)
+        XCTAssertGreaterThanOrEqual(choiceCases.count, 21)
         for (index, testCase) in choiceCases.enumerated() {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let course: URL = folder.appendingPathComponent("course-\(index)", isDirectory: true)
@@ -185,6 +185,13 @@ final class PlanningTabTests: XCTestCase {
             "cannotShowTitle": PlanningWording.cannotShowTitle,
             "cannotShowDescription": PlanningWording.cannotShowDescription,
             "revertOnPlanning": PlanningWording.revertOnPlanning,
+            "openInBrowser": PlanInTheBrowser.buttonTitle,
+            "openInBrowserHelp": PlanInTheBrowser.help,
+            "openInBrowserNothingToOpen": PlanInTheBrowser.nothingToOpen,
+            "openInBrowserOutsideThePlan": PlanInTheBrowser.outsideThePlan,
+            "openInBrowserPageIsGone": PlanInTheBrowser.pageIsGone,
+            "openInBrowserCouldNotOpenTitle": PlanInTheBrowser.couldNotOpenTitle,
+            "openInBrowserCouldNotOpen": PlanInTheBrowser.couldNotOpen,
         ]
         XCTAssertEqual(Set(words.keys), Set(mine.keys), "every word in the contract has a constant, and only those")
         for (key, value) in mine {
@@ -482,5 +489,174 @@ final class PlanningTabTests: XCTestCase {
             FileManager.default.fileExists(atPath: elsewhereAssets.appendingPathComponent("plan.css").path),
             "the copy wrote through the link"
         )
+    }
+
+    // MARK: - Open in Browser (#803)
+
+    /// Makes one `openInBrowser` case's planning folder, and answers it.
+    private func planningFolderFor(openCase testCase: [String: Any], index: Int) throws -> URL {
+        let course: URL = folder.appendingPathComponent("open-\(index)", isDirectory: true)
+        let planning: URL = course.appendingPathComponent(UnitPlans.folderPath, isDirectory: true)
+        try FileManager.default.createDirectory(at: planning, withIntermediateDirectories: true)
+        try "{}".write(to: course.appendingPathComponent("course_config.json"), atomically: true, encoding: .utf8)
+        for made in try XCTUnwrap(testCase["made"] as? [String]) {
+            let file: URL = planning.appendingPathComponent(made).standardizedFileURL
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try "made".write(to: file, atomically: true, encoding: .utf8)
+        }
+        if let links = testCase["links"] as? [String: String] {
+            for (at, pointsTo) in links {
+                let link: URL = planning.appendingPathComponent(at)
+                try FileManager.default.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: pointsTo)
+            }
+        }
+        return planning
+    }
+
+    /// A case's `onScreen` or `chosen`: a path resolved against the planning
+    /// folder as a browser resolves it, or an address with its own scheme.
+    private static func address(_ written: Any?, planningFolder: URL) throws -> URL? {
+        guard let text = written as? String else {
+            return nil
+        }
+        let base: URL = URL(fileURLWithPath: planningFolder.path, isDirectory: true)
+        return try XCTUnwrap(URL(string: text, relativeTo: base)?.absoluteURL, text)
+    }
+
+    func testOpenInBrowserOpensAsTheContractSays() throws {
+        let block: [String: Any] = try XCTUnwrap(try tab()["openInBrowser"] as? [String: Any])
+        let openCases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(openCases.count, 14)
+        for (index, testCase) in openCases.enumerated() {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let planning: URL = try planningFolderFor(openCase: testCase, index: index)
+            let onScreen: URL? = try PlanningTabTests.address(testCase["onScreen"], planningFolder: planning)
+            let chosen: URL? = try PlanningTabTests.address(testCase["chosen"], planningFolder: planning)
+            let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+
+            let answer: PlanInTheBrowser.Answer = PlanInTheBrowser.pageToOpen(
+                onScreen: onScreen, chosen: chosen, planningFolder: planning
+            )
+            if let opens = expect["opens"] as? String {
+                let expected: URL? = try PlanningTabTests.address(opens, planningFolder: planning)
+                XCTAssertEqual(answer.page?.absoluteString, expected?.absoluteString, name)
+                XCTAssertNil(answer.refusal, name)
+                if let page = answer.page {
+                    XCTAssertEqual(
+                        PlanInTheBrowser.kind(of: page, planningFolder: planning).rawValue, expect["kind"] as? String, name
+                    )
+                }
+                XCTAssertEqual(PlanInTheBrowser.helpText(for: answer), PlanInTheBrowser.help, name)
+            } else {
+                XCTAssertNil(answer.page, name)
+                XCTAssertEqual(answer.refusal?.rawValue, expect["refusal"] as? String, name)
+                if let refusal = answer.refusal {
+                    XCTAssertEqual(PlanInTheBrowser.helpText(for: answer), PlanInTheBrowser.sentence(for: refusal), name)
+                }
+            }
+        }
+    }
+
+    /// The action, with a browser that records what it is handed: a page
+    /// outside the planning folder never reaches it and writes nothing; a
+    /// page inside does, once, and the trail says which kind of page; a Mac
+    /// that could not open it says that instead.
+    func testOpenInBrowserHandsTheBrowserOnlyAPageOfThePlan() throws {
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: folder.appendingPathComponent("trail", isDirectory: true))
+        defer {
+            ActivityTrail.store = previousStore
+        }
+        let course: URL = folder.appendingPathComponent("course", isDirectory: true)
+        let planning: URL = course.appendingPathComponent(UnitPlans.folderPath, isDirectory: true)
+        let unit: URL = planning.appendingPathComponent("unit-1", isDirectory: true)
+        try FileManager.default.createDirectory(at: unit, withIntermediateDirectories: true)
+        let settings: URL = course.appendingPathComponent("course_config.json")
+        try "{}".write(to: settings, atomically: true, encoding: .utf8)
+        let correlation: URL = unit.appendingPathComponent(PlanInTheBrowser.correlationPageName)
+        try "<html></html>".write(to: correlation, atomically: true, encoding: .utf8)
+
+        var handed: [URL] = []
+        var answers: [Bool] = []
+        var browserSays: Bool = true
+        let opener: @MainActor (URL, @escaping @MainActor (Bool) -> Void) -> Void = {
+            (page: URL, done: @escaping @MainActor (Bool) -> Void) in
+            handed.append(page)
+            done(browserSays)
+        }
+        let finished: @MainActor (Bool) -> Void = { (opened: Bool) in
+            answers.append(opened)
+        }
+
+        let outside: PlanInTheBrowser.Answer = PlanInTheBrowser.open(
+            onScreen: settings, chosen: correlation, planningFolder: planning,
+            courseCode: "SNC2D", opener: opener, finished: finished
+        )
+        XCTAssertEqual(outside.refusal, .outsideThePlan)
+        let web: PlanInTheBrowser.Answer = PlanInTheBrowser.open(
+            onScreen: URL(string: "https://example.com/"), chosen: nil, planningFolder: planning,
+            courseCode: "SNC2D", opener: opener, finished: finished
+        )
+        XCTAssertEqual(web.refusal, .outsideThePlan)
+        XCTAssertEqual(handed, [], "nothing outside the planning folder reaches the browser")
+        XCTAssertFalse(ActivityTrail.store.activityText(includingPrompts: true).contains("in the browser"))
+
+        PlanInTheBrowser.open(
+            onScreen: correlation, chosen: nil, planningFolder: planning,
+            courseCode: "SNC2D", opener: opener, finished: finished
+        )
+        XCTAssertEqual(handed, [correlation])
+        XCTAssertEqual(answers, [true])
+        browserSays = false
+        PlanInTheBrowser.open(
+            onScreen: correlation, chosen: nil, planningFolder: planning,
+            courseCode: "SNC2D", opener: opener, finished: finished
+        )
+        XCTAssertEqual(answers, [true, false])
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        let opened: String = PlanInTheBrowser.trailText(courseCode: "SNC2D", kind: .correlation)
+        let couldNot: String = PlanInTheBrowser.couldNotOpenTrailText(courseCode: "SNC2D", kind: .correlation)
+        XCTAssertEqual(trail.components(separatedBy: opened).count - 1, 1, trail)
+        XCTAssertEqual(trail.components(separatedBy: couldNot).count - 1, 1, trail)
+        XCTAssertFalse(trail.contains("unit-1"), "the trail never names the unit's folder")
+    }
+
+    /// "opened a unit plan in the browser": the lines are the contract's.
+    func testOpenInBrowsersTrailLinesAreTheContracts() throws {
+        let activityTrail: [String: Any] = try SharedRulesContractTests.section("activityTrail")
+        var entry: [String: Any] = [:]
+        for candidate in try XCTUnwrap(activityTrail["mustRecord"] as? [[String: Any]]) {
+            if (candidate["event"] as? String) == ActivityTrail.Event.openedAUnitPlanInTheBrowser.rawValue {
+                entry = candidate
+            }
+        }
+        XCTAssertEqual(entry["line"] as? String, "{course}" + UnitPlans.trailSeparator + PlanInTheBrowser.trailLine)
+        XCTAssertEqual(
+            entry["couldNotOpenLine"] as? String, "{course}" + UnitPlans.trailSeparator + PlanInTheBrowser.couldNotOpenTrailLine
+        )
+        let what: [String: Any] = try XCTUnwrap(entry["what"] as? [String: Any])
+        let kinds: [PlanInTheBrowser.Kind] = [.allPlans, .plan, .correlation, .file]
+        XCTAssertEqual(what.count, kinds.count)
+        for kind in kinds {
+            XCTAssertEqual(what[kind.rawValue] as? String, PlanInTheBrowser.what(kind), kind.rawValue)
+        }
+        XCTAssertEqual(
+            PlanInTheBrowser.trailText(courseCode: "SNC2D", kind: .plan),
+            "SNC2D · opened a unit's plan in the browser"
+        )
+    }
+
+    /// The button is on the plan's bar beside Reload, and the click goes
+    /// through `PlanInTheBrowser.open` with the web view's own address.
+    func testOpenInBrowserIsBesideReloadAndGoesThroughTheRule() throws {
+        let view: String = try PlanningTabTests.readSource("QuartzTeachers/Views/Planning/PlanningTabView.swift")
+        let reload: Range<String.Index> = try XCTUnwrap(view.range(of: "accessibilityIdentifier(\"planningReload\")"))
+        let button: Range<String.Index> = try XCTUnwrap(view.range(of: "accessibilityIdentifier(\"planningOpenInBrowser\")"))
+        XCTAssertLessThan(reload.lowerBound, button.lowerBound)
+        XCTAssertTrue(view.contains("PlanInTheBrowser.open("))
+        XCTAssertTrue(view.contains("onScreen: model.controller?.webView.url,"))
+        XCTAssertFalse(view.contains("NSWorkspace"), "the view opens nothing itself")
     }
 }

@@ -283,6 +283,45 @@ final class PlanNavigationGuard: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 }
 
+/// Hands a page of a plan to the Mac's default web browser (#803, Open in
+/// Browser), as a `file:` address. The DEFAULT BROWSER is asked by name,
+/// the app that opens `https:` links, rather than whatever app opens the
+/// file's type: an `.html` file can belong to a text editor on a teacher's
+/// Mac, and a PDF to Preview, and the button says "Browser". With no browser
+/// set, the file is opened as the Mac opens it.
+///
+/// `PlanInTheBrowser.pageToOpen` has already refused anything outside the
+/// course's planning folder; this only opens.
+enum PlanBrowserOpener {
+
+    // MARK: - Stored properties
+
+    /// Any web address: only the app that would open it is asked for.
+    static let browserProbe: URL? = URL(string: "https://example.com/")
+
+    // MARK: - Functions
+
+    static func openInTheDefaultBrowser(_ page: URL, done: @escaping @MainActor (Bool) -> Void) {
+        guard let probe = browserProbe,
+              let browser = NSWorkspace.shared.urlForApplication(toOpen: probe) else {
+            done(NSWorkspace.shared.open(page))
+            return
+        }
+        let configuration: NSWorkspace.OpenConfiguration = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.open([page], withApplicationAt: browser, configuration: configuration) {
+            (_: NSRunningApplication?, error: Error?) in
+            let opened: Bool = error == nil
+            let reason: String = error?.localizedDescription ?? ""
+            Task { @MainActor in
+                if !opened {
+                    AppLog.interface.error("the Planning tab could not open a page in the browser: \(reason, privacy: .public)")
+                }
+                done(opened)
+            }
+        }
+    }
+}
+
 /// The Planning tab's web view, taking exactly the room it is offered.
 struct PlanWebView: NSViewRepresentable {
 
