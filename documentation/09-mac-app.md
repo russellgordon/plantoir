@@ -5435,7 +5435,7 @@ who boxes the papers, who records the yes, and what `marking.json` holds.
   no change to any pin).
 - **MEASURED (Apple M4 Pro, macOS 26.6, Poppler 25.09.1, Python 3.14.4 and
   macOS's own 3.9.6, `/bin/bash` 3.2.57).** `scripts/test_marking_teacher_run.py`:
-  28 tests in about 16 s on both Pythons. The launchers are driven in a
+  29 tests in about 17 s on both Pythons (a whole class scanned in one file, split, named from the table and boxed, among them). The launchers are driven in a
   pseudo-terminal with echo off and their questions answered; six invented
   canary names of ten letters or more are planted in a misnamed scan, the
   name table, a file in `Check/` and one in `Named/`, and a marker word is
