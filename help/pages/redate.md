@@ -21,20 +21,22 @@ keywords:
 - new semester
 - new dates
 - schedule changed
-description: Re-date Classes moves every class in a section onto the class dates on file, in order, after showing a plan.
+description: Re-date Classes moves every numbered class in a section onto the class dates on file, in order, after showing a plan.
 ---
 Re-date Classes moves the classes of a section onto the class dates Plantoir has on file for it. Use it when the days a section meets have changed, as they do after a snow day.
 
 ## What it does
 
-Re-date Classes works on every class in the section. You do not choose classes or a date. The first class takes the first date on file, the second class takes the second date, and so on down the list. Unit and day numbers are not used, and old dates are not matched to new ones.
+Re-date Classes works on every numbered class in the section, such as Unit 2, Day 4. You do not choose classes or a date. The first class takes the first date on file, the second class takes the second date, and so on down the list. The numbers decide only the order. Old dates are not matched to new ones.
+
+A page named another way, such as Field Trip, is passed over. It keeps the date it has.
 
 Other pages follow the classes:
 
 - **A page that a class links to** takes that class's new day. If several classes use the page, the earliest one decides.
 - **The pages the section uses all year**, which are the ones its Key Links lists, take the first day of class.
 - **Curriculum pages** are not moved.
-- **A class left over when the dates run out** is put into draft. It is hidden until you publish it again.
+- **A class left over when the dates run out** is moved onto the last class date and put into draft. The left-over classes then sit together, where you will see them. A page in draft is hidden: its publish line is set to `false` until you publish it again. See [Which classes see a page](page:page-settings).
 
 So the list of class dates must be right before you begin.
 

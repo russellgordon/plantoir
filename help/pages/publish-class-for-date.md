@@ -27,7 +27,7 @@ Publish Class for a Date publishes one day's class in a section. You choose the 
 1. In the sidebar, select the section.
 2. Choose {{menu:publishClassForDate}} from the menu bar. A sheet opens and says:
    {{say:assist-wording#wording.menuPickClassDay}}
-3. Set the date to the day of the class. The date starts at the section's next class day after today. If the section has no class dates on file, it starts at tomorrow.
+3. Set the date to the day of the class. The date starts at the section's next class day after today. If the section has no class date after today on file, it starts at tomorrow.
 
 {{picture:publish-class-for-date-1}}
 alt: The Publish Class for a Date sheet with its date field set to a class day, and the Continue button.
@@ -61,6 +61,6 @@ Choose {{menu:undoLastChange}}. The class and the pages published with it are hi
 ## If it does not work
 
 - **The sheet says no class is dated that day.** Choose another day. Or publish the page by its name with {{menu:publishPages}}.
-- **The date offered is not a class day.** The section has no class dates on file, so the sheet offers tomorrow. See [Give Plantoir your class dates](page:class-dates).
+- **The date offered is not a class day.** The section has no class date after today on file, so the sheet offers tomorrow. See [Give Plantoir your class dates](page:class-dates).
 - **A page stays exactly as it is.** Its settings are written in a way Plantoir cannot add to. Open the page in Obsidian and set it there.
 - **Students cannot see the class.** The section has not been deployed since you published it.

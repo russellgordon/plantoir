@@ -37,7 +37,7 @@ A section that deploys to Netlify or Cloudflare Pages must have been deployed th
 ## Schedule the deploy
 
 1. In the sidebar, select the section.
-2. Choose {{menu:scheduleDeploy}} from the menu bar, or right-click the section in the sidebar and choose the same command. A sheet titled {{control:scheduleADeploy}} opens.
+2. Choose {{menu:scheduleDeploy}} from the menu bar, or right-click the section in the sidebar and choose the same command. A sheet titled {{control:scheduleADeploy}} opens. The command is greyed when the section already has a deploy scheduled: see the part on changing the time, below.
 3. Set {{control:deployAt}} to the date and time. It starts at 6:30 tomorrow, and it cannot be set in the past.
 4. Read the plan under the time. It names the section, where it deploys to, and when. It also says what this Mac needs at that moment:
    - The Mac must be switched on and awake, with its lid open if closing the lid puts it to sleep.
@@ -55,7 +55,7 @@ A clock appears beside the section in the sidebar. Hold the pointer over it to r
 {{picture:schedule-deploy-2}}
 alt: The sidebar with a clock beside one section, and the text that appears when the pointer rests on it.
 
-A section holds one scheduled deploy. Scheduling again replaces it, and the plan says so.
+A section holds one scheduled deploy at a time.
 
 For a course that deploys to Netlify, the sheet also carries a note about Netlify's monthly allowance. See [Set up Netlify](page:netlify).
 
@@ -86,10 +86,24 @@ If the Mac wakes later than that, Plantoir cancels the deploy, leaves the websit
 1. Select the section and choose {{menu:cancelDeployAt}} from the menu bar. In the menu, the command's name includes the time of the deploy. The command is also in the menu that opens when you right-click the section.
 2. An alert titled {{control:cancelScheduledDeployQuestion}} opens. Press {{control:cancelIt}}, or press {{control:leaveItScheduled}} to keep the deploy.
 
-Plantoir also turns a scheduled deploy off when you remove the section or the course, rename the course, or keep the course for reference.
+Plantoir also turns a scheduled deploy off when you remove the section or the course, or rename the course. It does the same when you start the section on a new website for a new year. Making a copy of a course to keep for reference leaves the course's own scheduled deploys as they are.
+
+## Change the time of a scheduled deploy
+
+While a section has a deploy scheduled, it cannot be given a second one. {{menu:scheduleDeploy}} is greyed in the menu bar, and the menu that opens on a right-click offers only the command that cancels the deploy.
+
+1. Cancel the scheduled deploy, with the steps above.
+2. Choose {{menu:scheduleDeploy}}, which is live again, and set the new time.
+
+{{assistant}}
+The assistant can change the time in one step. Ask it to schedule a section that already has a deploy set. The new deploy takes the place of the old one, and the assistant's plan says:
+
+{{say:assist-wording#wording.scheduleReplaces}}
+{{/assistant}}
 
 ## If it does not work
 
 - **Orange text takes the place of the plan, and {{control:scheduleButton}} is greyed.** The text says why the deploy cannot be scheduled. The time may have passed, or a folder may need attention. A Cloudflare Account ID may be missing, or the section may never have been deployed to that place.
 - **No notification came.** Notifications for Plantoir are turned off in macOS. The section's window still says how the deploy went.
-- **{{menu:scheduleDeploy}} is not offered.** The course is kept for reference.
+- **{{menu:scheduleDeploy}} is greyed.** The section already has a deploy scheduled. Cancel it, then schedule again.
+- **{{menu:scheduleDeploy}} is greyed and the section has no clock beside it.** The course is kept for reference. Such a course is never deployed, and the menu that opens on a right-click does not offer the command.

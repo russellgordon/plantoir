@@ -51,7 +51,15 @@ Choose {{menu:hidePages}} and follow the same steps. The list holds the pages th
 
 {{say:assist-wording#wording.menuPickPagesToHide}}
 
-A page that the section's Key Links lists stays visible, and the plan says so.
+Every page you tick is hidden, a page in the section's Key Links included.
+
+Pages that only the ticked pages link to are hidden with them, and the plan lists each one. Five kinds of page are never hidden along with another page. The plan says why each of them stays:
+
+- a folder's own page;
+- a page in the section's Key Links;
+- a curriculum page;
+- another class page;
+- a page that a page staying visible still links to.
 
 ## One section, not the other
 
@@ -65,6 +73,7 @@ Choose {{menu:undoLastChange}}. A sheet titled {{control:undoLastChangeTitle}} s
 alt: The Section menu open, with Undo Last Change marked.
 
 - It takes back the last change made from the Section menu in this window. It does not reach a change made in another window.
+- It is live only while the section that change was made in is selected. Select that section first.
 - A page you have edited since the change is left alone, and the sheet says so.
 - It does not change a website that is already deployed. The sheet says:
   {{say:assist-wording#wording.undoDoesNotReachTheLiveSite}}
@@ -85,5 +94,5 @@ Anything older is in Plantoir's list of backups, because a copy is saved before 
 - **The sheet says every page is already published**, or that no page is published. There is nothing to tick.
 - **{{control:continueButton}} is greyed.** No page is ticked yet. Space ticks the selected row.
 - **A page stays exactly as it is.** Its settings are written in a way Plantoir cannot add to. Open the page in Obsidian and set it there: see [Which classes see a page](page:page-settings).
-- **{{menu:undoLastChange}} is greyed.** The last change was not made from the Section menu in this window.
+- **{{menu:undoLastChange}} is greyed.** It is live only when the last change made from the Section menu in this window was made in the section that is selected. It is also greyed while the section is being deployed, and while a copy of the course is being saved. The same holds while another command from the Section menu is still running in this window. For a course kept for reference it is always greyed.
 - **Students still cannot see the page.** The section has not been deployed since you published it.

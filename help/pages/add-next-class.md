@@ -61,7 +61,9 @@ Give the dates there. When you press {{control:rememberTheseDates}}, Add Next Cl
 
 ## Take the new page away again
 
-Choose {{menu:undoLastChange}}. The new page is deleted. This works while adding the page is still the last change made from the Section menu in this window.
+Select the section and choose {{menu:undoLastChange}}. The new page is deleted, unless you have written in it since. A page you have changed is kept, and the sheet says so.
+
+This works while adding the page is still the last change made from the Section menu in this window. [Show or hide pages for a section](page:publish-pages) has the rules for Undo Last Change.
 
 The copy of the course that Plantoir saved first is in its list of backups. See [Back up a course and restore it](page:backups).
 

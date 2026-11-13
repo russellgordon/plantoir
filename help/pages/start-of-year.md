@@ -21,7 +21,7 @@ keywords:
 - reuse a course
 description: Get Ready for the Start of the Year puts every class after the first into draft, with the pages students do not need yet.
 ---
-Get Ready for the Start of the Year takes a section back to its first class. Every later class goes into draft, and so do the pages students will not need until later. A page in draft is hidden from students.
+Get Ready for the Start of the Year takes a section back to its first class. Every later class goes into draft, and so do the pages students will not need until later. A page in draft is hidden from students. Plantoir sets its publish line to `false`, as [Which classes see a page](page:page-settings) describes.
 
 Use it on a course you have taught before, when a new group of students should start with the first class only.
 

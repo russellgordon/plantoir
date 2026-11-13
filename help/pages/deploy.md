@@ -44,7 +44,7 @@ alt: A finished deploy in the section's window, with the website's address shown
 
 ## The first deploy to a new place
 
-The first deploy of a section to Netlify or Cloudflare Pages may stop to ask you something. It may ask for a token from your account, your surname, or a name for the website. The window says it is waiting for your answer. These pages say what each question means:
+The first deploy of a section to Netlify or Cloudflare Pages may stop to ask you something. It may ask for a token from your account, and for your surname. Netlify also asks for a name for the website. Cloudflare Pages names the website for you. The window says it is waiting for your answer. These pages say what each question means:
 
 - [Put your site online with Cloudflare Pages](page:cloudflare)
 - [Set up Netlify](page:netlify)
@@ -70,7 +70,7 @@ To have a section deploy at a later time without you, see [Schedule a deploy for
 
 - **An alert titled {{control:cannotDeployYet}} appears.** Something the deploy needs is missing, and the alert says what. Two examples are a Cloudflare Account ID, and the folder a course deploys into. When the Account ID is missing, the alert also has an {{control:openSettings}} button.
 - **{{control:deployButton}} is greyed.** The section is already being deployed, a copy of the course is being saved, or the working folder is still being made ready. Hold the pointer over the button: when the course is being previewed or deployed somewhere else on this Mac, the button's help says so.
-- **There is no {{control:deployButton}} button.** The course is kept for reference. A course kept for reference is never deployed.
+- **There is no {{control:deployButton}} button.** The course is kept for reference, and {{menu:deploy}} is greyed for it too. A course kept for reference is never deployed.
 - **You pressed {{control:cancel}} on the question about later classes.** Nothing was deployed.
 - **The window says something went wrong.** It gives an explanation. See [A deploy did not work](page:deploy-failed).
 - **A change to the course's settings did not go out.** A deploy uses the settings as they were last saved, and a notice says so. Save them, then deploy again.
