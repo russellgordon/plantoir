@@ -40,15 +40,21 @@ final class SheetTitleScanTests: XCTestCase {
         // #454: asking before adding Plantoir's section to a teacher's own
         // AGENTS.md or CLAUDE.md; the file it found is said under the title.
         ("AgentGuidanceSheet", "AgentGuidanceSheet.swift", true),
+        // #709: a share of unit plans, its console in a sheet of its own,
+        // and the open share's lists, with the by-name sentence under the
+        // title.
+        ("PlanShareConsoleSheet", "Planning/PlanShareConsoleSheet.swift", false),
+        ("PlanShareListsSheet", "Planning/PlanShareListsSheet.swift", true),
     ]
 
     // MARK: - Tests
 
-    /// Eighteen sheets (fifteen, batch B's and #454's, and #572's New Group
-    /// and Rename Group sheet), each titled through `SheetTitle`, in the shape
-    /// it is listed with — and no title in those files at `.title2` or larger.
+    /// Twenty sheets (fifteen, batch B's, #454's, #709's two and #572's
+    /// New Group and Rename Group sheet), each titled through `SheetTitle`, in
+    /// the shape it is listed with — and no title in those files at `.title2`
+    /// or larger.
     func testEverySheetIsTitledByTheOneShape() throws {
-        XCTAssertEqual(SheetTitleScanTests.sheets.count, 18)
+        XCTAssertEqual(SheetTitleScanTests.sheets.count, 20)
         var problems: [String] = []
         for sheet in SheetTitleScanTests.sheets {
             let source: String = try SheetTitleScanTests.source(of: sheet.file)

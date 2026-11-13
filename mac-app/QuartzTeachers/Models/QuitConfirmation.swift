@@ -171,6 +171,9 @@ enum QuitConfirmation {
         _ = previews
         if publishes.count == 1 {
             let only: CourseActivity.PublishRecord = publishes[0]
+            if only.sectionNumber == PlanSharing.leaseSection {
+                return "sharing the unit plans of \(only.courseCode)"
+            }
             return "deploying Section \(only.sectionNumber) of \(only.courseCode)"
         }
         if publishes.count > 1 {

@@ -4320,7 +4320,10 @@ before the course's Planning tab (#708) and sharing (#709), so the skill and
 the greeting pointed at the folder and said nothing about either (Russell,
 2026-11-12). Since #708 the greeting's `one` and `some` sentences and the
 skill point at the Planning tab instead ("The course page's Planning tab
-(#708)" below); sharing adds its sentences with #709.
+(#708)" below); since #709 the skill also says the plans are shared from that
+tab, that a share without a password leaves answer keys out, and that the
+assistant never shares or deploys them ("Sharing unit plans from the Planning
+tab (#709)" below).
 
 **Where the plan lives: `courses/<CODE>/.internal/planning/`.** A folder whose
 name starts with a dot is never built (`build_site.py` → `_is_hidden`), never
@@ -4449,9 +4452,8 @@ the course's unit plans from `courses/<CODE>/.internal/planning/` on this Mac.
 The contract is `shared-rules.json` → `unitPlanning.tab` (`tabCases`,
 `choiceCases`, `navigationCases`, `words`, `assetsMirror`,
 `whatAPageMayRead`) and `app-rules.json` → `outsideAgents.planAUnit`; every
-case is walked by `PlanningTabTests`. Sharing a plan is #709 and is not on
-this tab yet: no Share control, no placeholder for one, and no sentence
-about it.
+case is walked by `PlanningTabTests`. Since #709 a share bar sits at the
+foot of the tab ("Sharing unit plans from the Planning tab (#709)" below).
 
 **The tabs are `DetailTabs`, and only the chosen tab is in the window.**
 `MainWindowView`'s `.course` branch draws `CourseDetailView`, which puts the
@@ -4854,8 +4856,9 @@ unit in the popup (Russell, 2026-11-12, as #708 also rejected).
 
 Three skills help a teacher with assessment: `plantoir-test-authoring`
 (#751) writes a unit test and the kit to mark it from, `plantoir-marking`
-(#750) marks papers onto feedback sheets, and a third drafts report
-comments (#752). Neither app reads or writes any file they make. Each
+(#750) marks papers onto feedback sheets, and `plantoir-report-comments`
+(#752) drafts report card comments from the marking. Neither app reads or
+writes any file they make. Each
 reaches a working folder as every skill does, and the contract is
 `shared-rules.json` → `assessment`. This subsection was started by #751;
 #750 and #752 add theirs below.
@@ -5274,7 +5277,10 @@ the trail, because it would be student data.
   path) to `Quarantine/`, counting both. Since the 750a review (H3) it
   tries not to say "checked" of a file it could not read: it reads UTF-16, gzip,
   a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
-  and XMP; it reports read and clean, moved, and NOT checked by kind, and
+  and XMP; it reports read and holding none of the forms of the table's
+  names (it said "read and clean" until the 752 review, H1; its last line
+  says a nickname or a name not in the table cannot be seen), moved, and
+  NOT checked by kind, and
   exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
   file, UTF-16 text, a PNG's zTXt chunk and a PDF's title each holding a
   name were "checked, 0 held a name", and a folder named by a name stayed
@@ -5304,7 +5310,9 @@ the trail, because it would be student data.
   direction. Must-fails: a runner that passes every line, or passes
   stderr through, lets the invented names out (`test_marking_guard.py`).
 - **The named step (review H2, M3).** `make_named_copies.py` is the only
-  script that puts a name into anything: the TeX-escaped name into each
+  script that puts a name into anything (since #752 the first names into
+  report comments as well: "The report-comments skill" below): the
+  TeX-escaped name into each
   sheet's one `\studentline{}`, compiled in a temporary folder outside both
   folders with its output captured and thrown away, never `--keep-logs`,
   the PDF alone moved into `Named/`. MEASURED (tectonic 0.17.0): a failed
@@ -5353,6 +5361,200 @@ the trail, because it would be student data.
 NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
 Codex) marking invented scanned papers, which the plan makes the gate that
 matters; it needs the screen-free Mac and is written up for the director.
+
+**The report-comments skill (#752).** The tenth skill,
+`plantoir-report-comments`, drafts report card comments from what
+`plantoir-marking` wrote: three options per student, each complete, so the
+teacher picks or blends. It has a `SKILL.md` and one reference, and no
+scripts of its own: the names go in through `plantoir-marking`'s
+`make_named_copies.py`, which gained three modes, run through the same
+never-adapted runner (`assessment.agentGuidance.reportCommentsSkill.uses`).
+Russell's kit had a separate comments script; REJECTED: a second name
+script, because two copies of the name step drift.
+
+- **What a comment is drawn from.** The marks records of tests marked from
+  scanned papers (`summary`, `strengths`, `focus`, `closing`, `byQuestion`,
+  each point's `studentNote`), the kit and the rulings, once the marks are
+  final; evidence from the records only. No skill marks a coding assignment
+  yet (750b is not built), so the skill says plainly that there is no record
+  of one. It drafts about something no record holds only from the teacher's
+  own notes, written by identifier in `Teacher Notes.md` and read only
+  after `make_named_copies.py --check-file` (through the runner) finds no
+  word of the mapping table in them. That check prints line numbers, never
+  the words, and counts EVERY part of two letters or more on its own,
+  surnames too, as the runner does, because it decides what the assistant
+  may read. It never calls a file clean: when it finds nothing it says what
+  it looked for, and that a nickname, initials or a name not in the table
+  cannot be seen by it, so the teacher reads the notes once first. MEASURED
+  by the implementation review (H1): with the first rule (a short part only
+  beside another part of its name), notes reading "Student A: Ixo led the
+  group project well." were reported clean, exit 0, and would have been read
+  and sent to the AI service; a three-letter first name is common.
+- **Whose shape.** The teacher's How I Teach page first, then the school's
+  own report convention, ASKED: the limit and whether the system counts
+  characters or bytes, line breaks, who the comment speaks about and in what
+  tense, the parts, words required or avoided; recorded in `Marking
+  Settings.md`. Russell's shape (formal, past tense, did well, still
+  working on, one next step, written for a parent as well as the student,
+  450 characters) is in `reference/template.md` as the comment shape of the
+  named template, offered with it only to a teacher who has shown the
+  interest it bridges, and shown to anyone else only as one teacher's
+  example when they have no convention and ask for a suggestion (plan review
+  L5). REJECTED: his shape as the default, since report conventions belong
+  to the school or board. Fixed for everyone: three options, kind, plain
+  words, evidence only, within the limit after the names go in, and a
+  separate reviewer checking each option against the records it cites.
+- **Names, and why no pronouns by default.** Drafts write `{first name}` and
+  are written so that no pronoun is needed. The assistant never asks for,
+  guesses or holds a pronoun or gender. Russell's kit had a `gender` column
+  on the assistant's side of its comment rows; REJECTED, because the
+  assistant does not know them and must not hold them. Only when the
+  teacher says the table has a `pronouns` column may a draft use `{they}`,
+  `{them}`, `{their}`, `{theirs}` (capitalised at a sentence's start),
+  filled from that column (`she/her`, `he/him`, `they/them`, the same with a
+  third word such as `she/her/hers`, or four words); a pronoun placeholder
+  with no column, or with an empty value, refuses the run. After `{they}`
+  or `{They}` only an ALLOW-list is accepted: can, could, will, would,
+  should, might, must, may, did, had, a past tense in -ed (need, proceed
+  and their like excluded) or a short list of irregular past forms, with
+  adverbs skipped; anything else, or anything glued to the placeholder, is
+  REFUSED at the draft, by word number, whatever the table holds. MEASURED
+  by the reviews: with they/them the first version wrote "They was proud of
+  their work, and they is improving." (M2), and the deny-list of auxiliaries
+  that fixed it still wrote "They explains" and "They always was careful"
+  (fix review M2); under a present-tense convention every verb after
+  `{they}` changes, so the skill steers such a teacher to `{first name}`.
+  REJECTED: conjugating the verb at the fill, because a refusal can be
+  proved by cases and a conjugator for every verb cannot. The first name is the `first name` column, else the part after the
+  comma of "Last, First", and otherwise refused, never guessed from a name
+  with no comma.
+- **A name in a draft.** `--comments` refuses the whole run, writing
+  nothing, when a draft already holds a word from the table before the
+  names go in: in an option (named by option and word number, never the
+  word), in another field of the student's entry such as `cites`, or on a
+  line of `Comments - Drafts.md` beside it. **The comparison is ONE block of
+  code** ("The name comparison", between `# >>>` and `# <<<` markers),
+  carried byte for byte in `run_with_names.py` and `make_named_copies.py`,
+  so the runner, `--check-file` and `--comments` give the same answer on
+  every line; `scripts/test_marking_comments.py` fails if the two copies
+  differ, and runs all three over one corpus of 31 lines, failing on any
+  disagreement. MEASURED by the fix review (H1): before, they disagreed on
+  7 of 22 lines in both directions (the runner passed `Ixo2`, `Ixo_notes`
+  and `Mark_feedback.pdf`, because `\w+` counts `_` and digits as letters;
+  the scripts passed a preferred name and a first name run into a surname,
+  because they read two columns where the runner reads five), and the
+  runner left `Ixo_feedback.txt` and `TestpartFeedback.txt` in the marking
+  folder while saying no word was found. The block reads the name, first
+  name, preferred name, last name, surname, e-mail, handle and repository
+  columns, compares case and accents off, counts every part of two letters
+  or more as a whole word (a short part on its own too), every form of six
+  letters or more anywhere, and finds whole words three ways: as `\w+`, as
+  runs of letters, and split where a small letter meets a capital
+  (`AnaLi`). REJECTED: a short part counted only beside another part of its
+  name, which let "{first name} and Ixo compared answers" into another
+  child's comment (review H1); a missed name is worse than a false alarm.
+  So an everyday word that is also a name (May, Will, Mark) is refused, and
+  every refusal says it may be one: a draft is rewritten without it, and a
+  teacher's note is read by the teacher, who changes the line or says to go
+  on by its number. Measured by the fix review on a table of fourteen such
+  names against eighteen ordinary sentences: 10 of 18 refused; a real class
+  holds one to three. No line says or implies that no name is present:
+  `--check-file`'s line when it finds nothing says it looked for the forms
+  of the N names in the table and found none of THEM, and that a nickname,
+  initials or a name not in the table cannot be seen. A printed line holding
+  an everyday word that is a name in the table is withheld by the runner,
+  so the scripts' own lines avoid them ("could", not "may"; "I do not open
+  them", not "will not"). It also refuses a `cites` entry that is not that
+  student's own marks record inside this marking folder: relative, no `..`,
+  exactly `<Assessment>/Marks/Section N/<identifier>.json`, and there.
+  MEASURED by the reviews: Student A's comment citing Student AA's record,
+  or Section 2's Student A drafted under Section 1, was written with exit 0
+  (M1), and then another course's record through `..`, a full path, and any
+  file called `Teacher Notes.md` were accepted (fix review L1). A comment
+  drawn from the teacher's notes says so with `"teacherNotes": true`. This is what catches a comment that quotes a student's work
+  holding their own or a classmate's name. The runner cannot, because the
+  drafts existed before the run and it looks only at what a run writes in
+  the marking folder. An everyday word that is also a name (May, Will) is
+  refused too, the safe direction; the skill says to rewrite the option
+  without it.
+- **Why the length is checked after the names go in.** `{first name}` is 12
+  characters, so a draft that fits can be over with a long name in it, and
+  one that looks over can fit with a short one; only the filled text counts.
+  It is counted in Unicode characters of the NFC text, or UTF-8 bytes with
+  `--count bytes`, because report systems differ and a system that counts
+  bytes counts an accented letter as two (a web form counting UTF-16 units
+  counts some emoji as two, and a line break is one or two: the skill names
+  both when it asks). MEASURED (`commentNames.cases`, 42, and `checkFileCases`, 6, every comment
+  typed and counted by hand; the invented names are made-up words such as
+  Qoë and Ixo, so the name check before a merge does not meet a real given
+  name): `Qoë` is 3 characters and 4 bytes; a table that holds it decomposed (e and a combining diaeresis)
+  counts 3 only after NFC; a 47-character draft for a 14-letter first name
+  is 2 over a limit of 47. `--longest-first-name` prints the longest first
+  name's length in characters and bytes for the budget, never the name. A
+  comment over the limit is still written, marked "OVER THE LIMIT by N" in
+  the teacher's files, and named by identifier and option; the run exits 1.
+  The line saying every comment is within the limit is printed only after
+  each was counted. `Report Comments.csv` is UTF-8 with a byte order mark
+  so a spreadsheet opens the accents; it and `Report Comments.md` go only
+  into the teacher-only folder that holds the mapping table (review L1: any
+  folder outside the marking folder was taken, and the line saying where the
+  names went was printed regardless), with the full name beside the
+  identifier for finding each student in the report system. A refused run
+  renames an earlier run's files "earlier run, do not use" (L2), and the
+  run names, by identifier, any student of a drafted section the drafts
+  left out (L4).
+- **Python 3.9.** MEASURED by the review (H2): `/usr/bin/python3` on macOS
+  is 3.9.6, and `Path.write_text(newline=)` is 3.10, so `--comments`
+  crashed there and the self-test, which the marking skill makes a gate,
+  failed, blocking 750a's named sheets too. The file is now written with
+  `open(..., newline="")`; every `--self-test` of both skills, and every
+  marking test, passes on 3.9.6 and 3.14.4, and a test compiles every
+  shipped `.py` of every skill under `/usr/bin/python3` and runs each
+  `--self-test` there (it skips where that Python is not installed).
+- **Tests.** `scripts/test_marking_comments.py` runs every case directly and
+  through the runner (which must withhold no line and move nothing), checks
+  that no word of the table is printed and nothing new is in the marking
+  folder, and checks the skill's files and pins. Must-fails by copy and
+  restore, each red: counting bytes when no count is given (5 cases), the
+  draft counted before the names go in (8), no look for a name in a draft
+  (the two quoting cases), NFC dropped at both the table read and the
+  filled comment (the decomposed case; dropping either alone stays green,
+  because each covers the other), a pronoun filled with no column, the
+  drafts page not looked at, an over-limit line carrying the name (directly
+  and through the runner), the marking skill without
+  `make_named_copies.py`, and a pinned sentence taken out. After the fix
+  review, each red too: the runner's copy of the block changed alone (the
+  one-block test and the agreement test), both copies back to `\w+` words
+  only, both without the preferred name column, both without long parts
+  matched inside a word, a deny-list in place of the allow-list, a cite
+  accepted when its record is not there or when it climbs out through
+  `..`, the everyday-word sentence dropped from `--check-file`, a "clean"
+  line, and `write_text(newline=)` under `/usr/bin/python3`. The narrow
+  regex guard for 3.10-only features is gone: a test compiles every shipped
+  `.py` of every skill under `/usr/bin/python3` and runs each `--self-test`
+  there (the fix review found the guard missed `int | None`, `except*`,
+  `itertools.pairwise` and more). After the
+  implementation review, each red as well: the beside rule for every short
+  part (the two classmate cases, and three of the four `checkFileCases`),
+  a short surname alone not counted by `--check-file`, the old "clean"
+  line, `write_text(newline=)` (the source guard, and the self-test on
+  `/usr/bin/python3`), `cites` not checked, the verb check removed,
+  three-word pronouns refused, `--out` anywhere, the earlier run left in
+  place, the left-out students not named, and each of seven privacy and
+  refusal sentences the review found unpinned, taken out one at a time.
+  `--self-test`
+  now tests the comments always and the named sheets only where tectonic
+  and pdftotext are installed, saying which. Before, a missing tectonic
+  failed it outright, which would have stopped a teacher who only wants
+  comments.
+- **How a teacher finds out.** `plantoir-marking` mentions it once when the
+  marks are final; the root `CLAUDE.md` and `AGENTS.md` name it in one
+  bullet each; it offers nothing after itself, being the last step. Nothing
+  on plantoir.app, no new app text, no trail event (the app does nothing
+  new, and work on student records is never recorded).
+
+NOT MEASURED in this piece: a trial with a real assistant drafting comments
+from invented marks records; it is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
@@ -11362,21 +11564,32 @@ folder ready after an update (#473)"), with the mac's differences named:**
   again at the next build rather than refused for ever with a sentence
   naming a File menu it has not got. And, like the quit, the server never
   leaves mid-copy: at the end of its input it waits for a running copy
-  before exiting (the fixes review's finding 1). **Not done on purpose:** a cross-process marker.
-  Windows wrote `toolchain-copying.<pid>` so one process could see another's
-  copy; the mac does not, because every file is written atomically from the
-  same bundle, so two copies at once write the same bytes and the worse
-  outcome is wasted work, not a broken recipe.
-- **The scheduled run is unchanged**: `ScheduledDeploy` starts its own
-  `Process`, never a `ScriptRunner`, and never mirrors; a `--stop`
-  (`PreviewStopper`) is its own process too, so neither meets the backstop
-  (finding 1). **Windows' run is no longer the same** (#477, 2026-10-15):
-  it waits for a live copy of the folder's tools and makes its own before it
-  builds, and its copies take turns, because two copies at once were
-  MEASURED to fail there with sharing violations (07 → "On Windows since
-  bundle 3: the scheduled run is Plantoir"). Whether the mac's run builds
-  from an out-of-date or half-copied `.toolchain/` after an update is a
-  `mac` issue.
+  before exiting (the fixes review's finding 1). **Not done on purpose
+  (until #748):** a cross-process marker. Windows wrote
+  `toolchain-copying.<pid>` so one process could see another's copy; the mac
+  did not, because every file is written atomically from the same bundle, so
+  two copies at once write the same bytes and the worse outcome is wasted
+  work, not a broken recipe. #748 MEASURED that and found it half right: the
+  bytes were right every time, but one of the two copies counted the files
+  the other had removed as FAILED, in every run after an update, and a
+  failed copy greys Preview and Deploy. The mac now writes Windows' marker
+  for every copy and counts a file already gone as done ("A scheduled deploy
+  brings its folder up to date first (#748 part 4)", below). Precisely: the
+  `.toolchain/` copy `ToolchainReadiness.ensure` starts off the main actor
+  and the scheduled run's copy write it; the launcher refresh, the
+  synchronous copy and `BuilderWarmUp` (its own folder) do not.
+- **The scheduled run was unchanged by #476**: `ScheduledDeploy` starts its
+  own `Process`, never a `ScriptRunner`; a `--stop` (`PreviewStopper`) is its
+  own process too, so neither meets the backstop (finding 1). It did not
+  mirror either, until #748 part 4 (2026-11-13): it now brings the folder's
+  launchers and `.toolchain/` up to date itself before its script runs,
+  waiting for another program's live copy first ("A scheduled deploy brings
+  its folder up to date first (#748 part 4)", below). Windows' run has done
+  the same since #477 (2026-10-15), with its copies taking turns because two
+  copies at once were MEASURED to fail there with sharing violations (07 →
+  "On Windows since bundle 3: the scheduled run is Plantoir"). That answers
+  the `mac` issue #535 asked: yes, the mac's run built from the folder's old
+  `.toolchain/` after an update, until #748.
 - **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
   the synced-folder notice) appears only once the copy has actually written
   or removed its first file (`syncDirectory` says so once, for a write or a
@@ -11709,6 +11922,168 @@ known folders. The trap this paragraph used to
 name (its `ToolchainFingerprintTests` writing to the real `AppDataRoot`) had
 already been closed by #285's suite-wide redirect; `documentation/12-windows-app.md`
 → "Pruning the index (#735)" has the Windows details.
+
+### A scheduled deploy brings its folder up to date first (#748 part 4, 2026-11-13)
+
+**The gap.** The `--run-scheduled-deploy` process is this app's own binary,
+so it carries the version installed now, and since #323 it writes its
+wrapper afresh at the run. But the wrapper runs the FOLDER's `preview.sh`
+and `deploy.sh`, and those hash the folder's `.toolchain/` to choose the
+website builder. Only a window (`refreshLaunchersIfNeeded`), the assistant's
+server and `BuilderWarmUp` (its own folder) ever copied them. So after an
+update installed overnight, a 6:30 deploy in a folder nobody had opened
+since ran the launchers and the recipe of the version that last touched
+it, and so the old builder. It did not even rebuild the site: #746's stamp
+check is in those same old launchers, whose image matched the old stamp.
+
+**What the run does now** (`ScheduledRunFolderRefresh`, called from
+`runScheduled` on the branch that deploys): after the settings decision,
+holding the course's `build` and `publish` leases, and before the script
+runs, it
+
+1. waits while another program's copy into the folder is live (Windows'
+   `toolchain-copying.<pid>` marker, `ToolchainCopyMarker`);
+2. writes its own marker, replaces any launcher at the folder's top that
+   differs from the bundle's (`refreshLaunchersReporting`), mirrors
+   `.toolchain/` (`copyToolchainFiles`, the same function and fingerprints
+   the window uses, #663), and removes its marker;
+3. waits again, because a window opened during step 2 copies too, and its
+   copy must be over before anything hashes the recipe;
+4. writes `scheduled deploy got its folder ready` unless it changed nothing
+   and waited for nobody, which is every run but the first after an update.
+
+The two waits share one limit, five minutes from the first look, looking
+every second; then it goes ahead. It never mirrors from a bundle with no
+`Dockerfile` at its root, because the mirror deletes what its source lacks,
+and never writes into a folder with no `preview.sh`. A plist from before
+v1.2.0 names no section, so it has no folder to copy into and copies
+nothing, as it reads no settings.
+
+**It goes ahead in every case**, and that is the decision this piece had to
+make: `contracts/shared-rules.json` → `scheduledRunGetsItsFolderReady` has the
+table (14 cases) and the reasons (`whyItAlwaysGoesAhead`). A deploy that
+silently does not happen at 6:30 is the worst outcome; one that goes ahead
+with the tools as they were and says so is better. A copy that wrote nothing
+(a folder that cannot be written, no tools in the app) leaves the folder's
+old set whole, which is what every scheduled run used before this. A copy
+that failed part way leaves some files new; if the build then fails, the
+build leg records it (`scheduledPublishStopped`) and the notification says
+so. Windows stands down instead (#477), and the difference is recorded in
+`platformDifferences`: its failures were sharing violations on files the
+other copy had written correctly, which on the mac no longer count at all.
+
+**The guard, and what two copies at once actually do.** MEASURED on an Apple
+M4 Pro, macOS 26.6, 2026-11-13, with `copyToolchainFiles` and
+`refreshLaunchers` compiled standalone from this branch's source, two
+processes started at the same instant on the app's own recipe (13,023 files,
+83 MB) into one folder:
+
+| Shape | Runs | Runs with a failure reported | Folder at the end |
+|---|---|---|---|
+| After an update (91 files changed, removed or added; every file restamped) | 5 | 5 (18 or 19 files in one of the two) | right, byte for byte, every run |
+| Into an empty folder | 8 | 5 (1 or 2 files) | right every run |
+| Both, with a file already gone counted as done | 13 | 0 | right every run |
+
+Every failure was a removal of a file the other copy had removed first, or
+of the other copy's temporary file (`<name>.sb-…`, which Foundation's atomic
+write makes beside the file) after it had been renamed into place. So the
+mac's two writers are safe for the bytes, as #476 said, but not for the
+COUNT, and a failed count greys Preview and Deploy in the window. Since
+#748 `WorkspaceModel.removeStrayFile` treats a file that is not there as
+done. The marker is for the READER: the run is the one copier that goes
+straight on to build with nobody watching, so it is the one that waits.
+Two copies write it: the `.toolchain/` copy a window or the assistant's
+server starts off the main actor (`ToolchainReadiness.ensure`), which waits
+for nobody, and the run's own. The window's launcher refresh
+(`refreshLaunchersIfNeeded`, milliseconds), the synchronous copy
+(`initializeWorkspace` and the suite) and `BuilderWarmUp` (its own folder)
+do not write it; each writes whole files atomically, so a reader never sees
+half of one.
+
+**Two different versions of Plantoir copying at once** (the 748b review's
+LOW 1, measured by the reviewer: a new and an old bundle started together
+into one folder): both reported no failure and the folder ended MIXED in 3
+of 4 runs, 8 to 14 files from the older recipe. Nothing compares the folder
+with the bundle after the run's second wait, so the trail would still say
+it copied its files. It needs two copies of the app on one Mac, a plist
+whose saved path is a different copy from the one the teacher opens, or an
+assistant server started from one; and a job whose saved path is an OLDER
+copy of the app copies that older version's files over a newer folder.
+That is accepted: on `dev` before this piece the same older binary wrote its
+own wrapper and ran whatever launchers the folder had, so the folder's
+launchers and the wrapper could come from different versions on every run;
+now the run's launchers, recipe and wrapper come from one version, and the
+next window of the newer app mirrors the folder back (the image tag is a
+hash of the recipe, so a mixed recipe gets a builder of its own, never the
+newer version's).
+
+**A launcher is never half written when the wrapper runs it.** Every
+launcher and recipe file is written whole to a temporary file and moved
+into place. Measured under `/bin/bash` 3.2 with a script that sleeps
+between two `echo`s: replaced by a move while it ran, bash finished the OLD
+text; overwritten in place, bash went on reading the NEW file from the
+byte it had reached.
+
+**The cost when nothing is stale** (same Mac, same recipe, a single copy;
+an unrelated `verify.sh` was running for the first set): 0.84 to 0.86 s, and
+3.9 to 6.6 s at background priority (`taskpolicy -b`). After an update: 1.33
+to 1.47 s (3.9 to 6.1 s at background priority). Into an empty folder: 4.1
+to 4.7 s (10.6 to 14.3 s). Not measured under launchd itself, because no
+real job may be registered in this run; a job with no `ProcessType`, as
+ours is, runs as Standard, which should sit between the two.
+
+**What the first run after an update then costs.** Any change in
+`.toolchain/` changes the image tag, so the launchers build the website
+builder again unless this version has already built it (`BuilderWarmUp`
+does at the first launch of a new version, so a Mac that was used after the
+update has it). Measured with `setup.sh --prepare-builder` on the same Mac,
+the earlier version's layers cached: a change to a script copied near the
+end of the recipe, 6 s; to one copied half way through (before wrangler is
+installed), 25 s; to the first layer, so everything is rebuilt and
+downloaded, 70 s. Then #746's stamp check remakes the folder's workspace and
+builds the site again (32 s from scratch, measured by verify-deploy.sh; 07 →
+"`verify-deploy.sh` — the publishing harness"),
+and a stopped virtual machine adds 22 to 27 s (#312). So the first scheduled
+deploy after an update can take between a few seconds and about two minutes
+longer than the one before it, which is why the trail line says so.
+
+**Two sections of one course set for the same time take turns** (the
+review's LOW 2). They wait for each other on the course's leases
+(`waitForTheCourse`, ten minutes, looking every fifteen seconds), and the
+first now holds them through its copy (0.84 to 4.7 s measured above, up to
+14.3 s at background priority), any wait for another program's copy (up to
+five minutes) and, after an update, the builder built again (6 to 70 s) and
+the site rebuilt (about 32 s). The second section's own copy then finds
+nothing to change (0.85 s) and its builder is already built, so it adds
+only its own deploy. It stands down `courseWasBusy` only if the first takes
+more than ten minutes in all, which needs the five-minute wait used up as
+well; it was not measured end to end, for want of a real launchd job.
+
+**Rejected:**
+- **Standing down when the copy fails** (Windows' choice): it turns a copy
+  that did no harm into a deploy that publishes nothing.
+- **Waiting with no limit**: a stuck copy would hold the deploy for ever,
+  and the other copy writes the same bytes.
+- **"Open the folder once after an update" in the notes**: nobody reads them
+  at 6:30, and Russell ruled the part in.
+- **Rewriting every folder's tools at the first launch after an update**:
+  the app does not know every folder, and a folder opened then is mirrored
+  anyway.
+- **A kernel lock (`flock`)**: a second mechanism beside the marker Windows
+  already writes, whose liveness rule already ignores a marker left by a
+  program that is gone.
+- **The window taking turns with the run, as Windows' copies do**: measured
+  above, two copies at once on the mac write the same bytes once a file
+  already gone is not a failure, and a window must never wait on a run that
+  may itself be waiting for the course.
+- **A fresh event name for Windows to adopt**: Windows already records the
+  same facts on `working folder tools copied` and `scheduled publish waited
+  for the course`; the mac's event says something Windows' cannot (it went
+  ahead with the tools as they were), so it is `appliesOn: ["mac"]`.
+
+**Tests:** `ScheduledRunFolderRefreshTests` (the contract's cases, the
+sentences, real folders, the waits with a pretend clock, the marker, a stray
+file already gone, and where the call sits in `runScheduled`).
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 
@@ -14984,3 +15359,76 @@ and the problem is a missing Release-26.6 build at the cut, not the daily
 compiler.
 
 Nothing here reaches Windows: it is the Swift toolchain only.
+
+## Sharing unit plans from the Planning tab (#709)
+
+The foot of the Planning tab is the share bar (`PlanShareBar`): the course's
+unit plans shared as a small website of their own on Cloudflare Pages, one
+for each school year. How a share works, what was measured and what was
+rejected is `documentation/07-deployment.md` → "Sharing a unit plan (#709)";
+this is the app's half.
+
+- **The bar reads the markers, never its own memory.** `PlanSharing.markers`
+  reads every `courses/<CODE>/.cloudflare_sites/plans-<year>.json` (exactly
+  that shape: a marker a reference copy moved aside is not a year still
+  shared), when the tab appears and when a share ends. So a share typed in
+  Terminal reads the same.
+- **Before the first share this school year:** `words.sharedThroughCloudflare`
+  and, when the course's class websites go to Netlify, `words.netlifyTeacher`;
+  Protect with a Username and Password; Include Answer Keys while Protect is
+  off; Share Unit Plans. **Once shared:** the address as a link and Copy Link;
+  with a password or open; the flood sentence for a protected share, from the
+  marker's `failClosed` (`PlanSharing.floodSentence`); when it was last
+  shared; how many answer keys an open share left out; while the marker's
+  `oldCopies` is above 0, that an earlier copy may still open at its own
+  address; Share Again, Change
+  Password or Remove Password (or Add a Password), and Stop Sharing. Earlier
+  years still shared are one row each with their own Stop Sharing.
+- **Never safer than the site** (implementation review H1): a marker left in
+  state `sending` by a share that stopped part way reads as
+  `words.lastShareUnfinished` (the plans may be open), and one in state
+  `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
+  (`PlanSharing.barStatus`, `barCases`).
+- **Before an open share goes out** the launcher lists every file it will
+  share and every file it leaves out, by name, and asks. The app reads the
+  lists from their marker lines (`PlanShareLists`, kept out of the console)
+  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
+  scrolling, the by-name sentence, Share and Cancel with Cancel the default
+  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
+  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **A plan's password** is sent from the credential sheet exactly as typed
+  (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
+- **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
+  comes before a choice exactly when `PlanSharing.warns` says
+  (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
+  nothing and runs nothing.
+- **The run** is `PlanShareRunner`: `deploy.sh` with
+  `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
+  `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so
+  the Cloudflare token and the plans' username and password are asked the way
+  a section's deploy asks (`CredentialRequest.unitPlanUsername`,
+  `unitPlanPassword`). No argument ever carries a username or a password.
+- **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
+  under section 0 (`PlanSharing.leaseSection`), which no section has: a
+  section's own deploy is never refused by it, while the course reads as busy
+  to Quit, Rename, Back Up, Start of Year and Archive, and an outside
+  assistant's deploy waits, as review M7 asked. Quit names it "sharing the
+  unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
+  a share builds no section. A new lease kind was rejected: `publish` already
+  means sending something somewhere to every reader of a lease.
+- **The trail** is written from the markers by `PlanShareReport`, which every
+  launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
+  "unit plans shared", "unit plan share refused", "unit plan sharing stopped".
+  Never the address, whose suffix is a line of defence, and never a username
+  or a password. The plan asked for the share line to say whether the
+  warning had been shown and the password changed; the markers do not carry
+  either, so the line does not, and that is a known gap for a later piece.
+- **A reference copy** of the course renames every year's marker aside
+  (`PlanSharing.releasePlanMarkers`, called by
+  `ReferenceCopier.makeIntoAReferenceCourse` beside `releaseSite`), so the
+  copy can never reach this year's plan site.
+- **Problem reports** carry two more redaction rules (`LogRedactor`):
+  `basicAuthHeader`, anchored on `Authorization:` so "Basic French" in a
+  course title is left alone, and `urlUserinfo`, before the email rule, which
+  would otherwise take a `user:password@host` for an address and leave the
+  username behind.

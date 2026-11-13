@@ -86,7 +86,7 @@ struct TaskProgressView: View {
     /// from.
     var awaitingInputBinding: Binding<Bool> {
         return Binding(
-            get: { runner.isAwaitingInput && runner.pendingCredentialRequest == nil },
+            get: { TaskProgressView.questionSurface(for: runner) == .plainQuestion },
             set: { isPresented in
                 if !isPresented {
                     runner.isAwaitingInput = false
@@ -98,13 +98,47 @@ struct TaskProgressView: View {
     /// Drives the credential sheet, on the same terms.
     var awaitingCredentialBinding: Binding<Bool> {
         return Binding(
-            get: { runner.isAwaitingInput && runner.pendingCredentialRequest != nil },
+            get: { TaskProgressView.questionSurface(for: runner) == .credential },
             set: { isPresented in
                 if !isPresented {
                     runner.isAwaitingInput = false
                 }
             }
         )
+    }
+
+    /// Drives the open share's lists sheet (#709).
+    var awaitingPlanShareListsBinding: Binding<Bool> {
+        return Binding(
+            get: { TaskProgressView.questionSurface(for: runner) == .planShareLists },
+            set: { isPresented in
+                if !isPresented {
+                    runner.isAwaitingInput = false
+                }
+            }
+        )
+    }
+
+    /// Where a waiting question is answered. One answer per question, so the
+    /// open share's question can never reach the plain alert.
+    enum QuestionSurface: Equatable {
+        case none
+        case plainQuestion
+        case credential
+        case planShareLists
+    }
+
+    static func questionSurface(for runner: ScriptRunner) -> QuestionSurface {
+        if !runner.isAwaitingInput {
+            return .none
+        }
+        if runner.isAskingAboutPlanShareLists {
+            return .planShareLists
+        }
+        if runner.pendingCredentialRequest != nil {
+            return .credential
+        }
+        return .plainQuestion
     }
 
     // MARK: - Functions
@@ -380,6 +414,19 @@ struct TaskProgressView: View {
                     }
                 )
             }
+        }
+        // The open share's question (#709): both lists in full, in a sheet
+        // of their own, and Cancel the default.
+        .sheet(isPresented: awaitingPlanShareListsBinding) {
+            PlanShareListsSheet(
+                lists: runner.planShareLists ?? PlanShareLists(),
+                onShare: {
+                    runner.send(line: "y")
+                },
+                onCancel: {
+                    runner.send(line: "n")
+                }
+            )
         }
         .onChange(of: runner.isAwaitingInput) {
             // Start from the answer the task would have used anyway, so

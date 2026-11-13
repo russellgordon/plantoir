@@ -611,7 +611,7 @@
       {
         "carries": "the course, the section, how many seconds it waited, what the other program held and its process id - or, on Windows since #477, that Plantoir was getting the working folder ready and that copy's process id, or both obstacles in one line - and whether it then went ahead or stood down",
         "event": "scheduled publish waited for the course",
-        "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record. On Windows since #477 (2026-10-15) the same wait, in the same ten minutes, also covers another program copying the app's tools into the working folder (a window opened on it just before the run, after an update): the line says 'waited N s for Plantoir to finish getting the working folder ready (process P)', and a copy still live at ten minutes stands the run down with couldNotRunAsSetNow and wording.wrapperCouldNotBeWritten - never courseWasBusy, which would be a false sentence about the course. The mac does not wait for a copy (its scheduled run does not mirror the tools); whether it should is a mac issue, not a contract case, by Russell's ruling on #477."
+        "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record. On Windows since #477 (2026-10-15) the same wait, in the same ten minutes, also covers another program copying the app's tools into the working folder (a window opened on it just before the run, after an update): the line says 'waited N s for Plantoir to finish getting the working folder ready (process P)', and a copy still live at ten minutes stands the run down with couldNotRunAsSetNow and wording.wrapperCouldNotBeWritten - never courseWasBusy, which would be a false sentence about the course. The mac's run waits for a copy too since #748 part 4, before and after its own copy, for up to five minutes, and records that wait on its own event ('scheduled deploy got its folder ready'), never on this one, because it is not a wait for the course; it is not a contract case for both platforms, by Russell's ruling on #477, and scheduledRunGetsItsFolderReady.platformDifferences says how the two differ."
       },
       {
         "event": "scheduled deploy waited for its earlier deploy",
@@ -1185,6 +1185,44 @@
         },
         "couldNotOpenLine": "{course} · could not open {what} in the browser",
         "why": "#803: Open in Browser on the Planning tab (unitPlanning.tab.openInBrowser) sends a plan out of Plantoir, to an app a report cannot see into, so a report of 'my plan looks wrong in Safari' or 'nothing happened' needs a line saying the button was pressed and whether the browser took the page. Written once the browser has answered. A refusal writes nothing: the button is dimmed and says why, and the alert at a click says it again. The kind of page and never its name, because a unit's folder name is made from its title, the teacher's own words (rule 5)."
+      },
+      {
+        "event": "unit plans shared",
+        "carries": "the course, the school year, how many units, with a password or open to anyone with the link, answer keys left out, what a flood would do (protected only, from the marker's failClosed), and that an earlier copy could not be removed. NEVER the address (its random suffix is a line of defence, and the trail goes into problem reports), a username or a password. Written by the app from share_plan.py's PLANTOIR_PLAN_SHARED: line (PlanShareReport).",
+        "line": "{course} · unit plans for {year} shared to Cloudflare Pages, {units}, {with a password | open to anyone with the link}{, answer keys left out}{, the plans close if flooded | , the plans would open if flooded}{, an earlier copy could not be removed}",
+        "why": "#709. A shared plan is something a teacher's colleagues can open from anywhere, and 'my colleague says the plans ask for no password' or 'the answer keys are not there' is answerable only from what the share did. The warning and a changed password are not on the line: the marker does not carry them (a known gap, documentation/09-mac-app.md)."
+      },
+      {
+        "event": "unit plan share refused",
+        "carries": "the course and why, in plain words by the refusal's key (unitPlanning.share.refusals), with the problem count for checkFound. Written by the app from PLANTOIR_PLAN_REFUSED:, and by deploy.sh itself when the plans were already being shared.",
+        "line": "{course} · unit plans not shared: {reason}",
+        "launcherLineWhenAlreadySharing": "{course} · unit plans not shared: they were already being shared",
+        "why": "#709. A share that did not happen says so in the console, which is gone once the sheet is closed."
+      },
+      {
+        "event": "unit plan sharing stopped",
+        "carries": "the course, the school year, and how it ended: deleted, already gone, or failed with the address still working. Never the address.",
+        "line": "{course} · stopped sharing the {year} unit plans ({deleted | already gone | failed, so the address still works | not confirmed, so the address may still work})",
+        "why": "#709. 'I stopped sharing and my colleague can still open it' is answerable only if the trail says whether the delete worked."
+      },
+      {
+        "event": "scheduled deploy got its folder ready",
+        "carries": "the course and the section, after the course's own prefix ({course}/{section} · ); which case of scheduledRunGetsItsFolderReady.cases it was (the line key); how many files were brought up to date and how many seconds the copy took; whether that means the website builder is built again; for a copy that could not finish, how many files failed and the first one with its error; and how long the run waited for another program's copy of the tools, with that program's process id. Never a path: the working folder is the course's.",
+        "lines": {
+          "broughtUpToDate": "a scheduled deploy copied {n} file(s) of Plantoir's tools into the working folder first, in {seconds} s{builder}, and went ahead",
+          "builderClause": ", so the website builder is built again for them unless this version of Plantoir has built it already",
+          "alreadyUpToDate": "a scheduled deploy found the working folder's tools already up to date, and went ahead",
+          "foundNothingToChange": "a scheduled deploy found nothing of its own to change in the working folder's tools, and went ahead",
+          "couldNotFinish": "a scheduled deploy could not bring all of the working folder's tools up to date ({failed} file(s) could not be copied or removed, {n} brought up to date, first: {first}){builder}, and went ahead with them as they were",
+          "appCarriesNoTools": "a scheduled deploy found none of Plantoir's own tools to bring the working folder up to date with, and went ahead with the folder's tools as they were",
+          "waitedClause": "; it first waited {waited} seconds for another program (process {pid}) to finish getting the working folder ready",
+          "stoppedWaitingClause": "; it stopped waiting after {waited} seconds for another program (process {pid}) that was still getting the working folder ready"
+        },
+        "why": "#748 part 4. The first scheduled deploy after an update is the one run that copies the new version's tools into a folder nobody has opened since, and it is also the one that then builds the website builder again, which makes it minutes slower than the run before it. A deploy that went out late, with a builder built again, looks from outside like a Mac that was slow for no reason; and one whose copy failed and went ahead with the old tools looks like a deploy that ignored the update. This line says which. Not written for the ordinary run that compares every file and changes nothing, and waits for nobody, which is every run but the first after an update: a line on every run would be noise in the one place a teacher's report is read. scheduledRunGetsItsFolderReady carries the cases and why the run goes ahead in every one of them.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Windows' run has done the same since #477 (2026-10-15) and records it under the two events it already had: 'working folder tools copied' ('got the working folder ready for a scheduled deploy', a failure ending 'the scheduled deploy stood down') and 'scheduled publish waited for the course' for the wait. The mac gives it an event of its own because its run never stands down for the copy (scheduledRunGetsItsFolderReady.platformDifferences), so its line says something Windows' lines do not: that it went ahead with the tools as they were. Nothing is owed by Windows."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -3054,6 +3092,21 @@
         "expect": "Netlify token missing",
         "input": "Netlify token missing",
         "why": "KEPT. A sentence that merely says the word 'token' is not a secret, and turning the product's own error messages into holes would make failures unreadable. The rule needs a value after a separator before it removes anything."
+      },
+      {
+        "expect": "curl -H 'Authorization: Basic [removed: token] https://plans.example",
+        "input": "curl -H 'Authorization: Basic Y29sbGVhZ3VlOlN1bmZsb3dlci00Mg==' https://plans.example",
+        "why": "#709: a protected unit plan's username and password travel as a Basic Authorization header, base64 and not encrypted. Anchored on the header's own name."
+      },
+      {
+        "expect": "Opening https://[removed: token]@snc2d-plans-2026-27-gordon-k3x9qa8m.pages.dev/",
+        "input": "Opening https://colleague:Sunflower-42@snc2d-plans-2026-27-gordon-k3x9qa8m.pages.dev/",
+        "why": "#709: a username and password written into an address. Before the email rule, which would otherwise take the password and the host for an address and leave the username behind."
+      },
+      {
+        "expect": "Shared Basic French unit plans and Basic Skills.",
+        "input": "Shared Basic French unit plans and Basic Skills.",
+        "why": "#709 review L4: a rule for 'Basic' that is not anchored on Authorization: mangles a course called Basic French."
       }
     ],
     "note": "What is taken OUT of a problem report before it is written to disk, and - just as important - what is KEPT. Redaction happens as the file is written, never as it is sent: a report that is only safe when it leaves by the right button leaks the first time somebody opens the folder it sits in, and writing it safe is what lets a teacher open the file and see for themselves what they are about to send. The rules lean towards removing too much, because removing a build hash by mistake costs a moment of puzzlement while a surviving token costs the teacher their account - but the four KEPT cases below are load-bearing, and a redactor that swallows them produces reports nobody can diagnose from. There is no way to switch this off in a development build: a redactor that is off while it is being worked on is a redactor nobody has run.",
@@ -27652,6 +27705,39 @@
           "Only if it is there, when the sheets are handed over and the marks are final",
           "draft report card comments from these records",
           "Do not raise it again in this session if they do not take it up."
+        ],
+        "plantoir-report-comments": [
+          "These are drafts for you to read, change and own.",
+          "I never send them anywhere or enter them into your report system.",
+          "Never call a draft final, finished or ready to submit",
+          "Before we start, four things about your students' privacy",
+          "Whatever I read is sent to the AI service I run on",
+          "I never open your name mapping table, a class list, your report system or an export from it, or anything in your teacher-only folder.",
+          "**Never ask for, guess or write a student's pronouns or gender.**",
+          "**Never put a name into a draft**, even one quoted from a student's work",
+          "**ask what the school's report convention is**",
+          "never as the default",
+          "**three options per student**",
+          "**Evidence from the records only.**",
+          "say plainly that there is no record of it",
+          "read them only if it finds no word from the table",
+          "written so that no pronoun is needed",
+          "**Length is checked after the names go in.**",
+          "**Every script that reads the name mapping table is run through `run_with_names.py`, never directly.**",
+          "Never trim a comment by cutting off its end.",
+          "**A reviewer checks every option**",
+          "nothing in the teacher-only folder is opened, rendered or listed",
+          "never involve firearms or ammunition",
+          "I will not repeat it in any message or file",
+          "The files I write stay on this computer",
+          "Please check that model training is turned off for the account you use with me",
+          "**Never open the name mapping table, a class list, the report system",
+          "**Never open, list, render or search anything in the teacher-only folder**",
+          "**Never write a name, a comment or a student's work into your memory",
+          "even after the teacher has changed it",
+          "cannot see a nickname, initials or a name that is not in the table",
+          "after `{they}` the script accepts only can, could, will, would, should, might, must, may, did, had or a past tense",
+          "It opens each student's record by that student's section and identifier"
         ]
       },
       "rootFileCases": {
@@ -36328,7 +36414,7 @@
     "knownLimits": "The alert's count is changed.new against the previous BUILD; a deploy of an old build that is newly refused re-counts that build's own new rows beside the refusal. A section built by a copy of Plantoir from before #717 has no record until it is built again, and shows no marker meanwhile. A deploy that does not rebuild (a public/ that was already deploy-fresh) leaves the record as the build that made it wrote it. A self-check question is identified by its place (`n`), not its content (kindsRule): inserting a question above a broken one reads as one new problem and one gone, and raises the alert. A row the site adds after the build's alert was answered raises nothing (alert.rule)."
   },
   "unitPlanning": {
-    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan's pages; it keeps assets/ the app's own (tab.assetsMirror). It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and to know which plans the course page's Planning tab offers (tab, #708). Sharing (#709) is a later sub-key of this one.",
+    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan's pages; it keeps assets/ the app's own (tab.assetsMirror). It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and to know which plans the course page's Planning tab offers (tab, #708). Sharing (#709) is its sub-key share.",
     "folder": "courses/<CODE>/.internal/planning",
     "siteLayout": {
       "index.html": "the course's list of plans, one card per unit (from the template's index.html)",
@@ -36521,7 +36607,7 @@
     },
     "appendOnly": "A rule in either stylesheet is never removed or renamed by a later release; changes are added at the end. Each sheet is the example page's own <style> block byte for byte (scripts/fixtures/unit_plan/), after Plantoir's comment and its @font-face rules, with ONE edit: a --ok colour token in :root and both dark blocks, and the reviewed mark's fixed green replaced by var(--ok) (Russell's ruling 2, 2026-11-01: the one change to the exact look). scripts/test_unit_plan_template.py proves the sheet equals its fixture once those are taken out, that the colour tokens and dark blocks are the same in both sheets, and that every class every shipped release defined still has a rule (scripts/fixtures/unit_plan/classes-shipped.json).",
     "agentGuidance": {
-      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); it says nothing about sharing until #709. The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
+      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); since #709 it says the plans are shared from the Planning tab, that a share without a password leaves answer keys out, and that the assistant never shares or deploys them (unitPlanning.share). The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
       "skill": "plantoir-unit-planning",
       "template": [
         "template/index.html",
@@ -36691,7 +36777,7 @@
       "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
     ],
     "tab": {
-      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Sharing a plan is not part of this tab yet (#709).",
+      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Since #709 the share bar sits at the foot of the tab (unitPlanning.share).",
       "tabCases": {
         "rule": "claude and codex say which assistant is installed (OutsideAssistantPresence on the mac); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
         "cases": [
@@ -37520,7 +37606,7 @@
         "openInBrowserNotAPage": "Only a page of the plan or one of its PDFs can be opened in your browser.",
         "openInBrowserNoBrowser": "No web browser is set on this Mac, so the page was not opened."
       },
-      "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. Nothing here says sharing: #709 adds it.",
+      "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. The share bar's words are unitPlanning.share.words (#709).",
       "saveOnPlanning": {
         "rule": "Course > Save on the Planning tab is the settings form's own Save, offered whenever the course has unsaved changes (held back or not), and never silent (708 fix review 2, L3). After it runs: saved with nothing more to say, the Planning tab shows the form's own confirmation (the mac's 'Saved ✓') for as long as the form would; refused (a held-back Save, with the form's reason), failed (a write error), or saved with a notice to read (a preview or deploy of the course running, another window's change replaced), the page goes to the Settings tab, where the form shows its own sentence beside the field. Revert is dimmed on Planning with words.revertOnPlanning under it, which VoiceOver reads with the menu.",
         "cases": [
@@ -37600,6 +37686,1273 @@
         "Open in Browser serving the plan over a local web server (#803): measured, every page, stylesheet, font and PDF resolves from a file: address in Chromium, WebKit and Firefox, and a server would have to be running for the page to open",
         "the trail naming the unit or the page Open in Browser opened (#803): a unit's folder name is made from its title, the teacher's own words; the kind of page is what a report needs"
       ]
+    },
+    "share": {
+      "rule": "Share (#709): the course's unit plans go to Cloudflare Pages as a small website of their own, one per school year, open to anyone with the address or protected by a username and password, from the Planning tab's share bar (mac first). deploy.sh <CODE> --plans runs scripts/share_plan.py, which checks the planning folder (checkKinds), stages it by allowlist (stageCases), creates or reuses the year's project (names), sets fail closed and reads it back (failClosed), deploys, proves the address answers as this share promises before saying it is shared (proof), deletes every older deployment (oldDeployments), and writes the year's marker (markerFile). Stop Sharing deletes the year's project. Nothing about a plan is ever sent to Netlify, and the local assistant has no tool that shares one.",
+      "host": {
+        "value": "cloudflare_pages",
+        "why": "Russell, 2026-11-12: Cloudflare Pages only. Netlify's free plan has no password protection, so a protected plan could not be promised there; a Pages project can run a small program (_worker.js) that asks for the username and password before any file is sent, and the teacher's existing Pages: Edit token makes it.",
+        "rejected": [
+          "Netlify, in any form, including probing a site for password protection and refusing on a free plan (707d, dropped 2026-11-12)",
+          "both hosts at once (Russell, 2026-11-01: one host)",
+          "Cloudflare Access: set up in the dashboard, an email PIN, not makeable with the teacher's token, and its preview-only switch does not cover *.pages.dev"
+        ]
+      },
+      "checkKinds": [
+        "noPlans",
+        "badSlug",
+        "excludedName",
+        "unitNotListed",
+        "brokenLink",
+        "externalUrl",
+        "noNoindex",
+        "wrongSheet",
+        "missingClass",
+        "noRobots",
+        "tooLarge"
+      ],
+      "checkKindsWhy": "Each is a rule the plantoir-unit-planning skill already asks an assistant to keep (its section 10), checked again before anything leaves the Mac, because a broken plan shared is a broken plan a colleague opens. externalUrl is about what a page LOADS (a stylesheet, a script, an image, a frame, a font, an @import or url()): a link a reader clicks to a page on the web is allowed, as the Planning tab's navigationCases allow it.",
+      "checkCases": {
+        "rule": "Each case starts from the skill's template (support/agent_guidance/skills/plantoir-unit-planning/template) copied as a planning folder, applies `change`, and expects exactly the problem kinds `expect`, in checkKinds order (an empty list is a plan that shares).",
+        "cases": [
+          {
+            "name": "the template as it ships",
+            "change": {},
+            "expect": []
+          },
+          {
+            "name": "no unit folder",
+            "change": {
+              "remove": [
+                "unit"
+              ]
+            },
+            "expect": [
+              "noPlans",
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a unit folder with a capital letter",
+            "change": {
+              "rename": {
+                "unit": "Unit-1"
+              }
+            },
+            "expect": [
+              "noPlans",
+              "badSlug",
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a folder a backup leaves out",
+            "change": {
+              "write": {
+                "unit/build/note.txt": "x"
+              }
+            },
+            "expect": [
+              "excludedName"
+            ]
+          },
+          {
+            "name": "a second unit the list of plans does not name",
+            "change": {
+              "copy": {
+                "unit": "unit-2"
+              }
+            },
+            "expect": [
+              "unitNotListed"
+            ]
+          },
+          {
+            "name": "a link to a PDF that is not there",
+            "change": {
+              "append": {
+                "unit/index.html": "<a href=\"pdfs/Missing%20Sheet.pdf\">x</a>"
+              }
+            },
+            "expect": [
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a link to a PDF with a space and a comma that is there",
+            "change": {
+              "write": {
+                "unit/pdfs/Quiz 1, Part A.pdf": "%PDF-1.4"
+              },
+              "append": {
+                "unit/index.html": "<a href=\"pdfs/Quiz%201%2C%20Part%20A.pdf\">x</a>"
+              }
+            },
+            "expect": []
+          },
+          {
+            "name": "a stylesheet from the internet",
+            "change": {
+              "append": {
+                "unit/index.html": "<link rel=\"preload\" href=\"https://fonts.example.org/a.css\">"
+              }
+            },
+            "expect": [
+              "externalUrl"
+            ]
+          },
+          {
+            "name": "a link a reader clicks to a page on the web",
+            "change": {
+              "append": {
+                "unit/index.html": "<a href=\"https://www.example.org/curriculum\">x</a>"
+              }
+            },
+            "expect": []
+          },
+          {
+            "name": "a page with no robots meta",
+            "change": {
+              "replace": {
+                "unit/correlation.html": [
+                  "<meta name=\"robots\" content=\"noindex, nofollow\">",
+                  ""
+                ]
+              }
+            },
+            "expect": [
+              "noNoindex"
+            ]
+          },
+          {
+            "name": "a plan page linking no stylesheet",
+            "change": {
+              "replace": {
+                "unit/index.html": [
+                  "href=\"../assets/plan.css\"",
+                  "href=\"../assets/other.css\""
+                ]
+              }
+            },
+            "expect": [
+              "brokenLink",
+              "wrongSheet"
+            ]
+          },
+          {
+            "name": "a class the sheet has no rule for",
+            "change": {
+              "append": {
+                "unit/index.html": "<p class=\"invented-class-name\">x</p>"
+              }
+            },
+            "expect": [
+              "missingClass"
+            ]
+          },
+          {
+            "name": "robots.txt missing",
+            "change": {
+              "remove": [
+                "robots.txt"
+              ]
+            },
+            "expect": [
+              "noRobots"
+            ]
+          },
+          {
+            "name": "robots.txt with CRLF line endings is still the two lines",
+            "change": {
+              "write": {
+                "robots.txt": "User-agent: *\r\nDisallow: /\r\n"
+              }
+            },
+            "expect": []
+          }
+        ]
+      },
+      "stage": {
+        "allowedSuffixes": [
+          ".html",
+          ".css",
+          ".woff2",
+          ".pdf",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".svg",
+          ".txt"
+        ],
+        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every answer key (answerKeys) is left out unless the share is protected or the teacher ticked Include Answer Keys. A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). Every share adds _worker.js (worker, edgeCache); an open share adds _headers (X-Robots-Tag) as well, which is what the static files would carry if the worker were ever passed by.",
+        "why": "An allowlist rather than a list of what to leave out: a teacher's plan.json, a .tex, an .htaccess or .htpasswd, and a _headers, _redirects, _routes.json or _worker.js of their own (which Cloudflare would obey) are never uploaded, and a new kind of file is left out until somebody decides it belongs."
+      },
+      "stageCases": {
+        "rule": "Each case stages the template with `add` written into it first, with `includeAnswerKeys` as given and the app's assets standing in for the plan's, and expects every path in `copied` to be in the staged folder, every path in `notCopied` not to be, and `answerKeysLeftOut` answer keys counted.",
+        "cases": [
+          {
+            "name": "an open share leaves an answer key out",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf",
+              "unit/pdfs/Quiz 1.pdf"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "unit/pdfs/Quiz 1.pdf",
+              "404.html",
+              "robots.txt",
+              "index.html",
+              "unit/index.html",
+              "unit/correlation.html",
+              "assets/plan.css"
+            ],
+            "notCopied": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "answerKeysLeftOut": 1
+          },
+          {
+            "name": "a protected share keeps it",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "includeAnswerKeys": true,
+            "copied": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "notCopied": [],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "the teacher's own host files and notes never go",
+            "add": [
+              "_worker.js",
+              "_headers",
+              "_redirects",
+              ".htaccess",
+              "unit/.htpasswd",
+              "unit/notes.tex",
+              "unit/data.json"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "unit/plan.json"
+            ],
+            "notCopied": [
+              "_worker.js",
+              "_headers",
+              "_redirects",
+              ".htaccess",
+              "unit/.htpasswd",
+              "unit/notes.tex",
+              "unit/data.json",
+              "unit/plan.json"
+            ],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "a folder a backup leaves out is not copied",
+            "add": [
+              "unit/node_modules/a.html"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [],
+            "notCopied": [
+              "unit/node_modules/a.html"
+            ],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "the teacher's own 404.html is replaced",
+            "add": [
+              "404.html"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "404.html"
+            ],
+            "notCopied": [],
+            "answerKeysLeftOut": 0
+          }
+        ],
+        "note": "unit/plan.json is in both lists of the third case on purpose: `copied` lists nothing that must be there for it, and a test reads notCopied first. Read it as: plan.json is never uploaded."
+      },
+      "answerKeys": {
+        "rule": "A file the rule applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is an answer key when its name without the extension, with its accents folded (Corrigé reads as corrige), in lower case and with every character that is not a letter taken away, holds one of `anywhere`, or when one of `wholeWords` is a word of its own in it (the name split at every character that is not a letter and at a lower-case letter followed by a capital). So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter, and AnswerKey and answerkey count. Only the NAME is read, never the file.",
+        "appliesTo": [
+          ".pdf",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".svg",
+          ".txt"
+        ],
+        "anywhere": [
+          "answer",
+          "solution",
+          "markingguide",
+          "markingscheme",
+          "markscheme",
+          "corrige",
+          "reponse"
+        ],
+        "wholeWords": [
+          "key",
+          "keys",
+          "soln",
+          "solns",
+          "ans"
+        ],
+        "why": "Russell, 2026-11-12: a share with no password leaves out answer keys unless the teacher ticks Include Answer Keys. Widened by the director on the #709 review (M3): teachers drop their own PDFs into pdfs/ under their own names (Quiz 1 Answers.pdf, Answer Key.pdf, Quiz 1 – Solutions.pdf, Test KEY.pdf), so the rule errs toward LEAVING OUT, which costs a PDF the teacher can still include, while the other way costs an answer key a class can read. A false positive such as Dissolution Lab.pdf is the accepted price. A key written inside a plan page or a PDF named something else cannot be caught by any rule on names, which is why the teacher is shown both lists before an open share goes out (openShareLists). Widened again on the fix review: Mark Scheme and Markscheme, Soln and Solns, Ans, and the French Corrigé and Réponses (Ontario's French-language courses), with accents folded before the letters are read.",
+        "cases": [
+          {
+            "name": "Quiz 1 - Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit Test - Version A - Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Review - with Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Worksheet 3 - Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Marking Guide.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "quiz 1 - solutions.PDF",
+            "answerKey": true
+          },
+          {
+            "name": "Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Answer Key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 - Answer Key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 – Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 — Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1-Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz_1_Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 - Solution.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 1 Marking Guide.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 1 Marking Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test KEY.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "test-key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "AnswerKey.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "answerkey.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz1Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Solutions Manual Notes.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Lab Keys.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Answers.png",
+            "answerKey": true
+          },
+          {
+            "name": "Answers.txt",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Solutions.jpg",
+            "answerKey": true
+          },
+          {
+            "name": "Worksheet.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keyboard Shortcuts.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Monkey Puzzle.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Unit 1 Notes.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "solutions.html",
+            "answerKey": false
+          },
+          {
+            "name": "answers.css",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1 - Solutions.tex",
+            "answerKey": false
+          },
+          {
+            "name": "Key Concepts.woff2",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1 Mark Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Markscheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 2 Soln.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test Solns.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 3 Ans.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Corrigé.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Corrige - Test 2.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Réponses du test.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "reponses.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 CORRIGÉ.PDF",
+            "answerKey": true
+          },
+          {
+            "name": "Hockey Drills.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keystone Species.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Answering Questions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Key Terms.pdf",
+            "answerKey": true
+          }
+        ]
+      },
+      "openShareLists": {
+        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints EVERY file it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question is answered ONLY in a sheet of its own (fix review H1): both lists in full, scrolling when long, read from the marker lines (`markers`), the `byName` sentence, and Share or Cancel with Cancel the default; never the generic question alert and never behind Show Details. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
+        "sharedHeading": "These files will be shared with anyone who has the address:",
+        "leftOutHeading": "These files are left out:",
+        "none": "(none)",
+        "byName": "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it.",
+        "question": "Share these files with anyone who has the address? [y/N]: ",
+        "nonInteractive": "Sharing as the lists say, because nobody is here to look at them.",
+        "declined": "Nothing was shared.",
+        "markers": {
+          "begin": "PLANTOIR_PLAN_LISTS_BEGIN:",
+          "shared": "PLANTOIR_PLAN_LISTS_SHARED:",
+          "leftOut": "PLANTOIR_PLAN_LISTS_LEFT_OUT:",
+          "end": "PLANTOIR_PLAN_LISTS_END:",
+          "rule": "Each file is printed twice: once in the lists a person reads at a terminal, and once as a marker line, `shared` or `leftOut` followed by one space and the file's place in the plan site (a line break in a name written as a space), between `begin` and `end` (each ending in a colon, so every reader's one rule for a machine line, PLANTOIR_ and capitals then a colon, keeps all four out of the console). The app reads only the marker lines, keeps them out of the console, and shows them in the open share's own sheet; it never reads the console's own lines for the lists."
+        },
+        "sheetTitle": "Share these files?",
+        "shareButton": "Share"
+      },
+      "interruptionCases": {
+        "rule": "A share or a Stop Sharing that stops part way (the console's Cancel, Quit, a crash) leaves a marker that says no MORE than the site does (review H1): the bar never shows protected, and never not shared, while the address may answer with the plans. share_plan.py writes the marker before the upload with `state` sending, the address, `protected` false, and the answer keys in when this share or the one before carried them; after the proof with `state` shared and `oldCopies` counted before the deletes; and before a Stop Sharing with `state` stopping. Each case interrupts at `point`, after the share before it (`before`: none, open or protected), and expects the marker's state, protected and address, what the bar shows (barCases), and what the next share does. `keysLeftOutLine` is whether the bar would say answer keys were left out (answerKeysLeftOut above 0 on an open marker): never while the address may still serve one (fix review M1).",
+        "cases": [
+          {
+            "name": "a first share stopped after its project was made",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "afterTheProject",
+            "marker": {
+              "state": null,
+              "protected": false,
+              "address": false
+            },
+            "bar": "notShared",
+            "nextShare": "reuses the project's name; nothing was sent, so nothing can be open"
+          },
+          {
+            "name": "a first open share stopped before its upload",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "beforeTheUpload",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share of the same project"
+          },
+          {
+            "name": "a first open share stopped during its proof",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share of the same project"
+          },
+          {
+            "name": "Remove Password stopped after its upload",
+            "before": "protected",
+            "choice": "removePassword",
+            "point": "afterTheUpload",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "open, as last asked"
+          },
+          {
+            "name": "Remove Password stopped during its proof",
+            "before": "protected",
+            "choice": "removePassword",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "open, as last asked"
+          },
+          {
+            "name": "a protected share stopped during its proof",
+            "before": "open",
+            "choice": "shareProtected",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "protected, as last asked"
+          },
+          {
+            "name": "a protected share stopped during the deletes",
+            "before": "open",
+            "choice": "shareProtected",
+            "point": "duringTheDeletes",
+            "marker": {
+              "state": "shared",
+              "protected": true,
+              "address": true,
+              "oldCopies": true
+            },
+            "bar": "protected",
+            "nextShare": "protected, and it deletes the older copy"
+          },
+          {
+            "name": "Stop Sharing stopped after the delete",
+            "before": "open",
+            "choice": "stop",
+            "point": "duringStopSharing",
+            "marker": {
+              "state": "stopping",
+              "protected": false,
+              "address": true
+            },
+            "bar": "stopping",
+            "nextShare": "Stop Sharing again"
+          },
+          {
+            "name": "an open re-share that drops the answer keys, stopped during its proof",
+            "before": "openWithKeys",
+            "choice": "shareOpen",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true,
+              "keysLeftOutLine": false
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share without the keys, which deletes the copy that held them"
+          },
+          {
+            "name": "an open re-share that drops the answer keys, stopped during the deletes",
+            "before": "openWithKeys",
+            "choice": "shareOpen",
+            "point": "duringTheDeletes",
+            "marker": {
+              "state": "shared",
+              "protected": false,
+              "address": true,
+              "oldCopies": true
+            },
+            "bar": "open",
+            "nextShare": "deletes the older copy that still holds the keys; until then the bar shows oldCopyStillThere"
+          }
+        ]
+      },
+      "barCases": {
+        "rule": "What the share bar shows for a school year's marker (PlanSharing.barStatus): no marker, or one with no address, is notShared; state sending is unfinished (words.lastShareUnfinished, with Share Again and Stop Sharing); state stopping is stopping (words.stopUnconfirmed, with Stop Sharing); otherwise protected (words.withPassword) or open (words.openToAnyone). oldCopiesLine is true when the marker's oldCopies is above 0: refusals.oldCopyStillThere is shown under the status until a later share deletes the older copy (review M2).",
+        "cases": [
+          {
+            "marker": null,
+            "bar": "notShared",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "name": "x",
+              "subdomain": "x.pages.dev",
+              "year": 2026
+            },
+            "bar": "notShared",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "sending",
+              "protected": false,
+              "asked": "protected",
+              "oldCopies": 1
+            },
+            "bar": "unfinished",
+            "oldCopiesLine": true
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "stopping",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "stopping",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "protected",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": false,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "open",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": false,
+              "asked": "open",
+              "oldCopies": 2
+            },
+            "bar": "open",
+            "oldCopiesLine": true
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "protected",
+            "oldCopiesLine": false
+          }
+        ]
+      },
+      "stopCases": {
+        "rule": "What Stop Sharing says, from what the address answers after the delete (fix review M2). It says stopped only on an answer that PROVES the site is gone: 522 or 530 (measured after a delete), or the name no longer resolving. Anything else is unknown (no answer at all, a timeout, a school filter's 403, a 5xx, a 404) and is fetched again every 2 s for up to 30 s; 200, 401 or any answer carrying X-Plantoir-Share is the plans still answering. Not proven by 30 s: words.stopUnconfirmed, the outcome unconfirmed, exit 1, the marker kept as stopping, the row kept with Stop Sharing, and the saved username and password kept (deploy.sh deletes them only after a Stop Sharing that exited 0). `delete` is what Cloudflare answered to the delete; `answers` is what the address says, in order, the last repeated.",
+        "cases": [
+          {
+            "name": "530 straight after the delete",
+            "delete": "deleted",
+            "answers": [
+              "530"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "the plans for a moment, then 522",
+            "delete": "deleted",
+            "answers": [
+              "200",
+              "522"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "the name no longer resolves",
+            "delete": "deleted",
+            "answers": [
+              "nameNotFound"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "no answer at all: offline",
+            "delete": "deleted",
+            "answers": [
+              "noAnswer"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a school filter's 403",
+            "delete": "deleted",
+            "answers": [
+              "403"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a 502",
+            "delete": "deleted",
+            "answers": [
+              "502"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a 404",
+            "delete": "deleted",
+            "answers": [
+              "404"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the plans still answer: another account",
+            "delete": "alreadyGone",
+            "answers": [
+              "200"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the address is offline",
+            "delete": "alreadyGone",
+            "answers": [
+              "noAnswer"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the address answers 530",
+            "delete": "alreadyGone",
+            "answers": [
+              "530"
+            ],
+            "outcome": "alreadyGone"
+          }
+        ]
+      },
+      "worker": {
+        "rule": "EVERY share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged); every request reaches it first. It answers only the files the share staged (a list written into it; a path is shared when it, it plus .html, or it plus /index.html is listed, and a path ending in / when its index.html is), with 404, the staged 404.html and Cache-Control: no-store for anything else, /_worker.js included. A protected share's worker also keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once; and without the right Authorization answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\" for every path, robots.txt and a missing path included. Every answer carries X-Robots-Tag: noindex, nofollow and Cache-Control: no-store (private, no-store when protected). Every answer, 401, 404 and 200 alike, carries X-Plantoir-Share: the share's own random id (proof).",
+        "why": "Salted SHA-256 rather than a slow hash: the worker's source is readable only inside the teacher's Cloudflare account, and the password is one made for colleagues, not the teacher's own (the dialog says so). PBKDF2 at 100,000 iterations measured 16.1 ms against a 10 ms CPU limit; at about 10,000, 2.0 ms, the upgrade if that ever changes. Measured: the static file server answers /_worker.js with 404, not the source, so even a bypassed worker does not hand out the salt and hash."
+      },
+      "workerCases": {
+        "rule": "Run under node against the worker written for a share holding index.html, unit/index.html, unit/correlation.html, unit/pdfs/Quiz 1, Solutions.pdf, robots.txt and 404.html, with a stand-in ASSETS that answers 200 for every path. `mode` is protected (username `colleague`, password `correct horse 7`) or open; `auth` is none, wrong or right.",
+        "cases": [
+          {
+            "mode": "protected",
+            "path": "/",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/",
+            "auth": "wrong",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/correlation",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/robots.txt",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/_worker.js",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/_worker.js",
+            "auth": "right",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/pdfs/Quiz%201%20-%20Solutions.pdf",
+            "auth": "right",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/pdfs/Quiz%201%20-%20Solutions.pdf",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/_worker.js",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/%E0%A4%A",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          }
+        ]
+      },
+      "edgeCache": {
+        "rule": "Why every share runs the worker, open ones too: Cloudflare's edge cache answers a file a later share left out from its old address. The worker runs before the cache and answers only the files the current share holds.",
+        "measured": "2026-11-12, the teacher's free account, through share_plan.py: an open share with the answer key included, the key fetched, then an open share without it and with no worker: the key went on answering 200 from the edge (cf-cache-status HIT, Cache-Control public, s-maxage=604800) at every sample for 90 s, while the same address with a query string answered 404. The first full run met it after Remove Password: the key colleagues had opened with the password answered 200 to anyone. With the worker on every share, the same sequence answered 404 at 0.3 s and at every sample to 37 s, and a changed page was served changed at once.",
+        "cost": "Every request to an open plan site now counts against the Workers Free plan's 100,000 a day, which a teacher's colleagues will not reach; at the limit an open site closes (fail closed) rather than opening, so it is unreachable until midnight UTC, not exposed."
+      },
+      "openHeaders": "/*\n  X-Robots-Tag: noindex, nofollow\n",
+      "schoolYear": {
+        "rolloverMonth": 8,
+        "rule": "One plan site per school year (Russell, 2026-11-12). The year is the calendar year the school year starts in, rolling over on 1 August, as SchoolYear.startingYear on the mac and Timetable.AcademicYearStarting on Windows; it is written in a name as its label, 2026-27.",
+        "cases": [
+          {
+            "day": "2026-07-31",
+            "year": 2025,
+            "label": "2025-26"
+          },
+          {
+            "day": "2026-08-01",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2026-12-31",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2027-01-01",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2099-09-01",
+            "year": 2099,
+            "label": "2099-00"
+          }
+        ]
+      },
+      "names": {
+        "maxLength": 58,
+        "suffixLength": 8,
+        "rule": "<code>-plans-<year label>-<surname>-<suffix>, lowercase letters, digits and dashes, at most maxLength characters (Cloudflare refuses 59, a capital and an underscore with code 8000003, measured). The suffix is suffixLength characters from a-z and 0-9, on EVERY plan site, protected or not (Russell, 2026-11-12), so the address never changes when a password is added or removed. The suffix is never cut: the surname is shortened first, then dropped, and only then the code. A name Cloudflare says is taken in this account (409, code 8000002) gets a new suffix, at most three tries. The address is always read from the project's `subdomain`, never built from the name: Cloudflare may add characters to a name taken elsewhere.",
+        "cases": [
+          {
+            "code": "MPM2D",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "k3x9qa8m",
+            "name": "mpm2d-plans-2026-27-gordon-k3x9qa8m"
+          },
+          {
+            "code": "AP CALC",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "abcd1234",
+            "name": "ap-calc-plans-2026-27-gordon-abcd1234"
+          },
+          {
+            "code": "ICS3U",
+            "year": 2027,
+            "surname": null,
+            "suffix": "zz99yy88",
+            "name": "ics3u-plans-2027-28-zz99yy88"
+          },
+          {
+            "code": "SNC2D",
+            "year": 2026,
+            "surname": "abcdefghijklmnopqrstuvwxyzabcdefghijklmnop",
+            "suffix": "a1b2c3d4",
+            "name": "snc2d-plans-2026-27-abcdefghijklmnopqrstuvwxyzabc-a1b2c3d4"
+          },
+          {
+            "code": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "q1w2e3r4",
+            "name": "abcdefghijklmnopqrstuvwxyzabcdefghi-plans-2026-27-q1w2e3r4"
+          },
+          {
+            "code": "ENG4U",
+            "year": 2099,
+            "surname": "côté",
+            "suffix": "00000000",
+            "name": "eng4u-plans-2099-00-ct-00000000"
+          }
+        ],
+        "note": "The last case is the name part's own rule (letters and digits only); deploy.py's sanitize_last_name has already folded côté to cote before it is saved, so a real surname never reaches it with an accent."
+      },
+      "modeCases": {
+        "rule": "Whether a share is protected, from the year's marker (`marker` is true when its `asked` is protected, false when open, null when there is no marker) and the flag given. Protection is sticky: a share with neither flag keeps what the marker says, and only --remove-password opens a protected site.",
+        "cases": [
+          {
+            "marker": null,
+            "flag": null,
+            "protected": false
+          },
+          {
+            "marker": null,
+            "flag": "--protect",
+            "protected": true
+          },
+          {
+            "marker": false,
+            "flag": null,
+            "protected": false
+          },
+          {
+            "marker": false,
+            "flag": "--protect",
+            "protected": true
+          },
+          {
+            "marker": true,
+            "flag": null,
+            "protected": true
+          },
+          {
+            "marker": true,
+            "flag": "--remove-password",
+            "protected": false
+          },
+          {
+            "marker": true,
+            "flag": "--protect",
+            "protected": true
+          }
+        ]
+      },
+      "warningCases": {
+        "rule": "Whether the public-address warning (words.crawlerWarningTitle, words.crawlerWarning) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing.",
+        "cases": [
+          {
+            "marker": null,
+            "choice": "shareOpen",
+            "warn": true
+          },
+          {
+            "marker": null,
+            "choice": "shareProtected",
+            "warn": false
+          },
+          {
+            "marker": false,
+            "choice": "shareAgain",
+            "warn": false
+          },
+          {
+            "marker": true,
+            "choice": "shareAgain",
+            "warn": false
+          },
+          {
+            "marker": true,
+            "choice": "removePassword",
+            "warn": true
+          },
+          {
+            "marker": true,
+            "choice": "changePassword",
+            "warn": false
+          },
+          {
+            "marker": false,
+            "choice": "addPassword",
+            "warn": false
+          }
+        ]
+      },
+      "failClosed": {
+        "rule": "On EVERY share, open or protected (the director's ruling, 2026-11-12: it costs one call, and a later protected share never runs with the default), PATCH /accounts/{account}/pages/projects/{name} with {\"deployment_configs\":{\"production\":{\"fail_open\":false},\"preview\":{\"fail_open\":false}}}, then GET the project. failClosed is true only when the GET shows false on BOTH environments. A PATCH or GET that fails records failClosed false and the share goes on: the teacher reads words.floodOpen beside a protected address, and the random suffix is the fallback (Russell, 2026-11-01, refined). A new project is also created with the same deployment_configs in its POST.",
+        "measured": "2026-11-12 on the teacher's free account with the teacher's Pages: Edit token: a new project starts with fail_open true on both; the PATCH answers 200 and a GET shows false on both, nothing else changed; it survives every later deploy; a malformed PATCH answers 400 (8000006) and changes nothing.",
+        "notMeasured": "The flood itself (ruled out by Russell). That the API's deployment_configs.*.fail_open IS the dashboard's Settings > Runtime > Fail open / closed is inferred from its name, its per-environment place, and its default of true; the API reference still describes it as 'Whether to fail open when the deployment config cannot be applied'. words.floodClosed therefore says what Cloudflare's own page says fail closed does, no more.",
+        "documentation": [
+          {
+            "page": "developers.cloudflare.com/pages/functions/routing/",
+            "updated": "2026-09-18",
+            "says": "\"Fail open\" means that static assets will continue to be served, even if Pages Functions would ordinarily have run first. \"Fail closed\" means an error page will be returned, rather than static assets."
+          },
+          {
+            "page": "developers.cloudflare.com/pages/functions/pricing/",
+            "updated": "2026-09-08",
+            "says": "The free plan daily request limit resets at midnight UTC."
+          },
+          {
+            "page": "developers.cloudflare.com/workers/platform/limits/",
+            "updated": "2026-10-29",
+            "says": "Accounts on the Workers Free plan have a daily request limit of 100,000 requests, resetting at midnight UTC."
+          }
+        ]
+      },
+      "proof": {
+        "rule": "Nothing is called shared until the address answers as the share promises, and only an answer from THIS share's deployment counts: each share writes a fresh random id into its worker, which sends it as X-Plantoir-Share on every answer, and the proof requires it (review M1: when the old and the new deployment answer alike, the status codes cannot tell them apart). Fetched without a password every 2 s for up to 60 s: a protected share needs 401 with a WWW-Authenticate: Basic header, then 200 with the password, and the project's canonical_deployment.uses_functions true; an open share needs 200. A protected share that fails any of these by 60 s is refusals.notProtectedYet, the marker records protected false, and the address is not shown as protected.",
+        "measured": "The main address answered the new deployment 0.2 to 2.2 s after wrangler returned, every time (2026-11-12); one open re-share still met the old protected deployment for 2.2 s."
+      },
+      "oldDeployments": {
+        "rule": "After the proof, every deployment of the project but the canonical one is deleted (GET .../deployments, then DELETE .../deployments/{id}?force=true). A delete that fails: the plans are shared as asked, refusals.oldCopyStillThere is said, the marker keeps oldCopies, and the next share tries again.",
+        "why": "Measured 2026-11-12 (S3): every deploy is also a deployment with an address of its own, and after an open share was re-shared protected, the OLD open deployment's own address still served the list of plans and a PDF with 200 and no password, while the main address answered 401. After its delete the old address answered 404 within 10 s (S4). The active production deployment cannot be deleted (400, 8000034)."
+      },
+      "markerFile": {
+        "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",
+        "keys": [
+          "name",
+          "subdomain",
+          "address",
+          "year",
+          "state",
+          "asked",
+          "protected",
+          "failClosed",
+          "answerKeys",
+          "answerKeysLeftOut",
+          "lastShared",
+          "units",
+          "oldCopies"
+        ],
+        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded. `state` is sending (written before the upload: the share has not been proved, so the bar says it may be open), shared (proved), or stopping (a Stop Sharing that has not been confirmed); interruptionCases says what each leaves behind."
+      },
+      "credential": {
+        "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a fresh file for each share, 0600 inside its own 0700 folder (/tmp/plan_cred.XXXXXX/cred, made by mktemp -d), named to share_plan.py by --credential-file (a path, never the secret); share_plan.py deletes the file and the folder as soon as it has read them and again on every way out, so two courses shared at once never read each other's (review M4). The password is used exactly as typed, spaces at either end included; neither the username nor the password is echoed into the console (both are read without echo). Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
+        "usernamePattern": "^[A-Za-z0-9._-]{1,32}$",
+        "passwordRule": "8 to 64 printable ASCII characters (space to ~)"
+      },
+      "stopSharing": {
+        "rule": "--plans --stop-sharing [--year YYYY] marks the year's marker stopping, then deletes the year's project (DELETE .../pages/projects/{name}); if the delete is refused, the deployments are deleted one by one and it is tried once more, and a refusal puts the marker back (words.stopFailed). After a delete, or a 404, the address is fetched every 2 s for up to 30 s, and stopped is said only once it no longer answers with the plans (200, 401, or any answer carrying X-Plantoir-Share): a 404 from the delete alone proves nothing, since the token may now reach another account (review M5). Still answering at 30 s: words.stopUnconfirmed, the marker kept as stopping, the outcome unconfirmed, and the bar keeps the row with Stop Sharing.",
+        "measured": "2026-11-12: a project holding 2 deployments deleted with 200 and nothing deleted first; the address answered 530 or 522 within 5 s, stopped resolving after about 100 s, and never answered 200 again in 3 minutes. A deleted project's *.pages.dev name could later be taken by another account; the suffix makes that a matter of chance, not of guessing (not measured: it needs a second account)."
+      },
+      "markers": {
+        "shared": "PLANTOIR_PLAN_SHARED: <CODE+> <year> <address> protected:<yes|no> failClosed:<yes|no> answerKeys:<in|out> units:<n> oldCopies:<n>",
+        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>] (notConfirmed when the teacher said no to the open share's lists)",
+        "stopped": "PLANTOIR_PLAN_STOPPED: <CODE+> <year> <address|none> <deleted|alreadyGone|failed|unconfirmed>",
+        "rule": "Printed by share_plan.py for the app to read and keep out of the console (app-rules.json -> markerOrigins, origin shared-python). <CODE+> is the course with its one permitted space written +, as every other marker writes it."
+      },
+      "words": {
+        "sharedThroughCloudflare": "Unit plans are shared as a small website of their own on Cloudflare Pages, one for each school year.",
+        "netlifyTeacher": "Your class websites go to Netlify, but unit plans are shared through Cloudflare Pages, because Netlify's free plan cannot ask for a password. The first time, you will be asked for a Cloudflare token.",
+        "protect": "Protect with a Username and Password",
+        "includeAnswerKeys": "Include Answer Keys",
+        "share": "Share Unit Plans",
+        "shareAgain": "Share Again",
+        "changePassword": "Change Password…",
+        "addPassword": "Add a Password…",
+        "removePassword": "Remove Password…",
+        "stopSharing": "Stop Sharing",
+        "copyLink": "Copy Link",
+        "withPassword": "Shared with a username and password.",
+        "openToAnyone": "Open to anyone with the address.",
+        "lastShared": "Last shared {when}.",
+        "answerKeysLeftOut": "{n} answer key(s) left out. Protect the plans with a password, or tick Include Answer Keys, to share them.",
+        "crawlerWarningTitle": "Share without a password?",
+        "crawlerWarning": "Anyone with the address can open these plans{answerKeysClause}. Plantoir asks search engines and AI crawlers not to read or keep them, but they can ignore that, so treat anything here as possibly searchable. To require a password, choose Protect with a Username and Password.",
+        "answerKeysClause": ", including the answer keys you chose to include",
+        "shareAnyway": "Share Without a Password",
+        "floodClosed": "If someone floods this address with requests, Cloudflare closes the plans until midnight UTC rather than opening them.",
+        "floodOpen": "Cloudflare did not accept the setting that keeps the plans closed if this address is flooded with requests. If that happened, anyone with the address could open the plans until midnight UTC. The address ends in random letters, so it is hard to guess.",
+        "stopTitle": "Stop sharing the {year} unit plans?",
+        "stopMessage": "The address {address} stops working within a minute, and anyone you gave it to can no longer open the plans. Your plans stay on this Mac.",
+        "stopFailed": "Plantoir could not stop sharing these plans, so the address still works. Try Stop Sharing again in a few minutes.",
+        "notSharedHere": "This page is not shared at this address.",
+        "earlierYear": "{year}: {address}",
+        "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with.",
+        "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished.",
+        "consoleSheetTitle": "Sharing unit plans",
+        "lastShareUnfinished": "The last share of these plans did not finish, so they may be open to anyone with the address. Share Again to finish it, or Stop Sharing.",
+        "stopUnconfirmed": "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes."
+      },
+      "refusals": {
+        "checkFound": "These plans were not shared, because {n} thing(s) in them need fixing first.",
+        "tooLarge": "These plans were not shared, because a file in them is larger than the 25 MB Cloudflare Pages takes.",
+        "noPassword": "These plans were not shared, because no username and password were given for them.",
+        "notProtectedYet": "These plans were sent, but Plantoir could not confirm that the address asks for the password, so they are not shown as protected and may be open to anyone with the address. Share Again in a minute.",
+        "oldCopyStillThere": "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more.",
+        "stillSharing": "These unit plans are already being shared, so they cannot be shared again until that has finished.",
+        "notToAFolder": "Unit plans are shared through Cloudflare Pages, not to a folder.",
+        "netlifyNever": "Unit plans are shared through Cloudflare Pages only, because Netlify's free plan cannot ask for a password.",
+        "notAnsweringYet": "These plans were sent, but their address did not answer yet, so Plantoir cannot say they are shared. Share Again in a minute.",
+        "cloudflareSaidNo": "Cloudflare did not take these plans, so they were not shared. The reason Cloudflare gave is above.",
+        "referenceCourse": "referenceCourses.refusal.sentence, unchanged",
+        "notConfirmed": "Nothing was shared."
+      },
+      "trail": {
+        "rule": "Three events (activityTrail.mustRecord): unit plans shared, unit plan share refused, unit plan sharing stopped. Never the address (its suffix is a line of defence, and the trail goes into problem reports), never a username or a password. Cancel at the warning or the Stop Sharing alert writes nothing."
+      },
+      "rejected": [
+        "one site per course with no year (707c's assumption; Russell, 2026-11-12: one per school year)",
+        "the random suffix only on open sites (Russell, 2026-11-12: on every plan site)",
+        "the address built from the project name: subdomain can differ",
+        "leaving old deployments up: each keeps an address of its own, measured serving an open copy after a protected share",
+        "a share without --protect removing the password: protection is sticky, and only --remove-password drops it, after the warning",
+        "functions/_middleware.js instead of _worker.js: wrangler takes functions/ from the folder it runs in, not the uploaded one",
+        "PBKDF2 at 100,000 iterations: 16.1 ms against a 10 ms CPU limit",
+        "the credential in argv (beyond the Keychain store's instant), an environment variable, a file under courses/, or the marker",
+        "staging under the builds root: a temp folder in the website builder is never backed up and needs no link",
+        "a new work-lease kind for sharing: publish already means sending something somewhere to every reader of a lease",
+        "the account id or project id in the marker: every call is by name",
+        "answer keys guessed from other words in a file name (Solutions Manual Notes.pdf): only the skills' own endings count",
+        "deploy.py --plans: its --section is required and the plans path shares none of its section logic",
+        "a share tool for the local assistant or an MCP client: it would move the tool surface, and sharing is the teacher's act",
+        "a flood test on any account (Russell, 2026-11-12)"
+      ]
     }
   },
   "assessment": {
@@ -37665,6 +39018,28 @@
           "the self-test as the guarantee for an adapted script: it is adapted with the script (750 plan review R3), so one never-adapted runner filters what reaches the assistant, and says it is a net, not a lock",
           "a greeting sentence: how a teacher finds out is the honest answer when asked and the one-time offer at the moment of need (Russell, 2026-11-12); piece G owns the greeting"
         ]
+      },
+      "reportCommentsSkill": {
+        "rule": "The skill `plantoir-report-comments` (#752) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It drafts report card comments from what plantoir-marking wrote (the marks records of tests marked from scanned papers; coding assignments are not marked by any skill yet, so it says plainly that there is no record for one and drafts from the teacher's own notes only when the teacher writes them by identifier and --check-file finds no word of the mapping table in them). It tells an assistant: the teacher owns every comment (a sentence in the first reply and under the title of every file written for the teacher; a draft is never called final); four privacy points before any record is read, which are true for this work; never to open the mapping table, a class list, the report system or an export from it, or the teacher-only folder; never to ask for, guess or write a pronoun or gender; never to put a name into a draft, even one quoted from a student's work; evidence from the records only, never invented; the teacher's How I Teach page first, then the school's own report convention ASKED (the limit and whether it counts characters or bytes, line breaks, person and tense, the parts, anything required or avoided), recorded in Marking Settings.md; three options per student, each complete, kind and readable by a parent; drafts written with `{first name}` and so that no pronoun is needed, pronoun placeholders only when the teacher says the table has a pronouns column; the length checked after the names go in, by `uses`' make_named_copies.py through the runner, with the budget from --longest-first-name; a reviewer who checks each option against the records it cites; contexts it invents never involve firearms or ammunition. One teacher's comment shape (formal, past tense, did well, working on, one next step, written for a parent as well as the student) is in reference/template.md as part of the handouts skill's named template (handoutsSkill.offeredTemplate.name): offered only to a teacher who has shown the interest it bridges, and shown to any other teacher only as one teacher's example when they have no convention and ask for a suggestion, never as the default (752 plan review L5). plantoir-marking mentions it once when the marks are final (mentionedBy); it mentions nothing after itself, being the last step. Neither app reads or writes anything it makes.",
+        "skill": "plantoir-report-comments",
+        "references": [
+          "reference/template.md"
+        ],
+        "uses": [
+          "plantoir-marking/scripts/make_named_copies.py",
+          "plantoir-marking/scripts/run_with_names.py"
+        ],
+        "mentionedBy": [
+          "plantoir-marking"
+        ],
+        "rejected": [
+          "one comment per student: the issue asks for three, so the teacher picks or blends",
+          "Russell's comment shape as the default: a report system's conventions belong to the school (752 plan review L5, Russell's ruling of 2026-11-12 that his practice ships as a template that is offered)",
+          "pronouns inferred, or a gender column on the assistant's side as the kit's comment rows had: the assistant does not know them and must not hold them",
+          "a second name script in this skill: two copies of the name step drift, so make_named_copies.py gains --comments",
+          "a PDF review table: an identifier Markdown file is enough to review, and one less template to keep course-neutral",
+          "a page on plantoir.app, or new text in the app: Russell, 2026-11-12"
+        ]
       }
     },
     "folders": {
@@ -37705,7 +39080,7 @@
       "selfTest": "--self-test",
       "notAStartingPoint": ["scripts/run_with_names.py", "plantoir-test-authoring: scripts/check_kit.py"],
       "runner": {
-        "rule": "run_with_names.py reads the mapping table itself and builds every form a name could take (each name part of two letters or more as a whole word; the whole name, the parts run together with and without . - _, first initial and last name, e-mail addresses and their local part, handles, a repository address's user and repository, anywhere), compares without regard to case or accents (750a review M4), runs the command IN the watched folder so a relative path is watched (M5), and BEFORE it passes anything on looks at every new or changed file, folder and link there (not following links): its name, and what the standard library can read of it (UTF-8 and UTF-16 text, gzip, a zip's members such as an xlsx or docx, a PNG's text chunks, a PDF's text, metadata and XMP through Poppler). One holding a name, or a folder named by one, is moved whole to the teacher-only Quarantine/. It reports THREE counts, never one: read and clean, held a word from the table and moved, and could not be read so NOT checked and moved unread, by kind (a link, which is moved as a link and never followed; what a picture shows; a PDF Poppler cannot read, broken or locked, whose raw bytes are still searched; any other file that is not text), so the assistant cannot open an unread file, and the skill says never to (750a fix review H3, M1, M2: a link to the mapping table was 'read and clean', as were a broken PDF and big-endian UTF-16 with no mark); UTF-16 is read both ways; a name part of two or three letters counts only beside another part of the same name, a form of fewer than six letters only as a whole word, and only a folder the run made or wrote into is moved (M3: 'Ho, Ed' withheld 'finished', and an untouched 'June Exam' folder was moved); and it exits 1 when anything was withheld, moved or not checked (750a review H3: the first runner said 'checked, 0 held a name' of an xlsx, a gzip file, UTF-16 text, a PNG's text chunk and a PDF's title that each held one, and left folders named by a name behind). The skill names the runner's SHA-256 and has the assistant check it before use, since it can be edited in place until Plantoir next refreshes the folder (L6). It refuses a table or a quarantine folder inside the watched folder. It is a safety net, not a guarantee: it cannot know a name the table does not hold, see what a picture shows, or stop a script run without it or writing elsewhere (750 plan review R3). A name part that is also an ordinary word (May, Will) withholds every line holding that word too, which is the safe direction, and the runner says it may be a false alarm (L3).",
+        "rule": "run_with_names.py reads the mapping table itself and builds every form a name could take (each name part of two letters or more as a whole word; the whole name, the parts run together with and without . - _, first initial and last name, e-mail addresses and their local part, handles, a repository address's user and repository, anywhere), compares without regard to case or accents (750a review M4), runs the command IN the watched folder so a relative path is watched (M5), and BEFORE it passes anything on looks at every new or changed file, folder and link there (not following links): its name, and what the standard library can read of it (UTF-8 and UTF-16 text, gzip, a zip's members such as an xlsx or docx, a PNG's text chunks, a PDF's text, metadata and XMP through Poppler). One holding a name, or a folder named by one, is moved whole to the teacher-only Quarantine/. It reports THREE counts, never one: read with no word from the table found (never called clean, 752 review H1), held a word from the table and moved, and could not be read so NOT checked and moved unread, by kind (a link, which is moved as a link and never followed; what a picture shows; a PDF Poppler cannot read, broken or locked, whose raw bytes are still searched; any other file that is not text), so the assistant cannot open an unread file, and the skill says never to (750a fix review H3, M1, M2: a link to the mapping table was 'read and clean', as were a broken PDF and big-endian UTF-16 with no mark); UTF-16 is read both ways; a name part of two or three letters counts only beside another part of the same name, a form of fewer than six letters only as a whole word, and only a folder the run made or wrote into is moved (M3: 'Ho, Ed' withheld 'finished', and an untouched 'June Exam' folder was moved); and it exits 1 when anything was withheld, moved or not checked (750a review H3: the first runner said 'checked, 0 held a name' of an xlsx, a gzip file, UTF-16 text, a PNG's text chunk and a PDF's title that each held one, and left folders named by a name behind). The skill names the runner's SHA-256 and has the assistant check it before use, since it can be edited in place until Plantoir next refreshes the folder (L6). It refuses a table or a quarantine folder inside the watched folder. It is a safety net, not a guarantee: it cannot know a name the table does not hold, see what a picture shows, or stop a script run without it or writing elsewhere (750 plan review R3). A name part that is also an ordinary word (May, Will) withholds every line holding that word too, which is the safe direction, and the runner says it may be a false alarm (L3). Since the 752 fix review (H1) its comparison is ONE block (\"The name comparison\") carried byte for byte in make_named_copies.py, so --check-file and --comments answer as it does; it finds whole words as \\w+, as runs of letters and split where a small letter meets a capital, and matches every part of six letters or more inside another word, so Ixo_feedback.txt and TestpartFeedback.txt are moved, which they were not before; its count line says how many were read and held none of the forms of the table's names, and its last line that a nickname or a name not in the table cannot be seen.",
         "says": "This is a safety net, not a guarantee"
       }
     },
@@ -37769,6 +39144,64 @@
         {"name": "a name typed with a typographic apostrophe", "table": "section,identifier,name\n1,Student A,D\u2019Testfamily Alphaname\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/D'Testfamily Alphaname - Feedback.pdf"]},
         {"name": "a name the font sets with ff, fi and ffi ligatures", "table": "section,identifier,name\n1,Student A,Ffinlaygh Offingtree\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/Ffinlaygh Offingtree - Feedback.pdf"]},
         {"name": "named copies asked for inside the marking folder", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "out": "marking", "exit": 1, "says": ["the named copies must go in the teacher-only folder, never in the marking folder; nothing was written"], "written": []}
+      ]
+    },
+    "commentNames": {
+      "rule": "make_named_copies.py --comments (#752) puts the first names into report card comments the assistant drafted with identifiers only (`<marking folder>/<Term> Comments/Comments.json`: {students: [{section, identifier, cites, options}]}), and is run through the runner like every other step that reads the mapping table. It REFUSES the whole run, writing nothing and printing identifiers, options and word positions only, when a draft already holds a word from the table before the names go in (by THE name comparison: one block of code, carried byte for byte in run_with_names.py and make_named_copies.py, so the runner, --check-file and --comments give the same answer on every line (752 fix review H1: they disagreed on 7 of 22); it reads the name, first name, preferred name, last name, surname, e-mail, handle and repository columns, compares without case or accents, and counts every part of a name of two letters or more as a whole word, a short part on its own too, and every form of six letters or more anywhere, inside another word as well, with whole words found as \\w+, as runs of letters (Ixo2, Ixo_notes) and split where a small letter meets a capital (AnaLi); a missed name is worse than a false alarm, so an everyday word that is also a name is refused, and the refusal says so; in an option, in any other field of a student's entry, or on a line of the Comments - Drafts.md beside it), when it uses a placeholder it does not know, a pronoun placeholder the table cannot fill (no pronouns column, or a value that is not she/her, he/him, they/them or four words), or `{first name}` for a student the table gives no first name (the first name column, else the part after the comma of a name written Last, First; never a guess from a name with no comma), when a student is not in the table or is in the drafts twice, when a `cites` entry is not that student's own marks record in this marking folder (relative, no `..`, exactly `<Assessment>/Marks/Section <section>/<identifier>.json`, not the comments folder, and the file there; not `Teacher Notes.md`; review M1 and fix review L1: Student AA's record, another section's, another course's through `..`, or any file called Teacher Notes.md were accepted), when the word after `{they}` or `{They}` (adverbs skipped) is not on the ALLOW-list of words that read the same for she, he and they (can, could, will, would, should, might, must, may, did, had, a past tense in -ed other than need and its like, and a short list of irregular past forms), or something is glued to the placeholder (review M2 and fix review M2: a deny-list of auxiliaries let `They explains` through); refused at the draft whatever the table holds rather than conjugated, because a refusal can be proved by cases and a conjugation cannot, or has a number of options other than three (an empty list is a student with nothing drafted, said and not written). Otherwise it fills `placeholders` (the pronoun ones, capitalised or not, only from the pronouns column, written she/her, he/him, they/them, those with a third word such as she/her/hers, or four words), COUNTS EVERY COMMENT AFTER THE NAMES ARE IN, on the NFC text, in Unicode characters, or UTF-8 bytes with --count bytes (a report system that counts bytes counts an accented letter as two), writes Report Comments.csv (UTF-8 with a byte order mark, for a spreadsheet) and Report Comments.md into --out, which must be inside the folder that holds the mapping table and never the marking folder (review L1), renames an earlier run's files 'earlier run, do not use' when a run is refused (L2), names the students of the drafted sections the drafts left out (L4), and names each comment over --limit by identifier and option and by how much, exiting 1 when any is. It says every comment is within the limit only after counting each one. --longest-first-name prints the longest first name's length in characters and bytes, never the name, for the budget; --check-file prints the line numbers of a file that hold a word from the table, never the words, by the same comparison, because it decides what the assistant may read; a refusal says the word may be an everyday word that is also a name and that the teacher reads that line and changes it or says to go on, naming the line; it never says no name is present: its line when it finds none says it looked for the forms of the N names in the table and found none of THEM, and that a nickname, initials or a name not in the table cannot be seen, so the teacher reads the file once first (`checkFileCases`). Each case's `table` is the mapping table, `students` the drafts, `draftsPage` an optional Comments - Drafts.md beside them, `limit` and `count` (characters when absent) the arguments, `out` the teacher-only folder unless it says `marking` (inside the marking folder) or `elsewhere` (a folder beside both); `exit` and `says` as in namedCopies; `recordsNotWritten: true` means the cited records are not written for the case (every other case writes each cite as a file in the marking folder, so a cite is checked for being there); `filled` is EVERY row Report Comments.csv must hold, in order (`size` in the case's unit, `over` by how much), each comment typed and counted by hand; `written: false` means no file is in --out. After every case no word of the table is in what was printed, and nothing new is in the marking folder. Each of `checkFileCases` is a `table` and a `file` (the teacher's notes) given to --check-file, with its `exit` and `says`; no word of the table is printed.",
+      "script": "scripts/make_named_copies.py",
+      "placeholders": ["{first name}", "{they}", "{them}", "{their}", "{theirs}"],
+      "counting": "Unicode code points of the NFC text after the names are in, or its UTF-8 bytes when the report system counts bytes",
+      "cases": [
+        {"name": "a comment exactly at the limit before the name goes in is over it after", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Bartholomewina\",Bartholomewina\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["{first name} balanced every equation in Part B.", "{first name} named each reaction type.", "Well done."]}], "limit": 47, "exit": 1, "says": ["Section 1: 3 comments written for 1 student", "Section 1/Student A option 1 is 2 characters over the limit of 47"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Bartholomewina balanced every equation in Part B.", "size": 49, "over": 2}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Bartholomewina named each reaction type.", "size": 40, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Well done.", "size": 10, "over": 0}]},
+        {"name": "a comment over the limit before the name goes in is within it after", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["{first name} balanced every equation in Part B, with care.", "Good work.", "Well done."]}], "limit": 49, "exit": 0, "says": ["Every comment written is within the limit of 49 characters, counted with the first names in."], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Ixo balanced every equation in Part B, with care.", "size": 49, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Well done.", "size": 10, "over": 0}]},
+        {"name": "the first name twice in one comment", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["{first name} solved B1, and {first name} explained B2.", "Good work.", "Well done."]}], "limit": 450, "exit": 0, "says": ["Section 1: 3 comments written for 1 student"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Ixo solved B1, and Ixo explained B2.", "size": 36, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Well done.", "size": 10, "over": 0}]},
+        {"name": "a pronoun placeholder when the table has no pronouns column", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "{They} balanced every equation.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 2: it uses a pronoun placeholder, and your mapping table has no pronouns column", "Stopped: 1 problem in the drafts; nothing was written"], "written": false},
+        {"name": "pronouns filled from the table's pronouns column, capitalised at the start", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["{They} balanced every equation, and {their} working was clear.", "Good work.", "Well done."]}, {"section": 1, "identifier": "Student B", "cites": [], "options": ["{They} balanced every equation, and {their} working was clear.", "Good work.", "Well done."]}], "limit": 450, "exit": 0, "says": ["Section 1: 6 comments written for 2 students"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "She balanced every equation, and her working was clear.", "size": 55, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Well done.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student B", "option": 1, "comment": "They balanced every equation, and their working was clear.", "size": 58, "over": 0}, {"section": 1, "identifier": "Student B", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student B", "option": 3, "comment": "Well done.", "size": 10, "over": 0}]},
+        {"name": "a pronoun placeholder for a student whose pronouns are empty", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Well done.", "{Their} working was clear."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 3: it uses a pronoun placeholder, and this student's pronouns in your mapping table are empty or not written like she/her, he/him, they/them, or four words such as xe/xem/xyr/xyrs"], "written": false},
+        {"name": "Qo\u00eb counts 3 characters, the count when none is given", "table": "section,identifier,name,first name\n1,Student A,\"Testpupil, Qo\u00eb\",Qo\u00eb\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Well done, {first name}.", "Good work.", "Fine."]}], "limit": 15, "exit": 0, "says": ["Every comment written is within the limit of 15 characters, counted with the first names in."], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Well done, Qo\u00eb.", "size": 15, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}]},
+        {"name": "Qo\u00eb counts 4 bytes when the report system counts bytes", "table": "section,identifier,name,first name\n1,Student A,\"Testpupil, Qo\u00eb\",Qo\u00eb\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Well done, {first name}.", "Good work.", "Fine."]}], "limit": 15, "count": "bytes", "exit": 1, "says": ["Section 1/Student A option 1 is 1 byte over the limit of 15"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Well done, Qo\u00eb.", "size": 16, "over": 1}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}]},
+        {"name": "a decomposed Qo\u00eb (e and a combining diaeresis) counts 3 after NFC", "table": "section,identifier,name,first name\n1,Student A,\"Testpupil, Qoe\u0308\",Qoe\u0308\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Well done, {first name}.", "Good work.", "Fine."]}], "limit": 15, "exit": 0, "says": ["Every comment written is within the limit of 15 characters, counted with the first names in."], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Well done, Qo\u00eb.", "size": 15, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}]},
+        {"name": "the first name taken from Testpupil, Qo\u00eb when the first name column is empty", "table": "section,identifier,name,first name\n1,Student A,\"Testpupil, Qo\u00eb\",\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Well done, {first name}.", "Good work.", "Fine."]}], "limit": 450, "exit": 0, "says": ["Section 1: 3 comments written for 1 student"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Well done, Qo\u00eb.", "size": 15, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}]},
+        {"name": "no first name in the table and none to be read from the name", "table": "section,identifier,name\n1,Student A,Qo\u00eb Testpupil\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Well done, {first name}.", "Good work.", "Fine."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 1: the mapping table gives no first name for this student (the first name column is empty, and the name is not written Last, First)"], "written": false},
+        {"name": "a draft quoting the student's own work, which holds their surname", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Quen\u00e9e\",Quen\u00e9e\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "{first name} called the game \"Testfamily Dice Race\" and explained its rules.", "Well done."]}, {"section": 1, "identifier": "Student B", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 2: word 5 holds a word from your mapping table before the names went in", "Stopped: 1 problem in the drafts; nothing was written"], "written": false},
+        {"name": "another student's first name in a draft, written without its accent", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Quen\u00e9e\",Quen\u00e9e\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "{first name} and Quenee compared answers on B2."]}, {"section": 1, "identifier": "Student B", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 3: word 3 holds a word from your mapping table before the names went in"], "written": false},
+        {"name": "a name in a field other than the options", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Quen\u00e9e\",Quen\u00e9e\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 1/Testfamily.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: a field other than its options holds a word from your mapping table"], "written": false},
+        {"name": "a name in the drafts page beside the drafts", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Quen\u00e9e\",Quen\u00e9e\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "draftsPage": "# Report comment drafts\n\nStudent A, option 1: Alphaname balanced it.\n", "limit": 450, "exit": 1, "says": ["Comments - Drafts.md: a word from your mapping table is on 1 line (line 3; it could be a name, or an everyday word that is also a name in your table: rewrite that line without it)"], "written": false},
+        {"name": "an identifier not in the table", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "students": [{"section": 1, "identifier": "Student D", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student D: not in the mapping table"], "written": false},
+        {"name": "a placeholder the script does not know", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["{name} balanced every equation.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 1: it uses a placeholder this script does not know (it knows {first name}, and {they}, {them}, {their} and {theirs}, capitalised or not)"], "written": false},
+        {"name": "two options where the skill drafts three", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A has 2 options, not 3"], "written": false},
+        {"name": "a student with nothing drafted", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Quen\u00e9e\",Quen\u00e9e\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}, {"section": 1, "identifier": "Student B", "cites": [], "options": []}], "limit": 450, "exit": 0, "says": ["Section 1: 3 comments written for 1 student", "Section 1/Student B: no comment drafted, so none was written"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Fine.", "size": 5, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Well done.", "size": 10, "over": 0}]},
+        {"name": "named comments asked for inside the marking folder", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "out": "marking", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Stopped: the named comments must go in the teacher-only folder, never in the marking folder; nothing was written"], "written": false},
+        {"name": "a classmate's three-letter first name alone in a draft", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Ixo\",Ixo\n1,Student C,\"Plumfamily, Qo\",Qo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "{first name} and Ixo compared answers on B2.", "Fine."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 2: word 3 holds a word from your mapping table before the names went in"], "written": false},
+        {"name": "a classmate's two-letter first name alone in a draft", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Ixo\",Ixo\n1,Student C,\"Plumfamily, Qo\",Qo\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "{first name} helped Qo with Part B."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 3: word 3 holds a word from your mapping table before the names went in"], "written": false},
+        {"name": "Student A and Student AA, and Student A in two sections, each filled with its own name", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 1/Student A.json"], "options": ["{first name} did well.", "Good work.", "Fine."]}, {"section": 1, "identifier": "Student AA", "cites": ["Unit 2 Test/Marks/Section 1/Student AA.json"], "options": ["{first name} did well.", "Good work.", "Fine."]}, {"section": 2, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 2/Student A.json"], "options": ["{first name} did well.", "Good work.", "Fine."]}], "limit": 450, "exit": 0, "says": ["Section 1: 6 comments written for 2 students", "Section 2: 3 comments written for 1 student"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Alphaname did well.", "size": 19, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}, {"section": 1, "identifier": "Student AA", "option": 1, "comment": "Betaname did well.", "size": 18, "over": 0}, {"section": 1, "identifier": "Student AA", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student AA", "option": 3, "comment": "Fine.", "size": 5, "over": 0}, {"section": 2, "identifier": "Student A", "option": 1, "comment": "Gammaname did well.", "size": 19, "over": 0}, {"section": 2, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 2, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}]},
+        {"name": "Student A's comment drafted from Student AA's record", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 1/Student AA.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a comment for Section 1's Student A drafted from Section 2's record", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 2/Student A.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a cite that is not this student's own record: another folder, through ..", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["../../Other Course/Unit 2 Test/Marks/Section 1/Student A.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a cite that is not this student's own record: an absolute path", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["/Users/someone/Marking/Unit 2 Test/Marks/Section 1/Student A.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a cite that is not this student's own record: a path through ..", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 2/../Section 1/Student A.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a cite that is not this student's own record: a folder named like a section", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Old Section 1/Student A.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a cite that is not this student's own record: the teacher's notes, which are not a marks record", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Term 1 Comments/Teacher Notes.md"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false},
+        {"name": "a cite that is not this student's own record: a record that is not there", "table": "section,identifier,name,first name\n1,Student AA,\"Quillfamily, Betaname\",Betaname\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n2,Student A,\"Plumfamily, Gammaname\",Gammaname\n", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 9 Quiz/Marks/Section 1/Student A.json"], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A: cites something that is not this student's own marks record in this marking folder (each cite is <Assessment>/Marks/Section 1/Student A.json, and that file must be there)"], "written": false, "recordsNotWritten": true},
+        {"name": "a word after a pronoun placeholder that may change: {They} was proud of the work.", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["{They} was proud of the work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student B option 1: word 2 after {they} may change with the pronoun (they were, she was; they explain, she explains): write a past tense other than was or were, or can or would"], "written": false},
+        {"name": "a word after a pronoun placeholder that may change: Good work, and {they} is improving.", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["Good work.", "Good work, and {they} is improving.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student B option 2: word 5 after {they} may change with the pronoun (they were, she was; they explain, she explains): write a past tense other than was or were, or can or would"], "written": false},
+        {"name": "a word after a pronoun placeholder that may change: {They} explains each step.", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["{They} explains each step.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student B option 1: word 2 after {they} may change with the pronoun (they were, she was; they explain, she explains): write a past tense other than was or were, or can or would"], "written": false},
+        {"name": "a word after a pronoun placeholder that may change: {They} always was careful.", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["{They} always was careful.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student B option 1: word 3 after {they} may change with the pronoun (they were, she was; they explain, she explains): write a past tense other than was or were, or can or would"], "written": false},
+        {"name": "a word after a pronoun placeholder that may change: {They}'s ready for the next unit.", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["{They}'s ready for the next unit.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student B option 1: word 1 after {they} may change with the pronoun (they were, she was; they explain, she explains): write a past tense other than was or were, or can or would"], "written": false},
+        {"name": "a word after a pronoun placeholder that may change: {They} and {their} partner was first.", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["Good work.", "Fine.", "{They} and {their} partner was first."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student B option 3: word 2 after {they} may change with the pronoun (they were, she was; they explain, she explains): write a past tense other than was or were, or can or would"], "written": false},
+        {"name": "ordinary sentences after a pronoun placeholder that must pass", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her\n1,Student B,\"Zedfamily, Betaname\",Betaname,they/them\n", "students": [{"section": 1, "identifier": "Student B", "cites": [], "options": ["{They} carefully checked each step.", "{They} can now balance any equation.", "{They} wrote clear answers, and {their} working was neat."]}], "limit": 450, "exit": 0, "says": ["Section 1: 3 comments written for 1 student"], "filled": [{"section": 1, "identifier": "Student B", "option": 1, "comment": "They carefully checked each step.", "size": 33, "over": 0}, {"section": 1, "identifier": "Student B", "option": 2, "comment": "They can now balance any equation.", "size": 34, "over": 0}, {"section": 1, "identifier": "Student B", "option": 3, "comment": "They wrote clear answers, and their working was neat.", "size": 53, "over": 0}]},
+        {"name": "pronouns written with three words, she/her/hers", "table": "section,identifier,name,first name,pronouns\n1,Student A,\"Testfamily, Alphaname\",Alphaname,she/her/hers\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["{They} explained {their} working.", "Good work.", "Fine."]}], "limit": 450, "exit": 0, "says": ["Section 1: 3 comments written for 1 student"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "She explained her working.", "size": 26, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Fine.", "size": 5, "over": 0}]},
+        {"name": "named comments asked for outside the teacher-only folder", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Ixo\",Ixo\n", "out": "elsewhere", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 1, "says": ["Stopped: the named comments must go in the teacher-only folder that holds the mapping table; nothing was written"], "written": false},
+        {"name": "a student in the table with no entry in the drafts", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Quen\u00e9e\",Quen\u00e9e\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "Fine.", "Well done."]}], "limit": 450, "exit": 0, "says": ["1 student in your mapping table, in the sections drafted, has no entry in the drafts: Section 1/Student B"], "filled": [{"section": 1, "identifier": "Student A", "option": 1, "comment": "Good work.", "size": 10, "over": 0}, {"section": 1, "identifier": "Student A", "option": 2, "comment": "Fine.", "size": 5, "over": 0}, {"section": 1, "identifier": "Student A", "option": 3, "comment": "Well done.", "size": 10, "over": 0}]},
+        {"name": "a table of everyday-word names: an everyday word in a draft is refused, and the refusal says why", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Plumfamily, May\",May\n1,Student C,\"Quillfamily, Will\",Will\n1,Student D,\"Zedfamily, Mark\",Mark\n", "students": [{"section": 1, "identifier": "Student A", "cites": [], "options": ["Good work.", "{first name} will check the units next time.", "Fine."]}], "limit": 450, "exit": 1, "says": ["Section 1/Student A option 2: word 2 holds a word from your mapping table before the names went in (it could be a name, or an everyday word that is also a name in your table: rewrite this option without it)"], "written": false}
+      ],
+      "checkFileCases": [
+        {"name": "a classmate's three-letter first name alone in the teacher's notes", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Ixo\",Ixo\n1,Student C,\"Plumfamily, Qo\",Qo\n", "file": "# Notes\n\nStudent A led the group.\nStudent A worked with Ixo on the model.\n", "exit": 1, "says": ["A word from your mapping table is on 1 line of the file (line 4). It could be a name, or an everyday word that is also a name in your table. Do not open the file: ask the teacher to read that line, and to change it, or, if it is not about a student, to tell you to go on, naming the line."]},
+        {"name": "a two-letter first name alone in the teacher's notes", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Ixo\",Ixo\n1,Student C,\"Plumfamily, Qo\",Qo\n", "file": "# Notes\n\nQo finished early.\n", "exit": 1, "says": ["A word from your mapping table is on 1 line of the file (line 3). It could be a name, or an everyday word that is also a name in your table. Do not open the file: ask the teacher to read that line, and to change it, or, if it is not about a student, to tell you to go on, naming the line."]},
+        {"name": "a short surname alone in the teacher's notes", "table": "section,identifier,name,first name\n1,Student A,\"Zu, Alphaname\",Alphaname\n", "file": "# Notes\n\nAsk Zu about the model.\n", "exit": 1, "says": ["A word from your mapping table is on 1 line of the file (line 3). It could be a name, or an everyday word that is also a name in your table. Do not open the file: ask the teacher to read that line, and to change it, or, if it is not about a student, to tell you to go on, naming the line."]},
+        {"name": "notes holding no part of any name in the table", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Ixo\",Ixo\n1,Student C,\"Plumfamily, Qo\",Qo\n", "file": "# Notes\n\nStudent A led the group.\n", "exit": 0, "says": ["Looked for the forms of the 3 names in your mapping table in 3 lines of the file, and found none of them. A nickname, initials, or a name that is not in your table cannot be seen by this check: the teacher reads the file once for those before it is opened."]},
+        {"name": "everyday words in notes, with a table of everyday-word names", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Plumfamily, May\",May\n1,Student C,\"Quillfamily, Will\",Will\n1,Student D,\"Zedfamily, Mark\",Mark\n", "file": "# Notes\n\nFull marks in May for Student A.\nStudent B: the mark scheme was followed.\n", "exit": 1, "says": ["A word from your mapping table is on 2 lines of the file (line 3, 4). It could be a name, or an everyday word that is also a name in your table. Do not open the file: ask the teacher to read that line, and to change it, or, if it is not about a student, to tell you to go on, naming the line."]},
+        {"name": "a first name glued to a file name in notes", "table": "section,identifier,name,first name\n1,Student A,\"Testfamily, Alphaname\",Alphaname\n1,Student B,\"Zedfamily, Ixo\",Ixo\n1,Student C,\"Plumfamily, Qo\",Qo\n", "file": "# Notes\n\nSee Ixo_feedback.pdf and Testfamily2.txt.\n", "exit": 1, "says": ["A word from your mapping table is on 1 line of the file (line 3). It could be a name, or an everyday word that is also a name in your table. Do not open the file: ask the teacher to read that line, and to change it, or, if it is not about a student, to tell you to go on, naming the line."]}
       ]
     },
     "kitFormat": {
@@ -38074,6 +39507,99 @@
       "Trimming. It would eat the space a teacher types in Course Settings.",
       "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
       "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
+    ]
+  },
+  "scheduledRunGetsItsFolderReady": {
+    "rule": "A scheduled deploy brings its working folder's launchers (setup.sh, preview.sh, deploy.sh at the folder's top) and .toolchain/ up to date from the tools of the Plantoir that runs it, before any of them runs, and then goes ahead in every case. The trail says what it did (activityTrail.mustRecord, 'scheduled deploy got its folder ready'), except for the ordinary run that finds nothing to change and waits for nobody.",
+    "order": "Lateness, the wait for an earlier deploy of the section, the wait for the course (which takes the run's build and publish leases), whether the job still stands, the settings as they are now (theDestination.order, unchanged), the wrapper written from them; then, only when the run will deploy and holding its leases: wait for another program's live copy, copy (the launchers, then .toolchain/, the window's order), wait again; then the wrapper runs. A run that stands down for its settings copies nothing. A plist from before v1.2.0 names no section and so no folder, and copies nothing, as it reads no settings.",
+    "theGuard": "Windows' marker, by name and body: courses/.internal/activity/toolchain-copying.<pid>, the lease body (process id, name, moment, start time), judged by the same liveness rule, written only when courses/ exists. Two copies on the mac write it while they run: the .toolchain/ copy a window or the assistant's server starts off the main actor (ToolchainReadiness.ensure), and the run's whole copy, launchers included. The window's launcher refresh (milliseconds), the synchronous copy (initializeWorkspace and the suite) and BuilderWarmUp (a folder of its own) do not. Only the run reads it: it waits while another program's marker is live before its own copy and again after, until five minutes have passed since it began waiting, then goes ahead. Each file is written whole to a temporary file and moved into place, so a launcher already running reads the file it opened and a launcher started now reads the old one or the new one, never part of one.",
+    "whyItAlwaysGoesAhead": "Because the alternative is a deploy that does not happen. A deploy that silently does not happen at 6:30 is the worst outcome; a deploy that goes ahead with the tools as they were and says so is better. In every case that cannot copy, the folder's tools are the ones the window last left there: nothing written at all (a folder that cannot be written, no tools in Plantoir) leaves the old set whole, which is exactly what every scheduled run used before #748. A copy that failed part way leaves some files new; the launchers then build from what is there, and if that build fails, the build leg and the destinations record it (scheduledPublishStopped) and the notification says so, so the run is never silent. Standing down would turn every one of these into a run that publishes nothing, the case where the copy did no harm included.",
+    "measured": "Apple M4 Pro, macOS 26.6, 2026-11-13, the app's own recipe (13,023 files, 83 MB), with an unrelated verify.sh running on the same Mac. The run's copy when nothing is stale: 0.84 to 0.86 s (3 runs), 3.9 to 6.6 s at background priority (taskpolicy -b). After an update (91 files changed, removed or added, every file restamped, the bundle's fingerprints valid): 1.33 to 1.47 s, 5.3 to 6.1 s at background priority. Into an empty folder: 4.1 to 4.7 s, 10.6 to 14.3 s. Two copies started at the same instant into one folder, before #748: after an update, one of the two counted 18 or 19 files as FAILED in each of 5 runs; into an empty folder, 5 of 8 runs had a failure; every one a file the other copy had already removed (or the other's temporary file), and the folder ended byte for byte right every time. With a file already gone not counted as a failure: 0 failures in 13 runs (5 after an update, 8 into an empty folder). A launcher replaced by a temporary file and a move while /bin/bash ran it: bash finished the old text; replaced in place: bash ran the new text from the middle. documentation/09-mac-app.md has the website builder's own rebuild time.",
+    "rejected": [
+      "Standing down when the copy fails (Windows' choice): it turns a copy that did no harm into a deploy that publishes nothing.",
+      "Waiting for the copy with no limit: a stuck copy would hold the deploy for ever, and the other copy writes the same bytes.",
+      "Leaving the folder alone and saying 'open the folder once after an update' in the notes: nobody reads the notes at 6:30, and Russell ruled the part in.",
+      "Rewriting every working folder's tools at the first launch after an update: the app does not know every folder, and a folder opened then is mirrored anyway.",
+      "A lock file the kernel releases (flock): a new mechanism beside the marker Windows already writes, and the marker's liveness rule already ignores a marker whose program is gone.",
+      "Making the window's copy take turns with the run's, as Windows does: on the mac two copies at once are measured to write the same bytes once an already-gone file is not a failure, and the window must never wait on a run that may itself be waiting for the course."
+    ],
+    "platformDifferences": "Mac: the run goes ahead in every case, waits up to five minutes in all for other copies, and writes its own event. Windows (#477): a failed copy, or one still waiting its turn when the run's ten minutes are up, stands the run down couldNotRunAsSetNow with wording.wrapperCouldNotBeWritten; its copies take turns because two writers failed with sharing violations on NTFS; its lines go under 'working folder tools copied' and 'scheduled publish waited for the course'. Both copy before the wrapper runs, and both write and honour the same marker.",
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "Windows' run already copies (#477) and decides differently on purpose, by Russell's ruling on #477 that this is not a contract case for both platforms: Windows stands down where the mac goes ahead. Windows' suite does not run these cases.",
+    "howToRunACase": "Build ScheduledRunFolderRefresh.Report from given (toolsChanged and toolsFailed are the .toolchain/ mirror's changed and failed counts; launchersRefreshed and launchersFailed are how many launchers at the folder's top were replaced or could not be; waitedFor is the other program's process id or null, waitedSeconds the seconds waited), call ScheduledRunFolderRefresh.decide, and compare every field of expect. When line is not none, trailLine must be the matching lines entry with the clauses expect names, and none of the others. A line written after the run stopped waiting says only what this run saw and did, so it never says the tools are up to date (the 748b review's LOW 4).",
+    "cases": [
+      {
+        "name": "every run but the first after an update: nothing stale, nobody else copying",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "none", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "the first run after an update: the launchers and the tools brought up to date",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 91, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "only a launcher at the folder's top differed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "only the tools differed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 3, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "a folder that cannot be written: nothing could be copied",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 1, "toolsChanged": 0, "toolsFailed": 91, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "the disk filled part way through",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 40, "toolsFailed": 51, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "only a launcher could not be replaced",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 1, "toolsChanged": 91, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "Plantoir carries no tools to copy: nothing is copied, nothing is removed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": false, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "appCarriesNoTools", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "not a working folder at all (no preview.sh): nothing to bring up to date",
+        "given": {"isAWorkingFolder": false, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "none", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "waited for a window's copy, which left nothing to do",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 3, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "alreadyUpToDate", "saysItWaited": true, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "waited for another program's copy, then brought the rest up to date",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 5, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 2, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": true, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "another program was still copying after five minutes: the run copied anyway, found nothing of its own to change, and went ahead (never 'already up to date': the other copy may still be changing the folder)",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "foundNothingToChange", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "another program was still copying after five minutes, and the run's own copy changed files: it says what it copied, no more",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 7, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "stopped waiting, and its own copy could not finish",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 2, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
+      }
     ]
   }
 }

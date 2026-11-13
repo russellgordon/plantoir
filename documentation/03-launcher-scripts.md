@@ -1909,7 +1909,8 @@ setup_course.py inside the Docker container", and the diagnostic trio
   printed: it is derived from the folder's path, which the trail records.
 - **A folder still holding the old launchers** is harmless during the
   change: the app replaces a folder's launchers whenever it opens it
-  (`reloadCourses` → `refreshLaunchersIfNeeded`), and an old copy run some
+  (`reloadCourses` → `refreshLaunchersIfNeeded`), and so does a scheduled
+  deploy before it runs them since #748 part 4; an old copy run some
   other way (an MCP-driven preview in a folder no window has reopened)
   only makes a bar skip "Starting up…" — the bar takes the HIGHEST marker
   it has seen, so it never stalls on the missing one.
@@ -2640,6 +2641,32 @@ all XNU compares).
 
 ### `deploy.sh`
 
+- **`deploy.sh <CODE> --plans …` shares the course's unit plans (#709)**
+  instead of deploying a section: `--plans` takes the section number's place,
+  with `--protect` or `--remove-password`, `--change-password`,
+  `--include-answer-keys`, `--year <YYYY>` and `--stop-sharing`, each refused
+  without `--plans`. Plans mode always goes to Cloudflare Pages: it never
+  reads the course's saved destinations (#668), refuses `--to-folder` and
+  `--target netlify` with `unitPlanning.share.refusals`, and skips every step
+  about a section (the rebuild checks of #746 and #768, the build-output link,
+  the built-site preflight, the folder deploy). The reference-course refusal,
+  the Cloudflare token and account, and the website builder are the same code.
+  A protected share asks for the plans' username and password in the console
+  when none is saved (or with `--change-password`), keeps them in the Keychain
+  (`containerized-quartz-unit-plan`, account `<folder id>/<CODE>`), and pipes
+  them into a fresh 0600 file in a 0700 folder made for each share inside the
+  website builder, passing only its name (`--credential-file`), never the
+  secret in argv. Both questions are read without echo, exactly as typed. Protection is sticky: with
+  neither `--protect` nor `--remove-password` the launcher reads the year's
+  marker (`the_plans_were_protected`). The school year is worked out on the
+  Mac's clock and always passed to `share_plan.py` as `--year`. A share
+  refuses while `deploy.sh <CODE> --plans` is already running in the folder
+  (`refuse_while_these_plans_share`, asked of the one process-table reader
+  with the place `<CODE> --PLANS`, so it never refuses for a section's deploy
+  nor the other way round). Pinned by `scripts/test_deploy_sh_plans.py`, which
+  runs the real launcher with the Keychain, Cloudflare and the website builder
+  stubbed. Why, and what was measured: `documentation/07-deployment.md` →
+  "Sharing a unit plan (#709)".
 - Normalizes the course code to uppercase and includes a friendly guard for a
   classic Ontario data-entry error: a course code ending in the digit `0`
   where the letter `O` (an "Open" course) was intended, e.g. `ICD2O` typed as

@@ -8312,7 +8312,11 @@ can catch up on" (`handoutsSkill.offeredTemplate`) that is OFFERED, never
 applied, and only to a teacher who has shown an interest in both
 constructivist and Thinking Classrooms practice and the reality of a
 school where students often miss class (his ruling on #765, 2026-11-12). The unit-planning skill (#707) already took its lesson
-shape from the page. Why, and what was rejected:
+shape from the page, and the marking (#750) and report-comments (#752)
+skills read it first as well; for report comments the school's own
+convention is asked next, and one teacher's comment shape is shown only as
+an example (`documentation/09-mac-app.md` → "Tests, marking and report
+comments"). Why, and what was rejected:
 `documentation/09-mac-app.md` → "Lesson materials, and whose way of
 teaching (#765, v1.10.0)".
 
@@ -9177,3 +9181,11 @@ recorded only if it has actually gone.
 Steering any of this with a tool description (the measured precedent is in
 "Steer the model with code"). Splitting steps 6–9 into four commits: they share
 one frame and one settler, and the plan pairs #260 with #193.
+
+## Sharing unit plans is not an assistant tool (#709)
+
+No tool shares a course's unit plans, for the local assistant or an MCP
+client, and the tool surface did not move for #709 (`scripts/test_tool_surface_digest.py`
+stays green). Sharing is the teacher's act, from the Planning tab's share bar,
+and the `plantoir-unit-planning` skill tells an outside assistant to point the
+teacher there and never to share or deploy a plan itself.

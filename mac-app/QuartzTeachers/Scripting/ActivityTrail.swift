@@ -1068,6 +1068,15 @@ nonisolated enum ActivityTrail {
         /// record). Recorded because a deploy that went out half an hour late,
         /// or not at all, looks from outside exactly like one that misfired.
         case scheduledDeployWaitedForItsEarlierDeploy = "scheduled deploy waited for its earlier deploy"
+        /// A scheduled deploy brought its working folder's launchers and
+        /// tools up to date before it ran them (#748 part 4), so the first
+        /// deploy after an update builds with the version installed now.
+        /// Carries the course, the section, how many files changed and how
+        /// long it took, whether that means the website builder is built
+        /// again, how long it waited for another program's copy, or that it
+        /// could not finish and went ahead with the tools as they were.
+        /// Never written for the ordinary run that finds nothing to do.
+        case scheduledDeployGotItsFolderReady = "scheduled deploy got its folder ready"
         /// A section's deploy set for later was set again while that
         /// section's run was still working (GitHub #439, #409). Setting it
         /// again ends the run's app, but the deploy it had started goes on and
@@ -1125,6 +1134,20 @@ nonisolated enum ActivityTrail {
         /// because it changes things a teacher sees weeks later: the address
         /// can change, and a custom domain went with the deleted project.
         case cloudflareProjectMadeAgain = "cloudflare project made again"
+        /// A course's unit plans shared to Cloudflare Pages (#709), read from
+        /// `share_plan.py`'s marker by `PlanShareReport`: the course, the
+        /// school year, how many units, with a password or open, answer keys
+        /// left out, what a flood would do. Never the address, a username or
+        /// a password.
+        case unitPlansShared = "unit plans shared"
+        /// A share of a course's unit plans that did not happen, and why, by
+        /// the refusal's key in plain words (#709); written by the app from
+        /// the marker, and by deploy.sh itself when the plans were already
+        /// being shared.
+        case unitPlanShareRefused = "unit plan share refused"
+        /// Stop Sharing on a school year's unit plans, and how it ended:
+        /// deleted, already gone, or failed with the address still working.
+        case unitPlanSharingStopped = "unit plan sharing stopped"
         /// A preview's address was held by something else on this Mac
         /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
         /// signed in). Carries where the preview was for, the address — a

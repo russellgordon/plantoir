@@ -234,6 +234,47 @@ struct CredentialRequest: Equatable {
         )
     }
 
+    /// The username colleagues are asked for before a course's shared unit
+    /// plans open (#709). The teacher's own choice, not an account.
+    static var unitPlanUsername: CredentialRequest {
+        return CredentialRequest(
+            name: "unitPlanUsername",
+            title: "Choose a Username for These Plans",
+            explanation: "Colleagues will be asked for this username and a password before the unit "
+                       + "plans open. Choose ones made for them, not the password to your own accounts. "
+                       + "Plantoir keeps them securely on this Mac, so you are asked once.",
+            steps: [
+                "Type a username of 1 to 32 letters, digits, dots, dashes or underscores.",
+                "Give it, and the password you choose next, to the colleagues you plan with.",
+            ],
+            linkTitle: "",
+            linkAddress: nil,
+            fieldLabel: "Username",
+            fieldPlaceholder: "e.g. science-dept",
+            isSecret: false
+        )
+    }
+
+    /// The password that goes with it (#709). A secret, so it is not shown
+    /// as it is typed.
+    static var unitPlanPassword: CredentialRequest {
+        return CredentialRequest(
+            name: "unitPlanPassword",
+            title: "Choose a Password for These Plans",
+            explanation: "Colleagues type this password with the username before the unit plans open. "
+                       + "Choose one made for them, 8 to 64 characters, not the password to your own accounts.",
+            steps: [
+                "Type a password of 8 to 64 letters, digits, spaces or symbols.",
+                "Keep a copy somewhere safe to give to colleagues: Plantoir does not show it again.",
+            ],
+            linkTitle: "",
+            linkAddress: nil,
+            fieldLabel: "Password",
+            fieldPlaceholder: "8 to 64 characters",
+            isSecret: true
+        )
+    }
+
     /// Every request there is, so a test can walk them.
     static var all: [CredentialRequest] {
         return [
@@ -244,6 +285,8 @@ struct CredentialRequest: Equatable {
             CredentialRequest.teacherSurname,
             CredentialRequest.siteName,
             CredentialRequest.siteNameConflict,
+            CredentialRequest.unitPlanUsername,
+            CredentialRequest.unitPlanPassword,
         ]
     }
 
@@ -257,6 +300,16 @@ struct CredentialRequest: Equatable {
     /// by the two launchers and neither wording is worth pinning.
     static func matching(_ question: String) -> CredentialRequest? {
         let wording: String = question.lowercased()
+        // First, and on words no other prompt uses: a unit plan's username
+        // and password (#709) are the teacher's own choice, never a host's.
+        if wording.contains("unit plans") || wording.contains("username of") || wording.contains("password of") {
+            if wording.contains("password") {
+                return CredentialRequest.unitPlanPassword
+            }
+            if wording.contains("username") {
+                return CredentialRequest.unitPlanUsername
+            }
+        }
         if wording.contains("last name") || wording.contains("surname") {
             return CredentialRequest.teacherSurname
         }

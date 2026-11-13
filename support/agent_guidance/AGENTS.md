@@ -39,6 +39,11 @@ that matches the task before writing:
   read `.agents/skills/plantoir-marking/SKILL.md` (the same file is at
   `.claude/skills/plantoir-marking/SKILL.md`) before opening any student
   work: it keeps students' names on this computer.
+- **Report card comments** for a class, drafted from the marking: three
+  options per student, identifiers only, the first names put in by script
+  at the end, are in `.agents/skills/plantoir-report-comments/SKILL.md`
+  (the same file is at `.claude/skills/plantoir-report-comments/SKILL.md`),
+  after `plantoir-marking`.
 - **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
   parabola beside its parent, two lines meeting), a geometry or
   similar-triangles figure, a number line, a probability tree, a circuit,

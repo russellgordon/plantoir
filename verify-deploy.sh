@@ -687,6 +687,8 @@ delete_sites_made() {
 }
 
 restore_what_was_borrowed() {
+  # The unit plans leg's own borrowings (#709), when the run got that far.
+  if type restore_the_plans_leg >/dev/null 2>&1; then restore_the_plans_leg; fi
   restore_first_publish_state
   delete_sites_made
   for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "  ↩︎  $line"; done
@@ -1383,6 +1385,202 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   [ -n "$CF_URL" ] && check_page_links "Cloudflare Pages" "$CF_URL/" cloudflare
 else
   skip "Cloudflare (no credentials)"
+fi
+
+# ------------------------------------------- sharing unit plans (#709)
+# The course's unit plans shared through deploy.sh --plans, for real, then
+# fetched back: open, protected, sticky, a new password, open again, stopped.
+# documentation/07-deployment.md -> "Sharing a unit plan (#709)" says why each
+# check is here. School year 2099, which no teacher shares, so the leg never
+# touches a real year's marker or site, and the project's name carries
+# "plans-2099", which is what delete_sites_made matches it by if the leg dies.
+# The plans' username and password are made for the run, stored in the
+# Keychain under this folder's own account the way the launcher stores them,
+# and removed on every exit; they reach curl through its config on stdin
+# (-K -), never its arguments. A Keychain item the folder already had is not
+# read: the leg is skipped instead.
+PLANS_YEAR=2099
+PLANS_DIR="$WORKING_FOLDER/courses/$COURSE/.internal/planning"
+PLANS_MARKER="$WORKING_FOLDER/courses/$COURSE/.cloudflare_sites/plans-$PLANS_YEAR.json"
+PLANS_ACCOUNT="$(cd "$WORKING_FOLDER" 2>/dev/null && /bin/pwd -P | shasum -a 256 | cut -c1-8)/$COURSE"
+PLANS_USER="colleague709"
+PLANS_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)"
+PLANS_PASS2="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)"
+PLANS_BORROWED=false
+PLANS_HAD_INTERNAL=true
+PLANS_HAD_SITES_FOLDER=true
+PLANS_STORED=false
+restore_the_plans_leg() {
+  if [ "$PLANS_STORED" = true ]; then
+    security delete-generic-password -s containerized-quartz-unit-plan -a "$PLANS_ACCOUNT" >/dev/null 2>&1
+    PLANS_STORED=false
+    echo "  ↩︎  removed the unit plans' test username and password from the Keychain"
+  fi
+  if [ "$PLANS_BORROWED" = true ]; then
+    rm -rf "$PLANS_DIR"
+    if [ -e "$PLANS_DIR.verify-deploy-hidden" ]; then
+      mv "$PLANS_DIR.verify-deploy-hidden" "$PLANS_DIR"
+    fi
+    rm -f "$PLANS_MARKER"
+    if [ -e "$PLANS_MARKER.verify-deploy-hidden" ]; then
+      mv "$PLANS_MARKER.verify-deploy-hidden" "$PLANS_MARKER"
+    fi
+    # Folders the leg made for a course that had none: removed only when
+    # empty, so nothing else that landed in them is lost.
+    [ "$PLANS_HAD_SITES_FOLDER" = true ] || rmdir "$(dirname "$PLANS_MARKER")" 2>/dev/null
+    [ "$PLANS_HAD_INTERNAL" = true ] || rmdir "$(dirname "$PLANS_DIR")" 2>/dev/null
+    PLANS_BORROWED=false
+    echo "  ↩︎  put the course's own planning folder back as it was"
+  fi
+}
+plan_status() {  # plan_status <url> [credential] -> the HTTP status, or 000
+  if [ -n "${2:-}" ]; then
+    printf 'user = "%s"\n' "$2" | curl -s -o /dev/null -w '%{http_code}' --max-time 20 -K - "$1" 2>/dev/null
+  else
+    curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$1" 2>/dev/null
+  fi
+}
+plan_header() {  # plan_header <url> <header name> -> its value, without the credential
+  curl -s -D - -o /dev/null --max-time 20 "$1" 2>/dev/null | tr -d '\r' | awk -v h="$(printf '%s' "$2" | tr 'A-Z' 'a-z')" -F': ' 'tolower($1) == h { print $2; exit }'
+}
+plans_api() {  # plans_api <path> -> the JSON; the token goes to curl on stdin
+  local token
+  token=$(security find-generic-password -s "containerized-quartz-cloudflare" -w 2>/dev/null)
+  printf 'Authorization: Bearer %s\n' "$token" | curl -s --max-time 30 -H @- "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/$1"
+  token=""
+}
+plans_expect() {  # plans_expect <label> <want> <url> [credential]
+  local got waited=0
+  for _ in $(seq 1 15); do
+    got=$(plan_status "$3" "${4:-}")
+    [ "$got" = "$2" ] && break
+    sleep 2; waited=$((waited+2))
+  done
+  if [ "$got" = "$2" ]; then ok "$1 answers $2"; else no "$1 answered $got, not $2"; fi
+}
+plans_share() {  # plans_share <logfile> <flags...>
+  local log="$1"; shift
+  : >"$log"
+  run_deploy "$log" "$COURSE" --plans --year "$PLANS_YEAR" --non-interactive "$@"
+}
+
+hdr "Sharing unit plans — Cloudflare Pages (#709)"
+if [ "$HAVE_CLOUDFLARE" != true ]; then
+  skip "unit plans (no Cloudflare credentials)"
+elif security find-generic-password -s containerized-quartz-unit-plan -a "$PLANS_ACCOUNT" >/dev/null 2>&1; then
+  skip "unit plans: this folder already keeps a username and password for $COURSE's plans, which this run will not read or replace"
+else
+  # Borrowed and put back exactly: a fresh course has no .internal yet, a
+  # taught one may hold a plan of the teacher's own, and either may have
+  # sites already recorded.
+  [ -d "$(dirname "$PLANS_DIR")" ] || PLANS_HAD_INTERNAL=false
+  [ -d "$(dirname "$PLANS_MARKER")" ] || PLANS_HAD_SITES_FOLDER=false
+  PLANS_BORROWED=true
+  if [ -e "$PLANS_DIR" ]; then mv "$PLANS_DIR" "$PLANS_DIR.verify-deploy-hidden"; fi
+  if [ -e "$PLANS_MARKER" ]; then mv "$PLANS_MARKER" "$PLANS_MARKER.verify-deploy-hidden"; fi
+  mkdir -p "$(dirname "$PLANS_DIR")"
+  cp -R "$REPO/support/agent_guidance/skills/plantoir-unit-planning/template" "$PLANS_DIR"
+  mkdir -p "$PLANS_DIR/unit/pdfs"
+  printf '%%PDF-1.4 invented quiz\n' >"$PLANS_DIR/unit/pdfs/Quiz 1, Part A.pdf"
+  printf '%%PDF-1.4 invented answer key\n' >"$PLANS_DIR/unit/pdfs/Quiz 1 - Solutions.pdf"
+  security add-generic-password -U -s containerized-quartz-unit-plan -a "$PLANS_ACCOUNT" -w "$PLANS_USER:$PLANS_PASS" >/dev/null 2>&1 \
+    && PLANS_STORED=true
+
+  # 1. Open.
+  plans_share "$WORK/plans-open.log" && ok "an open share exited 0" || no "an open share failed"
+  PLANS_NAME=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("name",""))' "$PLANS_MARKER" 2>/dev/null)
+  PLANS_URL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("address",""))' "$PLANS_MARKER" 2>/dev/null)
+  [ -n "$PLANS_NAME" ] && SITES_MADE+=("cloudflare"$'\t'"$PLANS_NAME"$'\t'"$CF_ACCOUNT"$'\t'"plans-$PLANS_YEAR")
+  if [ -z "$PLANS_URL" ]; then
+    no "the open share wrote no address into its marker"
+  else
+    plans_expect "open: the list of plans" 200 "$PLANS_URL"
+    plans_expect "open: a unit's plan" 200 "${PLANS_URL}unit/"
+    plans_expect "open: a PDF with a space and a comma" 200 "${PLANS_URL}unit/pdfs/Quiz%201%2C%20Part%20A.pdf"
+    plans_expect "open: the answer key, left out" 404 "${PLANS_URL}unit/pdfs/Quiz%201%20-%20Solutions.pdf"
+    plans_expect "open: a missing path" 404 "${PLANS_URL}no-such-page"
+    plans_expect "open: /_worker.js" 404 "${PLANS_URL}_worker.js"
+    [ "$(plan_header "$PLANS_URL" x-robots-tag)" = "noindex, nofollow" ] && ok "open: X-Robots-Tag is sent" || no "open: no X-Robots-Tag"
+    # Each share's worker names itself on every answer, which is how the
+    # share's own proof tells its deployment from the one before (#709 M1).
+    PLANS_SHARE_OPEN=$(plan_header "$PLANS_URL" x-plantoir-share)
+    [ -n "$PLANS_SHARE_OPEN" ] && [ "$(plan_header "${PLANS_URL}no-such-page" x-plantoir-share)" = "$PLANS_SHARE_OPEN" ] \
+      && ok "open: every answer carries the share's own id" || no "open: an answer without the share's own id"
+    [ "$(curl -s --max-time 20 "${PLANS_URL}robots.txt" | tr -d '\r')" = "$(printf 'User-agent: *\nDisallow: /')" ] \
+      && ok "open: robots.txt is the two lines" || no "open: robots.txt is not the two lines"
+    plans_api "$PLANS_NAME" | python3 -c 'import json,sys; c=json.load(sys.stdin)["result"]["deployment_configs"]; sys.exit(0 if c["production"]["fail_open"] is False and c["preview"]["fail_open"] is False else 1)' \
+      && ok "fail_open is false on both environments" || no "fail_open is not false on both environments"
+    # The deployment's OWN address (eight hex characters before the
+    # project), not the main one the share line prints after it.
+    PLANS_FIRST=$(grep -aoE "https://[0-9a-f]{8}\.[a-z0-9-]+\.pages\.dev" "$WORK/plans-open.log" | tail -1)
+    # A new project's own deployment addresses need their certificate first
+    # (about 135 s, measured), or "the old address no longer answers" below
+    # would pass for the wrong reason.
+    for _ in $(seq 1 60); do [ "$(plan_status "$PLANS_FIRST/")" = "200" ] && break; sleep 5; done
+    [ "$(plan_status "$PLANS_FIRST/")" = "200" ] && ok "the first deployment's own address answers before the protected share" \
+      || no "the first deployment's own address never answered, so the old-copy check below proves nothing"
+
+    # 2. Protected.
+    plans_share "$WORK/plans-protect.log" --protect && ok "a protected share exited 0" || no "a protected share failed"
+    for path in "" "unit/" "unit/pdfs/Quiz%201%2C%20Part%20A.pdf" "no-such-page" "_worker.js"; do
+      plans_expect "protected: /$path without the password" 401 "${PLANS_URL}$path"
+      plans_expect "protected: /$path with a wrong password" 401 "${PLANS_URL}$path" "$PLANS_USER:wrong-password"
+    done
+    _protected_share=$(plan_header "$PLANS_URL" x-plantoir-share)
+    [ -n "$_protected_share" ] && [ "$_protected_share" != "$PLANS_SHARE_OPEN" ] \
+      && ok "protected: the 401 comes from the new share's deployment" || no "protected: the 401 does not carry the new share's id"
+    plans_expect "protected: the list of plans with the password" 200 "$PLANS_URL" "$PLANS_USER:$PLANS_PASS"
+    plans_expect "protected: the answer key, included" 200 "${PLANS_URL}unit/pdfs/Quiz%201%20-%20Solutions.pdf" "$PLANS_USER:$PLANS_PASS"
+    plans_expect "protected: /_worker.js with the password" 404 "${PLANS_URL}_worker.js" "$PLANS_USER:$PLANS_PASS"
+    [ "$(plan_status "$PLANS_FIRST/")" != "200" ] && ok "the old open deployment's own address no longer answers 200" \
+      || no "the OLD OPEN DEPLOYMENT still answers 200 without a password"
+    [ "$(plans_api "$PLANS_NAME/deployments" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["result"]))')" = "1" ] \
+      && ok "exactly one deployment is left" || no "older deployments were left"
+
+    # 3. Sticky.
+    plans_share "$WORK/plans-again.log" && ok "a share with no flag exited 0" || no "a share with no flag failed"
+    plans_expect "a share with no flag is still protected" 401 "$PLANS_URL"
+
+    # 4. A new password.
+    security add-generic-password -U -s containerized-quartz-unit-plan -a "$PLANS_ACCOUNT" -w "$PLANS_USER:$PLANS_PASS2" >/dev/null 2>&1
+    plans_share "$WORK/plans-new-password.log" --protect && ok "a share with a new password exited 0" || no "a share with a new password failed"
+    plans_expect "the old password" 401 "$PLANS_URL" "$PLANS_USER:$PLANS_PASS"
+    plans_expect "the new password" 200 "$PLANS_URL" "$PLANS_USER:$PLANS_PASS2"
+
+    # 5. Open again.
+    plans_share "$WORK/plans-open-again.log" --remove-password && ok "Remove Password exited 0" || no "Remove Password failed"
+    plans_expect "open again: the list of plans" 200 "$PLANS_URL"
+    plans_expect "open again: the answer key colleagues opened with the password" 404 "${PLANS_URL}unit/pdfs/Quiz%201%20-%20Solutions.pdf"
+    if security find-generic-password -s containerized-quartz-unit-plan -a "$PLANS_ACCOUNT" >/dev/null 2>&1; then
+      no "Remove Password left the Keychain item"
+    else
+      ok "Remove Password removed the Keychain item"; PLANS_STORED=false
+    fi
+    [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["address"])' "$PLANS_MARKER" 2>/dev/null)" = "$PLANS_URL" ] \
+      && ok "the address did not change" || no "the address changed"
+
+    # 6. Stop sharing.
+    plans_share "$WORK/plans-stop.log" --stop-sharing && ok "Stop Sharing exited 0" || no "Stop Sharing failed"
+    [ ! -e "$PLANS_MARKER" ] && ok "Stop Sharing removed the year's marker" || no "Stop Sharing left the year's marker"
+    # Stop Sharing says stopped only once the address stopped answering, so
+    # the very next fetch must not be the plans (#709 M5).
+    case "$(plan_status "$PLANS_URL")" in
+      200|401) no "Stop Sharing said stopped while the address still answered with the plans" ;;
+      *) ok "Stop Sharing said stopped only once the address had stopped answering" ;;
+    esac
+    _stopped=false
+    for _ in $(seq 1 15); do [ "$(plan_status "$PLANS_URL")" != "200" ] && { _stopped=true; break; }; sleep 2; done
+    [ "$_stopped" = true ] && ok "the address stopped answering 200 within 30 s" || no "the address still answers 200 after Stop Sharing"
+    if [ "$_stopped" = true ]; then
+      # Gone already: only this leg's own entry leaves the list.
+      _kept=()
+      for _entry in ${SITES_MADE[@]+"${SITES_MADE[@]}"}; do
+        case "$_entry" in *"$PLANS_NAME"*) ;; *) _kept+=("$_entry") ;; esac
+      done
+      SITES_MADE=(${_kept[@]+"${_kept[@]}"})
+    fi
+  fi
+  restore_the_plans_leg
 fi
 
 # --------------------------------------------------------- the three pairings

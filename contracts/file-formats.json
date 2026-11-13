@@ -2035,5 +2035,11 @@
       }
     ],
     "howToRunACase": "readingCases: read text (null: no file) and compare the reading's kind, whether a change may be made, the made groups' names in file order, the no-year group's title, and each placement by folder -> the NAME of the group it shows in (a placement naming a group that is not there shows as none). writingCases: in a temporary working folder, make courses/ with an empty folder for each of folders, write text to the path (null: no file), run the act through the app's own change path (makeGroup: New Group with that name; recordArrival: the write every arriving door makes with no group), then compare: whether the file was written (its bytes changed, or it now exists), the sentence of a refusal (a key of referenceCourses.groups.wording), keptKeys (top-level keys and their values after the write), groupEntries (the length of the written groups list), groups (made group names in the written file), and placementFolders (the written placements' folder names, sorted)."
+  },
+  "unitPlanShared": {
+    "note": "A course's shared unit plans (#709), one file per school year: written by scripts/share_plan.py and read by the Planning tab's share bar (PlanSharing.markers) and by deploy.sh (whether protection is sticky, whether any year is still shared). Its keys and rules are contracts/shared-rules.json -> unitPlanning.share.markerFile.",
+    "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",
+    "readOnlyExactly": "plans-<four digits>.json. A reference copy renames each aside to plans-<year>.previous-yyyy-MM-dd_HHmmss.json, as releaseSite does a section's marker, and no reader takes that name for a year still shared.",
+    "notASectionsMarker": "It sits beside the section markers in .cloudflare_sites but is not one of firstDeployMarkers.paths: a section's rollover (releaseSite) and Get Ready for the Start of the Year leave it alone."
   }
 }

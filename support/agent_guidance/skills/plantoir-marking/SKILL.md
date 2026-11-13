@@ -187,7 +187,7 @@ shipped:
 python3 -B -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" .claude/skills/plantoir-marking/scripts/run_with_names.py
 ```
 
-It must print `b61b992c97215daea8e9e6776eb022d8aec685c0546451aae9e1cbe0a0e5818a`. If it does not, stop and tell the teacher
+It must print `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`. If it does not, stop and tell the teacher
 the runner has been changed; do not run any script that reads the table.
 
 **Every script that reads the name mapping table is run through
@@ -196,7 +196,8 @@ script in the marking folder with everything it prints captured, passes on
 only the lines that hold no word from the table (accents and case
 ignored), and moves any new file or folder in the marking folder that holds
 one, in its text or its name, to the teacher-only `Quarantine/` folder. Its
-last lines give three counts: files it read and found clean, files that
+last lines give three counts: files it read with no word from the table
+found in them, files that
 held a word from the table and were moved, and files it COULD NOT READ (a
 link, a picture, a PDF Poppler cannot read, anything else that is not
 text), which were not checked and were moved there unread. **Never open a
@@ -462,7 +463,7 @@ Look for `.claude/skills/plantoir-report-comments/SKILL.md` (or
 the root `CLAUDE.md` and `AGENTS.md` list the skills that are here. Only if
 it is there, when the sheets are handed over and the marks are final, you
 may mention once, in one sentence, that you can draft report card comments
-from these records with the plantoir-report-comments skill. Do not raise it
+from these records with the `plantoir-report-comments` skill. Do not raise it
 again in this session if they do not take it up. If it is not there, say
 nothing about report comments.
 

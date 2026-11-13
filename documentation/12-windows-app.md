@@ -2737,11 +2737,16 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `plantoir-test-authoring` (#751, templates for a unit test's marking
   guide and marking kit, and `scripts/check_kit.py`, which an assistant
   runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
-  09 → "Tests, marking and report comments") and `plantoir-marking` (#750
+  09 → "Tests, marking and report comments"), `plantoir-marking` (#750
   piece 750a, four Python scripts in `scripts/` that an assistant runs
   against a teacher's scans and the app never does, four templates and two
   references; `assessment.agentGuidance.markingSkill`, 09 → "Tests,
-  marking and report comments"). A Windows teacher marking scans needs
+  marking and report comments") and `plantoir-report-comments` (#752, a
+  `SKILL.md` and one reference, no scripts of its own: it uses
+  `plantoir-marking`'s `make_named_copies.py --comments` through the
+  runner, which needs Python only, neither Poppler nor tectonic;
+  `assessment.agentGuidance.reportCommentsSkill`, 09 → the same
+  section). A Windows teacher marking scans needs
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
   `pdfseparate`) and tectonic on PATH; which installs work, and how a
   teacher gets them, is NOT MEASURED here yet and is the `windows` issue
@@ -12513,3 +12518,21 @@ proves when it is asked, not what the window shows).
 
 **For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
 KNOW about #700").
+
+## Sharing unit plans (#709): what Windows owes
+
+The mac shares a course's unit plans to Cloudflare Pages from the Planning
+tab (`documentation/07-deployment.md` → "Sharing a unit plan (#709)" says
+why, what was measured and what was rejected; `documentation/09-mac-app.md`
+the app's half). Windows inherits the shared Python free: `scripts/unit_plan_site.py`,
+`scripts/share_plan.py` and their tests, which `PythonToolchainTests` already
+runs (the worker cases need node, which the runtime carries). It owes
+`deploy.ps1 -Plans` with its flags and the plans guard, the credential item
+in Credential Manager handed over through a file only the user can read,
+the share bar with `unitPlanning.share.words`, `modeCases`, `warningCases`
+and `deployArguments.planShareCases`, the three trail events, the two
+`LogRedactor` rules (`problemReportRedaction.cases`), the reference copy
+moving `plans-*.json` aside, and the plans leg of `verify-deploy.ps1`. The
+`windows` issue for #709 lists them; `NamedGapLedger` holds each open by name
+until done.
+
