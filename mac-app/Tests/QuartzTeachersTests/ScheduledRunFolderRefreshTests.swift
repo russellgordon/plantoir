@@ -38,7 +38,7 @@ final class ScheduledRunFolderRefreshTests: XCTestCase {
     func testEveryCaseGoesAheadAndSaysWhatTheContractSays() throws {
         let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["scheduledRunGetsItsFolderReady"])
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 13)
+        XCTAssertGreaterThanOrEqual(cases.count, 14)
         let lines: [String: String] = try ScheduledRunFolderRefreshTests.contractLines()
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -73,6 +73,12 @@ final class ScheduledRunFolderRefreshTests: XCTestCase {
             XCTAssertEqual(written.contains(waitedOpening), decision.saysItWaited, "\(name): \(written)")
             XCTAssertEqual(written.contains(stoppedOpening), decision.saysItStoppedWaiting, "\(name): \(written)")
             XCTAssertFalse(written.contains("{"), "\(name): a placeholder was left in \(written)")
+            // MUST FAIL before the 748b fix round (LOW 4): a run that stopped
+            // waiting for another copy cannot know the folder is up to date.
+            if decision.saysItStoppedWaiting {
+                XCTAssertFalse(written.contains("already up to date"), "\(name): \(written)")
+                XCTAssertNotEqual(decision.line, .alreadyUpToDate, name)
+            }
         }
     }
 
@@ -82,11 +88,12 @@ final class ScheduledRunFolderRefreshTests: XCTestCase {
         XCTAssertEqual(lines["broughtUpToDate"], ScheduledRunFolderRefresh.broughtUpToDateLine)
         XCTAssertEqual(lines["builderClause"], ScheduledRunFolderRefresh.builderClause)
         XCTAssertEqual(lines["alreadyUpToDate"], ScheduledRunFolderRefresh.alreadyUpToDateLine)
+        XCTAssertEqual(lines["foundNothingToChange"], ScheduledRunFolderRefresh.foundNothingToChangeLine)
         XCTAssertEqual(lines["couldNotFinish"], ScheduledRunFolderRefresh.couldNotFinishLine)
         XCTAssertEqual(lines["appCarriesNoTools"], ScheduledRunFolderRefresh.appCarriesNoToolsLine)
         XCTAssertEqual(lines["waitedClause"], ScheduledRunFolderRefresh.waitedClause)
         XCTAssertEqual(lines["stoppedWaitingClause"], ScheduledRunFolderRefresh.stoppedWaitingClause)
-        XCTAssertEqual(lines.count, 7, "a sentence in the contract that the Swift does not write")
+        XCTAssertEqual(lines.count, 8, "a sentence in the contract that the Swift does not write")
     }
 
     // MARK: - The refresh, on real folders
@@ -205,6 +212,26 @@ final class ScheduledRunFolderRefreshTests: XCTestCase {
         XCTAssertEqual(try read(folder.appendingPathComponent("deploy.sh")), "# old deploy.sh\n", "the old launcher is still whole")
         let line: String = try XCTUnwrap(ScheduledRunFolderRefresh.trailLine(for: report))
         XCTAssertTrue(line.hasSuffix("and went ahead with them as they were"), line)
+    }
+
+    /// MUST FAIL before the 748b fix round (LOW 5): a launcher that cannot
+    /// be read is counted as failed, not skipped, so the run never calls a
+    /// folder it could not compare up to date.
+    func testALauncherThatCannotBeReadIsCountedAsFailed() throws {
+        let bundle: URL = try makeBundle(version: "new")
+        let folder: URL = try makeWorkingFolder(launcherVersion: "old")
+        let unreadable: URL = folder.appendingPathComponent("deploy.sh")
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadable.path)
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: unreadable.path)
+        }
+        var sources: [String: URL] = [:]
+        for name in ["setup.sh", "preview.sh", "deploy.sh"] {
+            sources[name] = bundle.appendingPathComponent(name)
+        }
+        let refresh: WorkspaceModel.LauncherRefresh = WorkspaceModel.refreshLaunchersReporting(in: folder, from: sources)
+        XCTAssertEqual(refresh.failed, ["deploy.sh"])
+        XCTAssertEqual(refresh.refreshed, ["preview.sh", "setup.sh"])
     }
 
     // MARK: - The guard

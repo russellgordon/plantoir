@@ -10,10 +10,13 @@ import Foundation
 /// a `.lease` name: it holds no course, and every lease reader
 /// (`WorkLeaseFiles.everyLeaseHeldElsewhere`) reads `*.lease` only.
 ///
-/// **Who writes it, and who reads it.** Every copy the app makes into a
-/// working folder writes it for as long as the copy runs: a window's and an
-/// assistant server's (`ToolchainReadiness.ensure`), and a scheduled run's
-/// (`ScheduledRunFolderRefresh`). Only the scheduled run READS it, because it
+/// **Who writes it, and who reads it.** Two copies write it for as long as
+/// they run: the `.toolchain/` copy a window or the assistant's server starts
+/// off the main actor (`ToolchainReadiness.ensure`), and a scheduled run's
+/// whole copy, launchers included (`ScheduledRunFolderRefresh`). Three do not:
+/// the window's launcher refresh (`refreshLaunchersIfNeeded`, milliseconds),
+/// the synchronous copy (`initializeWorkspace` and the suite) and
+/// `BuilderWarmUp`, which copies into a folder of its own. Only the scheduled run READS it, because it
 /// is the one copier that goes straight on to build with nobody watching:
 /// it waits for another program's live copy before its own copy and again
 /// before its launchers start, so the launchers never hash a recipe another

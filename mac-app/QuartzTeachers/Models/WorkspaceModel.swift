@@ -1914,8 +1914,13 @@ class WorkspaceModel {
             if !fileManager.fileExists(atPath: destinationURL.path) {
                 continue
             }
+            // A launcher that cannot be READ, the app's or the folder's, is
+            // one that could not be brought up to date: counted, not skipped
+            // (the 748b review's LOW 5), so a scheduled run never says the
+            // folder's tools were already up to date when it could not tell.
             guard let current = try? Data(contentsOf: sourceURL),
                   let existing = try? Data(contentsOf: destinationURL) else {
+                failed.append(scriptName)
                 continue
             }
             if current == existing {

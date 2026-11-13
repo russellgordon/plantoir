@@ -20,8 +20,10 @@ import Foundation
 /// second copy of the app, and since #748 a scheduled run. Every file is
 /// written atomically from the same bundle, so two copies at once write the
 /// same bytes; since #748 a file the other copy removed first is not counted
-/// as a failure (measured: it was, in every run, `syncDirectory`). Each copy
-/// also writes Windows' `toolchain-copying.<pid>` marker while it runs
+/// as a failure (measured: it was, in every run, `syncDirectory`). The copy
+/// this registry starts off the main actor also writes Windows'
+/// `toolchain-copying.<pid>` marker while it runs (the synchronous one does
+/// not)
 /// (`ToolchainCopyMarker`), and the one reader is the scheduled run, which
 /// builds straight after and so waits for any other live copy first. The
 /// window and the assistant's server do not wait for one another.

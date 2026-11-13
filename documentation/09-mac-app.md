@@ -11018,7 +11018,10 @@ folder ready after an update (#473)"), with the mac's differences named:**
   the other had removed as FAILED, in every run after an update, and a
   failed copy greys Preview and Deploy. The mac now writes Windows' marker
   for every copy and counts a file already gone as done ("A scheduled deploy
-  brings its folder up to date first (#748 part 4)", below).
+  brings its folder up to date first (#748 part 4)", below). Precisely: the
+  `.toolchain/` copy `ToolchainReadiness.ensure` starts off the main actor
+  and the scheduled run's copy write it; the launcher refresh, the
+  synchronous copy and `BuilderWarmUp` (its own folder) do not.
 - **The scheduled run was unchanged by #476**: `ScheduledDeploy` starts its
   own `Process`, never a `ScriptRunner`; a `--stop` (`PreviewStopper`) is its
   own process too, so neither meets the backstop (finding 1). It did not
@@ -11402,7 +11405,7 @@ nothing, as it reads no settings.
 
 **It goes ahead in every case**, and that is the decision this piece had to
 make: `contracts/shared-rules.json` → `scheduledRunGetsItsFolderReady` has the
-table (13 cases) and the reasons (`whyItAlwaysGoesAhead`). A deploy that
+table (14 cases) and the reasons (`whyItAlwaysGoesAhead`). A deploy that
 silently does not happen at 6:30 is the worst outcome; one that goes ahead
 with the tools as they were and says so is better. A copy that wrote nothing
 (a folder that cannot be written, no tools in the app) leaves the folder's
@@ -11433,7 +11436,30 @@ COUNT, and a failed count greys Preview and Deploy in the window. Since
 #748 `WorkspaceModel.removeStrayFile` treats a file that is not there as
 done. The marker is for the READER: the run is the one copier that goes
 straight on to build with nobody watching, so it is the one that waits.
-A window and the assistant's server write the marker and wait for nobody.
+Two copies write it: the `.toolchain/` copy a window or the assistant's
+server starts off the main actor (`ToolchainReadiness.ensure`), which waits
+for nobody, and the run's own. The window's launcher refresh
+(`refreshLaunchersIfNeeded`, milliseconds), the synchronous copy
+(`initializeWorkspace` and the suite) and `BuilderWarmUp` (its own folder)
+do not write it; each writes whole files atomically, so a reader never sees
+half of one.
+
+**Two different versions of Plantoir copying at once** (the 748b review's
+LOW 1, measured by the reviewer: a new and an old bundle started together
+into one folder): both reported no failure and the folder ended MIXED in 3
+of 4 runs, 8 to 14 files from the older recipe. Nothing compares the folder
+with the bundle after the run's second wait, so the trail would still say
+it copied its files. It needs two copies of the app on one Mac, a plist
+whose saved path is a different copy from the one the teacher opens, or an
+assistant server started from one; and a job whose saved path is an OLDER
+copy of the app copies that older version's files over a newer folder.
+That is accepted: on `dev` before this piece the same older binary wrote its
+own wrapper and ran whatever launchers the folder had, so the folder's
+launchers and the wrapper could come from different versions on every run;
+now the run's launchers, recipe and wrapper come from one version, and the
+next window of the newer app mirrors the folder back (the image tag is a
+hash of the recipe, so a mixed recipe gets a builder of its own, never the
+newer version's).
 
 **A launcher is never half written when the wrapper runs it.** Every
 launcher and recipe file is written whole to a temporary file and moved
@@ -11464,6 +11490,18 @@ builds the site again (32 s from scratch, measured by verify-deploy.sh; 07 →
 and a stopped virtual machine adds 22 to 27 s (#312). So the first scheduled
 deploy after an update can take between a few seconds and about two minutes
 longer than the one before it, which is why the trail line says so.
+
+**Two sections of one course set for the same time take turns** (the
+review's LOW 2). They wait for each other on the course's leases
+(`waitForTheCourse`, ten minutes, looking every fifteen seconds), and the
+first now holds them through its copy (0.84 to 4.7 s measured above, up to
+14.3 s at background priority), any wait for another program's copy (up to
+five minutes) and, after an update, the builder built again (6 to 70 s) and
+the site rebuilt (about 32 s). The second section's own copy then finds
+nothing to change (0.85 s) and its builder is already built, so it adds
+only its own deploy. It stands down `courseWasBusy` only if the first takes
+more than ten minutes in all, which needs the five-minute wait used up as
+well; it was not measured end to end, for want of a real launchd job.
 
 **Rejected:**
 - **Standing down when the copy fails** (Windows' choice): it turns a copy

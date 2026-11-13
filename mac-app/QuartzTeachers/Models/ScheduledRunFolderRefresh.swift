@@ -65,6 +65,10 @@ nonisolated enum ScheduledRunFolderRefresh {
         case none
         case broughtUpToDate
         case alreadyUpToDate
+        /// It stopped waiting for another program's copy and its own found
+        /// nothing to change. Not "already up to date": the other copy may
+        /// still be changing the folder (the 748b review's LOW 4).
+        case foundNothingToChange
         case couldNotFinish
         case appCarriesNoTools
     }
@@ -99,9 +103,10 @@ nonisolated enum ScheduledRunFolderRefresh {
 
     /// The trail's sentences, word for word the contract's
     /// (`activityTrail.mustRecord` → "scheduled deploy got its folder ready").
-    static let broughtUpToDateLine: String = "a scheduled deploy brought the working folder's tools up to date first: {n} file(s) in {seconds} s{builder}, and went ahead"
+    static let broughtUpToDateLine: String = "a scheduled deploy copied {n} file(s) of Plantoir's tools into the working folder first, in {seconds} s{builder}, and went ahead"
     static let builderClause: String = ", so the website builder is built again for them unless this version of Plantoir has built it already"
     static let alreadyUpToDateLine: String = "a scheduled deploy found the working folder's tools already up to date, and went ahead"
+    static let foundNothingToChangeLine: String = "a scheduled deploy found nothing of its own to change in the working folder's tools, and went ahead"
     static let couldNotFinishLine: String = "a scheduled deploy could not bring all of the working folder's tools up to date ({failed} file(s) could not be copied or removed, {n} brought up to date, first: {first}){builder}, and went ahead with them as they were"
     static let appCarriesNoToolsLine: String = "a scheduled deploy found none of Plantoir's own tools to bring the working folder up to date with, and went ahead with the folder's tools as they were"
     static let waitedClause: String = "; it first waited {waited} seconds for another program (process {pid}) to finish getting the working folder ready"
@@ -123,6 +128,8 @@ nonisolated enum ScheduledRunFolderRefresh {
             line = .couldNotFinish
         } else if changed > 0 {
             line = .broughtUpToDate
+        } else if report.stoppedWaiting {
+            line = .foundNothingToChange
         } else if waitedAtAll {
             line = .alreadyUpToDate
         }
@@ -167,6 +174,8 @@ nonisolated enum ScheduledRunFolderRefresh {
                 .replacingOccurrences(of: "{builder}", with: builder)
         case .alreadyUpToDate:
             sentence = alreadyUpToDateLine
+        case .foundNothingToChange:
+            sentence = foundNothingToChangeLine
         case .couldNotFinish:
             var first: String = report.tools.firstFailure ?? ""
             if first.isEmpty, let launcher = report.launchersFailed.first {
