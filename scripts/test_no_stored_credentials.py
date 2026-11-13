@@ -12,8 +12,8 @@ pieces that say what they are (`contracts/shared-rules.json` ->
 `problemReportRedaction.assembledInput`), and this test keeps every such shape
 out of every tracked file, so a new one fails here before a scanner sees it:
 
-  * an address with a username and password in it, `scheme://user:pass@host`,
-    unless the host is a reserved example name (`.example`, `.invalid`,
+  * an address with a username and password written into it, before an `@`
+    and the host, unless the host is a reserved example name (`.example`, `.invalid`,
     `.test`, `.localhost`, `localhost`, or example.com/.net/.org), which no
     scanner reads as live and which can never be a real site;
   * an `Authorization`-style `Basic <base64>` whose base64 decodes to
