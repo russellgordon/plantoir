@@ -5064,7 +5064,7 @@ the rows in 57 s (the hold until quiet adds about 40 s: they took 14 to 15 s
 before it); the 40 sabotages (78 engine runs) in about 150 s, three at a
 time with the keys sabotage alone at the end, one engine at a time (344 s
 one at a time when there were 21); the whole step in `verify.sh`, its own
-build of the fixture site included (about 10 s), 224 to 225 s, so under four
+build of the fixture site included (about 10 s), 224 to 230 s, so under four
 minutes on a run that takes about 25. Before this round it took 137 to 139 s.
 With WebKit missing it took 116 s (before this round) and said SKIP twice;
 with no engine, 9 s. Cold visits to the isolated Python page: first contentful paint 275 to
