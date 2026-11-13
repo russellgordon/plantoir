@@ -1756,11 +1756,19 @@ and the credential item (the `windows` issue for #709).
    were all shared). A false positive such as `Dissolution Lab.pdf` costs a
    PDF the teacher can still include; the other way costs a key a class can
    read. No rule on names can see a key written inside a page or a PDF named
-   something else, so **before every open share the teacher is shown the
-   PDFs that will be shared and every file left out, by name, and the share
+   something else, so **before every open share the teacher is shown every
+   file that will be shared and every file left out, by name, and the share
    goes only on their yes** (`openShareLists`); the sentence says the lists
-   are by name and that Plantoir has not read the files. Under
-   `--non-interactive` the lists are printed and the rule decides.
+   are by name and that Plantoir has not read the files. In the app the
+   question is answered ONLY in a sheet of its own showing both lists in
+   full, with Cancel the default (fix review H1: the plain question alert
+   showed the `[y/N]` line alone, with the lists behind Show Details, so the
+   look the ruling relies on never happened). The app reads the lists from
+   marker lines `share_plan.py` prints beside the human ones
+   (`openShareLists.markers`), never from the console's text. Under
+   `--non-interactive` the lists are printed and the rule decides. Widened
+   again on the fix review: Mark Scheme, Soln, Ans, and the French Corrigé and
+   Réponses, with accents folded before the letters are read.
 5. **The public-address warning** comes before the first share without a
    password and again when a password is removed; never when protected, and
    there is no tick to silence it (`warningCases`).
@@ -1924,7 +1932,12 @@ and the folder at once and again on every way out, even when the upload fails.
 The first version used one fixed `/tmp/plan_cred`, and one website builder
 serves a whole working folder, so two courses shared at once could read each
 other's password (review M4); `test_deploy_sh_plans.py` now shares two at
-once. Never in argv beyond the Keychain store's instant (as the tokens' are),
+once. The credential is read first in `main()`, and SIGTERM (the app's Cancel)
+and SIGHUP leave through the same clean-up as ^C; a share killed outright
+leaves its folder, which the next share removes (only a folder named
+`plan_cred.` and six letters or digits, older than ten minutes). The app's
+password sheet sends a plan's password exactly as typed, as the command line
+does. Never in argv beyond the Keychain store's instant (as the tokens' are),
 an environment variable, the trail, the console, the marker or a fixture. Only
 `--remove-password` deletes the item, after the share succeeded; Stop Sharing
 deletes it when no school year of the course is still shared.
@@ -1942,7 +1955,9 @@ over a site answering 200 to anyone, and a first open share cancelled there
 left the bar saying not shared, with no Stop Sharing, over a public site. Now
 it is written before the upload with `state: sending`, the address, `protected:
 false`, and the answer keys counted as in when this share or the last one
-carried them; after the proof with `state: shared` and the older copies
+carried them, and `answerKeysLeftOut` 0 in that case, so the bar never says
+keys were left out while the address may still serve one (fix review M1);
+after the proof with `state: shared` and the older copies
 counted before the deletes; and before a Stop Sharing with `state: stopping`.
 The bar reads `sending` as "may be open" (`words.lastShareUnfinished`, with
 Share Again and Stop Sharing) and `stopping` as `words.stopUnconfirmed`, and
@@ -1960,13 +1975,16 @@ and nothing reads a name of that shape.
 `DELETE …/pages/projects/{name}`, measured on a project holding 2 deployments:
 200 with nothing deleted first. The address answered 530 or 522 within 5 s,
 stopped resolving after about 100 s, and never answered 200 again in 3
-minutes. So Stop Sharing says stopped only once the address, fetched every
-2 s for up to 30 s, no longer answers with the plans (200, 401, or anything
-carrying `X-Plantoir-Share`): a 404 from the delete proves nothing on its
-own, because the token or `--account` may now reach another account while the
-site in the first is still up (review M5). Still answering at 30 s:
+minutes. So Stop Sharing says stopped only on an answer that PROVES the site is gone
+(`stopCases`): 522 or 530, or the name no longer resolving, fetched every 2 s
+for up to 30 s. A 404 from the delete proves nothing on its own, because the
+token or `--account` may now reach another account while the site in the
+first is still up (review M5); and no answer at all, a school filter's 403, a
+5xx or a 404 from the address prove nothing either (fix review M2: the first
+fix read all of those as stopped, and deploy.sh then deleted the saved
+password). Not proven at 30 s:
 `words.stopUnconfirmed`, the marker kept as `stopping`, Stop Sharing still on
-the bar. A deleted project's `*.pages.dev` name could later be taken by
+the bar, and the saved username and password kept. A deleted project's `*.pages.dev` name could later be taken by
 another account, so an old link could one day show somebody else's site; the
 suffix makes that a matter of chance, not of guessing (not measured: it needs
 a second account).

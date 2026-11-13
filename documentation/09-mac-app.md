@@ -14442,9 +14442,15 @@ this is the app's half.
   `words.lastShareUnfinished` (the plans may be open), and one in state
   `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
   (`PlanSharing.barStatus`, `barCases`).
-- **Before an open share goes out** the console lists the PDFs it will share
-  and every file it leaves out, by name, and asks; the question arrives in the
-  share sheet as an ordinary question (`openShareLists`).
+- **Before an open share goes out** the launcher lists every file it will
+  share and every file it leaves out, by name, and asks. The app reads the
+  lists from their marker lines (`PlanShareLists`, kept out of the console)
+  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
+  scrolling, the by-name sentence, Share and Cancel with Cancel the default
+  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
+  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **A plan's password** is sent from the credential sheet exactly as typed
+  (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
 - **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
   comes before a choice exactly when `PlanSharing.warns` says
   (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
