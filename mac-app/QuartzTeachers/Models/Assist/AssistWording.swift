@@ -266,6 +266,15 @@ nonisolated enum AssistWording {
              + "Try again once that deploy has finished."
     }
 
+    /// The same refusal when what was in the way is another BUILD of the
+    /// section, not a deploy: the assistant's rebuild of the preview, or a
+    /// build typed in Terminal (GitHub #729). "Not deployed again" would be
+    /// false here, since nothing was deploying.
+    static func deployRefusedWhileItsSectionIsBeingBuilt(course: String, section: String) -> String {
+        return "\(course) Section \(section) is already being built, so it was not deployed. "
+             + "Try again once that build has finished."
+    }
+
     /// A deploy from a caller with no window (an assistant in another app,
     /// or the in-app assistant with no section window open) stopped at a
     /// question — a site name, a surname, a token — rather than waiting for

@@ -604,7 +604,8 @@
         "launcherLineWhenItsSectionIsBeingDeployed": "{course}/{section} · the preview stopped before building — this section was being deployed",
       "launcherLineWhenALaterDeployIsStillWorking": "{course}/{section} · the {leg} stopped before it started — this section was still being deployed by a deploy that was set for later",
       "launcherLineWhenItsSectionIsAlreadyBeingDeployed": "{course}/{section} · the {leg} stopped before it started — this section was already being deployed",
-      "launcherLineWhenItsSectionIsStillBeingDeployedWhy": "GitHub #439: shared-rules.json -> deployWhileItsSectionDeploys. Under THIS event for #381's reason: a build (or a deploy) was declined because something else is working on this section. {leg} is 'deploy' when deploy.sh refused and 'build' when preview.sh --build-only did. Written by the launcher itself (note_on_the_trail): a refusal met in Terminal, or by a scheduled run's own leg, has no app to write it. scripts/test_deploy_while_its_section_deploys.py checks both launchers against these fields.",
+      "launcherLineWhenItsSectionIsAlreadyBeingBuilt": "{course}/{section} · the {leg} stopped before it started — this section was already being built",
+      "launcherLineWhenItsSectionIsStillBeingDeployedWhy": "GitHub #439: shared-rules.json -> deployWhileItsSectionDeploys. Under THIS event for #381's reason: a build (or a deploy) was declined because something else is working on this section. {leg} is 'deploy' when deploy.sh refused and 'build' when preview.sh --build-only did. launcherLineWhenItsSectionIsAlreadyBeingBuilt (#729) is the line when what was in the way is another build of the section, preview.sh --build-only without --for-deploy (the assistant's rebuild, or one typed in Terminal), rather than a deploy. Written by the launcher itself (note_on_the_trail): a refusal met in Terminal, or by a scheduled run's own leg, has no app to write it. scripts/test_deploy_while_its_section_deploys.py checks both launchers against these fields.",
         "lineWhenItsSectionIsBeingDeployedWhy": "GitHub #381 (decision 4 on #378): shared-rules.json -> previewWhileItsSectionDeploys. Filed under THIS event rather than a new one, as the #378 plan decided: it already means 'a build was declined because something else is working on this course', and a second name for the same fact would split what a report reads. The window writes it with the course and section; preview.sh writes the launcher line itself (note_on_the_trail), because a preview typed at a command line has no app to read a marker, and a refusal a teacher met there is exactly the one nobody else saw. No process id: the window's own deploy is this program, and the launcher's line comes from the process table, which a teacher's report cannot use. scripts/test_preview_while_deploying.py checks the launcher against this field; PreviewWhileDeployingTests the window.",
         "why": "Added with #156, when the mac began reading the work leases other programs write. The program in the way is invisible from where the teacher is: an outside assistant, another copy of Plantoir, a publish set for later. A teacher who reports 'Preview said somebody else was using it' can be answered only by the process id - on the lease file itself, and on this line; the window's own 'app opened' line names it too when the other program is a copy of the app, while the --mcp-stdio and scheduled processes write no opening line - and without a line at all a declined press reads exactly like a button that did nothing. Written by whichever program declined; the MCP process writes the same trail."
       },
@@ -25029,7 +25030,7 @@
     "why": "GitHub #381, split from #378 on 2026-09-29. Russell's decision 4 on #378: 'A preview of a section cannot start AT ALL while that same section is being deployed — from this window or another.' A preview builds into the same folder a deploy is uploading from, and a preview that has to set the folder up again removes the workspace a deploy is about to run in. Read from code on 2026-09-29 (the #378 plan review), the mac refused only four of the six ways in: the same window only through its disabled Preview button (startPreview itself asked nothing, and the in-app assistant and the restart path call it directly); another window of the app and the in-app assistant's windowless deploy NOT AT ALL (startPreview read other programs' leases, never this program's own publishes); a deploy set for later and an outside assistant through their work leases; a command line NOT AT ALL, either way round (a bare launcher writes no lease, and preview.sh checked nothing).",
     "layers": {
       "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
-      "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it — labelCodeCases; the name must end .sh, so a log being read is not a deploy). The table is read by the one reader every launcher carries, the_launchers_running in the PROCESS TABLE BLOCK, which the look before a website builder is set up again asks too (#388); a table that cannot be read — `ps` fails, or its answer does not list this run — lets the preview through. It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
+      "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it — labelCodeCases; the name must end .sh, so a log being read is not a deploy), or, since #729, a deploy's build leg, preview.sh C S --build-only --for-deploy, by the same folder rule as deploy.sh. The table is read by the one reader every launcher carries, the_launchers_running in the PROCESS TABLE BLOCK, which the look before a website builder is set up again asks too (#388); a table that cannot be read — `ps` fails, or its answer does not list this run — lets the preview through. It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
       "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app) holds build and publish work leases for the COURSE; the window's existing take-then-check (workLeases) refuses with wording.courseIsBeingBuiltElsewhere. Unchanged by this rule and course-wide, which is wider than it.",
       "assistant": "The in-app assistant's (and the MCP server's own) preview, before it opens a window, stops a preview or runs a --build-only rebuild (mac: AssistToolRunner.bringThePreviewUpToDate), asks the same in-process publish record and answers wording.sectionIsBeingDeployed, with the same trail line as the window."
     },
@@ -25489,7 +25490,58 @@
           "700": "here"
         },
         "expect": "allowed",
-        "why": "The assistant's 'rebuild the preview' runs exactly this, and nothing on the command line tells it from a publish's build leg (the #378 plan review, S3). The window refuses its own build leg from its publish record."
+        "why": "The assistant's 'rebuild the preview' runs exactly this (the #378 plan review, S3). Since #729 a deploy's build leg carries --for-deploy as well, and that word is what tells the two apart: this line has none, so it is a rebuild, and refusing a preview while the assistant refreshes it would say something false."
+      },
+      {
+        "name": "a deploy's build leg (--build-only --for-deploy) is a deploy",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "why": "GitHub #729: a Plantoir app builds before its deploy.sh starts, and during that leg the section's built folder is being cleared and filled for the deploy. Until #729 nothing on the command line told it from a rebuild, so a preview typed in Terminal then was let through (knownLimits[0] until #729)."
+      },
+      {
+        "name": "a deploy's build leg in ANOTHER working folder does not refuse",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "elsewhere"
+        },
+        "expect": "allowed",
+        "why": "The same folder rule as deploy.sh's: another folder's build fills another folder's site."
+      },
+      {
+        "name": "a deploy's build leg merely named on a line is not a deploy",
+        "processes": [
+          [
+            700,
+            1,
+            "node /usr/local/bin/claude -p run ./preview.sh ICS4U 2 --build-only --for-deploy"
+          ],
+          [
+            701,
+            1,
+            "/usr/bin/vim ./preview.sh ICS4U 2 --build-only --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here"
+        },
+        "expect": "allowed",
+        "why": "preview.sh must be the program, as deploy.sh must."
       },
       {
         "name": "clearing a saved token is not a deploy",
@@ -25624,13 +25676,13 @@
       }
     ],
     "knownLimits": [
-      "A preview typed in Terminal while ANOTHER program is in the build leg of its deploy (preview.sh --build-only, before its deploy.sh starts) is not refused by the launcher: the build leg cannot be told from the assistant's rebuild (launcherCases, '--build-only is not a deploy'). A program deploying that way holds work leases, but a preview typed in Terminal reads none. A --for-deploy flag on the build leg would close it; it is a launcherFlags change and was not made for this.",
+      "A preview typed in Terminal while ANOTHER program REBUILDS the section (preview.sh --build-only without --for-deploy: the assistant's rebuild, or a build typed in Terminal) is not refused by the launcher, on purpose (launcherCases, '--build-only is not a deploy'): it is not a deploy, and the sentence says 'being deployed'. A Plantoir program rebuilding holds a build work lease, but a preview typed in Terminal reads none. The deploy's own build leg is refused since #729, which added --for-deploy to tell the two apart (app-rules.json -> launcherFlags.preview); before #729 this limit covered that leg too.",
       "The launcher's look is folder-aware for deploy.sh (its working directory) and for a deploy set for later (its label's folder id), but a deploy set before #237 names no folder and counts for every folder holding that course and section.",
       "A course code with a letter or digit outside A-Z and 0-9 (\"CAFÉ\") is written into a scheduled deploy's label by Swift's isLetter/isNumber as itself and by the launcher as '-', so a deploy set for later of such a course is not recognised by the launcher's label look (it fails open; the leases still refuse a window's preview, and deploy.sh's own row is still recognised by its words). Neither app can make such a code (course-management.json refuses \"CAFÉ\"; labelCodeCases and the mac's walk of the Basic Multilingual Plane pin that every code the apps accept is labelled alike), and since #402 neither can the command-line setup (course-management.json → courseCode.commandLine). A course made at the command line before #402, or a folder given a course_config.json by hand, can still carry one, and is still read this way (#388).",
       "A deploy run as `bash -x ./deploy.sh C S` — a shell given a flag before the script — is not the PROGRAM by the guard's rule, so its preview is let through (fails open; recorded by #388's plan review, unchanged by the fold). Widening the rule to allow shell flags other than -c would close it; it was not done in #388."
     ],
     "rejected": [
-      "Counting preview.sh C S --build-only as a deploy (the #378 plan's first shape): it refuses every preview while the assistant rebuilds that section's preview, with a false sentence.",
+      "Counting preview.sh C S --build-only as a deploy (the #378 plan's first shape): it refuses every preview while the assistant rebuilds that section's preview, with a false sentence. #729 counts only a build leg that says --for-deploy.",
       "Refusing when the process table cannot be read, as the look before a workspace is remade does: there failing open costs a publish; here failing closed refuses every preview until ps answers again, which is the 'blocked until a restart' #378 was about.",
       "Widening the window's check to the whole course: previewing section 1 while section 2 deploys from the same app works today, and the decision names the same section.",
       "Asking the work leases in-process instead of the publish record: this program's own leases are left out of whatBlocksABuild by design (a window must not decline its own build), and the record is what they are derived from.",
@@ -25643,7 +25695,7 @@
     "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows has the same guard in preview.ps1 since #386 (its own process table, never a remembered process id), and runs every launcherCase there through windows-app/test_launcher_rules.ps1; since #467 none is skipped."
   },
   "deployWhileItsSectionDeploys": {
-    "rule": "A deploy of a section refuses, before anything is changed, while that same section is still being deployed in this working folder: by a deploy that was set for later whose script is still running - including one whose run was ended by setting the section again (a 'leftover run') - or by deploy.sh for that course and section. It is asked by the launchers, so every caller is covered: the window's Deploy and an assistant's deploy (their build leg, preview.sh --build-only, and their deploy.sh legs), a scheduled run's own legs, and a deploy typed in Terminal. A preview being served is not this rule's (previewWhileItsSectionDeploys). Before it starts its script, a newly set run waits for a leftover run of its own section to finish (theNewRunWaits, below).",
+    "rule": "A deploy of a section refuses, before anything is changed, while that same section is still being deployed in this working folder: by a deploy that was set for later whose script is still running - including one whose run was ended by setting the section again (a 'leftover run') - or by deploy.sh for that course and section, or by a deploy's build leg (preview.sh C S --build-only --for-deploy, #729). Since #729 it also refuses while that same section is being BUILT in this working folder by any other preview.sh C S --build-only (the assistant's rebuild, or one typed in Terminal), in words that say 'built' rather than 'deployed', because two builds of one section clear and fill the same folder and the first one fails. It is asked by the launchers, so every caller is covered: the window's Deploy and an assistant's deploy (their build leg, preview.sh --build-only --for-deploy, and their deploy.sh legs), the assistant's rebuild (preview.sh --build-only), a scheduled run's own legs, and a deploy typed in Terminal. A preview being served is not this rule's (previewWhileItsSectionDeploys). Before it starts its script, a newly set run waits for a leftover run of its own section to finish (theNewRunWaits, below).",
     "why": "GitHub #439, decided by Russell 2026-10-04: fix it in the next release. Setting a section's deploy again while its run works boots the job out first (#237's 'never briefly two agents'; #409), and the job IS the running app, so the run ends there. The wrapper script it started is a process group of its own and keeps building and uploading - measured on an Apple M4 Pro, macOS 26.6, 2026-10-04, with stand-in launchers under a path holding a space: after SIGKILL of the pretend run, its script and legs kept running, and the process table showed them. The ended run's leases name a process that is gone, so they read as stale (workLeases.liveness), deploy.sh had no same-section guard, and preview.sh asked only on a serving run: two builds and uploads of one section could run at once, the fault #156's leases exist to prevent.",
     "sentences": {
       "launcher": {
@@ -25662,14 +25714,22 @@
         "anotherBuild": [
           "❌ {course} section {section} is already being deployed, so it cannot be built until that has finished.",
           "   Nothing was changed."
+        ],
+        "buildingDeploy": [
+          "❌ {course} section {section} is already being built, so it cannot be deployed until that has finished.",
+          "   Nothing was changed."
+        ],
+        "buildingBuild": [
+          "❌ {course} section {section} is already being built, so it cannot be built again until that has finished.",
+          "   Nothing was changed."
         ]
       },
       "panel": "The window's failure explanation is the launcher's first line with the cross taken off (failureExplanationCases), lifted as previewWhileItsSectionDeploys lifts its own.",
-      "assistant": "wording.deployRefusedWhileALaterDeployWorks when the deploy set for later was the reason, wording.deployRefusedWhileItsSectionDeploys otherwise - said by the in-app assistant and an outside assistant's deploy_section instead of 'did not finish', when every leg that ran was refused this way. When it is not a deploy but a rebuild that is refused - an outside assistant's rebuild_preview, publish_pages or unpublish_pages (a page, or a whole unit) rebuilding the preview after its write - the answer says the launcher's own build line, lifted as the window lifts it (failureExplanationCases' expect), after what was already done, and never wording.whereTheOutputIs: the server has no window (refusedBuildAnswers, #471).",
-      "why": "It names WHAT is deploying. After a re-set the app shows only the new time, so 'is being deployed right now' would read as false; 'a deploy that was set for later' is the thing the teacher set. 'Deployed', the word on the button (DEPLOY = going online; nothing here is about publishing a page). The build leg says 'built' rather than 'deployed again' because an assistant's rebuild of the preview runs the same leg - which is also why a refused rebuild says the LIFTED build line rather than wording.deployRefusedWhileItsSectionDeploys: that sentence says the section was not deployed again, which is false of a rebuild, and a new wording key can be added only where assist-wording.json is generated. The lifted line keeps the launcher's lower-case 'section 2'; that is accepted rather than re-cased, because it is the same line the window shows and a teacher who sees both should read one sentence, not two. No 'script', 'workspace' or 'container' (CLAUDE.md rule 1)."
+      "assistant": "wording.deployRefusedWhileALaterDeployWorks when the deploy set for later was the reason, wording.deployRefusedWhileItsSectionIsBeingBuilt when another build of the section was (buildingDeploy, buildingBuild; #729), wording.deployRefusedWhileItsSectionDeploys otherwise - said by the in-app assistant and an outside assistant's deploy_section instead of 'did not finish', when every leg that ran was refused this way. When it is not a deploy but a rebuild that is refused - an outside assistant's rebuild_preview, publish_pages or unpublish_pages (a page, or a whole unit) rebuilding the preview after its write - the answer says the launcher's own build line, lifted as the window lifts it (failureExplanationCases' expect), after what was already done, and never wording.whereTheOutputIs: the server has no window (refusedBuildAnswers, #471).",
+      "why": "It names WHAT is deploying. After a re-set the app shows only the new time, so 'is being deployed right now' would read as false; 'a deploy that was set for later' is the thing the teacher set. 'Deployed', the word on the button (DEPLOY = going online; nothing here is about publishing a page). The build leg says 'built' rather than 'deployed again' because an assistant's rebuild of the preview runs the same leg - which is also why a refused rebuild says the LIFTED build line rather than wording.deployRefusedWhileItsSectionDeploys: that sentence says the section was not deployed again, which is false of a rebuild, and a new wording key can be added only where assist-wording.json is generated. The lifted line keeps the launcher's lower-case 'section 2'; that is accepted rather than re-cased, because it is the same line the window shows and a teacher who sees both should read one sentence, not two. No 'script', 'workspace' or 'container' (CLAUDE.md rule 1). The two 'building' sentences (#729) say 'built' because what is in the way is a build, not a deploy: 'already being deployed' would send a teacher looking for a deploy that is not there."
     },
-    "launcherLines": "activityTrail.mustRecord 'build declined, course busy elsewhere' -> launcherLineWhenALaterDeployIsStillWorking and launcherLineWhenItsSectionIsAlreadyBeingDeployed, with {leg} 'deploy' (deploy.sh) or 'build' (preview.sh --build-only).",
-    "launcherCasesShape": "Run by scripts/test_deploy_while_its_section_deploys.py against the REAL guard, cut out of deploy.sh AND preview.sh (the two copies must match), with a pretend ps and lsof - the shape of previewWhileItsSectionDeploys.launcherCasesShape. leg is 'deploy' (default) or 'build'. The deploy asked for is ICS4U section 2 in the folder 'here'. who is the sentence expected when refused: 'later' (laterDeploy/laterBuild) or 'another' (anotherDeploy/anotherBuild). parentArgs is this run's parent's command line (default '-bash').",
+    "launcherLines": "activityTrail.mustRecord 'build declined, course busy elsewhere' -> launcherLineWhenALaterDeployIsStillWorking, launcherLineWhenItsSectionIsAlreadyBeingDeployed and (since #729) launcherLineWhenItsSectionIsAlreadyBeingBuilt, with {leg} 'deploy' (deploy.sh) or 'build' (preview.sh --build-only).",
+    "launcherCasesShape": "Run by scripts/test_deploy_while_its_section_deploys.py against the REAL guard, cut out of deploy.sh AND preview.sh (the two copies must match), with a pretend ps and lsof - the shape of previewWhileItsSectionDeploys.launcherCasesShape. leg is 'deploy' (default), 'build', or 'deploy-build' (preview.sh --build-only --for-deploy, a deploy's own build leg, #729: it takes the 'Build' sentences, except 'buildingDeploy' when another build is in the way, and {leg} 'build' on the trail). The deploy asked for is ICS4U section 2 in the folder 'here'. who is the sentence expected when refused: 'later' (laterDeploy/laterBuild), 'another' (anotherDeploy/anotherBuild) or 'building' (buildingDeploy/buildingBuild, #729). Every pid in processes is still running when the guard looks again, as in previewWhileItsSectionDeploys.launcherCasesShape. parentArgs is this run's parent's command line (default '-bash').",
     "launcherCases": [
       {
         "name": "a leftover run's script, under Application Support (a path with a space), refuses a deploy",
@@ -25978,7 +26038,7 @@
         "expect": "allowed"
       },
       {
-        "name": "a preview of the section is not a deploy",
+        "name": "a preview being served, or being stopped, is not a build",
         "processes": [
           [
             700,
@@ -25988,15 +26048,254 @@
           [
             701,
             1,
+            "/bin/bash ./preview.sh ICS4U 2 --stop"
+          ],
+          [
+            702,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only --stop"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
+        "expect": "allowed",
+        "why": "Not this guard's question: a preview being served is #381's, the other way round, and --stop builds nothing (until #729 this case also held a plain --build-only, which is now the 'building' cases below)."
+      },
+      {
+        "name": "a deploy's build leg (--build-only --for-deploy) in this folder refuses a deploy",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "another",
+        "why": "GitHub #729, measured in #706's reproduction: a Plantoir app builds before its deploy.sh starts, and during that leg nothing on the command line said it was a deploy, so a second deploy of the section started, its build cleared the folder, and the first deploy's build failed."
+      },
+      {
+        "name": "a deploy's build leg refuses the build leg of another deploy",
+        "leg": "build",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --non-interactive --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "another"
+      },
+      {
+        "name": "a deploy's build leg in ANOTHER folder does not count",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "elsewhere"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "a rebuild (--build-only, no --for-deploy) refuses a deploy, in words that say built",
+        "processes": [
+          [
+            700,
+            600,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --non-interactive"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "building",
+        "why": "#729, the plan review's M7, ruled by the director 2026-11-12: the assistant's Rebuild Preview holds a build lease, but a deploy.sh typed in Terminal reads none, and its build would clear the folder the rebuild is filling. Any second build of the section is refused; --for-deploy decides only the words."
+      },
+      {
+        "name": "a deploy's own build leg held up by a rebuild says it cannot be deployed",
+        "leg": "deploy-build",
+        "processes": [
+          [
+            700,
+            1,
             "/bin/bash ./preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "building",
+        "why": "#729 review, L-a3: the teacher pressed Deploy, so the line says 'cannot be deployed' (buildingDeploy), not 'cannot be built again'. The leg knows it is a deploy's from --for-deploy."
+      },
+      {
+        "name": "a deploy's own build leg held up by a deploy keeps the build leg's words",
+        "leg": "deploy-build",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "another",
+        "why": "anotherBuild, as before #729: 'already being deployed, so it cannot be built'. Only the building sentences take the deploy's words on this leg."
+      },
+      {
+        "name": "a rebuild refuses another build of the section",
+        "leg": "build",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "building"
+      },
+      {
+        "name": "a rebuild whose working folder cannot be asked still counts",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {},
+        "expect": "refused",
+        "who": "building",
+        "why": "The same rule as deploy.sh's (#381): a build of this very section is proved; only its folder is not."
+      },
+      {
+        "name": "a rebuild in ANOTHER folder does not count",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "elsewhere"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "two builds started by the same app are not one family",
+        "leg": "build",
+        "parentArgs": "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
+        "processes": [
+          [
+            700,
+            4999,
+            "/bin/bash {here}/preview.sh ICS4U 2 --build-only --non-interactive"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "building",
+        "why": "The window's deploy and the in-app assistant's rebuild are both children of the one app: brothers, not ancestor and descendant, so the family rule does not hide one from the other. Two builds of one section clear the same folder whoever started them."
+      },
+      {
+        "name": "a deploy.sh beside its own rebuild says deployed",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --to-folder /Users/t/Sites/ics4u"
+          ],
+          [
+            701,
+            700,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only --non-interactive"
           ]
         ],
         "cwd": {
           "700": "here",
           "701": "here"
         },
+        "expect": "refused",
+        "who": "another",
+        "why": "deploy.sh's own rebuild (#136) carries no --for-deploy; the deploy.sh that started it is in the table too, and a deploy is the truer name for what is happening."
+      },
+      {
+        "name": "a build of section 12, of another course, or of a course whose code begins with this one's, does not count",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./preview.sh ICS4U 12 --build-only"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./preview.sh ICS3U 2 --build-only --for-deploy"
+          ],
+          [
+            702,
+            1,
+            "/bin/bash ./preview.sh ICS4UX 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "a build merely named on a line, in an editor or in a search, is not a build",
+        "processes": [
+          [
+            700,
+            1,
+            "node /usr/local/bin/claude -p run ./preview.sh ICS4U 2 --build-only --for-deploy"
+          ],
+          [
+            701,
+            1,
+            "/usr/bin/vim ./preview.sh ICS4U 2 --build-only"
+          ],
+          [
+            702,
+            1,
+            "/usr/bin/grep -n preview.sh ICS4U 2 --build-only --for-deploy"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
         "expect": "allowed",
-        "why": "Not this guard's question: a preview being served is #381's, the other way round, and a second build is the leases'."
+        "why": "preview.sh must be the program: the first word, or the script a shell was handed."
       },
       {
         "name": "an unreadable table lets the deploy through",
@@ -26045,6 +26344,16 @@
         "output": "❌ ICS4U section 2 is already being deployed, so it cannot be built until that has finished.\n   Nothing was changed.",
         "expect": "ICS4U section 2 is already being deployed, so it cannot be built until that has finished.",
         "assistant": "deployRefusedWhileItsSectionDeploys"
+      },
+      {
+        "output": "❌ ICS4U section 2 is already being built, so it cannot be deployed until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is already being built, so it cannot be deployed until that has finished.",
+        "assistant": "deployRefusedWhileItsSectionIsBeingBuilt"
+      },
+      {
+        "output": "❌ ICS4U section 2 is already being built, so it cannot be built again until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is already being built, so it cannot be built again until that has finished.",
+        "assistant": "deployRefusedWhileItsSectionIsBeingBuilt"
       }
     ],
     "refusedBuildAnswersShape": "Each case drives an outside assistant's tool once, in a working folder whose ICS4U section 2 has a class page 'Unit 2, Day 3' (unpublished for publish_pages, published for unpublish_pages), with the preview's --build-only failing (exit 1) with failureExplanationCases[failureExplanationCase].output as its output - its cross replaced by crossArrivesAs when that is given. arguments are the tool's own beside course 'ICS4U' and section 2; pages is the contract's semicolon-separated string (a side that takes an array splits it). The answer must contain that case's expect, whole, must not contain the cross in the form it arrived in (or the real cross), and must not contain wording.whereTheOutputIs. Where the next words go is each side's: the page and unit answers say what was already done first. The single-page unpublish_pages case was added from the mac on 2026-10-08, when only the mac rebuilt after hiding one page; it runs on both since Windows began rebuilding after a hide (GitHub #479, 2026-10-15). It was never marked appliesOn, since that would have recorded as chosen a difference Windows still owed.",
@@ -26129,17 +26438,23 @@
       "A leftover run's own after-work is still lost: the app's record that the section was deployed (it stays ' — Edited', the harmless direction), the run's trail line and its notification. Its script does write the section's outcome record, and since #439 never over a newer run's (scheduledPublishStopped.newerRecordWins).",
       "A deploy set for later before #237 names no folder in its label, so its leftover run refuses that course and section in every working folder until it ends; a newly set run never ends such a run's app (its plist is gone, so there is nothing to boot out), so the run's app and leases live on, #156's ten-minute wait sees them, and if it is still working when the new run starts the new run's legs are refused by this guard and the run is recorded as stopped.",
       "A scheduled run does not wait for a deploy typed in Terminal (it writes no lease); its legs are refused here and the run is recorded as stopped, which is better than two deploys of one section at once.",
-      "The look is the live process table: a process another account runs is not seen, as everywhere else the launchers look.",
+      "The look is the live process table, which lists every account's processes. A process another account runs is listed but never counted: lsof cannot read its working folder, and a folder that belongs to another account is not this one (#729 review, L-a1, measured: until then another account's build or deploy of the same course code and section refused this teacher's, in every folder). That is the mac's two-look mechanics (ps, then lsof and ps -p's owner), so it is tested in scripts/test_deploy_while_its_section_deploys.py (otherAccount), not as a shared case. A process of THIS account whose folder lsof cannot read still counts, as #381 decided.",
+      "Two builds or deploys of one section started within a few milliseconds of each other each see the other and BOTH are refused (#729 review, L-a2, measured with real processes: started together, both refused 20 of 20; started 50, 100, 200, 400 or 800 ms apart, exactly one refused, 10 of 10 at each). The overlap never gets through; each teacher sees the refusal and a second press goes ahead. No tie-break was added: one that is provably right needs an order both runs agree on, which the process table does not give. #439 already had this shape for two deploy.sh runs.",
       "One narrow race turns a deploy off yet lets it go out: the sidebar's Cancel Deploy dialog opened before the deploy's time and confirmed after its run has started. The run has removed its own plist, so cancelScheduledDeploy boots the label out blind, ending the run's app as a re-set does, and the deploy its script started still goes out (the guard keeps it from overlapping anything); no trail line says so. Every other cancel - a rename (CourseRenamer), the assistants' cancels, the cleanup - acts only on a plist found on disk, so it never reaches a working run. Recorded rather than built (#439 review finding 5, narrowed by the fixes review): it needs the dialog's moment to pass while it is open.",
       "newerRecordWins holds only for a leftover whose script was written by an app that has it (1.4.4 and later): the look is in the leftover's OWN script, written at the PREVIOUS set. A deploy set under 1.4.3 or earlier and set again after updating leaves a leftover without the look, so if the new run stands down after thirty minutes that leftover can still replace earlierDeployStillWorking with its own 'succeeded'. Transitional: it ends with the last deploy set before the update (#439 review, finding 6).",
-      "A teacher who dismisses earlierDeployStillWorking while the leftover still works leaves no record in place, so the leftover then writes its own 'succeeded' and the section reads as deployed on its own - true of the OLD deploy's content, not of what was just set. Left as it is: the record is the truth about what last went out, and what was just set never ran, which the dismissed notice had said (#439 review, finding 7)."
+      "A teacher who dismisses earlierDeployStillWorking while the leftover still works leaves no record in place, so the leftover then writes its own 'succeeded' and the section reads as deployed on its own - true of the OLD deploy's content, not of what was just set. Left as it is: the record is the truth about what last went out, and what was just set never ran, which the dismissed notice had said (#439 review, finding 7).",
+      "A serving preview builds before it serves, and that build is not counted (#729): the process table cannot tell a preview still building from one already serving, and counting every open preview would refuse the window's own Deploy whenever the section's preview is open. Between Plantoir programs a preview work lease refuses the build first (workLeases); a preview typed in Terminal is seen by nothing here.",
+      "On a Mac where two copies of Plantoir of different ages open the same working folder (a developer's Debug build beside an installed copy; CLAUDE.md, Trap 2), each mirrors its own launchers into it, so the newer copy's --for-deploy can meet the older copy's preview.sh, which refuses it as an unknown option. A teacher has one copy, and the launchers it mirrors always match the arguments it passes."
     ],
     "rejected": [
       "Leases naming the wrapper's process id (#439 option 2): misses a deploy typed in Terminal or run by an outside assistant's own command line, leaves a gap between the script starting and the leases being rewritten, and touches the leases both platforms read.",
       "Refusing or deferring a re-set while the run works: blocks a teacher changing a schedule during a long deploy, needs a pending state, and leaves the overlap itself untouched.",
       "Letting the run survive a re-set and finish its after-work, as Windows' ClearIfStillMine does: the boot-out-first order is what keeps #237's 'never briefly two agents' true. Not reopened.",
       "Counting the app's --run-scheduled-deploy line: a run still waiting for the course would refuse the window's deploy leg half way through, while that run waits for the window.",
-      "Refusing when the table cannot be read: every deploy and every scheduled run's own legs refused while ps fails."
+      "Refusing when the table cannot be read: every deploy and every scheduled run's own legs refused while ps fails.",
+      "Counting only a deploy's build leg, and letting a plain rebuild through (the #729 plan's first shape): the assistant's Rebuild Preview holds a build lease, but a deploy.sh typed in Terminal reads none, and its build cleared the folder the rebuild was filling, which is the failure #729 reported. The plan review's M7; ruled by the director 2026-11-12.",
+      "Marking a deploy's build leg with an environment variable rather than an argument: `ps -Ao args` does not show the environment, `ps -E` is per account and platform-specific, and Windows' table is command lines.",
+      "Passing --for-deploy from the scheduled wrapper's build leg: the wrapper's own script is already in the table and counts as 'later', which wins over anything a leg could say."
     ],
     "appliesOn": [
       "mac",

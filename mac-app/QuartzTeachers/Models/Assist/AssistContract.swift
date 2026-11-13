@@ -264,6 +264,9 @@ enum AssistContract {
             "deployRefusedWhileItsSectionDeploys": AssistWording.deployRefusedWhileItsSectionDeploys(
                 course: course, section: section
             ),
+            "deployRefusedWhileItsSectionIsBeingBuilt": AssistWording.deployRefusedWhileItsSectionIsBeingBuilt(
+                course: course, section: section
+            ),
             "deployNeedsAnAnswerAt": AssistWording.deployNeedsAnAnswerAt(
                 course: course, section: section, destinations: "{destinations}"
             ),
