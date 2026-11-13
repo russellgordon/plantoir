@@ -24,9 +24,18 @@ public static class LogRedactor
     {
         new("macHomeFolder", @"/Users/[^/\s""':]+", "/Users/" + RemovedPersonPath),
         new("windowsHomeFolder", @"([A-Za-z]:\\Users\\)[^\\\s""':]+", "$1" + RemovedPersonPath),
+        // A username and password written into an address (#709; on Windows
+        // since step 0 of v2.0.0): before the email rule, which would
+        // otherwise take the password and the host for an address and leave
+        // the username behind.
+        new("urlUserinfo", @"(?i)(https?://)[^/\s:@]+:[^/\s@]+@", "$1" + RemovedToken + "@"),
         new("emailAddress", @"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", RemovedEmail),
         new("labelledSecret", @"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)\S+", "$1" + RemovedToken),
         new("bearerHeader", @"(?i)\bBearer\s+\S+", "Bearer " + RemovedToken),
+        // A Basic Authorization header (#709): the base64 of a username and
+        // password. Anchored on the header's own name, so "Basic French" in a
+        // course title is left alone (the mac's review L4).
+        new("basicAuthHeader", @"(?i)(\bAuthorization:\s*Basic\s+)\S+", "$1" + RemovedToken),
         new("netlifyToken", @"\bnfp_[A-Za-z0-9]{8,}", RemovedToken),
         new("accountFlag", @"(?i)(--account[=\s]\s*)[A-Za-z0-9]{16,}", "$1" + RemovedAccount),
         new("accountIdentifier", @"(?i)(account\s*id\s*[:=]?\s*)[A-Za-z0-9]{16,}", "$1" + RemovedAccount),
