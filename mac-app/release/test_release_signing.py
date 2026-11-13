@@ -293,6 +293,60 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertEqual(run(keys, str(self.fake_app("keys-rehearsal", feed=rehearsal)), rehearsal).returncode, 0)
         self.assertEqual(run(keys, str(self.fake_app("keys-rehearsal-2", feed=rehearsal))).returncode, 1)
 
+    # MARK: no compiled Python in the toolchain the bundle carries (#747)
+
+    def toolchain_app(self, name: str) -> Path:
+        """A bundle's Resources with the four folders the launchers hash, and one script in each."""
+        app = self.folder / name / "Plantoir.app"
+        resources = app / "Contents" / "Resources"
+        for folder in ["patches", "scripts", "support", "contracts"]:
+            (resources / folder).mkdir(parents=True)
+            (resources / folder / "kept.txt").write_text("recipe\n", encoding="utf-8")
+        return app
+
+    def test_bytecode_in_the_bundle_is_refused(self) -> None:
+        check = str(RELEASE / "check-no-bytecode.sh")
+        self.assertEqual(run(check, str(self.toolchain_app("bytecode-clean"))).returncode, 0)
+        in_a_cache = self.toolchain_app("bytecode-cache")
+        cache = in_a_cache / "Contents" / "Resources" / "support" / "swift" / "__pycache__"
+        cache.mkdir(parents=True)
+        (cache / "marker.cpython-314.pyc").write_bytes(b"\x00")
+        result = run(check, str(in_a_cache))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("support/swift/__pycache__", result.stdout)
+        loose = self.toolchain_app("bytecode-loose")
+        (loose / "Contents" / "Resources" / "scripts" / "stray.pyc").write_bytes(b"\x00")
+        result = run(check, str(loose))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("scripts/stray.pyc", result.stdout)
+        self.assertEqual(run(check, str(self.folder / "bytecode-nothing")).returncode, 1)
+        old_name = self.toolchain_app("bytecode-pyo")
+        (old_name / "Contents" / "Resources" / "patches" / "old.pyo").write_bytes(b"\x00")
+        result = run(check, str(old_name))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("patches/old.pyo", result.stdout)
+
+    def test_a_folder_the_bytecode_check_cannot_read_fails_it(self) -> None:
+        check = str(RELEASE / "check-no-bytecode.sh")
+        app = self.toolchain_app("bytecode-unreadable")
+        locked = app / "Contents" / "Resources" / "support" / "locked"
+        locked.mkdir()
+        locked.chmod(0o000)
+        try:
+            result = run(check, str(app))
+        finally:
+            locked.chmod(0o755)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Permission denied", result.stderr)
+
+    def test_a_recipe_folder_that_is_a_link_fails_the_bytecode_check(self) -> None:
+        check = str(RELEASE / "check-no-bytecode.sh")
+        app = self.toolchain_app("bytecode-link")
+        contracts = app / "Contents" / "Resources" / "contracts"
+        shutil.rmtree(contracts)
+        contracts.symlink_to(self.folder)
+        self.assertEqual(run(check, str(app)).returncode, 1)
+
     # MARK: publish.sh calls them, in order
 
     def test_publish_sh_runs_each_step_in_its_place(self) -> None:
@@ -314,6 +368,10 @@ class ReleaseSigningTests(unittest.TestCase):
         sign_updater = at('./release/sign-updater.sh "${STAGE_APP}" "${IDENTITY}"')
         check_signatures = at('./release/check-signatures.sh "${STAGE_APP}"')
         self.assertLess(at("xcodebuild -project"), at('./release/check-update-keys.sh "${STAGE_APP}"'))
+        # The bytecode check reads the staged copy, before anything is signed.
+        no_bytecode = at('./release/check-no-bytecode.sh "${STAGE_APP}"')
+        self.assertLess(at('cp -a "${APP_SOURCE}" "${STAGE_APP}"'), no_bytecode)
+        self.assertLess(no_bytecode, sign_updater)
         self.assertLess(sign_updater, at('-name "*.dylib"'))
         self.assertLess(sign_updater, at("Signing Plantoir.app with entitlements"))
         self.assertLess(at("Signing Plantoir.app with entitlements"), check_signatures)
