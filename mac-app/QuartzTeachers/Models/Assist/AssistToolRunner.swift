@@ -368,7 +368,26 @@ final class AssistToolRunner {
     func explain(call: AssistToolCall) -> String {
         let arguments: [String: Any] = call.argumentValues
         let code: String = text("course", in: arguments)
-        let number: Int = number("section", in: arguments) ?? 0
+        // The section the call will act on: the one named, or a course's
+        // only section when none was named, exactly as `locate` reads it
+        // (#865). A missing section used to be read as 0 here, so a card for
+        // a one-section course said "Section 0" about a deploy that would go
+        // to Section 1.
+        let namedSection: Int? = number("section", in: arguments)
+        var number: Int = namedSection ?? 0
+        var sectionWords: String = " Section \(number)"
+        switch locate(arguments) {
+        case .success(let located):
+            number = located.sectionNumber
+            sectionWords = " Section \(number)"
+        case .failure:
+            if namedSection == nil {
+                // No section named and more than one to choose from: the
+                // card names none rather than one that does not exist, and
+                // the tool itself says which ones there are.
+                sectionWords = ""
+            }
+        }
 
         switch call.function.name {
         case "deploy_section":
@@ -403,7 +422,7 @@ final class AssistToolRunner {
             let raw: String = text("when", in: arguments)
             let when: String = AssistToolRunner.moment(named: raw)
                 .map { moment in ScheduledDeploy.dayAndTimeText(moment) } ?? raw
-            let card: String = "Set this Mac to deploy \(code) Section \(number) to \(destination) at \(when). "
+            let card: String = "Set this Mac to deploy \(code)\(sectionWords) to \(destination) at \(when). "
                  + "It has to be " + AssistToolRunner.awakeThenWithTheLidOpen + " "
                  + "Plantoir cannot wake it up."
             // The deploy this one would replace, if there is one (issue #195).
@@ -606,8 +625,14 @@ final class AssistToolRunner {
         case "make_room_for_classes":
             return await makeRoomForClasses(arguments)
         case "plan_add_classes":
+            if let question = addClassesQuestion(arguments) {
+                return AssistToolOutcome.couldNotRead(question)
+            }
             return planAddNextClass(addClassesArguments(from: arguments))
         case "add_classes":
+            if let question = addClassesQuestion(arguments) {
+                return AssistToolOutcome.refused(question)
+            }
             return await addNextClass(addClassesArguments(from: arguments))
         case "list_courses":
             return listCourses()
@@ -5207,6 +5232,29 @@ final class AssistToolRunner {
         }
     }
 
+    /// What `add_classes` and its plan ask when the unit or the count is
+    /// missing, or nil when both are there (#865).
+    ///
+    /// Both are required by the schema, and an MCP caller can still leave
+    /// one out. Without this, a missing `howMany` became 0 and a missing
+    /// `unit` no number, and either sent the call down the "next class"
+    /// path: a call to add days to Unit 4 planned ONE class after the last
+    /// one in the section. Asked only once the course and section are found,
+    /// so a call that is wrong about those hears that first.
+    private func addClassesQuestion(_ arguments: [String: Any]) -> String? {
+        guard case .success = locate(arguments) else {
+            return nil
+        }
+        guard let unit = number("unit", in: arguments) else {
+            return "No unit was named. Which unit should the class pages be added to? "
+                 + "Give its number, for example 4."
+        }
+        guard let howMany = number("howMany", in: arguments), howMany > 0 else {
+            return "No number of class pages was given. How many should be added to Unit \(unit)?"
+        }
+        return nil
+    }
+
     /// `add_classes` said in the words the existing engine already speaks.
     ///
     /// The capability is not new — "add five more days to Unit 4" has reached
@@ -5989,11 +6037,16 @@ final class AssistToolRunner {
             return .failure(.noSuchSection(course.code, asked))
         }
         // No section given. A course with exactly one section has only one
-        // answer, so that is not a guess; anything else is, and is refused.
+        // answer, so that is not a guess; anything else is, and is refused
+        // by saying a section is needed and which ones there are (#865).
+        // This used to refuse with `noSuchSection(code, 0)`, which told an
+        // outside assistant that called without a section that the course
+        // "has no Section 0": true, and no help, and it read as if the
+        // section it never sent had been wrong.
         if numbers.count == 1, let only = numbers.first {
             return .success(Located(course: course, sectionNumber: only))
         }
-        return .failure(.noSuchSection(course.code, 0))
+        return .failure(.noSectionNamed(course.code, numbers))
     }
 
     /// The folder names of every reference course showing this code.

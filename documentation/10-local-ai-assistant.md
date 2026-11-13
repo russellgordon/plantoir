@@ -1677,6 +1677,48 @@ terms, and a complaint about the teacher when relayed. It is now
 `wording.noCourseNamed` (the runner's `noSuchCourse` refusal and
 `back_up_course`). Result text only; no schema moved.
 
+**A call that names no SECTION, since
+[#865](https://github.com/russellgordon/plantoir/issues/865) (2026-11-13).**
+Found in the Copilot trial: an outside assistant called
+`list_curriculum_expectations` without `section` and was told the course "has
+no Section 0". `AssistToolRunner.locate` answers every tool that takes a
+section, and when none was named it already resolved a course with exactly one
+section to that section (no guess), but for any other course it refused with
+`noSuchSection(code, 0)`: a missing argument read as the number 0. It now
+refuses with `AssistToolRefusal.noSectionNamed(code, numbers)`, which says no
+section was named and lists the ones the course has ("1, 2 and 3"), or says it
+has none. A section that IS named and is not there keeps `noSuchSection`.
+
+*Expectations were not answered for the course instead*, although the issue
+offered it: `list_curriculum_expectations` reads them from the pages that
+section lists (`AssistCurriculumMentions.expectations(forSection:)`), so two
+sections can differ, and the schema REQUIRES `section`. Every MCP tool that
+takes a section goes through `locate` except `back_up_course` (course-wide;
+its `?? 1` only records who made the copy), so the one change answers the
+thirty-two of the thirty-three that take one, measured by reading each tool's path to `locate` and pinned by
+`AssistMissingSectionTests`, which calls each one without a section.
+
+Measured for the same kind of default on the other number arguments:
+`plan_add_classes` and `add_classes` read a missing `howMany` as 0 (and a
+missing `unit` as no number), which sent the call down the "next class" path:
+a call to add days to Unit 4 with no count planned ONE class after the last
+one in the section. Both now ask for what is missing
+(`AssistToolRunner.addClassesQuestion`), after the course and section are
+found. The schedule card (`explain(call:)`, the local window's approval card)
+read a missing section as 0 too, so a one-section course's card said
+"Section 0" about a deploy to Section 1; it now names the section `locate`
+resolves, and no section when there is a choice. Left as they are: the
+outside-change gate's trail line (`noteDeclined`) still records section 0 for
+a call with no section; the caller's answer there is right (the course is
+being built), and changing the line is a trail change for another piece.
+`make_room_for_classes`' `howMany ?? 1` is what its schema says ("Leave empty
+for one"). The sentences are inline in `AssistToolRefusal`, beside
+`noSuchSection`'s, not in `AssistWording`, so no generated contract moved; no
+description, schema or prompt byte moved (`scripts/test_tool_surface_digest.py`
+green). Windows' `plantoir-mcp.exe` binds `int section` and `int howMany`,
+so what it answers for a missing one is the SDK's choice; the `windows` issue
+for #865 asks them to measure it.
+
 **Measured cost:** across the 990 tool-call rows in `research/ai-assist/*.txt`,
 175 were empty-argument calls — every one to a tool that requires nothing —
 and none left out `course`/`section`, so the rule changes no measured routing
