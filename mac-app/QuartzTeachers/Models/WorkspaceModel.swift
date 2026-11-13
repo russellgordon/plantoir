@@ -359,6 +359,11 @@ class WorkspaceModel {
     /// True while the New Course wizard sheet should be shown.
     var isShowingNewCourseWizard: Bool = false
 
+    /// True when the wizard was opened from New Reference Course… on the
+    /// Reference Courses heading (#572), so it opens with "Keep this course
+    /// for reference" already on. Put back to false when the sheet closes.
+    var newCourseWizardIsForReference: Bool = false
+
     /// True while a freshly chosen folder is being set up.
     ///
     /// Setting up a folder mirrors the whole build recipe into it, and that

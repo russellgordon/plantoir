@@ -458,7 +458,7 @@
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
       },
       {
-        "carries": "the NAME of the folder it was read from, the folder it was given here, the code and school year it shows, and how many sections came across - and, for a course in the MODERN layout only and only when there were any (#255), the Obsidian add-ons left behind by FOLDER name (or that a folder was a link, could not be read, or Obsidian Publish's site setting stayed behind). The two older layouts say theirs on their own second line, so this line adds nothing for them; a course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
+        "carries": "the NAME of the folder it was read from (the zip's file name when a backup or archive zip was chosen, #572), the folder it was given here, the code and school year it shows, and how many sections came across - and, for a course in the MODERN layout only and only when there were any (#255), the Obsidian add-ons left behind by FOLDER name (or that a folder was a link, could not be read, or Obsidian Publish's site setting stayed behind). The two older layouts say theirs on their own second line, so this line adds nothing for them; a course with none leaves a line byte-identical to before. Never anything read from inside an add-on",
         "event": "course imported for reference",
         "why": "The folder it was READ from is the half a copy does not have, and it is the answer to 'where did this ICS4U come from' - a folder somewhere else on this Mac, which the teacher may have moved or deleted since. Named rather than written as a path, the same way every other line here names a course rather than a path. The contents of a page never appear."
       },
@@ -484,6 +484,21 @@
         "carries": "which course did not come across, and why, as the sentence the summary showed - already kept for reference under that school year (the shelf rule, which also refuses a second course of the same code in one run) or a folder of that name already there (both #287), already being imported in another window or another copy of Plantoir (#245), what an earlier unfinished attempt left behind could not be cleared away (#245), could not be read, no room on the disk. Written for EVERY course the summary lists as not imported - refused before it starts or failed part way; never for a course the teacher stopped",
         "event": "course could not be imported for reference",
         "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
+      },
+      {
+        "carries": "the folder a NEW reference course was given, the code it shows, its school year and how many sections, and that it began from the ready-made pages written for it",
+        "event": "course created for reference",
+        "why": "Added for #572: the New Course wizard can make a course straight onto the Reference Courses shelf, beside a live course of the same code. The ordinary 'course created' line is written BEFORE setup runs and names the code alone, so for this course it would read as the live one; this line is written after the course is on the shelf, and names its folder. 'My new reference course is wrong' is the report it answers."
+      },
+      {
+        "carries": "the code, the folder the course would have been given when one was chosen, and the sentence the teacher read",
+        "event": "course could not be created for reference",
+        "why": "Added for #572. Written for every way the act ends without a course on the shelf: refused by the shelf rule, a folder of that name, being made somewhere else, setup not finishing, the ready-made pages not landing (plan review H3: a locked course without them would be worthless, so it is never made), or Cancel. Without it a teacher who pressed Create Reference Course and found nothing on the shelf would leave no trace of having tried."
+      },
+      {
+        "carries": "the FILE NAME of a backup or archive zip chosen in Import Courses for Reference..., and why it could not be read for courses, as the sentence the sheet showed",
+        "event": "zip could not be read for reference",
+        "why": "Added for #572: Import Courses for Reference... also takes a backup or an archive zip, a colleague's included. A zip that cannot be opened, that would put files outside its own folder or holds links, or that holds no course is refused before anything is copied, and that refusal is a button pressed and refused, which rule 5 says leaves a line. The file name only: nothing read from inside the zip."
       },
       {
         "carries": "which course an unfinished import was going to be",

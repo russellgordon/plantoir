@@ -1283,6 +1283,17 @@ struct SidebarView: View {
                 }
             } header: {
                 Text(ReferenceWording.groupTitle)
+                    // The shelf's own door to the New Course wizard (#572),
+                    // opening it with the reference choice already made.
+                    // The shelf is drawn only when it holds a course, so the
+                    // wizard's own toggle is the door for a teacher with none.
+                    .contextMenu {
+                        Button(ReferenceCreationWording.newReferenceCourseMenuItem, systemImage: "plus") {
+                            workspace.newCourseWizardIsForReference = true
+                            workspace.isShowingNewCourseWizard = true
+                        }
+                        .accessibilityIdentifier("newReferenceCourse")
+                    }
             }
         }
     }

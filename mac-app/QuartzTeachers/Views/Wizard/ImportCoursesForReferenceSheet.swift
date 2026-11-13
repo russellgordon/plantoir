@@ -38,9 +38,12 @@ struct ImportCoursesForReferencePresenter: ViewModifier {
         @Bindable var workspace = workspace
 
         return content
+            // A folder, or a backup or archive zip, a colleague's included
+            // (#572): the zip is opened into a folder of its own and read as
+            // the one course folder it holds (`ReferenceZipSource`).
             .fileImporter(
                 isPresented: $workspace.isChoosingFolderToImportFrom,
-                allowedContentTypes: [.folder]
+                allowedContentTypes: [.folder, .zip]
             ) { result in
                 switch result {
                 case .success(let folderURL):
@@ -88,7 +91,8 @@ struct ImportCoursesForReferenceSheet: View {
 
     // MARK: - Stored properties
 
-    /// The folder the teacher chose in the chooser.
+    /// The folder, or the backup or archive zip, the teacher chose in the
+    /// chooser.
     let chosenURL: URL
 
     /// Called once anything has landed, so the sidebar reloads and selects
@@ -123,6 +127,10 @@ struct ImportCoursesForReferenceSheet: View {
     /// Why the folder chosen for a row could not be its shared folder, by
     /// folder name. Said beside the row; the row keeps what it had.
     @State var sharedPickProblem: [String: String] = [:]
+
+    /// Where a chosen zip was opened, while the sheet is up (#572). Removed
+    /// when the sheet goes; the zip itself is never written to.
+    @State var openedZipFolderURL: URL?
 
     /// The day the year lists are built from. A stored property rather than a
     /// call to the clock inside the body, so the lists cannot change under
@@ -295,6 +303,11 @@ struct ImportCoursesForReferenceSheet: View {
         .frame(width: 560)
         .task {
             await readTheFolder()
+        }
+        .onDisappear {
+            if let openedZipFolderURL {
+                ReferenceZipSource.remove(openedZipFolderURL)
+            }
         }
         .fileImporter(
             isPresented: $isChoosingShared,
@@ -693,8 +706,26 @@ struct ImportCoursesForReferenceSheet: View {
         guard stage == .reading else {
             return
         }
+        // A zip is opened first, and then read as the course folder inside
+        // it, exactly as a course folder chosen on its own is read.
+        var folderToRead: URL = chosenURL
+        if ReferenceZipSource.isAZip(chosenURL) {
+            let opened: ReferenceZipSource.Outcome = await ReferenceZipSource.open(chosenURL)
+            switch opened {
+            case .refused(let sentence):
+                ActivityTrail.note(
+                    .zipCouldNotBeReadForReference,
+                    ImportCoursesForReferenceSheet.zipTrailLine(zip: chosenURL, reason: sentence)
+                )
+                stage = .refused(sentence)
+                return
+            case .opened(let courseFolderURL, let openedIntoURL):
+                openedZipFolderURL = openedIntoURL
+                folderToRead = courseFolderURL
+            }
+        }
         let outcome: ReferenceImportSource.Outcome = await ReferenceImportSource.read(
-            chosen: chosenURL,
+            chosen: folderToRead,
             workingFolderURL: workspace.workspaceURL,
             leavingBehind: ReferenceImporter.leftBehindNames,
             on: today
@@ -707,6 +738,12 @@ struct ImportCoursesForReferenceSheet: View {
             ticked = found.tickedWhenOpened
             stage = .choosing
         }
+    }
+
+    /// The trail line for a zip that could not be read for courses: its
+    /// file name and the sentence the sheet showed. Nothing from inside it.
+    static func zipTrailLine(zip: URL, reason: String) -> String {
+        return "could not read \(zip.lastPathComponent) for reference — \(reason)"
     }
 
     /// The year chosen for a course, or the one proposed for it.
@@ -844,7 +881,9 @@ struct ImportCoursesForReferenceSheet: View {
                 into: coursesDirectoryURL,
                 existingFolderNames: folderNames,
                 alreadyShelved: shelved,
-                from: source.rootURL,
+                // A zip is named by its own file name on the trail, not by
+                // the folder it was opened into.
+                from: openedZipFolderURL == nil ? source.rootURL : chosenURL,
                 progress: { step in
                     progress = step
                 }

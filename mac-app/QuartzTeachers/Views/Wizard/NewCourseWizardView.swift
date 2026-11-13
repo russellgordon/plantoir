@@ -162,6 +162,26 @@ struct NewCourseWizardView: View {
     @State var validationProblem: String?
     @State var hasStarted: Bool = false
 
+    /// "Keep this course for reference" (#572): the course goes straight
+    /// onto the Reference Courses shelf, even when a live course has its
+    /// code. Offered only for a code with ready-made pages
+    /// (`ReferenceChoice.offered`); what is made is `ReferenceCreation`'s.
+    @State var keepsForReference: Bool = false
+
+    /// True when the wizard was opened from New Reference Course… on the
+    /// shelf, which is what decides whether a code with no ready-made pages
+    /// is told so where the choice would be.
+    @State var cameForReference: Bool = false
+
+    /// The school year a course kept for reference is filed under, or nil
+    /// for "Other". The current school year to start with, so a newer
+    /// example lands beside last year's rather than clashing in Other.
+    @State var referenceSchoolYear: Int?
+
+    /// The day the year list is built from, fixed for the life of the sheet
+    /// so the list cannot change under the teacher.
+    let today: CalendarDay
+
     /// What the progress header is called — the wizard creates a course,
     /// but the same sheet also adds the example course.
     @State var progressTitle: String = WizardWording.coursePanelWords.creatingTitle
@@ -186,8 +206,14 @@ struct NewCourseWizardView: View {
         unitWord: String = ClassPageTerm.standard,
         frontPageHeading: String = ClubVocabulary.course.frontPageHeading,
         classNoun: ClassNoun = ClubVocabulary.course.noun,
-        curriculumFolderTicks: [String]? = nil
+        curriculumFolderTicks: [String]? = nil,
+        startsForReference: Bool = false,
+        today: CalendarDay = CalendarDay.today()
     ) {
+        self.today = today
+        _keepsForReference = State(initialValue: startsForReference)
+        _cameForReference = State(initialValue: startsForReference)
+        _referenceSchoolYear = State(initialValue: SchoolYear.startingYear(on: today))
         _creator = State(initialValue: creator)
         _curriculumFolderTicks = State(initialValue: curriculumFolderTicks)
         if startedForTesting {
@@ -303,12 +329,108 @@ struct NewCourseWizardView: View {
     /// `CourseCodeRule` rather than here: renaming a course asks the same
     /// question, and a wizard that accepted a code renaming would refuse is
     /// a wizard that hands a teacher a course they cannot re-type.
+    ///
+    /// A course kept for reference is asked the code rule WITHOUT the clash,
+    /// and the shelf rule for its year instead (#572) —
+    /// `ReferenceCreation.courseCodeProblem`, the function the act asks too.
     var courseCodeProblem: String? {
-        var existingCodes: [String] = []
+        return ReferenceCreation.courseCodeProblem(
+            typed: courseCode,
+            existingFolderNames: courseFolderNamesHere,
+            keepsForReference: makesAReferenceCourse,
+            schoolYear: referenceSchoolYear,
+            shelved: workspace.shelvedReferenceCourses(on: today)
+        )
+    }
+
+    /// Every course folder in this working folder, live and reference.
+    var courseFolderNamesHere: [String] {
+        var names: [String] = []
         for course in workspace.courses {
-            existingCodes.append(course.code)
+            names.append(course.code)
         }
-        return CourseCodeRule.problem(courseCode, existingCodes: existingCodes)
+        return names
+    }
+
+    /// What the wizard offers about keeping this course for reference.
+    var referenceChoice: ReferenceChoice {
+        return ReferenceChoice.offered(
+            code: courseCode,
+            hasReadyMadePages: ExampleContentCatalog.hasContent(forCode: courseCode),
+            isClub: isClubCourse,
+            takenByACourseHere: ReferenceCreation.isTakenByACourseHere(
+                courseCode, existingFolderNames: courseFolderNamesHere
+            ),
+            keepsForReference: keepsForReference,
+            cameForReference: cameForReference
+        )
+    }
+
+    /// True when Create will make a course for reference: the toggle is on
+    /// AND it is offered for this code. A code changed to one without
+    /// ready-made pages makes an ordinary course, and the button says so.
+    var makesAReferenceCourse: Bool {
+        return keepsForReference && referenceChoice == .toggle
+    }
+
+    /// The toggle's binding. Turning it on takes the ready-made pages, which
+    /// are the whole of a reference course.
+    var keepsForReferenceBinding: Binding<Bool> {
+        return Binding(
+            get: {
+                return keepsForReference
+            },
+            set: { newValue in
+                if newValue && !prepopulatesExampleContent {
+                    prepopulatesExampleContent = true
+                }
+                keepsForReference = newValue
+            }
+        )
+    }
+
+    /// The reference choice, under the course code (#572). Which of the
+    /// four shapes it takes is `ReferenceChoice.offered`'s answer.
+    @ViewBuilder
+    var referenceChoiceRow: some View {
+        let typedCode: String = CourseCodeRule.normalized(courseCode)
+        switch referenceChoice {
+        case .notShown:
+            EmptyView()
+        case .toggle:
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(ReferenceCreationWording.toggleLabel, isOn: keepsForReferenceBinding)
+                    .accessibilityIdentifier("referenceToggle")
+                ExampleCaption(ReferenceCreationWording.toggleCaption)
+                if keepsForReference {
+                    Picker(ReferenceImportWording.schoolYearLabel, selection: $referenceSchoolYear) {
+                        ForEach(SchoolYear.offeredStartingYears(on: today), id: \.self) { year in
+                            Text(SchoolYear.label(forStartingYear: year)).tag(Int?.some(year))
+                        }
+                        Text(SchoolYear.otherGroupName).tag(Int?.none)
+                    }
+                    .accessibilityIdentifier("referenceSchoolYearPicker")
+                }
+            }
+        case .offerUnderTheRefusal:
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(ReferenceCreationWording.offerUnderTheRefusal(code: typedCode))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("referenceOffer")
+                Spacer(minLength: 0)
+                Button(ReferenceCreationWording.offerButton) {
+                    keepsForReferenceBinding.wrappedValue = true
+                }
+                .accessibilityIdentifier("keepForReferenceButton")
+            }
+        case .noReadyMadePages:
+            Text(ReferenceCreationWording.noReadyMadePages(code: typedCode))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("noReadyMadePagesForReference")
+        }
     }
 
     /// True when the example content, not the teacher, decides the
@@ -647,6 +769,11 @@ struct NewCourseWizardView: View {
             }
             .onChange(of: isClubCourse) { _, isAClubNow in
                 applyClubChoice(isAClubNow)
+                // A club takes no ready-made pages, so it is never kept for
+                // reference (#572).
+                if isAClubNow {
+                    keepsForReference = false
+                }
             }
             // The structure editor must show what will actually be
             // created, in both directions — so the toggle adopts and
@@ -747,7 +874,7 @@ struct NewCourseWizardView: View {
                 if !hasStarted || creator.isCreating {
                     Button("Cancel") {
                         if creator.isCreating {
-                            creator.runner.terminate()
+                            creator.cancel()
                         }
                         workspace.reloadCourses()
                         dismiss()
@@ -767,9 +894,17 @@ struct NewCourseWizardView: View {
                         .foregroundStyle(.red)
                         .font(.callout)
                 }
+                if let problem = creator.finishingProblem {
+                    Text(problem)
+                        .foregroundStyle(.red)
+                        .font(.callout)
+                        .accessibilityIdentifier("referenceCourseNotMade")
+                }
 
                 if !hasStarted {
-                    Button(WizardWording.panelWords(isClub: isClubCourse).createButton) {
+                    Button(makesAReferenceCourse
+                           ? ReferenceCreationWording.createButton
+                           : WizardWording.panelWords(isClub: isClubCourse).createButton) {
                         startCreation()
                     }
                     // Greyed while the folder is getting ready (#476), with
@@ -794,6 +929,12 @@ struct NewCourseWizardView: View {
                         // rather than back at an empty window.
                         if let exampleCode = creator.installedExampleCode {
                             workspace.selection = SidebarSelection.section(exampleCode, 1)
+                        }
+                        // A course kept for reference lands on the shelf,
+                        // with its groups open (#572).
+                        if let referenceFolder = creator.madeReferenceFolderName {
+                            workspace.revealReferenceCourse(folderName: referenceFolder)
+                            workspace.selection = SidebarSelection.course(referenceFolder)
                         }
                         dismiss()
                     }
@@ -880,6 +1021,7 @@ struct NewCourseWizardView: View {
                     }
                 }
                 .padding(.bottom, 8)
+                referenceChoiceRow
                 // Nothing below here means anything until a course (or
                 // club) has actually been identified — see
                 // `hasChosenCourse`.
@@ -1002,7 +1144,9 @@ struct NewCourseWizardView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("clubStartingContentNote")
                 } else {
-                if ExampleContentCatalog.hasContent(forCode: courseCode) {
+                // Withheld for a course kept for reference (#572): the
+                // ready-made pages are the whole of one.
+                if ExampleContentCatalog.hasContent(forCode: courseCode) && !makesAReferenceCourse {
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle("Pre-populate course with example content", isOn: $prepopulatesExampleContent)
                             .accessibilityIdentifier("prepopulateToggle")
@@ -1239,6 +1383,10 @@ struct NewCourseWizardView: View {
             }
             .disabled(!hasChosenCourse)
 
+            // Withheld, not greyed, for a course kept for reference (#572):
+            // it is never deployed, and its destination is emptied as it is
+            // made (`referenceCourses.interface.withheldNotRefused`).
+            if !makesAReferenceCourse {
             Section {
                 PublishingChoiceView(
                     deployTarget: $deployTarget,
@@ -1255,6 +1403,7 @@ struct NewCourseWizardView: View {
                 FormSectionHeader("Deploying", caption: PublishingDestinations.wizardCaption)
             }
             .disabled(!hasChosenCourse)
+            }
 
             Section {
                 if structureComesFromExampleContent {
@@ -1707,6 +1856,24 @@ struct NewCourseWizardView: View {
         }
         guard let workspaceURL = workspace.workspaceURL else {
             validationProblem = "No working folder is selected."
+            return
+        }
+        // A course kept for reference is never deployed and is not asked
+        // where to (#572), so none of the Deploying checks apply to it.
+        if makesAReferenceCourse {
+            var referenceName: String = courseName.trimmingCharacters(in: .whitespaces)
+            if referenceName.isEmpty {
+                referenceName = WizardWording.coursePanelWords.defaultSiteName
+            }
+            progressTitle = ReferenceCreationWording.creatingTitle
+            hasStarted = true
+            creator.createReferenceCourse(
+                configuration: buildConfigurationDictionary(code: code, name: referenceName),
+                schoolYear: referenceSchoolYear,
+                workspaceURL: workspaceURL,
+                existingFolderNames: courseFolderNamesHere,
+                shelved: workspace.shelvedReferenceCourses(on: today)
+            )
             return
         }
         if deployTarget == "local_folder" {

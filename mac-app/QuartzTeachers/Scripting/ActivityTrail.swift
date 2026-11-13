@@ -887,6 +887,31 @@ nonisolated enum ActivityTrail {
         /// four courses that imports three is the ordinary shape of this.
         case courseCouldNotBeImportedForReference = "course could not be imported for reference"
 
+        /// A NEW course was made straight onto the Reference Courses shelf
+        /// from the New Course wizard (#572): the folder it was given, the
+        /// code it shows, its school year and how many sections, and that it
+        /// began from the ready-made pages written for it. Its own event
+        /// rather than `courseCreated`, which is written before setup runs
+        /// and names the code alone, so beside a live course of the same code
+        /// it would read as that course. Never the contents of a page.
+        case courseCreatedForReference = "course created for reference"
+
+        /// A course the teacher asked to make for reference was not made:
+        /// the code, the folder it would have been given when one was chosen,
+        /// and the sentence the teacher read (already on the shelf for that
+        /// year, a folder of that name, being made somewhere else, setup did
+        /// not finish, the ready-made pages did not land, or stopped). Written
+        /// for every way it ends without a course, so "my reference course is
+        /// missing" can be answered from the trail.
+        case courseCouldNotBeCreatedForReference = "course could not be created for reference"
+
+        /// A backup or archive zip chosen in Import Courses for Reference…
+        /// could not be read for courses (#572): the zip's FILE NAME and why,
+        /// as the sentence the sheet showed (it could not be opened, it would
+        /// put files outside its own folder or holds links, or it holds no
+        /// course). Nothing from inside the zip, and never a page.
+        case zipCouldNotBeReadForReference = "zip could not be read for reference"
+
         /// The teacher stopped an import part way. Carries the course that
         /// was in hand, which was not kept, and the folder it was coming
         /// from. Its own event rather than a failure: a teacher who stops

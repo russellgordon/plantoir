@@ -55,6 +55,26 @@ nonisolated enum ReferenceImportWording {
         return "\(folder) holds the folder you already have open. Choose a folder somewhere else."
     }
 
+    // MARK: - When a backup or archive zip cannot be used (#572)
+
+    /// The zip could not be read at all.
+    static func zipCouldNotBeOpened(zip: String) -> String {
+        return "\(zip) could not be opened. It may be damaged, or it may not be a zip file."
+    }
+
+    /// The zip would put files outside its own folder, or holds links to
+    /// other places. Nothing is taken from it.
+    static func zipIsNotSafeToOpen(zip: String) -> String {
+        return "\(zip) holds files that would be put outside its own folder, or shortcuts to "
+            + "other places, so nothing was taken from it."
+    }
+
+    /// The zip opened, and there is not one course folder inside it.
+    static func zipHoldsNoCourse(zip: String) -> String {
+        return "\(zip) does not hold a course. Choose a backup or an archive of a whole course, "
+            + "or a folder."
+    }
+
     // MARK: - The list
 
     /// The column of ticks, and what one row says beside the code.

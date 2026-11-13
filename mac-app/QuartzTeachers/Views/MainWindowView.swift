@@ -59,8 +59,10 @@ struct MainWindowView: View {
         }
         // Adding a course lives on the sidebar's own +/- bar, where
         // macOS list interfaces conventionally put it.
-        .sheet(isPresented: $workspace.isShowingNewCourseWizard) {
-            NewCourseWizardView()
+        .sheet(isPresented: $workspace.isShowingNewCourseWizard, onDismiss: {
+            workspace.newCourseWizardIsForReference = false
+        }) {
+            NewCourseWizardView(startsForReference: workspace.newCourseWizardIsForReference)
         }
         // A teacher's own AGENTS.md or CLAUDE.md: asked before Plantoir adds
         // its section (#454). One file at a time; answering moves to the next.
