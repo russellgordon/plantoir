@@ -1,0 +1,4 @@
+{
+ "about": "One entry per picture a page shows with {{picture:<scene>}}. Scene ids are <page id>-<n> and are never renumbered: a new picture takes the next number. Fields: page (the page that shows it), shows (what the picture shows), labels (the red word labels), expectText (words the capture must show, read back by OCR; filled by P3 and CF), awaiting_capture (true until both pictures exist), waiting_on (\"#<issue>\", or absent), setup (how the scene is set up in a scratch state), windows (null until Windows), raw (true when the site also needs an unannotated copy, <scene>-<light|dark>-raw.webp). Files: help/pictures/<scene>-light.webp and <scene>-dark.webp.",
+ "scenes": {}
+}

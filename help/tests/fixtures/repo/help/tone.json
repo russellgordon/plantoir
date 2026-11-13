@@ -1,0 +1,11 @@
+{
+ "about": "fixture",
+ "banned": [
+  {"pattern": "\\bseamless(ly)?\\b", "why": "praise"},
+  {"pattern": "!", "why": "no exclamation marks"}
+ ],
+ "exemptions": [
+  {"phrase": "Python", "pages": ["python-page"], "why": "the language students write"}
+ ],
+ "quotes": []
+}
