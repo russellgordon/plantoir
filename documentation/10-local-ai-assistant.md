@@ -8297,7 +8297,7 @@ before changing it:
   the tools, never before them, for the reason the issue gives.
 - Not done here: Course Settings' row (#360) and MCP `instructions` (mac only).
 
-### The skills read it too (#765, v1.10.0)
+### The skills read it too (#765, v2.0.0)
 
 Since #765 the `plantoir-handouts` skill (section 13) and the
 `plantoir-page-authoring` skill (section 22) tell an assistant to read the
@@ -8318,7 +8318,7 @@ convention is asked next, and one teacher's comment shape is shown only as
 an example (`documentation/09-mac-app.md` → "Tests, marking and report
 comments"). Why, and what was rejected:
 `documentation/09-mac-app.md` → "Lesson materials, and whose way of
-teaching (#765, v1.10.0)".
+teaching (#765, v2.0.0)".
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 

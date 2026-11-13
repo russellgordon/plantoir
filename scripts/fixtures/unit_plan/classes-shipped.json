@@ -1,7 +1,7 @@
 {
   "rule": "Every class each stylesheet defined in a release that shipped it. A later release may ADD rules at the end of a sheet; it never removes or renames one, so a plan written against an older template keeps its look (contracts/shared-rules.json -> unitPlanning.appendOnly). Add a release's list when it ships; never edit an earlier one.",
   "releases": {
-    "1.10.0": {
+    "2.0.0": {
       "plan.css": [
         "acts",
         "assess",

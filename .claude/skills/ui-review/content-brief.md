@@ -1,7 +1,7 @@
-# Brief: write the content for a design-review page of v1.10.0's interface
+# Brief: write the content for a design-review page of v2.0.0's interface
 
 Russell (the teacher who owns Plantoir) is evaluating the UX and UI of what
-v1.10.0 added. Another agent is capturing screenshots; you write the WORDS
+v2.0.0 added. Another agent is capturing screenshots; you write the WORDS
 AND FACTS the page needs, as one JSON file. You are a READER: edit no
 checkout; read `origin/dev` in `<repo>` with
 `git show origin/dev:<path>` / `git grep … origin/dev` (the checkout itself

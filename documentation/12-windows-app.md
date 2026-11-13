@@ -837,7 +837,7 @@ read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
 only, so the UI test accepts either and says which).
 
 **Coverage, owed (#793).** The mac's section page gained a Coverage tab
-(Website | Coverage | Problems) in v1.10.0, and with it a change Windows owes
+(Website | Coverage | Problems) in v2.0.0, and with it a change Windows owes
 here too: the mac now draws only the chosen tab's content, never one over
 another, because a layered tab left the preview able to take keys and browser
 commands. Windows' collapse of the covered layers already keeps them out of the
@@ -1147,10 +1147,10 @@ line/paragraph separators U+2028/2029 and the bidi overrides — none ends or
 splits a command line (measured) and they are characters a name might carry.
 Whether a control character belongs in a course name at all — it also reaches
 the sidebar, the title and the trail — was the follow-up, and is #780
-(v1.10.0): no, and the name is cleaned where it is READ, by
+(v2.0.0): no, and the name is cleaned where it is READ, by
 `contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
 C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
-Python did their half in v1.10.0;
+Python did their half in v2.0.0;
 this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
 `windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
 lands: a course name will reach it already clean, but it also cleans the page
