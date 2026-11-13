@@ -102,7 +102,10 @@ public class FixWithAssistantContractTests
     public void PiecesAndBoundsAreTheContracts()
     {
         var fixWith = FixWith();
-        var buttons = fixWith["buttons"]!.AsArray();
+        // A door this app does not have yet (GitHub Copilot, #884) has no
+        // button here and is held open by name; the rest as before, in order.
+        var held = NamedGapLedger.OutsideDoorsHeld(fixWith["buttons"]!.AsArray().Select(b => b!["key"]!.ToString()));
+        var buttons = fixWith["buttons"]!.AsArray().Where(b => !held.Contains(b!["key"]!.ToString())).ToList();
         Assert.Equal(new[] { "claude", "codex" }, buttons.Select(b => b!["key"]!.ToString()));
         Assert.Equal(FixWithAssistant.ClaudeButtonTitle, buttons[0]!["title"]!.ToString());
         Assert.Equal(FixWithAssistant.CodexButtonTitle, buttons[1]!["title"]!.ToString());

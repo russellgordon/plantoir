@@ -253,16 +253,22 @@ public class ContractTests
         // #468 (mac #458): both doors hold the course — rendered with the
         // contract's own placeholder, and the generator's count of 2.
         Assert.Equal(wording["courseIsAlreadyBeingRevised"]!.ToString(), AssistWording.CourseIsAlreadyBeingRevised("{course}"));
-        Assert.Equal(wording["claudeIsRevisingTheCourseRename"]!.ToString(), AssistWording.ClaudeIsRevisingTheCourseRename("{course}"));
-        Assert.Equal(wording["claudeIsRevisingTheCourseRestore"]!.ToString(), AssistWording.ClaudeIsRevisingTheCourseRestore("{course}"));
-        Assert.Equal(wording["claudeIsRevisingTheCourseAddSection"]!.ToString(),
-                     AssistWording.ClaudeIsRevisingTheCourseAddSection("{course}"));
-        Assert.Equal(wording["backupKeptForAClaudeSession"]!.ToString(), AssistWording.BackupKeptForAClaudeSession("{course}"));
-        Assert.Equal(wording["backupsKeptForAClaudeSession"]!.ToString(), AssistWording.BackupsKeptForAClaudeSession("{course}", 2));
-        Assert.Equal(wording["finishTheClaudeSessionToDeleteItsBackup"]!.ToString(),
-                     AssistWording.FinishTheClaudeSessionToDeleteItsBackup("{course}"));
-        Assert.Equal(wording["finishTheClaudeSessionToDeleteItsBackups"]!.ToString(),
-                     AssistWording.FinishTheClaudeSessionToDeleteItsBackups("{course}"));
+        // Since the mac's #783 these nine carry {assistant}, held here as said
+        // in the older "Claude or Codex" words until #884 item 7 lands (see
+        // NamedGapLedger, Reason884Naming). The two constants are asked here
+        // too, and the value walk below leaves a held key to this call.
+        SaidAsTheContract(wording, "availableOnceYouFinishRevisingWithClaude", AssistWording.AvailableOnceYouFinishRevisingWithClaude, heldAndAsked);
+        SaidAsTheContract(wording, "finishTheClaudeSessionFirst", AssistWording.FinishTheClaudeSessionFirst, heldAndAsked);
+        SaidAsTheContract(wording, "claudeIsRevisingTheCourseRename", AssistWording.ClaudeIsRevisingTheCourseRename("{course}"), heldAndAsked);
+        SaidAsTheContract(wording, "claudeIsRevisingTheCourseRestore", AssistWording.ClaudeIsRevisingTheCourseRestore("{course}"), heldAndAsked);
+        SaidAsTheContract(wording, "claudeIsRevisingTheCourseAddSection",
+                          AssistWording.ClaudeIsRevisingTheCourseAddSection("{course}"), heldAndAsked);
+        SaidAsTheContract(wording, "backupKeptForAClaudeSession", AssistWording.BackupKeptForAClaudeSession("{course}"), heldAndAsked);
+        SaidAsTheContract(wording, "backupsKeptForAClaudeSession", AssistWording.BackupsKeptForAClaudeSession("{course}", 2), heldAndAsked);
+        SaidAsTheContract(wording, "finishTheClaudeSessionToDeleteItsBackup",
+                          AssistWording.FinishTheClaudeSessionToDeleteItsBackup("{course}"), heldAndAsked);
+        SaidAsTheContract(wording, "finishTheClaudeSessionToDeleteItsBackups",
+                          AssistWording.FinishTheClaudeSessionToDeleteItsBackups("{course}"), heldAndAsked);
 
         // #467 (mac #439): a deploy refused while its section was still being deployed.
         SaidAsTheContract(wording, "deployRefusedWhileALaterDeployWorks",
@@ -423,6 +429,8 @@ public class ContractTests
         var differs = here
             .Select(key => (key, member: WordingMember(key)))
             .Where(entry => entry.member is FieldInfo { FieldType: var type } && type == typeof(string))
+            // A held constant is compared above, where it must still differ.
+            .Where(entry => !heldAndAsked.Contains(entry.key))
             .Where(entry => (string?)((FieldInfo)entry.member!).GetValue(null) != wording[entry.key]!.ToString())
             .Select(entry => $"{entry.key}: contract \"{wording[entry.key]}\", here \"{((FieldInfo)entry.member!).GetValue(null)}\"")
             .ToList();
@@ -1468,6 +1476,8 @@ public class ContractTests
         string Title(string key) => agents.Single(a => a!["key"]!.ToString() == key)!["menuItem"]!.ToString();
         Assert.Equal(Title("claude"), ClaudeCodeLauncher.MenuItemTitle);
         Assert.Equal(Title("codex"), CodexLauncher.MenuItemTitle);
-        Assert.Equal(2, agents.Count);
+        // GitHub Copilot's door is held open by name (#884).
+        var held = NamedGapLedger.OutsideDoorsHeld(agents.Select(a => a!["key"]!.ToString()));
+        Assert.Equal(2, agents.Count - held.Count);
     }
 }

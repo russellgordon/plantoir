@@ -81,7 +81,15 @@ public sealed class DoorCourseHoldTests : IDisposable
         var entry = ContractLoader.LoadJson("shared-rules.json")["activityTrail"]!["mustRecord"]!.AsArray()
             .Single(e => e!["event"]!.ToString() == "outside session held a course")!;
         Assert.Null(entry["appliesOn"]);
-        Assert.Equal(entry["line"]!.ToString(), AssistWorkspace.HoldingTrailLine("{course}"));
+        // Since the mac's #783 the line carries {assistant}; held here as
+        // written in the older words until #884 item 7 (NamedGapLedger), and
+        // then it must still differ.
+        NamedGapLedger.StillNamed(NamedGapLedger.TrailLineSaidDifferently,
+            ContractLoader.LoadJson("shared-rules.json")["activityTrail"]!["mustRecord"]!.AsArray().Select(e => e!["event"]!.ToString()));
+        if (NamedGapLedger.Holding(NamedGapLedger.TrailLineSaidDifferently, "outside session held a course") is { } owed)
+            Assert.False(entry["line"]!.ToString() == AssistWorkspace.HoldingTrailLine("{course}"), NamedGapLedger.ClosedMessage(owed));
+        else
+            Assert.Equal(entry["line"]!.ToString(), AssistWorkspace.HoldingTrailLine("{course}"));
         Assert.Equal("outside session held a course",
                      Plantoir.Core.Scripting.ActivityTrail.KeyFor(Plantoir.Core.Scripting.ActivityTrail.Event.OutsideSessionHeldACourse));
     }
@@ -112,11 +120,21 @@ public sealed class DoorCourseHoldTests : IDisposable
     {
         var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!;
         var cases = Contract()["reviseCases"]!.AsArray();
-        Assert.Equal(9, cases.Count);
-        int ran = 0, windowNotes = 0;
+        Assert.Equal(11, cases.Count);
+        // A door this app does not have yet (GitHub Copilot, #884) is held
+        // open by name: its case is not run here, and has no item to run.
+        var heldDoors = NamedGapLedger.OutsideDoorsHeld(
+            ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["agents"]!.AsArray().Select(a => a!["key"]!.ToString()));
+        int ran = 0, windowNotes = 0, heldCases = 0;
         foreach (var c in cases)
         {
             string name = c!["name"]!.ToString();
+            if (c["appliesOn"] is null && heldDoors.Contains(c["item"]!.ToString()))
+            {
+                Assert.False(Enum.GetNames<CourseActivity.ReviseItem>().Any(n => n.Equals(c["item"]!.ToString(), StringComparison.OrdinalIgnoreCase)), name);
+                heldCases++;
+                continue;
+            }
             if (c["appliesOn"] is { } only)
             {
                 Assert.Equal(new[] { "mac" }, only.AsArray().Select(p => p!.ToString()));
@@ -125,7 +143,15 @@ public sealed class DoorCourseHoldTests : IDisposable
                 // A case about the window open on THIS course (ICS3U) must say
                 // what Windows says there since #468 — the window's own words —
                 // not leave it to Windows or name the Claude-or-Codex sentence.
-                if (c["active"]?["course"]?.ToString() == "ICS3U")
+                if (c["active"]?["course"]?.ToString() == "ICS3U" && heldDoors.Contains(c["item"]!.ToString()))
+                {
+                    // A door held open by name (GitHub Copilot, #884): its note
+                    // must name the window's own member, and is read in full
+                    // with the other window notes once the door is built here.
+                    Assert.Contains("WindowHoldWording.AvailableOnceTheAssistantCloses", note);
+                    heldCases++;
+                }
+                else if (c["active"]?["course"]?.ToString() == "ICS3U")
                 {
                     Assert.Contains("WindowHoldWording.AvailableOnceTheAssistantCloses", note);
                     Assert.Contains(WindowHoldWording.AvailableOnceTheAssistantCloses("{course}", 1).Replace("Section 1", "Section {section}"), note);
@@ -141,12 +167,20 @@ public sealed class DoorCourseHoldTests : IDisposable
                 "local" => CourseActivity.ReviseItem.Local,
                 var other => throw new InvalidOperationException($"an item this app does not know: {other}"),
             };
-            string? expected = c["expect"]?.ToString() is { } key ? wording[key]!.ToString() : null;
-            Assert.True(expected == CourseActivity.ReviseUnavailableReason(item, c["revisedElsewhere"]!.GetValue<bool>()), name);
+            string? said = CourseActivity.ReviseUnavailableReason(item, c["revisedElsewhere"]!.GetValue<bool>());
+            if (c["expect"]?.ToString() is { } key)
+            {
+                // A sentence held as said in older words (#884) must still differ.
+                Assert.True(said is not null, name);
+                ContractTests.SaidAsTheContract(wording.AsObject(), key, said!);
+            }
+            else
+                Assert.True(said is null, name);
             ran++;
         }
-        Assert.Equal(5, ran);
-        Assert.Equal(3, windowNotes);
+        Assert.Equal(heldDoors.Count == 0 ? 6 : 5, ran);
+        Assert.Equal(heldDoors.Count == 0 ? 0 : 2, heldCases);
+        Assert.Equal(heldDoors.Count == 0 ? 4 : 3, windowNotes);
     }
 
     /// <summary>

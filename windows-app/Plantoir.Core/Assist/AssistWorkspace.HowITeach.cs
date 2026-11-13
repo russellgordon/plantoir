@@ -33,6 +33,19 @@ public sealed partial class AssistWorkspace
     public const string DoorCourseVariable = "PLANTOIR_DOOR_COURSE";
 
     /// <summary>
+    /// Which door started the server (<c>app-rules.json</c> →
+    /// <c>outsideAgents.doorAssistantVariable</c>, mac #783): each door writes
+    /// its own agent key (<c>claude</c>, <c>codex</c>) beside
+    /// <see cref="DoorCourseVariable"/> in its server's environment, as each
+    /// agent's <c>serverEnvironment</c> says. Written by both doors since #884's
+    /// first part (2026-11-13); <c>plantoir-mcp</c> does NOT read it yet, so a
+    /// Windows hold still names no assistant: recording it as the assist
+    /// lease's fifth line (writing line 4 first) and naming the assistant in
+    /// the busy sentences are #884's item 7, still owed.
+    /// </summary>
+    public const string DoorAssistantVariable = "PLANTOIR_DOOR_ASSISTANT";
+
+    /// <summary>
     /// The trail's line when a DOOR's server takes its assist lease (#468,
     /// <c>activityTrail.mustRecord</c> → "outside session held a course"): the
     /// course and nothing else. "Claude or Codex" because the server cannot
