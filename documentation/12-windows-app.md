@@ -2730,7 +2730,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   handouts are kept), and the unit-planning skill a folder,
   `courses/<CODE>/.internal/planning/`, whose `plan.json` files the mac
   reads for the Revise doors' greeting (Windows owes that reader: the
-  `windows` issue for #707), and the marking skill one more,
+  `windows` issue for #707) and shows on the course page's Planning tab
+  (Windows owes the tab: the `windows` issue for #708, and 09 → "The course
+  page's Planning tab (#708)"), and the marking skill one more,
   `courses/<CODE>/.internal/marking/marking.json` (the two marking folders'
   paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the

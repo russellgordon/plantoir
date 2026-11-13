@@ -769,8 +769,10 @@ teacher left it, and moving it between containers is how that is thrown away
 (the plan's place) — the section's toolbar keeps every item ALWAYS present,
 because inserting one conditionally makes macOS rebuild the toolbar and
 mis-lay-out the title (the comment on `.toolbar`), and the switch exists only
-while there are problems. `DetailTabs` is generic over its tab type so #708's
-Settings | Unit plan on a course adds a tab rather than a second shell. The tab
+while there are problems. `DetailTabs` is generic over its tab type, and its
+second user is #708's Settings | Planning on a course (`CourseDetailView`,
+"The course page's Planning tab (#708)" below), which added a tab rather than
+a second shell. The tab
 chosen is kept in the store, not the view's `@State`, because
 `.id("code-section")` rebuilds the view and Show must survive that.
 
@@ -4004,8 +4006,10 @@ needed for that half. The contract is `shared-rules.json` → `unitPlanning`
 (the folder, the site's layout, `planFile` and its cases, the slug rules,
 `appendOnly`, and `agentGuidance` with the pinned fonts). This piece lands
 before the course's Planning tab (#708) and sharing (#709), so the skill and
-the greeting point at the folder and say nothing about either (Russell,
-2026-11-12); those pieces add their sentences.
+the greeting pointed at the folder and said nothing about either (Russell,
+2026-11-12). Since #708 the greeting's `one` and `some` sentences and the
+skill point at the Planning tab instead ("The course page's Planning tab
+(#708)" below); sharing adds its sentences with #709.
 
 **Where the plan lives: `courses/<CODE>/.internal/planning/`.** A folder whose
 name starts with a dot is never built (`build_site.py` → `_is_hidden`), never
@@ -4123,6 +4127,272 @@ flight both append to the end of `CLAUDE.md` and `AGENTS.md`, a small merge
 conflict; and a skill with binary or template files owes its own pinning test,
 as `scripts/test_unit_plan_template.py` is for this one, and a `windows` issue
 mirroring its `PrintablePagesTests` case.
+
+### The course page's Planning tab (#708)
+
+A course's page has two tabs while Claude Code or Codex is installed:
+Settings, which is what the page has always shown, and Planning, which shows
+the course's unit plans from `courses/<CODE>/.internal/planning/` on this Mac.
+The contract is `shared-rules.json` → `unitPlanning.tab` (`tabCases`,
+`choiceCases`, `navigationCases`, `words`, `assetsMirror`,
+`whatAPageMayRead`) and `app-rules.json` → `outsideAgents.planAUnit`; every
+case is walked by `PlanningTabTests`. Sharing a plan is #709 and is not on
+this tab yet: no Share control, no placeholder for one, and no sentence
+about it.
+
+**The tabs are `DetailTabs`, and only the chosen tab is in the window.**
+`MainWindowView`'s `.course` branch draws `CourseDetailView`, which puts the
+Settings | Planning switch in the thin bar a section's Website | Problems tabs
+use (#717), then `CourseDetailContent`: the settings form OR the Planning
+tab, never both. With Planning chosen the form is not in the view tree, so no
+setting can hold the keyboard, be reached by Tab, be read by VoiceOver or sit
+in the responder chain.
+
+This is the third shape, and the first two failed in measurable ways (708
+implementation review H1, then 708 fix review H1). Planning drawn OVER a
+mounted form: a field focused on Settings stayed first responder, and a Space
+and an "x" typed with the plan on top replaced the course's name, unseen.
+Planning over a DISABLED form: text fields let go, but SwiftUI's `TextEditor`
+(the footer box) stays editable and first responder under `.disabled`, and a
+Space and a paste went into the footer; a focused settings table kept the
+keyboard too. Patching control by control would leave the next control added
+to the form to find out the same way, so the form is removed instead.
+MEASURED offscreen (`S/708/notlayered`, the review's footer case rebuilt):
+with the form removed the first responder became the window, the tree held no
+editable control, Space and a paste changed nothing, and nothing was left to
+undo; the layered shape, run the same way, kept `PlatformTextView` as first
+responder and the footer took " PASTED".
+
+**Nothing typed is lost by that.** What the teacher has typed and not saved is
+the course's `configuration` (an `@Observable` model the course owns, with
+`hasUnsavedChanges`), so it never lived in the form. What did live in the
+form as `@State` and is wanted after a switch moved to `CourseSettingsSession`,
+which the page owns: `saveNotice` (#265, which stays until the next Save, a
+Preview Again or leaving the course), `saveProblem`, `howITeachProblem`,
+`unitWordNotice`, `didJustSave` and `heldBackWasNoted` (#373, once per visit
+to the course). The add-folder field is a popover, which closes when the
+teacher clicks the tabs, and the rename sheet is window-modal, so neither can
+hold a half-typed name across a switch. Coming back to Settings shows every
+setting and the form's notices as they were left, with nothing focused
+(measured: the first responder is the window). A switch DOES drop what only a
+drawn view keeps (708 fix review 2, L2): where the form was scrolled to, which
+row of a list was selected, an open explanation, and the note under a folder
+list after an add, a removal or a rename (`StringListEditorView.notice`:
+"a folder was created", "a removed folder is still on disk", "renamed, links
+rewritten"). Those notes said what had just happened, and what happened is
+in the list itself and on the trail; keeping them across a switch would mean
+one session entry per list, kept for a sentence that has already been read. Open in Obsidian moved from the form's toolbar to the page's, so it
+is there on both tabs, and the page sets the window's title on Planning.
+
+**Undo is cleared on every switch** (`CourseDetailTabs.choose`, before the
+tab changes), as a guard. The first fix review measured ⌘Z on the Planning
+tab undoing typing in the hidden footer box, on the LAYERED shape, where the
+box never left the window. MEASURED on this shape (708 fix review 2, L1):
+with the form removed, the footer box's own Undo leaves with it, so the clear
+is not what makes Undo safe now. It is kept so a control added to the form
+later cannot leave an action behind for ⌘Z on Planning to run. The window's
+undo manager has no other user (`git grep registerUndo` and `undoManager`
+find none in the app), so nothing outside this page is lost. ⌘Z on Settings
+undoes what was typed since the teacher last came to Settings, and on
+Planning there is nothing to undo.
+REJECTED: an undo scope per tab (SwiftUI offers no per-view undo manager on
+macOS, and a second manager would still have to drop the gone field's
+actions).
+
+**Course ▸ Save on Planning saves the settings as the teacher left them**
+(`CourseDetailTabs.planningCommands`): the form's own Save, run with the
+page's session. Only edits made on Settings can be in it, since nothing on
+Planning edits a setting. **It is never silent** (708 fix review 2, L3;
+`unitPlanning.tab.saveOnPlanning`): it is offered whenever there is something
+unsaved, held back or not; a Save that worked shows the form's own "Saved ✓"
+on the Planning tab for as long as the form would; one refused (a held-back
+Save, with the form's reason), failed (a write error) or saved with a notice
+to read takes the teacher to Settings, where the form shows its sentence
+beside the field (`CourseDetailTabs.afterASave`). Revert is dimmed on
+Planning, with `words.revertOnPlanning` as a line under it in the Course menu,
+which VoiceOver reads: it would discard edits the teacher cannot see.
+`CourseDetailStructureTests` draws the real form in a window never put on
+screen and checks the tree with Planning showing (no editable field, box or
+table), the footer case, Undo, that a draft typed on Settings survives the
+switch and Save on Planning writes it and says Saved, that a Save that fails
+there goes to Settings (the course folder made read-only), and every
+`saveOnPlanning` case. None waits on a clock: "Saved ✓" is read straight
+after the Save, before its fade could run.
+
+The tab chosen is the view's `@State`, because
+nothing outside the page selects Planning; `.id(code)` makes it Settings
+again for each course. The plan's web view and the unit chosen live in a
+`PlanningTabModel` the page owns, so a switch to Settings and back keeps the
+history. A reference course keeps `ReferenceCourseSummaryView` and gets no
+tabs.
+
+**No assistant, no tab.** `PlanningTab.isShown` reads
+`OutsideAssistantPresence` (asked at launch and when Plantoir becomes
+active): with neither assistant installed the course page is exactly what it
+was before, with no tab and no word about planning, so Plantoir never reads
+as an app that needs an assistant (Russell, 2026-11-01: absent, never
+disabled). The tabs show whether or not there are plans, because the empty
+tab is the offer. If the tabs go while Planning is chosen, the page shows
+Settings.
+
+**The popup.** "All Plans" (the folder's own `index.html`) when there is
+one, then each plan whose folder has an `index.html`, in `UnitPlans.read`'s
+order; each is labelled by `UnitPlans.nameInTheGreeting`. It starts on the
+first of the offered plans in `UnitPlans.namedFirst` order for today (the
+plan covering today, then the next to start, then the last to end), which is
+the greeting's own ordering, so there is one ordering and not two; a course
+whose plans have no dates starts on All Plans (`choiceCases`, 14). A plan
+without a page is not offered, because choosing it would show nothing.
+Back, Forward (bound to the web view's `canGoBack` and `canGoForward`, plus
+the two-finger swipe) and Reload sit on the right of the bar.
+
+**When it looks again**: when the tab appears, when the window becomes key
+(`controlActiveState`, the pattern `CourseSettingsView` uses: the teacher
+was in the terminal while the assistant built), when a unit is chosen, and
+on Reload. Each time it reads the folder, and reloads the chosen page from
+disk (`reloadFromOrigin`). No file watcher and no timer.
+
+**The assets mirror (707 plan review M4).** Before each look,
+`PlanningAssets.refresh` makes `<planning>/assets` the same as the
+template's `assets/` in the app's bundle, through `WorkspaceModel.syncDirectory`
+(changed files copied, extras removed). The source is
+`ToolchainReadiness.bundledGuidanceURL`, the one place `writeGuidance` also
+reads, so Debug and Release cannot disagree on the path
+(`PlanningTabTests.testTheBundledAssetsAreTheTemplates` compares the bundle's
+copy with the repository's, 22 files). It runs only when the planning folder
+exists: opening the tab never makes one. A failure is logged and the plan
+shows with the copy it has. The preview then shows the look this release
+ships, and #709 refreshes the same folder from the same bytes.
+
+**The empty tab: Plan a Unit.** When there is nothing to offer, the tab is a
+`ContentUnavailableView` ("No Unit Plans Yet", `words.emptyDescription`,
+which names no assistant) with Plan a Unit with Claude… and Plan a Unit with
+Codex…, each only while its assistant is installed, Claude's first. The
+click makes Revise With's refusal (`WorkspaceModel.reviseRefusal`) in its own
+alert, then opens the door with `PlanAUnit.openingMessage` in place of the
+greeting, so the reference-courses and unit-planning sentences do not ride
+along. The message names the course as Fix with does (code, then the name in
+brackets cut at `fixWith.courseNameMaxCharacters`, on one line), asks for
+"the plantoir-unit-planning guide" by name, the same first steps as the
+greeting, and the guide's three opening questions, and holds the build until
+the teacher says go. It says "guide" rather than the assistants' own word
+because the teacher reads the message in the terminal as their own words.
+A door that did not open shows the door's could-not-start sentence. Once it
+has opened, `ActivityTrail` writes "asked an assistant to plan a unit"
+(`{course} · asked {assistant} to plan a unit from the Planning tab`).
+
+**What stops a plan page reading other files.** A plan is written by an
+outside assistant, so its pages are content the app did not write. Three
+guards, each with one job (`unitPlanning.tab.whatAPageMayRead`):
+
+1. `loadFileURL(_:allowingReadAccessTo:)` names the PLANNING folder, never
+   the course. WebKit's page process gets a read extension for that folder
+   alone, so a picture, stylesheet or frame pointing at
+   `../../../course_config.json` loads nothing. This is what covers
+   subresources, which no navigation decision sees.
+2. `PlanNavigation.decide` on every navigation in every frame
+   (`navigationCases`, 23): a file inside the planning folder loads; a link
+   asking for a new window loads in this view instead (`loadHere`, so Back
+   returns, since an app's web view opens no windows, as
+   `PreviewBrowserHandoff` measured for the section preview); http, https
+   and mailto open in the teacher's own browser or mail app, and only on a
+   CLICK, so a `<meta http-equiv="refresh">` or a frame's address cannot
+   open the browser just by being shown (this holds because page scripts
+   are off: measured by the review, a script's `click()` reaches the
+   decision as a click, so turning scripts on reopens it, review L1); anything else is refused without a
+   word. Inside means after `..` is removed and every symbolic link on the
+   way is followed (`realpath` on the part that exists), compared folder by
+   folder, so `planning-old` is not inside `planning` and a link inside the
+   folder that points out of it is outside.
+3. No JavaScript (`allowsContentJavaScript = false`; the template has
+   none), a non-persistent website data store, and a `WKContentRuleList`
+   that blocks every load and then lets `file:` loads through, so nothing on
+   the page reaches the network. The list is compiled before the first page
+   loads; if it cannot be, no page is ever loaded.
+
+MEASURED, in a standalone harness that compiled `PlanningTab.swift`,
+`UnitPlans.swift` and `CalendarDay.swift` from this branch with four
+retyped stubs (macOS 26.6, swiftc 6): the 65 cases of `tabCases`,
+`choiceCases`, `navigationCases` and `planAUnit.messageCases` all held, and
+the 18 `greetingUnitPlansCases` with the new sentences. Made to allow any
+`file:` address, the rule failed 5 navigation cases; made to follow no
+links, it failed the shortcut case. Since the fixes the harness runs 72
+(with `followsThePage`), all held.
+
+MEASURED, the real web view with no window (708 implementation review M3;
+`PlanWebViewGuardTests`, also run headless through a driver on macOS 26.6):
+a page carrying a stylesheet, `@import`, `@font-face`, a CSS background,
+`<img>`, `srcset`, a remote script and frame, `<object>`, a poster,
+`prefetch`, `preconnect`, an icon and `<a ping>` made **zero** connections
+to a listener on 127.0.0.1, where a plain web view with the same page made
+some; an inline script and an `onload` did not run; a picture three folders
+up loaded at 0 pixels while one beside the page loaded at 7; and a rule list
+that cannot compile leaves the tab saying `cannotShowTitle`, writes the
+trail once, and loads nothing. Each was made to fail: a rule list that lets
+everything through (3 connections), scripts on (the title changed), read
+access to the course (the picture showed at 9). The review measured more
+by hand (`<meta refresh>` to the web or outside the folder refused; a
+`_blank` web link opened outside exactly once; `plantoir:` and `ftp:`
+refused). One caveat, measured: WebKit's page process may read
+`/private/tmp` and the user's temporary folder (`/var/folders/…/T`, where the
+suite's throwaway home is) whatever folder it is given, so the tests keep their
+fixtures under `/Users/Shared`, which it does not open, and not in the
+teacher's home, which the suite never touches (`RealHomeTripwireTests`). Still hand tests: a PDF drawn
+inline, Back after a new-window PDF, dark mode through
+`prefers-color-scheme`.
+
+**The popup follows the page** (review L4): a link from one unit's plan to
+another's moves the popup to that unit (`followsThePage`, the web view's
+address observed), and choosing an entry always loads it, even the one the
+popup already names.
+
+**A linked planning folder is never mirrored** (review L2): the mirror
+removes extra files, and through a symbolic link at `.internal/planning` it
+removed a photo from the folder behind it (measured by the review). It now
+does nothing when the planning folder or its `assets` is a link.
+
+**The trail when the tab opens (review M1).** Each appearance of the tab
+writes "looked at a course's unit plans" once: the course and how many unit
+plans it offered, "only the list of plans", or "nothing to show yet". The
+same event writes a line when no plan can be shown at all (the rule list
+could not be made; the tab then says `cannotShowTitle` rather than staying
+blank) and, once per appearance, when the assets mirror failed, with how
+many files. The first version wrote nothing for looking, following the
+plan; the brief's ruling asked for a line, and a report of "the Planning tab
+is blank" found nothing, which is the failure rule 5 exists for. Choosing a
+unit, Back, Forward and Reload still write nothing. No line carries a plan's
+title: it is the teacher's own words, and the count is what a report needs.
+So `LogRedactor` needed no new rule: the lines carry a course code, counts
+and an assistant's name.
+
+**A greeting can name plans the tab does not offer yet** (review L3,
+accepted): the greeting names every plan with a readable `plan.json`, the
+popup only those with a page, so mid-build the greeting says "Planning tab"
+while the tab shows the offer. The gap is short, and closing it would make
+the greeting look for pages too. Said in `choiceCases.rule`.
+
+**The greeting points here.** `greetingUnitPlans.one` and `.some` now say
+the plans are on the course's Planning tab, and the skill tells the
+assistant to send the teacher there (707 plan review M5). That is always
+true on the mac when a greeting is said, since a Revise door and the tab
+both need Claude Code or Codex. Windows does #790 (#707's greeting) and
+#708's tab together, because `greetingUnitPlansCases` now carries these
+sentences and a greeting written with the folder wording fails them.
+
+REJECTED: Planning drawn over the settings form, mounted or disabled (the
+measurements above); a `TabView` (a different control from the section's
+switch for the same job, and it decides for itself what each tab keeps); the switch in the toolbar (`DetailTabs`' comment); a disabled Planning
+tab with no assistant (Russell ruled absent); the plan served through the
+website builder's preview (a file address needs no builder running, and a
+plan never goes through it); a new-window PDF sent to the default browser as
+the section preview does (it leaves Plantoir for nothing, and Back returns
+here); a file watcher or a timed refresh (coming back to the window is the
+moment, and a delay papers over a race); making the planning folder when the
+tab opens (an empty folder backed up for nothing); the date range beside
+each unit in the popup (the page shows its dates, and a date in a menu would
+need its own rule on both platforms); JavaScript on (the template needs
+none); a copyable sample prompt in the empty tab (#708's first idea: the
+buttons do it in one click, Russell's ruling 5).
 
 ### Tests, marking and report comments (#751, #750, #752)
 

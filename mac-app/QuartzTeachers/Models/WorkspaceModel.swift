@@ -2601,8 +2601,11 @@ class WorkspaceModel {
             // publish the pages the teacher has just undone. Missed here
             // until 2026-09-10, when renaming a course's word for a unit made
             // this backup its last resort: a site built under "Module" over a
-            // vault restored to "Unit" is exactly that case.
-            BuildOutputLocation.discardBuild(
+            // vault restored to "Unit" is exactly that case. The kept copies
+            // of geogebra.org sketches stay: each is named by its fence, so
+            // a restored page whose fence has one still uses it, offline
+            // included (#789).
+            BuildOutputLocation.discardBuiltSites(
                 forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
                 courseCode: item.courseCode
             )

@@ -49,6 +49,10 @@ struct CourseMenu: Commands {
             item("Save Course Settings", .saveCourseSettings, enabled)
                 .keyboardShortcut("s", modifiers: [.command])
             item("Revert Course Settings", .revertCourseSettings, enabled)
+            // Dimmed on the Planning tab, and the line says why (#708).
+            if let revertNote = settings?.revertNote {
+                Text(revertNote)
+            }
 
             Divider()
 

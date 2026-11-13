@@ -39,7 +39,9 @@ nonisolated enum UnitPlans {
     /// `outsideAgents.greetingUnitPlans.mostUnitsNamed`.
     static let mostUnitsNamed: Int = 6
 
-    /// The sentences, verbatim from `outsideAgents.greetingUnitPlans`. They
+    /// The sentences, verbatim from `outsideAgents.greetingUnitPlans`. Since
+    /// #708 `one` and `some` point at the course's Planning tab, which is
+    /// there whenever a Revise door is (both need Claude Code or Codex). They
     /// are instructions to the assistant, in the teacher's voice, asking it
     /// to SAY one sentence in its first reply (plan review M3): a sentence
     /// the teacher seems to say to themselves is one the assistant was never
@@ -51,11 +53,11 @@ nonisolated enum UnitPlans {
 
     static let oneSentence: String =
         "In your first reply, also remind me in one sentence that this course has a unit plan for {units}, "
-        + "kept in courses/{course}/.internal/planning, and do not describe what is in it."
+        + "which I can see on the course's Planning tab in Plantoir, and do not describe what is in it."
 
     static let someSentence: String =
         "In your first reply, also remind me in one sentence that this course has unit plans for {units}, "
-        + "kept in courses/{course}/.internal/planning, and do not describe what is in them."
+        + "which I can see on the course's Planning tab in Plantoir, and do not describe what is in them."
 
     /// `greetingUnitPlans.more`, after the last unit named.
     static let moreClause: String = ", and {n} more"
