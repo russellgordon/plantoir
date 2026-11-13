@@ -1511,9 +1511,10 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   one marker from it; it is not redacted, and does not outlive the run.
   **Two more rules since step 0 of v2.0.0** (2026-11-13, the mac's #709,
   owed under #824 item 4 and taken early because the difference was live):
-  `urlUserinfo`, before `emailAddress`, which until then took
-  `password@host` from `https://user:password@host` and left `user:` in the
-  line, and `basicAuthHeader`, anchored on `Authorization:` so a course called
+  `urlUserinfo`, before `emailAddress`, which until then took the password
+  and the host from an address with a username and password written into it
+  and left the username in the line, and `basicAuthHeader`, anchored on
+  `Authorization:` so a course called
   Basic French is left alone; same patterns and order as `LogRedactor.swift`.
   The contract keeps both cases' credentials in pieces (`assembledFrom`, mac
   #844), and `LogRedactorTests.Filled` builds the line before redacting it,
