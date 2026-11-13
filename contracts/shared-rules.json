@@ -478,6 +478,11 @@
         "why": "Added for #572's third piece. Every group act is a button pressed, and rule 5 says one pressed and refused leaves a line; the sentence is what the teacher saw. The name rule's live sentence under the field is not a press and writes nothing; the press itself does."
       },
       {
+        "carries": "the name the unreadable arrangement was kept under beside the new one (reference-shelf.unreadable-<stamp>.json), never what it held",
+        "event": "reference groups started again",
+        "why": "Added for #572's third piece (implementation review M2). Start the Groups Again moves an arrangement that cannot be read aside and gives the teacher the year layout back. The kept name is the way back to whatever it held, and 'my groups vanished' is answered by this line."
+      },
+      {
         "carries": "the course, how many pages had to be locked again, and how many would not stay locked",
         "event": "reference course pages locked again",
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
@@ -18411,7 +18416,8 @@
       "whereItIsOffered": [
         "New Group...: on the Reference Courses heading's menu, beside New Reference Course..., and inside every Move to Group submenu (it makes the group and moves that course into it).",
         "Rename Group...: on a made group's row and on the no-year group's row. A year group offers neither Rename nor Remove: its name is its year.",
-        "Remove Group: on a made group's row only. An empty group goes at once; one that holds courses is asked about first (removeGroupAskingMenuItem, removeGroupTitle, removeGroupMessage), and its courses go back to their year groups or the no-year group.",
+        "Remove Group: on a made group's row only. An empty group goes at once; one that holds courses is asked about first (removeGroupAskingMenuItem, removeGroupTitle, and removeGroupMessageOne or removeGroupMessageMany by how many it holds), and its courses go back to their year groups or the no-year group. Cancel is that question's default button.",
+        "Start the Groups Again...: on the Reference Courses heading's menu ONLY while the arrangement cannot be read (file-formats.json -> referenceShelf.startingAgain), under the sentence couldNotReadGroups, and asked first (startAgainTitle, startAgainMessage; Cancel is the default). It moves the unreadable arrangement aside under a dated name, never deleting it, and the shelf is the year layout with every control working again. While a NEWER Plantoir's arrangement is there, the heading's menu says arrangedByANewerPlantoir instead and offers nothing: an older app never moves a newer one's file.",
         "Move to Group: a submenu on a reference course's row and in the menu bar's Course menu after Set School Year... (live where Set School Year is: subjectMenus item moveToGroup), so a teacher can reach it from the keyboard through menu search. It lists where the course's school year puts it first, named by what it is (the year label or the no-year group's name), then every made group A to Z, then a divider and New Group.... The group the course is in now carries a checkmark and does nothing.",
         "The Group picker: in the New Course wizard's reference mode ONLY (plan review M8), drawn only when the teacher has made at least one group, defaulting to wording.groupPickerDefault. Every other door (Import, Keep a Copy, Restore from Archived, a backup restored where its course is gone) lands the course by its school year, and Move to Group does the rest."
       ],
@@ -18422,7 +18428,7 @@
         "Any assistant tool: the local assistant and the MCP surface gain no group tool, and no tool description moves."
       ],
       "nameRule": {
-        "rule": "The name is normalised first: every run of white space and control characters becomes one space and the ends are trimmed, so a pasted line break is a space, not a refusal. Then: empty -> nameIsEmpty; more than mostCharacters characters -> nameIsTooLong; the same as a name already on the shelf -> nameIsTaken with that name as the shelf spells it. Names are compared with case, accents and width folded and every dash read as an en dash, so '2025-26' is the year group 2025–26. The names in the way are every year the shelf can draw (each offered year on the day, and any year a course sits in), the no-year group's name, and every made group's name, except the group being renamed: its own name, in any case, is never in the way. Checked live under the field and again at the button.",
+        "rule": "The name is cleaned first by the SAME rule as a course's name, courseNameCharacters (#780): its controls become a space, the bidirectional controls are removed, and the zero-width joiner and non-joiner, the marks and every other character are kept, so an emoji joined by U+200D and a Persian word with U+200C come through whole. Then every run of white space (Unicode White_Space) becomes one space and the ends are trimmed, so a pasted line break is a space, not a refusal. Then: empty -> nameIsEmpty; more than mostCharacters characters (grapheme clusters: what a reader sees as one character) -> nameIsTooLong; a name that READS AS A SCHOOL YEAR, past, present or future (four digits, a dash, then the last two digits of the next year: SchoolYear's label shape for any year, not only the offered ones) -> nameIsAYear, because the shelf draws that year's own group the day a course is filed under it; the same as a name already on the shelf (the no-year group's, or a made group's) -> nameIsTaken with that name as the shelf spells it. Names are compared with case, accents and width folded and every dash read as an en dash, so '2025-26' reads as the year 2025–26. The group being renamed is never in its own way: its own name, in any case, is allowed. Checked live under the field and again at the button.",
         "mostCharacters": 40,
         "onDay": "2026-09-20",
         "cases": [
@@ -18462,25 +18468,30 @@
           {
             "name": "a year label",
             "typed": "2025–26",
-            "expect": {
-              "taken": "2025–26"
-            }
+            "expect": "isAYear"
           },
           {
             "name": "a year label typed with a hyphen",
             "typed": "2025-26",
-            "expect": {
-              "taken": "2025–26"
-            }
+            "expect": "isAYear"
           },
           {
             "name": "an offered year nobody has a course in",
             "typed": "2022–23",
-            "expect": {
-              "taken": "2022–23"
-            },
+            "expect": "isAYear",
             "why": "The shelf draws that group the day a course is filed under it, and two rows called 2022–23 could not be told apart."
           },
+          {
+            "name": "next year's name, not offered yet",
+            "typed": "2027–28",
+            "expect": "isAYear",
+            "why": "Made on 2026-09-20 it would pass a list of today's years, and from August 2027 it would sit beside the year group of the same name (implementation review L3)."
+          },
+          { "name": "a year at the turn of a century", "typed": "2099-00", "expect": "isAYear" },
+          { "name": "four digits and two that are not the next year", "typed": "2025–27", "expect": null, "expectName": "2025–27" },
+          { "name": "an emoji joined with a zero-width joiner is kept whole", "typed": "👩‍🏫 Exemplars", "expect": null, "expectName": "👩‍🏫 Exemplars", "expectCharacters": 11, "why": "Foundation's controlCharacters set holds U+200D, and spacing it split the teacher emoji in two (implementation review M1). courseNameCharacters keeps it." },
+          { "name": "a Persian word keeps its zero-width non-joiner", "typed": "می‌خواهم", "expect": null, "expectName": "می‌خواهم" },
+          { "name": "a right-to-left override is removed, not spaced", "typed": "A\u202eB", "expect": null, "expectName": "AB" },
           {
             "name": "the no-year group in another case",
             "typed": "other",
@@ -19173,6 +19184,17 @@
               "ICS3U-2025-2": "2025–26"
             },
             "trail": "reference groups not changed"
+          },
+          {
+            "name": "a group whose id appears twice in the file does not come back under its other name",
+            "file": {"version": 1, "groups": [{"id": "g-4", "name": "Kept"}, {"id": "g-4", "name": "Twice"}], "placements": {}},
+            "courses": [{"folder": "ICS3U-2025", "code": "ICS3U", "year": 2025}],
+            "remove": "Kept",
+            "expect": "removed",
+            "expectGroupNames": [],
+            "expectGroups": {"ICS3U-2025": "2025–26"},
+            "trail": "reference group removed",
+            "why": "The reader shows the first entry with an id and keeps a repeat aside (file-formats.json -> referenceShelf.readingCases). Removing the group takes the kept entry with that id too; before, the next reading brought it back as Twice (implementation review L2)."
           }
         ]
       },
@@ -19271,7 +19293,9 @@
         "removeGroupMenuItem": "Remove Group",
         "removeGroupAskingMenuItem": "Remove Group…",
         "removeGroupTitle": "Remove the group {group}?",
-        "removeGroupMessage": "Its {courses} go back to the groups their school years put them in. No course is removed, and nothing in them changes.",
+        "removeGroupMessageNone": "It holds no course, so nothing else changes.",
+        "removeGroupMessageOne": "Its course goes back to the group its school year puts it in. No course is removed, and nothing in it changes.",
+        "removeGroupMessageMany": "Its {count} courses go back to the groups their school years put them in. No course is removed, and nothing in them changes.",
         "removeButton": "Remove Group",
         "cancelButton": "Cancel",
         "removeWouldClash": "{group} was not removed: its {course} would go back to {target}, which already has one. Move one of them to another group first.",
@@ -19283,11 +19307,17 @@
         "summaryGroupLabel": "Group",
         "nameIsEmpty": "Give the group a name.",
         "nameIsTooLong": "A group name can be at most 40 characters.",
+        "nameIsAYear": "A school year has a group of its own. Choose a name that is not a school year.",
         "nameIsTaken": "There is already a group called {name}.",
-        "couldNotReadGroups": "The reference shelf’s groups could not be read, so nothing was changed. Try again in a moment.",
+        "couldNotReadGroups": "The arrangement of the groups on the reference shelf cannot be read, so nothing was changed. Start the Groups Again, on the Reference Courses heading’s menu, sets them up afresh.",
+        "startAgainMenuItem": "Start the Groups Again…",
+        "startAgainTitle": "Start the groups on the reference shelf again?",
+        "startAgainMessage": "Their arrangement cannot be read. Starting again puts every reference course back in the group its school year puts it in, with no groups of your own. Nothing in any course changes, and what could not be read is kept beside the new arrangement.",
+        "startAgainButton": "Start Again",
+        "couldNotStartAgainTitle": "Could not start the groups again",
         "arrangedByANewerPlantoir": "The reference shelf’s groups were last arranged by a newer version of Plantoir, so this one leaves them as they are.",
         "couldNotSaveGroups": "The reference shelf’s groups could not be saved, so nothing was changed.",
-        "rule": "{group} is a group's name as the shelf shows it; {course} the code a teacher reads (ICS3U); {target} the group a course would go back to; {name} a name already on the shelf, spelled as the shelf spells it; {courses} is '1 course' / '3 courses'. The menu items that open a sheet or ask first end in a real ellipsis character; Remove Group on an EMPTY group asks nothing and has none. Cancel is the default button of the removal question. The year-group sentences of the shelf rule are unchanged (referenceCourses.wording); a made group's is referenceCourses.wording.codeAlreadyInThatGroup.",
+        "rule": "{group} is a group's name as the shelf shows it; {course} the code a teacher reads (ICS3U); {target} the group a course would go back to; {name} a name already on the shelf, spelled as the shelf spells it; {count} a number of courses, two or more (removeGroupMessageOne says one, removeGroupMessageNone none; never '(s)'). The menu items that open a sheet or ask first end in a real ellipsis character; Remove Group on an EMPTY group asks nothing and has none. Cancel is the default button of the removal question and of the start-again question, as it is of the replace warning. couldNotReadGroups says no 'try again in a moment', because waiting does not help a hand-edited or foreign-written copy; it names the way out. The year-group sentences of the shelf rule are unchanged (referenceCourses.wording); a made group's is referenceCourses.wording.codeAlreadyInThatGroup.",
         "machineryCheck": "No 'file', 'JSON', 'placement', 'id', 'folder name', 'script' or 'container' in any sentence here."
       },
       "rejected": "Converting today's layout into a stored list on first open: it would write a file into every working folder on every Mac on upgrade, an older Plantoir and Windows would then disagree with the file, and year labels stored as names drift from reference_school_year the first time a year is set; deriving years and storing only what the teacher made gives the same picture with nothing to convert. The group in each course's course_config.json: a group must exist with no course in it, which a per-course key cannot say, and the arrangement belongs to the folder. Keeping placements when a course is removed so it comes back into its group (the plan's first answer): a freed folder name is reused by the next course of that code and year, which would inherit the group (plan review H2). Remove Group withheld while the group holds a course (the plan's first answer): the teacher would have to move every course out by hand to get rid of a group, when sending them back to their years is exactly what removing it means; asked first instead. The Group picker at every door (plan review M8). A confirmation for an EMPTY group: nothing is lost. Renamable year groups, nested groups, hand ordering and drag and drop (Russell, 2026-11-12, and section 10 of the plan)."

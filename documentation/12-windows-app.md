@@ -5620,7 +5620,11 @@ third piece lists the work.
   picker in the wizard's reference mode only; the shelf rule by group; the
   placement every arriving door writes and Remove Course… forgets
   (`groups.arrivals`, plan review H2); the summary's group line; fold state
-  for made groups; five trail events.
+  for made groups; Start the Groups Again… for an arrangement that cannot
+  be read (`referenceShelf.startingAgain`: moved aside, never deleted; a newer
+  version's file never moved); the name cleaned by `courseNameCharacters`,
+  #780's rule, before it is checked (`char.IsControl` alone is not it); six
+  trail events.
 - **To decide on Windows rather than copy:** the lock. The mac takes an
   exclusive `flock` on `courses/.internal`; Windows needs its own exclusive
   open (a lock file opened with `FileShare.None`, say), and it must be one

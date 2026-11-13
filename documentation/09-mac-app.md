@@ -9777,7 +9777,15 @@ its course still is keeps the folder name, and so the group.
 **The file is the teacher's arrangement, so it is never written over by an app
 that could not read it.** Missing: the year layout, and the first change
 writes it. Unreadable (half synced, cut short, hand-edited): the year layout,
-and EVERY change is refused with `couldNotReadGroups`. Written by a newer
+and EVERY change is refused with `couldNotReadGroups`, which names the way
+out rather than saying "try again", since waiting does not help a hand-edited
+copy (implementation review M2). **The way out is Start the Groups Again…**,
+on the Reference Courses heading's menu only while the arrangement cannot be
+read, asked first (Cancel the default). It MOVES the unreadable file aside to
+`reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
+name is taken; never deleted, never written over), and the shelf is the year
+layout with every control working. A NEWER version's file is never moved by
+an older app: the heading's menu says so and offers nothing. Written by a newer
 Plantoir (`version` above 1): what is understood is drawn, and every change
 is refused with `arrangedByANewerPlantoir`. A key or an entry this version
 does not understand is written back as it was. A change that moves nothing
@@ -9849,16 +9857,22 @@ Fold state of a made group is remembered by its id under a key of its own
 Every menu item is a text label, so VoiceOver reads it, and the disclosure
 rows are the sidebar's own.
 
-**The name rule** (`groups.nameRule`): normalised first (a pasted line break
-is a space), then refused when empty, longer than 40 characters, or a name
-already on the shelf, compared with case, accents and width folded and every
-dash read as an en dash, so "2025-26" is taken by 2025–26. The names in the
-way include every offered year, drawn or not, because a made group called
-2022–23 would sit beside the year group the day a course is filed under it.
+**The name rule** (`groups.nameRule`): cleaned first by the SAME rule as a
+course's name (#780's `CourseName.cleaned`, `courseNameCharacters`), so the
+zero-width joiner an emoji needs and the non-joiner a Persian word needs are
+kept and the bidirectional overrides removed; then white space collapsed and
+trimmed (a pasted line break is a space). Foundation's `controlCharacters`,
+used at first, holds those joiners, and spacing them split "👩‍🏫" into two
+(implementation review M1). Then refused when empty, longer than 40
+characters, shaped like a school year at all (four digits, a dash, the next
+year's last two digits, so next year's "2027–28" too and not only today's
+offered years: review L3), or a name already on the shelf, compared with
+case, accents and width folded and every dash read as an en dash.
 
 **The trail** (rule 5): "reference group made", "reference group renamed",
-"reference group removed", "reference course moved to a group", and "reference
-groups not changed" for a press that was refused. A group's name is the
+"reference group removed", "reference course moved to a group", "reference
+groups started again" (with the name the unreadable copy was kept under), and
+"reference groups not changed" for a press that was refused. A group's name is the
 teacher's own words, like a course or folder name, and goes in quoted; it
 passes through `LogRedactor` like every line, so a 40-character name that
 looks like a token is taken out. "course created for reference" gains the
@@ -9872,7 +9886,14 @@ inserted before the years, both order cases with made groups failed; an
 unreadable file read as no file, the half-written case read as absent and the
 next change OVERWROTE it; Remove Course… without forgetting, the freed name
 kept the group; a replace that recorded an arrival, the replacement lost its
-group.
+group. After the implementation review: the old cleaning rule, the emoji,
+Persian and override cases failed; Start the Groups Again deleting instead of
+moving, the kept copy was missing; moving a newer version's file, the newer
+case failed; the duplicate-id entry left in place, removing "Kept" brought
+"Twice" back; the year shape limited to today's years, "2027–28" was
+allowed; Cancel without the default key, the structure test failed; each of
+import, Keep a Copy and a backup restored where its course is gone without
+`recordArrival`, its real test kept the stale group.
 
 #### Rejected
 

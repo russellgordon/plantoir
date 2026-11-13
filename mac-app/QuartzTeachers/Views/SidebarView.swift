@@ -1325,6 +1325,19 @@ struct SidebarView: View {
                         }
                         .disabled(!workspace.referenceGroupsMayChange)
                         .accessibilityIdentifier("newReferenceGroup")
+                        // An arrangement that cannot be read is not a dead
+                        // end: the way out is here, said in a sentence.
+                        // A newer version's arrangement is left as it is.
+                        if let refusal = workspace.referenceShelf.refusal {
+                            Divider()
+                            Text(refusal)
+                            if workspace.referenceShelf.mayStartAgain {
+                                Button(ReferenceGroupWording.startAgainMenuItem) {
+                                    workspace.isAskingToStartReferenceGroupsAgain = true
+                                }
+                                .accessibilityIdentifier("startReferenceGroupsAgain")
+                            }
+                        }
                     }
             }
         }

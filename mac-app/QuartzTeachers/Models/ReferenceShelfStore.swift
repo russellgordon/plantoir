@@ -181,17 +181,12 @@ nonisolated enum ReferenceShelfStore {
     /// New Group…: makes an empty group. Returns its id, or the sentence.
     static func makeGroup(
         named typed: String,
-        coursesDirectoryURL: URL,
-        entries: [ReferenceShelf.Entry],
-        on day: CalendarDay = CalendarDay.today()
+        coursesDirectoryURL: URL
     ) -> Result<String, ReferenceShelfRefusal> {
         let name: String = ReferenceShelf.normalizedName(typed)
         var madeID: String = ""
         let outcome: Outcome = ReferenceShelfStore.change(inCoursesDirectory: coursesDirectoryURL) { arrangement in
-            if let problem = ReferenceShelf.nameProblem(
-                typed, renaming: nil, arrangement: arrangement,
-                yearsOnTheShelf: ReferenceShelfStore.years(of: entries), on: day
-            ) {
+            if let problem = ReferenceShelf.nameProblem(typed, renaming: nil, arrangement: arrangement) {
                 return problem.sentence
             }
             madeID = ReferenceShelf.newGroupID(avoiding: arrangement)
@@ -215,17 +210,12 @@ nonisolated enum ReferenceShelfStore {
     static func renameGroup(
         _ place: ReferenceShelf.Place,
         to typed: String,
-        coursesDirectoryURL: URL,
-        entries: [ReferenceShelf.Entry],
-        on day: CalendarDay = CalendarDay.today()
+        coursesDirectoryURL: URL
     ) -> ReferenceShelfRefusal? {
         let name: String = ReferenceShelf.normalizedName(typed)
         var oldName: String = ""
         let outcome: Outcome = ReferenceShelfStore.change(inCoursesDirectory: coursesDirectoryURL) { arrangement in
-            if let problem = ReferenceShelf.nameProblem(
-                typed, renaming: place, arrangement: arrangement,
-                yearsOnTheShelf: ReferenceShelfStore.years(of: entries), on: day
-            ) {
+            if let problem = ReferenceShelf.nameProblem(typed, renaming: place, arrangement: arrangement) {
                 return problem.sentence
             }
             switch place {
@@ -314,6 +304,17 @@ nonisolated enum ReferenceShelfStore {
                 groups.append(kept)
             }
             arrangement.groups = groups
+            // An entry the reader left aside because it repeated this id
+            // goes too, or the group would come back under that entry's name
+            // the next time the file is read.
+            var keptEntries: [Any] = []
+            for entry in arrangement.keptGroupEntries {
+                if let object = entry as? [String: Any], let keptID = object["id"] as? String, keptID == id {
+                    continue
+                }
+                keptEntries.append(entry)
+            }
+            arrangement.keptGroupEntries = keptEntries
             var placements: [String: String] = [:]
             for (folderName, placedIn) in arrangement.placements where placedIn != id {
                 placements[folderName] = placedIn
@@ -398,6 +399,72 @@ nonisolated enum ReferenceShelfStore {
             ReferenceShelfStore.announceChange(inCoursesDirectory: coursesDirectoryURL)
         }
         return nil
+    }
+
+    /// Start the Groups Again…: the way out of an arrangement that cannot be
+    /// read. The file is MOVED aside, never deleted and never written over,
+    /// under a dated name beside it (`reference-shelf.unreadable-<stamp>.json`,
+    /// with `-2`, `-3`… when that name is taken), and the shelf is the year
+    /// layout again with every control working. Refused for a file a NEWER
+    /// Plantoir wrote, which an older one leaves exactly as it is, and does
+    /// nothing at all to a file that can be read or is not there. Returns the
+    /// name the file was kept under, or the refusal.
+    static func startAgain(
+        coursesDirectoryURL: URL,
+        at moment: Date = Date()
+    ) -> Result<String?, ReferenceShelfRefusal> {
+        let internalURL: URL = coursesDirectoryURL.appendingPathComponent(".internal")
+        let lock: Int32 = ReferenceShelfStore.takeLock(on: internalURL)
+        defer {
+            ReferenceShelfStore.releaseLock(lock)
+        }
+        let fileURL: URL = ReferenceShelfStore.fileURL(inCoursesDirectory: coursesDirectoryURL)
+        switch ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL) {
+        case .absent, .read:
+            return .success(nil)
+        case .newer:
+            let sentence: String = ReferenceGroupWording.arrangedByANewerPlantoir
+            ActivityTrail.note(
+                .referenceGroupsNotChanged,
+                ReferenceShelfStore.notChangedLine(asked: "start the groups again", sentence: sentence)
+            )
+            return .failure(ReferenceShelfRefusal(sentence: sentence))
+        case .unreadable:
+            break
+        }
+        let stamp: String = ArchiveStamp.text(for: moment)
+        var attempt: Int = 1
+        while attempt < 1000 {
+            var keptName: String = "reference-shelf.unreadable-\(stamp).json"
+            if attempt > 1 {
+                keptName = "reference-shelf.unreadable-\(stamp)-\(attempt).json"
+            }
+            let keptURL: URL = internalURL.appendingPathComponent(keptName)
+            if FileManager.default.fileExists(atPath: keptURL.path) {
+                attempt += 1
+                continue
+            }
+            do {
+                // A move, which refuses a name that is there: an earlier
+                // copy kept aside is never written over.
+                try FileManager.default.moveItem(at: fileURL, to: keptURL)
+            } catch {
+                break
+            }
+            ActivityTrail.note(
+                .referenceGroupsStartedAgain,
+                "started the groups on the Reference Courses shelf again; the arrangement that could not be read "
+                    + "was kept beside it as \(keptName)"
+            )
+            ReferenceShelfStore.announceChange(inCoursesDirectory: coursesDirectoryURL)
+            return .success(keptName)
+        }
+        let sentence: String = ReferenceGroupWording.couldNotSaveGroups
+        ActivityTrail.note(
+            .referenceGroupsNotChanged,
+            ReferenceShelfStore.notChangedLine(asked: "start the groups again", sentence: sentence)
+        )
+        return .failure(ReferenceShelfRefusal(sentence: sentence))
     }
 
     // MARK: - What every door that lands a course does
@@ -495,17 +562,6 @@ nonisolated enum ReferenceShelfStore {
                 ))
             } else {
                 result.append(existing)
-            }
-        }
-        return result
-    }
-
-    /// The years the courses sit in.
-    static func years(of entries: [ReferenceShelf.Entry]) -> [Int] {
-        var result: [Int] = []
-        for entry in entries {
-            if let year = entry.schoolYear, !result.contains(year) {
-                result.append(year)
             }
         }
         return result

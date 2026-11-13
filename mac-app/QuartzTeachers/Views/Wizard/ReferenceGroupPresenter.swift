@@ -48,6 +48,15 @@ struct ReferenceGroupPresenter: ViewModifier {
         )
     }
 
+    var isAskingToStartAgain: Binding<Bool> {
+        return Binding(
+            get: { return workspace.isAskingToStartReferenceGroupsAgain },
+            set: { showing in
+                workspace.isAskingToStartReferenceGroupsAgain = showing
+            }
+        )
+    }
+
     var isShowingAProblem: Binding<Bool> {
         return Binding(
             get: { return workspace.referenceGroupProblem != nil },
@@ -88,19 +97,33 @@ struct ReferenceGroupPresenter: ViewModifier {
                 ReferenceGroupWording.removeGroupTitle(group: workspace.removeGroupRequest?.title ?? ""),
                 isPresented: isAskingToRemove
             ) {
-                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
-                    workspace.removeGroupRequest = nil
-                }
                 Button(ReferenceGroupWording.removeButton) {
                     if let group = workspace.removeGroupRequest {
                         workspace.removeGroupRequest = nil
                         workspace.removeReferenceGroup(group)
                     }
                 }
+                // Cancel is the default button (the contract's wording.rule),
+                // the shape the replace warning uses.
+                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
+                    workspace.removeGroupRequest = nil
+                }
+                .keyboardShortcut(.defaultAction)
             } message: {
-                Text(ReferenceGroupWording.removeGroupMessage(
-                    courses: ReferenceGroupWording.courses(removeGroupCourseCount)
-                ))
+                Text(ReferenceGroupWording.removeGroupMessage(courseCount: removeGroupCourseCount))
+            }
+            .alert(ReferenceGroupWording.startAgainTitle, isPresented: isAskingToStartAgain) {
+                Button(ReferenceGroupWording.startAgainButton) {
+                    workspace.isAskingToStartReferenceGroupsAgain = false
+                    workspace.startReferenceGroupsAgain()
+                }
+                // Cancel is the default button here too.
+                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
+                    workspace.isAskingToStartReferenceGroupsAgain = false
+                }
+                .keyboardShortcut(.defaultAction)
+            } message: {
+                Text(ReferenceGroupWording.startAgainMessage)
             }
             .alert(workspace.referenceGroupProblem?.title ?? "", isPresented: isShowingAProblem) {
                 Button("OK") {

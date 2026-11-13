@@ -486,6 +486,9 @@ class WorkspaceModel {
     /// (it holds courses), or nil.
     var removeGroupRequest: ReferenceShelfGroup?
 
+    /// True while Start the Groups Again… is asking first.
+    var isAskingToStartReferenceGroupsAgain: Bool = false
+
     /// A group change that did not happen, for the alert: its title and the
     /// sentence.
     var referenceGroupProblem: ReferenceGroupProblem?

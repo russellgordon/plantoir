@@ -1693,6 +1693,17 @@
         ".plantoir-importing-<FOLDER>"
       ]
     },
+    "startingAgain": {
+      "rule": "An arrangement that is there and cannot be read is not a dead end. Start the Groups Again (shared-rules.json -> referenceCourses.groups.whereItIsOffered) MOVES it, under the change lock, to reference-shelf.unreadable-<stamp>.json beside it in courses/.internal, <stamp> being course-management.json's yyyy-MM-dd_HHmmss in local Gregorian time; when that name is taken, -2, -3 and so on before .json. It is never deleted and never written over: an earlier copy kept aside stays as it was. The shelf then reads as having no file: the year layout, and every control works. A file written by a NEWER version is never moved by an older app: refused with arrangedByANewerPlantoir, byte-identical. A file that can be read, or no file, is left alone and nothing is moved. Whatever stands at the path is moved, a folder included.",
+      "cases": [
+        {"name": "an unreadable file is moved aside", "text": "{\n  \"version\": 1,\n  \"groups\": [", "atMoment": "2026-11-13_091500", "expect": {"keptAs": "reference-shelf.unreadable-2026-11-13_091500.json", "readingAfter": "absent", "sentence": null}},
+        {"name": "an earlier copy kept aside is not written over", "text": "{", "alreadyKept": ["reference-shelf.unreadable-2026-11-13_091500.json"], "atMoment": "2026-11-13_091500", "expect": {"keptAs": "reference-shelf.unreadable-2026-11-13_091500-2.json", "readingAfter": "absent", "sentence": null, "earlierUnchanged": true}},
+        {"name": "a newer version's file is never moved", "text": "{\"version\": 2, \"groups\": [], \"placements\": {}}", "atMoment": "2026-11-13_091500", "expect": {"keptAs": null, "readingAfter": "newer", "sentence": "arrangedByANewerPlantoir"}},
+        {"name": "a file that can be read is left alone", "text": "{\"version\": 1}", "atMoment": "2026-11-13_091500", "expect": {"keptAs": null, "readingAfter": "read", "sentence": null}},
+        {"name": "no file: nothing to do", "text": null, "atMoment": "2026-11-13_091500", "expect": {"keptAs": null, "readingAfter": "absent", "sentence": null}},
+        {"name": "a folder where the file should be is moved aside too", "folderInsteadOfFile": true, "atMoment": "2026-11-13_091500", "expect": {"keptAs": "reference-shelf.unreadable-2026-11-13_091500.json", "readingAfter": "absent", "sentence": null}}
+      ]
+    },
     "readingCases": [
       {
         "name": "no file",

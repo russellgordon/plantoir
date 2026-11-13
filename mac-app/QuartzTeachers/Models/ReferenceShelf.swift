@@ -166,6 +166,16 @@ nonisolated enum ReferenceShelf {
             }
         }
 
+        /// True when the teacher can start the groups again: the file is
+        /// there and cannot be read. Never for a newer version's file, which
+        /// an older Plantoir leaves exactly as it is.
+        var mayStartAgain: Bool {
+            if case .unreadable = self {
+                return true
+            }
+            return false
+        }
+
         /// Why a change cannot be made right now, as a teacher reads it, or
         /// nil when it can.
         var refusal: String? {
@@ -238,6 +248,7 @@ nonisolated enum ReferenceShelf {
     enum NameProblem: Equatable, Sendable {
         case empty
         case tooLong
+        case isAYear
         case taken(String)
 
         // MARK: - Computed properties
@@ -248,6 +259,8 @@ nonisolated enum ReferenceShelf {
                 return ReferenceGroupWording.nameIsEmpty
             case .tooLong:
                 return ReferenceGroupWording.nameIsTooLong
+            case .isAYear:
+                return ReferenceGroupWording.nameIsAYear
             case .taken(let name):
                 return ReferenceGroupWording.nameIsTaken(name: name)
             }
@@ -382,16 +395,18 @@ nonisolated enum ReferenceShelf {
         return sorted
     }
 
-    /// The name as it is kept: every run of white space and control
-    /// characters becomes one space, and the ends are trimmed. A pasted line
-    /// break is a space, not a refusal.
+    /// The name as it is kept: first cleaned by the SAME rule as a course's
+    /// name (#780, `CourseName.cleaned`, `shared-rules.json` →
+    /// `courseNameCharacters`: control characters become a space, the
+    /// bidirectional controls are removed, and the zero-width joiner and
+    /// non-joiner an emoji or a Persian word needs are kept), then every run
+    /// of white space becomes one space and the ends are trimmed. A pasted
+    /// line break is a space, not a refusal.
     static func normalizedName(_ typed: String) -> String {
         var result: String = ""
         var pendingSpace: Bool = false
-        for scalar in typed.unicodeScalars {
-            let isSpace: Bool = CharacterSet.whitespacesAndNewlines.contains(scalar)
-                || CharacterSet.controlCharacters.contains(scalar)
-            if isSpace {
+        for scalar in CourseName.cleaned(typed).unicodeScalars {
+            if CharacterSet.whitespacesAndNewlines.contains(scalar) {
                 pendingSpace = true
                 continue
             }
@@ -424,15 +439,15 @@ nonisolated enum ReferenceShelf {
     /// Why `typed` cannot name a group, or nil when it can.
     ///
     /// `renaming` is the group being renamed (a made group or the no-year
-    /// group), whose own name is never in the way. The names in the way are
-    /// every year the shelf can draw (the offered years, and any year a
-    /// course sits in), the no-year group's, and every made group's.
+    /// group), whose own name is never in the way. A name that reads as a
+    /// school year ("2025–26", "2031-32"), past, present or future, is never
+    /// a made group's: the shelf draws that year's own group the day a
+    /// course is filed under it. Otherwise the names in the way are the
+    /// no-year group's and every made group's.
     static func nameProblem(
         _ typed: String,
         renaming: Place?,
-        arrangement: Arrangement,
-        yearsOnTheShelf: [Int],
-        on day: CalendarDay
+        arrangement: Arrangement
     ) -> NameProblem? {
         let name: String = ReferenceShelf.normalizedName(typed)
         if name.isEmpty {
@@ -442,16 +457,8 @@ nonisolated enum ReferenceShelf {
             return .tooLong
         }
         let wanted: String = ReferenceShelf.comparable(name)
-
-        var years: [Int] = SchoolYear.offeredStartingYears(on: day)
-        for year in yearsOnTheShelf where !years.contains(year) {
-            years.append(year)
-        }
-        for year in years {
-            let label: String = SchoolYear.label(forStartingYear: year)
-            if ReferenceShelf.comparable(label) == wanted {
-                return .taken(label)
-            }
+        if ReferenceShelf.readsAsASchoolYear(wanted) {
+            return .isAYear
         }
         if renaming != .noYear && ReferenceShelf.comparable(arrangement.noYearTitle) == wanted {
             return .taken(arrangement.noYearTitle)
@@ -465,6 +472,27 @@ nonisolated enum ReferenceShelf {
             }
         }
         return nil
+    }
+
+    /// True when a name, already through `comparable`, has the shape of a
+    /// school year's label: four digits, a dash, and the last two digits of
+    /// the next year (`SchoolYear.label`'s shape, for any year at all).
+    static func readsAsASchoolYear(_ comparableName: String) -> Bool {
+        let scalars: [Unicode.Scalar] = Array(comparableName.unicodeScalars)
+        if scalars.count != 7 || scalars[4] != "–" {
+            return false
+        }
+        var digits: [Int] = []
+        for index in [0, 1, 2, 3, 5, 6] {
+            let value: UInt32 = scalars[index].value
+            if value < 0x30 || value > 0x39 {
+                return false
+            }
+            digits.append(Int(value - 0x30))
+        }
+        let startingYear: Int = digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3]
+        let endsIn: Int = digits[4] * 10 + digits[5]
+        return endsIn == (startingYear + 1) % 100
     }
 
     /// A new group id no group in `arrangement` has.

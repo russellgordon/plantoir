@@ -206,7 +206,9 @@ final class ReferenceShelfTests: XCTestCase {
             ("removeGroupMenuItem", ReferenceGroupWording.removeGroupMenuItem),
             ("removeGroupAskingMenuItem", ReferenceGroupWording.removeGroupAskingMenuItem),
             ("removeGroupTitle", ReferenceGroupWording.removeGroupTitle(group: "{group}")),
-            ("removeGroupMessage", ReferenceGroupWording.removeGroupMessage(courses: "{courses}")),
+            ("removeGroupMessageNone", ReferenceGroupWording.removeGroupMessage(courseCount: 0)),
+            ("removeGroupMessageOne", ReferenceGroupWording.removeGroupMessage(courseCount: 1)),
+            ("removeGroupMessageMany", ReferenceGroupWording.removeGroupMessageMany(count: 0).replacingOccurrences(of: "0", with: "{count}")),
             ("removeButton", ReferenceGroupWording.removeButton),
             ("cancelButton", ReferenceGroupWording.cancelButton),
             ("removeWouldClash", ReferenceGroupWording.removeWouldClash(group: "{group}", course: "{course}", target: "{target}")),
@@ -218,6 +220,12 @@ final class ReferenceShelfTests: XCTestCase {
             ("summaryGroupLabel", ReferenceGroupWording.summaryGroupLabel),
             ("nameIsEmpty", ReferenceGroupWording.nameIsEmpty),
             ("nameIsTooLong", ReferenceGroupWording.nameIsTooLong),
+            ("nameIsAYear", ReferenceGroupWording.nameIsAYear),
+            ("startAgainMenuItem", ReferenceGroupWording.startAgainMenuItem),
+            ("startAgainTitle", ReferenceGroupWording.startAgainTitle),
+            ("startAgainMessage", ReferenceGroupWording.startAgainMessage),
+            ("startAgainButton", ReferenceGroupWording.startAgainButton),
+            ("couldNotStartAgainTitle", ReferenceGroupWording.couldNotStartAgainTitle),
             ("nameIsTaken", ReferenceGroupWording.nameIsTaken(name: "{name}")),
             ("couldNotReadGroups", ReferenceGroupWording.couldNotReadGroups),
             ("arrangedByANewerPlantoir", ReferenceGroupWording.arrangedByANewerPlantoir),
@@ -233,6 +241,14 @@ final class ReferenceShelfTests: XCTestCase {
         }
         XCTAssertEqual(ReferenceGroupWording.courses(1), "1 course")
         XCTAssertEqual(ReferenceGroupWording.courses(3), "3 courses")
+        XCTAssertTrue(ReferenceGroupWording.removeGroupMessage(courseCount: 3).hasPrefix("Its 3 courses go back"))
+        for count in [0, 1, 2, 7] {
+            XCTAssertFalse(ReferenceGroupWording.removeGroupMessage(courseCount: count).contains("(s)"))
+        }
+        XCTAssertFalse(
+            ReferenceGroupWording.couldNotReadGroups.localizedCaseInsensitiveContains("try again"),
+            "Waiting does not help an unreadable arrangement; the sentence names the way out."
+        )
 
         let shelfWording: [String: Any] = try XCTUnwrap(try ReferenceCreationTests.referenceRules(["wording"]))
         XCTAssertEqual(
@@ -320,7 +336,7 @@ final class ReferenceShelfTests: XCTestCase {
             var said: String?
             if let groupName = act["makeGroup"] as? String {
                 let made: Result<String, ReferenceShelfRefusal> = ReferenceShelfStore.makeGroup(
-                    named: groupName, coursesDirectoryURL: coursesDirectoryURL, entries: []
+                    named: groupName, coursesDirectoryURL: coursesDirectoryURL
                 )
                 if case .failure(let refusal) = made {
                     said = refusal.sentence
@@ -379,9 +395,8 @@ final class ReferenceShelfTests: XCTestCase {
 
     func testEveryNameRuleCaseHolds() throws {
         let rule: [String: Any] = try XCTUnwrap(try ReferenceShelfTests.groupRules()["nameRule"] as? [String: Any])
-        let day: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(rule["onDay"] as? String)))
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 16, "a case was added or lost; the README census counts them")
+        XCTAssertEqual(cases.count, 22, "a case was added or lost; the README census counts them")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             var arrangement: ReferenceShelf.Arrangement = ReferenceShelf.Arrangement(
@@ -402,18 +417,32 @@ final class ReferenceShelfTests: XCTestCase {
             }
             let typed: String = try XCTUnwrap(testCase["typed"] as? String)
             let problem: ReferenceShelf.NameProblem? = ReferenceShelf.nameProblem(
-                typed, renaming: renaming, arrangement: arrangement, yearsOnTheShelf: [], on: day
+                typed, renaming: renaming, arrangement: arrangement
             )
             var expected: ReferenceShelf.NameProblem?
-            if let word = testCase["expect"] as? String {
-                expected = word == "empty" ? .empty : .tooLong
+            switch testCase["expect"] as? String {
+            case "empty":
+                expected = .empty
+            case "tooLong":
+                expected = .tooLong
+            case "isAYear":
+                expected = .isAYear
+            default:
+                break
             }
             if let taken = testCase["expect"] as? [String: Any] {
                 expected = .taken(try XCTUnwrap(taken["taken"] as? String))
             }
             XCTAssertEqual(problem, expected, name)
             if let normalised = testCase["expectName"] as? String {
-                XCTAssertEqual(ReferenceShelf.normalizedName(typed), normalised, name)
+                // Compared scalar by scalar: a joiner lost or spaced is a
+                // different name even where it looks the same.
+                XCTAssertEqual(
+                    Array(ReferenceShelf.normalizedName(typed).unicodeScalars), Array(normalised.unicodeScalars), name
+                )
+            }
+            if let characters = testCase["expectCharacters"] as? Int {
+                XCTAssertEqual(ReferenceShelf.normalizedName(typed).count, characters, name)
             }
         }
     }
@@ -613,7 +642,7 @@ final class ReferenceShelfTests: XCTestCase {
     func testEveryRemoveCaseHolds() throws {
         let block: [String: Any] = try XCTUnwrap(try ReferenceShelfTests.groupRules()["removeCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 3, "a case was added or lost; the README census counts them")
+        XCTAssertEqual(cases.count, 4, "a case was added or lost; the README census counts them")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             try prepareCoursesFolder()
@@ -625,9 +654,8 @@ final class ReferenceShelfTests: XCTestCase {
             let fileBefore: Data? = try? Data(contentsOf: shelfFileURL)
             let coursesBefore: [String: Data] = everyCourseFile()
             let before: ReferenceShelf.Arrangement = ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL).arrangement
-            let id: String = try XCTUnwrap(
-                ReferenceShelfTests.madeGroupID(named: try XCTUnwrap(testCase["remove"] as? String), in: before)
-            )
+            let removing: String = try XCTUnwrap(testCase["remove"] as? String)
+            let id: String = try XCTUnwrap(ReferenceShelfTests.madeGroupID(named: removing, in: before))
 
             let refusal: ReferenceShelfRefusal? = ReferenceShelfStore.removeGroup(
                 withID: id, coursesDirectoryURL: coursesDirectoryURL, entries: entries
@@ -657,7 +685,7 @@ final class ReferenceShelfTests: XCTestCase {
                 XCTAssertTrue(trail.contains("did not remove the group \"From colleagues\""), trail)
             } else {
                 XCTAssertNil(refusal, name)
-                XCTAssertTrue(trail.contains("removed the group \"From colleagues\""), trail)
+                XCTAssertTrue(trail.contains("removed the group \"\(removing)\""), trail)
                 XCTAssertTrue(trail.contains("no course was removed"), trail)
             }
         }
@@ -673,7 +701,7 @@ final class ReferenceShelfTests: XCTestCase {
         ]
         let coursesBefore: [String: Data] = everyCourseFile()
         let made: Result<String, ReferenceShelfRefusal> = ReferenceShelfStore.makeGroup(
-            named: "  From\ncolleagues ", coursesDirectoryURL: coursesDirectoryURL, entries: entries
+            named: "  From\ncolleagues ", coursesDirectoryURL: coursesDirectoryURL
         )
         guard case .success(let id) = made else {
             return XCTFail("\(made)")
@@ -686,17 +714,17 @@ final class ReferenceShelfTests: XCTestCase {
             entries[0], to: .made(id), coursesDirectoryURL: coursesDirectoryURL, entries: entries
         ))
         XCTAssertNil(ReferenceShelfStore.renameGroup(
-            .made(id), to: "Exemplars", coursesDirectoryURL: coursesDirectoryURL, entries: entries
+            .made(id), to: "Exemplars", coursesDirectoryURL: coursesDirectoryURL
         ))
         XCTAssertTrue(trail.contains("renamed the group \"From colleagues\" to \"Exemplars\""), trail)
         XCTAssertNil(ReferenceShelfStore.renameGroup(
-            .noYear, to: "Example courses", coursesDirectoryURL: coursesDirectoryURL, entries: entries
+            .noYear, to: "Example courses", coursesDirectoryURL: coursesDirectoryURL
         ))
         XCTAssertTrue(trail.contains(
             "renamed the group \"Other\" to \"Example courses\" (the group for courses with no school year)"
         ), trail)
         let taken: ReferenceShelfRefusal? = ReferenceShelfStore.renameGroup(
-            .noYear, to: "exemplars", coursesDirectoryURL: coursesDirectoryURL, entries: entries
+            .noYear, to: "exemplars", coursesDirectoryURL: coursesDirectoryURL
         )
         XCTAssertEqual(taken?.sentence, ReferenceGroupWording.nameIsTaken(name: "Exemplars"))
         XCTAssertTrue(trail.contains("did not rename a group to \"exemplars\""), trail)
@@ -708,7 +736,7 @@ final class ReferenceShelfTests: XCTestCase {
 
         // Renaming the no-year group back to Other removes the key.
         XCTAssertNil(ReferenceShelfStore.renameGroup(
-            .noYear, to: "Other", coursesDirectoryURL: coursesDirectoryURL, entries: entries
+            .noYear, to: "Other", coursesDirectoryURL: coursesDirectoryURL
         ))
         let object: [String: Any] = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: try Data(contentsOf: shelfFileURL)) as? [String: Any]
@@ -724,7 +752,7 @@ final class ReferenceShelfTests: XCTestCase {
         await withTaskGroup(of: Void.self) { group in
             for index in 1...20 {
                 group.addTask {
-                    _ = ReferenceShelfStore.makeGroup(named: "Group \(index)", coursesDirectoryURL: courses, entries: [])
+                    _ = ReferenceShelfStore.makeGroup(named: "Group \(index)", coursesDirectoryURL: courses)
                 }
             }
         }
@@ -807,6 +835,195 @@ final class ReferenceShelfTests: XCTestCase {
             replacer.contains("recordArrival(") || replacer.contains("forgetRemoved("),
             "A replace keeps the replaced course's folder, and so its group: it must write no placement."
         )
+    }
+
+    // MARK: - Starting the groups again
+
+    func testEveryStartingAgainCaseHolds() throws {
+        let block: [String: Any] = try XCTUnwrap(try ReferenceShelfTests.shelfFormat()["startingAgain"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 6, "a case was added or lost; the README census counts them")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            try prepareCoursesFolder()
+            let internalURL: URL = shelfFileURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: internalURL, withIntermediateDirectories: true)
+            var before: Data?
+            if let text = testCase["text"] as? String {
+                before = Data(text.utf8)
+                try before?.write(to: shelfFileURL)
+            }
+            if testCase["folderInsteadOfFile"] as? Bool == true {
+                try FileManager.default.createDirectory(at: shelfFileURL, withIntermediateDirectories: true)
+            }
+            var earlier: [String: Data] = [:]
+            for keptName in (testCase["alreadyKept"] as? [String]) ?? [] {
+                let data: Data = Data("an earlier copy \(keptName)".utf8)
+                try data.write(to: internalURL.appendingPathComponent(keptName))
+                earlier[keptName] = data
+            }
+            let moment: Date = try XCTUnwrap(ArchiveStamp.moment(from: try XCTUnwrap(testCase["atMoment"] as? String)))
+
+            let outcome: Result<String?, ReferenceShelfRefusal> = ReferenceShelfStore.startAgain(
+                coursesDirectoryURL: coursesDirectoryURL, at: moment
+            )
+
+            let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+            var keptAs: String?
+            var said: String?
+            switch outcome {
+            case .success(let kept):
+                keptAs = kept
+            case .failure(let refusal):
+                said = refusal.sentence
+            }
+            XCTAssertEqual(keptAs, expect["keptAs"] as? String, name)
+            if let key = expect["sentence"] as? String {
+                XCTAssertEqual(said, ReferenceShelfTests.sentence(forKey: key), name)
+            } else {
+                XCTAssertNil(said, name)
+            }
+            var readingAfter: String
+            switch ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL) {
+            case .absent:
+                readingAfter = "absent"
+            case .read:
+                readingAfter = "read"
+            case .unreadable:
+                readingAfter = "unreadable"
+            case .newer:
+                readingAfter = "newer"
+            }
+            XCTAssertEqual(readingAfter, expect["readingAfter"] as? String, name)
+            if let keptAs {
+                let keptURL: URL = internalURL.appendingPathComponent(keptAs)
+                XCTAssertTrue(FileManager.default.fileExists(atPath: keptURL.path), "\(name): nothing kept aside.")
+                if let before {
+                    XCTAssertEqual(try? Data(contentsOf: keptURL), before, "\(name): what was kept is not what was there.")
+                }
+                XCTAssertTrue(trail.contains("started the groups on the Reference Courses shelf again"), trail)
+                XCTAssertTrue(trail.contains(keptAs), trail)
+                // Every control works again: a group can be made.
+                guard case .success = ReferenceShelfStore.makeGroup(named: "Afresh", coursesDirectoryURL: coursesDirectoryURL) else {
+                    return XCTFail("\(name): the groups did not start again.")
+                }
+            } else if let before {
+                XCTAssertEqual(try? Data(contentsOf: shelfFileURL), before, "\(name): the file was moved or changed.")
+            }
+            for (keptName, data) in earlier {
+                XCTAssertEqual(try? Data(contentsOf: internalURL.appendingPathComponent(keptName)), data, "\(name): an earlier copy was written over.")
+            }
+        }
+    }
+
+    /// Cancel is the default button of both of the groups' questions, as the
+    /// contract says and as the replace warning does: the button carries the
+    /// default key itself, rather than leaving SwiftUI to choose.
+    func testCancelIsTheDefaultButtonOfBothQuestions() throws {
+        let url: URL = ReferenceShelfTests.repositoryURL()
+            .appendingPathComponent("mac-app/QuartzTeachers/Views/Wizard/ReferenceGroupPresenter.swift")
+        let lines: [String] = try String(contentsOf: url, encoding: .utf8).components(separatedBy: "\n")
+        var cancels: Int = 0
+        for index in 0..<lines.count where lines[index].contains("Button(ReferenceGroupWording.cancelButton, role: .cancel)") {
+            cancels += 1
+            var found: Bool = false
+            for next in (index + 1)..<min(index + 5, lines.count) where lines[next].contains(".keyboardShortcut(.defaultAction)") {
+                found = true
+            }
+            XCTAssertTrue(found, "line \(index + 1): a Cancel without the default key")
+        }
+        XCTAssertEqual(cancels, 2, "the removal question and the start-again question")
+        let rule: String = try XCTUnwrap(
+            (try ReferenceShelfTests.groupRules()["wording"] as? [String: Any])?["rule"] as? String
+        )
+        XCTAssertTrue(rule.contains("Cancel is the default button of the removal question and of the start-again question"))
+    }
+
+    // MARK: - The three arrival doors, for real (implementation review L5)
+
+    /// Writes a placement for `folderName` in a group "Stale" into the file,
+    /// as an older app or a removal made by hand would have left it.
+    func writeAStalePlacement(for folderName: String) throws {
+        try writeShelfFile([
+            "version": 1,
+            "groups": [["id": "g-5a1e0001", "name": "Stale"]],
+            "placements": [folderName: "g-5a1e0001"],
+        ])
+    }
+
+    func placementNow(_ folderName: String) -> String? {
+        return ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL).arrangement.placements[folderName]
+    }
+
+    func testAnImportLandsByItsYearOverAStalePlacement() async throws {
+        try prepareCoursesFolder()
+        let oldCoursesURL: URL = rootURL.appendingPathComponent("Old Folder").appendingPathComponent("courses")
+        let oldCourseURL: URL = oldCoursesURL.appendingPathComponent("ICS4U")
+        try FileManager.default.createDirectory(at: oldCourseURL.appendingPathComponent("section1"), withIntermediateDirectories: true)
+        try Data("{\"course_code\": \"ICS4U\", \"section_numbers\": [1]}\n".utf8)
+            .write(to: oldCourseURL.appendingPathComponent("course_config.json"))
+        try Data("---\ntitle: Front\n---\nOld.\n".utf8)
+            .write(to: oldCourseURL.appendingPathComponent("section1").appendingPathComponent("index.md"))
+        try writeAStalePlacement(for: "ICS4U-2025")
+        guard case .found(let source) = ReferenceImportSource.resolve(
+            chosen: oldCoursesURL.deletingLastPathComponent(),
+            workingFolderURL: coursesDirectoryURL.deletingLastPathComponent(),
+            leavingBehind: ReferenceImporter.leftBehindNames
+        ) else {
+            return XCTFail("The old folder was refused.")
+        }
+        let outcomes: [ReferenceImporter.Outcome] = await ReferenceImporter.importCourses(
+            [ReferenceImporter.Request(course: try XCTUnwrap(source.courses.first), schoolYear: 2025)],
+            into: coursesDirectoryURL, existingFolderNames: [], alreadyShelved: [],
+            from: source.rootURL, progress: { _ in }
+        )
+        guard case .imported(let made) = try XCTUnwrap(outcomes.first) else {
+            return XCTFail("\(outcomes)")
+        }
+        XCTAssertEqual(made.folderName, "ICS4U-2025")
+        XCTAssertNil(placementNow("ICS4U-2025"), "The import landed in a stranger's group.")
+    }
+
+    func testKeepACopyLandsByItsYearOverAStalePlacement() throws {
+        try prepareCoursesFolder()
+        let liveURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U")
+        try FileManager.default.createDirectory(at: liveURL.appendingPathComponent("section1"), withIntermediateDirectories: true)
+        try Data("{\"course_code\": \"ICS3U\", \"section_numbers\": [1]}\n".utf8)
+            .write(to: liveURL.appendingPathComponent("course_config.json"))
+        try Data("---\ntitle: Front\n---\nLive.\n".utf8)
+            .write(to: liveURL.appendingPathComponent("section1").appendingPathComponent("index.md"))
+        try writeAStalePlacement(for: "ICS3U-2025")
+        let live: Course = Course(
+            code: "ICS3U", directoryURL: liveURL,
+            configuration: try CourseConfiguration(contentsOf: liveURL.appendingPathComponent("course_config.json"))
+        )
+        let made: ReferenceCopier.Made = try ReferenceCopier.keepACopy(
+            of: live, named: "ICS3U-2025", schoolYear: 2025, coursesDirectoryURL: coursesDirectoryURL
+        )
+        XCTAssertEqual(made.folderName, "ICS3U-2025")
+        XCTAssertNil(placementNow("ICS3U-2025"), "The copy landed in a stranger's group.")
+        ReferenceLock.clearLock(at: coursesDirectoryURL.appendingPathComponent("ICS3U-2025"))
+    }
+
+    func testABackupRestoredWhereItsCourseIsGoneLandsByItsYear() async throws {
+        try prepareCoursesFolder()
+        try writeReferenceCourse(folder: "ICS3U-2025", code: "ICS3U", year: 2025)
+        let folderURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2025")
+        let course: Course = Course(
+            code: "ICS3U-2025", directoryURL: folderURL,
+            configuration: try CourseConfiguration(contentsOf: folderURL.appendingPathComponent("course_config.json"))
+        )
+        let backupURL: URL = try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+        ReferenceLock.clearLock(at: folderURL)
+        try FileManager.default.removeItem(at: folderURL)
+        try writeAStalePlacement(for: "ICS3U-2025")
+        try CourseRestorer.restoreBackup(
+            BackupItem(courseCode: "ICS3U-2025", backedUpAt: Date(), fileURL: backupURL, maker: .teacher),
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folderURL.appendingPathComponent("course_config.json").path))
+        XCTAssertNil(placementNow("ICS3U-2025"), "The restored course landed in a stranger's group.")
+        ReferenceLock.clearLock(at: folderURL)
     }
 
     // MARK: - The window

@@ -1001,6 +1001,12 @@ nonisolated enum ActivityTrail {
         /// could not be recorded.
         case referenceGroupsNotChanged = "reference groups not changed"
 
+        /// The teacher started the shelf's groups again because their
+        /// arrangement could not be read (Start the Groups Again…). Carries
+        /// the name the unreadable copy was kept under beside it, which is
+        /// the way back to whatever it held. Never what it held.
+        case referenceGroupsStartedAgain = "reference groups started again"
+
         /// Backups were deleted — one from the sidebar, or several from All
         /// Backups (#242). Carries the course code or codes, how many, what
         /// they took when every size is known, each file's NAME (a course code,

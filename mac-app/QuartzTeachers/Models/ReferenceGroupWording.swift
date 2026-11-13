@@ -55,9 +55,27 @@ nonisolated enum ReferenceGroupWording {
     /// The read-only summary's label for the group a course was put in.
     static let summaryGroupLabel: String = "Group"
 
-    /// Every change refused because the file is there and cannot be read.
+    /// Every change refused because the arrangement is there and cannot be
+    /// read. Waiting does not help (a hand-edited or foreign-written copy
+    /// stays unreadable), so it names the way out instead.
     static let couldNotReadGroups: String =
-        "The reference shelf’s groups could not be read, so nothing was changed. Try again in a moment."
+        "The arrangement of the groups on the reference shelf cannot be read, so nothing was changed. "
+        + "Start the Groups Again, on the Reference Courses heading’s menu, sets them up afresh."
+
+    /// On the Reference Courses heading's menu, only while the arrangement
+    /// cannot be read.
+    static let startAgainMenuItem: String = "Start the Groups Again…"
+
+    /// Its question.
+    static let startAgainTitle: String = "Start the groups on the reference shelf again?"
+    static let startAgainMessage: String =
+        "Their arrangement cannot be read. Starting again puts every reference course back in the group its "
+        + "school year puts it in, with no groups of your own. Nothing in any course changes, and what could "
+        + "not be read is kept beside the new arrangement."
+    static let startAgainButton: String = "Start Again"
+
+    /// The alert title when it could not be done.
+    static let couldNotStartAgainTitle: String = "Could not start the groups again"
 
     /// Every change refused because a newer Plantoir arranged the shelf.
     static let arrangedByANewerPlantoir: String =
@@ -71,6 +89,7 @@ nonisolated enum ReferenceGroupWording {
     /// The name rule's three sentences.
     static let nameIsEmpty: String = "Give the group a name."
     static let nameIsTooLong: String = "A group name can be at most 40 characters."
+    static let nameIsAYear: String = "A school year has a group of its own. Choose a name that is not a school year."
 
     // MARK: - Functions
 
@@ -84,9 +103,24 @@ nonisolated enum ReferenceGroupWording {
     }
 
     /// The confirmation's message: where the courses go, and that none is
-    /// removed.
-    static func removeGroupMessage(courses: String) -> String {
-        return "Its \(courses) go back to the groups their school years put them in. "
+    /// removed. One sentence for none, one for one, one for many.
+    static func removeGroupMessage(courseCount: Int) -> String {
+        if courseCount == 0 {
+            return ReferenceGroupWording.removeGroupMessageNone
+        }
+        if courseCount == 1 {
+            return ReferenceGroupWording.removeGroupMessageOne
+        }
+        return ReferenceGroupWording.removeGroupMessageMany(count: courseCount)
+    }
+
+    static let removeGroupMessageNone: String = "It holds no course, so nothing else changes."
+    static let removeGroupMessageOne: String =
+        "Its course goes back to the group its school year puts it in. "
+        + "No course is removed, and nothing in it changes."
+
+    static func removeGroupMessageMany(count: Int) -> String {
+        return "Its \(count) courses go back to the groups their school years put them in. "
              + "No course is removed, and nothing in them changes."
     }
 

@@ -77,22 +77,31 @@ extension WorkspaceModel {
     }
 
     /// The sentence under the New Group or Rename Group field, live, or nil.
-    func referenceGroupNameProblem(
-        _ typed: String,
-        renaming: ReferenceShelf.Place?,
-        on day: CalendarDay = CalendarDay.today()
-    ) -> String? {
+    func referenceGroupNameProblem(_ typed: String, renaming: ReferenceShelf.Place?) -> String? {
         if let refusal = referenceShelf.refusal {
             return refusal
         }
         let problem: ReferenceShelf.NameProblem? = ReferenceShelf.nameProblem(
-            typed,
-            renaming: renaming,
-            arrangement: referenceShelf.arrangement,
-            yearsOnTheShelf: ReferenceShelfStore.years(of: referenceShelfEntries(on: day)),
-            on: day
+            typed, renaming: renaming, arrangement: referenceShelf.arrangement
         )
         return problem?.sentence
+    }
+
+    /// Start the Groups Again… (an arrangement that cannot be read): moves
+    /// it aside and reads the shelf again; on a refusal, the alert says why.
+    func startReferenceGroupsAgain() {
+        guard let coursesDirectoryURL else {
+            return
+        }
+        let outcome: Result<String?, ReferenceShelfRefusal> = ReferenceShelfStore.startAgain(
+            coursesDirectoryURL: coursesDirectoryURL
+        )
+        refreshReferenceShelf()
+        if case .failure(let refusal) = outcome {
+            referenceGroupProblem = ReferenceGroupProblem(
+                title: ReferenceGroupWording.couldNotStartAgainTitle, sentence: refusal.sentence
+            )
+        }
     }
 
     /// New Group…: makes it, opens it, and — when it was chosen from inside
@@ -103,7 +112,7 @@ extension WorkspaceModel {
             return ReferenceGroupWording.couldNotSaveGroups
         }
         let made: Result<String, ReferenceShelfRefusal> = ReferenceShelfStore.makeGroup(
-            named: typed, coursesDirectoryURL: coursesDirectoryURL, entries: referenceShelfEntries(on: day), on: day
+            named: typed, coursesDirectoryURL: coursesDirectoryURL
         )
         refreshReferenceShelf()
         switch made {
@@ -124,17 +133,12 @@ extension WorkspaceModel {
     }
 
     /// Rename Group…: returns the sentence to show in the sheet, or nil.
-    func renameReferenceGroup(
-        _ group: ReferenceShelfGroup,
-        to typed: String,
-        on day: CalendarDay = CalendarDay.today()
-    ) -> String? {
+    func renameReferenceGroup(_ group: ReferenceShelfGroup, to typed: String) -> String? {
         guard let coursesDirectoryURL else {
             return ReferenceGroupWording.couldNotSaveGroups
         }
         let refusal: ReferenceShelfRefusal? = ReferenceShelfStore.renameGroup(
-            group.place, to: typed, coursesDirectoryURL: coursesDirectoryURL,
-            entries: referenceShelfEntries(on: day), on: day
+            group.place, to: typed, coursesDirectoryURL: coursesDirectoryURL
         )
         refreshReferenceShelf()
         return refusal?.sentence
