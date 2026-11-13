@@ -2868,28 +2868,111 @@ class ClubStart:
 NEW_COURSE_DEPLOY_TARGET = "cloudflare_pages"
 
 
-def setup_course(no_backup: bool = False):
+# The hidden folder both apps build a reference course in before renaming it
+# into place. The same text as `ReferenceStaging.prefix` on the mac and
+# `ReferenceStaging.Prefix` on Windows, and the shape
+# contracts/course-management.json -> courseCode.commandLine refuses at the
+# code prompt; scripts/test_setup_course_reference_staging.py holds them
+# together.
+REFERENCE_STAGING_PREFIX = ".plantoir-importing-"
+
+# Said, and the run stops with exit 1 having written nothing, when
+# --reference-staging-folder names anything but a staging folder that already
+# holds a reference course's settings.
+REFERENCE_STAGING_REFUSED = "❌ This folder cannot be set up this way."
+
+# Said, and the run stops with exit 1, when a course being made for reference
+# would end up without the ready-made pages it was made for (#572, plan review
+# H3). A reference course is locked once it is made, so a course holding a
+# skeleton or nothing would be worthless and could not be repaired; the app
+# removes the staging folder and tells the teacher plainly.
+REFERENCE_PAGES_NOT_INSTALLED = (
+    "❌ The ready-made pages for {code} could not be installed, "
+    "so this course was not kept for reference."
+)
+
+
+def reference_staging_course(base_path, folder_name):
+    """The staging folder and its course code, or None when it is refused.
+
+    The second door into this script (#572), used only by the two apps when a
+    teacher makes a course straight onto the Reference Courses shelf. It
+    accepts exactly one shape: a bare folder name beginning with
+    REFERENCE_STAGING_PREFIX, directly inside courses/, not a link, holding a
+    course_config.json that is not a link either and that already carries
+    `kept_for_reference: true` and a course code the rule accepts. A live
+    course of the same code is the point of the door, so the clash check is
+    not asked. Anything else is refused, and nothing is written.
+    """
+    if not isinstance(folder_name, str):
+        return None
+    if not folder_name.startswith(REFERENCE_STAGING_PREFIX):
+        return None
+    if len(folder_name) <= len(REFERENCE_STAGING_PREFIX):
+        return None
+    if not _is_a_bare_folder_name(folder_name):
+        return None
+    folder = Path(base_path) / folder_name
+    if folder.is_symlink() or not folder.is_dir():
+        return None
+    config_path = folder / "course_config.json"
+    if config_path.is_symlink() or not config_path.is_file():
+        return None
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(saved, dict):
+        return None
+    if saved.get("kept_for_reference") is not True:
+        return None
+    raw_code = saved.get("course_code")
+    if not isinstance(raw_code, str):
+        return None
+    code = normalized_course_code(raw_code)
+    if code == "" or not _is_a_bare_folder_name(code):
+        return None
+    if course_code_trouble(code) is not None:
+        return None
+    return folder, code
+
+
+def setup_course(no_backup: bool = False, reference_staging_folder=None):
     print("📚 Welcome to the Course Setup Script!\n")
 
     base_path = toolchain_paths.COURSES_DIR
 
-    # --- NEW: Offer to install the Example Course (EXC2O) -------------------
-    try:
-        maybe_install_example_course(base_path)
-    except SystemExit:
-        # early exit is expected after example install
-        return
-    except Exception as e:
-        print(f"⚠️ Example Course installation step encountered an error and will be skipped: {e}")
+    # A course made straight onto the Reference Courses shelf (#572) is set
+    # up inside the app's own hidden staging folder, never under its code:
+    # the code may belong to a live course this run must not touch. Neither
+    # the code prompt nor the Example Course offer is asked, and no backup is
+    # made, because the app made the folder seconds ago.
+    for_reference = reference_staging_folder is not None
+    if for_reference:
+        staged = reference_staging_course(base_path, reference_staging_folder)
+        if staged is None:
+            print(REFERENCE_STAGING_REFUSED)
+            sys.exit(1)
+        course_path, course_code = staged
+    else:
+        # --- NEW: Offer to install the Example Course (EXC2O) ---------------
+        try:
+            maybe_install_example_course(base_path)
+        except SystemExit:
+            # early exit is expected after example install
+            return
+        except Exception as e:
+            print(f"⚠️ Example Course installation step encountered an error and will be skipped: {e}")
 
-    # The same rule both apps ask of a code (#402); a leading dot is still
-    # refused first, whatever is on disk. See ask_for_course_code.
-    course_code = ask_for_course_code(base_path)
-    course_path = base_path / course_code
+        # The same rule both apps ask of a code (#402); a leading dot is still
+        # refused first, whatever is on disk. See ask_for_course_code.
+        course_code = ask_for_course_code(base_path)
+        course_path = base_path / course_code
 
     # --- NEW: Automatic backup BEFORE any mutations -------------------------
     try:
-        if course_path.exists() and not no_backup:
+        if course_path.exists() and not no_backup and not for_reference:
             backup_root = base_path / "_backups"
             backup_existing_course_dir(course_path, backup_root)
     except Exception as e:
@@ -3054,6 +3137,11 @@ def setup_course(no_backup: bool = False):
     if numbered_course:
         print("\n📘 This course numbers its pages one after another, so it starts "
               "with empty folders and its first page.")
+    # A course made for reference exists to hold the ready-made pages, so a
+    # run that is not going to install them stops here (plan review H3).
+    if for_reference and not example_manifest:
+        print(REFERENCE_PAGES_NOT_INSTALLED.format(code=course_code))
+        sys.exit(1)
     if not example_manifest and not numbered_course:
         candidate = find_skeleton_dir(course_code)
         if candidate:
@@ -3433,6 +3521,14 @@ def setup_course(no_backup: bool = False):
                 print("\n📖 Example content: nothing to add (every page already exists).")
         except Exception as e:
             print(f"⚠️ Could not install the example content: {e}")
+            files_written = 0
+        # An ordinary course carries on without them and the teacher can
+        # repair it; a reference course is locked once made, so it stops
+        # (plan review H3). A fresh staging folder has no pages yet, so
+        # nothing written means nothing installed.
+        if for_reference and files_written == 0:
+            print(REFERENCE_PAGES_NOT_INSTALLED.format(code=course_code))
+            sys.exit(1)
 
     # ---------- The declined payload's curriculum, into the skeleton --------
     # Before the skeleton, never after: the installer refuses a name that
@@ -3506,7 +3602,7 @@ def setup_course(no_backup: bool = False):
 
     # ---------- Create shared structure (with createdSectionN + publishForSectionN) ----------
     for folder in shared_folders:
-        folder_path = toolchain_paths.COURSES_DIR / course_code / folder
+        folder_path = course_path / folder
         folder_path.mkdir(parents=True, exist_ok=True)
         index_md_path = folder_path / "index.md"
         if not index_md_path.exists():
@@ -3520,7 +3616,7 @@ def setup_course(no_backup: bool = False):
                 f.write(f"This is the **{folder}** folder. Add Markdown files to this folder to build out your site. Optionally, you can remove this `index.md` file and Quartz will then show only a listing of files that exist in this folder instead.\n")
     
     for file in shared_files:
-        file_path = toolchain_paths.COURSES_DIR / course_code / file
+        file_path = course_path / file
         if not file_path.exists():
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write("---\n")
@@ -3556,7 +3652,7 @@ def setup_course(no_backup: bool = False):
 
     for sec in section_numbers:
         section_name = f"section{sec}"
-        section_path = toolchain_paths.COURSES_DIR / course_code / section_name
+        section_path = course_path / section_name
         section_path.mkdir(exist_ok=True)
 
         # Before the front page, which is how it tells a section being made
@@ -3627,6 +3723,11 @@ def setup_course(no_backup: bool = False):
     ensure_quartz_overflowlist_static_id()
 
     print(f"\n✅ Course '{course_code}' set up successfully at: {course_path}")
+    # The line above is the last courseCreation milestone the apps watch for,
+    # so it is printed in both modes. The commands below would name a hidden
+    # folder no launcher accepts, so a course made for reference skips them.
+    if for_reference:
+        return
     print("\n\nWebsite previews")
     print("----------------")
     for sec in section_numbers:
@@ -3641,6 +3742,8 @@ def parse_args():
     parser.add_argument("--no-backup", action="store_true", help="Skip creating a backup of the existing course folder.")
     parser.add_argument("--host-os", choices=["windows","mac","linux","unknown"], default="unknown", help="Host operating system (passed by setup.sh/setup.ps1).")
     parser.add_argument("--install-example", action="store_true", help="Install the example course without prompting, then exit.")
+    parser.add_argument("--reference-staging-folder", default=None, metavar="NAME",
+                        help="Used by the Plantoir apps: set up a course being made for reference inside their hidden staging folder NAME, which must already hold its settings.")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -3650,4 +3753,5 @@ if __name__ == "__main__":
     if args.install_example:
         installed = install_example_course_noninteractive(toolchain_paths.COURSES_DIR)
         sys.exit(0 if installed else 1)
-    setup_course(no_backup=args.no_backup)
+    setup_course(no_backup=args.no_backup,
+                 reference_staging_folder=args.reference_staging_folder)
