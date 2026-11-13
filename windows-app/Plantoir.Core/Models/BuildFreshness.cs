@@ -129,8 +129,11 @@ public static class BuildFreshness
     /// Times are read from each entry's own record (<see cref="FileSystemInfo.Refresh"/>,
     /// one GetFileAttributesEx), not the directory listing's copy, which can
     /// lag behind a file still held open for writing; a lag is the stale
-    /// direction. An unreadable course folder answers "nothing newer", as the
-    /// Python does (the build would fail on it anyway).
+    /// direction. A folder that cannot be LISTED, the course folder included,
+    /// counts as changed (#799's review, L2): passing it over would deploy the
+    /// last build's copy of it. The shared Python passes such a folder over (a
+    /// known limit, in 05). A course folder whose own times cannot be read, or
+    /// that does not exist, answers "nothing newer", as the Python does.
     /// </summary>
     internal static bool SomethingInTheCourseIsNewer(string courseDirectory, DateTime referenceUtc)
     {
@@ -166,8 +169,12 @@ public static class BuildFreshness
         {
             var (folder, depth) = pending.Pop();
             IEnumerable<FileSystemInfo> entries;
+            // A folder that cannot be LISTED counts as changed (#799's review, L2):
+            // nobody can say what is in it, and passing it over would deploy the
+            // last build's copy of it. Building is the safe direction. (The shared
+            // Python's os.walk passes such a folder over: a known limit, in 05.)
             try { entries = new DirectoryInfo(folder).EnumerateFileSystemInfos("*", EveryEntry); }
-            catch { continue; }
+            catch { return true; }
             try
             {
                 foreach (var entry in entries)
@@ -195,7 +202,9 @@ public static class BuildFreshness
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException)
             {
-                // A folder that stops being listable part-way: what was read stands.
+                // A folder that cannot be listed, or stops being listable part-way:
+                // what is in it is unknown, so it counts as changed (above).
+                return true;
             }
         }
         return false;
@@ -207,7 +216,8 @@ public static class BuildFreshness
     private static readonly EnumerationOptions EveryEntry = new()
     {
         AttributesToSkip = 0,
-        IgnoreInaccessible = true,
+        // false: a folder that cannot be listed must THROW, so it counts as changed.
+        IgnoreInaccessible = false,
         RecurseSubdirectories = false,
         ReturnSpecialDirectories = false,
     };

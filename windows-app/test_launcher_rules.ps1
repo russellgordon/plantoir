@@ -810,6 +810,25 @@ def site_was_built_by_this_toolchain(section_dir, toolchain_id=None):
             $builds = ([regex]::Matches($run.Said, 'PREVIEW-WAS-ASKED')).Count
             Report 'realDeploy' 'two saved legs: one build, one trail line' (($builds -eq 1) -and (@(Get-BuiltLines).Count -eq $before + 1) -and ($run.Code -eq 0)) ("$builds builds, exit $($run.Code); said: " + $run.Said)
             $env:STAMP_STUB_COUNTER = $null
+
+            # --reset-token and --logout deploy NOTHING, to a folder included
+            # (#799's review, H1): typed with --to-folder, or on a course whose
+            # saved destination is a folder, the site (a preview's, here) is
+            # never copied and "Deployed." is never said; the token is cleared.
+            $env:STAMP_STUB = 'preview'; $env:PREVIEW_STUB_EXIT = '1'
+            $resetFolder = Join-Path $work 'published-reset'
+            $savedFolder = (Join-Path $work 'published-reset-saved').Replace('\', '/')
+            foreach ($r in @(
+                @{ name = '--to-folder with --reset-token'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--reset-token'); folder = $resetFolder },
+                @{ name = '--to-folder with --logout'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--logout'); folder = $resetFolder },
+                @{ name = 'a saved folder destination with --logout'; settings = ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + $savedFolder + '"}'); args = @('ICS3U', '1', '--logout'); folder = $savedFolder.Replace('/', '\') })) {
+                Remove-Item -LiteralPath $r.folder -Recurse -Force -ErrorAction SilentlyContinue
+                Set-Settings $r.settings
+                $run = Invoke-ScratchDeploy $r.args
+                $copied = (Test-Path -LiteralPath $r.folder) -and @(Get-ChildItem -LiteralPath $r.folder -Recurse -File -Force -ErrorAction SilentlyContinue).Count -gt 0
+                $ok = (-not $copied) -and (-not $run.Said.Contains('Deployed.')) -and (-not $run.Said.Contains('PUBLISHED_FOLDER=')) -and $run.Said.Contains('CLEARED-THE-NETLIFY-TOKEN') -and ($run.Code -eq 0)
+                Report 'realDeploy' ($r.name + ' deploys nothing') $ok ("exit $($run.Code), copied $copied; said: " + $run.Said)
+            }
             Set-Settings '{"course_code":"ICS3U"}'
 
             # #739: two saved folder legs. The first is refused by the leg

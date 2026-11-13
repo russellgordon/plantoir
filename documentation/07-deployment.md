@@ -273,7 +273,7 @@ they did not agree:
 | The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
 | `deploy.sh`, every destination | one `site_carries_preview_client`, called four times: first in `why_this_deploy_builds_first`, which asks a preview's site before the toolchain for every destination (#768), then three times in the folder leg | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
 | `toolchain_paths.site_carries_preview_client` (deploy.py's `main` and `why_build_before_deploying`, Netlify and Cloudflare, both platforms) | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract; one Python copy since #768 |
-| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)**. *Since #799 deploy.ps1 DECIDES with the shared Python's `site_carries_preview_client` (the row above), before every destination; `Test-CarriesLiveReload` runs only after a rebuild, in its wait and its "still carries" refusal.* |
 | `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 
 (Windows' scheduled task built unconditionally until #799, so it had no check

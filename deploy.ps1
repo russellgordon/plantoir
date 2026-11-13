@@ -32,6 +32,7 @@ Notes:
   The account is discovered from the token, so there is nothing else to enter.
 - Use --reset-token (or --logout) to remove the saved token and re-link on next
   run; combine it with --target cloudflare to clear the Cloudflare one instead.
+  It deploys nothing, to a folder included.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
 "@ | Out-Host
 }
@@ -853,8 +854,10 @@ os._exit(0)
 # pins each against deploy.sh. A build that went through writes one trail line
 # (activityTrail.mustRecord -> "site built again before deploying") with the
 # reason it built for; a build that failed, needed an answer, or left a
-# preview's site or no front page behind writes nothing. Not for
-# --reset-token, which deploys nothing.
+# preview's site or no front page behind writes nothing. Both call sites are
+# unconditional: --reset-token and --logout deploy nothing and reach neither
+# (the folder branch is not entered for them, and the token code exits before
+# the native run).
 function Invoke-BuildFirstWhenAsked([string]$Python) {
   $reason = Get-WhyBuildBeforeDeploying $Python $env:PLANTOIR_SCRIPTS_DIR $COURSE_DIR_HOST $SECTION_DIR_HOST
   if (-not $reason) { return }
@@ -1121,7 +1124,17 @@ if (-not $builtFound) {
 # mirror via robocopy — only changed files move, removals propagate.
 # Each section lands in its own subfolder so sections never overwrite
 # one another. Netlify is not involved.
-if ($TO_FOLDER) {
+#
+# NOT with --reset-token or --logout, which clear a saved token and deploy
+# nothing (the legs above keep only the first for that reason, and the guard
+# at the top does not run for them). Until #799's review (H1) this branch
+# ran for them anyway: a folder deploy typed with either flag mirrored the
+# site, and since the question below was skipped for them it mirrored a
+# preview's pages and said "Deployed." They now go on to the token code
+# below, which clears the token --target names (Netlify unless it says
+# cloudflare) and exits, so a folder course's `deploy.bat ICS3U 1 --logout`
+# does what the flag says and copies nothing.
+if ($TO_FOLDER -and -not $RESET_TOKEN) {
   # Resolved ONCE, against THIS working folder, before anything uses it
   # (#304 / mac #227). The app refuses a partial path outright; a command
   # line can still hand one over, and one-argument GetFullPath (like robocopy,
@@ -1142,9 +1155,10 @@ if ($TO_FOLDER) {
   # version built is built again, and so is one the course has changed since
   # (#749, #799): Invoke-BuildFirstWhenAsked, above, asks the shared Python
   # and builds once. This branch deploys host-to-host and never enters
-  # deploy.py, so it is the only check a folder deploy gets. Not for
-  # --reset-token, which deploys nothing.
-  if (-not $RESET_TOKEN) { Invoke-BuildFirstWhenAsked (Enter-NativeRuntime) }
+  # deploy.py, so it is the only check a folder deploy gets. Asked on every
+  # path that reaches the mirror below: --reset-token and --logout never
+  # enter this branch (above).
+  Invoke-BuildFirstWhenAsked (Enter-NativeRuntime)
 
   Write-Host ("Deploying {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
@@ -1668,7 +1682,9 @@ if ($NATIVE_RUNTIME) {
   # Asked HERE, before any token is put in the environment below, so the
   # build and its node processes never inherit one (#799; the reasons for
   # this place, and for two call sites, are above Invoke-BuildFirstWhenAsked).
-  if (-not $RESET_TOKEN) { Invoke-BuildFirstWhenAsked $py }
+  # Unconditionally: --reset-token and --logout have exited above, after
+  # clearing the token, and never reach this upload.
+  Invoke-BuildFirstWhenAsked $py
   $env:HOST_TZ_OFFSET = $HOST_TZ_OFFSET
   Write-Host ("Deploying {0} S{1} from this PC ..." -f $COURSE_CODE, $SECTION_NUM)
   $deployArgs = @('--host-os','windows')

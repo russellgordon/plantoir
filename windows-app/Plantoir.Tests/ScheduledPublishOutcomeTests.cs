@@ -785,8 +785,9 @@ public class ScheduledPublishOutcomeTests : IDisposable
     /// <summary>
     /// <c>scheduledPublishStopped.whichKind.cases</c> (#297, mac #137), each
     /// played through the REAL generated wrapper with stand-in launchers and
-    /// one configured destination, as <c>whichKind.note</c> says. This app's
-    /// wrapper builds unconditionally, so every row's build stub exits its
+    /// one configured destination, as <c>whichKind.note</c> says. The wrapper
+    /// asks before it builds since #799, but every row's section has never been
+    /// built (no front page), so it builds, and every row's build stub exits its
     /// code (0 for the destination and none rows). The 127 row is the one that
     /// catches a wrapper testing <c>-eq 1</c> rather than not-3.
     /// </summary>

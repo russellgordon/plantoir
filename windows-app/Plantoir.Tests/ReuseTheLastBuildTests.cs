@@ -122,6 +122,38 @@ public class ReuseTheLastBuildTests : IDisposable
         Assert.Null(BuildFreshness.ChangedSince(built.Course, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(1)));
     }
 
+    /// <summary>
+    /// #799's review, L2: a folder inside the course that cannot be LISTED
+    /// counts as changed. Nobody can say what is in it, and passing it over
+    /// would deploy the last build's copy of it. Windows only (an ACL).
+    /// </summary>
+    [Fact]
+    public void AFolderThatCannotBeListedCountsAsChanged()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var built = FreshnessCases.Build(_root, FreshnessCases.Case("nothing has changed since the build"));
+        Assert.Null(BuildFreshness.WhyRebuild(built.Course, built.Section));
+        var notes = new DirectoryInfo(Path.Combine(built.Course, "notes"));
+        var deny = new System.Security.AccessControl.FileSystemAccessRule(
+            System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+            System.Security.AccessControl.FileSystemRights.ListDirectory,
+            System.Security.AccessControl.AccessControlType.Deny);
+        var security = notes.GetAccessControl();
+        security.AddAccessRule(deny);
+        notes.SetAccessControl(security);
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => notes.EnumerateFileSystemInfos().ToList());
+            Assert.Equal(BuildFreshness.ReasonPages, BuildFreshness.WhyRebuild(built.Course, built.Section));
+        }
+        finally
+        {
+            var back = notes.GetAccessControl();
+            back.RemoveAccessRule(deny);
+            notes.SetAccessControl(back);
+        }
+    }
+
     [Fact]
     public void TheKnownLimitsOnWindowsAreSkippedByName()
     {

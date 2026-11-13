@@ -2524,9 +2524,16 @@ Windows a JUNCTION inside the course IS followed**, by both Windows readers:
 measured by the #799 plan review with the runtime's Python 3.14.10
 (`os.path.isjunction` true, `islink` false, and `os.walk` descends into it),
 and the app's walk does the same so the two agree; a symbolic link is not
-followed there either, and a junction that leads back into the course ends
-(the app keeps a set of the folders it reached through junctions). That
-errs toward building and needs nothing from the mac. **A symbolic link INSIDE the
+followed there either. Following one errs toward building. **A junction that
+leads back into the course ends only in the APP's walk**, which keeps a set
+of the folders it reached through junctions. The shared Python has no such
+guard (`os.walk` in `something_in_the_course_is_newer`): measured by #799's
+review with Python 3.14.10, one `back -> course` junction walked in 0.37 s,
+and two did not end in 90 s (it grows exponentially), so `deploy.ps1`,
+`deploy.py` and the scheduled wrapper would hang on such a course rather than
+answer. A known limit of the shared reader, left to its own issue: #799
+changes no shared Python. A teacher's course is unlikely to hold a junction
+loop, but a scheduled run that hangs has nobody watching it. **A symbolic link INSIDE the
 course is still not followed by any reader** (`knownLimits`): a section
 folder kept elsewhere and linked in reads as built after a change behind
 it, while the build follows it. `Media` is not such a link: it is a real
@@ -2749,6 +2756,37 @@ see the reason for.
   contract's `replaceKeepingItsOldTime`) keeps its own new creation time: no
   tunnelling on that path. The issue said the opposite; it holds for the
   delete-and-create path only.
+- **A folder that cannot be listed counts as changed** in the app's walk
+  (#799's review, L2): an access-denied folder inside the course answers
+  `pages`, because passing it over would deploy the last build's copy of it
+  (`AFolderThatCannotBeListedCountsAsChanged`, which fails on the code before
+  it). The shared Python's `os.walk` passes such a folder over
+  (`onerror=None`) and reads it as unchanged: a known limit of the shared
+  reader, for the same later issue as the junction loop above. Reach is low:
+  the teacher's own course and a denied ACL.
+- **A question that FAILED is recorded with the toolchain's words.** A Python
+  that would not start, a traceback or an answer nobody knows builds, and the
+  trail line then says "Plantoir had been updated since it was last built":
+  deploy.sh's choice for the same failure, inherited (#799's review, L3). The
+  words can say an update where there was only a failure; the build itself
+  is the safe direction.
+- **`--reset-token` and `--logout` deploy nothing, to a folder included**
+  (#799's review, H1). The flags clear a saved token; the legs keep only the
+  first destination for them and the section guard does not run for them,
+  both because they deploy nothing. But the folder branch still ran for them,
+  and once its question was guarded "not for --reset-token" it mirrored a
+  preview's pages and said "Deployed." (measured by the review; on 1.9.3 the
+  same command refused or rebuilt, because the preview check there was not
+  guarded). The folder branch is now not entered with either flag: the run
+  goes on to the token code, which clears the token `--target` names
+  (Netlify unless it says cloudflare) and exits. So `deploy.bat ICS3U 1
+  --to-folder X --logout`, and `--logout` on a course whose saved destination
+  is a folder, copy nothing. Both calls of the question are unconditional
+  now; the web legs never reach an upload with either flag, because the
+  token code exits first. `test_launcher_rules.ps1` has the three rows, and
+  each fails on the code before the fix. REJECTED: only dropping the
+  condition, which would still have mirrored the site under a flag that
+  says it deploys nothing.
 - **Hidden is the NAME**, never the attribute: the walk skips no attribute (a
   default `EnumerationOptions` skips Hidden and System, the #272 trap), and
   a folder given the Hidden attribute without a dot is read (a Windows-only
