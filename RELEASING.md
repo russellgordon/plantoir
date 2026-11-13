@@ -160,40 +160,51 @@ release starts, and the cut CHECKS it rather than raising it.**
   correction). Since #861 each such merge brings `dev`'s raised number and
   `dev`'s unreleased code onto `main`, so `main` is NOT a hotfix base in
   general. The procedure:
-  1. Branch `hotfix/<version>` from the commit the platform's shipped bundle
-     was built from: the tag for a platform that shipped in that cut, the
-     catch-up merge for one that joined it later (8107d8723 for Windows
-     1.9.3). Raise that platform's number there, and only there (1.9.3 to
-     1.9.4); `dev` keeps its own (2.0.0).
-  2. **The check, before the bundle is built.** Mechanical:
+  **`<base>`, defined once per platform:** the commit that platform's
+  shipped bundle was built from. For the mac after v1.9.3 it is the tag,
+  `v1.9.3`. For Windows it is the catch-up merge that joined that tag,
+  8107d8723, not the tag: `git diff --stat v1.9.3 main -- windows-app/`
+  prints 120 files, all from the catch-up itself, and from 8107d8723 it
+  prints nothing. Every command below uses `<base>`. **The shared folders**
+  are `scripts/ support/ patches/ contracts/ Dockerfile` and the launchers
+  (`setup`, `preview` and `deploy`, each as `.sh`, `.ps1` and `.bat`).
+  1. Branch `hotfix/<version>` from `<base>`. Raise that platform's number
+     there, and only there (1.9.3 to 1.9.4); `dev` keeps its own (2.0.0).
+  2. **The check, on the branch, before the bundle is built and before it
+     merges.** Mechanical:
      `git rev-list --first-parent --merges <base>..hotfix/<version>` prints
      nothing, so no merge has come onto the branch since what shipped. Run
-     against `main` on 2026-11-13 it printed two (8107d8723 and 5ff48304b),
-     the right refusal; on a branch made from v1.9.3 with one commit it
-     printed nothing. Then read
-     `git diff --stat <base> hotfix/<version> -- mac-app windows-app scripts support patches contracts`:
-     it must list only the hotfix's own files and the version line. Which
-     files those are is a judgement, so this half is read, not computed.
-     When `git rev-list --first-parent --merges v<last tag>..main` prints
-     nothing, no merge has reached `main` since the tag and the branch may
-     be made from `main`'s head.
+     against `main` on 2026-11-13 from `v1.9.3` it printed two (8107d8723
+     and 5ff48304b), the right refusal; on a branch made from v1.9.3 with
+     one commit it printed nothing. Then read, for the mac,
+     `git diff --stat <base> hotfix/<version> -- mac-app/ scripts/ support/ patches/ contracts/ Dockerfile setup.sh preview.sh deploy.sh setup.ps1 preview.ps1 deploy.ps1 setup.bat preview.bat deploy.bat`
+     (for Windows, `windows-app/` in place of `mac-app/`): it must list only
+     the hotfix's own files and the version line. Which files those are is
+     a judgement, so this half is read, not computed.
   3. Merge the branch into `main` with `--no-ff`, and put the TAG on that
      merge commit on `main` (CLAUDE.md rule 6: release tags point at
      `main`), never on the hotfix branch. For the tagged commit to be what
-     the bundle was built from, `main` must hold nothing of the hotfixing
-     platform's beyond the tag:
-     `git diff --stat v<last tag> main -- mac-app` (or `windows-app`, and
-     the shared `scripts support patches contracts`) prints nothing before
-     the merge. If it prints anything (a merge of `dev` brought code), or if
-     the base is older than `main`'s tip because a newer release is already
-     out, this procedure does not cover it: the director asks Russell.
-     Then make the website commit on `main`.
+     the bundle was built from, `main` must hold nothing of that platform's
+     or of the shared folders beyond `<base>`. Before the merge, for the mac,
+     `git diff --stat <base> main -- mac-app/ scripts/ support/ patches/ contracts/ Dockerfile setup.sh preview.sh deploy.sh setup.ps1 preview.ps1 deploy.ps1 setup.bat preview.bat deploy.bat`
+     (for Windows, `windows-app/` in place of `mac-app/`) must print
+     nothing. If it prints anything, or if `<base>` is older than `main`'s
+     last release because a newer one is already out, this procedure does
+     not cover it: the director asks Russell. **As written today, every mac
+     hotfix goes to Russell for a decision**: measured on 2026-11-13, the
+     mac command from `v1.9.3` prints `10 files changed`, shared `scripts/`
+     files the Windows catch-up merge brought to `main`, so the tagged merge
+     would not be the commit the bundle was built from. The Windows command
+     from 8107d8723 prints nothing. Then make the website commit on `main`.
   4. Merge `main` back into `dev`, as after any cut. Both sides have changed
-     the version line from the last release (`main` to 1.9.4, `dev` to
-     2.0.0), so git stops on `project.yml` (and the csproj): resolve it to
-     `dev`'s side, because `dev` keeps the next release's number. The next
-     cut's check (checklist step 1) confirms it, since the platform it ships
-     must read that cut's tag. Delete the hotfix branch.
+     the mac's version line from the last release (`main` to 1.9.4, `dev` to
+     2.0.0), so git stops on `project.yml`: resolve it to `dev`'s side,
+     because `dev` keeps the next release's number. The csproj conflicts the
+     same way only once #862 has raised `<Version>` on `dev`; until then a
+     Windows hotfix's number merges into `dev` with no conflict, and that is
+     the right number for `dev` too. The next cut's check (checklist step 1)
+     confirms the result, since the platform it ships must read that cut's
+     tag. Delete the hotfix branch.
   If the hotfix takes the very number `dev` is heading for (`dev` at 1.9.4
   and a 1.9.4 hotfix), `dev`'s release has to move up: that is a question
   for Russell, since its milestone moves with it.

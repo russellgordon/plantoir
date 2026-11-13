@@ -139,28 +139,33 @@ picture cannot show.
      (`RELEASING.md` → "When the number is raised" has the measured history
      and the whole procedure). `main` is not a hotfix base in general: since
      #861 every merge of `dev` into `main` between cuts brings `dev`'s raised
-     number and unreleased code with it. Branch `hotfix/<version>` from the
-     tag (or, for a platform that joined the tag later, its catch-up merge),
+     number and unreleased code with it. **`<base>`** is the commit the
+     platform's shipped bundle was built from: the tag for the mac (`v1.9.3`
+     today), the catch-up merge for a platform that joined the tag later
+     (8107d8723 for Windows; from `v1.9.3`, `-- windows-app/` prints 120
+     files, all the catch-up's). Branch `hotfix/<version>` from `<base>` and
      raise that platform's number there only (1.9.3 to 1.9.4; `dev` keeps
-     2.0.0). **Check before building:**
+     2.0.0). **Check on the branch, before building and before it merges:**
      `git rev-list --first-parent --merges <base>..hotfix/<version>` prints
-     nothing (on 2026-11-13, `v1.9.3..main` printed 8107d8723 and 5ff48304b,
-     so `main` would rightly fail), and READ
-     `git diff --stat <base> hotfix/<version> -- mac-app windows-app scripts support patches contracts`,
-     which must list only the hotfix's files and the version line. Both
-     checks run on the branch, BEFORE it merges. Then merge it into `main`
-     with `--no-ff` and put the TAG on that merge commit on `main` (CLAUDE.md
-     rule 6), never on the hotfix branch. First confirm `git diff --stat
-     v<last tag> main -- mac-app` (or `windows-app`, plus `scripts support
-     patches contracts`) prints nothing, so the tagged commit is what the
-     bundle was built from; if it prints anything, or the base is older than
-     `main`'s tip because a newer release is out, this procedure does not
-     cover it: ask Russell. Make the website commit, then merge `main` back
-     into `dev`: git stops on the version line (`main` 1.9.4, `dev` 2.0.0),
-     and it resolves to `dev`'s side, which keeps the next release's number;
-     the next cut's step 5 check confirms it. If the hotfix takes the number
-     `dev` is heading for, `dev`'s release moves up with its milestone: ask
-     Russell.
+     nothing, and READ
+     `git diff --stat <base> hotfix/<version> -- mac-app/ scripts/ support/ patches/ contracts/ Dockerfile setup.sh preview.sh deploy.sh setup.ps1 preview.ps1 deploy.ps1 setup.bat preview.bat deploy.bat`
+     (`windows-app/` in place of `mac-app/` for Windows), which must list
+     only the hotfix's files and the version line. Then confirm
+     `git diff --stat <base> main -- mac-app/ scripts/ support/ patches/ contracts/ Dockerfile setup.sh preview.sh deploy.sh setup.ps1 preview.ps1 deploy.ps1 setup.bat preview.bat deploy.bat`
+     (likewise for Windows) prints nothing, so the tagged merge is the
+     commit the bundle was built from. If it prints anything, or `<base>` is
+     older than `main`'s last release, this procedure does not cover it:
+     ask Russell. **As written today every mac hotfix goes to Russell**: from
+     `v1.9.3` that command prints `10 files changed` (shared `scripts/`
+     files from the Windows catch-up); from 8107d8723 the Windows one prints
+     nothing. Merge the branch into `main` with `--no-ff`, put the TAG on
+     that merge commit on `main` (CLAUDE.md rule 6), never on the branch,
+     and make the website commit. Merge `main` back into `dev`: git stops on
+     `project.yml` (`main` 1.9.4, `dev` 2.0.0) and it resolves to `dev`'s
+     side, which keeps the next release's number; the csproj conflicts the
+     same way only once #862 raises `<Version>` on `dev`. The next cut's
+     step 5 check confirms it. If the hotfix takes the number `dev` is
+     heading for, `dev`'s release moves up with its milestone: ask Russell.
 
    **After the cut, each platform's number on `dev` is the next release THAT
    platform will ship.** Once `main` is merged back into `dev` (step 4),
