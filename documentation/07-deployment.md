@@ -1744,10 +1744,23 @@ and the credential item (the `windows` issue for #709).
    the bar lists each earlier year with its own Stop Sharing.
 3. **A random suffix on every plan site**, open or protected, so the address
    never changes when a password is added or removed.
-4. **Answer keys** (`answerKeys`: a PDF whose name ends ` - Answers`,
-   ` - Solutions`, ` - with Answers` or ` - with Solutions`, or is
-   `Marking Guide`) are left out of a share without a password unless the
-   teacher ticks Include Answer Keys. A protected share includes them.
+4. **Answer keys** are left out of a share without a password unless the
+   teacher ticks Include Answer Keys; a protected share includes them. The
+   rule (`answerKeys`) reads NAMES only and errs toward leaving out (the
+   director's ruling on the implementation review, M3): a PDF, image or text
+   file whose name, with case, dashes of every kind, underscores and spaces
+   taken away, holds "answer", "solution", "markingguide" or
+   "markingscheme", or has "key" as a word. The first rule knew only the
+   skills' own endings, and teachers name their own files (`Quiz 1
+   Answers.pdf`, `Answer Key.pdf`, `Quiz 1 – Solutions.pdf`, `Test KEY.pdf`
+   were all shared). A false positive such as `Dissolution Lab.pdf` costs a
+   PDF the teacher can still include; the other way costs a key a class can
+   read. No rule on names can see a key written inside a page or a PDF named
+   something else, so **before every open share the teacher is shown the
+   PDFs that will be shared and every file left out, by name, and the share
+   goes only on their yes** (`openShareLists`); the sentence says the lists
+   are by name and that Plantoir has not read the files. Under
+   `--non-interactive` the lists are printed and the rule decides.
 5. **The public-address warning** comes before the first share without a
    password and again when a password is removed; never when protected, and
    there is no tick to silence it (`warningCases`).
@@ -1837,7 +1850,15 @@ Nothing is called shared until the address answers as the share promises
 (`proof`): without a password, 401 with a Basic challenge (protected) or 200
 (open); with it, 200; a random path that is not shared, 404 with the worker's
 `Cache-Control: no-store`; and the project's `canonical_deployment.uses_functions`
-true. **All of these are retried together**, every 2 s for up to 60 s. The
+true. **Only an answer from THIS share's deployment counts** (implementation
+review M1): every share writes a fresh random id into its worker, which sends
+it as `X-Plantoir-Share` on every answer, 401, 404 and 200 alike, and the
+proof requires it. Without it, a re-share whose new deployment answers
+exactly as the old one did (the same password; an open share that now leaves
+out a key; a broken new deployment) was proved by the old deployment's
+answers in the 0.2 to 2.2 s the main address still serves it: the review's
+stand-in passed the proof on two fetches, both from the old deployment.
+**All of these are retried together**, every 2 s for up to 60 s. The
 main address answered the new deployment 0.2 to 2.2 s after wrangler returned,
 and the second full run met the case that makes retrying all of them
 necessary: after Change Password the OLD deployment also answers 401 without a
@@ -1890,23 +1911,46 @@ Kept in the macOS Keychain, service `containerized-quartz-unit-plan`, account
 `<folder id>/<CODE>`, secret `username:password`: one per course across
 school years, so a colleague keeps one password, and a new password applies
 to this year's site once it is shared again. Asked by `deploy.sh` in the
-console (`read -rp`, then `read -rsp`) only when there is none or
+console (both with `IFS= read -rsp`, so neither is echoed into the console
+the teacher is reading and the password is kept exactly as typed, spaces at
+either end included) only when there is none or
 `--change-password` is given, and refused under `--non-interactive`; the app
 turns the two prompts into its own requests (`credentialPrompts`,
 `unitPlanUsername`, `unitPlanPassword`). Handed to the website builder through
-a pipe into `/tmp/plan_cred`, readable only by the user, which `share_plan.py`
-reads once and deletes at once and again on the way out, even when the upload
-fails. Never in argv beyond the Keychain store's instant (as the tokens' are),
+a pipe into a fresh file for each share, `cred` inside a folder `mktemp -d
+/tmp/plan_cred.XXXXXX` made under `umask 077` (0600 in 0700), whose NAME is
+passed as `--credential-file`; `share_plan.py` reads it once, deletes the file
+and the folder at once and again on every way out, even when the upload fails.
+The first version used one fixed `/tmp/plan_cred`, and one website builder
+serves a whole working folder, so two courses shared at once could read each
+other's password (review M4); `test_deploy_sh_plans.py` now shares two at
+once. Never in argv beyond the Keychain store's instant (as the tokens' are),
 an environment variable, the trail, the console, the marker or a fixture. Only
 `--remove-password` deletes the item, after the share succeeded; Stop Sharing
 deletes it when no school year of the course is still shared.
 
-### The marker
+### The marker, and a share that stops part way
 
 `courses/<CODE>/.cloudflare_sites/plans-<year>.json` (`markerFile`), mode
 600, written with the name and subdomain as soon as the project exists, so a
-crash never leaves a project the next share cannot find, and whole after the
-share. No account id and no project id: every call is by name. A reference
+crash never leaves a project the next share cannot find. **It never says more
+than the site does** (implementation review H1). The first version wrote the
+marker only after the proof and the deletes, so a Cancel in that minute left
+the previous marker: measured with the stand-in, Remove Password cancelled
+during its proof left the bar saying "Shared with a username and password."
+over a site answering 200 to anyone, and a first open share cancelled there
+left the bar saying not shared, with no Stop Sharing, over a public site. Now
+it is written before the upload with `state: sending`, the address, `protected:
+false`, and the answer keys counted as in when this share or the last one
+carried them; after the proof with `state: shared` and the older copies
+counted before the deletes; and before a Stop Sharing with `state: stopping`.
+The bar reads `sending` as "may be open" (`words.lastShareUnfinished`, with
+Share Again and Stop Sharing) and `stopping` as `words.stopUnconfirmed`, and
+shows `refusals.oldCopyStillThere` while `oldCopies` is above 0 (M2). Every
+point a share can stop at is a case (`interruptionCases`, 8, run by
+`test_share_plan.py`; `barCases`, 8, by `PlanSharingTests`); seven of them
+failed on the first version, and the eighth (stopped after the project was
+made, nothing sent) was already right. No account id and no project id: every call is by name. A reference
 copy of the course renames every year's marker aside
 (`plans-<year>.previous-<moment>.json`), as `releaseSite` does a section's,
 and nothing reads a name of that shape.
@@ -1916,7 +1960,13 @@ and nothing reads a name of that shape.
 `DELETE …/pages/projects/{name}`, measured on a project holding 2 deployments:
 200 with nothing deleted first. The address answered 530 or 522 within 5 s,
 stopped resolving after about 100 s, and never answered 200 again in 3
-minutes. A deleted project's `*.pages.dev` name could later be taken by
+minutes. So Stop Sharing says stopped only once the address, fetched every
+2 s for up to 30 s, no longer answers with the plans (200, 401, or anything
+carrying `X-Plantoir-Share`): a 404 from the delete proves nothing on its
+own, because the token or `--account` may now reach another account while the
+site in the first is still up (review M5). Still answering at 30 s:
+`words.stopUnconfirmed`, the marker kept as `stopping`, Stop Sharing still on
+the bar. A deleted project's `*.pages.dev` name could later be taken by
 another account, so an old link could one day show somebody else's site; the
 suffix makes that a matter of chance, not of guessing (not measured: it needs
 a second account).

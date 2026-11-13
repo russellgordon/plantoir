@@ -39,9 +39,12 @@ and a file written here is lost). Copy from it instead.
   colleagues from the Share bar at the foot of the course's Planning tab,
   as a small website of their own for the school year, open to anyone with
   the address or protected by a username and password. A share without a
-  password leaves out every answer key (a PDF named `… - Answers.pdf`,
-  `… - Solutions.pdf`, `… - with Answers.pdf` or `Marking Guide.pdf`) unless
-  the teacher ticks Include Answer Keys, so name answer keys that way. If
+  password leaves out every file whose name looks like an answer key (one
+  holding "answer", "solution", "marking guide" or "marking scheme", or the
+  word "key") unless the teacher ticks Include Answer Keys, so name answer
+  keys that way, as `… - Answers.pdf` or `… - Solutions.pdf`, and never put
+  answers inside a plan page or a PDF named something else: Plantoir reads
+  names, not files, and shows the teacher both lists before an open share. If
   the teacher asks you to share the plans, tell them where the Share bar is;
   never share or deploy them yourself.
 

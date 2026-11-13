@@ -1485,6 +1485,11 @@ else
     plans_expect "open: a missing path" 404 "${PLANS_URL}no-such-page"
     plans_expect "open: /_worker.js" 404 "${PLANS_URL}_worker.js"
     [ "$(plan_header "$PLANS_URL" x-robots-tag)" = "noindex, nofollow" ] && ok "open: X-Robots-Tag is sent" || no "open: no X-Robots-Tag"
+    # Each share's worker names itself on every answer, which is how the
+    # share's own proof tells its deployment from the one before (#709 M1).
+    PLANS_SHARE_OPEN=$(plan_header "$PLANS_URL" x-plantoir-share)
+    [ -n "$PLANS_SHARE_OPEN" ] && [ "$(plan_header "${PLANS_URL}no-such-page" x-plantoir-share)" = "$PLANS_SHARE_OPEN" ] \
+      && ok "open: every answer carries the share's own id" || no "open: an answer without the share's own id"
     [ "$(curl -s --max-time 20 "${PLANS_URL}robots.txt" | tr -d '\r')" = "$(printf 'User-agent: *\nDisallow: /')" ] \
       && ok "open: robots.txt is the two lines" || no "open: robots.txt is not the two lines"
     plans_api "$PLANS_NAME" | python3 -c 'import json,sys; c=json.load(sys.stdin)["result"]["deployment_configs"]; sys.exit(0 if c["production"]["fail_open"] is False and c["preview"]["fail_open"] is False else 1)' \
@@ -1505,6 +1510,9 @@ else
       plans_expect "protected: /$path without the password" 401 "${PLANS_URL}$path"
       plans_expect "protected: /$path with a wrong password" 401 "${PLANS_URL}$path" "$PLANS_USER:wrong-password"
     done
+    _protected_share=$(plan_header "$PLANS_URL" x-plantoir-share)
+    [ -n "$_protected_share" ] && [ "$_protected_share" != "$PLANS_SHARE_OPEN" ] \
+      && ok "protected: the 401 comes from the new share's deployment" || no "protected: the 401 does not carry the new share's id"
     plans_expect "protected: the list of plans with the password" 200 "$PLANS_URL" "$PLANS_USER:$PLANS_PASS"
     plans_expect "protected: the answer key, included" 200 "${PLANS_URL}unit/pdfs/Quiz%201%20-%20Solutions.pdf" "$PLANS_USER:$PLANS_PASS"
     plans_expect "protected: /_worker.js with the password" 404 "${PLANS_URL}_worker.js" "$PLANS_USER:$PLANS_PASS"
@@ -1538,6 +1546,12 @@ else
     # 6. Stop sharing.
     plans_share "$WORK/plans-stop.log" --stop-sharing && ok "Stop Sharing exited 0" || no "Stop Sharing failed"
     [ ! -e "$PLANS_MARKER" ] && ok "Stop Sharing removed the year's marker" || no "Stop Sharing left the year's marker"
+    # Stop Sharing says stopped only once the address stopped answering, so
+    # the very next fetch must not be the plans (#709 M5).
+    case "$(plan_status "$PLANS_URL")" in
+      200|401) no "Stop Sharing said stopped while the address still answered with the plans" ;;
+      *) ok "Stop Sharing said stopped only once the address had stopped answering" ;;
+    esac
     _stopped=false
     for _ in $(seq 1 15); do [ "$(plan_status "$PLANS_URL")" != "200" ] && { _stopped=true; break; }; sleep 2; done
     [ "$_stopped" = true ] && ok "the address stopped answering 200 within 30 s" || no "the address still answers 200 after Stop Sharing"

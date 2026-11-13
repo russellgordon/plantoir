@@ -14210,9 +14210,19 @@ this is the app's half.
   off; Share Unit Plans. **Once shared:** the address as a link and Copy Link;
   with a password or open; the flood sentence for a protected share, from the
   marker's `failClosed` (`PlanSharing.floodSentence`); when it was last
-  shared; how many answer keys an open share left out; Share Again, Change
+  shared; how many answer keys an open share left out; while the marker's
+  `oldCopies` is above 0, that an earlier copy may still open at its own
+  address; Share Again, Change
   Password or Remove Password (or Add a Password), and Stop Sharing. Earlier
   years still shared are one row each with their own Stop Sharing.
+- **Never safer than the site** (implementation review H1): a marker left in
+  state `sending` by a share that stopped part way reads as
+  `words.lastShareUnfinished` (the plans may be open), and one in state
+  `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
+  (`PlanSharing.barStatus`, `barCases`).
+- **Before an open share goes out** the console lists the PDFs it will share
+  and every file it leaves out, by name, and asks; the question arrives in the
+  share sheet as an ordinary question (`openShareLists`).
 - **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
   comes before a choice exactly when `PlanSharing.warns` says
   (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
