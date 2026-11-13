@@ -34,7 +34,7 @@ This page lists what a Drama website made with Plantoir can show. Each item name
 
 One code has ready-made pages: **ADA1O**, Drama, Grade 9.
 
-To get it, choose {{menu:newCourse}}, type ADA1O and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. It comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are published and dated across the semester, so the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
+To get it, choose {{menu:newCourse}}, type ADA1O and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. It comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are dated across the semester. All but the last are published, and the last is held back as an example of a page students do not see yet. So the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
 
 To read it without teaching from it, put it on the Reference Courses shelf. See [Bring in last year's courses](page:import-for-reference).
 
@@ -48,7 +48,7 @@ Any other Drama code offers a starting point for the subject instead. Its folder
 {{picture:subject-drama-1}}
 alt: The part named Tableau on the professional stage, on the page Tableau on the class website, with the interview's player and what to listen for.
 
-The interview is not copied into the course. It plays from YouTube when a student opens the page, so it needs an internet connection. The page tells students so, under the interview. A video does not print.
+The interview is not copied into the course. The player loads from YouTube when a student opens the page, and the interview plays when the student presses play. So it needs an internet connection. The page tells students so, under the interview.
 
 On the page, the interview is its address on a line of its own, in the form used for a picture:
 
@@ -71,7 +71,7 @@ alt: The question on the page Thought Tracking, on the class website, with its f
 ## Folders made for the subject
 
 - **Conventions** has eight pages: Tableau, Hot Seating, Thought Tracking, Mime, Choral Speaking, Corridor of Voices, Flashback and Flash-Forward, and Writing in Role.
-- **Warm-Ups** has eight: Zip Zap Zop, Mirrors, Status Walks, Soundscape, Machine, Group Counting, Yes Lets and What Are You Doing.
+- **Warm-Ups** has eight: Zip Zap Zop, Mirrors, Status Walks, Soundscape, Machine, Group Counting, Yes, Let's and What Are You Doing.
 - **Style** holds How This Site Is Organised, What This Site Can Do and Writing About Drama.
 - **Tasks** is the folder whose work counts for marks.
 

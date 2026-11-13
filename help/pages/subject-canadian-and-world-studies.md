@@ -54,7 +54,7 @@ Six codes have ready-made pages:
 
 To get one, choose {{menu:newCourse}}, type its code and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. Each comes with its folders, its shared pages, and class pages for every section. Five have 86 class pages in four units. CHV2O is a half credit, and has 42 class pages in three units.
 
-The class pages are published and dated across the semester, so the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes). CHV2O is made as the second half credit of a pair with Career Studies. Its first class is dated on the 43rd school day, the day after the last class of Career Studies.
+The class pages are dated across the semester. All but the last are published, and the last is held back as an example of a page students do not see yet. So the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes). CHV2O is made as the second half credit of a pair with Career Studies. Its first class is dated on the 43rd school day, the day after the last class of Career Studies.
 
 To read one without teaching from it, put it on the Reference Courses shelf. See [Bring in last year's courses](page:import-for-reference).
 
@@ -70,7 +70,7 @@ Two of the examples below are in CHC2D only: the film, and the question students
 {{picture:subject-canadian-and-world-studies-1}}
 alt: The part named A film to practise on, on the page Photographs on the class website, with the film's player and the questions under it.
 
-The film is not copied into the course. It plays from YouTube when a student opens the page, so it needs an internet connection. The page tells students so, under the film. A film does not print.
+The film is not copied into the course. The player loads from YouTube when a student opens the page, and the film plays when the student presses play. So it needs an internet connection. The page tells students so, under the film.
 
 On the page, the film is its address on a line of its own, in the form used for a picture:
 
@@ -84,7 +84,7 @@ On the page, the film is its address on a line of its own, in the form used for 
 alt: The question on the page Newspapers and Propaganda, on the class website, with its four choices and the Check button.
 
 - **A checklist students tick.** Every class page in all six has one, under the heading Things to do before our next class. See [Checklists students tick](page:task-boxes).
-- **Diagrams drawn from text.** CGC1W's page Reading a Topographic Map, in Mapping, has one. So do CIA4U's Circular Flow, in Models, and CHC2D's Who Gets to Tell the Story, in Discussions. See [Diagrams drawn from text](page:diagrams-from-text).
+- **Diagrams drawn from text.** CGC1W's page Reading a Topographic Map, in Mapping, has one. So do CIA4U's Circular Flow, in Models, and CHC2D's Who Gets to Tell the Story?, in Discussions. See [Diagrams drawn from text](page:diagrams-from-text).
 - **What a page can hold.** Each of the six has a page named What This Site Can Do, in its Style folder. It shows what a page can hold, with examples of its own.
 
 {{assistant}}

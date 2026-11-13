@@ -36,7 +36,7 @@ This page lists what a Dance website made with Plantoir can show. Each item name
 
 One code has ready-made pages: **ATC1O**, Dance, Grade 9.
 
-To get it, choose {{menu:newCourse}}, type ATC1O and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. It comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are published and dated across the semester, so the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
+To get it, choose {{menu:newCourse}}, type ATC1O and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. It comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are dated across the semester. All but the last are published, and the last is held back as an example of a page students do not see yet. So the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
 
 To read it without teaching from it, put it on the Reference Courses shelf. See [Bring in last year's courses](page:import-for-reference).
 
@@ -68,10 +68,9 @@ On the page, each film is its address on a line of its own, in the form used for
 alt: The page Four Forms on Film in Obsidian, with the line that holds a film's address marked.
 
 - **Students see a YouTube player** where each address is.
-- **A film is not copied into the course.** It plays from YouTube when a student opens the page, so the student needs an internet connection.
-- **A film does not print.**
+- **A film is not copied into the course.** The player loads from YouTube when a student opens the page, and the film plays when the student presses play. So the student needs an internet connection.
 - **The page tells students so.** It ends with a note named About these films. The note says that each film plays from YouTube, needs an internet connection and will not print. It adds that the four makers published their films under a Creative Commons Attribution licence.
-- **Watch each film through** before your class does.
+- **Watch each film through** before your class does. The films were chosen from what their YouTube pages say: the licence, the publisher, and that they can be shown in another page. They were not watched through when the course was written. The ballet class runs close to an hour.
 
 The class page for Unit 3, Day 3 links to Four Forms on Film in its agenda. So does the page Forms From Around the World, in Technique.
 

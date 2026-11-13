@@ -42,7 +42,7 @@ Four codes have ready-made pages:
 - **ENG3U**, English, Grade 11
 - **ENG4U**, English, Grade 12
 
-To get one, choose {{menu:newCourse}}, type its code and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. Each comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are published and dated across the semester, so the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
+To get one, choose {{menu:newCourse}}, type its code and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. Each comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are dated across the semester. All but the last are published, and the last is held back as an example of a page students do not see yet. So the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
 
 To read one without teaching from it, put it on the Reference Courses shelf. See [Bring in last year's courses](page:import-for-reference).
 

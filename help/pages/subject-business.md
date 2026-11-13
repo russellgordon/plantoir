@@ -36,7 +36,7 @@ This page lists what a Business website made with Plantoir can show. Each item n
 
 One code has ready-made pages: **BOH4M**, Business Leadership: Management Fundamentals, Grade 12.
 
-To get it, choose {{menu:newCourse}}, type BOH4M and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. It comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are published and dated across the semester, so the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
+To get it, choose {{menu:newCourse}}, type BOH4M and leave {{control:newCourseSheetPrePopulateWithExampleContent}} turned on. [Make a new course](page:new-course) has the steps. It comes with its folders, its shared pages, and 86 class pages in four units for every section. The class pages are dated across the semester. All but the last are published, and the last is held back as an example of a page students do not see yet. So the first deploy may ask about classes dated later. See [Classes dated after the next class, at Deploy](page:later-classes).
 
 To read it without teaching from it, put it on the Reference Courses shelf. See [Bring in last year's courses](page:import-for-reference).
 

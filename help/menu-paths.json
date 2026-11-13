@@ -216,10 +216,6 @@
    "mac": "Course \u25b8 Revise With \u25b8 GitHub Copilot\u2026",
    "windows": null
   },
-  "courseReviseWithGitHubCopilot": {
-   "mac": "Course \u25b8 Revise With \u25b8 GitHub Copilot\u2026",
-   "windows": null
-  },
   "sectionReviseWithClaude": {
    "mac": "Section \u25b8 Revise With \u25b8 Claude\u2026",
    "windows": null
@@ -228,7 +224,7 @@
    "mac": "Section \u25b8 Revise With \u25b8 Codex\u2026",
    "windows": null
   },
-  "sectionReviseWithGitHubCopilot": {
+  "sectionReviseWithCopilot": {
    "mac": "Section \u25b8 Revise With \u25b8 GitHub Copilot\u2026",
    "windows": null
   }
