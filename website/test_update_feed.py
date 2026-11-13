@@ -153,6 +153,25 @@ class MacUpdateWindowNotesTests(unittest.TestCase):
                     self.assertEqual(kept, [expected])
 
 
+def images_attached_under(folder: Path) -> list:
+    """(image path, whole-disk device) for every image file under ``folder``
+    that the Mac still has attached (#872). Read from ``hdiutil info``
+    directly, so it does not lean on the code under test."""
+    result = subprocess.run(["hdiutil", "info", "-plist"], capture_output=True, check=True)
+    root = str(Path(folder).resolve()) + "/"
+    found: list = []
+    for entry in plistlib.loads(result.stdout).get("images", []):
+        path = str(Path(entry.get("image-path", "")).resolve())
+        if not path.startswith(root):
+            continue
+        devices: list = []
+        for entity in entry.get("system-entities", []):
+            devices.append(entity.get("dev-entry", ""))
+        devices.sort(key=len)
+        found.append((path, devices[0] if devices else ""))
+    return found
+
+
 class UpdateFeedTests(unittest.TestCase):
 
     @classmethod
@@ -174,12 +193,65 @@ class UpdateFeedTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        # #872: nothing this run attached may outlive it, a failed test
+        # included. An image left attached makes every later attach of the
+        # same file fail with "Resource busy", and stays on the Mac.
+        for path, device in images_attached_under(cls.folder):
+            print(f"Detaching {Path(path).name}, left attached by this run ({device}).", file=sys.stderr)
+            subprocess.run(["hdiutil", "detach", device, "-force"], capture_output=True)
         shutil.rmtree(cls.folder, ignore_errors=True)
         if not cls.cache_existed:
             shutil.rmtree(cls.cache, ignore_errors=True)
 
     def setUp(self) -> None:
         self.updates = Path(tempfile.mkdtemp(prefix="updates-", dir=self.folder))
+
+    def test_a_volume_held_open_is_still_detached(self) -> None:
+        # #872, the must-fail: something else reading the mounted volume (a
+        # file held open in it, as another process can) makes a plain
+        # detach fail with "Resource busy". Before #872 that failure was
+        # ignored and the image stayed attached.
+        held: list = []
+        real_load = update_feed.plistlib.load
+
+        def load_and_hold(handle, *arguments, **keywords):
+            # plistlib is one module for everybody, so only the app's own
+            # Info.plist, read from the mounted volume, is held open.
+            name = getattr(handle, "name", "")
+            if isinstance(name, str) and name.endswith("Info.plist"):
+                held.append(open(name, "rb"))
+            return real_load(handle, *arguments, **keywords)
+
+        update_feed.plistlib.load = load_and_hold
+        try:
+            version, build_number = update_feed.read_dmg_version(self.dmg_three)
+        finally:
+            update_feed.plistlib.load = real_load
+            for handle in held:
+                handle.close()
+        self.assertEqual((version, build_number), ("1.3.4", "3200"))
+        attached: list = []
+        for path, device in images_attached_under(self.folder):
+            attached.append(Path(path).name)
+        self.assertEqual(attached, [], "the image stayed attached")
+
+    def test_an_image_left_attached_is_let_go_of_before_attaching_it(self) -> None:
+        # #872: a run that stopped half way can leave an image attached, and
+        # hdiutil refuses a second attach of it ("Resource busy").
+        mount = Path(tempfile.mkdtemp(prefix="left-", dir=self.folder))
+        subprocess.run(["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", str(mount),
+                        str(self.dmg_four)], check=True, capture_output=True)
+        self.assertEqual(update_feed.read_dmg_version(self.dmg_four), ("1.3.5", "3250"))
+        self.assertEqual(images_attached_under(self.folder), [])
+
+    def test_a_failed_attach_says_what_hdiutil_said(self) -> None:
+        # #872: the reason used to be thrown away (capture_output, check=True).
+        not_an_image = self.updates / "Plantoir-0.dmg"
+        not_an_image.write_bytes(b"not a disk image")
+        with self.assertRaises(update_feed.Refusal) as caught:
+            update_feed.read_dmg_version(not_an_image)
+        self.assertIn("hdiutil could not attach Plantoir-0.dmg: ", str(caught.exception))
+        self.assertNotIn("nothing printed", str(caught.exception))
 
     def earlier(self, item: dict, folder: Path) -> Path:
         """An earlier release's DMG, handed over rather than downloaded."""
