@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// A detail view's tabs as one segmented control in a thin bar above its
-/// content (#717): Website | Problems on a section, and — #708, later —
-/// Settings | Unit plan on a course. Built once so the second use adds a
-/// tab rather than a second shell.
+/// content (#717): Website | Problems on a section, and Settings | Planning
+/// on a course (#708, `CourseDetailView`, while Claude Code or Codex is
+/// installed). Built once so the second use added a tab rather than a
+/// second shell.
 ///
 /// **Not a `TabView`.** A section's site is a live `WKWebView` scrolled to
 /// where the teacher left it, and moving it between containers is how that

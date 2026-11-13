@@ -1075,6 +1075,26 @@
           "mac",
           "windows"
         ]
+      },
+      {
+        "event": "asked an assistant to plan a unit",
+        "carries": "the course and which assistant (Claude or Codex) - nothing the teacher typed, and nothing from a plan: its title and contents are the teacher's own",
+        "line": "{course} · asked {assistant} to plan a unit from the Planning tab",
+        "why": "#708: Plan a Unit with Claude… / Plan a Unit with Codex… on a course's empty Planning tab (unitPlanning.tab, app-rules.json -> outsideAgents.planAUnit). The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, as 'asked an assistant to fix problems' argued. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for looking at a plan, choosing a unit, Back, Forward or Reload: none of them changes anything."
+      },
+      {
+        "event": "looked at a course's unit plans",
+        "carries": "the course and how many unit plans the Planning tab offered, or that it offered only the list of plans, or that it had nothing to show; as further lines, that it could not show a plan at all, or could not bring a plan's look (its assets) up to date and how many files failed - never a plan's title or anything in it",
+        "line": "{course} · opened the Planning tab: {what}",
+        "what": {
+          "one": "1 unit plan to choose from",
+          "several": "{n} unit plans to choose from",
+          "listOnly": "only the list of plans",
+          "none": "nothing to show yet, offered to plan a unit"
+        },
+        "couldNotShowLine": "{course} · the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet on this Mac",
+        "couldNotRefreshTheLookLine": "{course} · the Planning tab could not bring the plan's look up to date: {n} file(s) could not be copied",
+        "why": "#708, the 708 implementation review M1: the brief's ruling asked for a line when the Planning tab is opened, and the tab's two failures (no page can be shown; the assets mirror failed) reached only the system log, so a report of 'the Planning tab is blank' found nothing. Once per appearance of the tab (not on every return to the window), and the mirror's failure once per appearance. No title: a plan's title is the teacher's own words (rule 5), and the count is what a report needs."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -9914,11 +9934,113 @@
       ]
     },
     "aBuildWithNoLinkIsNotAdopted": {
-      "rule": "A per-course builds folder found with no link pointing at it is CLEARED, never reused.",
+      "rule": "A per-course builds folder found with no link pointing at it is CLEARED, never reused. Its kept copies of geogebra.org sketches are the one thing the clear leaves: keptCopiesSurviveTheClear.",
       "why": "Archiving a course, restoring one from a backup, and replacing a course's contents all remove the link along with everything else in the course folder — and each of them leaves content whose timestamps may be OLDER than the built site standing outside. Adopting that build would let a restored course publish last month's pages while every freshness check said it was up to date, which is the silent wrong answer this codebase refuses. Archiving a course or a section discards its build outright as well, so the clearing is a safety net rather than the only line of defence.",
       "aSecondMacClearsRatherThanAdopts": "A link left by a SECOND MAC sharing the folder clears this machine's build too, rather than adopting it. ADOPTING was proposed by one adversarial review and rejected by the next, and the reasoning is the point. Adopting looks strictly better: a teacher switching between two Macs would keep each machine's build instead of rebuilding after every switch. But the second Mac cannot tell 'the folder came back unchanged' from 'the folder was archived and restored while I was shut' — and in the second case the pages it would adopt a build for are OLDER than that build, so the freshness check says up to date and the teacher publishes what they undid. Clearing costs one rebuild, which is cheap and visible; adopting risks a wrong site nobody is told about. A generation stamp carried in the course folder (a UUID written beside the link and copied into the build, adopted only when the two match) would buy both, and was judged not worth a new synced file inside a teacher's vault for a case this rare. If two-Mac working ever becomes common, that is the design to build.",
       "renameIsTheException": "Renaming a course CARRIES its build across to the new code and re-points the link, because the built site used to travel with the folder and a rename should not silently cost a teacher their website.",
       "restoringOneSection": "Putting ONE section's pages back — from a backup, or by the assistant undoing what it just did — discards that section's built website too. The link is at COURSE level and survives, so the clearing rule above does not reach it. This staleness is OLDER than the move: it was equally true when .merged_output sat inside the course folder, because a section restore replaces section<N> and never touched the built tree beside it. Found and fixed on 2026-09-05 while moving the output; recorded as pre-existing so the fix is not read as repairing damage this piece did."
+    },
+    "keptCopiesSurviveTheClear": {
+      "rule": "Every clear of a course's builds folder keeps `folder`, the copies of geogebra.org sketches kept beside the course's built sites (geogebraFences.cache): a course never linked, a link pointing anywhere else, a missing link, and a file where the link belongs all clear the built sites and leave the kept copies where they are. Moving a real .merged_output out of the working folder carries the copies already beside the built sites INTO the site being moved before anything is cleared; where both hold a copy under the same key the moved site's copy wins, because it is the one the course's builds have been using, and the copies only the builds folder holds are added to it. The built sites themselves are still cleared, exactly as aBuildWithNoLinkIsNotAdopted says. Only a REAL folder is kept: a `folder` that is a file, a link or a link to itself is cleared with the rest, so the course can keep copies again, and removing a link never touches what it points at. Copies are carried only out of a REAL builds folder, so a builds folder that is a link gives up nothing of the folder it points at. Every entry of the folder is carried, a name starting with a dot included, by both implementations. Restoring a whole course from a backup in the app keeps them too. Implemented in the launchers' BUILD OUTPUT BLOCK (KEPT_COPIES_FOLDER) and in the app (BuildOutputLocation.keptCopiesFolderName); the cases below are run by scripts/test_build_output_link.sh against the real block and by BuildOutputLocationTests against the app, which skips the cases that carry a `fault` (shell only: they shadow a command).",
+      "folder": ".geogebra-cache",
+      "why": "A kept copy is the one thing under the builds folder that is NOT derived from the teacher's notes: it was fetched from geogebra.org, so a cleared copy comes back only while the Mac is online, and a sketch with no copy and no connection is a folder problem (geogebraFences.cache). It is also the one thing the clear has no reason to remove. The clear exists because a build with no link may be OLDER than the pages it would publish; a kept copy is named by the key of the fence that asked for it (figureRules.keyOf), so it is right for any page that still carries that fence, whatever happened to the course folder in between. Measured 2026-11-12 with the launcher's own block against a scratch folder before the change: a course never linked, a link naming another Mac's folder, and a missing link each lost a planted copy; the course already linked kept it. A brand-new working copy is the first case, which is why verify.sh's GeoGebra check failed on its first run in a fresh clone and passed on the second.",
+      "howTheyAreKept": "In place. The clear removes every entry of the builds folder except `folder`, so no step puts the copies anywhere else and a run stopped halfway leaves fewer built files, never fewer copies. The move out of the working folder moves the copies into the site being moved, so the move, and the put-back when the link cannot be made, carry them; when a copy cannot be moved nothing is cleared and the built website stays where it is, with every copy still in one of the two folders.",
+      "whenTheyCannotBeKept": "Nothing new is said to a teacher, because no branch loses a copy: the one failure that could, a copy that cannot be moved during the move out of the working folder, leaves everything where it was and prints the move's existing line that the built website was left where it is.",
+      "onlyThisFolder": "The other caches beside the built sites, .figure-cache (diagrams and graphs) and .swift-cache (Swift blocks), are still cleared. Both are made again on this computer with no network: the figures from the engines the website builder carries, and the Swift blocks by the Swift toolchain, a first download of about 1.3 GB on the mac and 2.3 GB on Windows (codeRunnerBlocks.swift.downloadGigabytes) kept in its own image on the mac and under %LOCALAPPDATA% on Windows, which no clear here touches. So a clear costs time and nothing else: every diagram is drawn again, and every Swift block on the course's pages is compiled again on the next build. Keeping them was left out to keep this to the copies that cannot be made again offline.",
+      "noSweepHere": "A copy whose fence has gone is harmless and stays until geogebraFences.cache's own rule removes it: an entry unused for pruneDays is removed by the build that next reads the folder. Moving a copy keeps its modification time, so surviving a clear does not reset that clock. No sweep was added here.",
+      "rejected": [
+        "Setting the copies aside in another folder, clearing, and putting them back. A run stopped between the two steps would leave the copies in a folder no reader looks in, and the app's sweep of the builds folder removes every entry that is not a course code it has, so the copies set aside would be thrown away by the next folder-open. Keeping them in place leaves no such state.",
+        "Moving the kept copies into the course folder, hidden, so they would travel with the course to a second Mac and into backups (Russell's first ruling on #789, replaced the same day). A build that fetches a sketch would then write into the course folder, which the check of whether anything in the course changed since the last build could read as a change, and it would add files to whatever syncs or backs up the course. A second Mac, or a synced copy opened elsewhere, fetches the sketches again the first time it builds online, as before.",
+        "Adopting the whole build when the link is missing. Rejected long before this piece, for the reason aBuildWithNoLinkIsNotAdopted gives; keeping the copies is safe where adopting the site is not, because a copy is keyed by the fence and a site is not keyed by anything."
+      ],
+      "cases": [
+        {
+          "name": "a course never linked, with copies already kept for it",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": false, "keptCopies": ["a", "b"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites", "b": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a link that went missing (a restored or synced course), over a built site and its copies",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", "b"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites", "b": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a link naming another Mac's builds folder",
+          "courseFolder": "a link to another Mac's builds folder",
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a file where the link belongs",
+          "courseFolder": "a file where the link belongs",
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a built site moved out of the working folder, both holding copies",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b", "c"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", "b"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", "b": "in the course folder", "c": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a built site with no copies of its own moved out of the working folder",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": [],
+          "buildsFolder": {"builtSite": false, "keptCopies": ["a"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a move whose link cannot be made is put back, copies and all",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", "b"]},
+          "fault": "the link cannot be made",
+          "expect": {"link": "a real folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", "b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a move where a kept copy cannot be carried leaves everything where it was",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a"]},
+          "fault": "a kept copy cannot be moved",
+          "expect": {"link": "a real folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", "b": "in the course folder"}, "readByTheNextBuild": false, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a copy whose name starts with a dot is carried with the rest in the move",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", ".dot"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", ".dot": "beside the built sites", "b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a kept-copies folder that is a file is cleared with the rest",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": true, "keptCopies": [], "keptCopiesFolderIs": "a file"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "nothingRemainsInTheBuildsFolder": true}
+        },
+        {
+          "name": "a kept-copies folder that is a link to a folder outside is cleared, and the folder outside is not touched",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": true, "keptCopies": [], "keptCopiesFolderIs": "a link to a folder outside"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "nothingRemainsInTheBuildsFolder": true, "theFolderOutsideIsUntouched": true}
+        },
+        {
+          "name": "a kept-copies folder that is a link to itself is cleared",
+          "courseFolder": "a link to another Mac's builds folder",
+          "buildsFolder": {"builtSite": true, "keptCopies": [], "keptCopiesFolderIs": "a link to itself"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "nothingRemainsInTheBuildsFolder": true}
+        },
+        {
+          "name": "a builds folder that is a link: the move takes no copy out of what it points at",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": false, "keptCopies": [], "is": "a link to a folder outside"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "theFolderOutsideIsUntouched": true}
+        }
+      ]
     },
     "aSecondSpellingIsClearedAway": {
       "rule": "A launcher handed a spelling of its folder that is not the disk's own clears away the second copy that spelling made before GitHub #189: the workspace teaching-quartz-{id of the spelling handed} if it is STOPPED (plain docker rm, never -f), and builds/{that id} if its working-folder.txt names THIS folder (an EMPTY note names no folder) and no workspace, running or stopped, still mounts it. A RUNNING one is left exactly as it is and named on the console. Nothing is removed when Docker cannot be asked, and the teacher's courses are never touched. It lives in the PREVIEW PORT BLOCK the three launchers share (clear_away_this_folders_other_spelling), called once by each just before it looks at its own workspace.",
@@ -32751,7 +32873,7 @@
     "knownLimits": "The alert's count is changed.new against the previous BUILD; a deploy of an old build that is newly refused re-counts that build's own new rows beside the refusal. A section built by a copy of Plantoir from before #717 has no record until it is built again, and shows no marker meanwhile. A deploy that does not rebuild (a public/ that was already deploy-fresh) leaves the record as the build that made it wrote it. A self-check question is identified by its place (`n`), not its content (kindsRule): inserting a question above a broken one reads as one new problem and one gone, and raises the alert. A row the site adds after the build's alert was answered raises nothing (alert.rule)."
   },
   "unitPlanning": {
-    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan. It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and nothing else in this release. A later piece adds the course's Planning tab (#708) and sharing (#709) as sub-keys of this one.",
+    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan's pages; it keeps assets/ the app's own (tab.assetsMirror). It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and to know which plans the course page's Planning tab offers (tab, #708). Sharing (#709) is a later sub-key of this one.",
     "folder": "courses/<CODE>/.internal/planning",
     "siteLayout": {
       "index.html": "the course's list of plans, one card per unit (from the template's index.html)",
@@ -32944,7 +33066,7 @@
     },
     "appendOnly": "A rule in either stylesheet is never removed or renamed by a later release; changes are added at the end. Each sheet is the example page's own <style> block byte for byte (scripts/fixtures/unit_plan/), after Plantoir's comment and its @font-face rules, with ONE edit: a --ok colour token in :root and both dark blocks, and the reviewed mark's fixed green replaced by var(--ok) (Russell's ruling 2, 2026-11-01: the one change to the exact look). scripts/test_unit_plan_template.py proves the sheet equals its fixture once those are taken out, that the colour tokens and dark blocks are the same in both sheets, and that every class every shipped release defined still has a rule (scripts/fixtures/unit_plan/classes-shipped.json).",
     "agentGuidance": {
-      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. It says nothing about a Planning tab or about sharing: those sentences arrive with #708 and #709 (Russell, 2026-11-12). The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
+      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); it says nothing about sharing until #709. The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
       "skill": "plantoir-unit-planning",
       "template": [
         "template/index.html",
@@ -33112,7 +33234,669 @@
       "the plan in the course's visible folders: everything there that is not a page is copied to the students' site",
       "a plan the app renders from JSON, or a Quartz site: Russell asked for the example's exact format, which a plain static site reproduces and a Quartz site does not",
       "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
-    ]
+    ],
+    "tab": {
+      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward and Reload, and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Sharing a plan is not part of this tab yet (#709).",
+      "tabCases": {
+        "rule": "claude and codex say which assistant is installed (OutsideAssistantPresence on the mac); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
+        "cases": [
+          {
+            "name": "neither assistant, no plans",
+            "claude": false,
+            "codex": false,
+            "referenceCourse": false,
+            "plans": false,
+            "expect": "absent"
+          },
+          {
+            "name": "neither assistant, with plans",
+            "claude": false,
+            "codex": false,
+            "referenceCourse": false,
+            "plans": true,
+            "expect": "absent"
+          },
+          {
+            "name": "Claude only, no plans",
+            "claude": true,
+            "codex": false,
+            "referenceCourse": false,
+            "plans": false,
+            "expect": "shown"
+          },
+          {
+            "name": "Codex only, with plans",
+            "claude": false,
+            "codex": true,
+            "referenceCourse": false,
+            "plans": true,
+            "expect": "shown"
+          },
+          {
+            "name": "both",
+            "claude": true,
+            "codex": true,
+            "referenceCourse": false,
+            "plans": true,
+            "expect": "shown"
+          },
+          {
+            "name": "a course kept for reference, both installed",
+            "claude": true,
+            "codex": true,
+            "referenceCourse": true,
+            "plans": true,
+            "expect": "absent"
+          }
+        ]
+      },
+      "choiceCases": {
+        "rule": "Each case is a course folder read on the day `today`. planningFolder says whether courses/<course>/.internal/planning exists; coursePage whether it holds index.html; each of plans is a unit folder holding plan.json with exactly `file` as its text (unitPlanning.planFile), and index.html when page is true. expect.choices is the unit popup's entries in order: allPlans (the planning folder's own index.html, shown as words.allPlans) when there is a course page, then unit:<folder> for each plan read whose folder has an index.html, in UnitPlans.read's order (dated plans by firstClass, then the undated, a tie by folder name). A plan without a page is not offered, and an unreadable plan.json is left out as planFile says. An empty list is the empty tab. Accepted: the Revise greeting names every plan with a readable plan.json (greetingUnitPlans), so while an assistant is still building, or after a unit's page was deleted, the greeting can name plans that the tab does not yet offer, and the tab shows the empty offer (708 implementation review L3). The plan.json is written with the page, so the gap is short, and naming them only once a page exists would need the greeting to look for pages too. expect.startsOn is the entry the popup starts on: the offered plans in outsideAgents.greetingUnitPlans.order (covering today first, then upcoming soonest first, then past most recent first, then undated; the greeting's own order, one function on each platform, not a second ordering), and the first of them when it has a date; otherwise allPlans when offered, otherwise the first entry; null when there are none. A plan with one of its two dates is read as that one day. Each entry is labelled as greetingUnitPlans.nameForm names a plan, cut at unitNameMaxCharacters.",
+        "cases": [
+          {
+            "name": "today inside one plan: that plan",
+            "today": "2027-02-17",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "between two plans: the next to start",
+            "today": "2027-02-13",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "after every plan: the last to end",
+            "today": "2027-04-01",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-3"
+            }
+          },
+          {
+            "name": "before every plan: the first to start",
+            "today": "2027-01-04",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-1"
+            }
+          },
+          {
+            "name": "two plans covering today: the earlier first class",
+            "today": "2027-02-15",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-b",
+                "file": "{\"unit\": \"Unit B\", \"title\": \"Waves\", \"firstClass\": \"2027-02-10\", \"lastClass\": \"2027-02-28\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-a",
+                "file": "{\"unit\": \"Unit A\", \"title\": \"Light\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-20\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-a",
+                "unit:unit-b"
+              ],
+              "startsOn": "unit:unit-a"
+            }
+          },
+          {
+            "name": "no plan has a date: All Plans",
+            "today": "2027-02-15",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Waves\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Light\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2"
+              ],
+              "startsOn": "allPlans"
+            }
+          },
+          {
+            "name": "no plan has a date and there is no course page: the first plan",
+            "today": "2027-02-15",
+            "planningFolder": true,
+            "coursePage": false,
+            "plans": [
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Waves\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Light\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "unit:unit-1",
+                "unit:unit-2"
+              ],
+              "startsOn": "unit:unit-1"
+            }
+          },
+          {
+            "name": "a dated plan that has ended comes before an undated one",
+            "today": "2027-06-01",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Light\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-2",
+                "unit:unit-1"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "a plan with a date that is not a real day is left out beside a good one",
+            "today": "2027-02-17",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-30\", \"lastClass\": \"2027-03-05\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-2"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "a plan with only its first class is read as that one day",
+            "today": "2027-02-01",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2"
+              ],
+              "startsOn": "unit:unit-1"
+            }
+          },
+          {
+            "name": "a plan whose folder has no page is not offered",
+            "today": "2027-02-03",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": false
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-2"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "only the course page",
+            "today": "2027-02-17",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [],
+            "expect": {
+              "choices": [
+                "allPlans"
+              ],
+              "startsOn": "allPlans"
+            }
+          },
+          {
+            "name": "a planning folder with nothing to show: the empty tab",
+            "today": "2027-02-17",
+            "planningFolder": true,
+            "coursePage": false,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": false
+              }
+            ],
+            "expect": {
+              "choices": [],
+              "startsOn": null
+            }
+          },
+          {
+            "name": "no planning folder: the empty tab",
+            "today": "2027-02-17",
+            "planningFolder": false,
+            "coursePage": false,
+            "plans": [],
+            "expect": {
+              "choices": [],
+              "startsOn": null
+            }
+          }
+        ]
+      },
+      "navigationCases": {
+        "rule": "Each case is a link on `page` (a path inside the planning folder) to `href`, resolved against that page as a browser resolves it. newWindow is a link asking for a new window (target=\"_blank\"); click is whether the teacher clicked it (a page sending itself somewhere, a frame's address, a meta refresh, is not a click). links makes each key, a path inside the planning folder, a link (a symbolic link or shortcut) pointing at its value, read from the link's own folder. expect: load (let it go where it was going), loadHere (load it in this view instead of a new window, so Back returns: an app's web view opens no windows, measured for the section preview in PreviewBrowserHandoff), openOutside (hand it to the default browser or mail app), refuse (cancel, silently). The order: http, https and mailto are openOutside on a click and refuse otherwise; any other scheme but file is refused; a file address is load (loadHere for a new window) only when it is inside the planning folder after .. is taken out and every link on the way is followed, compared folder by folder (so planning-old is not inside planning); otherwise refuse. Applied to every frame's navigations, not only the page's.",
+        "cases": [
+          {
+            "name": "a place on the same page",
+            "page": "unit/index.html",
+            "href": "#l3",
+            "newWindow": false,
+            "click": true,
+            "expect": "load"
+          },
+          {
+            "name": "the unit's correlation page",
+            "page": "unit/index.html",
+            "href": "correlation.html",
+            "newWindow": false,
+            "click": true,
+            "expect": "load"
+          },
+          {
+            "name": "the course's list of plans",
+            "page": "unit/index.html",
+            "href": "../index.html",
+            "newWindow": false,
+            "click": true,
+            "expect": "load"
+          },
+          {
+            "name": "another unit's plan",
+            "page": "unit/index.html",
+            "href": "../unit-2/index.html#l1",
+            "newWindow": false,
+            "click": true,
+            "expect": "load"
+          },
+          {
+            "name": "a day's PDF, its name with spaces and a comma, in a new window",
+            "page": "unit/index.html",
+            "href": "pdfs/Warm-up%20-%20Signs%20of%20Change,%20Answers.pdf",
+            "newWindow": true,
+            "click": true,
+            "expect": "loadHere"
+          },
+          {
+            "name": "a day's PDF in the same window",
+            "page": "unit/index.html",
+            "href": "pdfs/Warm-up%20-%20Signs%20of%20Change.pdf",
+            "newWindow": false,
+            "click": true,
+            "expect": "load"
+          },
+          {
+            "name": "the plan's stylesheet",
+            "page": "unit/index.html",
+            "href": "../assets/plan.css",
+            "newWindow": false,
+            "click": true,
+            "expect": "load"
+          },
+          {
+            "name": "a page loading itself without a click",
+            "page": "unit/index.html",
+            "href": "index.html",
+            "newWindow": false,
+            "click": false,
+            "expect": "load"
+          },
+          {
+            "name": "a web address, clicked",
+            "page": "unit/index.html",
+            "href": "https://example.org/rubric",
+            "newWindow": false,
+            "click": true,
+            "expect": "openOutside"
+          },
+          {
+            "name": "a web address, clicked, asking for a new window",
+            "page": "unit/index.html",
+            "href": "https://example.org/rubric",
+            "newWindow": true,
+            "click": true,
+            "expect": "openOutside"
+          },
+          {
+            "name": "a plain web address, clicked",
+            "page": "unit/index.html",
+            "href": "http://example.org/",
+            "newWindow": false,
+            "click": true,
+            "expect": "openOutside"
+          },
+          {
+            "name": "an email address, clicked",
+            "page": "unit/index.html",
+            "href": "mailto:colleague@example.org",
+            "newWindow": false,
+            "click": true,
+            "expect": "openOutside"
+          },
+          {
+            "name": "a web address the page goes to by itself, with no click",
+            "page": "unit/index.html",
+            "href": "https://example.org/",
+            "newWindow": false,
+            "click": false,
+            "expect": "refuse"
+          },
+          {
+            "name": "a web address a frame asks for",
+            "page": "unit/index.html",
+            "href": "https://example.org/frame",
+            "newWindow": false,
+            "click": false,
+            "expect": "refuse"
+          },
+          {
+            "name": "a file elsewhere on the Mac",
+            "page": "unit/index.html",
+            "href": "file:///etc/hosts",
+            "newWindow": false,
+            "click": true,
+            "expect": "refuse"
+          },
+          {
+            "name": "the course's settings, three folders up from the unit's page",
+            "page": "unit/index.html",
+            "href": "../../../course_config.json",
+            "newWindow": false,
+            "click": true,
+            "expect": "refuse"
+          },
+          {
+            "name": "the course's settings in a new window",
+            "page": "unit/index.html",
+            "href": "../../../course_config.json",
+            "newWindow": true,
+            "click": true,
+            "expect": "refuse"
+          },
+          {
+            "name": "a folder beside the planning folder whose name starts the same",
+            "page": "unit/index.html",
+            "href": "../../planning-old/index.html",
+            "newWindow": false,
+            "click": true,
+            "expect": "refuse"
+          },
+          {
+            "name": "a shortcut inside the planning folder that leads out of it",
+            "page": "unit/index.html",
+            "href": "shortcut/course_config.json",
+            "newWindow": false,
+            "click": true,
+            "links": {
+              "unit/shortcut": "../../.."
+            },
+            "expect": "refuse"
+          },
+          {
+            "name": "a shortcut inside the planning folder that stays in it",
+            "page": "unit/index.html",
+            "href": "shared/plan.css",
+            "newWindow": false,
+            "click": true,
+            "links": {
+              "unit/shared": "../assets"
+            },
+            "expect": "load"
+          },
+          {
+            "name": "a script address",
+            "page": "unit/index.html",
+            "href": "javascript:alert(1)",
+            "newWindow": false,
+            "click": true,
+            "expect": "refuse"
+          },
+          {
+            "name": "a data address",
+            "page": "unit/index.html",
+            "href": "data:text/html,hello",
+            "newWindow": false,
+            "click": true,
+            "expect": "refuse"
+          },
+          {
+            "name": "another scheme",
+            "page": "unit/index.html",
+            "href": "ftp://example.org/file.pdf",
+            "newWindow": false,
+            "click": true,
+            "expect": "refuse"
+          }
+        ]
+      },
+      "words": {
+        "tabSettings": "Settings",
+        "tabPlanning": "Planning",
+        "allPlans": "All Plans",
+        "unitPopup": "Unit",
+        "back": "Back",
+        "forward": "Forward",
+        "reload": "Reload",
+        "emptyTitle": "No Unit Plans Yet",
+        "emptyDescription": "Plan a unit with an assistant: a calendar across your sections, lesson cards, each day's materials, assessment drafts and a curriculum correlation. Once it is built, the plan shows here.",
+        "revertOnPlanning": "Revert works on the Settings tab, where the changes are shown.",
+        "cannotShowTitle": "Unit Plans Can’t Be Shown",
+        "cannotShowDescription": "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough."
+      },
+      "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. Nothing here says sharing: #709 adds it.",
+      "saveOnPlanning": {
+        "rule": "Course > Save on the Planning tab is the settings form's own Save, offered whenever the course has unsaved changes (held back or not), and never silent (708 fix review 2, L3). After it runs: saved with nothing more to say, the Planning tab shows the form's own confirmation (the mac's 'Saved ✓') for as long as the form would; refused (a held-back Save, with the form's reason), failed (a write error), or saved with a notice to read (a preview or deploy of the course running, another window's change replaced), the page goes to the Settings tab, where the form shows its own sentence beside the field. Revert is dimmed on Planning with words.revertOnPlanning under it, which VoiceOver reads with the menu.",
+        "cases": [
+          {"name": "saved, nothing more to say", "problem": false, "notice": false, "expect": "staysOnPlanning"},
+          {"name": "refused or failed: the form's reason", "problem": true, "notice": false, "expect": "showsSettings"},
+          {"name": "saved, with a notice to read", "problem": false, "notice": true, "expect": "showsSettings"},
+          {"name": "both", "problem": true, "notice": true, "expect": "showsSettings"}
+        ]
+      },
+      "followsThePage": {
+        "rule": "The popup follows the page the plan is showing, so a link from one unit's plan to another's leaves the popup naming the unit on screen (708 implementation review L4): `page` is a path inside the planning folder; the planning folder's own index.html is allPlans when offered; a page anywhere in a unit's folder is unit:<folder> when that unit is offered; anything else (a unit not offered, a file at the top that is not index.html) is null, and the popup keeps what it showed. Choosing an entry always loads its page, even the one the popup already names.",
+        "cases": [
+          {"name": "the list of plans", "page": "index.html", "choices": ["allPlans", "unit:unit-1"], "expect": "allPlans"},
+          {"name": "the list of plans when it is not offered", "page": "index.html", "choices": ["unit:unit-1"], "expect": null},
+          {"name": "a unit's plan page", "page": "unit-1/index.html", "choices": ["allPlans", "unit:unit-1", "unit:unit-2"], "expect": "unit:unit-1"},
+          {"name": "a unit's correlation page", "page": "unit-2/correlation.html", "choices": ["allPlans", "unit:unit-1", "unit:unit-2"], "expect": "unit:unit-2"},
+          {"name": "a PDF in a unit's folder", "page": "unit-2/pdfs/Day 1 - Warm-up.pdf", "choices": ["allPlans", "unit:unit-2"], "expect": "unit:unit-2"},
+          {"name": "a unit the popup does not offer", "page": "unit-3/index.html", "choices": ["allPlans", "unit:unit-1"], "expect": null},
+          {"name": "a file at the top that is not the list", "page": "robots.txt", "choices": ["allPlans", "unit:unit-1"], "expect": null}
+        ]
+      },
+      "whenItLooksAgain": "When the tab appears, when the window becomes key (the teacher comes back from the terminal where the assistant was building), when a unit is chosen, and on Reload: each time it reads the planning folder again and shows the chosen unit, reloaded from the disk. No file watcher and no timer.",
+      "assetsMirror": {
+        "rule": "Each time the tab looks again, before the page loads, <planning folder>/assets is made the same as the template's assets in the app's own copy of support/agent_guidance (skills/plantoir-unit-planning/template/assets): changed files copied, missing ones added, extra ones removed. Only when the planning folder already exists: opening the tab never makes one. Never when the planning folder, or its assets, is a symbolic link: the mirror removes extra files, and through a link it would remove them from a folder that is not the plan's (708 implementation review L2, measured). A failure is logged, written on the trail (trail) and changes nothing on screen.",
+        "why": "assets/ belongs to Plantoir (assetsAreThePlantoirs). Mirroring it when the tab opens means the preview shows the look this release ships, whatever release the assistant copied it from, and sharing (#709) refreshes the same folder from the same bytes, so what the teacher looked at is what is shared (707 plan review M4)."
+      },
+      "whatAPageMayRead": {
+        "rule": "A plan is written by an outside assistant, so its pages are content the app did not write. The tab shows LOCAL files only. Three guards: (1) the page process may read the planning folder alone, never the course (the mac's loadFileURL allowingReadAccessTo: the planning folder), so a picture, a stylesheet or a frame pointing outside it loads nothing; (2) navigationCases, on every navigation in every frame; (3) no JavaScript (the template has none), no website data kept between views, and every load that is not a file one blocked (the mac's WKContentRuleList), so nothing on the page reaches the network. If the block cannot be put in place no page is shown, and the tab says cannotShowTitle. The 'only on a click' of navigationCases rests on (3): measured (708 implementation review L1), a script's click() on a link reaches the decision as a click, so turning page scripts on would reopen it.",
+        "why": "navigationCases covers where a page may GO; a page also LOADS things (pictures, fonts, frames) that no navigation decision sees, so the folder-only read access and the network block are what stop those. Windows owes the same three in its own terms (WebView2: a virtual host mapped onto the planning folder alone, scripts off, and a WebResourceRequested filter that refuses anything else)."
+      },
+      "trail": "Each time the tab appears it writes activityTrail.mustRecord 'looked at a course's unit plans' once: the course and how many unit plans it offered, or that it had nothing to show, or, when no plan can be shown, the could-not-show line in place of the count (708 fix review L3) (the 708 implementation review, M1: the brief's ruling asked for a line when the tab is opened). The same event writes a line when no plan can be shown at all (the rule list of whatAPageMayRead could not be made, and the tab says cannotShowTitle) and, once per appearance, when the assets mirror failed, so a report of a blank or odd-looking tab has a line to start from. Plan a Unit's door writes 'asked an assistant to plan a unit'. Choosing a unit, Back, Forward and Reload write nothing: they change nothing. No line ever carries a plan's title or anything in it: it is the teacher's own words, and the count is what a report needs.",
+      "rejected": [
+        "a TabView: a different control from the section's Website | Problems switch for the same job, and it would decide for itself what each tab keeps; the page decides instead (only the chosen tab drawn, the draft in the model)",
+        "Planning drawn over the settings form, mounted or disabled: measured, a focused field, the footer box and a table kept the keyboard under the plan, and a Space or a paste edited the footer out of sight (708 implementation review H1, 708 fix review H1)",
+        "the tabs in the toolbar: DetailTabs' own comment says why (an item inserted conditionally makes macOS rebuild the toolbar)",
+        "a disabled Planning tab with no assistant installed: Russell ruled absent (2026-11-01), so Plantoir never reads as an app that needs an assistant",
+        "the plan served over the website builder's local preview: a file address needs no builder running, and a plan never goes through the website builder",
+        "a new-window link sent to the default browser, as the section preview does: a plan's PDF opened in the browser leaves Plantoir for nothing, and Back returns from it here",
+        "a file watcher or a timed refresh: coming back to the window is the moment a teacher expects what changed, and a delay would paper over a race",
+        "making the planning folder when the tab opens: an empty folder would then be backed up for nothing",
+        "the date range beside each unit in the popup: the plan page shows its dates, and a date written in a menu would need its own rule on both platforms",
+        "JavaScript on: the template needs none, and a plan's page that ran scripts could do more than the three guards can see"
+      ]
+    }
   },
   "assessment": {
     "rule": "Tests, marking and report comments (#751, #750, #752): skills an outside assistant follows, written into a working folder like every other (printablePages.agentGuidance). Neither app reads or writes any file they make; the only part either app plays is writing the skills, and the greeting sentence that names them (app-rules.json -> outsideAgents, piece G). #751 adds agentGuidance.testAuthoringSkill and kitFormat; #750 and #752 add their own sub-keys here.",
