@@ -34,15 +34,20 @@ nonisolated enum PlanningTab {
     // MARK: - Functions
 
     /// `tabCases`: the Settings | Planning tabs are on a course's page only
-    /// while Claude Code or Codex is installed, and never on a course kept
-    /// for reference. With neither installed the course page is exactly what
-    /// it was before #708: no tabs, no hint (Russell, 2026-11-01: absent,
-    /// never disabled).
-    static func isShown(claudeIsInstalled: Bool, codexIsInstalled: Bool, courseIsKeptForReference: Bool) -> Bool {
+    /// while Claude Code, Codex or GitHub Copilot (#783) is installed, and
+    /// never on a course kept for reference. With none installed the course
+    /// page is exactly what it was before #708: no tabs, no hint (Russell,
+    /// 2026-11-01: absent, never disabled).
+    static func isShown(
+        claudeIsInstalled: Bool,
+        codexIsInstalled: Bool,
+        copilotIsInstalled: Bool,
+        courseIsKeptForReference: Bool
+    ) -> Bool {
         if courseIsKeptForReference {
             return false
         }
-        return claudeIsInstalled || codexIsInstalled
+        return claudeIsInstalled || codexIsInstalled || copilotIsInstalled
     }
 
     /// `choiceCases` → `choices`: what the unit popup offers, in order. All
@@ -586,14 +591,15 @@ extension PlanInTheBrowser {
 }
 
 /// Plan a Unit with Claude… and Plan a Unit with Codex… on an empty Planning
-/// tab (#708): the two doors Revise With ▸ opens, with an opening message of
+/// tab (#708): the doors Revise With ▸ opens, with an opening message of
 /// their own (`contracts/app-rules.json` → `outsideAgents.planAUnit`), as
 /// Fix with Claude… does for problems (#717).
 nonisolated enum PlanAUnit {
 
     // MARK: - Stored properties
 
-    /// `planAUnit.message`, with `{course}` and `{howITeach}` to fill. One
+    /// `planAUnit.message`, with `{course}`, `{howITeach}` and `{handouts}`
+    /// (#859) to fill. One
     /// line with no semicolon, for the reason `FixWithAssistant` gives
     /// (Windows' `cmd /k` and Windows Terminal).
     static let message: String =
@@ -603,11 +609,13 @@ nonisolated enum PlanAUnit {
         + "{howITeach} "
         + "After that, ask me which unit I want to plan, which sections it covers "
         + "and whether a colleague teaches it on other dates. "
-        + "Do not build anything until I say go."
+        + "Do not build anything until I say go. "
+        + "{handouts}"
 
     /// `planAUnit.buttons`.
     static let claudeButtonTitle: String = "Plan a Unit with Claude…"
     static let codexButtonTitle: String = "Plan a Unit with Codex…"
+    static let copilotButtonTitle: String = "Plan a Unit with GitHub Copilot…"
 
     /// `planAUnit.trailLine`, after the course and the separator.
     static let trailLine: String = "asked {assistant} to plan a unit from the Planning tab"
@@ -630,6 +638,7 @@ nonisolated enum PlanAUnit {
         var text: String = FixWithAssistant.fill(message, [
             "{course}": courseNamed,
             "{howITeach}": ClaudeCodeLauncher.howITeachGreetingSentence,
+            "{handouts}": ClaudeCodeLauncher.handoutsGreetingSentence,
         ])
         for pair in FixWithAssistant.replaceInTheMessage {
             text = text.replacingOccurrences(of: pair[0], with: pair[1])
@@ -644,6 +653,8 @@ nonisolated enum PlanAUnit {
             return claudeButtonTitle
         case .codex:
             return codexButtonTitle
+        case .copilot:
+            return copilotButtonTitle
         }
     }
 

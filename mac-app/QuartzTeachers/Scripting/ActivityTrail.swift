@@ -101,9 +101,10 @@ nonisolated enum ActivityTrail {
         /// ID is missing or not a whole ID — never the ID.
         case deployRefusedForTheAccountID = "deploy refused for the Cloudflare Account ID"
         case assistantOpened = "assistant opened"
-        /// A Claude or Codex session opened from Plantoir's door is holding the course
+        /// A Claude, Codex or GitHub Copilot session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
-        /// it takes its `assist` lease. Carries the course only. It answers
+        /// it takes its `assist` lease. Carries the course and, through the busy
+        /// sentences' slot, which assistant's session it is (#783). It answers
         /// "why is Rename greyed?" — `assistant opened` says a door was
         /// opened, never which course its server went on to hold.
         case outsideSessionHeldACourse = "outside session held a course"
@@ -1033,7 +1034,7 @@ nonisolated enum ActivityTrail {
         /// too when the other program is a copy of the app; the
         /// `--mcp-stdio` and scheduled processes write no opening line.
         case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
-        /// An outside assistant (Claude or Codex) changed a course, asked for
+        /// An outside assistant (Claude, Codex or GitHub Copilot) changed a course, asked for
         /// a rebuild, or deployed, while a preview of that course was open in
         /// Plantoir (#433). A change or a rebuild left the open preview
         /// exactly as it was — not rebuilt; a deploy went ahead and may have
@@ -1148,6 +1149,21 @@ nonisolated enum ActivityTrail {
         /// Stop Sharing on a school year's unit plans, and how it ended:
         /// deleted, already gone, or failed with the address still working.
         case unitPlanSharingStopped = "unit plan sharing stopped"
+        /// A section's deployed folder opened in the web browser (#850):
+        /// where Open in Browser was pressed, whether it was already being
+        /// shown, and whether its usual address was taken (so what the site
+        /// remembered there is not shown). Never the folder's path or the
+        /// address.
+        case deployedFolderOpened = "deployed folder opened in the web browser"
+        /// A section's deployed folder stopped being shown (#850): Stop was
+        /// pressed, Plantoir quit, or the folder was gone; with how many
+        /// requests it answered and how many found nothing, which is what
+        /// makes "a page would not open" answerable. Counts only.
+        case deployedFolderNoLongerShown = "deployed folder no longer shown"
+        /// Open in Browser on a deployed folder did not happen (#850): the
+        /// folder was not found, nothing was deployed there, no address on
+        /// this computer was free, or the browser did not open it.
+        case deployedFolderCouldNotBeOpened = "deployed folder could not be opened"
         /// Change Password saved a new password for a course's unit plans
         /// and shared nothing (#833): the school year, and whether the new
         /// password now waits for a share or nothing was shared yet. Never

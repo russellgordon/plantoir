@@ -127,7 +127,10 @@ final class ClaudeCodeLauncherTests: XCTestCase {
                 + "Start by listing its sections so we both know what's there. "
                 + "Then read my How I Teach page for this course, and keep to it in anything you write for me. "
                 + "Before changing anything, use the matching plan tool first and show me what it says, "
-                + "in plain words, and wait for me to agree."
+                + "in plain words, and wait for me to agree. "
+                // #859: named, not retyped; the contract pins its words
+                // (AppRulesContractTests.testTheHandoutsSentenceIsTheContractsOnEveryDoor).
+                + ClaudeCodeLauncher.handoutsGreetingSentence
         )
     }
 
@@ -174,6 +177,7 @@ final class ClaudeCodeLauncherTests: XCTestCase {
               ],
               "command" : "\\/Applications\\/Plantoir.app\\/Contents\\/MacOS\\/Plantoir",
               "env" : {
+                "PLANTOIR_DOOR_ASSISTANT" : "claude",
                 "PLANTOIR_DOOR_COURSE" : "ICS3U_GOLDEN"
               }
             }

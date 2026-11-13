@@ -1,0 +1,6 @@
+{
+ "about": "fixture",
+ "paths": [
+  {"path": "Plantoir ▸ Settings…", "key": "⌘,", "source": "mac-app/QuartzTeachers/FixtureApp.swift", "why": "fixture"}
+ ]
+}

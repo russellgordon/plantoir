@@ -69,16 +69,28 @@ final class PlanningTabTests: XCTestCase {
 
     func testTheTabsAreThereAsTheContractSays() throws {
         let tabCases: [[String: Any]] = try cases("tabCases")
-        XCTAssertGreaterThanOrEqual(tabCases.count, 6)
+        XCTAssertGreaterThanOrEqual(tabCases.count, 8)
+        var sawCopilotAlone: Bool = false
         for testCase in tabCases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let claude: Bool = try XCTUnwrap(testCase["claude"] as? Bool)
+            let codex: Bool = try XCTUnwrap(testCase["codex"] as? Bool)
+            let copilot: Bool = try XCTUnwrap(testCase["copilot"] as? Bool, "\(name): copilot (#783)")
+            let reference: Bool = try XCTUnwrap(testCase["referenceCourse"] as? Bool)
             let shown: Bool = PlanningTab.isShown(
-                claudeIsInstalled: try XCTUnwrap(testCase["claude"] as? Bool),
-                codexIsInstalled: try XCTUnwrap(testCase["codex"] as? Bool),
-                courseIsKeptForReference: try XCTUnwrap(testCase["referenceCourse"] as? Bool)
+                claudeIsInstalled: claude,
+                codexIsInstalled: codex,
+                copilotIsInstalled: copilot,
+                courseIsKeptForReference: reference
             )
             XCTAssertEqual(shown ? "shown" : "absent", testCase["expect"] as? String, name)
+            if copilot && !claude && !codex && !reference {
+                sawCopilotAlone = true
+            }
         }
+        // #783: GitHub Copilot alone is enough for the tabs. MUST FAIL if
+        // `isShown` ignores `copilotIsInstalled`.
+        XCTAssertTrue(sawCopilotAlone, "a case with GitHub Copilot the only assistant installed")
     }
 
     // MARK: - The unit popup
@@ -255,11 +267,21 @@ final class PlanningTabTests: XCTestCase {
             codexPath: "/opt/homebrew/bin/codex", serverPath: "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
             greeting: message
         )
+        let copilotScript: String = try CopilotLauncher.prepareSession(
+            workspacePath: folder.path, courseCode: courseCode, courseName: "Grade 10 Science",
+            copilotPath: "/opt/homebrew/bin/copilot", serverPath: "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
+            greeting: message
+        )
         defer {
             try? FileManager.default.removeItem(atPath: claudeScript)
             try? FileManager.default.removeItem(atPath: codexScript)
+            try? FileManager.default.removeItem(atPath: copilotScript)
+            if let support = try? ClaudeCodeLauncher.supportDirectory() {
+                try? FileManager.default.removeItem(at: support.appendingPathComponent("mcp-\(courseCode).json"))
+                try? FileManager.default.removeItem(at: support.appendingPathComponent("mcp-\(courseCode)-copilot.json"))
+            }
         }
-        for script in [claudeScript, codexScript] {
+        for script in [claudeScript, codexScript, copilotScript] {
             let written: String = try String(contentsOfFile: script, encoding: .utf8)
             XCTAssertTrue(written.contains(ClaudeCodeLauncher.escapeForShell(message)), script)
             XCTAssertFalse(written.contains(UnitPlans.noneSentence), script)

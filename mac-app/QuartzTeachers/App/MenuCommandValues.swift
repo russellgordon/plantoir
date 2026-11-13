@@ -64,6 +64,12 @@ struct SectionSiteCommands: Equatable {
     var deployButtonEnabled: Bool
     var previewIsShowing: Bool
 
+    /// The deployed folder (#850): it can be opened, it is shown, and why
+    /// Open in Browser is greyed for it, said under the item.
+    var deployedFolderReady: Bool = false
+    var deployedFolderShown: Bool = false
+    var deployedFolderReason: String? = nil
+
     /// The assistant's functions (#457 batch B): Undo Last Change's target is
     /// this section, and one of them is running on it.
     var lastChangeIsHere: Bool = false
@@ -89,6 +95,9 @@ struct SectionSiteCommands: Equatable {
             && left.previewButtonEnabled == right.previewButtonEnabled
             && left.deployButtonEnabled == right.deployButtonEnabled
             && left.previewIsShowing == right.previewIsShowing
+            && left.deployedFolderReady == right.deployedFolderReady
+            && left.deployedFolderShown == right.deployedFolderShown
+            && left.deployedFolderReason == right.deployedFolderReason
             && left.lastChangeIsHere == right.lastChangeIsHere
             && left.verbIsRunning == right.verbIsRunning
             && left.previewOpensAt == right.previewOpensAt
@@ -159,6 +168,8 @@ enum MenuSituation {
             situation.deployButtonEnabled = site.deployButtonEnabled
             situation.previewIsShowing = site.previewIsShowing
             situation.previewIsRunning = site.previewIsRunning
+            situation.deployedFolderReady = site.deployedFolderReady
+            situation.deployedFolderShown = site.deployedFolderShown
             situation.lastChangeIsHere = site.lastChangeIsHere
             situation.verbIsRunning = site.verbIsRunning
         }

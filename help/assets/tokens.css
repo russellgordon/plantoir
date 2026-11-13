@@ -1,0 +1,43 @@
+/* Plantoir's colour and type tokens: the ONE copy (decision 14 on #839).
+ *
+ * Help uses it now; plantoir.app moves onto it with #840's P6. Light is the
+ * palette approved 2026-11-13. Dark is the site's dark palette as it stood on
+ * 2026-11-13 (website/assets/style.css), with the two Fern greens.
+ * No web font and nothing loaded from the web.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --paper:      #FCFDFB;
+  --paper-deep: #F1F5EF;
+  --card:       #FFFFFF;
+  --rule:       #D9E2D6;
+  --ink:        #1E2721;
+  --ink-soft:   #566259;
+  --green:      #1F7A3A;
+  --green-deep: #0F4A27;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 8px 24px rgba(0, 0, 0, .07);
+
+  /* The annotation red: rounded boxes and word labels on pictures. */
+  --annotation: #d0312d;
+
+  --font-text: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:      #1C1A15;
+    --paper-deep: #252118;
+    --card:       #24211A;
+    --rule:       #3D382C;
+    --ink:        #EDE7D6;
+    --ink-soft:   #A8A08C;
+    --green:      #9CC788;
+    --green-deep: #7FB069;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}

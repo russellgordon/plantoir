@@ -6,6 +6,10 @@ rules below. Change anything freely, except two things: keep the first
 section (identifiers only), and keep the point IDs exactly as answers.json
 has them. -->
 
+This version of Plantoir does not help with marking or with report card
+comments; the files in this kit are for your own marking. An assistant
+does not mark from it.
+
 Read this first, before any paper.
 
 ## Identifiers only
@@ -13,9 +17,7 @@ Read this first, before any paper.
 Papers are named by identifier (`Student A`), never by a name. If a name
 can be seen anywhere on a paper, do not repeat it: write
 "NAME VISIBLE page N" in that paper's `checks` and tell the teacher the
-identifier and the page. Mark only with the `plantoir-marking` skill, and
-its rules come first. If that skill is not in this working folder, do not
-mark papers from this kit.
+identifier and the page.
 
 ## What is here
 

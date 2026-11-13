@@ -276,6 +276,54 @@ else
 fi
 rm -rf "$DEMO_HOME"
 
+# Plantoir Help (#839): help/build_help.py and its checks, on fixtures and on
+# the real help/. Stdlib only; hiutil and node are used when present.
+if ! command -v node >/dev/null 2>&1; then
+  echo "note: node is not on PATH, so help/tests/test_web_search.py skips its search test (the pass line below does not cover search)"
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_build_help.py >/tmp/verify_help_test_build_help.log 2>&1; then
+  pass "Help: the real help/ builds green with its 102 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+else
+  fail "Help: the real help/ builds green with its 102 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+  cat /tmp/verify_help_test_build_help.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_markdown.py >/tmp/verify_help_test_markdown.log 2>&1; then
+  pass "Help: the page format's Markdown subset, and every refusal named with its file and line (help/tests/test_markdown.py, #839)"
+else
+  fail "Help: the page format's Markdown subset, and every refusal named with its file and line (help/tests/test_markdown.py, #839)"
+  cat /tmp/verify_help_test_markdown.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_tokens.py >/tmp/verify_help_test_tokens.log 2>&1; then
+  pass "Help: menu, control, say, fact, key and count tokens resolve against the menu golden, the Swift source and the contract (help/tests/test_tokens.py, #839)"
+else
+  fail "Help: menu, control, say, fact, key and count tokens resolve against the menu golden, the Swift source and the contract (help/tests/test_tokens.py, #839)"
+  cat /tmp/verify_help_test_tokens.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_checks.py >/tmp/verify_help_test_checks.log 2>&1; then
+  pass "Help: the outline owns each page's identity, and pages, scenes, links and head fields agree with it (help/tests/test_checks.py, #839)"
+else
+  fail "Help: the outline owns each page's identity, and pages, scenes, links and head fields agree with it (help/tests/test_checks.py, #839)"
+  cat /tmp/verify_help_test_checks.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_words.py >/tmp/verify_help_test_words.log 2>&1; then
+  pass "Help: no machinery, no selling, no typed counts, quoted runs or whole contract sentences typed by hand, and doubtful uses of publish and deploy listed for the page's reviewer (help/tests/test_words.py, #839)"
+else
+  fail "Help: no machinery, no selling, no typed counts, quoted runs or whole contract sentences typed by hand, and doubtful uses of publish and deploy listed for the page's reviewer (help/tests/test_words.py, #839)"
+  cat /tmp/verify_help_test_words.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_macbook.py >/tmp/verify_help_test_macbook.log 2>&1; then
+  pass "Help: the Mac Help book's Info.plist, pages and both indexes, read back with hiutil, rebuilt atomically and quietly (help/tests/test_macbook.py, #839)"
+else
+  fail "Help: the Mac Help book's Info.plist, pages and both indexes, read back with hiutil, rebuilt atomically and quietly (help/tests/test_macbook.py, #839)"
+  cat /tmp/verify_help_test_macbook.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_web_search.py >/tmp/verify_help_test_web_search.log 2>&1; then
+  pass "Help: the web copy, its assistant switch, platform runs, search (run with node), --release-web and --serve (help/tests/test_web_search.py, #839)"
+else
+  fail "Help: the web copy, its assistant switch, platform runs, search (run with node), --release-web and --serve (help/tests/test_web_search.py, #839)"
+  cat /tmp/verify_help_test_web_search.log
+fi
+
 if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
   pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
 else
@@ -712,6 +760,10 @@ fi
 # runner, and the plantoir-report-comments skill's files. Class results
 # (#750, 750c): every results case through class_results.py, and the named
 # grade tables and documents (gradeCases, documentCases). Stdlib only.
+# Both skills are HELD from v2.0.0 (#750, shared-rules.json ->
+# printablePages.agentGuidance.held): their folders are in
+# held/agent_guidance/skills, which neither app copies into a working folder,
+# and these tests find them there through the contract's held.place.
 for marking_test in redact names guard sheets comments results; do
   if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
     pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a and 750c; comments #752)"
@@ -720,6 +772,17 @@ for marking_test in redact names guard sheets comments results; do
     cat "/tmp/verify_marking_${marking_test}_test.log"
   fi
 done
+
+# Held skills (#750, 2026-11-13): marking and report comments are deferred from
+# v2.0.0. A held skill is not where both apps copy skills from, and nothing a
+# working folder receives, no greeting or sentence, neither app, not Help and
+# not the website names or offers it (shared-rules.json -> printablePages.agentGuidance.held).
+if (cd scripts && python3 -B test_held_skills.py) >/tmp/verify_held_skills_test.log 2>&1; then
+  pass "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
+else
+  fail "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
+  cat /tmp/verify_held_skills_test.log
+fi
 
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
@@ -824,6 +887,18 @@ if (cd scripts && python3 test_course_names.py) >/tmp/verify_course_names_test.l
 else
   fail "a course's name is cleaned of control characters where it is read (scripts/test_course_names.py, #780)"
   cat /tmp/verify_course_names_test.log
+fi
+
+# A value from a course's settings is written into the site's TypeScript as an
+# escaped string (GitHub #871): every typescriptStrings case, and every writer
+# (title, locale, baseUrl, fonts, colours, footer) read back from its file and
+# run again over its own output. Pure stdlib; Node reads the literals back
+# when it is on PATH.
+if (cd scripts && python3 test_typescript_strings.py) >/tmp/verify_typescript_strings_test.log 2>&1; then
+  pass "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
+else
+  fail "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
+  cat /tmp/verify_typescript_strings_test.log
 fi
 
 # A deploy reuses the last build only when nothing has changed (GitHub #768,
@@ -6103,6 +6178,138 @@ else
   RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
   echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
+
+# ---- 6h-r. The rendered check, in Chrome and in Safari's engine (#597, #807) ----
+# Every kind of diagram, sketch, graph, formula, quiz, task box and runnable
+# program on browser-checks/fixtures/rendered/, pressed for real in Chrome
+# for Testing AND in Playwright's WebKit (browser-checks/rendered_features.mjs,
+# rows in browser-checks/rendered_rows.json), with every request any frame
+# or worker made judged against the site's own host. Then every row proven
+# to SEE: a copy of the site broken one way at a time (lib/sabotage.py), and
+# each time the row aimed at must fail for its own reason while the page's
+# other rows still pass.
+#
+# Built in a working folder of its own, from the pristine Example Course
+# with only the rendered pages planted: the fixtures above change what this
+# site carries (its Python pages, its quizzes, its sketches), and a dozen
+# checks below count those. Its own container and builds folder too,
+# removed before and after (6e's pattern). The site is served by
+# browser-checks/lib/site_server.mjs with the _headers a Netlify publish
+# writes, so the policy and live input's isolation are both in force.
+#
+# An engine that is not on this Mac is a SKIP by name (fetch it with
+# ./browser-checks/fetch-browsers.sh), never a pass; with
+# PLANTOIR_REQUIRE_ENGINES=chromium,webkit it is a FAILURE.
+RENDERED_DIR="$HOME/.plantoir-verify-rendered"
+RENDERED_ID="$(mkdir -p "$RENDERED_DIR" && cd "$RENDERED_DIR" && /bin/pwd -P | shasum -a 256 | cut -c1-8)"
+RENDERED_CONTAINER="teaching-quartz-${RENDERED_ID}"
+RENDERED_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${RENDERED_ID}"
+RENDERED_SITE="/tmp/plantoir-verify-rendered-site"
+rendered_cleanup() {
+  docker rm -f "$RENDERED_CONTAINER" >/dev/null 2>&1 || true
+  rm -rf "$RENDERED_DIR" "$RENDERED_BUILDS" "$RENDERED_SITE"
+}
+RENDERED_NOT_RUN=""
+# The engines a log says ran, in words: "Chrome for Testing and WebKit", or
+# one of them with ONLY, so a pass line can never hide an engine that was not there.
+rendered_engines() {
+  local ran
+  ran="$(grep '^ENGINES: ' "$1" | tail -1 | sed 's/^ENGINES: //')"
+  case "$ran" in
+    chromium,webkit|webkit,chromium) echo "in Chrome for Testing and WebKit" ;;
+    chromium) echo "in Chrome for Testing ONLY (WebKit did not run)" ;;
+    webkit) echo "in WebKit ONLY (Chrome for Testing did not run)" ;;
+    *) echo "in no engine" ;;
+  esac
+}
+rendered_lines() {
+  # The checker's own lines of one kind, each as a verify.sh result.
+  # Read through a redirect, not a pipe, so fail() sets FAILED in THIS shell.
+  local kind="$1" log="$2" verb="$3" line
+  while IFS= read -r line; do
+    "$verb" "rendered check: ${line#"${kind}: "}"
+  done < <(grep "^${kind}: " "$log")
+}
+echo ""
+echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
+rendered_cleanup
+RENDERED_STARTED=$SECONDS
+if python3 browser-checks/lib/test_rendered_lib.py >/tmp/verify_rendered_lib.log 2>&1; then
+  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row but the deployed-only embeds has one, a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
+else
+  fail "the rendered check's planting or sabotages (browser-checks/lib/test_rendered_lib.py, #597)"
+  tail -20 /tmp/verify_rendered_lib.log
+fi
+mkdir -p "$RENDERED_DIR/courses"
+cp setup.sh preview.sh deploy.sh "$RENDERED_DIR/"
+cp -R support/example_course/EXC2O "$RENDERED_DIR/courses/EXC2O"
+# What the launcher needs to get the Swift blocks ready (resolve_build_context
+# finds a recipe beside it; the Swift image is named by support/swift alone,
+# so it is the image this run already has). The site's own image is --image.
+mkdir -p "$RENDERED_DIR/.toolchain/support"
+cp Dockerfile "$RENDERED_DIR/.toolchain/"
+cp -R support/swift "$RENDERED_DIR/.toolchain/support/swift"
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "the rendered check (#597): no Node 22 or later on this Mac, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+  else
+    skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
+  fi
+  RENDERED_NOT_RUN="chromium and webkit (no Node 22)"
+elif ! node browser-checks/lib/test_site_server.mjs >/tmp/verify_rendered_server.log 2>&1; then
+  fail "the rendered check's server does not serve a site as the hosts do (browser-checks/lib/test_site_server.mjs, #597)"
+  grep '^FAIL' /tmp/verify_rendered_server.log
+elif ! python3 browser-checks/lib/plant_rendered.py plant "$RENDERED_DIR/courses/EXC2O" >/tmp/verify_rendered_build.log 2>&1 \
+     || ! (cd "$RENDERED_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) >>/tmp/verify_rendered_build.log 2>&1 \
+     || [[ ! -f "$RENDERED_BUILDS/EXC2O/section1/public/Rendered-Check/Diagrams.html" ]]; then
+  # A build that failed is a failure, never a skip: the rows never ran.
+  fail "the rendered check (#597): its fixture site did not build"
+  tail -20 /tmp/verify_rendered_build.log
+else
+  mkdir -p "$RENDERED_SITE"
+  cp -Rc "$RENDERED_BUILDS/EXC2O/section1/public/." "$RENDERED_SITE/" 2>/dev/null || cp -R "$RENDERED_BUILDS/EXC2O/section1/public/." "$RENDERED_SITE/"
+  rm -f "$RENDERED_SITE/_headers"
+  # The publish's own two writers, in deploy.py's order (isolation, then the
+  # badge policy), with the contract they read.
+  if ! (cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$RENDERED_SITE") >>/tmp/verify_rendered_build.log 2>&1; then
+    fail "the rendered check (#597): the Netlify _headers could not be written for its site"
+    tail -5 /tmp/verify_rendered_build.log
+  else
+    RENDERED_STATUS=0
+    node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
+      >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
+    RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
+    RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p')"
+    if [[ "$RENDERED_STATUS" == "3" ]] && ! grep -q '^OK: ' /tmp/verify_rendered_features.log; then
+      # No engine at all: skips only, and no pass line (a SKIP is never a pass).
+      rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
+    elif [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
+      pass "the rendered check $(rendered_engines /tmp/verify_rendered_features.log): $(grep -c '^OK: ' /tmp/verify_rendered_features.log) row results passed - $RENDERED_DONE (browser-checks/rendered_features.mjs, #597, #807)"
+      rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
+    else
+      fail "the rendered check: a row failed in a browser ($RENDERED_DONE; browser-checks/rendered_features.mjs, #597)"
+      rendered_lines FAIL /tmp/verify_rendered_features.log fail
+      rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
+    fi
+    # Proven red: only when the rows ran green, since a row already red
+    # proves nothing by failing again.
+    if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]] && grep -q '^OK: ' /tmp/verify_rendered_features.log; then
+      RED_STATUS=0
+      node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
+        >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
+      RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
+      if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
+        pass "the rendered check sees, $(rendered_engines /tmp/verify_rendered_red.log): in each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) runs, $(grep '^OK: sabotage ' /tmp/verify_rendered_red.log | sed 's/ \[.*//' | sort -u | wc -l | tr -d ' ') sabotages over the engines each applies to, the row aimed at failed for its own reason and the page's other rows stayed green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
+        rendered_lines SKIPPED /tmp/verify_rendered_red.log skip
+      else
+        fail "the rendered check did not see a sabotage, or saw it for the wrong reason ($RED_DONE; browser-checks/lib/sabotage.py, #597)"
+        rendered_lines FAIL /tmp/verify_rendered_red.log fail
+      fi
+    fi
+  fi
+fi
+echo "   (the rendered check took $((SECONDS - RENDERED_STARTED)) s, its build included)"
+rendered_cleanup
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
 # class="explorer-ul overflow">`), so does a table of contents (`<ul id="…"
@@ -6951,6 +7158,34 @@ if grep -Fq "$TC_BUILT_RULE" "$TC_OUT/section1/index.css" 2>/dev/null; then
 else
   fail "the deployed stylesheet does not carry '$TC_BUILT_RULE' (#746)"
 fi
+# #850: the same deployed folder, served by the app's own Open in Browser,
+# answers every link every page writes. The app is named, never found: a
+# DerivedData bundle may be another checkout's (rule 10), so the gate passes
+# PLANTOIR_APP=<Plantoir.app>, and a named bundle that cannot serve FAILS.
+# Unnamed, it is skipped and says plainly that nothing ran. The crawl starts
+# the bundle with --serve-deployed-folder, which is decided before any
+# application exists (PlantoirMain). Measured 2026-11-13: it does not become
+# an application or take the front (3 of 3, check_headless_modes.py). What
+# took the teacher's key window that day is unknown, so still never set
+# PLANTOIR_APP while the teacher is at the keyboard.
+# against python3 -m http.server, which adds no .html.
+if [[ -n "${PLANTOIR_APP:-}" ]]; then
+  if python3 -I browser-checks/crawl_deployed_folder.py --app "$PLANTOIR_APP" "$TC_OUT/section1" \
+       >/tmp/verify_deployed_folder_crawl.log 2>&1; then
+    pass "the deployed folder, opened in the browser through the app, answers every link it writes: $(head -1 /tmp/verify_deployed_folder_crawl.log) (#850)"
+  else
+    fail "the deployed folder, served by the app, did not answer every link (#850)"
+    head -12 /tmp/verify_deployed_folder_crawl.log
+  fi
+  if python3 -I browser-checks/crawl_deployed_folder.py --plain-server "$TC_OUT/section1" \
+       >/tmp/verify_deployed_folder_plain.log 2>&1; then
+    fail "the crawl's must-fail passed: a server that adds no .html answered every link, so the crawl proves nothing (#850)"
+  else
+    pass "and the crawl's must-fail failed as it should: $(head -1 /tmp/verify_deployed_folder_plain.log) from a server that adds no .html (#850)"
+  fi
+else
+  skip "SKIPPED, NOT A PASS: the deployed folder crawl through the app did not run, because PLANTOIR_APP is not set. Run again with PLANTOIR_APP=<the Plantoir.app built from this tree> (#850)"
+fi
 TC_STAMP="$(tr -d '[:space:]' < "$TC_SECTION/.built-with-toolchain" 2>/dev/null || true)"
 if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then
   pass "and the rebuilt site is stamped with this image again, so the next deploy does not build (#746)"
@@ -7082,7 +7317,21 @@ if [[ "$FAILED" == "true" ]]; then
   echo "❌ Verification FAILED — see items above."
   exit 1
 fi
-echo "✅ All checks passed."
+# A SKIP checked nothing; the last lines say how many and which, so one can
+# never scroll past under a green line (#597 implementation review M5).
+SKIPPED_RESULTS=()
+for line in "${RESULTS[@]}"; do
+  [[ "$line" == "⏭️ "* ]] && SKIPPED_RESULTS+=("$line")
+done
+if (( ${#SKIPPED_RESULTS[@]} > 0 )); then
+  echo "✅ All checks that ran passed, but ${#SKIPPED_RESULTS[@]} SKIPPED check(s) checked nothing:"
+  for line in "${SKIPPED_RESULTS[@]}"; do echo "   $line"; done
+  if [[ -n "$RENDERED_NOT_RUN" ]]; then
+    echo "   ⚠️  The rendered check (#597) did NOT run in: $RENDERED_NOT_RUN. PLANTOIR_REQUIRE_ENGINES=chromium,webkit makes that a failure."
+  fi
+else
+  echo "✅ All checks passed."
+fi
 echo ""
 echo "ℹ️  Notes:"
 echo "   • The '$CONTAINER_NAME' container was left running from $DEV_TEST_IMAGE"

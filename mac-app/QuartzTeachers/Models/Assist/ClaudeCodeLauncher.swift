@@ -32,8 +32,9 @@ import Foundation
 /// `isAvailable` — a teacher without Claude Code should not be offered a
 /// door that opens onto an error.
 ///
-/// `CodexLauncher` is the same door for `codex`, and borrows the helpers
-/// below rather than copying them.
+/// `CodexLauncher` is the same door for `codex`, and `CopilotLauncher` for
+/// GitHub's `copilot` (#783); both borrow the helpers below rather than
+/// copying them.
 nonisolated enum ClaudeCodeLauncher {
 
     // MARK: - Stored properties
@@ -82,23 +83,65 @@ nonisolated enum ClaudeCodeLauncher {
     /// inherits launchd's minimal PATH, so `onPath` usually finds nothing even
     /// on a Mac where the teacher's own shell finds the tool immediately.
     ///
-    /// The same directories serve both doors — Codex's official installer
-    /// script uses `$HOME/.local/bin`, and Homebrew, npm-global and bun land
-    /// where they always do — so the list is written once with the name as a
-    /// parameter rather than copied with one word changed.
+    /// The same directories serve every door — Codex's official installer
+    /// script and GitHub's install script for Copilot use `$HOME/.local/bin`,
+    /// and Homebrew, npm-global and bun land where they always do — so the
+    /// list is written once with the name as a parameter rather than copied
+    /// with one word changed.
     static func findCommandLineTool(named name: String) -> String? {
-        if let onPath = onPath(name) {
-            return onPath
+        for candidate in commandLineToolCandidates(named: name) {
+            if FileManager.default.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// The first of `candidates` that is executable AND passes `accepting`,
+    /// or nil. The Copilot door's search (#783): a `copilot` on the list may
+    /// be another maker's program (Homebrew's own `copilot` formula is AWS's
+    /// tool, and writes the same `/opt/homebrew/bin/copilot`), so a candidate
+    /// that is not GitHub's is skipped and the search goes on down the list.
+    static func firstCommandLineTool(
+        among candidates: [String],
+        accepting isTheRightProgram: (String) -> Bool
+    ) -> String? {
+        for candidate in candidates {
+            if !FileManager.default.isExecutableFile(atPath: candidate) {
+                continue
+            }
+            if isTheRightProgram(candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// Every place a command-line assistant called `name` is looked for, in
+    /// order: each folder on PATH, then the places its own installers put it
+    /// (`contracts/app-rules.json` → `outsideAgents.searchedForInOrder`).
+    /// `findCommandLineTool(named:)` takes the first that is executable,
+    /// which is what it always did: PATH first, then the list.
+    static func commandLineToolCandidates(named name: String) -> [String] {
+        var candidates: [String] = []
+        if let pathVariable = ProcessInfo.processInfo.environment["PATH"] {
+            for directory in pathVariable.components(separatedBy: ":") {
+                let trimmed: String = directory.trimmingCharacters(in: .whitespacesAndNewlines)
+                candidates.append((trimmed as NSString).appendingPathComponent(name))
+            }
         }
 
         let homeDirectory: URL = RealHome.forFiles
-        var candidates: [String] = [
+        let installerPlaces: [String] = [
             homeDirectory.appendingPathComponent(".local/bin/\(name)").path,
             "/opt/homebrew/bin/\(name)",
             "/usr/local/bin/\(name)",
             homeDirectory.appendingPathComponent(".npm-global/bin/\(name)").path,
             homeDirectory.appendingPathComponent(".bun/bin/\(name)").path,
         ]
+        for place in installerPlaces {
+            candidates.append(place)
+        }
 
         let nvmNodeDirectory: URL = homeDirectory.appendingPathComponent(".nvm/versions/node")
         if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: nvmNodeDirectory.path) {
@@ -107,13 +150,7 @@ nonisolated enum ClaudeCodeLauncher {
                 candidates.append(nvmToolPath)
             }
         }
-
-        for candidate in candidates {
-            if FileManager.default.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
-        return nil
+        return candidates
     }
 
     /// The MCP server, which is the Plantoir binary itself answering `--mcp-stdio`.
@@ -266,6 +303,22 @@ nonisolated enum ClaudeCodeLauncher {
     static let howITeachGreetingSentence: String =
         "Then read my How I Teach page for this course, and keep to it in anything you write for me."
 
+    /// The sentence that has the session tell the teacher it can make printed
+    /// handouts (#859), verbatim from `contracts/app-rules.json` →
+    /// `outsideAgents.greetingHandoutsSentence`.
+    ///
+    /// Said on EVERY door, for every assistant: the Revise greeting, Fix
+    /// with's message and Plan a Unit's message each carry it straight after
+    /// the sentence that holds every change until the teacher agrees. The same
+    /// in every session, because the `plantoir-handouts` guide is always
+    /// written into the working folder, so nothing is read from the disk at
+    /// the click. It names none of the held skills (`held.skills` in the
+    /// contract), which are never advertised in a greeting.
+    static let handoutsGreetingSentence: String =
+        "In your first reply, also tell me in one sentence that you can make printed handouts, "
+        + "worksheets and quizzes for this course, each with its answer key, as good-looking PDFs "
+        + "with diagrams and graphs, following the plantoir-handouts guide."
+
     /// The opening message. It names the course and points at the plan tools,
     /// because the safety of every write here depends on a plan being shown to
     /// the teacher first — and an assistant that starts by reading is far more
@@ -295,6 +348,11 @@ nonisolated enum ClaudeCodeLauncher {
         text.append(ClaudeCodeLauncher.howITeachGreetingSentence + " ")
         text.append("Before changing anything, use the matching plan tool first and show me what it says, ")
         text.append("in plain words, and wait for me to agree.")
+        // The handouts sentence (#859) comes straight after the plan-first
+        // sentence, before the reference courses and the unit plans, so the
+        // greeting with reference courses is still the plain greeting, a
+        // space and that sentence (`greetingReferenceCourses.casesHow`).
+        text.append(" " + ClaudeCodeLauncher.handoutsGreetingSentence)
         // **Decision (s): the two Revise doors are NOT offered on a reference
         // course. Instead a LIVE course's session is told the reference
         // courses exist**, so the agent's first reply can tell the teacher
@@ -387,7 +445,9 @@ nonisolated enum ClaudeCodeLauncher {
                     // HOLD (#458, as Windows since #430): an `assist` lease,
                     // never a narrowing — `args` stays the folder alone.
                     "env": [
-                        AssistMCPServer.doorCourseVariable: courseCode
+                        AssistMCPServer.doorCourseVariable: courseCode,
+                        // Which door, so the hold can name it (#783).
+                        AssistMCPServer.doorAssistantVariable: "claude"
                     ]
                 ]
             ]

@@ -1,0 +1,15 @@
+{
+ "userFacingLabelWords": {
+  "forbidden": ["docker", "python", "script", "scripts", "json"],
+  "matching": "Whole word and case-insensitive."
+ },
+ "fixtureNotice": {
+  "wording": {
+   "finished": "The section was copied into the folder you chose.",
+   "button": "Open in Browser",
+   "copy": "The teacher\u2019s copy stays on this Mac.",
+   "sending": "Deploying {section} to the folder now."
+  },
+  "count": 3
+ }
+}

@@ -40,6 +40,28 @@ points* of their story are, which is harder and more useful than it sounds.
 > argues about which three, the exercise is already working — that argument
 > is dramaturgy.
 
+## Tableau on the professional stage
+
+Tableau is not only a classroom exercise. In this interview from Canada's
+Theatre Museum, the two founding directors of Opera Atelier, a Toronto
+company that stages opera and ballet from the seventeenth and eighteenth
+centuries, talk about tableau and the thinking behind their stage pictures.
+
+![](https://www.youtube.com/watch?v=EIOxEqlYgXo)
+
+*Pynkoski and Lajeunesse on tableau and aesthetics (Part 7 of 9). Canada's
+Theatre Museum, interview recorded in Toronto in 2011.*
+
+Listen with the table above beside you:
+
+- What do they say a stage picture is for? Is it the answer this page
+  gives, or a different one?
+- Which of the five choices do they talk about, in their own words?
+- They work with trained singers and dancers. Name one thing they ask for
+  that you could ask of your own group tomorrow.
+
+The interview plays from YouTube, so it needs an internet connection.
+
 Tableau combines naturally with [[Thought Tracking]] — tap a frozen shoulder
 and the character speaks a single thought aloud — and it is the backbone of
 our first performance task, [[Tableau Story Sequence]].

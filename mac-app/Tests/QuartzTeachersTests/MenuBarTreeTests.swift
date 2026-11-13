@@ -186,6 +186,7 @@ final class MenuBarTreeTests: XCTestCase {
             let tags: [(String, Bool)] = [
                 ("  [if claude]", presence.claudeIsInstalled),
                 ("  [if codex]", presence.codexIsInstalled),
+                ("  [if copilot]", presence.copilotIsInstalled),
                 ("  [if local]", presence.localAssistantCanRun),
                 ("  [if any reviser]", presence.anyReviseTargetExists),
             ]

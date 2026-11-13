@@ -1,0 +1,7 @@
+{
+ "about": "fixture",
+ "assistantOnTheWeb": false,
+ "facts": {
+  "fixture-fact": {"value": "40 MB", "read": "2026-11-01", "source": "fixture"}
+ }
+}
