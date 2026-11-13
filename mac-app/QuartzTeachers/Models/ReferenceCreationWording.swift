@@ -63,6 +63,10 @@ nonisolated enum ReferenceCreationWording {
             + "to the Reference Courses shelf."
     }
 
+    /// No code reached the act. The wizard refuses an empty code first, so
+    /// this is said only by a caller that skipped it.
+    static let noCode: String = "Enter a course code."
+
     /// The teacher pressed Cancel while it was being made.
     static let stopped: String = "Stopped. Nothing was added to the Reference Courses shelf."
 

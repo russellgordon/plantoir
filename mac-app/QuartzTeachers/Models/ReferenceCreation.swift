@@ -119,12 +119,15 @@ enum ReferenceCreation {
     }
 
     /// Why a course was not made, in the sentence the teacher reads.
-    enum Problem: LocalizedError, Equatable {
+    ///
+    /// Not `Equatable`: it carries the shelf rule's own value, whose
+    /// conformance belongs to the main actor.
+    enum Problem: LocalizedError {
         case noCode
-        /// The shelf rule's refusal, in its own sentence. The rule's value
-        /// (`ReferenceCourseRule.Trouble`) is what the wizard's live check
-        /// holds, which is where a later door can offer something beside it.
-        case onTheShelfAlready(String)
+        /// The shelf rule's refusal: its value, which a later door (572b's
+        /// Replace) can offer something beside, and its sentence, read on the
+        /// main actor when the refusal was made.
+        case onTheShelfAlready(ReferenceCourseRule.Trouble, sentence: String)
         case folderAlreadyExists(String)
         case alreadyBeingMade(String)
         case couldNotBeMade(code: String)
@@ -136,8 +139,8 @@ enum ReferenceCreation {
         var errorDescription: String? {
             switch self {
             case .noCode:
-                return "Enter a course code."
-            case .onTheShelfAlready(let sentence):
+                return ReferenceCreationWording.noCode
+            case .onTheShelfAlready(_, let sentence):
                 return sentence
             case .folderAlreadyExists(let folderName):
                 return ReferenceCopier.Problem.folderAlreadyExists(folderName).errorDescription
@@ -182,10 +185,22 @@ enum ReferenceCreation {
         if let trouble = CourseCodeRule.trouble(typed, existingCodes: []) {
             return trouble.sentence
         }
-        if let trouble = ReferenceCourseRule.trouble(placing: typed, inYear: schoolYear, among: shelved) {
+        if let trouble = ReferenceCreation.shelfTrouble(typed: typed, schoolYear: schoolYear, shelved: shelved) {
             return trouble.sentence
         }
         return nil
+    }
+
+    /// The shelf rule's refusal as a VALUE, for a course kept for reference,
+    /// or nil. The wizard's live check reads its sentence through
+    /// `courseCodeProblem`; a later door that offers something beside the
+    /// refusal (572b's Replace) asks this.
+    static func shelfTrouble(
+        typed: String,
+        schoolYear: Int?,
+        shelved: [ReferenceCourseRule.Shelved]
+    ) -> ReferenceCourseRule.Trouble? {
+        return ReferenceCourseRule.trouble(placing: typed, inYear: schoolYear, among: shelved)
     }
 
     /// Whether a code is taken by a course folder here — the refusal the
@@ -239,7 +254,7 @@ enum ReferenceCreation {
 
         // The shelf rule again, at the act, so the caption and the act agree.
         if let trouble = ReferenceCourseRule.trouble(placing: code, inYear: schoolYear, among: shelved) {
-            let problem: Problem = .onTheShelfAlready(trouble.sentence)
+            let problem: Problem = .onTheShelfAlready(trouble, sentence: trouble.sentence)
             ReferenceCreation.noteNotMade(code: code, folderName: nil, because: problem)
             throw problem
         }

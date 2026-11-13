@@ -92,6 +92,24 @@ final class ReferenceCreationTests: XCTestCase {
         XCTAssertEqual(
             ReferenceImportWording.zipHoldsNoCourse(zip: "{zip}"), importWording["zipHoldsNoCourse"] as? String
         )
+        XCTAssertEqual(
+            ReferenceImportWording.zipHoldsSeveralCourses(zip: "{zip}"),
+            importWording["zipHoldsSeveralCourses"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceImportWording.zipIsFarLargerThanACourse(zip: "{zip}"),
+            importWording["zipIsFarLargerThanACourse"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceImportWording.zipNeedsMoreRoom(zip: "{zip}", size: "{size}"),
+            importWording["zipNeedsMoreRoom"] as? String
+        )
+        XCTAssertEqual(ReferenceImportWording.chooserMessage, importWording["chooserMessage"] as? String)
+        XCTAssertEqual(
+            ReferenceImportWording.importForReferenceMenuItem, importWording["importForReferenceMenuItem"] as? String
+        )
+        XCTAssertEqual(ReferenceImportWording.explanation, importWording["explanation"] as? String)
+        XCTAssertEqual(ReferenceCreationWording.noCode, wording["noCode"] as? String)
     }
 
     /// The marker setup prints is the one this side looks for.
@@ -394,6 +412,57 @@ final class ReferenceCreationTests: XCTestCase {
         }
     }
 
+    /// The listing's closing line, and every size the contract names.
+    func testTheZipSizeRules() throws {
+        let zips: [String: Any] = try XCTUnwrap(try ReferenceCreationTests.referenceRules(["importing", "zips"]))
+        XCTAssertEqual(zips["mostFiles"] as? Int, ReferenceZipSource.mostFiles)
+        XCTAssertEqual((zips["mostBytes"] as? NSNumber)?.int64Value, ReferenceZipSource.mostBytes)
+        XCTAssertEqual((zips["mostGrowth"] as? NSNumber)?.int64Value, ReferenceZipSource.mostGrowth)
+        XCTAssertEqual((zips["growthAskedAbove"] as? NSNumber)?.int64Value, ReferenceZipSource.growthAskedAbove)
+        XCTAssertEqual((zips["roomToSpare"] as? NSNumber)?.int64Value, ReferenceZipSource.roomToSpare)
+
+        for testCase in try XCTUnwrap(zips["summaryCases"] as? [[String: Any]]) {
+            let line: String = try XCTUnwrap(testCase["line"] as? String)
+            let totals: ReferenceZipSource.ListingTotals? = ReferenceZipSource.totals(fromSummaryLine: line)
+            guard let files = testCase["files"] as? Int else {
+                XCTAssertNil(totals, line)
+                continue
+            }
+            XCTAssertEqual(totals?.files, files, line)
+            XCTAssertEqual(totals?.uncompressedBytes, (testCase["uncompressed"] as? NSNumber)?.int64Value, line)
+            XCTAssertEqual(totals?.compressedBytes, (testCase["compressed"] as? NSNumber)?.int64Value, line)
+        }
+
+        let sizeCases: [[String: Any]] = try XCTUnwrap(zips["sizeCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(sizeCases.count, 6)
+        for testCase in sizeCases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let totals: ReferenceZipSource.ListingTotals = ReferenceZipSource.ListingTotals(
+                files: try XCTUnwrap(testCase["files"] as? Int),
+                uncompressedBytes: try XCTUnwrap((testCase["uncompressed"] as? NSNumber)?.int64Value),
+                compressedBytes: try XCTUnwrap((testCase["compressed"] as? NSNumber)?.int64Value)
+            )
+            let trouble: ReferenceZipSource.SizeTrouble? = ReferenceZipSource.sizeTrouble(
+                totals,
+                freeWhereOpened: try XCTUnwrap((testCase["freeWhereOpened"] as? NSNumber)?.int64Value),
+                freeWhereCopied: try XCTUnwrap((testCase["freeWhereCopied"] as? NSNumber)?.int64Value),
+                sameDisk: try XCTUnwrap(testCase["sameDisk"] as? Bool)
+            )
+            var said: String?
+            switch trouble {
+            case .tooManyFiles:
+                said = "tooManyFiles"
+            case .farLargerThanACourse:
+                said = "farLargerThanACourse"
+            case .needsMoreRoom:
+                said = "needsMoreRoom"
+            case nil:
+                said = nil
+            }
+            XCTAssertEqual(said, testCase["expect"] as? String, name)
+        }
+    }
+
     func testEveryZipCase() async throws {
         let zips: [String: Any] = try XCTUnwrap(try ReferenceCreationTests.referenceRules(["importing", "zips"]))
         let cases: [[String: Any]] = try XCTUnwrap(zips["cases"] as? [[String: Any]])
@@ -409,7 +478,9 @@ final class ReferenceCreationTests: XCTestCase {
             let openParent: URL = rootURL.appendingPathComponent("opened")
             try FileManager.default.createDirectory(at: openParent, withIntermediateDirectories: true)
 
-            let outcome: ReferenceZipSource.Outcome = ReferenceZipSource.openNow(zipURL, into: openParent)
+            let outcome: ReferenceZipSource.Outcome = ReferenceZipSource.openNow(
+                zipURL, into: openParent, copyingInto: coursesDirectoryURL
+            )
 
             if testCase["expect"] as? String == "refused" {
                 let zipName: String = zipURL.lastPathComponent
@@ -419,6 +490,10 @@ final class ReferenceCreationTests: XCTestCase {
                     expected = ReferenceImportWording.zipIsNotSafeToOpen(zip: zipName)
                 case "zipHoldsNoCourse":
                     expected = ReferenceImportWording.zipHoldsNoCourse(zip: zipName)
+                case "zipHoldsSeveralCourses":
+                    expected = ReferenceImportWording.zipHoldsSeveralCourses(zip: zipName)
+                case "zipIsFarLargerThanACourse":
+                    expected = ReferenceImportWording.zipIsFarLargerThanACourse(zip: zipName)
                 default:
                     expected = ReferenceImportWording.zipCouldNotBeOpened(zip: zipName)
                 }
@@ -478,7 +553,26 @@ final class ReferenceCreationTests: XCTestCase {
                     ActivityTrail.store.activityText(includingPrompts: true)
                         .contains("imported ICS3U for reference from \(zipURL.lastPathComponent) as ICS3U-2025")
                 )
-                ReferenceZipSource.remove(openedIntoURL)
+                let landedURL: URL = coursesDirectoryURL.appendingPathComponent("ICS3U-2025")
+                for path in (testCase["addOnsLeftBehind"] as? [String]) ?? [] {
+                    XCTAssertFalse(
+                        FileManager.default.fileExists(atPath: landedURL.appendingPathComponent(path).path),
+                        "\(name): \(path) came along."
+                    )
+                }
+                for path in (testCase["kept"] as? [String]) ?? [] {
+                    XCTAssertTrue(
+                        FileManager.default.fileExists(atPath: landedURL.appendingPathComponent(path).path),
+                        "\(name): \(path) was left behind."
+                    )
+                }
+                for path in (testCase["markersGone"] as? [String]) ?? [] {
+                    XCTAssertFalse(
+                        FileManager.default.fileExists(atPath: landedURL.appendingPathComponent(path).path),
+                        "\(name): the marker \(path) came along."
+                    )
+                }
+                XCTAssertTrue(ReferenceZipSource.remove(openedIntoURL))
                 XCTAssertFalse(FileManager.default.fileExists(atPath: openedIntoURL.path))
             }
 
@@ -606,10 +700,148 @@ final class ReferenceCreationTests: XCTestCase {
                 "/usr/bin/zip", ["-q", zipURL.path, "course_config.json", "../escaped.txt"],
                 in: course
             )
+        case "holdsALinkFromAnotherSystem":
+            // Written by hand, as another system's zipper writes it: a link
+            // stored with an MS-DOS host byte, which `zipinfo` lists as an
+            // ordinary file, inside a folder whose own entry (mode 0600, no
+            // search bit) comes AFTER the link.
+            let link: UInt32 = 0o120777
+            let file: UInt32 = 0o100644
+            let openFolder: UInt32 = 0o040755
+            let shutFolder: UInt32 = 0o040600
+            let config: Data = Data("{\"course_code\": \"ICS3U\", \"section_numbers\": [1]}\n".utf8)
+            try ReferenceCreationTests.writeStoredZip([
+                StoredEntry(name: "ICS3U/", data: Data(), mode: openFolder, host: 3),
+                StoredEntry(name: "ICS3U/course_config.json", data: config, mode: file, host: 3),
+                StoredEntry(name: "ICS3U/locked/out", data: Data("/Users".utf8), mode: link, host: 0),
+                StoredEntry(name: "ICS3U/locked/", data: Data(), mode: shutFolder, host: 3),
+            ], to: zipURL)
+        case "twoCourses":
+            let second: URL = source.appendingPathComponent("ICS4U")
+            try fileManager.createDirectory(at: second, withIntermediateDirectories: true)
+            try Data("{\"course_code\": \"ICS4U\"}\n".utf8).write(to: second.appendingPathComponent("course_config.json"))
+            try ReferenceCreationTests.run("/usr/bin/ditto", ["-c", "-k", source.path, zipURL.path])
+        case "unpacksFarLarger":
+            // A gigabyte of zeros, sparse on disk, zipped to about a megabyte.
+            let zeros: URL = course.appendingPathComponent("zeros.bin")
+            fileManager.createFile(atPath: zeros.path, contents: nil)
+            let handle: FileHandle = try FileHandle(forWritingTo: zeros)
+            try handle.truncate(atOffset: 1_073_741_824)
+            try handle.close()
+            try ReferenceCreationTests.run("/usr/bin/ditto", ["-c", "-k", "--keepParent", course.path, zipURL.path])
+            try fileManager.removeItem(at: zeros)
+        case "carriesObsidianAddOns":
+            let obsidian: URL = course.appendingPathComponent(".obsidian")
+            let plugin: URL = obsidian.appendingPathComponent("plugins").appendingPathComponent("someones-plugin")
+            try fileManager.createDirectory(at: plugin, withIntermediateDirectories: true)
+            try Data("console.log('ran');\n".utf8).write(to: plugin.appendingPathComponent("main.js"))
+            try Data("[\"someones-plugin\"]\n".utf8).write(to: obsidian.appendingPathComponent("community-plugins.json"))
+            let snippets: URL = obsidian.appendingPathComponent("snippets")
+            try fileManager.createDirectory(at: snippets, withIntermediateDirectories: true)
+            try Data("body { max-width: 60em; }\n".utf8).write(to: snippets.appendingPathComponent("wide.css"))
+            try Data("{\"theme\": \"obsidian\"}\n".utf8).write(to: obsidian.appendingPathComponent("appearance.json"))
+            try ReferenceCreationTests.run("/usr/bin/ditto", ["-c", "-k", "--keepParent", course.path, zipURL.path])
+        case "markerForAnUnlistedSection":
+            try Data("{\"site_id\": \"someone-elses\"}\n".utf8).write(to: markers.appendingPathComponent("section7.json"))
+            try ReferenceCreationTests.run("/usr/bin/ditto", ["-c", "-k", "--keepParent", course.path, zipURL.path])
         default:
             try Data("not a zip at all".utf8).write(to: zipURL)
         }
         return zipURL
+    }
+
+    /// One entry of a zip written by hand: stored, not compressed.
+    struct StoredEntry {
+        let name: String
+        let data: Data
+        let mode: UInt32
+        let host: UInt8
+    }
+
+    /// Writes a zip of stored entries, so a test can make the shapes no
+    /// zipper on this Mac writes.
+    static func writeStoredZip(_ entries: [StoredEntry], to zipURL: URL) throws {
+        var body: Data = Data()
+        var directory: Data = Data()
+        for entry in entries {
+            let offset: UInt32 = UInt32(body.count)
+            let name: Data = Data(entry.name.utf8)
+            let checksum: UInt32 = ReferenceCreationTests.crc32(entry.data)
+            let size: UInt32 = UInt32(entry.data.count)
+
+            ReferenceCreationTests.append32(0x04034b50, to: &body)
+            ReferenceCreationTests.append16(10, to: &body)
+            ReferenceCreationTests.append16(0, to: &body)
+            ReferenceCreationTests.append16(0, to: &body)
+            ReferenceCreationTests.append16(0, to: &body)
+            ReferenceCreationTests.append16(0x21, to: &body)
+            ReferenceCreationTests.append32(checksum, to: &body)
+            ReferenceCreationTests.append32(size, to: &body)
+            ReferenceCreationTests.append32(size, to: &body)
+            ReferenceCreationTests.append16(UInt16(name.count), to: &body)
+            ReferenceCreationTests.append16(0, to: &body)
+            body.append(name)
+            body.append(entry.data)
+
+            ReferenceCreationTests.append32(0x02014b50, to: &directory)
+            ReferenceCreationTests.append16(UInt16(entry.host) << 8 | 20, to: &directory)
+            ReferenceCreationTests.append16(10, to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append16(0x21, to: &directory)
+            ReferenceCreationTests.append32(checksum, to: &directory)
+            ReferenceCreationTests.append32(size, to: &directory)
+            ReferenceCreationTests.append32(size, to: &directory)
+            ReferenceCreationTests.append16(UInt16(name.count), to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append16(0, to: &directory)
+            ReferenceCreationTests.append32(entry.mode << 16, to: &directory)
+            ReferenceCreationTests.append32(offset, to: &directory)
+            directory.append(name)
+        }
+        var end: Data = Data()
+        ReferenceCreationTests.append32(0x06054b50, to: &end)
+        ReferenceCreationTests.append16(0, to: &end)
+        ReferenceCreationTests.append16(0, to: &end)
+        ReferenceCreationTests.append16(UInt16(entries.count), to: &end)
+        ReferenceCreationTests.append16(UInt16(entries.count), to: &end)
+        ReferenceCreationTests.append32(UInt32(directory.count), to: &end)
+        ReferenceCreationTests.append32(UInt32(body.count), to: &end)
+        ReferenceCreationTests.append16(0, to: &end)
+        var whole: Data = body
+        whole.append(directory)
+        whole.append(end)
+        try whole.write(to: zipURL)
+    }
+
+    static func append16(_ value: UInt16, to data: inout Data) {
+        data.append(UInt8(value & 0xff))
+        data.append(UInt8(value >> 8))
+    }
+
+    static func append32(_ value: UInt32, to data: inout Data) {
+        data.append(UInt8(value & 0xff))
+        data.append(UInt8((value >> 8) & 0xff))
+        data.append(UInt8((value >> 16) & 0xff))
+        data.append(UInt8(value >> 24))
+    }
+
+    static func crc32(_ data: Data) -> UInt32 {
+        var crc: UInt32 = 0xffffffff
+        for byte in data {
+            crc ^= UInt32(byte)
+            for _ in 0..<8 {
+                if crc & 1 == 1 {
+                    crc = (crc >> 1) ^ 0xedb88320
+                } else {
+                    crc = crc >> 1
+                }
+            }
+        }
+        return crc ^ 0xffffffff
     }
 
     static func run(_ executable: String, _ arguments: [String], in folderURL: URL? = nil) throws {

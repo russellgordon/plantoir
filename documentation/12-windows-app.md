@@ -5563,8 +5563,12 @@ Not yet on Windows. The mac's write-up, with what was measured and rejected, is
   writes the marked settings, runs setup inside it and finishes through
   `MakeIntoAReferenceCourse`; New Reference Course… on the shelf heading;
   zips in Import Courses for Reference… (`referenceCourses.importing.zips`,
-  with the three new `importing.wording` sentences); and the three trail
-  events.
+  with its new `importing.wording` sentences, the size check and its
+  ceilings, the folders made searchable before the second link check, and
+  Import for Reference… on backup and whole-course archive rows as a pointer
+  to the same sheet); the changed `importing.wording.explanation`; and the
+  three trail events. `makeIntoAReferenceCourse` also releases the markers
+  of sections the settings do not list (`ReferenceCopier.sectionsToRelease`).
 - **To measure on Windows rather than copy:** what the unzipper there does
   with a `..` name, an absolute name and a link entry. The mac's ditto keeps
   names inside and makes links as links; the contract's checks refuse all

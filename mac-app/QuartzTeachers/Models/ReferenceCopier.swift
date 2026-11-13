@@ -294,7 +294,13 @@ enum ReferenceCopier {
         // deploy that somehow ran would make a NEW site rather than overwrite
         // last year's, and a section that has never deployed cannot be
         // scheduled at all.
-        for sectionNumber in copy.sectionNumbers {
+        //
+        // Every section a marker NAMES, as well as every section the
+        // settings list (#572 implementation review L4): a backup or a
+        // colleague's folder can carry `section7.json` for a course whose
+        // settings now list section 1 only, and a marker left in place is a
+        // marker that points at somebody's live site.
+        for sectionNumber in ReferenceCopier.sectionsToRelease(in: copy) {
             _ = DeployCommand.releaseSite(forSection: sectionNumber, in: copy, at: moment)
         }
 
@@ -347,6 +353,34 @@ enum ReferenceCopier {
             schoolYear: schoolYear,
             sectionCount: copy.sectionNumbers.count
         )
+    }
+
+    /// The sections whose site markers a new reference course gives up:
+    /// those its settings list, and those any `section<N>.json` marker in
+    /// `.netlify_sites` or `.cloudflare_sites` names, in order, once each.
+    static func sectionsToRelease(in course: Course) -> [Int] {
+        var sections: [Int] = []
+        for sectionNumber in course.sectionNumbers where !sections.contains(sectionNumber) {
+            sections.append(sectionNumber)
+        }
+        for folderName in [".netlify_sites", ".cloudflare_sites"] {
+            let folder: URL = course.directoryURL.appendingPathComponent(folderName)
+            let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            for name in names {
+                guard name.hasPrefix("section"), name.hasSuffix(".json") else {
+                    continue
+                }
+                let digits: String = String(name.dropFirst("section".count).dropLast(".json".count))
+                guard let sectionNumber = Int(digits), sectionNumber > 0, String(sectionNumber) == digits else {
+                    continue
+                }
+                if !sections.contains(sectionNumber) {
+                    sections.append(sectionNumber)
+                }
+            }
+        }
+        sections.sort()
+        return sections
     }
 
     /// The trail line — what a teacher would recognise, and enough to explain

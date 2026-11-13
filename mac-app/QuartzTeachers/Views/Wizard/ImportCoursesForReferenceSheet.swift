@@ -52,6 +52,7 @@ struct ImportCoursesForReferencePresenter: ViewModifier {
                     break
                 }
             }
+            .fileDialogMessage(ReferenceImportWording.chooserMessage)
             .sheet(item: $workspace.referenceImportRequest) { request in
                 ImportCoursesForReferenceSheet(chosenURL: request.folderURL) { folderNames in
                     workspace.reloadCourses()
@@ -710,7 +711,9 @@ struct ImportCoursesForReferenceSheet: View {
         // it, exactly as a course folder chosen on its own is read.
         var folderToRead: URL = chosenURL
         if ReferenceZipSource.isAZip(chosenURL) {
-            let opened: ReferenceZipSource.Outcome = await ReferenceZipSource.open(chosenURL)
+            let opened: ReferenceZipSource.Outcome = await ReferenceZipSource.open(
+                chosenURL, copyingInto: workspace.coursesDirectoryURL
+            )
             switch opened {
             case .refused(let sentence):
                 ActivityTrail.note(
@@ -743,7 +746,8 @@ struct ImportCoursesForReferenceSheet: View {
     /// The trail line for a zip that could not be read for courses: its
     /// file name and the sentence the sheet showed. Nothing from inside it.
     static func zipTrailLine(zip: URL, reason: String) -> String {
-        return "could not read \(zip.lastPathComponent) for reference — \(reason)"
+        // The sentence names the zip by its file name already.
+        return "a zip was not read for reference — \(reason)"
     }
 
     /// The year chosen for a course, or the one proposed for it.

@@ -27,7 +27,7 @@ nonisolated enum ReferenceImportWording {
     /// What the sheet is for, above the list.
     static let explanation: String =
         "Plantoir copies the courses you tick into this working folder and keeps them for "
-        + "reference. The folder you choose is left exactly as it is."
+        + "reference. The folder, backup or archive you choose is left exactly as it is."
 
     // MARK: - When the folder cannot be used
 
@@ -68,6 +68,31 @@ nonisolated enum ReferenceImportWording {
         return "\(zip) holds files that would be put outside its own folder, or shortcuts to "
             + "other places, so nothing was taken from it."
     }
+
+    /// The zip opened, and it holds more than one course.
+    static func zipHoldsSeveralCourses(zip: String) -> String {
+        return "\(zip) holds more than one course. Choose a backup or an archive of one course."
+    }
+
+    /// The zip unpacks to far more than any course holds: too many files,
+    /// too many bytes, or a zip that grows far more than a course does.
+    static func zipIsFarLargerThanACourse(zip: String) -> String {
+        return "\(zip) would unpack to far more than any course holds, so nothing was taken from it."
+    }
+
+    /// This Mac has not the room to unpack the zip and copy the course in.
+    static func zipNeedsMoreRoom(zip: String, size: String) -> String {
+        return "There is not enough free space on this Mac to bring in \(zip), which unpacks to "
+            + "\(size). Make some room and try again."
+    }
+
+    /// Said in the chooser, and as the menu item's help: what can be chosen.
+    static let chooserMessage: String =
+        "Choose the folder you kept last year's classes in, or a backup or archive of a course."
+
+    /// On a backup row and a whole-course archive row: the same Import
+    /// sheet, with that zip already chosen. Not a door of its own.
+    static let importForReferenceMenuItem: String = "Import for Reference…"
 
     /// The zip opened, and there is not one course folder inside it.
     static func zipHoldsNoCourse(zip: String) -> String {
