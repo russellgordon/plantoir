@@ -15,6 +15,9 @@ nonisolated enum ReferenceGroupWording {
     /// On the "Reference Courses" heading's menu, and inside Move to Group.
     static let newGroupMenuItem: String = "New Group…"
 
+    /// The heading's menu button, as VoiceOver and its help name it (#834).
+    static let headingMenuLabel: String = "Reference Courses Actions"
+
     /// The New Group sheet's title.
     static let newGroupTitle: String = "New Group"
 
@@ -66,12 +69,18 @@ nonisolated enum ReferenceGroupWording {
     /// cannot be read.
     static let startAgainMenuItem: String = "Start the Groups Again…"
 
-    /// Its question.
+    /// Its question (#834: one sentence, then the facts as rows).
     static let startAgainTitle: String = "Start the groups on the reference shelf again?"
-    static let startAgainMessage: String =
-        "Their arrangement cannot be read. Starting again puts every reference course back in the group its "
-        + "school year puts it in, with no groups of your own. Nothing in any course changes, and what could "
-        + "not be read is kept beside the new arrangement."
+    static let startAgainSentence: String =
+        "Every reference course goes back to the group its school year puts it in."
+    static let startAgainWhyLabel: String = "Because"
+    static let startAgainWhyValue: String = "The groups’ arrangement could not be read"
+    static let startAgainOwnGroupsLabel: String = "Groups you made"
+    static let startAgainOwnGroupsValue: String = "Taken off the shelf"
+    static let startAgainKeptLabel: String = "Kept"
+    static let startAgainKeptValue: String = "What could not be read, beside the new arrangement"
+    static let startAgainCoursesLabel: String = "Inside the courses"
+    static let startAgainCoursesValue: String = "Nothing changes"
     static let startAgainButton: String = "Start Again"
 
     /// The alert title when it could not be done.
@@ -102,26 +111,60 @@ nonisolated enum ReferenceGroupWording {
         return "Remove the group \(group)?"
     }
 
-    /// The confirmation's message: where the courses go, and that none is
-    /// removed. One sentence for none, one for one, one for many.
-    static func removeGroupMessage(courseCount: Int) -> String {
-        if courseCount == 0 {
-            return ReferenceGroupWording.removeGroupMessageNone
-        }
-        if courseCount == 1 {
-            return ReferenceGroupWording.removeGroupMessageOne
-        }
-        return ReferenceGroupWording.removeGroupMessageMany(count: courseCount)
+    /// The confirmation's one sentence (#834).
+    static let removeGroupSentence: String = "The group is removed from the Reference Courses shelf."
+
+    /// Its rows: where the courses go, and that none is removed or changed.
+    static let removeGroupCoursesLabel: String = "Its courses"
+    static let removeGroupCoursesNone: String = "None"
+    static let removeGroupCoursesOne: String = "1 course, back to the group its school year puts it in"
+    static let removeGroupStaysLabel: String = "The courses themselves"
+    static let removeGroupStaysValue: String = "Not removed, and nothing in them changes"
+
+    static func removeGroupCoursesMany(count: Int) -> String {
+        return "\(count) courses, back to the groups their school years put them in"
     }
 
-    static let removeGroupMessageNone: String = "It holds no course, so nothing else changes."
-    static let removeGroupMessageOne: String =
-        "Its course goes back to the group its school year puts it in. "
-        + "No course is removed, and nothing in it changes."
+    /// Where the courses go: one value for none, one for one, one for many,
+    /// never "(s)".
+    static func removeGroupCourses(courseCount: Int) -> String {
+        if courseCount == 0 {
+            return ReferenceGroupWording.removeGroupCoursesNone
+        }
+        if courseCount == 1 {
+            return ReferenceGroupWording.removeGroupCoursesOne
+        }
+        return ReferenceGroupWording.removeGroupCoursesMany(count: courseCount)
+    }
 
-    static func removeGroupMessageMany(count: Int) -> String {
-        return "Its \(count) courses go back to the groups their school years put them in. "
-             + "No course is removed, and nothing in them changes."
+    /// The removal question, for a group holding `courseCount` courses.
+    static func removeGroupQuestion(group: String, courseCount: Int) -> FactsQuestion {
+        return FactsQuestion(
+            title: removeGroupTitle(group: group),
+            message: removeGroupSentence,
+            rows: [
+                FactsQuestionRow(label: removeGroupCoursesLabel, value: removeGroupCourses(courseCount: courseCount)),
+                FactsQuestionRow(label: removeGroupStaysLabel, value: removeGroupStaysValue),
+            ],
+            action: removeButton,
+            cancel: cancelButton
+        )
+    }
+
+    /// The start-again question.
+    static var startAgainQuestion: FactsQuestion {
+        return FactsQuestion(
+            title: startAgainTitle,
+            message: startAgainSentence,
+            rows: [
+                FactsQuestionRow(label: startAgainWhyLabel, value: startAgainWhyValue),
+                FactsQuestionRow(label: startAgainOwnGroupsLabel, value: startAgainOwnGroupsValue),
+                FactsQuestionRow(label: startAgainKeptLabel, value: startAgainKeptValue),
+                FactsQuestionRow(label: startAgainCoursesLabel, value: startAgainCoursesValue),
+            ],
+            action: startAgainButton,
+            cancel: cancelButton
+        )
     }
 
     /// Remove Group refused: one of its courses would land beside another
