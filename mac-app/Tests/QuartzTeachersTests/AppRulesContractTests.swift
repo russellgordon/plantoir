@@ -895,6 +895,76 @@ final class AppRulesContractTests: XCTestCase {
 
     // MARK: - The outside doors
 
+    /// `outsideAgents.greetingReferenceCourses` (#856): the sentence naming
+    /// the same-code courses kept for reference is the contract's, placed
+    /// where the contract says, and absent when there are none. The template
+    /// and the separator are compared with the named constants, and every
+    /// case runs through the greeting both doors send.
+    func testTheReferenceCoursesSentenceIsTheContracts() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let block: [String: Any] = try XCTUnwrap(section["greetingReferenceCourses"] as? [String: Any])
+        XCTAssertEqual(block["sentence"] as? String, ClaudeCodeLauncher.referenceCoursesSentenceTemplate)
+        XCTAssertEqual(block["separator"] as? String, ClaudeCodeLauncher.referenceCoursesSeparator)
+
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let course: String = try XCTUnwrap(testCase["course"] as? String, name)
+            let courseName: String = try XCTUnwrap(testCase["courseName"] as? String, name)
+            let referenceCourses: [String] = try XCTUnwrap(testCase["referenceCourses"] as? [String], name)
+            let expectSentence: String? = testCase["expectSentence"] as? String
+
+            let plain: String = ClaudeCodeLauncher.greeting(courseCode: course, courseName: courseName)
+            let told: String = ClaudeCodeLauncher.greeting(
+                courseCode: course, courseName: courseName, referenceCourses: referenceCourses
+            )
+            XCTAssertEqual(
+                ClaudeCodeLauncher.referenceCoursesSentence(courseCode: course, referenceCourses: referenceCourses),
+                expectSentence,
+                name
+            )
+            if let expectSentence {
+                XCTAssertEqual(told, plain + " " + expectSentence, name)
+            } else {
+                XCTAssertEqual(told, plain, name)
+            }
+        }
+    }
+
+    /// `greetingReferenceCourses.listCases` (#856): which courses the
+    /// sentence names, in what form and order, run through
+    /// `referenceCoursesToMention` with each shelf built as `Course`s.
+    func testTheReferenceCoursesListIsMadeAsTheContractSays() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let block: [String: Any] = try XCTUnwrap(section["greetingReferenceCourses"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["listCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        let root: URL = URL(fileURLWithPath: "/pretend/courses", isDirectory: true)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let todayText: String = try XCTUnwrap(testCase["today"] as? String, name)
+            let today: CalendarDay = try XCTUnwrap(CalendarDay(text: todayText), name)
+            let given: [String: Any] = try XCTUnwrap(testCase["course"] as? [String: Any], name)
+            let shelf: [[String: Any]] = try XCTUnwrap(testCase["shelf"] as? [[String: Any]], name)
+            let expect: [String] = try XCTUnwrap(testCase["expect"] as? [String], name)
+
+            let course: Course = try AppRulesContractTests.course(from: given, under: root)
+            var courses: [Course] = [course]
+            for entry in shelf {
+                courses.append(try AppRulesContractTests.course(from: entry, under: root))
+            }
+            XCTAssertEqual(
+                ClaudeCodeLauncher.referenceCoursesToMention(for: course, among: courses, today: today),
+                expect,
+                name
+            )
+        }
+    }
+
     /// Runs `outsideAgents` — the two menu items that hand one course to a
     /// command-line assistant the teacher already has, "Revise with Claude…"
     /// and "Revise with Codex…".
@@ -1203,6 +1273,27 @@ final class AppRulesContractTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    /// One course for a `listCases` row: its folder, `course_code`,
+    /// `kept_for_reference` and `reference_school_year`.
+    private static func course(from entry: [String: Any], under root: URL) throws -> Course {
+        let folder: String = try XCTUnwrap(entry["folder"] as? String)
+        var values: [String: Any] = [
+            "course_code": try XCTUnwrap(entry["courseCode"] as? String),
+            "course_name": "A course",
+        ]
+        if entry["keptForReference"] as? Bool == true {
+            values["kept_for_reference"] = true
+        }
+        if let year = entry["referenceSchoolYear"] as? Int {
+            values["reference_school_year"] = year
+        }
+        return Course(
+            code: folder,
+            directoryURL: root.appendingPathComponent(folder, isDirectory: true),
+            configuration: CourseConfiguration(values: values, lastSavedData: Data())
+        )
     }
 
     private static func readRules() throws -> [String: Any] {

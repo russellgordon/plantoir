@@ -164,7 +164,9 @@ enum UpdateGate {
         otherCopies: [OtherCopy],
         leases: [LeaseSighting]
     ) -> String? {
-        if let ownPublish = QuitConfirmation.workUnderWay(publishes: publishes, previews: previews) {
+        if let ownPublish = QuitConfirmation.workUnderWay(
+            publishes: publishes, previews: previews, planWork: CourseActivity.activePlanWork
+        ) {
             return ownPublish
         }
 

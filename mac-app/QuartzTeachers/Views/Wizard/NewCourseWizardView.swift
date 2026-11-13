@@ -1825,6 +1825,20 @@ struct NewCourseWizardView: View {
         return name
     }
 
+    /// A club's short label as the window writes it: cleaned before it is
+    /// trimmed (#822), and empty for a course that is not a club.
+    static func shortLabelToWrite(typed: String, isClub: Bool) -> String {
+        if !isClub {
+            return ""
+        }
+        return OneLineText.cleaned(typed).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// A section's label as the window writes it, cleaned (#822).
+    static func sectionLabelToWrite(chosen: String) -> String {
+        return OneLineText.cleaned(chosen)
+    }
+
     static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
         return GradedFolderRule.reconciled(gradedFolders, toFolders: validChoices)
     }
@@ -2078,7 +2092,7 @@ struct NewCourseWizardView: View {
         var fontsSectionsMap: [String: Any] = [:]
         for sectionNumber in sectionNumbers {
             let key: String = "section\(sectionNumber)"
-            emojiMap[key] = emoji
+            emojiMap[key] = NewCourseWizardView.sectionLabelToWrite(chosen: emoji)
             markerMap[key] = showsSectionMarker
             gradeMap[key] = showsGradeInTitle
             schemeMap[key] = colourSchemeID
@@ -2172,7 +2186,7 @@ struct NewCourseWizardView: View {
         var config: [String: Any] = [
             "course_code": code,
             "course_name": CourseName.cleaned(name),
-            "custom_short_name": isClubCode ? customShortName.trimmingCharacters(in: .whitespaces) : "",
+            "custom_short_name": NewCourseWizardView.shortLabelToWrite(typed: customShortName, isClub: isClubCode),
             "locale": locale,
             "emojis": ["sections": emojiMap],
             "num_sections": sectionNumbers.count,

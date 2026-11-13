@@ -60,6 +60,11 @@ final class PlanShareRunner {
         if choice == .stop {
             return "Stopping sharing the \(PlanSharing.yearLabel(year)) unit plans"
         }
+        // A Change Password saves a new password and sends nothing (#833),
+        // so its console is not called sharing (#863 review).
+        if choice == .changePassword {
+            return "Changing the password for the \(PlanSharing.yearLabel(year)) unit plans"
+        }
         return "Sharing the \(PlanSharing.yearLabel(year)) unit plans"
     }
 
@@ -92,6 +97,11 @@ final class PlanShareRunner {
         }
         heldCourseCode = course.code
         heldFolderPath = folder.path
+        // What this run is doing, for the quit question (#863): the lease
+        // alone cannot tell a share from a Change Password or a Stop Sharing.
+        CourseActivity.beginPlanWork(
+            folderPath: folder.path, courseCode: course.code, work: CourseActivity.PlanWork.of(choice)
+        )
         self.choice = choice
         self.year = year
         isShowingSheet = true
@@ -156,6 +166,7 @@ final class PlanShareRunner {
             return
         }
         CourseActivity.endPublish(folderPath: path, courseCode: code, sectionNumber: PlanSharing.leaseSection)
+        CourseActivity.endPlanWork(folderPath: path, courseCode: code)
         heldCourseCode = nil
         heldFolderPath = nil
     }

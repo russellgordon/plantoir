@@ -1295,8 +1295,11 @@ def select_header_emojis_for_sections(section_numbers: list[int], saved_config: 
     result_sections = {}
     for sec in section_numbers:
         section_key = f"section{sec}"
-        prior_for_section = prev_sections.get(section_key)
-        suggested = prior_for_section or prev_default or PRESET_HEADER_EMOJIS[0]
+        # A saved label is cleaned by the course name's rule before it is
+        # offered again (#822).
+        prior_for_section = course_names.cleaned(str(prev_sections.get(section_key) or "")).strip()
+        legacy_default = course_names.cleaned(str(prev_default or "")).strip()
+        suggested = prior_for_section or legacy_default or PRESET_HEADER_EMOJIS[0]
         chosen = prompt_single_emoji(
             f"Choose header emoji for Section {sec}:", suggested
         )
@@ -3039,24 +3042,26 @@ def setup_course(no_backup: bool = False, reference_staging_folder=None):
     
     # ---------- NEW: Optional custom short label for clubs (no grade) -------
     # If the 4th character of the course code is not a digit, treat as no grade
-    custom_short_name = saved_config.get("custom_short_name", "")
+    # The short label is cleaned by the course name's rule wherever it is
+    # read (#822): the saved one, the suggestion, and the answer.
+    custom_short_name = course_names.cleaned(str(saved_config.get("custom_short_name", "")))
     grade_char_for_prompt = course_code[3] if len(course_code) >= 4 else ""
     if not grade_char_for_prompt.isdigit():
         print("\n🔤 Optional: Set a short label (≤12 chars) to appear beside the emoji (replaces course code).")
-        suggested_short = (saved_config.get("custom_short_name") 
+        suggested_short = (custom_short_name
                            or (course_name.split()[0][:12] if course_name else "") 
                            or course_code[:12])
         # Use existing helper to allow default suggestion
         user_input = prompt_with_default("Short label (≤12 chars, or leave blank to keep course code)", suggested_short)
-        user_input = (user_input or "").strip()
+        user_input = course_names.cleaned(str(user_input or "")).strip()
         # Enforce 12 characters max
         while len(user_input) > 12:
             print("⚠️  Please keep this label to 12 characters or fewer.")
-            user_input = input("Short label (≤12 chars, or Enter to skip): ").strip()
+            user_input = course_names.cleaned(input("Short label (≤12 chars, or Enter to skip): ")).strip()
         custom_short_name = user_input
     else:
-        # Preserve previously saved value if present
-        custom_short_name = saved_config.get("custom_short_name", "")
+        # Preserve previously saved value if present, cleaned
+        custom_short_name = course_names.cleaned(str(saved_config.get("custom_short_name", "")))
 # ---------- NEW: Prompt for Quartz locale (restricted list) --------------
     locale_code = prompt_quartz_locale(saved_config)
 
