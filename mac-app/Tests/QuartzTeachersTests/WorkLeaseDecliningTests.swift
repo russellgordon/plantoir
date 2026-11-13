@@ -520,7 +520,6 @@ final class WorkLeaseDecliningTests: XCTestCase {
         text += "\nsections 1=\(moment)@8081 3=\(moment)@8083\n"
         try Data(text.utf8).write(to: url, options: .atomic)
 
-        XCTAssertEqual(PreviewLeases.portsServedByOtherPrograms(folderPath: root.path), [8081, 8083])
         let lease: PreviewLeases.Lease = try PreviewLeases.lease(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2)
         XCTAssertEqual(lease.port, 8082)
         let next: PreviewLeases.Lease = try PreviewLeases.lease(folderPath: root.path, courseCode: "MPM2D", sectionNumber: 1)
@@ -537,7 +536,91 @@ final class WorkLeaseDecliningTests: XCTestCase {
         // Gone: its addresses are free again.
         other?.terminate()
         other?.waitUntilExit()
-        XCTAssertEqual(PreviewLeases.portsServedByOtherPrograms(folderPath: root.path), [])
+        let free: PreviewLeases.Lease = try PreviewLeases.lease(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 3)
+        XCTAssertEqual(free.port, 8081)
+        PreviewLeases.release(free)
+    }
+
+    /// `app-rules.json` → `previewPorts.anotherProgramsPreviews.cases`
+    /// (#835): real lease files for the other programs (a live `/bin/sleep`
+    /// each, or one that has ended), this program's own previews in the
+    /// store, and the address `PreviewLeases.lease` hands out.
+    func testThePreviewPortCasesAreTheContracts() throws {
+        let block: [String: Any] = try WorkLeaseLivenessTests.contract(
+            "app-rules.json", ["previewPorts", "anotherProgramsPreviews"]
+        )
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 7, "Cases went missing from the contract.")
+        let directory: URL = WorkLeaseFiles.activityDirectory(coursesDirectory: coursesURL)
+        for item in cases {
+            let name: String = item["name"] as? String ?? "?"
+            PreviewLeases.reset()
+            try? FileManager.default.removeItem(at: directory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            var holders: [Process] = []
+            for entry in try XCTUnwrap(item["others"] as? [[String: Any]], name) {
+                let process: Process = Process()
+                process.executableURL = URL(fileURLWithPath: entry["alive"] as? Bool == true ? "/bin/sleep" : "/usr/bin/true")
+                process.arguments = entry["alive"] as? Bool == true ? ["60"] : []
+                try process.run()
+                if entry["alive"] as? Bool != true {
+                    process.waitUntilExit()
+                } else {
+                    holders.append(process)
+                }
+                let pid: Int32 = process.processIdentifier
+                var processName: String = "true"
+                var started: String = "1.000000"
+                if case .found(let tableName, _, let startTime) = ProcessLiveness.askTheProcessTable(pid: pid) {
+                    processName = tableName
+                    started = startTime
+                }
+                let moment: String = ProcessLiveness.leaseMomentText(Date().addingTimeInterval(-1))
+                var body: String = "\(pid)\n\(processName)\n\(moment)\n\(started)\n"
+                if let ports = entry["ports"] as? [Int] {
+                    var entries: [WorkLeaseFiles.SectionEntry] = []
+                    var section: Int = 1
+                    for port in ports {
+                        entries.append(WorkLeaseFiles.SectionEntry(section: section, moment: moment, port: port))
+                        section += 1
+                    }
+                    body += "\n" + WorkLeaseFiles.sectionsLine(entries) + "\n"
+                }
+                let course: String = try XCTUnwrap(entry["course"] as? String, name)
+                try Data(body.utf8).write(
+                    to: directory.appendingPathComponent(WorkLeaseFiles.fileName(courseCode: course, kind: "preview", pid: pid)),
+                    options: .atomic
+                )
+            }
+            var section: Int = 10
+            for port in try XCTUnwrap(item["mine"] as? [Int], name) {
+                PreviewLeases.store.active.append(PreviewLeases.Lease(
+                    port: port, folderPath: root.path, courseCode: "EXC2O", sectionNumber: section
+                ))
+                section += 1
+            }
+            var answer: String = ""
+            do {
+                let lease: PreviewLeases.Lease = try PreviewLeases.lease(
+                    folderPath: root.path, courseCode: "EXC2O", sectionNumber: 4
+                )
+                answer = String(lease.port)
+            } catch PreviewLeases.Problem.allPortsBusy {
+                answer = "allPortsBusy"
+            }
+            var expected: String = ""
+            if let port = item["expect"] as? Int {
+                expected = String(port)
+            } else {
+                expected = try XCTUnwrap(item["expect"] as? String, name)
+            }
+            XCTAssertEqual(answer, expected, name)
+            for holder in holders {
+                holder.terminate()
+                holder.waitUntilExit()
+            }
+        }
+        PreviewLeases.reset()
     }
 
     func testEveryKindItBlocksOnIsOneTheFormatNames() throws {

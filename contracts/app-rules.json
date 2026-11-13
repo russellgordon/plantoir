@@ -5018,6 +5018,71 @@
       "whenTheLauncherCannotReadIt" : "preview.sh asks for this folder's published port twice; if both answers are empty it says it could not find out where the preview will be and stops before building (exit 1). It never announces the port inside the builder in its place. A build for publishing (--build-only) announces nothing and asks nothing, so it can never be stopped here.",
       "why" : "The port the builder uses inside is the same on every Mac, and the one this Mac opens is not: the first working folder publishes 8081 -> 8081, the next 8091 -> 8081, and so on. A guessed address is right by luck for the first folder only, and can open ANOTHER section's preview as though it were this one."
     },
+    "anotherProgramsPreviews" : {
+      "appliesOn" : [
+        "mac"
+      ],
+      "appliesOnWhy" : "Windows serves natively and probes an address just before it binds, so no other program can be handed one it holds; only the mac shares one website builder between programs.",
+      "cases" : [
+        {
+          "expect" : 8081,
+          "mine" : [],
+          "name" : "nothing held: the first address",
+          "others" : []
+        },
+        {
+          "expect" : 8082,
+          "mine" : [],
+          "name" : "another program serves 8081: the next address",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : [8081]}
+          ]
+        },
+        {
+          "expect" : 8083,
+          "mine" : [8082],
+          "name" : "another program's address and this program's own are both skipped",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : [8081]}
+          ]
+        },
+        {
+          "expect" : 8082,
+          "mine" : [],
+          "name" : "another COURSE in the folder shares the builder's addresses",
+          "others" : [
+            {"alive" : true, "course" : "OTHER", "ports" : [8081, 8083]}
+          ]
+        },
+        {
+          "expect" : 8081,
+          "mine" : [],
+          "name" : "a program that has ended holds no address",
+          "others" : [
+            {"alive" : false, "course" : "EXC2O", "ports" : [8081]}
+          ]
+        },
+        {
+          "expect" : 8081,
+          "mine" : [],
+          "name" : "a preview lease that names no address (Windows, an older Plantoir) cannot be avoided: the builder's claim refuses that one (twoPreviewsOneAddress)",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : null}
+          ]
+        },
+        {
+          "expect" : "allPortsBusy",
+          "mine" : [8082, 8084],
+          "name" : "every address taken between the two programs: refused, as four of this program's own are",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : [8081, 8083]}
+          ]
+        }
+      ],
+      "fields" : "Each case asks for a preview of EXC2O Section 4 in one working folder. others: preview leases other programs hold there, each naming the addresses its sixth line carries (ports null: a lease with no sixth line); alive false: its program has ended. mine: the addresses this program's own previews in the folder already hold. expect: the container port handed out, or allPortsBusy.",
+      "rule" : "GitHub #835 (third piece). An address another LIVE program's preview lease in the same working folder names (file-formats.json -> workLease.lines, line 6, '@<port>'), on any course, is not handed out, beside the addresses this program's own previews hold.",
+      "why" : "Two copies of Plantoir in one working folder share its one website builder, and each chose an address knowing only its own previews, so both were handed 8081 and the second preview ended the first (3 of 3, #835's measurement). shared-rules.json -> twoPreviewsOneAddress refuses the second in words; this makes that refusal rare. It does not replace it: two programs choosing at the same instant each read the other's lease before either is written."
+    },
     "bindsTo" : {
       "address" : "127.0.0.1",
       "how" : "Every published address of a folder's workspace - the four site addresses and their four live-reload websockets - is published as `-p 127.0.0.1:<base>-<base+3>:8081-8084 -p 127.0.0.1:<base+1000>-<base+1003>:9081-9084`, from create_the_workspace_on_free_ports in the PREVIEW PORT BLOCK, so setup.sh, preview.sh and deploy.sh make it the same way and cannot remake it away from each other. A workspace made before #684 (every HostIp empty, which Docker reads as every interface) is remade once by setup.sh and preview.sh (every_published_address_is_this_macs_only, then whenTheWorkspaceIsInUse.sentences.whenItNeedsSettingUpAgain.forThisMacOnly and remake_the_workspace, so #94's wait and refusals apply). The check reads each binding in brackets, `[{{.HostIp}}]`: an old workspace's host address is EMPTY, and a check that every listed word is 127.0.0.1 passes it by finding no words. deploy.sh never makes this check: it never serves, and a publish at six in the morning should not pay a two-minute remake for it; it makes new workspaces the shared way, and a later preview remakes the old one.",

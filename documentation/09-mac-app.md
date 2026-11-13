@@ -1034,7 +1034,9 @@ named it. A Deploy refused in the race after the button was available still
 says the course sentence (it is shared with the in-app assistant).
 
 **Addresses.** `PreviewLeases.lease` skips every address another live
-program's preview lease in the folder names. The builder's claim
+program's preview lease in the folder names (`app-rules.json` →
+`previewPorts.anotherProgramsPreviews`, 7 cases, mac only: Windows binds
+natively). The builder's claim
 (`twoPreviewsOneAddress`) still refuses the two shapes this cannot see: two
 programs choosing at once, and a lease with no sixth line.
 
@@ -1055,7 +1057,8 @@ that cannot be written, which has never stopped the work.
 `testCourseWideWorkMakesTheLeaseHoldTheWholeCourse`,
 `testASiblingBuiltElsewhereLeavesThisSectionFree`,
 `testAScheduledPublishWaitsOnlyForItsOwnSection`,
-`testAPreviewSkipsAnAddressAnotherProgramServes`;
+`testAPreviewSkipsAnAddressAnotherProgramServes`,
+`testThePreviewPortCasesAreTheContracts`;
 `WorkLeaseLivenessTests.testALeaseIsReadTheContractsWay` (the body cases);
 `LeaseWatcherTests.testEveryHeldElsewhereCase` (18 cases). Must-fail, each
 rebuilt and run: the rule made course-wide again (`holds(section:)` always
