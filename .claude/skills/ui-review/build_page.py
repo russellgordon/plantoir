@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the v1.10.0 interface review page from content.json and the shots manifest.
+"""Build the v2.0.0 interface review page from content.json and the shots manifest.
 
 Usage: python3 build_page.py
 Writes index.html beside this file, and files.json: the map of published

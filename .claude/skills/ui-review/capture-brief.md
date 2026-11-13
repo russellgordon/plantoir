@@ -62,7 +62,7 @@ The house style (from Russell's tutorial work):
 - Nothing in any picture shows a teacher's name, e-mail, account or home
   path.
 
-Label what is NEW in v1.10.0 in each picture, in a teacher's words (the
+Label what is NEW in v2.0.0 in each picture, in a teacher's words (the
 control's own name as the app shows it). Two to five labels a picture; a
 picture with nothing new in it does not belong on the page. Look at every
 annotated image before keeping it: a label must not cover the thing it names
@@ -73,10 +73,10 @@ each mode you captured, and `labels`: the words on the picture, in order.
 
 ---
 
-# Brief: capture the new v1.10.0 interface from the real app, for a design-review page
+# Brief: capture the new v2.0.0 interface from the real app, for a design-review page
 
 Russell (the teacher who owns Plantoir) asked for a page that shows the UI
-built in v1.10.0 so he can judge its UX. He has stepped away and said "You
+built in v2.0.0 so he can judge its UX. He has stepped away and said "You
 have the keyboard", so for THIS task you may drive the real app on screen.
 You are the ONLY agent allowed to touch the screen. Work at HIGH EFFORT.
 

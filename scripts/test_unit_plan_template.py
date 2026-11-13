@@ -170,7 +170,7 @@ class SheetsAreTheExampleTests(unittest.TestCase):
 
     def test_every_class_every_shipped_release_defined_still_has_a_rule(self):
         shipped = json.loads(read_text(FIXTURES / "classes-shipped.json"))["releases"]
-        self.assertIn("1.10.0", shipped)
+        self.assertIn("2.0.0", shipped)
         for release, sheets in shipped.items():
             for sheet, classes in sheets.items():
                 defined = defined_classes(read_text(TEMPLATE / "assets" / sheet))

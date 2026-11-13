@@ -153,7 +153,7 @@ own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
 from the source, since `SectionDetailView` cannot be mounted in a unit test —
 that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
 
-**A sixth and a seventh shipped to `dev` in v1.10.0, and were caught in the
+**A sixth and a seventh shipped to `dev` in v2.0.0, and were caught in the
 real window before the cut** (#831, #832, 2026-11-13). On a section whose last
 build made a coverage map, the Coverage tab's column was laid out **2,194**
 points tall inside a 700-point content area; on a course whose class sites go
@@ -1289,7 +1289,7 @@ window by reading each `NSButton`'s key equivalent and sending the keys:
 
 | the buttons | Return | Escape |
 |---|---|---|
-| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v1.10.0 used for "Cancel is the default") | Cancel | **nothing** |
+| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v2.0.0 first used for "Cancel is the default") | Cancel | **nothing** |
 | a plain action, then Cancel `role: .cancel` | the action | Cancel |
 | Cancel listed first, then a plain action | the action | Cancel |
 | an action `role: .destructive`, then Cancel `role: .cancel` | nothing | Cancel |
@@ -1297,7 +1297,7 @@ window by reading each `NSButton`'s key equivalent and sending the keys:
 
 A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
 a Return given to it later is dropped. So "Cancel is the default" and "Escape
-closes the question" cannot both hold in an alert, and the v1.10.0 shape had
+closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
 kept the first and lost the second without anybody noticing: the structure
 test pinned the modifier, not the key. The questions now use the destructive
 row of the table: **Escape is Cancel, and Return presses neither button**, so
@@ -4538,7 +4538,7 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   more room than that. Known, not fixed (#737 review): a guard that asks
   `ps -p` still counts a zombie process in the instant before it is reaped.
 
-**Lettered parts hang, and questions are worded plainly (#754, v1.10.0).**
+**Lettered parts hang, and questions are worded plainly (#754, v2.0.0).**
 Ruled 2026-11-09, written into the skill on 2026-11-12. On a quiz or test a part a), b),
 c) that runs to more than one line hangs under its first word, as a
 numbered question does. `starters/Quiz.tex` gains four macros:
@@ -4576,7 +4576,7 @@ which is not in the repository and, if it was in a working folder's
 `.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
 (`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
 
-**Lesson materials, and whose way of teaching (#765, v1.10.0).** Rules
+**Lesson materials, and whose way of teaching (#765, v2.0.0).** Rules
 settled on 2026-11-10 while building a day's resources (a warmup, task
 cards, a summary, an exercise). The handouts skill gains section 13,
 "Lesson materials", and section 14, "Wording and contexts"; the
@@ -4734,7 +4734,7 @@ still starts with its fixture (`scripts/fixtures/unit_plan/`, CSS only,
 extracted once from the example with Russell's leave), that the tokens and
 dark blocks are identical across the two sheets, and that every class a
 shipped release defined still has a rule (`classes-shipped.json`, whose
-first entry is 1.10.0). A later release adds rules at the end of a sheet and
+first entry is 2.0.0). A later release adds rules at the end of a sheet and
 never removes or renames one, because a plan written today must keep its look.
 REJECTED: one merged sheet (it cannot equal both blocks); one sheet scoped by
 a body class (every selector rewritten and one class more specific, so the
@@ -12953,6 +12953,55 @@ never the transcript, and the server writes nothing to stdout but its
 replies. Windows' `plantoir-mcp` relays progress lines and a kept tail,
 which is why it redacts that output too (documentation/12-windows-app.md).
 
+**What a redaction fixture may hold (#844).** On 2026-11-13 GitGuardian
+emailed Russell about a "Basic Auth String exposed on GitHub" in this
+repository. It was two of #709's cases: an `Authorization: Basic` header
+whose base64 decoded to an invented username and password, and an address
+with that pair written into it, on a `pages.dev` host that does not resolve.
+Nothing real leaked and nothing needed rotating. But a scanner cannot tell
+an invented pair from a live one, and an alert nobody can tell apart from a
+real one teaches people to dismiss the next. From then on:
+
+- **No case stores a username and password pair in either shape.** A case
+  that needs one carries `assembledFrom` (`user` and `password`, words that
+  say what they are: `example-user`, `example-password`) and an `input`
+  template; the test fills `{user}`, `{password}` and `{basic}` (the base64
+  of `user:password`) before it redacts
+  (`problemReportRedaction.assembledInput`,
+  `SharedRulesContractTests.assembledRedactionInput`). The redactor is run
+  against exactly the string a browser would send, so the case is as strong
+  as before. Measured with `LogRedactor.swift` compiled on its own: with
+  `basicAuthHeader` taken out the Basic case fails, and with `urlUserinfo`
+  taken out the address comes back as
+  `https://example-user:[removed: email address]/`, which is the ordering
+  against the email rule that the case exists to prove. Read unfilled, the
+  template still fails without either rule but no longer proves that
+  ordering: with `urlUserinfo` moved after the email rule, an unfilled
+  reader stays green (measured by the review). So a third assembled case,
+  `Signed in as {user}` expecting `Signed in as example-user`, holds no
+  credential and fails any reader that does not fill the template.
+- **An address in a fixture uses a reserved example host** (`plans.example`)
+  unless the rule under test reads the host. `urlUserinfo` does not.
+- **A prefixed token** (`nfp_`, `ghp_`, `github_pat_`, `AKIA`, `xox?-`, a
+  private key block) appears only where the rule under test keys on the
+  prefix, made of an obviously invented run (the alphabet), and is named in
+  `scripts/test_no_stored_credentials.py`'s `ALLOWED` by its SHA-256 with
+  where it is and why. That test fails on any other stored pair or prefixed
+  token in a tracked file, and on an `ALLOWED` entry that no longer matches
+  anything. Unprefixed fixtures (the 40-character run `secretLength` needs,
+  `CLOUDFLARE_API_TOKEN=abc123XYZ_super-secret-value`, the JWT-shaped
+  `Bearer` value with `abc.def` for its body) are left as they are: they
+  carry no provider's prefix for a detector to key on, and the rules they
+  prove need that shape.
+
+REJECTED: rewriting history to remove the two old strings. They were never
+secrets, a rewrite gives every commit since #709 a new hash on a repository
+two platforms work from, and the scanner's alert is closed in GitGuardian
+(as a test credential, a false positive) rather than in Git. Also rejected:
+storing the base64 of the example pair, which the issue first suggested. It
+is still a stored pair to a scanner that does not read the words, and the
+test that builds it is four lines.
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
@@ -13164,7 +13213,7 @@ file, which is exactly how the mac lost lines.
 
 ### One line per entry: the trail is cleaned and redacted (#780)
 
-Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+Since v2.0.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
 `ProblemReportStore.appendActivityLine` passes every line through
 `ProblemReportStore.safeTrailLine` before the append described above, which
 cleans it with `OneLineText.cleaned` (the course name's rule,
