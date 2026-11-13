@@ -85,7 +85,6 @@ alt: A printed handout, with the questions on one sheet and the answer key on a 
 
 - A part of the page under the heading Curriculum connection is never printed.
 - A question students check themselves prints its question only. See [Questions students check themselves](page:quizzes).
-- A video does not print.
 
 ## A PDF of your own instead
 

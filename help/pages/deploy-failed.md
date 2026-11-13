@@ -74,7 +74,7 @@ Cloudflare Pages refuses any single file bigger than 25 MB, and the section is n
 Hold the pointer over {{control:deployButton}}. Its help says why when the course is being previewed or deployed somewhere else on this computer. That can be another copy of Plantoir, or a scheduled deploy that is running now. {{control:deployButton}} is available again once that preview is stopped or that deploy has finished.
 
 {{assistant}}
-An assistant working on the course from another app holds it in the same way.
+An assistant that is previewing or deploying the course from another app holds it in the same way. An assistant that only has a session open on the course does not.
 {{/assistant}}
 
 {{picture:deploy-failed-1}}
