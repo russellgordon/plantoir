@@ -1116,6 +1116,32 @@
           "Use only lowercase letters, numbers, and hyphens."
         ],
         "title" : "Website Address Already Taken"
+      },
+      {
+        "explanation" : "Colleagues will be asked for this username and a password before the unit plans open. Choose ones made for them, not the password to your own accounts. Plantoir keeps them securely on this Mac, so you are asked once.",
+        "fieldLabel" : "Username",
+        "isSecret" : false,
+        "linkAddress" : "",
+        "linkTitle" : "",
+        "name" : "unitPlanUsername",
+        "steps" : [
+          "Type a username of 1 to 32 letters, digits, dots, dashes or underscores.",
+          "Give it, and the password you choose next, to the colleagues you plan with."
+        ],
+        "title" : "Choose a Username for These Plans"
+      },
+      {
+        "explanation" : "Colleagues type this password with the username before the unit plans open. Choose one made for them, 8 to 64 characters, not the password to your own accounts.",
+        "fieldLabel" : "Password",
+        "isSecret" : true,
+        "linkAddress" : "",
+        "linkTitle" : "",
+        "name" : "unitPlanPassword",
+        "steps" : [
+          "Type a password of 8 to 64 letters, digits, spaces or symbols.",
+          "Keep a copy somewhere safe to give to colleagues: Plantoir does not show it again."
+        ],
+        "title" : "Choose a Password for These Plans"
       }
     ]
   },
@@ -1267,7 +1293,147 @@
         "why" : "A folder deploy asks nothing today — it never reaches a web host and never names a site — so the flag changes nothing here. It is passed anyway because it describes the CALLER, not the destination: it says nobody is at the computer, and that stays true if a question is ever added to this path."
       }
     ],
-    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Every destination is NAMED, Netlify included (--target netlify) since #668: a deploy.sh given no destination now reads the course's saved destinations itself (Russell, 2026-11-01), so a call from the app must say which leg it is. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive."
+    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Every destination is NAMED, Netlify included (--target netlify) since #668: a deploy.sh given no destination now reads the course's saved destinations itself (Russell, 2026-11-01), so a call from the app must say which leg it is. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive.",
+    "planShareCases" : {
+      "cases" : [
+        {
+          "account" : "",
+          "choice" : "shareOpen",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : false,
+          "name" : "the first share, open",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "shareOpen",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--include-answer-keys",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : true,
+          "name" : "the first share, open, answer keys ticked",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "shareProtected",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--protect",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : true,
+          "name" : "the first share, protected: the tick is not read",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "shareAgain",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : false,
+          "name" : "share again keeps what the marker last asked for",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "addPassword",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--protect",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : false,
+          "name" : "add a password",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "changePassword",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--protect",
+            "--change-password",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : false,
+          "name" : "change the password",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "removePassword",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--remove-password",
+            "--year",
+            "2026"
+          ],
+          "includeAnswerKeys" : false,
+          "name" : "remove the password",
+          "year" : 2026
+        },
+        {
+          "account" : "",
+          "choice" : "stop",
+          "course" : "SNC2D",
+          "expect" : [
+            "SNC2D",
+            "--plans",
+            "--stop-sharing",
+            "--year",
+            "2025"
+          ],
+          "includeAnswerKeys" : true,
+          "name" : "stop sharing an earlier year",
+          "year" : 2025
+        },
+        {
+          "account" : " 0123456789abcdef0123456789abcdef ",
+          "choice" : "shareOpen",
+          "course" : "AP CALC",
+          "expect" : [
+            "AP CALC",
+            "--plans",
+            "--year",
+            "2026",
+            "--account",
+            "0123456789abcdef0123456789abcdef"
+          ],
+          "includeAnswerKeys" : false,
+          "name" : "the account the teacher gave, trimmed",
+          "year" : 2026
+        }
+      ],
+      "note" : "What the Planning tab's share bar hands deploy.sh for each choice (#709), PlanSharing.arguments on the mac. Never a username or a password: the launcher asks for those, and the Keychain keeps them. A share with no flag is sticky (the launcher reads the year's marker); --year is always passed, from the Mac's own clock."
+    }
   },
   "failureExplanations" : {
     "cases" : [
@@ -2370,6 +2536,48 @@
           "a scheduled publish, which runs at a time the teacher chose and then went to bed for"
         ],
         "why" : "Both alternatives were seen for real (TODO.md, 2026-09-06). With a terminal on standard input, deploy.py's input() WAITS — two measured runs sat at one prompt for 45 minutes — and the teacher's site is simply not updated in the morning, with nothing to say why. Without one, sys.stdin.isatty() is false and the DEFAULT is taken silently, so the site is published at an address nobody chose. Refusing is the only answer that neither hangs nor publishes something unasked for. The launcher passes the same flag on to deploy.py, and asks for no terminal at all when it is set, so the waiting branch cannot exist."
+      },
+      {
+        "flag" : "--plans",
+        "meaning" : "In place of the section number: share the course's unit plans (courses/<CODE>/.internal/planning) through Cloudflare Pages as a small website of their own for this school year, rather than deploying a section (#709). Every section step is skipped, the course's saved destinations are never read, and --to-folder and --target netlify are refused.",
+        "usedFor" : "The Planning tab's share bar (PlanSharing.arguments, deployArguments.planShareCases).",
+        "why" : "One launcher, so the token, the account, the reference-course refusal and the website builder are the same code a section's deploy runs. documentation/07-deployment.md -> Sharing a unit plan (#709)."
+      },
+      {
+        "flag" : "--protect",
+        "meaning" : "With --plans: ask colleagues for a username and password before any page opens. Sticky: a later share with neither --protect nor --remove-password keeps it.",
+        "usedFor" : "Share with Protect ticked, Add a Password, Change Password.",
+        "why" : "unitPlanning.share.modeCases."
+      },
+      {
+        "flag" : "--remove-password",
+        "meaning" : "With --plans: share open to anyone with the address, and delete the plans' Keychain item once the share succeeded.",
+        "usedFor" : "Remove Password, after the public-address warning.",
+        "why" : "The only way a protected plan site opens again (review H2)."
+      },
+      {
+        "flag" : "--change-password",
+        "meaning" : "With --plans --protect: ask for a new username and password even when one is saved.",
+        "usedFor" : "Change Password.",
+        "why" : "One credential per course across school years; a new one applies to this year's site once it is shared."
+      },
+      {
+        "flag" : "--include-answer-keys",
+        "meaning" : "With --plans and no password: keep answer keys in, which a share without a password otherwise leaves out.",
+        "usedFor" : "Include Answer Keys ticked.",
+        "why" : "Russell, 2026-11-12 (unitPlanning.share.answerKeys)."
+      },
+      {
+        "flag" : "--stop-sharing",
+        "meaning" : "With --plans: delete the school year's plan site and its marker; the Keychain item goes too when no year of the course is still shared.",
+        "usedFor" : "Stop Sharing, this year's or an earlier year's.",
+        "why" : "unitPlanning.share.stopSharing."
+      },
+      {
+        "flag" : "--year <YYYY>",
+        "meaning" : "With --plans: the school year, by the year it began. Without it, the year this Mac's clock is in, rolling over on 1 August.",
+        "usedFor" : "Every share from the app, and Stop Sharing on an earlier year.",
+        "why" : "Worked out on the Mac so the website builder's UTC clock cannot give a share late on 31 July another year."
       }
     ],
     "nonInteractive" : {
@@ -2430,6 +2638,12 @@
           "reachedWhen" : "A new Cloudflare project is being named and no surname is saved on this computer.",
           "refuse" : "Refuse. On the Netlify path this is unreachable — naming the site is refused first. Note the asymmetry: with a surname already saved, a new Cloudflare project asks NOTHING (the address is derived from the course, section, year and surname), so nothing is refused there.",
           "where" : "deploy.py"
+        },
+        {
+          "question" : "Choose a username for these unit plans",
+          "reachedWhen" : "A protected share of a course's unit plans (deploy.sh <CODE> --plans --protect, or a sticky one) with no username and password saved for the course, or with --change-password.",
+          "refuse" : "Say nobody is here to choose them, and that sharing the plans once from Plantoir, where they can be chosen, sorts it out. The password question after it is never reached.",
+          "where" : "launcher"
         },
         {
           "question" : "any other prompt",

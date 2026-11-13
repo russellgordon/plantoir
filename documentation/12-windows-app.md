@@ -12410,3 +12410,21 @@ proves when it is asked, not what the window shows).
 
 **For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
 KNOW about #700").
+
+## Sharing unit plans (#709): what Windows owes
+
+The mac shares a course's unit plans to Cloudflare Pages from the Planning
+tab (`documentation/07-deployment.md` → "Sharing a unit plan (#709)" says
+why, what was measured and what was rejected; `documentation/09-mac-app.md`
+the app's half). Windows inherits the shared Python free: `scripts/unit_plan_site.py`,
+`scripts/share_plan.py` and their tests, which `PythonToolchainTests` already
+runs (the worker cases need node, which the runtime carries). It owes
+`deploy.ps1 -Plans` with its flags and the plans guard, the credential item
+in Credential Manager handed over through a file only the user can read,
+the share bar with `unitPlanning.share.words`, `modeCases`, `warningCases`
+and `deployArguments.planShareCases`, the three trail events, the two
+`LogRedactor` rules (`problemReportRedaction.cases`), the reference copy
+moving `plans-*.json` aside, and the plans leg of `verify-deploy.ps1`. The
+`windows` issue for #709 lists them; `NamedGapLedger` holds each open by name
+until done.
+

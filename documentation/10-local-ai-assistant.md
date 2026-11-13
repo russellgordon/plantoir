@@ -9177,3 +9177,11 @@ recorded only if it has actually gone.
 Steering any of this with a tool description (the measured precedent is in
 "Steer the model with code"). Splitting steps 6–9 into four commits: they share
 one frame and one settler, and the plan pairs #260 with #193.
+
+## Sharing unit plans is not an assistant tool (#709)
+
+No tool shares a course's unit plans, for the local assistant or an MCP
+client, and the tool surface did not move for #709 (`scripts/test_tool_surface_digest.py`
+stays green). Sharing is the teacher's act, from the Planning tab's share bar,
+and the `plantoir-unit-planning` skill tells an outside assistant to point the
+teacher there and never to share or deploy a plan itself.

@@ -550,7 +550,19 @@ class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
         "Paste Cloudflare token": "test_the_cloudflare_token_question_refuses",
         "Paste Cloudflare Account ID":
             "test_the_cloudflare_account_question_refuses_ON_THE_SCREEN",
+        # Driven next door, where the Keychain and Cloudflare are stubbed far
+        # enough for a protected share of unit plans to reach it (#709).
+        "Choose a username for these unit plans":
+            "test_deploy_sh_plans.PlansModeTests.test_a_protected_share_with_nothing_saved_refuses_under_non_interactive",
     }
+
+    def test_every_question_driven_elsewhere_is_there(self):
+        for test in self.DRIVEN_ABOVE.values():
+            if "." not in test:
+                continue
+            module, _, method = test.partition(".")
+            text = (REPOSITORY_ROOT / "scripts" / (module + ".py")).read_text(encoding="utf-8")
+            self.assertIn("def " + method.split(".")[-1] + "(", text, test)
 
     def test_the_four_questions_driven_are_the_four_the_contract_names(self):
         import json

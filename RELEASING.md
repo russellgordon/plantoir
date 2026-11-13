@@ -392,6 +392,14 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > A cut needs both: `./verify-deploy.sh --first-publish`, then a plain
    > `./verify-deploy.sh` against the sites the section already has.
    >
+   > **Both runs include the unit plans leg** (#709, "Sharing unit plans"):
+   > the course's plans shared for school year 2099 open, protected, again
+   > with no flag, with a new password and open again, each fetched back
+   > (the left-out answer key must answer 404), then Stop Sharing. It makes
+   > one Cloudflare project and deletes it, and it is skipped, not failed,
+   > when the test folder already keeps a username and password for that
+   > course's plans, which it never reads.
+   >
    > **On Windows, run it from the checkout being released, and once with
    > `-FirstPublish`** (#630, #623). It mirrors that checkout's launchers and
    > recipe into the working folder's `.toolchain\` before anything runs,

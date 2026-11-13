@@ -35,6 +35,15 @@ and a file written here is lost). Copy from it instead.
   Planning tab, and give the full path as well.
 - **You never upload it.** Do not deploy, upload or send the plan site
   anywhere, and do not put it in the course's pages.
+- **Plantoir shares it, never you.** The teacher shares the plans with
+  colleagues from the Share bar at the foot of the course's Planning tab,
+  as a small website of their own for the school year, open to anyone with
+  the address or protected by a username and password. A share without a
+  password leaves out every answer key (a PDF named `… - Answers.pdf`,
+  `… - Solutions.pdf`, `… - with Answers.pdf` or `Marking Guide.pdf`) unless
+  the teacher ticks Include Answer Keys, so name answer keys that way. If
+  the teacher asks you to share the plans, tell them where the Share bar is;
+  never share or deploy them yourself.
 
 ## 2. Gather, agree, then build
 

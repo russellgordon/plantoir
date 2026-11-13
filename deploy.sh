@@ -4666,12 +4666,10 @@ retire_legacy_container() {
 }
 # <<< PREVIEW PORT BLOCK <<<
 # Where the refusal above is filed on the trail: this run's course and section,
-# or the course's unit plans (#709).
-if [[ "$PLANS_MODE" == "true" ]]; then
-  WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/plans"
-else
-  WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/${SECTION_NUM}"
-fi
+# or the course's unit plans (#709). The first line is kept as it is:
+# scripts/test_port_blocks.py and test_folder_spelling.py read it by its text.
+WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/${SECTION_NUM}"
+[[ "$PLANS_MODE" != "true" ]] || WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/plans"
 
 
 run_container_with_mount() {
