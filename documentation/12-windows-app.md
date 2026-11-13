@@ -11540,6 +11540,20 @@ here: the OpenSSL half was #764 (v1.9.3), which moved the runtime to Python
 3.14.10 and OpenSSL 3.5.9 (next section), and Pillow's Brotli is #766,
 which asks for its version on both platforms.
 
+**Answered by #766 (2026-11-12): it is Brotli 1.2.0 on both.** The PyPI
+wheel `pillow-12.3.0-cp314-cp314-win_amd64.whl` links it statically into
+`_imagingft.cp314-win_amd64.pyd`, and its `LICENSE` carries
+`===== brotli-1.2.0 =====`, so the version is readable after all, from the
+licence rather than the binary. CVE-2026-111497 affects it, and no Pillow
+release carries 1.2.1 yet, so Pillow stays at 12.3.0 and the social sharing
+card opens only the fonts `shared-rules.json` → `socialCardFonts` lists
+(05 → "The social sharing card opens only Plantoir's own fonts (#766)"),
+which matters more here than on the mac: the decoder runs on the teacher's
+PC with no container around it. What the mac could not measure (that the
+runtime's installed Pillow is that wheel, and its LICENSE line) is on the
+`windows` issue from #766. The full record is
+[02 → Pillow's Brotli (#766)](02-docker-image.md#pillows-brotli-766).
+
 ## Python 3.14.10 in the runtime: a supported OpenSSL (#764, Windows 1.9.3)
 
 Written 2026-11-11 for [#764](https://github.com/russellgordon/plantoir/issues/764).

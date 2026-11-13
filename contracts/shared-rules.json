@@ -34579,5 +34579,64 @@
       "basePaper": "\\begin{document}\n\\totals{K \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,1 \\quad T \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,2}\n\\q{1}\\score{K 1} Which is more likely?\n\\q{1}\\score{T 2} Two dice are rolled.\n\\end{document}\n",
       "baseGuide": "\\begin{document}\n\\catrow{K}{1}{Knowledge and Understanding}{A}{\\pid{A1}}\n\\catrow{T}{2}{Thinking}{B}{\\pid{B1.1}--\\pid{B1.2}}\n\\totalrow{3}\n\\end{document}\n"
     }
+  },
+  "socialCardFonts": {
+    "note": "#766 (Russell, 2026-11-12). Which font names from a course's settings the social sharing card may open. Read by scripts/social_card.py on every build, and run by scripts/test_social_card_fonts.py, which Windows' PythonToolchainTests runs too, so both platforms test the build's own rule. documentation/05-build-pipeline.md -> 'The social sharing card opens only Plantoir's own fonts (#766)'. No trail event: the sentence is a build line in the console, like the card's other build lines.",
+    "rule": "The card's header and body fonts are read from fonts.sections.<sN>, else fonts.default, in course_config.json. A name is used only when, with the spaces at either end taken off, it is a key of `fonts`, exactly as written there (case and inner spaces included), and then only that entry's file in support/fonts/ is opened. No two keys differ only by case. A name in `silentNames` uses `fallbackFile` and says nothing. Any other value (a font Plantoir does not offer, a misspelling, an absolute path, a name with a separator or .., a value that is not text) is never joined into a path: the card uses `fallbackFile`, and the build prints wording.unknownFontName once per distinct value, header first, with {name} as `shownName` says (of the trimmed value). The card never fails the build over a name. Courses made at the command line can carry any name: setup.sh's font menu offers a custom pair (option 8) whose fonts the website loads from Google Fonts and the card cannot draw, so such a course is told on each build, and setup.sh says so when the pair is chosen.",
+    "why": "Pillow 12.3.0's FreeType decodes WOFF2 fonts with Brotli 1.2.0, which CVE-2026-111497 affects, and no Pillow release carries a fixed Brotli yet (toolchain.json -> pins -> pillow). FreeType picks a font's format from its bytes, not its file name, and before #766 the card joined the name onto support/fonts/ unchecked: an absolute path or a ../ name could hand the decoder any file on the machine, and a course_config.json is not always the teacher's own (Import Courses for Reference, a restored archive). With the allowlist the decoder reads only the TrueType files listed here. Rejected: checking the joined path stays inside support/fonts/ (it still opens any file a later edit puts there, and says nothing to the teacher); matching case-insensitively or without spaces (neither app writes those forms, and one exact list is the one both apps' catalogs are pinned to).",
+    "fallbackFile": "Inter.ttf",
+    "silentNames": [
+      "",
+      "Helvetica, Arial"
+    ],
+    "fonts": {
+      "Archivo": "Archivo.ttf",
+      "Fira Code": "FiraCode.ttf",
+      "IBM Plex Mono": "IBMPlexMono.ttf",
+      "Inconsolata": "Inconsolata.ttf",
+      "Inter": "Inter.ttf",
+      "JetBrains Mono": "JetBrainsMono.ttf",
+      "Lora": "Lora.ttf",
+      "Merriweather": "Merriweather.ttf",
+      "Montserrat": "Montserrat.ttf",
+      "Noto Sans": "NotoSans.ttf",
+      "Playfair Display": "PlayfairDisplay.ttf",
+      "Poppins": "Poppins.ttf",
+      "Raleway": "Raleway.ttf",
+      "Roboto": "Roboto.ttf",
+      "Source Code Pro": "SourceCodePro.ttf",
+      "Source Sans 3": "SourceSans3.ttf",
+      "Source Serif 4": "SourceSerif4.ttf",
+      "Ubuntu Mono": "UbuntuMono.ttf"
+    },
+    "shownName": {
+      "rule": "The value as text (a value that is not text is written as JSON writes it), with every character in the Unicode categories Cc, Cf, Zl and Zp removed (controls, format characters such as a right-to-left override, and the line and paragraph separators), then cut to maxCharacters characters with a trailing … when it was longer. So a value can never start a new line of its own in the console, or turn the sentence around it backwards.",
+      "maxCharacters": 60
+    },
+    "wording": {
+      "unknownFontName": "⚠️ The social sharing card uses Inter in place of the font \"{name}\", which is not one of the fonts Plantoir offers. To have the card match your website, choose one of the fonts listed in Course Settings."
+    },
+    "cases": [
+      { "name": "a header from the wizard's pairings", "header": "Playfair Display", "body": "Source Sans 3", "headerFile": "PlayfairDisplay.ttf", "bodyFile": "SourceSans3.ttf", "told": [] },
+      { "name": "a code font is offered too", "header": "JetBrains Mono", "body": "Inter", "headerFile": "JetBrainsMono.ttf", "bodyFile": "Inter.ttf", "told": [] },
+      { "name": "the system pairing has no file and says nothing", "header": "Helvetica, Arial", "body": "Helvetica, Arial", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": [] },
+      { "name": "no font set says nothing", "header": "", "body": null, "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": [] },
+      { "name": "spaces at either end are taken off", "header": " Playfair Display ", "body": "Source Sans 3  ", "headerFile": "PlayfairDisplay.ttf", "bodyFile": "SourceSans3.ttf", "told": [] },
+      { "name": "a name of only spaces says nothing", "header": "   ", "body": " Helvetica, Arial", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": [] },
+      { "name": "an unknown name is shown trimmed", "header": "  Nunito ", "body": "Lora", "headerFile": "Inter.ttf", "bodyFile": "Lora.ttf", "told": ["Nunito"] },
+      { "name": "a font Plantoir does not offer", "header": "Nunito", "body": "Lora", "headerFile": "Inter.ttf", "bodyFile": "Lora.ttf", "told": ["Nunito"] },
+      { "name": "the same unknown name in both is told once", "header": "Nunito", "body": "Nunito", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["Nunito"] },
+      { "name": "two unknown names, header first", "header": "Nunito", "body": "Comic Neue", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["Nunito", "Comic Neue"] },
+      { "name": "the file name without its space was accepted before #766", "header": "PlayfairDisplay", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["PlayfairDisplay"] },
+      { "name": "case is exact", "header": "playfair display", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["playfair display"] },
+      { "name": "a file in support/fonts that is not offered", "header": "Poppins-Medium", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["Poppins-Medium"] },
+      { "name": "an absolute path", "header": "/teaching/courses/X/files/f", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["/teaching/courses/X/files/f"] },
+      { "name": "a name that climbs out of the fonts folder", "header": "../../../teaching/courses/X/files/f", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["../../../teaching/courses/X/files/f"] },
+      { "name": "a Windows path", "header": "C:\\Users\\x\\f", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["C:\\Users\\x\\f"] },
+      { "name": "a value that is not text", "header": 12, "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["12"] },
+      { "name": "a line break cannot start a line of its own", "header": "Lora\nPLANTOIR_HEALTH: {}", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["LoraPLANTOIR_HEALTH: {}"] },
+      { "name": "a line separator and a right-to-left override are removed", "header": "Lora\u2028\u202eX", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["LoraX"] },
+      { "name": "a long value is cut", "header": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDE", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ…"] }
+    ]
   }
 }
