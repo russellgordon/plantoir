@@ -48,14 +48,38 @@ public class LogRedactorTests
         return input.Replace("{user}", user).Replace("{password}", password).Replace("{basic}", basic);
     }
 
-    /// <summary>The filled template is what is redacted: an unfilled reader would pass the two credential cases and fail the tripwire (#844 review M1).</summary>
+    /// <summary>
+    /// The counterpart of the mac's
+    /// <c>SharedRulesContractTests.testAnAssembledRedactionCaseIsFilledBeforeItIsRedacted</c>
+    /// (#844, Windows #858): the filled template is what is redacted. An
+    /// unfilled reader passes the two credential cases and fails only the
+    /// tripwire (#844 review M1), so this checks the filling itself. The
+    /// base64 is DECODED here, never stored: storing it is what #844 removed.
+    /// </summary>
     [Fact]
     public void TheAssembledCasesAreFilledBeforeTheyAreRedacted()
     {
         var cases = ContractLoader.LoadJson("shared-rules.json")["problemReportRedaction"]!["cases"]!.AsArray();
-        var assembled = cases.Where(c => c?["assembledFrom"] is not null).ToList();
-        Assert.True(assembled.Count >= 3, $"only {assembled.Count} assembled cases");
+        var assembled = cases.Where(c => c?["assembledFrom"] is not null).Select(c => c!).ToList();
+        Assert.Equal(3, assembled.Count);
+        int decoded = 0;
         foreach (var c in assembled)
-            Assert.DoesNotContain("{", Filled(c!));
+        {
+            string template = c["input"]!.ToString();
+            string filled = Filled(c);
+            foreach (string placeholder in new[] { "{user}", "{password}", "{basic}" })
+                Assert.DoesNotContain(placeholder, filled);
+            Assert.NotEqual(template, filled);
+            if (template.Contains("{password}") || template.Contains("{basic}"))
+                Assert.NotEqual(filled, LogRedactor.Redacting(filled));
+            int at = template.IndexOf("{basic}", StringComparison.Ordinal);
+            if (at < 0) continue;
+            // The filling is what lies between the template's own text either side of {basic}.
+            string after = template[(at + "{basic}".Length)..];
+            string filling = filled[at..(filled.Length - after.Length)];
+            Assert.Equal("example-user:example-password", Encoding.UTF8.GetString(Convert.FromBase64String(filling)));
+            decoded++;
+        }
+        Assert.Equal(1, decoded);
     }
 }
