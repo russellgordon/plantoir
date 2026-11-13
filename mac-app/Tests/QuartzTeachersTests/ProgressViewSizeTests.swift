@@ -494,28 +494,51 @@ final class ProgressViewSizeTests: XCTestCase {
     /// "simplifying" `body` back into one `ZStack` — which is exactly what it
     /// looked like until issue #219 — turns nothing red.
     func testTheNoticeIsMountedAboveTheStackTheSiteLivesIn() throws {
+        // Since #793 the page draws only the chosen tab's content
+        // (`SectionTabContent`), and the Website tab's stack, the console and
+        // placeholder with the site over them, is `websiteLayers` in
+        // SectionDetailCoverage.swift. The notice is still mounted in
+        // `sectionLayout`, ABOVE the tab content and so above that stack: the
+        // property #219 needs, in its new shape.
         let source: String = try readSource(
             "QuartzTeachers/Views/Section/SectionDetailView.swift"
+        )
+        let layers: String = try readSource(
+            "QuartzTeachers/Views/Section/SectionDetailCoverage.swift"
         )
         let notice: Range<String.Index> = try XCTUnwrap(
             source.range(of: "ScheduledPublishNoticeView("),
             "SectionDetailView no longer shows the scheduled-publish notice at all"
         )
+        let content: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "SectionTabContent(showing: selectedTab) {\n                websiteLayers"),
+            "SectionDetailView no longer draws the Website tab's stack through its tab content"
+        )
+        XCTAssertTrue(
+            notice.lowerBound < content.lowerBound,
+            "The notice must be mounted ABOVE the stack the site lives in, or a teacher with a preview showing sees nothing but a tint through the toolbar — issue #219"
+        )
+        let stackHome: Range<String.Index> = try XCTUnwrap(
+            layers.range(of: "var websiteLayers: some View {"),
+            "the Website tab's stack is gone"
+        )
+        let rest: Substring = layers[stackHome.upperBound...]
         let stack: Range<String.Index> = try XCTUnwrap(
-            source.range(of: "ZStack {"),
+            rest.range(of: "ZStack {"),
             "SectionDetailView no longer has the stack the site is laid over"
         )
         let site: Range<String.Index> = try XCTUnwrap(
-            source.range(of: "WebPreviewView("),
+            rest.range(of: "WebPreviewView("),
             "SectionDetailView no longer shows the site"
-        )
-        XCTAssertTrue(
-            notice.lowerBound < stack.lowerBound,
-            "The notice must be mounted ABOVE the stack the site lives in, or a teacher with a preview showing sees nothing but a tint through the toolbar — issue #219"
         )
         XCTAssertTrue(
             stack.lowerBound < site.lowerBound,
             "The site must still be laid inside that stack, over the console and the placeholder"
+        )
+        XCTAssertFalse(
+            rest[..<stack.lowerBound].contains("ScheduledPublishNoticeView(")
+                || layers.contains("ScheduledPublishNoticeView("),
+            "The notice must not move into the site's stack"
         )
     }
 

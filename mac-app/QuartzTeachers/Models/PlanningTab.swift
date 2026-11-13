@@ -225,6 +225,10 @@ nonisolated enum PlanNavigation {
         case openOutside
         /// Cancel it, silently.
         case refuse
+        /// Cancel it and hand it to the app itself: a click on a code in the
+        /// Coverage tab's map (#793, `CoverageNavigation`). A plan never
+        /// gets this answer.
+        case handToTheApp
     }
 
     // MARK: - Stored properties

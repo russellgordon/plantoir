@@ -984,7 +984,7 @@
       },
       {
         "event": "page opened in Obsidian",
-        "carries": "the course and section, and EITHER the place in the course folder of the file Open in Obsidian opened for the page the preview showed (without .md), with '(hidden from students)' when the page is hidden, OR why it opened the section as before instead: no preview page was showing, the list of pages could not be read, the page is not one of the course's own files, two files make that address, the file is outside the course folder, or it is gone. The exact words are obsidianOpensThePreviewedPage.trail and .fallbacks. Written for every SECTION press (the section window's button, Section > Open in Obsidian, a section row's menu, and since #610 the in-app assistant's open_in_obsidian, which presses that window's button through the same route, so its press writes this one line and no other) that goes ahead - a press turned away while the add-ons scan is still running writes nothing - the fallback included (ruling 5) - and never for a course press. NEVER anything written on the page.",
+        "carries": "the course and section, and EITHER the place in the course folder of the file Open in Obsidian opened for the page the preview showed (without .md), with '(hidden from students)' when the page is hidden, OR why it opened the section as before instead: no preview page was showing, the list of pages could not be read, the page is not one of the course's own files, two files make that address, the file is outside the course folder, or it is gone. The exact words are obsidianOpensThePreviewedPage.trail and .fallbacks. Since #793 (793b) also a click on a code on a section's Coverage tab, which goes through the same route: that Obsidian was ASKED to open the expectation's page (its place without .md, and its code; the route cannot confirm it opened, #721), or that it did not open that code and why (its page is no longer there, is not inside the course folder, the map on screen was older than its record, the map names no page for it, or Obsidian is not on this Mac); the exact words are coverageTab.tab.trailWords (opened, didNotOpen and the why words). Written for every SECTION press (the section window's button, Section > Open in Obsidian, a section row's menu, and since #610 the in-app assistant's open_in_obsidian, which presses that window's button through the same route, so its press writes this one line and no other) that goes ahead - a press turned away while the add-ons scan is still running writes nothing - the fallback included (ruling 5) - and never for a course press. NEVER anything written on the page.",
         "line": "ICS3U/1 · opened Unit 1/Lesson 3 in Obsidian, the page the preview shows",
         "why": "#518. Which file opened is decided out of sight - the build's list, the address on screen, the front page's embed - so 'I pressed Open in Obsidian and got the wrong page' (or the front page) has its answer only here, and which of the reasons it was says whether anything is wrong at all."
       },
@@ -1081,6 +1081,18 @@
         "carries": "the course and which assistant (Claude or Codex) - nothing the teacher typed, and nothing from a plan: its title and contents are the teacher's own",
         "line": "{course} · asked {assistant} to plan a unit from the Planning tab",
         "why": "#708: Plan a Unit with Claude… / Plan a Unit with Codex… on a course's empty Planning tab (unitPlanning.tab, app-rules.json -> outsideAgents.planAUnit). The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, as 'asked an assistant to fix problems' argued. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for looking at a plan, choosing a unit, Back, Forward or Reload: none of them changes anything."
+      },
+      {
+        "event": "looked at a section's curriculum coverage",
+        "carries": "the course and section, then one of: how many coverage maps the Coverage tab showed, how many expectations across them and how many not yet addressed if every page were published, and when the map's build started (yyyy-MM-dd HH:mm), with whether pages had changed since and whether the map is not the latest build's; or that there was no map yet, or one made by another version of Plantoir, or that the last build found no curriculum to map; or, as a further line, that the map could not be shown at all. Counts and states only: NEVER an expectation's words, a page's words or a path. The exact words are coverageTab.tab.trailWords.",
+        "line": "ICS3U/2 · looked at the Coverage tab: 1 map, 57 expectations, 12 not yet addressed if every page were published; made 2026-11-12 14:04",
+        "why": "#793 (793b). The map is made out of sight, by every build, and read back by the tab, so a report of 'the Coverage tab is empty', 'it shows an old map' or 'it is blank' needs a line to start from: which map the tab had, how old, and whether it was another build's. Once per appearance of the tab, as the Planning tab's line is (708 implementation review M1)."
+      },
+      {
+        "event": "asked to make a section's coverage map again",
+        "carries": "the course and section, and that Make the Map (Again) was pressed on the Coverage tab; then, as a further line once it settled, whether the map was made again, or the build ended before it made one, or the preview could not start. NEVER anything written on a page. The exact words are coverageTab.tab.trailWords (asked, madeAgain, didNotFinish, refused).",
+        "line": "ICS3U/2 · asked to make the coverage map again from the Coverage tab",
+        "why": "#793 (793b). A refresh builds the section's preview in the background while the teacher stays on the tab, and says how it ended only in the tab; 'I pressed Make the Map Again and nothing changed' is answerable only if the trail says it was asked and how it came out. The preview's own lines say what the build did."
       },
       {
         "event": "looked at a course's unit plans",
@@ -5238,7 +5250,1678 @@
     "whereItIsWritten": "In the section's built output, in a hidden folder .coverage-tab beside public/, .page-sources.json and .problems.json: never in content/, which Quartz publishes, never in public/, which every deploy sends, and never in the course folder, which would sync and which #768's change walk would read as a change. file-formats.json -> coverageTabMap names the files and the order they are written in.",
     "whenItIsWritten": "On every build of the section, whatever the section's coverage-map setting says (Russell's ruling, 2026-11-12: the setting decides what students see, not the teacher's planning view), after the How I Teach sweep, the hiding of pages whose settings cannot be read and the clearing of a site the build cannot replace, and BEFORE the section's problems record, so by the time the PLANTOIR_PROBLEMS: line every build prints arrives, the map STEP has run. That line does NOT say the step succeeded: it never fails a build, and anything that goes wrong (a full disk, a folder that cannot be written) prints one warning line (consoleWords.couldNotMake) and leaves the previous build's map and record as they were. So the map is THIS build's only when about.json's buildId equals the build's own id (the buildId the PLANTOIR_PROBLEMS: line carries, and the section's .build-id); otherwise the map is another build's, and the tab must say so (mapOfThisBuild; the implementation review's M2). Which map belongs is never decided by the clock: the build that owns the section's .build-id (the last to start) writes its map and removes the others; a build that no longer owns it leaves the record and the other build's map alone (file-formats.json -> coverageTabMap.orderOfWriting). A successful map prints nothing (the plan review's M4: a line naming a tab before the app has one, under the site's own map line with different numbers, would mislead).",
     "reusedBuild": "A deploy that reuses the last build (#768) runs no Python, so the map stays exactly as that build left it, with its own startedNs. That is true: the build was reused because nothing in the course changed since it started. A deploy that builds writes a new map like a preview. Nothing ever re-dates an old map.",
-    "trail": "None from 793a: the build already records itself, and 793a shows a teacher nothing. The app's line for looking at the tab is 793b's.",
+    "trail": "793a writes no trail line: the build records itself. The tab's lines are tab.trail's (793b).",
+    "tab": {
+      "note": "793b, the app half of #793: the Coverage tab on a section's page, which shows the map 793a's build writes (file-formats.json -> coverageTabMap). Every rule below is a case both apps run, and every sentence the tab shows is in words, pinned by name (mac: CoverageTabTests). A test names a sentence by its key, never by quoting it. {when} is the map's startedNs in the app's own date and time style, {code} a code from the click, {reason} the sentence the preview's own refusal says; the two words that name the computer carry specialNames.platformWording.machine's placeholder, recorded in its usedIn.",
+      "notLayered": "Only the chosen tab's content is in the window: the section's Website content (the console or placeholder and the preview over it), the Coverage tab, or the Problems tab, never one over another (the plan review's H1, the shape the course page ended with in #708). While Coverage or Problems shows, the preview's web view is not in the window, so no key, Space or paste reaches it, and the browser commands (Back, Forward, Reload Page) are not offered to it: the focused preview is nil and the toolbar's Back, Forward and Reload are disabled. The preview's web view is owned by its controller, so a switch back finds the same web view with its page and scroll (mac: SectionDetailStructureTests). State that must survive a switch lives in a model (mac: SectionCoverage, keyed per section): the map's web view, the record read last, and a refresh under way.",
+      "tabCases": [
+        {
+          "name": "no curriculum and no problems: no bar, as before",
+          "hasCurriculum": false,
+          "recordHasMaps": false,
+          "hasProblems": false,
+          "chosen": "website",
+          "expectShown": [],
+          "expectShowing": "website"
+        },
+        {
+          "name": "curriculum only",
+          "hasCurriculum": true,
+          "recordHasMaps": false,
+          "hasProblems": false,
+          "chosen": "website",
+          "expectShown": [
+            "website",
+            "coverage"
+          ],
+          "expectShowing": "website"
+        },
+        {
+          "name": "the last map names a map, the course root shows none (a curriculum folder inside a section)",
+          "hasCurriculum": false,
+          "recordHasMaps": true,
+          "hasProblems": false,
+          "chosen": "coverage",
+          "expectShown": [
+            "website",
+            "coverage"
+          ],
+          "expectShowing": "coverage"
+        },
+        {
+          "name": "problems only",
+          "hasCurriculum": false,
+          "recordHasMaps": false,
+          "hasProblems": true,
+          "chosen": "problems",
+          "expectShown": [
+            "website",
+            "problems"
+          ],
+          "expectShowing": "problems"
+        },
+        {
+          "name": "both, in order",
+          "hasCurriculum": true,
+          "recordHasMaps": true,
+          "hasProblems": true,
+          "chosen": "coverage",
+          "expectShown": [
+            "website",
+            "coverage",
+            "problems"
+          ],
+          "expectShowing": "coverage"
+        },
+        {
+          "name": "Coverage chosen, then the curriculum is gone: Website",
+          "hasCurriculum": false,
+          "recordHasMaps": false,
+          "hasProblems": true,
+          "chosen": "coverage",
+          "expectShown": [
+            "website",
+            "problems"
+          ],
+          "expectShowing": "website"
+        },
+        {
+          "name": "Problems chosen, then the problems are gone: Website, not the neighbour",
+          "hasCurriculum": true,
+          "recordHasMaps": true,
+          "hasProblems": false,
+          "chosen": "problems",
+          "expectShown": [
+            "website",
+            "coverage"
+          ],
+          "expectShowing": "website"
+        }
+      ],
+      "tabRule": "Website, then Coverage, then Problems; no bar when Website would be the only tab. Coverage is in the bar when the course has a curriculum folder holding an expectation page (curriculumRules, the build's own rule) or the section's record names at least one map, WHATEVER the section's website coverage setting says (Russell, 2026-11-12). It needs no assistant. A course with neither has no Coverage tab and no line about it (absent, never disabled, #708's ruling). The tab showing is the one chosen while it is in the bar, otherwise Website, never a neighbour.",
+      "readingTheRecord": "The tab reads about.json and the page it names, never the HTML, against the section's .build-id (mapOfThisBuild). noRecord: no record, one that cannot be read, a page name that is not a plain file name, or the named page not there. otherVersion: a record whose version is there and is not 1 (said in its own words; no map is shown). noMaps: version 1 with page null (the build found no curriculum to map). thisBuild and anotherBuild as mapOfThisBuild says. A record a later build of the section wrote is read when the tab appears, when any run in the app prints its PLANTOIR_PROBLEMS: line (the map is written before it), when a run of the section starts or ends, and when the app comes to the front (a scheduled deploy's or an outside assistant's build). No polling, no folder watch.",
+      "freshness": "changedSince and mayBeOutOfDate come from #768's own rule, BuildFreshness.changedSince (mac) / its Windows twin, asked of the moment the MAP's build started (record startedNs), not of the site's .build-started or public/index.html: the map, unlike the site, is written mid-build, so its own start is its reference (the plan review's M1). pages: something in the course changed after it (changedSince). clock: it is still dated later than now. A null startedNs: nobody can tell. Both of the last two say mayBeOutOfDate. The walk runs off the main thread. A first build after a class date moves rewrites dates in pages after it starts (build_site's write-back), so the map made by that build reads changedSince straight away: true, and errs safe.",
+      "stateCases": [
+        {
+          "name": "this build's map, nothing changed since",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "pages changed since the map's build started",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "pages",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "changedSince",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "the map's build is dated later than now (the clock, #768's M1)",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "clock",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "mayBeOutOfDate",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "the record has no start time: no empty date",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "unknown",
+            "startKnown": false,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOfNoTime",
+              "mayBeOutOfDate",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "a new map whose walk for changes has not come back yet: no line, and no claim it is current",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "notKnownYet",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "pressed, and a preview still running is being stopped first: making, from the press",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "starting",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "Obsidian is not installed: the hint would be false, so the tab says so instead",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": false
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "noObsidian"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "a refresh was asked for and its build has not reached the map",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "a refresh was asked for and the build has not started yet",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the Preview button's build, before its map: the same being-made-again state",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "this window's build has made its map and is still building the site",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the refresh's own build has started and moved .build-id, before its map: the latest build is the one making it",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuilding",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the same with no start time",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "unknown",
+            "startKnown": false,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuildingNoTime",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the refresh's build ended, or was stopped, before it made the map",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "didNotFinish",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "couldNotMakeAgain",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "the latest build ran its map step and made no map: another build's map, nothing running",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMap",
+              "couldNotMakeAgain",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "an earlier build's map with no start time",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "unknown",
+            "startKnown": false,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapNoTime",
+              "couldNotMakeAgain",
+              "mayBeOutOfDate",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "another build's map while a deploy of this section is building",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": true,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuilding",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "a deploy of this section that has not started a new build (or reuses the last)",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": true,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "deploying",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "another program is building the course",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": true,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "elsewhere",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "another program built the section and it made a map: another build's map while it runs",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": true,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuilding",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "another window of this app holds the section's preview",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": true,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "otherWindow",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the preview could not start: said in the tab, never an alert",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "refused",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "couldNotMakeAgain",
+              "refusedReason",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "a preview is showing: the tab says before the press that making the map again restarts it",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": true,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "previewRestarts",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "the refresh stopped a showing preview and starts it again with its build",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": true,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "makingWithThePreview",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the same, with the preview open in the web browser too: reload it there",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": true,
+            "browserHasThePreview": true,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "makingWithThePreview",
+              "browserReload",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "another window's build has moved .build-id before its map: no claim the latest build made none",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": true,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuilding",
+              "otherWindow",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "no map yet",
+          "facts": {
+            "record": "noRecord",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "empty",
+            "lines": [],
+            "button": "makeTheMap",
+            "buttonEnabled": true,
+            "description": "emptyDescription"
+          }
+        },
+        {
+          "name": "no map yet, and a refresh is making it",
+          "facts": {
+            "record": "noRecord",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "empty",
+            "lines": [
+              "making"
+            ],
+            "button": "makeTheMap",
+            "buttonEnabled": false,
+            "description": "emptyDescription"
+          }
+        },
+        {
+          "name": "no map yet, and the refresh's build ended without one",
+          "facts": {
+            "record": "noRecord",
+            "refresh": "didNotFinish",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "empty",
+            "lines": [
+              "couldNotMake"
+            ],
+            "button": "makeTheMap",
+            "buttonEnabled": true,
+            "description": "emptyDescription"
+          }
+        },
+        {
+          "name": "a map made by another version of Plantoir is not shown",
+          "facts": {
+            "record": "otherVersion",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "empty",
+            "lines": [],
+            "button": "makeTheMap",
+            "buttonEnabled": true,
+            "description": "emptyOtherVersion"
+          }
+        },
+        {
+          "name": "the last build found no curriculum to map",
+          "facts": {
+            "record": "noMaps",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "empty",
+            "lines": [],
+            "button": "makeTheMap",
+            "buttonEnabled": true,
+            "description": "emptyNoCurriculum"
+          }
+        },
+        {
+          "name": "the page's rule list could not be made: no map is ever shown",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": false,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "cannotShow",
+            "lines": [],
+            "button": null,
+            "buttonEnabled": false,
+            "description": "cannotShowDescription"
+          }
+        }
+      ],
+      "stateRule": "making: a refresh is pending, or this window's own build has not yet printed its problems line, or the map is another build's while a build of the section is running (this window's, a deploy's, or another program's). When not making: couldNotMakeAgain (with a map) or couldNotMake (without) when the refresh did not finish or was refused (refused adds the refusal's own sentence, refusedReason), or when the map is another build's and nothing is building; then changedSince or mayBeOutOfDate (with a map); then one of deploying, elsewhere or otherWindow, first that holds. With a map, the first line is asOf (thisBuild), olderMapWhileBuilding while making (a build in progress has already written .build-id, so 'the latest build made no map' would be false), or olderMap otherwise, each in a NoTime form when the record has no start time (startKnown); the last is clickHint, or noObsidian when Obsidian is not installed. The button is makeTheMapAgain with a map and makeTheMap without, and is disabled while making, while this window's build runs, while the section deploys, while another program builds the course, and while another window holds the section's preview (and, outside these cases, while the folder is being copied or made ready, with that reason as its help).",
+      "sequenceCases": [
+        {
+          "name": "one press with no preview running: the build starts at once",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "one press with a preview serving: it is stopped and waited for, then the build starts",
+          "previewRunning": true,
+          "duringTheStop": [],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a second press while the old preview stops does nothing: one build, its wait left alone",
+          "previewRunning": true,
+          "duringTheStop": [
+            "press"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the OLD run's end arriving while it stops, read as the view reads it (a reading, then the run's end), settles nothing",
+          "previewRunning": true,
+          "duringTheStop": [
+            "reloadThenOwnRunEnded"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a reading while it stops (the app coming to the front, a click) leaves the press alone",
+          "previewRunning": true,
+          "duringTheStop": [
+            "reload"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a Preview the teacher starts while it stops is the build: the refresh starts nothing of its own",
+          "previewRunning": true,
+          "duringTheStop": [
+            "teacherStartsAPreview"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 0,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "another window on the same section leaving while it stops abandons nothing",
+          "previewRunning": true,
+          "duringTheStop": [
+            "anotherWindowLeaves"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "another window stopping its own preview while the refresh builds settles nothing",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [
+            "anotherWindowsRunEnded"
+          ],
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the old run's end arriving AFTER its stop has finished is waited for, as an event: the build then starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "oldRunEndsLate"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the old run's end without a reading (the store's own rule)",
+          "previewRunning": true,
+          "duringTheStop": [
+            "ownRunEnded"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a switch of section or course, or the window closing, while the old preview stops: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "leave"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 0,
+            "refresh": "didNotFinish",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "quitting while the old preview stops: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "quit"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 0,
+            "refresh": "didNotFinish",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a press while the refresh's own build runs does nothing",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [
+            "press"
+          ],
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the preview could not start: settled at once, never left waiting",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [],
+          "startRefused": true,
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "didNotFinish",
+            "askedLines": 1
+          }
+        }
+      ],
+      "sequenceInterleavings": {
+        "rule": "Generated, not hand-picked (the 793b fix review's H1): a press with a preview serving, then one event at each of three points, every combination of them. The points are duringTheStop (the old preview is being stopped), afterTheStart (the refresh's build has begun and written .build-id, no map yet) and afterTheMap (that build's map and record are on disk; a build that ended or reported no map at afterTheStart writes none). After the last point the view's own run end arrives (a reading, then noteOwnRunEnded). Expect: one stop and one start, except teacherStartsAPreview, which is the build, so no start of the refresh's own; the refresh stays starting through every event at duringTheStop; it ends didNotFinish exactly when afterTheStart is reloadThenOwnRunEnded or reloadAfterAMarker (the build ended, or ran its map step and made none), and none (the map made again) otherwise; one 'asked' line always.",
+        "duringTheStop": [
+          "nothing",
+          "reload",
+          "reloadThenOwnRunEnded",
+          "anotherWindowLeaves",
+          "teacherStartsAPreview"
+        ],
+        "afterTheStart": [
+          "nothing",
+          "reload",
+          "reloadThenOwnRunEnded",
+          "reloadAfterAMarker"
+        ],
+        "afterTheMap": [
+          "nothing",
+          "reload",
+          "reloadAfterAMarker",
+          "reloadThenOwnRunEnded"
+        ]
+      },
+      "sequenceRule": "The press is recorded AT ONCE, before anything is awaited (the 793b review's H1): the refresh is starting, with a token, and the tab says making with the button unavailable from that instant. A preview already running is stopped and waited for; its run ending meanwhile is the old run's and settles nothing. The build starts only if the press's token survives the stop: leaving the section, the course or the window, or quitting, clears it (didNotFinish), so a view that has gone never starts a preview nobody would stop. A second press while starting or pending does nothing, so it never ends the running build's wait (#232's record of a build in progress). A start that did not begin (refused, or the course being copied) is settled at once. A reading of the record never moves a press out of starting: only its own start or its abandon does (the 793b fix review's H1, where a reading during the stop, which the old run's end always brings, wiped the press and nothing started). A preview somebody started during the stop (the teacher's own Preview, the assistant) is the build: the refresh starts nothing, so that build keeps its wait (⌘Q still asks about it). Only the pressing window's leaving, or its own run ending, settles the press; another window on the same section settles nothing. After the stop, the OLD run's end is waited for as an event if it has not come (oldRunEndsLate), so a build already running is never that old run (the 793b fix review 2's LOW 1). A preview that was showing starts again at the page last viewed (previewStartPage's lastViewed, the Preview button's own rule), and the tab says so before the press (previewRestarts) and while it builds (makingWithThePreview), with browserReload when this window had handed the preview to the web browser: Quartz's live-reload client there does not reconnect, so that tab must be reloaded once by hand. In a case, stops and starts count the stop and start the steps asked for, refresh is the state at the end, askedLines the trail lines saying the press was made; a press refused by the preview's own rule is startRefused.",
+      "refresh": "Make the Map (Again) runs the section's ordinary preview build in the background (Russell, 2026-11-12: no map-only run): a preview already running is stopped and waited for, then the preview starts through the way in every caller but the Preview button uses (mac: startPreview, never pressPreview), so the question about today's class is never asked. The teacher stays on the Coverage tab: no switch to Website, no browser, no focus taken. The refresh is a per-section state driven by events: pending from the press; the map made again when a reading finds the record thisBuild with a buildId other than the one it had at the press (the tab updates in place, before Quartz has finished); didNotFinish when this build printed its problems line and the map is not its own, or when this window's build ended, was stopped or cancelled, or the section's view went away (a switch of section stops its build) before that; refused, with the refusal's sentence, when the preview could not start. A later build's own map clears an earlier didNotFinish or refused. Quitting leaves nothing: the state is memory only, and the map's files are written whole by the build. Between the press and the start the refresh is starting (sequenceRule). A preview serving when the refresh is pressed starts again at the site's front page, as every way in but the Preview button does: the teacher's place in the preview is not kept.",
+      "alertsWait": "While the Coverage tab shows, nothing a build can raise pops up over it (Russell, 2026-11-12): the Problems alert stays due, the links checklist waits, and the refusal of the tab's own START (only while that start runs, which is when its refusals come) is said in the tab instead (refusedReason) and not shown as an alert. A refusal of anybody else's press, in this window or another, is shown as ever, Coverage or not, to whoever pressed (the 793b review's M2 and the fix review's M1, M2). A 'preview did not appear', which arrives long after any press, is held while Coverage shows and raised when the teacher leaves it. The Problems tab still appears in the bar. What waited is raised when the teacher next shows Website or Problems, one at a time, as it would have been. The question about today's class is asked only by the Preview button, which a refresh never presses.",
+      "whatAPageMayRead": "The map is content Plantoir did not write (it comes from course content), so it is shown by the Planning tab's web view, parameterised, never a second one: unitPlanning.tab.whatAPageMayRead's three guards, with the .coverage-tab folder (every link followed) as the only folder the page may read, a rule list of its own name compiled from the same text, scripts off, nothing stored, and the network blocked. A rule list that cannot be made shows cannotShowTitle and cannotShowDescription and writes a trail line, and no page is ever shown without it.",
+      "navigationCases": [
+        {
+          "name": "the map's own page",
+          "url": "file://{folder}/map-20261112T190405Z-ab12cd34.html",
+          "isNewWindow": false,
+          "byALinkClick": false,
+          "expect": "load"
+        },
+        {
+          "name": "a place on the page",
+          "url": "file://{folder}/map-20261112T190405Z-ab12cd34.html#strand-a",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "load"
+        },
+        {
+          "name": "the built site beside the folder",
+          "url": "file://{folder}/../public/index.html",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a code, clicked",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "handToTheApp"
+        },
+        {
+          "name": "a code, not clicked (a refresh or a frame)",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1",
+          "isNewWindow": false,
+          "byALinkClick": false,
+          "expect": "refuse"
+        },
+        {
+          "name": "a code asking for a new window, clicked",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1",
+          "isNewWindow": true,
+          "byALinkClick": true,
+          "expect": "handToTheApp"
+        },
+        {
+          "name": "an overall expectation's chip",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "handToTheApp"
+        },
+        {
+          "name": "a College Board objective on the second map",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/1/CRD-1.A",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "handToTheApp"
+        },
+        {
+          "name": "a map's place that is not a number",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/x/A1.1",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a fifth part",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1/extra",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a path in the code",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/%2E%2E%2Fsecret",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "markup in the code",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/%3Cb%3E",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a query on the code",
+          "url": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1?x=1",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "another verb",
+          "url": "plantoir-coverage:show/20261112T190405Z-ab12cd34/0/A1.1",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a web link, clicked: refused, the page has none",
+          "url": "https://example.com/",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a plain web link, clicked",
+          "url": "http://example.com/",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "an email link, clicked",
+          "url": "mailto:someone@example.com",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a script address",
+          "url": "javascript:void(0)",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        },
+        {
+          "name": "a data address",
+          "url": "data:text/html,hello",
+          "isNewWindow": false,
+          "byALinkClick": true,
+          "expect": "refuse"
+        }
+      ],
+      "navigationRule": "The page may load itself and files inside its folder (load; a new window loads here, loadHere). A CLICK on a plantoir-coverage: link of exactly the coverageTab.link form is handed to the app (handToTheApp); the same link not clicked (a refresh, a frame) is refused, so a page cannot open anything by being shown. Every other address, the web and email included, is refused without a word: the page has no outside links. {folder} in a case is the .coverage-tab folder.",
+      "linkCases": [
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1",
+          "expect": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.1"
+          }
+        },
+        {
+          "text": "PLANTOIR-COVERAGE:open/20261112T190405Z-ab12cd34/2/b2.3",
+          "expect": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 2,
+            "code": "b2.3"
+          }
+        },
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/1/CRD-1.A",
+          "expect": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 1,
+            "code": "CRD-1.A"
+          }
+        },
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1%2E1",
+          "expect": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.1"
+          }
+        },
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1%252E1",
+          "expect": null
+        },
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/-1/A1.1",
+          "expect": null
+        },
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/",
+          "expect": null
+        },
+        {
+          "text": "plantoir-coverage:open//0/A1.1",
+          "expect": null
+        },
+        {
+          "text": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1#top",
+          "expect": null
+        }
+      ],
+      "linkRule": "The click is read exactly (793b-must-do, item 3): the scheme in any letter case, then exactly four parts separated by '/', 'open' first, each part percent-decoded ONCE; the build id must be ASCII letters, digits and hyphens, the map's place ASCII digits alone (at most six), the code ASCII letters, digits, dots and hyphens. Anything else is not a link, and is refused (expect null).",
+      "itemCases": [
+        {
+          "name": "a listed code whose page is there",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.1"
+          },
+          "expect": "open",
+          "place": "Curriculum/A1.1"
+        },
+        {
+          "name": "an overall expectation's page",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1"
+          },
+          "expect": "open",
+          "place": "Curriculum/A1. Data"
+        },
+        {
+          "name": "a listed code whose page has gone since the build",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.2"
+          },
+          "expect": "gone"
+        },
+        {
+          "name": "a page swapped for a link pointing out of the course since the build",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.3"
+          },
+          "expect": "outside"
+        },
+        {
+          "name": "a path that climbs out of the course",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.4"
+          },
+          "expect": "outside"
+        },
+        {
+          "name": "a path that climbs out through the curriculum folder",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.5"
+          },
+          "expect": "outside"
+        },
+        {
+          "name": "a folder NAMED %2e%2e is an ordinary name, never decoded",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.6"
+          },
+          "expect": "open",
+          "place": "Curriculum/%2e%2e/A1.6"
+        },
+        {
+          "name": "a file that is not a page",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.7"
+          },
+          "expect": "outside"
+        },
+        {
+          "name": "a folder where the page was",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "A1.8"
+          },
+          "expect": "gone"
+        },
+        {
+          "name": "an absolute path",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "B1.1"
+          },
+          "expect": "outside"
+        },
+        {
+          "name": "a code the record does not list",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 0,
+            "code": "C9.9"
+          },
+          "expect": "notListed"
+        },
+        {
+          "name": "a map's place past the last map",
+          "click": {
+            "buildId": "20261112T190405Z-ab12cd34",
+            "map": 3,
+            "code": "A1.1"
+          },
+          "expect": "notListed"
+        },
+        {
+          "name": "a click on an older page than the record: reload, open nothing",
+          "click": {
+            "buildId": "20261111T080000Z-00000000",
+            "map": 0,
+            "code": "A1.1"
+          },
+          "expect": "reload"
+        }
+      ],
+      "itemRecord": {
+        "buildId": "20261112T190405Z-ab12cd34",
+        "maps": [
+          {
+            "pages": {
+              "A1.1": "Curriculum/A1.1.md",
+              "A1": "Curriculum/A1. Data.md",
+              "A1.2": "Curriculum/A1.2.md",
+              "A1.3": "Curriculum/A1.3.md",
+              "A1.4": "../elsewhere/A1.4.md",
+              "A1.5": "Curriculum/../../elsewhere/A1.5.md",
+              "A1.6": "Curriculum/%2e%2e/A1.6.md",
+              "A1.7": "Curriculum/A1.7.txt",
+              "A1.8": "Curriculum/A1.8.md",
+              "B1.1": "/etc/B1.1.md"
+            }
+          }
+        ]
+      },
+      "itemLayout": {
+        "files": [
+          "course/Curriculum/A1.1.md",
+          "course/Curriculum/A1. Data.md",
+          "elsewhere/A1.4.md",
+          "outside/A1.3.md",
+          "elsewhere/A1.5.md",
+          "course/Curriculum/%2e%2e/A1.6.md",
+          "course/Curriculum/A1.7.txt"
+        ],
+        "folders": [
+          "course/Curriculum/A1.8.md"
+        ],
+        "links": {
+          "course/Curriculum/A1.3.md": "../../outside/A1.3.md"
+        }
+      },
+      "itemRule": "A click opens maps[map].pages[code] from the record read AGAIN at the click, and only after checking it again (793b-must-do, item 4): a click naming another build id than the record's is a click on an older page, so the record's page is shown and nothing opens (reload); a map's place past the last map, or a code the map does not list, opens nothing (notListed). The path is taken LITERALLY: never percent-decoded; a path starting '/' or holding an empty, '.' or '..' part, or not ending .md, is outside. It is joined to the course folder, every link on the way followed, and must then be inside the course folder resolved the same way (else outside), end .md once resolved (else outside), and be a plain file (else gone: deleted since the build, or a folder now). It opens through Open in Obsidian's own route (mac: WorkspaceModel.openExpectationInObsidian), so a reference course's locked-pages note, the add-ons offer and registering a course Obsidian has never seen as a vault all happen exactly as they do for the toolbar's button. Obsidian not installed: nothing opens (the tab already says noObsidian). gone and outside put pageGone or pageOutside above the map until the next reading. In itemLayout, every path is below a temporary root; the record's paths are below its course/ folder; links maps a link's place to what it points at.",
+      "words": {
+        "tabCoverage": "Coverage",
+        "asOf": "Made when this section was last built, {when}.",
+        "asOfNoTime": "Made when this section was last built.",
+        "olderMap": "Made by an earlier build of this section, {when}. The latest build made no map.",
+        "olderMapNoTime": "Made by an earlier build of this section. The latest build made no map.",
+        "olderMapWhileBuilding": "Made by an earlier build of this section, {when}.",
+        "olderMapWhileBuildingNoTime": "Made by an earlier build of this section.",
+        "making": "Making the map again with a new build of this section…",
+        "makingWithThePreview": "Making the map again with a new build of this section… Its preview starts again when the build is done, at the page you were last reading.",
+        "previewRestarts": "Making the map again starts this section’s preview again, at the page you were last reading.",
+        "browserReload": "If this section’s preview is open in your web browser, reload it there once the build is done.",
+        "couldNotMakeAgain": "The map could not be made again this time.",
+        "couldNotMake": "The map could not be made this time.",
+        "changedSince": "Pages in the course have changed since then, so the map may be out of date.",
+        "mayBeOutOfDate": "Plantoir cannot tell whether pages have changed since then, so the map may be out of date.",
+        "deploying": "This section is being deployed. If its website is built again, the map is made again with it.",
+        "elsewhere": "Another program is building this course just now. If it builds this section, the map is made again with it.",
+        "otherWindow": "This section is being previewed in another window. Make the map again from there.",
+        "clickHint": "Click a code to open its page in Obsidian.",
+        "noObsidian": "Obsidian is not on this {machine}, so clicking a code opens nothing.",
+        "pageGone": "The page for {code} is no longer in the course. Make the map again to bring it up to date.",
+        "pageOutside": "The page for {code} is not inside the course folder, so it was not opened.",
+        "makeTheMap": "Make the Map",
+        "makeTheMapAgain": "Make the Map Again",
+        "makeHelp": "Builds this section’s preview again, which makes the map again. You stay on this tab.",
+        "emptyTitle": "No Coverage Map Yet",
+        "emptyDescription": "The map is made each time this section is previewed or deployed. Make it now to see what the course would cover once every page is published.",
+        "emptyOtherVersion": "This section’s map was made by another version of Plantoir. Make it again to see it here.",
+        "emptyNoCurriculum": "The last build of this section found no curriculum expectations to map. If you have added them since, make the map again.",
+        "cannotShowTitle": "The Map Can’t Be Shown",
+        "cannotShowDescription": "Plantoir could not get ready to show the map on this {machine}. Quitting Plantoir and opening it again may be enough."
+      },
+      "trailWords": {
+        "looked": "looked at the Coverage tab: {what}",
+        "oneMap": "1 map",
+        "maps": "{n} maps",
+        "counts": "{maps}, {e} expectations, {u} not yet addressed if every page were published; made {stamp}",
+        "changedSince": "; pages have changed since",
+        "notThisBuild": "; the latest build did not make it again",
+        "noMapYet": "no map made yet",
+        "otherVersion": "the map was made by another version of Plantoir",
+        "noCurriculum": "the last build found no curriculum to map",
+        "couldNotShow": "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet",
+        "asked": "asked to make the coverage map again from the Coverage tab",
+        "madeAgain": "the coverage map was made again",
+        "didNotFinish": "the coverage map could not be made again: the build ended before it was made",
+        "refused": "the coverage map could not be made again: the preview could not start",
+        "leftBeforeItsBuild": "the coverage map was not made again: the section was left before its build started",
+        "opened": "asked Obsidian to open {place}, curriculum expectation {code}, from the Coverage tab",
+        "didNotOpen": "did not open {code} from the Coverage tab: {why}",
+        "whyGone": "its page is no longer there",
+        "whyOutside": "its page is not inside the course folder",
+        "whyOlder": "the map on screen was older than its record",
+        "whyNotListed": "the map names no page for it",
+        "whyNoObsidian": "Obsidian is not installed"
+      },
+      "trail": "activityTrail.mustRecord: 'looked at a section's curriculum coverage' once each time the tab appears (looked, with counts across every map: how many maps, expectations and not yet addressed, and the map's start as yyyy-MM-dd HH:mm in the Mac's time zone, plus changedSince when the walk had already said so and notThisBuild when the map is another build's; or noMapYet, otherVersion, noCurriculum), and once when the map cannot be shown (couldNotShow). 'asked to make a section's coverage map again' when Make the Map (Again) is pressed (asked), and once more when it settles (madeAgain, didNotFinish or refused). A click writes 'page opened in Obsidian' (opened, with the page's place in the course folder without .md and the code; or didNotOpen with one of whyGone, whyOutside, whyOlder, whyNotListed, whyNoObsidian). Never an expectation's words or a page's words.",
+      "rejected": [
+        "Drawing the Coverage tab over the section's preview and console, disabled or moved focus: SwiftUI's disabled does not take the keyboard from a web view, and the browser commands reach the preview through the focused value whatever is on top (the plan review's H1; #708's fix review measured the same with a text box).",
+        "Running the Preview button's own path for a refresh: it can ask about today's class, and its refusals and the alerts after a build would pop up over the tab the teacher asked to stay on (the plan review's H2).",
+        "A timer, a fixed delay or a folder watch to notice the map: the build already says when the map step has run (its PLANTOIR_PROBLEMS: line), and the app knows when a run it started ends.",
+        "A second web view class for the map: the Planning tab's is parameterised, so a fix to its network block reaches both tabs.",
+        "Opening the page with obsidianOpening.openPage directly from the tab: it would skip the reference course's note and the add-ons offer that Open in Obsidian's route asks first.",
+        "Putting the click hint on the page: it would be false on a Mac without Obsidian, and on Windows until its tab is wired (the plan review's L1).",
+        "Holding every preview refusal while Coverage shows: a refusal of the teacher's own Preview press then arrived minutes later, out of context, or never (the 793b review's M2).",
+        "Recording the press only once the old preview had stopped: for those seconds the tab said nothing and the button could be pressed again, and a second press ended the running build's wait (the 793b review's H1).",
+        "Printing the map: not asked for. The tab has no Print; with the focused preview nil, the preview's own cannot be reached from it either."
+      ]
+    },
     "rejected": [
       "Counting in Swift and C#, or drawing the map natively: two more copies of the counting rule and the layout, which would drift from the site's.",
       "Making the map when the tab opens: a second build path and a wait, which Russell ruled out.",
@@ -10879,7 +12562,9 @@
           "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
-          "shared-rules.json:appUpdates.wording.elsewhereWork"
+          "shared-rules.json:appUpdates.wording.elsewhereWork",
+          "shared-rules.json:coverageTab.tab.words.cannotShowDescription",
+          "shared-rules.json:coverageTab.tab.words.noObsidian"
         ],
         "rule": "A sentence outside specialNames that names the teacher's computer is written ONCE, with {machine} where the computer's name goes, and each app puts in its own word: the mac 'Mac', Windows 'PC'. The placeholder is the bare NOUN and the sentence keeps its own determiner ('on this {machine}', 'restarting your {machine}'), because every such sentence Windows had reworded kept the determiner and swapped only the noun - so filling it changes no sentence on either platform. usedIn names every string in contracts/ that carries the placeholder, as file:path with array positions in brackets; SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded walks every contract file and goes red when the two differ, so a reader on either side can drive its fill off this list.",
         "why": "GitHub #418 (DO 1) and #410 (DO 1, DO 2), decided by Russell 2026-10-03. Before it, Windows carried its own copy of each such sentence (appUpdates.windowsWording.elsewhereWorkOnWindows; previewPorts.whenNoBlockIsFree.sentenceOnWindows) or compared with a substitution of its own (#233's 'your PC'), and a reworded sentence on one side would leave the other copy standing. REJECTED: a separate Windows key per sentence (two copies of every sentence, which is the drift this replaces); 'this Mac'/'this PC' as the placeholder's value (the sentences say 'your Mac' as well as 'this Mac', and changing either to fit would reword a sentence teachers already read); reusing the keys list above, whose substitution is 'on your Mac' -> 'on this PC' and changes the determiner as well as the noun."

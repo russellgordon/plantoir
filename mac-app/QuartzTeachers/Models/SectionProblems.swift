@@ -24,11 +24,10 @@ import Observation
 @Observable
 final class SectionProblems {
 
-    /// Which of a section's two tabs is showing.
-    enum Tab: String, Sendable {
-        case website
-        case problems
-    }
+    /// A section's tabs: Website, Coverage (#793) and Problems. One type
+    /// for all three, `SectionTab`; this store keeps which one the teacher
+    /// chose, and `SectionTabs.showing` says which one shows.
+    typealias Tab = SectionTab
 
     // MARK: - Stored properties
 
@@ -141,11 +140,19 @@ final class SectionProblems {
         ActivityTrail.note(.problemsChanged, SectionProblemsRules.answerLine(answer), course: courseCode, section: sectionNumber)
     }
 
-    /// The tab a section shows: Problems only while it has rows.
+    /// The tab a section shows, as far as this store can say: Problems only
+    /// while it has rows. The section's page asks `SectionTabs.showing` with
+    /// every tab its bar holds, Coverage included (#793).
     func tab(folder: URL, courseCode: String, sectionNumber: Int) -> Tab {
-        if !hasProblems(folder: folder, courseCode: courseCode, sectionNumber: sectionNumber) {
+        let chosen: Tab = chosenTab(folder: folder, courseCode: courseCode, sectionNumber: sectionNumber)
+        if chosen == .problems && !hasProblems(folder: folder, courseCode: courseCode, sectionNumber: sectionNumber) {
             return .website
         }
+        return chosen
+    }
+
+    /// The tab the teacher last chose for a section, Website until then.
+    func chosenTab(folder: URL, courseCode: String, sectionNumber: Int) -> Tab {
         return tabs[key(folder: folder, courseCode: courseCode, sectionNumber: sectionNumber)] ?? .website
     }
 
