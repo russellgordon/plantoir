@@ -4764,6 +4764,25 @@ two blocks of CSS came from Russell's example; its lessons, its file names and
 its people did not. Every component of the example is a commented PATTERN in
 the template pages, so an assistant writes each component the same way.
 
+**The reference-courses sentence in the same greeting (#856).** A live
+course whose code has courses kept for reference tells the session they are
+there to read and build on (decision (s), since v1.3.0). The sentence had no
+contract key, so Windows' greeting lacked it and no test noticed. It is now
+`app-rules.json` → `outsideAgents.greetingReferenceCourses`: the template with
+`{course}` and `{courses}`, the separator, how each listed course is made
+(`referenceCoursesToMention`: same code, folder and school year, sorted), where
+it goes, and four cases, run by
+`AppRulesContractTests.testTheReferenceCoursesSentenceIsTheContracts` against
+`ClaudeCodeLauncher.referenceCoursesSentenceTemplate` and
+`referenceCoursesSentence(courseCode:referenceCourses:)`; and seven
+`listCases` (the review's finding), which give a course and its shelf and
+expect the list, run through `referenceCoursesToMention` by
+`testTheReferenceCoursesListIsMadeAsTheContractSays`, so Windows runs how the
+list is made rather than working it out from `eachCourse`. The mac's greeting
+did not move by a byte (the old and new code compiled side by side and compared
+on four inputs), and the greeting is not shown to the local model, whose
+digest is unchanged.
+
 **The reminder in the Revise doors' greeting.** `ClaudeCodeLauncher.greeting`
 gains `unitPlans: [UnitPlans.Plan]?`, and its sentence goes LAST, after the
 reference-courses sentence, so the opening instructions keep their order.
@@ -16090,13 +16109,51 @@ this is the app's half.
   the Cloudflare token and the plans' username and password are asked the way
   a section's deploy asks (`CredentialRequest.unitPlanUsername`,
   `unitPlanPassword`). No argument ever carries a username or a password.
+  The username's explanation names the computer, so since #863 it is built by
+  `CredentialRequest.unitPlanUsername(machine:)` and the contract's readout
+  (`app-rules.json` → `credentialRequests`) is written with `{machine}`
+  (`specialNames.platformWording.machine.usedIn`); this app fills in "Mac", so
+  the sentence a teacher reads here did not change. REJECTED: "on this
+  computer", as the token explanations say, which would have changed the mac's
+  sentence for no reader's benefit when the placeholder keeps both.
 - **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
   under section 0 (`PlanSharing.leaseSection`), which no section has: a
   section's own deploy is never refused by it, while the course reads as busy
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. A new lease kind was rejected: `publish` already
+  a share builds no section. **Since #863 a run of the plans' launcher has
+  its own words on quit** (Russell, 2026-11-13), in the contract so Windows
+  says the same ones: `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`,
+  `words` and fourteen cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`,
+  with every fragment pinned key by key by
+  `testEveryShareFragmentIsTheContractsKeyByKey`. The lease is the same for
+  a share, a Change Password and a Stop Sharing, so `PlanShareRunner.start`
+  records what the run was started to do beside it
+  (`CourseActivity.beginPlanWork`, `PlanWork.of(choice)`), and removes it with
+  the lease. `QuitConfirmation.Kinds` sorts the publishes into deploys, shares,
+  password changes and stops; the question names each part ("sharing the unit
+  plans of <CODE>", "changing the password for the unit plans of <CODE>",
+  "stopping the sharing of the unit plans of <CODE>", or "of N courses"), deploys
+  first, joined "A and B" or "A, B and C". The message is
+  `messageOne`/`messageSeveral` with one clause per part: the class website
+  part way updated, the plans part way shared, the new password not saved
+  yet, the plans' address still working. No clause carries its remedy: the
+  share bar already offers Share Again and Stop Sharing, and a remedy in each
+  clause made a two- or three-clause message misparse (the second fix
+  review). A Change Password's console is titled "Changing the password for
+  the … unit plans", not "Sharing". Each clause was read off what that run leaves
+  when it stops early (`interruptionCases`, `changePasswordCases`,
+  `stopSharing`); deploys alone read exactly as before. The update banner
+  borrows the same phrase (`UpdateGate.workUnderWay`). REJECTED, each in the
+  block's `rejected`: the deploy's message for a share (the first commit's
+  recording of the mac's old words); "anyone with the address could still
+  open the plans" (the first fix round), untrue for protected plans re-shared
+  with their password, a first share stopped before anything was sent, a
+  Change Password and a Stop Sharing; calling the latter two "sharing"
+  because they share a lease; and one fixed sentence per combination, which
+  would be ten sentences for these fourteen cases. A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
