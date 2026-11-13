@@ -1,11 +1,20 @@
-% Plantoir house style: a handout, worksheet or review sheet.
-% Compile this file for the questions, or "Handout - Answers.tex" (which
-% defines \showanswers) for the answer key. Copy BOTH files to where the
-% teacher keeps handouts, rename them to the handout's name, and change the
-% \input line in the answers file to match. Fill in the three lines marked
-% "Fill in" below. An exercise with hints adds a third wrapper,
-% "Handout - Hints.tex" (which defines \showhints): the worksheet with each
-% hint under its question (the skill's sections 3 and 13).
+% Plantoir house style: a handout, worksheet, review sheet or exercise.
+% ONE source, up to three outputs:
+%   this file                  -> Handout.pdf            the questions
+%   "Handout - Answers.tex"    -> Handout - Answers.pdf  final answers (defines \showanswers)
+%   "Handout - Hints.tex"      -> Handout - Hints.pdf    the hints alone (defines \showhints)
+% Copy the files you need to where the teacher keeps handouts, rename them
+% to the handout's name, and change the \input line in each wrapper to match.
+% Fill in the lines marked "Fill in" below. Delete the hints block (and the
+% hints wrapper) when the exercise has no hints.
+%
+% This starter is a WORKING EXAMPLE of a finished sheet, not an empty
+% template: worked examples in peach boxes with substituted values in red
+% and side notes beside the steps, a table and a graph inside a box, a
+% table with negatives in an N column, a graph drawn to the grid's edge
+% with arrowheads, a context graph that stops at its end points, fill-in
+% blanks, and the answer key on the SAME tables and grids. Keep those forms
+% and change the mathematics. The skill's sections 3 to 5 and 9 to 13 say why.
 \documentclass[11pt]{article}
 \usepackage[letterpaper, left=0.75in, right=0.75in, top=1.05in, bottom=0.9in,
             headheight=14pt, headsep=0.3in]{geometry}
@@ -19,29 +28,33 @@
 \usepackage{lastpage}
 \usepackage{pgfplots}
 \usepackage{array}
+\usepackage{collcell}     % the C column's minus-sign warning (below)
 \usepackage{needspace}
 \usepackage[most]{tcolorbox}
 \usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the skill's section 9)
 \pgfplotsset{compat=1.18}
 
 % ---------- Fill in ----------
-\newcommand{\schoolname}{School Name}   % print_school_name in the course's settings
-\newcommand{\coursecode}{COURSE}        % the course code, in capitals
+% The school's name comes ONLY from print_school_name in the course's
+% settings, or from the teacher in this conversation. Never a placeholder:
+% with no name, leave the braces empty and the corner prints nothing.
+\newcommand{\schoolname}{}
+\newcommand{\coursecode}{COURSE}        % the course's code, in capitals
 \newcommand{\handouttitle}{Handout Title}
 
-% ---------- Questions or answers ----------
+% ---------- Questions, answers or hints ----------
 \newif\ifanswers
 \ifdefined\showanswers \answerstrue \fi
 \newcommand{\qa}[2]{\ifanswers #2\else #1\fi}
 \newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
 \newcommand{\onlya}[1]{\ifanswers #1\fi}
-
-% ---------- Hints (the skill's section 13) ----------
-% \hint{...} under a question shows only on the hints sheet. A hint never
-% gives the answer; how much more it gives is the teacher's.
+% The hints sheet (the skill's section 13): the hints alone, one per
+% question, in the block right after \begin{document}. Nothing else in the
+% file changes for hints, so the questions and the answers compile exactly
+% as they would without them.
 \newif\ifhints
 \ifdefined\showhints \hintstrue \fi
-\newcommand{\hint}[1]{\ifhints\par{\color{gray}\small\sffamily Hint: #1}\par\fi}
+\newcommand{\hint}[2]{\item[Question #1] #2}
 
 % A blank students write on, in a question (the skill's section 4): an
 % invisible strut makes its line about two lines tall, so a wrapped prompt
@@ -63,11 +76,12 @@
 \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
 \newcommand{\fillblank}[2]{#1 \rule[-0.15em]{#2}{0.4pt}}
+% Lay the corners out as the course's print settings do (the skill's
+% sections 2 and 5). The blanks are print_blanks' list in the order Name,
+% Date, Class #; with no list, Name and Date, as here. Add
+% \quad\fillblank{Class \#}{1.4cm} when the list has class_number.
 \fancyhead[L]{\small\sffamily\color{gray}\schoolname}
-% Lay the corners out as the course's print settings do (the skill's sections 2
-% and 5): keep only the blanks print_blanks lists, and move or drop the school's
-% name and the course code as print_school_name_at and print_course_code_at say.
-\fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}\quad\fillblank{Class \#}{1.4cm}}
+\fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}}
 \fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ \coursecode}
 \fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}
 \setlength{\parindent}{0pt}
@@ -77,29 +91,9 @@
 \definecolor{peach}{RGB}{253,244,233}
 \definecolor{peachframe}{RGB}{226,160,96}
 \definecolor{exampletitle}{RGB}{176,38,30}
+\definecolor{sub}{RGB}{200,30,30}      % a substituted value, in a worked example
+\definecolor{note}{RGB}{20,70,140}     % a side note beside a step
 \definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
-% One heading-row height for tables set side by side (the skill's section 9)
-\newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}
-% Tables (the skill's section 9). Every value sits in a row \valuepitch tall,
-% centred in it, so the first value is half a row below the heading rule and
-% the last half a row above the bottom rule. The value columns of a table are
-% one width (\setvaluecol{the widest value in either column} sets \valuecol
-% to it plus 0.5cm). C is a centred value column; N{$18$} is for a column
-% holding a negative or whole numbers beside decimals: each value right-
-% aligned in a box as wide as the column's widest value WITHOUT its sign,
-% the box centred - \makebox[\widthof{$18$}][r]{$-6$} in every cell - so the
-% digits share one trailing edge and a minus sign juts out to the left.
-% \renewcommand{\valuepitch}{3em} for a table with room to write.
-\renewcommand{\arraystretch}{1.1}
-\newcommand{\valuepitch}{1.5em}
-\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
-\newlength{\valuecol}
-\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
-\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
-\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
-
-% Section heading for the answer key, where the worked examples are hidden
-\newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
 
 % Worked example box
 \newtcolorbox{example}[1]{
@@ -112,8 +106,53 @@
   fonttitle=\large\bfseries\sffamily,
   titlerule=0pt, toptitle=1mm, bottomtitle=-1mm,
 }
+% Inside a worked example: a step's method as a small heading, a note beside
+% a step (in an alignat, after &&), and a substituted value in red.
+\newcommand{\method}[1]{\medskip{\bfseries\sffamily #1}\par\smallskip}
+\newcommand{\sidenote}[1]{\text{\small\sffamily\color{note}#1}}
+\newcommand{\sv}[1]{{\color{sub}#1}}
+% A small framed note set beside an example, in a [t] minipage
+\newtcolorbox{notebox}{colback=white, colframe=peachframe, boxrule=0.5pt, arc=1.5mm,
+  left=2mm, right=2mm, top=1mm, bottom=1mm, fontupper=\small\sffamily}
+% A grey box of instructions before a group of questions
+\newtcolorbox{groupnote}{colback=gray!8, colframe=gray!45, boxrule=0.6pt, arc=2mm,
+  left=3mm, right=3mm, top=1.5mm, bottom=1.5mm, before skip=0.4em, after skip=0.8em,
+  fontupper=\small}
 
-% Numbered questions
+% Section heading for the answer key, where the worked examples are hidden
+\newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
+
+% ---------- Tables (the skill's section 9) ----------
+% Every value sits in a row \valuepitch tall, centred in it, so the first
+% value is half a row below the heading rule and the last half a row above
+% the bottom rule. The value columns of a table are one width
+% (\setvaluecol{the widest value in either column} sets \valuecol to it plus
+% 0.5cm). C is a centred value column, for a column with no negative value
+% and not mixing whole numbers with decimals. N{$18$} is for every other
+% column of numbers: each value right-aligned in a box as wide as the
+% column's widest value WITHOUT its sign, the box centred, so the digits
+% share one trailing edge and a minus sign juts out to the left.
+% A C cell holding a minus sign prints a small red "use N" beside it, so a
+% centred column of negatives shows on the rendered page (the skill's
+% section 8). An N column never does. \renewcommand{\valuepitch}{3em} for a
+% table with room to write.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newlength{\valuecol}
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
+\makeatletter
+\newcommand{\centredvalue}[1]{%
+  \begingroup\edef\x{\endgroup\noexpand\in@{\detokenize{$-}}{\detokenize{#1}}}\x
+  \ifin@\else\begingroup\edef\x{\endgroup\noexpand\in@{\detokenize{$ -}}{\detokenize{#1}}}\x\fi
+  \ifin@\llap{\tiny\sffamily\color{red}use N\ }\fi#1}
+\makeatother
+\newcolumntype{C}{>{\rowstrut{\valuepitch}\collectcell\centredvalue}w{c}{\valuecol}<{\endcollectcell}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
+% One heading-row height for tables set side by side
+\newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}
+
+% ---------- Numbered questions ----------
 \newenvironment{questions}
   {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
                   \setlength{\labelsep}{0.4em}\setlength{\itemsep}{0.7em}}}
@@ -123,95 +162,255 @@
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 
-% ---------- Graph style ----------
+% ---------- Graph styles (the skill's section 12) ----------
+% Tick labels are drawn above the plotted lines on a white patch, so a line
+% that passes a label never runs through its digits. The axes run a little
+% past the grid, so a line's arrowhead at the grid's edge is clear of the
+% axis arrows. Leave a tick label out where an arrowhead ends on it
+% (yticklabels={,$-4$,...}).
 \pgfplotsset{
+  layers/labels on top/.define layer set={axis background, axis grid, axis ticks, axis lines,
+    main, axis tick labels, axis descriptions, axis foreground}{},
   gridgraph/.style={
+    set layers=labels on top,
     axis lines=middle, grid=both,
     major grid style={gray!35}, minor grid style={gray!18},
     minor tick num=1,
     tick label style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, inner sep=1pt},
     xlabel=$x$, ylabel=$y$,
-    xlabel style={anchor=west}, ylabel style={anchor=south},
-    axis line style={-latex},
+    xlabel style={anchor=west, xshift=0.25cm}, ylabel style={anchor=south, yshift=0.25cm},
+    axis line style={-latex, shorten >=-0.25cm},
     clip mode=individual,
   },
+  % A graph that models a situation: axes from zero at the bottom left,
+  % labelled with what they measure and its units, no arrowheads on the line.
+  contextgraph/.style={
+    set layers=labels on top,
+    axis lines=left, grid=both,
+    major grid style={gray!35}, minor grid style={gray!18},
+    tick label style={font=\scriptsize},
+    label style={font=\small},
+    axis line style={-latex, shorten >=-0.25cm},
+    clip mode=individual,
+  },
+  exampleline/.style={blue!70!black, thick, samples=2, latex-latex},
   lineA/.style={blue!70!black, thick, samples=2},
+  lineB/.style={red!75!black, thick, samples=2},
+  lineC/.style={green!50!black, thick, samples=2},
+  lineD/.style={orange!85!black, thick, samples=2},
+  % a legend whose keys show a plain line, without the arrowheads the lines carry
+  answerlegend/.style={legend pos=outer north east, legend cell align=left,
+    legend style={font=\small, draw=gray!50}, legend image post style={arrows=-}},
 }
 
 \begin{document}
 
+% ---------- The hints sheet: only in "Handout - Hints.pdf" ----------
+% One \hint per question that has one. A hint never gives the answer, not
+% even through a pointed first step: it points back to the day's idea, in
+% the words the lesson used (the skill's section 13).
+\ifhints
+{\LARGE\bfseries\sffamily \doctitle}\par
+\medskip
+{\color{why} Try each question first. Open a hint only when you are stuck.
+The answers come out at the start of next class.}
+\begin{description}[leftmargin=6.5em, style=nextline, itemsep=0.8em]
+  \hint{1}{Look back at the worked example ``Substitute and Evaluate''. Each value goes where its letter was, in brackets.}
+  \hint{2}{Look back at ``Solve an Equation''. The side notes name each step in the order it was done.}
+  \hint{3}{Look back at ``Graph a Line from a Table of Values''. Each $y$ value comes from its own $x$ value.}
+  \hint{4}{Look back at what the lesson called the \emph{slope} and the \emph{$y$-intercept}, then at your table and graph from question 3.}
+  \hint{5}{Each second the cyclist goes the same distance. The graph stops where the ride stops.}
+\end{description}
+\end{document}
+\fi
+
 {\LARGE\bfseries\sffamily \doctitle}\par
 \medskip
 \ifanswers
-  {\color{why} Final answers only.}
+  {\color{why} Final answers only. Equivalent forms are fine (for example, $(0, 3)$ or ``the $y$-intercept is $3$'').}
 \else
-  {\color{why} Read the worked example, then try the questions that follow it.
+  {\color{why} Read each worked example, then try the questions that follow it.
   Show all your work.}
 \fi
 
 % =====================================================================
 \ifanswers
-\strand{A worked example's topic}
+\strand{Substitute and evaluate}
 \else
-\begin{example}{A Worked Example}
-Evaluate $3x + 2$ when $x = 4$.
+\begin{example}{Substitute and Evaluate}
+Evaluate $2x^2 - 3y$ when $x = -3$ and $y = 4$.
 \begin{align*}
-  & 3x + 2 \\
-  ={} & 3(4) + 2 \\
-  ={} & 14
+  & 2x^2 - 3y \\
+  ={} & 2(\sv{-3})^2 - 3(\sv{4}) \\
+  ={} & 2(9) - 12 \\
+  ={} & 6
 \end{align*}
 \end{example}
 \fi
 
 \begin{questions}
-\q{1} \onlyq{Evaluate each expression when $x = -2$.}
+\q{1} \onlyq{Evaluate each expression when $x = -2$ and $y = 5$.}
 \begin{tasks}(3)
-  \task \qa{$3x + 4$}{$-2$}
-  \task \qa{$5 - x$}{$7$}
-  \task \qa{$x^2 + 1$}{$5$}
+  \task \qa{$3x + y$}{$-1$}
+  \task \qa{$x^2 - y$}{$-1$}
+  \task \qa{$4y - 2x$}{$24$}
+  \task \qa{$-x + 3y$}{$17$}
+  \task \qa{$xy + 7$}{$-3$}
+  \task \qa{$\dfrac12x - y$}{$-6$}
 \end{tasks}
+\end{questions}
 
-\q[12]{2} \qa{Graph the line $y = 2x - 1$.}{$y = 2x - 1$:}
-% The answer key keeps the question's layout: ONE grid, the same axis ranges,
-% scale and size in both copies, and only what is plotted on it is switched.
-% y = 2x - 1 has no context, so the line runs past its plotted points to the
-% edge of the grid (it leaves through y = -6 at x = -2.5 and y = 6 at x = 3.5)
-% with an arrowhead at each end. A graph that models a situation stops at the
-% end points the situation gives it, with no arrowheads.
+% =====================================================================
+\ifanswers
+\strand{Solve an equation}
+\else
+\begin{example}{Solve an Equation}
+Solve $3(x - 2) + 4 = 13$.
+\begin{alignat*}{2}
+  3(x - 2) + 4 &= 13 \qquad && \sidenote{Expand the brackets.} \\
+  3x - 6 + 4 &= 13 && \sidenote{Collect like terms.} \\
+  3x - 2 &= 13 && \sidenote{Add 2 to both sides.} \\
+  3x &= 15 && \sidenote{Divide both sides by 3.} \\
+  x &= 5 &&
+\end{alignat*}
+\method{Check}
+$3(\sv{5} - 2) + 4 = 3(3) + 4 = 13$, so $x = 5$ is right.
+\end{example}
+\fi
+
+\begin{questions}
+\q[1]{2} \onlyq{Solve. Check each answer.}
+\begin{tasks}(3)
+  \task \qa{$2(x + 3) = 14$}{$x = 4$}
+  \task \qa{$5x - 7 = 3x + 9$}{$x = 8$}
+  \task \qa{$4(x - 1) - 2 = 18$}{$x = 6$}
+\end{tasks}
+\end{questions}
+
+% =====================================================================
+% A worked example with a table and its graph side by side INSIDE the box:
+% two [t] minipages, the right one starting with \vspace{0pt} so both share
+% a top edge. The line has no context, so it runs to the grid's edge with an
+% arrowhead at each end; its label sits on a peach patch.
+\ifanswers
+\strand{Graph a line from a table of values}
+\else
+\begin{example}{Graph a Line from a Table of Values}
+\begin{minipage}[t]{0.56\linewidth}
+Graph the line $y = x - 2$.
+
+\smallskip
+Choose simple values for $x$. Find each $y$ value: when $x = \sv{0}$,
+$y = \sv{0} - 2 = -2$.
+
+\medskip
 \begin{center}
-\begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
-    xmin=-5, xmax=5, ymin=-6, ymax=6, xtick={-4,-2,...,4}, ytick={-6,-4,...,6}]
-  \onlya{%
-  \addplot[lineA, <->, >=latex, domain=-2.5:3.5]{2*x - 1};
-  \addplot[only marks, mark=*, mark size=1.5pt] coordinates {(0,-1) (1,1) (2,3)};}
-\end{axis}\end{tikzpicture}
-\end{center}
-
-\q[9]{3} \onlyq{Complete the table of values for $y = x - 3$.}\onlya{$y = x - 3$:}
-\hint{Look back at the worked example at the top of this sheet.}
-
-% A table: full border, a shaded heading row, each column set by its own
-% values - x has no negative value, so it is a centred C column; y has
-% negatives, so it is N{$3$}: right-aligned in a box as wide as its widest
-% value without the sign, the box centred, its heading centred over it. The
-% x and y columns are ONE width; here 1.6cm, so students have room to write
-% in y (a table students do not write in takes \setvaluecol{widest value}).
-% It is written once: the key switches only the cells (\qa{}{...}), so it is
-% vertical in both copies, with the same alignment and row height.
-\begin{center}
-{\setlength{\valuecol}{1.6cm}%
-\begin{NiceTabular}{CN{$3$}}[hvlines]
+{\setvaluecol{$-3$}%
+\begin{NiceTabular}{N{$3$}N{$3$}}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
-$x$ & \multicolumn{1}{c}{$y$} \\
-$0$ & \qa{}{$-3$} \\
-$1$ & \qa{}{$-2$} \\
-$2$ & \qa{}{$-1$} \\
-$3$ & \qa{}{$0$} \\
+\multicolumn{1}{c}{$x$} & \multicolumn{1}{c}{$y$} \\
+$-1$ & $-3$ \\
+$0$ & $-2$ \\
+$1$ & $-1$ \\
+$2$ & $0$ \\
+$3$ & $1$ \\
 \end{NiceTabular}}
 \end{center}
 
-\q{4} The line $y = 2x - 1$ crosses the $y$-axis at the point where $x = 0$,
-so its $y$-intercept is \fillin[2cm]{$-1$}, and its slope is \fillin[2cm]{$2$}.
+\medskip
+Plot the points. Draw a line through them, to the edge of the grid.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.4\linewidth}
+\vspace{0pt}\centering
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
+    xmin=-3, xmax=5, ymin=-6, ymax=4, xtick={-2,2,4}, ytick={-4,-2,2}]
+  \addplot[exampleline, domain=-2.9:4.9]{x - 2};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(-1,-3) (0,-2) (1,-1) (2,0) (3,1)};
+  \node[anchor=west, font=\small, fill=peach, inner sep=1pt] at (axis cs:2.2,-1.6) {$y = x - 2$};
+\end{axis}\end{tikzpicture}
+\end{minipage}
+\end{example}
+\fi
+
+\onlyq{%
+\begin{groupnote}
+\textbf{\sffamily For questions 3 and 4:} use the table you complete in question 3 to draw the graph.
+\end{groupnote}}
+
+\begin{questions}
+% The table and the grid are written ONCE, outside the switch: the key
+% switches only the cells (\qa{}{...}) and the plotted answer (\onlya{...}),
+% so both copies have the same table, the same grid and the same size.
+% Both columns hold a negative, so both are N columns (N{$3$} and N{$5$}:
+% each one's widest value without its sign), their headings centred.
+\q[14]{3} \qa{Complete the table of values for $y = -2x + 3$. Then graph the line.}{$y = -2x + 3$:}
+
+\smallskip
+\begin{minipage}[t]{0.35\linewidth}\vspace{0pt}\centering
+{\setlength{\valuecol}{1.6cm}%
+\begin{NiceTabular}{N{$3$}N{$5$}}[hvlines]
+\CodeBefore \rowcolor{tablehead}{1} \Body
+\multicolumn{1}{c}{$x$} & \multicolumn{1}{c}{$y$} \\
+$-1$ & \qa{}{$5$} \\
+$0$ & \qa{}{$3$} \\
+$1$ & \qa{}{$1$} \\
+$2$ & \qa{}{$-1$} \\
+$3$ & \qa{}{$-3$} \\
+\end{NiceTabular}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.6\linewidth}\vspace{0pt}\centering
+% It leaves the grid through y = 6 at x = -1.5 and y = -6 at x = 4.5.
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
+    xmin=-4, xmax=6, ymin=-6, ymax=6, xtick={-4,-2,...,6}, ytick={-4,-2,...,4}]
+  \onlya{%
+  \addplot[lineA, <->, >=latex, domain=-1.45:4.45]{-2*x + 3};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(-1,5) (0,3) (1,1) (2,-1) (3,-3)};}
+\end{axis}\end{tikzpicture}
+\end{minipage}
+
+\q{4} The line $y = -2x + 3$ crosses the $y$-axis at the point \fillin[2.4cm]{$(0, 3)$}.
+Its slope is \fillin[2cm]{$-2$}. Each time $x$ goes up by 1, the value of $y$ \fillin[4cm]{goes down by 2}.
+\end{questions}
+
+% =====================================================================
+% A graph that models a situation stops at the end points the situation
+% gives it, with a dot at each and no arrowheads. The distance column mixes
+% whole numbers and decimals, so every value has one decimal place
+% (0.0, 9.0, 18.0) and it is an N column; the time column is whole numbers
+% only, so it is centred. The sentences say 9 m, never 9.0 m.
+\begin{questions}
+\q[16]{5} A cyclist starts a ride at the start line and rides at a steady speed of
+4.5 metres every second for 4 seconds.
+
+\smallskip
+\begin{minipage}[t]{0.35\linewidth}\vspace{0pt}\centering
+{\setvaluecol{Distance (m)}%
+\begin{NiceTabular}{CN{$18.0$}}[hvlines]
+\CodeBefore \rowcolor{tablehead}{1} \Body
+Time (s) & \multicolumn{1}{c}{Distance (m)} \\
+$0$ & $0.0$ \\
+$1$ & $4.5$ \\
+$2$ & \qa{}{$9.0$} \\
+$3$ & \qa{}{$13.5$} \\
+$4$ & \qa{}{$18.0$} \\
+\end{NiceTabular}}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.6\linewidth}\vspace{0pt}\centering
+\begin{tikzpicture}\begin{axis}[contextgraph, x=1.1cm, y=0.22cm,
+    xmin=0, xmax=5, ymin=0, ymax=20, xtick={0,1,...,5}, ytick={0,4,...,20}, minor y tick num=1,
+    xlabel={Time (s)}, ylabel={Distance (m)}]
+  \onlya{%
+  \addplot[lineA, domain=0:4]{4.5*x};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(0,0) (1,4.5) (2,9) (3,13.5) (4,18)};}
+\end{axis}\end{tikzpicture}
+\end{minipage}
+
+\begin{tasks}(1)
+  \task \onlyq{Complete the table.}\onlya{The table above.}
+  \task \onlyq{Graph the ride on the grid.}\onlya{The graph above: a line from $(0, 0)$ to $(4, 18)$, with no arrowheads.}
+  \task How far has the cyclist gone after 2 seconds? \fillin[2.4cm]{9 m}
+  \task After how many seconds has the cyclist gone 13.5 m? \fillin[2.4cm]{3 s}
+\end{tasks}
 \end{questions}
 
 \end{document}

@@ -1,6 +1,6 @@
 ---
 name: plantoir-handouts
-description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered, aligned and turned, how far a graph is drawn and when it has arrowheads, how the answer key keeps the question copy's layout, the finite-difference scaffold, task cards, lesson materials (warmups, task cards, summaries, exercises with hints) and plain wording, how quizzes and tests differ, and how every answer is checked before handing over.
+description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered, aligned and turned, how far a graph is drawn and when it has arrowheads, how the answer key keeps the question copy's layout, worked examples with substituted values and side notes, a hints sheet from the same source, the finite-difference scaffold, task cards, lesson materials (warmups, task cards, summaries, exercises with hints) and plain wording, how quizzes and tests differ, and how every answer is checked, every page rendered and looked at, and the checker run before handing over.
 ---
 
 # Making a printed handout in the house style
@@ -32,6 +32,19 @@ style below as the starting point, in one or two sentences:
 Do not build it as HTML, a Word file or anything else unless the teacher
 asks for that. If the teacher has already said which they want, do that
 without asking again.
+
+Before writing anything, check that the two programs it needs are on the
+computer (section 8). Before saying a handout is done, go through
+**"Before you hand over"** at the end of section 8, every line of it.
+
+**The starters are finished sheets to imitate, not empty templates.**
+`starters/Handout.tex` is three pages: worked examples in peach boxes with
+the substituted values in red and a note beside each step, a table and a
+graph inside a box, a table with negatives, a line drawn to the grid's
+edge with arrowheads, a graph of a situation that stops at its end points,
+fill-in blanks, a hints sheet, and an answer key on the same tables and
+grids. Make every handout at least that finished: keep those forms, and
+change the content to what the teacher asked for.
 
 A unit plan's assessments are made here too, and copied into the plan by
 the `plantoir-unit-planning` skill (`.claude/skills/plantoir-unit-planning/SKILL.md`,
@@ -80,16 +93,31 @@ the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
 - **On the class website, only the PDF a page hands out.** Copy it into
   the course's `Media` folder and follow section 4 of `plantoir-printing`:
   - `Name.pdf` - the default.
-  - A merged `Name - with Answers.pdf` (the questions, then the answer
+  - A joined `Name - with Hints.pdf` (the questions, then the hints) for
+    an exercise whose page gives hints (section 13).
+  - A joined `Name - with Answers.pdf` (the questions, then the answer
     key, as one file) for a worksheet or handout whose page gives the
-    answers as well, when the teacher wants that:
-    `pdfunite "Name.pdf" "Name - Answers.pdf" "Name - with Answers.pdf"`
-    (`pdfunite` comes with Poppler, like `pdftoppm`).
+    answers as well, when the teacher wants that. How to join two PDFs is
+    in section 3.
   - A quiz or test may go on the website if the teacher wants it there;
     its **solutions never do**.
   - Never a `.tex`. After every change to the source, compile again and
     copy the PDF into `Media` again, so the site never hands out an old
-    copy.
+    copy. Before saying it is done, compare the copy in `Media` with the
+    one in the handouts folder, byte for byte, and say so if they differ.
+- **A suggestion: the page's Print button hands out the PDF.** When a page
+  of the site and a handout carry the same or largely the same content,
+  you may offer, once, in one sentence, to make the page's Print button
+  give students the handout's PDF instead of a print of the page ("This
+  page and the handout carry the same questions. Would you like its Print
+  button to hand out the PDF?"). It is a starting point a teacher can take
+  or leave, never done unasked. On a yes, copy the PDF into `Media` and set
+  the page's `printPdf` to it (`plantoir-printing`, section 4); the button
+  then opens the PDF. **Before the Print button hands out a file that
+  holds answers** (a joined `Name - with Answers.pdf`), say plainly that
+  students who press Print will get the answers, and set it only on the
+  teacher's yes. An answer key on its own (`Name - Answers.pdf`,
+  `Name - Solutions.pdf`) is never what the button offers.
 - **The names.** `Name.tex` and `Name - Answers.tex` for a worksheet or
   handout; `Name.tex` and `Name - Solutions.tex` for a quiz or test. Check
   that a new name does not differ from an existing file in that folder only
@@ -101,7 +129,11 @@ the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
   - `print_school_name` - the school's name. If it is missing or empty,
     ask the teacher for it, and mention that putting it in Course
     Settings, under Printing, makes the website's printed pages carry it
-    too.
+    too. **The school's name comes only from the course's settings or from
+    the teacher in this conversation**, never from anywhere else (another
+    file, another course, your own memory). If the teacher gives none,
+    leave the corner empty (`\newcommand{\schoolname}{}`): never a
+    placeholder such as "School Name".
   - `print_school_name_at` - where the school's name goes: `header_left`
     (top left, also when the key is missing), `footer_left` (bottom left)
     or `none` (not printed).
@@ -146,10 +178,40 @@ An exercise with hints (section 13) has a third wrapper,
 \input{Name.tex}
 ```
 
-It makes `Name - Hints.pdf`: the worksheet itself, with each `\hint{...}`
-shown under its question and nowhere else (the starter's `Handout.tex`
-defines `\hint` and `\ifhints`, and its question 3 carries one). One
-source, so the hints sheet never drifts from the worksheet.
+It makes `Name - Hints.pdf`: the hints alone, titled "Hints", one item per
+question ("Question 1", "Question 2", ...). In the source they are one
+block right after `\begin{document}`, inside `\ifhints`, ending with its
+own `\end{document}`; each hint is `\hint{3}{...}` for question 3 (the
+starter's `Handout.tex` defines `\hint` and `\ifhints`, and its block has
+a hint for every question). Nothing else in the file changes, so the
+question copy and the answer key compile exactly as they would without
+hints. One source, so the hints never drift from the worksheet.
+
+**Joining two PDFs into one**, for a page's Print button or to hand out
+on one sheet: `Name - with Hints.pdf` is the questions then the hints,
+`Name - with Answers.pdf` the questions then the answers. With Poppler
+(the program that renders pages, section 8):
+
+```bash
+pdfunite "Name.pdf" "Name - Hints.pdf" "Name - with Hints.pdf"
+pdfunite "Name.pdf" "Name - Answers.pdf" "Name - with Answers.pdf"
+```
+
+Without `pdfunite`, `tectonic` joins them: write `join.tex` beside them,
+compile it, rename `join.pdf`, and delete `join.tex`. Write each file name
+as it is, spaces and all, with no quotation marks (measured: quotation
+marks around a name with spaces fail to load):
+
+```latex
+\documentclass{article}
+\usepackage{pdfpages}
+\begin{document}
+\includepdf[pages=-]{Name.pdf}
+\includepdf[pages=-]{Name - Hints.pdf}
+\end{document}
+```
+
+A joined file is made again every time either part is compiled again.
 
 **The answer key keeps the question copy's layout.** A student holds the
 two side by side, so what they wrote on and what they check against must
@@ -167,7 +229,14 @@ look the same:
   questions 2 and 3 do exactly this.
 - Never a vertical table in the question copy with a horizontal one in the
   key, never a smaller, more compressed or differently scaled grid in the
-  key, and never a grid that appears only in the key.
+  key, and never a grid that appears only in the key. The checker
+  (section 8) finds a table or graph inside an answers-only branch, axis
+  options or a column spec that switch between the copies, and a
+  `tasks` column count that switches.
+- **The key's instructions line says equivalent forms are fine**, with an
+  example from the sheet: "Final answers only. Equivalent forms are fine
+  (for example, $(0, 3)$ or "the $y$-intercept is 3")." The starter's key
+  says it.
 
 ## 4. The look
 
@@ -205,9 +274,26 @@ look the same:
 - Tables: full borders, alignment by column, decimals and tables side by
   side are in section 9; the finite-difference scaffold in section 10;
   task cards in section 11.
-- Worked examples in peach `tcolorbox` boxes with dark-red sans titles. The
-  answer key hides the worked examples and gives final answers only, with a
-  graph where the answer is a graph.
+- **Worked examples** in peach `tcolorbox` boxes with dark-red sans titles,
+  one before each group of questions it teaches. The answer key hides the
+  worked examples behind a `\strand` heading of the same name and gives
+  final answers only, with a graph where the answer is a graph. A good
+  example teaches the WHOLE method a question below it needs, in the order
+  a student does it:
+  - the steps aligned on `=`, in an `align*` or `alignat*`;
+  - each value put in marked in red with `\sv` ("$2(\sv{-3})^2$");
+  - a blue note beside the step a student gets wrong, with `\sidenote`
+    after `&&` in an `alignat*` ("Expand the brackets.");
+  - a small heading for a second part of the method, with `\method`
+    ("Check");
+  - for a graphical method, the table of values and its graph INSIDE the
+    box, side by side in two `[t]` minipages (the right one starting with
+    `\vspace{0pt}`), the graph's label on a peach patch;
+  - where it helps, a small framed note beside it (`notebox`), or two
+    short workings side by side.
+  A grey box of instructions before a group of questions is `groupnote`.
+  `patterns/worked_examples.tex` shows each of these, compiled; the
+  starter's three examples use them.
 
 ## 5. Header and footer
 
@@ -222,18 +308,18 @@ blanks, that is:
 \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
 \newcommand{\fillblank}[2]{#1 \rule[-0.15em]{#2}{0.4pt}}
-\fancyhead[L]{\small\sffamily\color{gray}School Name}
+\fancyhead[L]{\small\sffamily\color{gray}\schoolname}
 \fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}\quad\fillblank{Class \#}{1.4cm}}
-\fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ COURSE}
+\fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ \coursecode}
 \fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}
 ```
 
 - **Top left**: whatever `print_school_name_at` and `print_course_code_at`
   put at `header_left` - by default the school's name. Two in one corner
-  read `School Name $\cdot$ CODE`, school first.
+  read `\schoolname\ $\cdot$ \coursecode`, school first.
 - **Top right**: the blanks `print_blanks` lists, in the order Name, Date,
   Class #, at the widths above. Leave out the `\fillblank` of any it does
-  not list (by default Class # is left out).
+  not list (by default Class # is left out, as in the starters).
 - **Bottom left**: the handout's title, then whatever is placed at
   `footer_left` - by default the course code of the course it is for
   (`MPM2D`, `ICS3U`, `SCH3U`, ...). With nothing placed there, the title
@@ -293,22 +379,62 @@ the two copies line up).
   agent, say plainly that the questions have not had that second check.
 - **Adapting a textbook page**: renumber the questions that are kept.
 
-## 8. Compile, look at every page, leave the folder clean
+## 8. Compile, look at every page, check, leave the folder clean
+
+### The two programs, checked before writing anything
+
+A handout needs two free programs: **Tectonic**, which makes the PDF, and
+**Poppler**, whose `pdftoppm` turns each page into a picture you can look
+at (and whose `pdfunite` joins two PDFs). Check for both FIRST, before
+planning or writing, so a missing one is found before the work rather
+than after it:
+
+```bash
+tectonic --version
+pdftoppm -v
+```
+
+Where Plantoir has set these programs up for the teacher, the commands
+find them. If one is missing, say in one sentence which one and what it
+is for ("Tectonic, the free program that turns the handout into a PDF, is
+not on this computer"), offer the way to get it below, and run it only on
+the teacher's yes. Never switch to another format without asking.
+
+- **A Mac with Homebrew**: `brew install tectonic` and `brew install poppler`.
+- **A Mac without Homebrew, Tectonic**: its own installer, run INSIDE a
+  folder of its own, never the working folder or a course (the installer
+  puts the program in the folder it is run from):
+  `mkdir -p ~/.local/bin && cd ~/.local/bin && curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh`,
+  then use `~/.local/bin/tectonic`.
+- **Windows, Tectonic**: its own installer, in PowerShell, inside a folder
+  of its own (`mkdir $HOME\tools; cd $HOME\tools`, never the working
+  folder): `[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://drop-ps1.fullyjustified.net'))`,
+  then use `$HOME\tools\tectonic.exe`.
+- **Poppler without Homebrew, or on Windows**: there is no installer of
+  its own. On Windows, `scoop install poppler` where Scoop is set up, or
+  the builds at https://github.com/oschwartz10612/poppler-windows/releases
+  unpacked into a folder of their own. Otherwise go on without it: see
+  "Looking at the pages" below.
+
+The first `tectonic` run downloads what it needs, once, so it needs the
+internet that first time.
+
+### Compile
 
 ```bash
 tectonic "Name.tex"
 tectonic "Name - Answers.tex"
+tectonic "Name - Hints.tex"      # only when the exercise has hints
 ```
 
-`tectonic` writes only the PDF beside the source (its first run needs the
-internet, once). If `tectonic` is not installed, say so and point the
-teacher at https://tectonic-typesetting.github.io (on a Mac with Homebrew,
-`brew install tectonic`); do not switch to another format without asking.
+`tectonic` writes only the PDF beside the source.
 
-Then render every page of both PDFs into a temporary folder OUTSIDE the
-working folder, and look at each image before handing over - a column that
-ran off the page, a box split across two pages, a graph in the wrong place
-or an answer showing on the student copy are only found this way:
+### Looking at the pages
+
+Render every page of every PDF into a temporary folder OUTSIDE the working
+folder, and look at each picture before handing over: a column that ran
+off the page, a box split across two pages, a graph in the wrong place or
+an answer showing on the student copy are only found this way.
 
 ```bash
 mkdir -p /tmp/handout-check
@@ -316,18 +442,78 @@ pdftoppm -png -r 80 "Name.pdf" /tmp/handout-check/Name
 pdftoppm -png -r 80 "Name - Answers.pdf" /tmp/handout-check/Answers
 ```
 
-(Any temporary folder outside the working folder will do. `pdftoppm`
-comes with Poppler: `brew install poppler` on a Mac.) If you
-cannot render the pages, tell the teacher they have not been looked at.
-Render and look at everything you make, except anything in a teacher-only
-folder (the `plantoir-marking` skill's), which is never opened.
+On Windows the temporary folder is `$env:TEMP\handout-check`. If writing
+there is refused, render into a folder named `.handout-check` inside the
+handouts folder (never inside `courses/`) and delete that folder when you
+have looked. If deleting is refused, tell the teacher the name of every
+file left behind.
 
-Leave no build files behind. Of THIS handout's files, only `Name.tex`,
-`Name - Answers.tex`, `Name.pdf` and `Name - Answers.pdf` (and a merged
-`Name - with Answers.pdf`, if the page links one) stay, and the rendered
-images are deleted. The folder holds the course's other handouts too, and
-perhaps folders for units and days: leave every file you did not make in
-this session exactly as it is.
+Without `pdftoppm`: if you can open a PDF's pages yourself (some
+assistants can read a PDF directly), look at every page that way. If you
+cannot look at the pages at all, tell the teacher plainly that they have
+not been looked at. Render and look at everything you make, except
+anything in a teacher-only folder (the `plantoir-marking` skill's), which
+is never opened.
+
+### The checker
+
+`tools/check_handout.py` beside this file reads the source, its wrappers,
+its PDFs and its folder, and names every problem it can decide from them:
+a column with a negative value or mixed whole numbers and decimals that is
+not an `N` column, a table without its full border, a blank without its
+strut, a table or graph only in the key, a relation with arrowheads that
+stops short of the grid's edge or runs past it, a context graph with
+arrowheads, a placeholder or a wrong corner, a missing wrapper, a hints
+block in the wrong place, build files or pictures left in the folder, a
+PDF older than its source, and the wrong paper. Run it, never import it,
+from the working folder, when Python is on the computer:
+
+```bash
+python3 .claude/skills/plantoir-handouts/tools/check_handout.py "path/to/Name.tex" --course-config "courses/CODE/course_config.json"
+```
+
+(the same file is at `.agents/skills/plantoir-handouts/tools/`). It exits
+1 and prints one line per problem; fix each, compile again and run it
+again until it finds nothing. It changes nothing. It also prints what it
+cannot check, which is what you look for on the rendered pages. Without
+Python, check each line of the list below by looking.
+
+### Leave no build files
+
+Of THIS handout's files, only `Name.tex`, its wrappers (`Name - Answers.tex`
+or `Name - Solutions.tex`, and `Name - Hints.tex`) and their PDFs stay,
+with a joined `Name - with Hints.pdf` or `Name - with Answers.pdf` if one
+was made; the rendered pictures and any `join.tex` are deleted. The folder
+holds the course's other handouts too, and perhaps folders for units and
+days: leave every file you did not make in this session exactly as it is.
+
+### Before you hand over
+
+Go through every line, on the rendered pages of every copy:
+
+- The checker found nothing (or, without Python, each item below was
+  checked by eye).
+- Every table has its top edge at 80 dpi; every column holding a negative,
+  or mixing whole numbers and decimals, is right-aligned in a centred box
+  (no small red "use N" anywhere); every other number column is centred
+  (section 9).
+- Every relation without a context reaches the grid's edge with both
+  arrowheads showing; every graph with a context stops at its end points
+  with none; no curve runs through a label (section 12).
+- Every blank is two lines tall (section 4).
+- The key's tables and grids are the same as the question copy's, and no
+  answer shows on the student copy (section 3). The hints give no answer
+  away (section 13).
+- Every worked example teaches its method in full, with the value put in
+  marked and a note beside the step that needs one (section 4).
+- No page is less than a third full except the last, nothing is clipped,
+  no box is split across pages, no question is parted from its parts.
+- The corners come from the course's settings, with no placeholder left
+  (section 5).
+- Every answer was solved again independently, and new questions had a
+  second reviewer (section 7); if not, say so.
+- No file is left but the ones listed above, and nothing was written in
+  `courses/` except `handouts.json` and a PDF a page hands out.
 
 ## 9. Tables
 
@@ -379,7 +565,14 @@ handout; never edit it here.
     and negatives (0, -3, -4, -3, 0), an all-negative one (-6, -10, -14),
     and one such as 9.0, 10.5, 12.0. (This replaces a fixed 0.25 cm of
     trailing padding: the digits ended up hard against the right side of
-    the column instead of in its middle.)
+    the column instead of in its middle.) **The x column counts too**: x
+    from -2 to 2 holds negatives, so it is an `N` column as well.
+  - A `C` cell holding a minus sign prints a small red "use N" beside it,
+    so a centred column of negatives shows on the rendered page (it shows
+    in the copy whose cells hold the negative: an answer written only in
+    the key shows it in the key). An `N` column never does. The checker
+    (section 8) finds these from the source as well, with `c`, `w{c}`,
+    `p{}` and `r` columns too.
   - Any other column of numbers - no negative value, and all whole
     numbers or all decimals - is centred: `C` (or `c`). Zero is not
     negative.
@@ -557,6 +750,22 @@ The same rule holds on a page of the class website: `plantoir-math-graphs`
 section 4 says how. Whatever the graph, the answer key draws it on the
 same grid the question copy gives (section 3).
 
+**How a graph looks** (the starters' `gridgraph` and `contextgraph`
+styles carry it): tick labels on a layer above the curves, on a white
+patch, so no curve runs through a digit; axes that run 0.25 cm past the
+grid, so an arrowhead at the edge is clear of the axis arrow; a grid unit
+of at least 0.35 cm, the same on both axes where a graph compares
+steepness; a tick label left out where an arrowhead ends on it
+(`yticklabels={$-6$,$-4$,$-2$,,$2$,$4$,}`); several relations on one grid
+in `lineA` to `lineD` with an `answerlegend`, whose keys show no
+arrowheads; a vertical line drawn with `\draw`, since it is not a
+function of $x$. A graph with a context uses `contextgraph`: axes from
+zero at the bottom left, each labelled with what it measures and its
+units. `patterns/graphs.tex` shows each of these, compiled, with the
+working for every domain in a comment above it. The checker (section 8)
+finds a relation with arrowheads whose ends stop short of the grid's edge
+or run past it, and a context graph with arrowheads.
+
 ## 13. Lesson materials: warmups, task cards, summaries, exercises
 
 A teacher may ask for a warmup, task cards (and a Discussion page that
@@ -627,6 +836,65 @@ Whether an exercise has hints is the teacher's choice. When it has them:
 - When the teacher wants the hints on paper, they come as
   `Name - Hints.pdf` beside `Name.pdf` and `Name - Answers.pdf`, from the
   same source (section 3, `\hint`).
+- Hints are reviewed like answers (section 7): the separate reviewer
+  re-solves each question, checks each hint for anything that gives the
+  answer away, and checks that the idea it points at was taught. A
+  rewrite that would itself give the answer away is softened.
+
+### A suggestion: hints first, then the answers
+
+Offer this, once, in one or two sentences, to a teacher making an exercise
+whose questions each have one right answer, where handing out the answers
+with the exercise gives the questions away. It is one teacher's way of
+working, a starting point to take or leave; the teacher decides topic by
+topic, and other topics keep their answers from the start.
+
+- **The idea.** The homework goes out with HINTS. At the start of the next
+  class the teacher checks that it was done; then the answers replace the
+  hints.
+- **What a hint is here.** It never gives the answer away, not even
+  through a pointed first step. It points back to that day's key ideas, in
+  the words the lesson itself used (a worked example by its title, a
+  summary by its title). Where the teacher uses hints at all, offer a hints
+  sheet for every exercise as the default.
+- **On paper**: one source, three outputs, `Name.pdf`, `Name - Hints.pdf`
+  and `Name - Answers.pdf` (section 3), and the two joined files
+  `Name - with Hints.pdf` and `Name - with Answers.pdf`. Adding hints
+  changes nothing in the question copy or the key.
+- **On the class website** (with `plantoir-page-authoring` and
+  `plantoir-printing`), for an exercise page titled, say, "Practice":
+  1. The page students see first folds a hint under each question, where
+     an answers page folds an answer (`> [!hint]- Hint`). Its opening says
+     to try each question before opening its hint, and that the answers
+     come at the start of next class. Its `printPdf` (and any link to the
+     PDF) is `Name - with Hints.pdf`.
+  2. At the same time, make a second copy named "Practice - Answers" (its
+     file name and its `title`), the same page with folded answers and
+     `printPdf` set to `Name - with Answers.pdf`, and leave it
+     UNPUBLISHED (`unpublish_pages`, or `publish: false` in its settings).
+- **The swap**, when the teacher asks for it (homework checked). Back up
+  the course first (`back_up_course`). Show the teacher the whole plan and
+  wait for their yes before changing anything; say plainly that the
+  answers page TAKES the plain title, so the exercise keeps its address
+  and every class page that links to it opens the answers with no link
+  changed (naming the page by its old title makes it read as if a new
+  address were being made). With two or more sections, ask which section
+  or sections; they may swap on different days. Then, in this order:
+  1. unpublish "Practice" for those sections (`plan_unpublish_pages`,
+     then `unpublish_pages`);
+  2. rename "Practice" to "Practice - Hints": its file name and its
+     `title`;
+  3. rename "Practice - Answers" to "Practice": its file name and its
+     `title`;
+  4. publish "Practice" for those sections (`plan_publish_pages`, then
+     `publish_pages`);
+  5. preview the course again, and say what changed. Never deploy on the
+     teacher's behalf; deploying is theirs.
+  Plantoir has no tool that renames a page, so steps 2 and 3 are file
+  edits you make yourself, and `undo_last_change` does not undo them: the
+  backup does. Touch only the exercise page and its copy, never a warmup,
+  discussion, summary or class page. A unit plan's page that lists a
+  day's files lists Worksheet, Hints and Answers.
 
 ### When the length is not given, go shorter
 

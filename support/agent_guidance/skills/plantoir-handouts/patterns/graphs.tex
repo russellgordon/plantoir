@@ -1,0 +1,327 @@
+% Plantoir house style: graphs (the skill's section 12). A pattern to copy
+% FROM, never a starter: copy a graph into a handout made from
+% starters/Handout.tex, whose preamble this file repeats line for line.
+%
+% The one question per graph: does the relation have a context?
+%   A. An abstract parabola: drawn to the grid's edge, an arrowhead at each
+%      end, the plotted points kept. Each end of the domain is found by
+%      solving the relation against EVERY edge and stopping at the first
+%      edge it crosses (a little short of it is fine; past it, the axis
+%      clips the arrowheads off).
+%   B. A line that leaves through the top and the bottom.
+%   C. A vertical line, x = -3: \draw, since it is not a function of x.
+%   D. A context: a ball's height from the throw to the landing. It STOPS at
+%      the end points the situation gives (a dot at each), no arrowheads,
+%      axes from zero labelled with what they measure and the units.
+%   E. Four lines on one grid with a legend whose keys show no arrowheads.
+%   F. A tick label left out where an arrowhead ends on it.
+%   G. The same grid in the question copy and the answer key: written ONCE,
+%      only the plotted answer behind \onlya. Shown here both ways.
+%
+% The style lines (in the preamble): tick labels on a layer above the
+% curves on a white patch, so no curve runs through a digit; axes that run
+% 0.25cm past the grid, so an arrowhead at the edge is clear of the axis
+% arrow; a grid unit of at least 0.35cm, the same on both axes where a
+% graph compares steepness; a label on a peach patch inside an example.
+%
+% ---------- The starter's preamble, line for line (a test keeps it so) ----------
+\documentclass[11pt]{article}
+\usepackage[letterpaper, left=0.75in, right=0.75in, top=1.05in, bottom=0.9in,
+            headheight=14pt, headsep=0.3in]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tasks}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{pgfplots}
+\usepackage{array}
+\usepackage{collcell}     % the C column's minus-sign warning (below)
+\usepackage{needspace}
+\usepackage[most]{tcolorbox}
+\usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the skill's section 9)
+\pgfplotsset{compat=1.18}
+
+% ---------- Fill in ----------
+% The school's name comes ONLY from print_school_name in the course's
+% settings, or from the teacher in this conversation. Never a placeholder:
+% with no name, leave the braces empty and the corner prints nothing.
+\newcommand{\schoolname}{}
+\newcommand{\coursecode}{COURSE}        % the course's code, in capitals
+\newcommand{\handouttitle}{Handout Title}
+
+% ---------- Questions, answers or hints ----------
+\newif\ifanswers
+\ifdefined\showanswers \answerstrue \fi
+\newcommand{\qa}[2]{\ifanswers #2\else #1\fi}
+\newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
+\newcommand{\onlya}[1]{\ifanswers #1\fi}
+% The hints sheet (the skill's section 13): the hints alone, one per
+% question, in the block right after \begin{document}. Nothing else in the
+% file changes for hints, so the questions and the answers compile exactly
+% as they would without them.
+\newif\ifhints
+\ifdefined\showhints \hintstrue \fi
+\newcommand{\hint}[2]{\item[Question #1] #2}
+
+% A blank students write on, in a question (the skill's section 4): an
+% invisible strut makes its line about two lines tall, so a wrapped prompt
+% still leaves a full line of writing room above the blank. \fillin{answer}
+% or \fillin[5cm]{answer}: the student copy shows the blank, the answer key
+% writes the answer on the same line, at the same height.
+\newcommand{\fillin}[2][3.2cm]{\ \qa{\rule[-0.2em]{#1}{0.4pt}}{\makebox[#1]{#2}\llap{\rule[-0.2em]{#1}{0.4pt}}}\rule[-0.2em]{0pt}{2.1em}}
+
+\ifanswers
+  \newcommand{\doctitle}{\handouttitle\ --- Answers}
+\else\ifhints
+  \newcommand{\doctitle}{\handouttitle\ --- Hints}
+\else
+  \newcommand{\doctitle}{\handouttitle}
+\fi\fi
+
+% ---------- Header and footer (matches pages printed from the class website) ----------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\newcommand{\fillblank}[2]{#1 \rule[-0.15em]{#2}{0.4pt}}
+% Lay the corners out as the course's print settings do (the skill's
+% sections 2 and 5). The blanks are print_blanks' list in the order Name,
+% Date, Class #; with no list, Name and Date, as here. Add
+% \quad\fillblank{Class \#}{1.4cm} when the list has class_number.
+\fancyhead[L]{\small\sffamily\color{gray}\schoolname}
+\fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}}
+\fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ \coursecode}
+\fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}
+\setlength{\parindent}{0pt}
+
+% ---------- Colours and boxes ----------
+\definecolor{why}{gray}{0.4}
+\definecolor{peach}{RGB}{253,244,233}
+\definecolor{peachframe}{RGB}{226,160,96}
+\definecolor{exampletitle}{RGB}{176,38,30}
+\definecolor{sub}{RGB}{200,30,30}      % a substituted value, in a worked example
+\definecolor{note}{RGB}{20,70,140}     % a side note beside a step
+\definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
+
+% Worked example box
+\newtcolorbox{example}[1]{
+  enhanced, breakable=false,
+  colback=peach, colframe=peachframe, boxrule=0.8pt, arc=3mm,
+  left=3mm, right=3mm, top=2mm, bottom=2mm,
+  before skip=0.9em, after skip=0.6em,
+  fontupper=\normalsize,
+  title={#1}, coltitle=exampletitle, colbacktitle=peach,
+  fonttitle=\large\bfseries\sffamily,
+  titlerule=0pt, toptitle=1mm, bottomtitle=-1mm,
+}
+% Inside a worked example: a step's method as a small heading, a note beside
+% a step (in an alignat, after &&), and a substituted value in red.
+\newcommand{\method}[1]{\medskip{\bfseries\sffamily #1}\par\smallskip}
+\newcommand{\sidenote}[1]{\text{\small\sffamily\color{note}#1}}
+\newcommand{\sv}[1]{{\color{sub}#1}}
+% A small framed note set beside an example, in a [t] minipage
+\newtcolorbox{notebox}{colback=white, colframe=peachframe, boxrule=0.5pt, arc=1.5mm,
+  left=2mm, right=2mm, top=1mm, bottom=1mm, fontupper=\small\sffamily}
+% A grey box of instructions before a group of questions
+\newtcolorbox{groupnote}{colback=gray!8, colframe=gray!45, boxrule=0.6pt, arc=2mm,
+  left=3mm, right=3mm, top=1.5mm, bottom=1.5mm, before skip=0.4em, after skip=0.8em,
+  fontupper=\small}
+
+% Section heading for the answer key, where the worked examples are hidden
+\newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
+
+% ---------- Tables (the skill's section 9) ----------
+% Every value sits in a row \valuepitch tall, centred in it, so the first
+% value is half a row below the heading rule and the last half a row above
+% the bottom rule. The value columns of a table are one width
+% (\setvaluecol{the widest value in either column} sets \valuecol to it plus
+% 0.5cm). C is a centred value column, for a column with no negative value
+% and not mixing whole numbers with decimals. N{$18$} is for every other
+% column of numbers: each value right-aligned in a box as wide as the
+% column's widest value WITHOUT its sign, the box centred, so the digits
+% share one trailing edge and a minus sign juts out to the left.
+% A C cell holding a minus sign prints a small red "use N" beside it, so a
+% centred column of negatives shows on the rendered page (the skill's
+% section 8). An N column never does. \renewcommand{\valuepitch}{3em} for a
+% table with room to write.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newlength{\valuecol}
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
+\makeatletter
+\newcommand{\centredvalue}[1]{%
+  \begingroup\edef\x{\endgroup\noexpand\in@{\detokenize{$-}}{\detokenize{#1}}}\x
+  \ifin@\else\begingroup\edef\x{\endgroup\noexpand\in@{\detokenize{$ -}}{\detokenize{#1}}}\x\fi
+  \ifin@\llap{\tiny\sffamily\color{red}use N\ }\fi#1}
+\makeatother
+\newcolumntype{C}{>{\rowstrut{\valuepitch}\collectcell\centredvalue}w{c}{\valuecol}<{\endcollectcell}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
+% One heading-row height for tables set side by side
+\newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}
+
+% ---------- Numbered questions ----------
+\newenvironment{questions}
+  {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
+                  \setlength{\labelsep}{0.4em}\setlength{\itemsep}{0.7em}}}
+  {\end{list}}
+% Optional argument: lines to keep together so a question is never split from its parts
+\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+
+\settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
+
+% ---------- Graph styles (the skill's section 12) ----------
+% Tick labels are drawn above the plotted lines on a white patch, so a line
+% that passes a label never runs through its digits. The axes run a little
+% past the grid, so a line's arrowhead at the grid's edge is clear of the
+% axis arrows. Leave a tick label out where an arrowhead ends on it
+% (yticklabels={,$-4$,...}).
+\pgfplotsset{
+  layers/labels on top/.define layer set={axis background, axis grid, axis ticks, axis lines,
+    main, axis tick labels, axis descriptions, axis foreground}{},
+  gridgraph/.style={
+    set layers=labels on top,
+    axis lines=middle, grid=both,
+    major grid style={gray!35}, minor grid style={gray!18},
+    minor tick num=1,
+    tick label style={font=\scriptsize, fill=white, fill opacity=0.85, text opacity=1, inner sep=1pt},
+    xlabel=$x$, ylabel=$y$,
+    xlabel style={anchor=west, xshift=0.25cm}, ylabel style={anchor=south, yshift=0.25cm},
+    axis line style={-latex, shorten >=-0.25cm},
+    clip mode=individual,
+  },
+  % A graph that models a situation: axes from zero at the bottom left,
+  % labelled with what they measure and its units, no arrowheads on the line.
+  contextgraph/.style={
+    set layers=labels on top,
+    axis lines=left, grid=both,
+    major grid style={gray!35}, minor grid style={gray!18},
+    tick label style={font=\scriptsize},
+    label style={font=\small},
+    axis line style={-latex, shorten >=-0.25cm},
+    clip mode=individual,
+  },
+  exampleline/.style={blue!70!black, thick, samples=2, latex-latex},
+  lineA/.style={blue!70!black, thick, samples=2},
+  lineB/.style={red!75!black, thick, samples=2},
+  lineC/.style={green!50!black, thick, samples=2},
+  lineD/.style={orange!85!black, thick, samples=2},
+  % a legend whose keys show a plain line, without the arrowheads the lines carry
+  answerlegend/.style={legend pos=outer north east, legend cell align=left,
+    legend style={font=\small, draw=gray!50}, legend image post style={arrows=-}},
+}
+
+% ---------- End of the starter's preamble ----------
+\renewcommand{\handouttitle}{Pattern: Graphs}
+
+% G: the grid is defined once; \onlya decides, where it is used, whether
+% the answer is drawn on it.
+\newcommand{\keygrid}{%
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.36cm, y=0.36cm,
+    xmin=-6, xmax=6, ymin=-6, ymax=6, xtick={-6,-4,...,6}, ytick={-6,-4,...,6}]
+  \onlya{%
+  \addplot[lineA, <->, >=latex, domain=-3.45:2.45]{-2*x - 1};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(-1,1) (0,-1) (1,-3)};}
+\end{axis}\end{tikzpicture}}
+
+\newcommand{\graphnote}[1]{\par\smallskip{\small\sffamily\color{why}#1}}
+
+\begin{document}
+
+{\LARGE\bfseries\sffamily \doctitle}\par
+\medskip
+{\color{why} Seven graphs. For each, the comment above it in the source says how its domain was found.}
+
+\bigskip
+% ---------- A and B ----------
+\begin{minipage}[t]{0.48\linewidth}\vspace{0pt}\centering
+% y = -x^2 + 6x - 5 on x from -1 to 7, y from -6 to 5: the top edge y = 5 is
+% never reached (the vertex is (3, 4)); the bottom edge y = -6 is met at
+% x = 3 - sqrt(10) and 3 + sqrt(10), about -0.16 and 6.16, inside -1 to 7.
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
+    xmin=-1, xmax=7, ymin=-6, ymax=5, xtick={2,4,6}, ytick={-4,-2,2,4}]
+  \addplot[lineA, <->, >=latex, domain=-0.15:6.15, samples=60]{-x^2 + 6*x - 5};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(1,0) (2,3) (3,4) (4,3) (5,0)};
+\end{axis}\end{tikzpicture}
+\graphnote{A. $y = -x^2 + 6x - 5$: to the edge, both arrowheads.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}\vspace{0pt}\centering
+% y = 2x - 1 on -6 to 6: it meets y = -6 at x = -2.5 and y = 6 at x = 3.5,
+% both before the side edges.
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.36cm, y=0.36cm,
+    xmin=-6, xmax=6, ymin=-6, ymax=6, xtick={-6,-4,...,6}, ytick={-6,-4,...,6}]
+  \addplot[lineA, <->, >=latex, domain=-2.45:3.45]{2*x - 1};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(0,-1) (1,1) (2,3)};
+\end{axis}\end{tikzpicture}
+\graphnote{B. $y = 2x - 1$: leaves through the bottom and the top.}
+\end{minipage}
+
+\bigskip
+% ---------- C and D ----------
+\begin{minipage}[t]{0.48\linewidth}\vspace{0pt}\centering
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.36cm, y=0.36cm,
+    xmin=-6, xmax=6, ymin=-6, ymax=6, xtick={-6,-4,...,6}, ytick={-6,-4,...,6}]
+  \draw[blue!70!black, thick, <->, >=latex] (axis cs:-3,-5.88) -- (axis cs:-3,5.88);
+\end{axis}\end{tikzpicture}
+\graphnote{C. $x = -3$: a vertical line, drawn with \texttt{\textbackslash draw}.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}\vspace{0pt}\centering
+% h = -5t^2 + 10t + 15: thrown at 15 m (t = 0), highest at t = 1 (20 m),
+% lands when h = 0, at t = 3. The graph runs from t = 0 to t = 3 and stops.
+\begin{tikzpicture}\begin{axis}[contextgraph, x=1.2cm, y=0.16cm,
+    xmin=0, xmax=3.5, ymin=0, ymax=25, xtick={0,0.5,...,3.5}, ytick={0,5,...,25},
+    minor y tick num=1, xlabel={Time (s)}, ylabel={Height (m)},
+    xticklabel style={/pgf/number format/fixed, /pgf/number format/precision=1}]
+  \addplot[lineA, domain=0:3, samples=60]{-5*x^2 + 10*x + 15};
+  \addplot[only marks, mark size=1.8pt, blue!70!black] coordinates {(0,15) (3,0)};
+\end{axis}\end{tikzpicture}
+\graphnote{D. A ball's flight: it stops at the throw and the landing.}
+\end{minipage}
+
+\bigskip
+% ---------- E and F ----------
+\begin{minipage}[t]{0.6\linewidth}\vspace{0pt}\centering
+% Each line's domain, on -6 to 6: a) y = x + 2 meets x = -6 (at y = -4) and
+% y = 6 (at x = 4); b) y = -2x + 1 meets y = 6 at x = -2.5 and y = -6 at
+% x = 3.5; c) y = x/2 - 3 meets both sides, x = -6 and x = 6; d) y = -x - 4
+% meets x = -6 (at y = 2) and y = -6 (at x = 2).
+\begin{tikzpicture}\begin{axis}[gridgraph, answerlegend, x=0.36cm, y=0.36cm,
+    xmin=-6, xmax=6, ymin=-6, ymax=6, xtick={-6,-4,...,6}, ytick={-6,-4,...,6}]
+  \addplot[lineA, <->, >=latex, domain=-5.9:3.9]{x + 2};       \addlegendentry{a) $y = x + 2$}
+  \addplot[lineB, <->, >=latex, domain=-2.45:3.45]{-2*x + 1};  \addlegendentry{b) $y = -2x + 1$}
+  \addplot[lineC, <->, >=latex, domain=-5.9:5.9]{x/2 - 3};     \addlegendentry{c) $y = \frac12x - 3$}
+  \addplot[lineD, <->, >=latex, domain=-5.9:1.9]{-x - 4};      \addlegendentry{d) $y = -x - 4$}
+\end{axis}\end{tikzpicture}
+\graphnote{E. Four lines and a legend without arrowheads.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.36\linewidth}\vspace{0pt}\centering
+% y = 3x + 6 on -6 to 6 meets y = -6 at x = -4 and y = 6 at x = 0: its
+% arrowhead ends on the y-axis where the label 6 would be, so that label
+% is left out (the 0 is never labelled on middle axes).
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.36cm, y=0.36cm,
+    xmin=-6, xmax=6, ymin=-6, ymax=6, xtick={-6,-4,...,6}, ytick={-6,-4,...,6},
+    yticklabels={$-6$,$-4$,$-2$,,$2$,$4$,}]% no 6 label: the arrowhead ends there
+  \addplot[lineA, <->, >=latex, domain=-3.95:-0.05]{3*x + 6};
+\end{axis}\end{tikzpicture}
+\graphnote{F. $y = 3x + 6$: no label where it ends.}
+\end{minipage}
+
+\bigskip
+% ---------- G ----------
+\needspace{14\baselineskip}
+{\large\bfseries\sffamily G. The same grid in both copies}\par\smallskip
+Graph $y = -2x - 1$. The question copy shows the empty grid; the key shows the same grid with the answer on it.
+
+\smallskip
+\begin{minipage}[t]{0.48\linewidth}\vspace{0pt}\centering
+{\answersfalse\keygrid}
+\graphnote{The question copy}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\linewidth}\vspace{0pt}\centering
+{\answerstrue\keygrid}
+\graphnote{The answer key}
+\end{minipage}
+
+\end{document}
