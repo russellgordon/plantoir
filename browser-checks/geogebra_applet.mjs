@@ -75,6 +75,30 @@
 //    keyboard got in while the lines ran: a sketch left half built, and that
 //    half kept as its start.
 //
+// 13. While the first sketch opens (#756), pressed with a REAL pointer at
+//    its button's centre (#761), never a scripted click: the engine's
+//    first request is HELD (Fetch.requestPaused) so the in-between state
+//    can be read, then let go. Inside the sketch's own card, where the
+//    student pressed, the contract's words.site.loading and under it
+//    words.site.loadingFirstTime show, in a polite live region, readable
+//    (contrast at least 4.5) in light and in dark, each set explicitly,
+//    the card on top of the applet's box, which lies exactly under it
+//    (in WebKit it once hung below; that engine is measured outside the
+//    gate); the figure's height and the
+//    page's scroll height stay within 1 px from before the press, through
+//    every change while it opens, to the drawn sketch (before #756 the
+//    page grew by one sketch height while the engine arrived, 393.6 px on
+//    the fixture page, which is how this item fails on the old loader);
+//    the spinner turns, and is still when the reader asks for less motion;
+//    once drawn, the words are gone and the sketch's canvas is at its
+//    centre. Then the fourth sketch on the first page, from a file and not
+//    yet opened, pressed with its file refused (Fetch.failRequest): the
+//    words go, the button is back, and the contract's
+//    words.site.couldNotLoad is said below the sketch. No picture is taken
+//    here: a screenshot made Chrome fetch the theme's font again, which
+//    the off-site count then reported (measured); the pictures to look at
+//    come from the issue's own measurements.
+//
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
 //
@@ -235,11 +259,22 @@ async function connect(chunk) {
   let engineRequests = 0
   let bytes = 0
   let refusedLines = 0
+  // 13 (#756): what happens to a request Fetch pauses - "hold" keeps it
+  // until let go, "fail" refuses it, anything else lets it through.
+  let fetchMode = "pass"
+  let held = []
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data)
     if (message.id && waiting.has(message.id)) {
       waiting.get(message.id)(message.result ?? message.error)
       waiting.delete(message.id)
+      return
+    }
+    if (message.method === "Fetch.requestPaused") {
+      const requestId = message.params.requestId
+      if (fetchMode === "hold") held.push(requestId)
+      else if (fetchMode === "fail") void send("Fetch.failRequest", { requestId, errorReason: "Failed" })
+      else void send("Fetch.continueRequest", { requestId })
       return
     }
     if (message.method === "Network.requestWillBeSent") {
@@ -277,13 +312,21 @@ async function connect(chunk) {
   // Taps the sketch at `index` on this page and waits for it to open.
   // Answers {opened, ms, bytes} - the time from the tap to the canvas, and
   // what the network carried meanwhile.
-  const tap = async (index) => {
+  // With `watch` (13, #756), the button is pressed with a real pointer and
+  // `watch.during()` reads the sketch while it opens, before the wait.
+  const tap = async (index, watch = null) => {
     tapped = true
     fetchedSinceTap = []
     const before = bytes
     const ready = await waitFor(`document.querySelectorAll("figure.pl-geogebra .pl-geogebra-open").length > ${index}`, 40)
     if (!ready) return { opened: false, ms: null, bytes: 0, why: "no such sketch on the page" }
-    await evaluate(`(() => { window.__plantoirTap = performance.now(); document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-open").click(); return true })()`)
+    if (watch === null) {
+      await evaluate(`(() => { window.__plantoirTap = performance.now(); document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-open").click(); return true })()`)
+    } else {
+      const pressed = await pressOpen(index)
+      if (pressed.why) return { opened: false, ms: null, bytes: 0, why: pressed.why }
+      await watch.during()
+    }
     const opened = await waitFor(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; if (f && f.classList.contains("pl-geogebra-loaded") && f.querySelector(".pl-geogebra-applet canvas")) { window.__plantoirOpened = performance.now(); return true } return false })()`)
     const ms = opened ? Math.round(await evaluate("window.__plantoirOpened - window.__plantoirTap")) : null
     const message = opened ? "" : await evaluate(`document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-message").textContent`)
@@ -301,6 +344,128 @@ async function connect(chunk) {
   // replaces - measured without it, Chromium opened no sketch after a page
   // change until a reload.
   const frameUnderHtml = async () => await evaluate(`(() => { const frame = document.getElementById("web3d"); return !!frame && frame.parentElement === document.documentElement })()`)
+  // 13 (#756): presses the open button of the sketch at `index` the way a
+  // person does - move, press, release at its centre (Input.dispatchMouseEvent),
+  // never a scripted click (#761) - once the button is what lies there.
+  const pressOpen = async (index) => {
+    const place = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; f.scrollIntoView({ block: "center", behavior: "instant" }); const b = f.querySelector(".pl-geogebra-open"); const r = b.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const top = document.elementFromPoint(x, y); return { x, y, onButton: !!top && b.contains(top) } })()`)
+    if (!place || place.thrown) return { why: `its button could not be found: ${place?.thrown}` }
+    if (!place.onButton) return { why: "its button is not what lies at the button's centre, so a press there would miss it" }
+    const mouse = (type, buttons) => send("Input.dispatchMouseEvent", { type, x: place.x, y: place.y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 })
+    await mouse("mouseMoved", 0)
+    await evaluate("(() => { window.__plantoirTap = performance.now(); return true })()")
+    await mouse("mousePressed", 1)
+    await mouse("mouseReleased", 0)
+    return {}
+  }
+  // 13 (#756): the sketch at `index`, its card's words and the sizes that
+  // must not move. `figure` and `scroll` are the figure's height and the
+  // page's scroll height; the rest describe the card's live region.
+  const opening = async (index) => await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; const card = f.querySelector(":scope > .pl-geogebra-card"); const region = card && card.querySelector(":scope > .pl-geogebra-loading"); const box = f.querySelector(":scope > .pl-geogebra-applet"); const message = f.querySelector(":scope > .pl-geogebra-message"); const button = f.querySelector(".pl-geogebra-open"); const rgb = (text) => (text.match(/[0-9.]+/g) || []).slice(0, 3).map(Number); const lum = (c) => { const [r, g, b] = c.map((v) => { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }; const ratio = (a, b) => { const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((p, q) => q - p); return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100 }; const boxRect = box ? box.getBoundingClientRect() : null; const cardRect = card ? card.getBoundingClientRect() : null; const out = { theme: document.documentElement.getAttribute("saved-theme"), boxOnCard: !!boxRect && !!cardRect && Math.abs(boxRect.left - cardRect.left) <= 1 && Math.abs(boxRect.top - cardRect.top) <= 1 && Math.abs(boxRect.width - cardRect.width) <= 1 && Math.abs(boxRect.height - cardRect.height) <= 1, boxSize: boxRect ? Math.round(boxRect.width) + "×" + Math.round(boxRect.height) : null, cardSize: cardRect ? Math.round(cardRect.width) + "×" + Math.round(cardRect.height) : null, figure: f.getBoundingClientRect().height, scroll: document.documentElement.scrollHeight, opening: f.classList.contains("pl-geogebra-opening"), loaded: f.classList.contains("pl-geogebra-loaded"), boxShown: !!box && !box.hidden, button: !!button && !button.disabled && getComputedStyle(button).visibility !== "hidden" && getComputedStyle(card).display !== "none", message: message && !message.hidden ? message.textContent : "" }; if (!region) return { ...out, region: false }; const r = region.getBoundingClientRect(); const c = card.getBoundingClientRect(); const style = getComputedStyle(region); const lines = Array.from(region.querySelectorAll(".pl-geogebra-loading-line")); const spinner = region.querySelector(".pl-geogebra-spinner"); const top = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2); return { ...out, region: true, role: region.getAttribute("role"), live: region.getAttribute("aria-live"), text: region.textContent, lines: lines.map((line) => line.textContent), contrast: lines.map((line) => ratio(getComputedStyle(line).color, style.backgroundColor)), visible: r.width > 0 && r.height > 0 && Number(style.opacity) > 0 && style.visibility !== "hidden", inCard: r.top >= c.top - 0.5 && r.bottom <= c.bottom + 0.5 && r.left >= c.left - 0.5 && r.right <= c.right + 0.5, cardOnTop: !!top && card.contains(top), spinner: spinner ? getComputedStyle(spinner).animationName : null } })()`)
+  // 13 (#756): every change to the figure while it opens, and every frame
+  // until it is drawn, records the figure's height and the page's scroll
+  // height; read back as their least and greatest.
+  const watchSizes = async (index) => await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; const seen = { figure: [Infinity, -Infinity], scroll: [Infinity, -Infinity], samples: 0 }; window.__plantoirSizes = seen; const take = () => { if (f.classList.contains("pl-geogebra-loaded")) return; const h = f.getBoundingClientRect().height, s = document.documentElement.scrollHeight; seen.figure = [Math.min(seen.figure[0], h), Math.max(seen.figure[1], h)]; seen.scroll = [Math.min(seen.scroll[0], s), Math.max(seen.scroll[1], s)]; seen.samples += 1 }; window.__plantoirSizesWatcher = new MutationObserver(take); window.__plantoirSizesWatcher.observe(f, { attributes: true, childList: true, subtree: true }); const frame = () => { take(); if (!f.classList.contains("pl-geogebra-loaded")) requestAnimationFrame(frame) }; requestAnimationFrame(frame); return true })()`)
+  // 13 (#756): the first sketch opened with its engine held, read while it
+  // opens, then let go. Answers what `tap` answers, with `said` and
+  // `problems` for this item.
+  const opensInItsBox = async (phase) => {
+    const found = []
+    const words = [contract.words.site.loading, contract.words.site.loadingFirstTime]
+    await evaluate(`document.querySelectorAll("figure.pl-geogebra")[0].scrollIntoView({ block: "center", behavior: "instant" })`)
+    const before = await opening(0)
+    await watchSizes(0)
+    held = []
+    fetchMode = "hold"
+    await send("Fetch.enable", { patterns: [{ urlPattern: "*/static/geogebra/HTML5/*", requestStage: "Request" }] })
+    let during = null
+    let light = null
+    let dark = null
+    let still = null
+    const opened = await tap(0, {
+      during: async () => {
+        // At once: the words are put in by the press itself.
+        const atPress = await opening(0)
+        if (!atPress.region || !atPress.visible || !atPress.opening) found.push(`${phase}: right after the press, the first sketch's card does not show its words: ${JSON.stringify(atPress)}`)
+        // Then the box laid out under the card, its engine held.
+        const laidOut = await waitFor(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[0].querySelector(":scope > .pl-geogebra-applet"); return !box.hidden })()`, 120)
+        for (let attempt = 0; attempt < 120 && held.length === 0; attempt += 1) await pause(250)
+        if (!laidOut || held.length === 0) found.push(`${phase}: the first sketch's box was ${laidOut ? "" : "not "}laid out and ${held.length} of the engine's requests were held, so the state while it opens could not be read`)
+        during = await opening(0)
+        // Each theme set explicitly, the page's attribute and the browser's
+        // colour scheme both: Quartz takes the theme from the browser, and
+        // headless Chrome follows the Mac's appearance, so a reading taken
+        // as the page came was dark on a Mac in Dark Mode (#756 review M1).
+        const theme = await evaluate(`document.documentElement.getAttribute("saved-theme")`)
+        const inTheme = async (scheme) => {
+          await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] })
+          await evaluate(`(() => { document.documentElement.setAttribute("saved-theme", ${JSON.stringify(scheme)}); return true })()`)
+          return await opening(0)
+        }
+        light = await inTheme("light")
+        dark = await inTheme("dark")
+        await send("Emulation.setEmulatedMedia", { media: "", features: [] })
+        await evaluate(`(() => { const theme = ${JSON.stringify(theme)}; if (theme === null) document.documentElement.removeAttribute("saved-theme"); else document.documentElement.setAttribute("saved-theme", theme); return true })()`)
+        await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] })
+        still = await opening(0)
+        await send("Emulation.setEmulatedMedia", { media: "", features: [] })
+        fetchMode = "pass"
+        for (const requestId of held) await send("Fetch.continueRequest", { requestId })
+        held = []
+      },
+    })
+    fetchMode = "pass"
+    await send("Fetch.disable")
+    const sizes = await evaluate(`(() => { window.__plantoirSizesWatcher && window.__plantoirSizesWatcher.disconnect(); return window.__plantoirSizes })()`)
+    const after = await opening(0)
+    const centre = await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[0].querySelector(".pl-geogebra-applet"); const r = box.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!top && top.tagName === "CANVAS" && box.contains(top) })()`)
+    if (during !== null) {
+      if (!during.region || during.role !== "status" || during.live !== "polite") found.push(`${phase}: the first sketch's card has no polite live region: ${JSON.stringify({ region: during.region, role: during.role, live: during.live })}`)
+      if (JSON.stringify(during.lines) !== JSON.stringify(words)) found.push(`${phase}: while the first sketch opens its card says ${JSON.stringify(during.lines)}, not the contract's ${JSON.stringify(words)}`)
+      if (!during.visible || !during.inCard || !during.cardOnTop) found.push(`${phase}: while the first sketch opens its words are not seen inside its card on top of the box: ${JSON.stringify({ visible: during.visible, inCard: during.inCard, cardOnTop: during.cardOnTop, boxShown: during.boxShown })}`)
+      if (!during.boxShown) found.push(`${phase}: the first sketch's box was not laid out while it opened, so GeoGebra could not measure it`)
+      // The box lies exactly under the card while it opens: in WebKit it
+      // once hung below it, white, over the caption (#756 review H1).
+      for (const read of [during, light, dark]) if (read && !read.boxOnCard) found.push(`${phase}: while the first sketch opens (theme ${read.theme}) its box is ${read.boxSize} and its card ${read.cardSize}: the box is not exactly under the card`)
+      if (during.message !== "") found.push(`${phase}: while the first sketch opens the line below it says ${JSON.stringify(during.message)}, a second live region saying it again`)
+      for (const [theme, read] of [["light", light], ["dark", dark]]) {
+        if (read?.theme !== theme) found.push(`${phase}: the ${theme} reading was taken with the page's theme ${read?.theme}`)
+        for (const ratio of read?.contrast ?? []) if (!(ratio >= 4.5)) found.push(`${phase}: in ${theme}, a line of the first sketch's words has contrast ${ratio}, under 4.5`)
+      }
+      if (during.spinner !== "pl-geogebra-spin") found.push(`${phase}: the first sketch's spinner does not turn (${during.spinner})`)
+      if (still?.spinner !== "none") found.push(`${phase}: with less motion asked for, the first sketch's spinner still turns (${still?.spinner})`)
+    }
+    const moved = (range, from) => Math.max(Math.abs(range[0] - from), Math.abs(range[1] - from))
+    if (!sizes || sizes.samples === 0) found.push(`${phase}: no size was read while the first sketch opened`)
+    else {
+      if (moved(sizes.figure, before.figure) > 1 || Math.abs(after.figure - before.figure) > 1) found.push(`${phase}: the first sketch's figure was ${before.figure} px tall before the press, ${sizes.figure[0]} to ${sizes.figure[1]} px while it opened (${sizes.samples} readings) and ${after.figure} px once drawn: the page moved`)
+      if (moved(sizes.scroll, before.scroll) > 1 || Math.abs(after.scroll - before.scroll) > 1) found.push(`${phase}: the page's scroll height was ${before.scroll} px before the press, ${sizes.scroll[0]} to ${sizes.scroll[1]} px while the first sketch opened and ${after.scroll} px once drawn`)
+    }
+    if (opened.opened && (after.opening || (after.region && (after.visible || after.text !== "")) || !centre)) found.push(`${phase}: once drawn, the first sketch still shows its words, or its canvas is not at its centre: ${JSON.stringify({ opening: after.opening, visible: after.visible, text: after.text, canvasAtCentre: centre })}`)
+    const said = `the first sketch pressed for real, its card saying the contract's two lines while its engine was held (contrast ${light?.contrast?.join(" and ")} with the theme set to ${light?.theme}, ${dark?.contrast?.join(" and ")} with it set to ${dark?.theme}; box ${during?.boxSize} under a ${during?.cardSize} card), the figure ${Math.round(before.figure * 100) / 100} px tall throughout (${sizes?.samples ?? 0} readings)`
+    return { ...opened, found, said }
+  }
+  // 13 (#756): the sketch from a file at `index` on this page, not opened
+  // yet, pressed with its file refused (Fetch.failRequest): its words go,
+  // its button comes back, and the contract's couldNotLoad is said below
+  // it. On the page already showing, so no page load is added to the run.
+  const couldNotOpen = async (phase, index) => {
+    const found = []
+    const fromAFile = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; return !!f && JSON.parse(f.dataset.geogebra).sketch !== null && !f.classList.contains("pl-geogebra-loaded") })()`)
+    if (fromAFile !== true) return [`${phase}: the sketch at ${index} on ${pageA} is not an unopened sketch from a file, so its file cannot be refused`]
+    fetchMode = "fail"
+    await send("Fetch.enable", { patterns: [{ urlPattern: "*.ggb", requestStage: "Request" }] })
+    const pressed = await pressOpen(index)
+    let gave = false
+    if (pressed.why) found.push(`${phase}: with its file refused, ${pressed.why}`)
+    else gave = await waitFor(`(() => { const m = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(":scope > .pl-geogebra-message"); return !m.hidden && m.textContent === ${JSON.stringify(contract.words.site.couldNotLoad)} })()`, 80)
+    fetchMode = "pass"
+    await send("Fetch.disable")
+    const after = await opening(index)
+    if (!gave) found.push(`${phase}: with its file refused, the sketch never said the contract's couldNotLoad below it: ${JSON.stringify({ message: after.message })}`)
+    else if (after.opening || !after.button || after.boxShown || (after.region && (after.visible || after.text !== ""))) found.push(`${phase}: with its file refused, the sketch is not back to its button with the contract's couldNotLoad below it: ${JSON.stringify({ message: after.message, opening: after.opening, button: after.button, boxShown: after.boxShown, words: after.text })}`)
+    return found
+  }
   // Drags the knob of slider `name` in the sketch at `index` with real
   // pointer events (Input.dispatchMouseEvent: press, ten moves with the
   // button held, release) toward the middle of its range, and reads its
@@ -477,8 +642,9 @@ async function connect(chunk) {
       await waitFor(`document.readyState === "complete" && document.querySelectorAll("figure.pl-geogebra").length > 0`, 40)
       await pause(500)
       if (engineRequests !== 0) problems.push(`${phase}: ${engineRequests} requests for GeoGebra before any tap`)
-      const first = await tap(0)
+      const first = await opensInItsBox(phase)
       if (!first.opened) problems.push(`${phase}: the first sketch on ${pageA} did not open (${first.why})`)
+      problems.push(...first.found)
       const commands = await tap(1)
       if (!commands.opened) problems.push(`${phase}: the sketch made from commands on ${pageA} did not open (${commands.why})`)
       // 7: which of its lines GeoGebra refused, and in what words.
@@ -571,6 +737,10 @@ async function connect(chunk) {
         problems.push(`${phase}: GeoGebra's loader frame is not under <html> before and after each page change (${first.frame}, ${toB.frame}, ${backToA.frame})`)
       }
 
+      // 13 (#756): a sketch whose file is refused, on the page now showing.
+      const notOpened = await couldNotOpen(phase, 3)
+      problems.push(...notOpened)
+
       // 9 (stage 5): sketches in self-check questions.
       let quizSaid = ""
       if (quizPage) {
@@ -625,7 +795,7 @@ async function connect(chunk) {
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}${resetSaid}${keysSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: ${first.said}, then ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}${resetSaid}${keysSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))
