@@ -896,10 +896,8 @@ nonisolated struct ReferenceImportSource: Sendable {
             courseCode = courseURL.lastPathComponent
         }
 
-        var courseName: String = ""
-        if let recorded = values["course_name"] as? String {
-            courseName = CourseName.cleaned(recorded)
-        }
+        // Cleaned as CourseConfiguration.courseName cleans it (#780).
+        let courseName: String = CourseName.cleaned(values["course_name"] as? String ?? "")
 
         var sectionNumbers: [Int] = []
         if let recorded = values["section_numbers"] as? [Int] {
