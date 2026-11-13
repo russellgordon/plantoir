@@ -105,7 +105,10 @@ picture cannot show.
 4. Confirm the version of every platform this cut ships matches the
    intended tag (step 5 says how), and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
-   and the website commit both land on `main` (CLAUDE.md rule 6). After the
+   and the website commit both land on `main` (CLAUDE.md rule 6). **A hotfix
+   cut from `main` is the exception**: `dev` is NOT merged in, and the check
+   is instead that `git log v<last tag>..main` holds only the hotfix (step
+   5's hotfix bullet). After the
    website push, merge `main` back into `dev` so the branches do not drift.
 5. Check `MARKETING_VERSION` in `mac-app/project.yml` and `<Version>` in
    the csproj against the tag. **This step CHECKS the number; it does not
@@ -133,15 +136,31 @@ picture cannot show.
      "so the files agree". Nothing reads it to decide what shipped: the
      download cards and `build.py --deploy`'s feed checks read `site.json`
      and the feeds (`build.shipped_version`).
-   - **A hotfix cut from `main` keeps its own number.** It is raised on
-     `main` for the hotfix; when `main` is merged back into `dev`, `dev`
-     keeps its own, higher number (resolve the conflict to `dev`'s side).
+   - **A hotfix cut from `main` keeps its own number.** `main` carries the
+     number it last shipped (say 1.9.3), and the hotfix raises it there, on
+     `main`, for each platform it ships (1.9.4), while `dev` says 2.0.0. It
+     is cut from `main` without `dev` (step 4's hotfix check). When `main`
+     is merged back into `dev`, git stops on the version line: resolve it to
+     `dev`'s side (2.0.0). If the hotfix takes the very number `dev` is
+     heading for, `dev`'s release moves up with its milestone: ask Russell.
 
-   **After the cut**, once `main` is merged back into `dev` (step 4), raise
-   both numbers on `dev` to the next release's milestone number in a commit
-   of their own, and re-run `xcodegen generate`. `website/site.json`'s
-   `version` is NOT raised then: it is the released version line, and it
-   moves in this cut's website step.
+   **After the cut, each platform's number on `dev` is the next release THAT
+   platform will ship.** Once `main` is merged back into `dev` (step 4),
+   raise the number of each platform that SHIPPED in this cut to its next
+   release's milestone number, in a commit of its own, and re-run `xcodegen
+   generate` for the mac. A platform that shipped nothing keeps its number
+   until its own cut. Check the text against the three cases:
+   - Both ship 2.0.0: both read 2.0.0 now; after the merge back both go to
+     the next milestone (say 2.1.0).
+   - The mac ships 2.0.0 alone: `MARKETING_VERSION` goes to 2.1.0 and
+     `<Version>` STAYS at 2.0.0, so the Windows catch-up joins v2.0.0 at the
+     tag's number (the catch-up rule below). `<Version>` goes to 2.1.0 after
+     that catch-up.
+   - A 1.9.4 hotfix from `main` while `dev` says 2.0.0: nothing is raised
+     on `dev`; the merge back keeps `dev`'s 2.0.0.
+
+   `website/site.json`'s `version` is NOT raised then: it is the released
+   version line, and it moves in this cut's website step.
 
    **The catch-up cut has its own rule, and it is the one people get wrong.**
    When the lagging platform later joins a tag that already exists, it is
@@ -243,7 +262,9 @@ gh release edit v<version> --draft=false -R <owner/repo>
    `windows-app/release-notes/<version>.md`) and the signature checks are in
    `RELEASING.md` → "The update feed (Windows)". `python website/build.py
    --check` verifies both signatures, and `--deploy` refuses unless the
-   newest item is `<Version>`; confirm too that it carries this installer's
+   newest item is the release `site.json` says Windows shipped in (its
+   card's pin, else the version line, `build.shipped_version`) and
+   `<Version>` is not below it (#861); confirm too that it carries this installer's
    length; if it does not, stop — a Windows release with a
    stale feed is offered to nobody. Never print the private key, and never let
    the feed's line endings change (`.gitattributes` keeps them).

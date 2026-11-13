@@ -30,9 +30,10 @@ right and this file is corrected.
   first, always: a force-push, a history rewrite, `git branch -D`. A cut, a
   tag, a merge into `main`, signing and a website deploy happen only when
   Russell asks for that cut or that deploy; after a cut, `main` is merged
-  back into `dev` in the same session, and the version number on `dev` is
-  then raised to the next release's (`RELEASING.md` → "When the number is
-  raised", #861).
+  back into `dev` in the same session, and then the number of each platform
+  that SHIPPED in the cut is raised on `dev` to that platform's next
+  release; a platform that shipped nothing keeps its number until its own
+  cut (`RELEASING.md` → "When the number is raised", #861).
 - **If this harness cannot run Fable as the main session, you are not a
   Fable director**: rule 6's ordinary rule applies, and each merge into
   `dev` is Russell's. Where the model names differ, use the strongest model

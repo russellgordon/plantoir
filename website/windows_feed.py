@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import re
 import sys
@@ -246,7 +247,31 @@ def problems_with(feed: Path, key: str | None = None) -> list[str]:
     return problems
 
 
-def version_refusal(feed: Path, shipped: str | None, csproj: Path = CSPROJ) -> str | None:
+def shipped_version(site: dict, platform: str) -> str | None:
+    """The release this platform last shipped an installer in, as site.json says (#861).
+
+    A card pinned to an older release names that release; an unpinned card
+    ships in the site's version line. This, and not the version in the
+    platform's project file, is what its feed must offer: since #861 the
+    project file carries the release being BUILT, raised on `dev` when work
+    on a release starts, so it runs ahead of every feed between cuts and
+    stays ahead after a cut that ships nothing for that platform.
+    """
+    for entry in site.get("downloads", []):
+        if entry.get("platform") == platform:
+            return entry.get("pinned") or site.get("version")
+    return site.get("version")
+
+
+def committed_site() -> dict:
+    """``website/site.json`` as committed: the released version line and the cards' pins."""
+    return json.loads((WEBSITE / "site.json").read_text(encoding="utf-8"))
+
+
+_FROM_THE_SITE = object()
+
+
+def version_refusal(feed: Path, shipped: str | None | object = _FROM_THE_SITE, csproj: Path = CSPROJ) -> str | None:
     """Why the Windows feed must not be deployed with this site, or None —
     the Windows twin of ``build.feed_version_refusal`` (#861).
 
@@ -257,9 +282,11 @@ def version_refusal(feed: Path, shipped: str | None, csproj: Path = CSPROJ) -> s
     not compared for equality, because since #861 it names the release being
     built and is raised on ``dev`` when work on a release starts; it is still
     refused when it is BELOW the feed, which only a number moved backwards
-    can cause."""
+    can cause. Left out, ``shipped`` is read from the committed site.json."""
     if not feed.is_file():
         return None
+    if shipped is _FROM_THE_SITE:
+        shipped = shipped_version(committed_site(), "Windows")
     newest = newest_item(feed.read_bytes())
     newest_version = newest["version"] if newest else None
     if newest_version is None or shipped is None or version_key(newest_version) != version_key(shipped):

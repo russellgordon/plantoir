@@ -27,7 +27,10 @@ this build":
 changed on this platform."** The two apps are coupled through
 [`contracts/`](contracts/README.md): a contract vintage is part of the
 version, and a teacher saying "I'm on 1.1.0" must pin down exactly one set of
-sentences and rules regardless of their OS. Three consequences:
+sentences and rules regardless of their OS. On `dev` the number is the
+TARGET, raised when work on a release starts ("When the number is raised",
+#861); a bundle EARNS it at the gate, and only a bundle that passed the gate
+ships under it. Three consequences:
 
 - **A platform may ship a version the other is not ready for.** The tag goes
   up carrying the ready platform's assets; GitHub releases accept assets
@@ -107,10 +110,12 @@ Ruled by Russell on 2026-11-13, after he asked why test builds did not say
 2.0.0. **The number in each platform's project file is raised when work on a
 release starts, and the cut CHECKS it rather than raising it.**
 
-- **When.** Right after the previous cut's merge of `main` back into `dev`,
-  raise `MARKETING_VERSION` in `mac-app/project.yml` (and `<Version>` in
-  `windows-app/Plantoir/Plantoir.csproj`, on that side) to the number of the
-  next release's milestone, in a commit of its own on `dev`, then re-run
+- **When.** When work on a platform's next release starts: right after the
+  merge of `main` back into `dev` that ends that platform's previous cut
+  (the bullet "After a cut", below, says which platforms that is). Raise
+  `MARKETING_VERSION` in `mac-app/project.yml` (and `<Version>` in
+  `windows-app/Plantoir/Plantoir.csproj`, on that side) to the number of
+  that release's milestone, in a commit of its own on `dev`, then re-run
   `xcodegen generate`. From then on every build from `dev`, Debug included,
   says the release it is heading for in About, on the trail and in a problem
   report. Before #861 the number moved as a step of the cut, so for the whole
@@ -125,11 +130,34 @@ release starts, and the cut CHECKS it rather than raising it.**
   working toward. Nothing reads that number to decide what shipped. The
   download cards and the feed checks read `website/site.json` and the feeds
   (below), never a project file.
+- **After a cut, each platform's number on `dev` is the next release THAT
+  platform will ship.** Once `main` is merged back into `dev`, raise the
+  number of each platform that SHIPPED in the cut to the next release's
+  milestone number, in a commit of its own, then re-run `xcodegen generate`
+  for the mac. A platform that shipped nothing keeps its number until its own
+  cut: its next release is the catch-up that joins the tag just cut, at that
+  tag's number. It is raised after that catch-up, the same way. Three cases,
+  walked through:
+  - *Both platforms ship 2.0.0.* Both files read 2.0.0 at the cut. After the
+    merge back, both go to the next milestone's number (say 2.1.0).
+  - *The mac ships 2.0.0 alone, then Windows catches up.* Both files read
+    2.0.0 at the mac's cut, because both were raised when work on 2.0.0
+    started. After the merge back, `MARKETING_VERSION` goes to 2.1.0 and
+    `<Version>` stays at 2.0.0. The Windows catch-up joins v2.0.0 with
+    `<Version>` 2.0.0, which matches the tag, and only after it does
+    `<Version>` go to 2.1.0.
+  - *A 1.9.4 hotfix from `main` while `dev` says 2.0.0.* See the next bullet.
 - **A hotfix cut from `main` keeps its own number.** `main` carries the
-  number it last shipped; the hotfix raises it there (say 2.0.0 to 2.0.1)
-  and is cut from `main`. When `main` is merged back into `dev`, `dev` KEEPS
-  its own, higher number: resolve the `project.yml` (and csproj) conflict to
-  `dev`'s side.
+  number it last shipped (1.9.3); the hotfix raises it there, on `main`, for
+  each platform the hotfix ships (1.9.4), and the cut is made from `main`
+  without `dev` merged in. Checklist step 4's "`git log main..dev` is empty"
+  is therefore NOT a hotfix check: a hotfix confirms instead that
+  `git log v<last tag>..main` holds only the hotfix. When `main` is merged
+  back into `dev`, both sides have changed the version line from 1.9.3, so
+  git stops on a conflict: resolve it to `dev`'s side (2.0.0), which is
+  still higher. If the hotfix takes the very number `dev` is heading for
+  (`dev` at 1.9.4 and a 1.9.4 hotfix), `dev`'s release has to move up: that
+  is a question for Russell, since its milestone moves with it.
 - **`website/site.json`'s `version` does not move early.** It is the
   RELEASED version line plantoir.app prints, and it moves at the cut, when
   the release is public.
@@ -314,8 +342,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    every platform this cut ships: they were raised when work on the release
    started ("When the number is raised", #861). `project.yml` is the source on
    the mac side, so re-run `xcodegen generate` after changing it. After the
-   cut's merge of `main` back into `dev`, raise both on `dev` to the next
-   release's number.
+   cut's merge of `main` back into `dev`, raise the number of each platform
+   that SHIPPED in this cut to its next release's number; a platform that
+   shipped nothing keeps its number until its own cut ("After a cut", in
+   that section, walks the cases through).
 1a. **Cloudflare Pages vs Workers — every minor release (x.y.0), skip for
    patches.** Plantoir publishes to Cloudflare **Pages** (the default
    destination for new courses since #668). Cloudflare steers new projects
@@ -909,7 +939,9 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   must each say "Signature valid" (both did in the rehearsal, and the pure-
   Python check agreed: valid on the CR LF bytes, invalid once converted to
   LF). `build.py --deploy` then refuses if the newest item's version is not
-  `<Version>` in `Plantoir.csproj`.
+  the release `site.json` says Windows shipped in (the Windows card's pin,
+  else the version line, `build.shipped_version`), or if `<Version>` in
+  `Plantoir.csproj` is below it (#861; `<Version>` may be ahead).
 
   **Rejected:** `--overwrite-old-items` (rewrites an existing version's item
   from whatever binary is on disk — the way to re-point 1.4.2 at a 1.4.3

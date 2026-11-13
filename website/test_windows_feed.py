@@ -197,6 +197,18 @@ class CheckerTests(unittest.TestCase):
             csproj.write_text("<Project><PropertyGroup><Version>1.4.2</Version></PropertyGroup></Project>")
             self.assertIn("which is older", windows_feed.version_refusal(feed, "1.4.3", csproj))
 
+    def test_a_csproj_ahead_of_the_released_one_does_not_stop_a_deploy(self):
+        # #861, the behaviour that changed: the committed feed and site, with
+        # <Version> one major release ahead of what the feed offers, as it
+        # will be on `dev` between cuts. Before #861 this was refused.
+        committed = WEBSITE / "updates" / "windows.xml"
+        released = windows_feed.newest_item(committed.read_bytes())["version"]
+        ahead = f"{int(released.split('.')[0]) + 1}.0.0"
+        with _Folder() as folder:
+            csproj = folder.path / "Plantoir.csproj"
+            csproj.write_text(f"<Project><PropertyGroup><Version>{ahead}</Version></PropertyGroup></Project>")
+            self.assertIsNone(windows_feed.version_refusal(committed, csproj=csproj))
+
     def test_the_committed_feed_agrees_with_the_committed_site(self):
         site = json.loads((WEBSITE / "site.json").read_text(encoding="utf-8"))
         self.assertIsNone(windows_feed.version_refusal(WEBSITE / "updates" / "windows.xml",

@@ -1165,23 +1165,12 @@ def serve(port: int) -> int:
     return 1
 
 
-def shipped_version(site: dict, platform: str) -> str | None:
-    """The release this platform last shipped an installer in, as site.json says (#861).
-
-    A card pinned to an older release names that release; an unpinned card
-    ships in the site's version line. This, and not the version in the
-    platform's project file, is what its feed must offer: since #861 the
-    project file carries the release being BUILT, raised on `dev` when work
-    on a release starts, so it runs ahead of every feed between cuts and
-    stays ahead after a cut that ships nothing for that platform.
-    """
-    for entry in site.get("downloads", []):
-        if entry.get("platform") == platform:
-            return entry.get("pinned") or site.get("version")
-    return site.get("version")
+# Lives in windows_feed.py, which both feed checks can reach; named here too,
+# because the deploy and the cut-release skill call it by this name (#861).
+shipped_version = windows_feed.shipped_version
 
 
-def feed_version_refusal(feed: Path, project_yml: Path, site: dict) -> str | None:
+def feed_version_refusal(feed: Path, project_yml: Path, site: dict | None = None) -> str | None:
     """Why the mac feed must not be deployed with this site, or None (#204, #861).
 
     The feed's newest version must be the release site.json says the mac
@@ -1191,10 +1180,13 @@ def feed_version_refusal(feed: Path, project_yml: Path, site: dict) -> str | Non
     for one that has not been. MARKETING_VERSION is no longer compared for
     equality, because since #861 it names the release being built and runs
     ahead of the feed between cuts. It is still refused when it is BELOW the
-    feed, which only a number moved backwards can cause.
+    feed, which only a number moved backwards can cause. ``site`` defaults to
+    the committed ``website/site.json``.
     """
     if not feed.is_file():
         return None
+    if site is None:
+        site = windows_feed.committed_site()
     newest = update_feeds.newest_version(feed)
     shipped = shipped_version(site, "macOS")
     if newest is None or shipped is None or windows_feed.version_key(newest) != windows_feed.version_key(shipped):

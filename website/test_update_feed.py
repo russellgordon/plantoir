@@ -378,6 +378,17 @@ class UpdateFeedTests(unittest.TestCase):
         project.write_text('        MARKETING_VERSION: "1.3.1"\n')
         self.assertIn("which is older", build.feed_version_refusal(feed, project, between_cuts))
 
+    def test_a_number_ahead_of_the_released_one_does_not_stop_a_deploy(self) -> None:
+        # #861, the behaviour that changed: the committed feed and site, with
+        # MARKETING_VERSION one major release ahead of what the feed offers,
+        # as it is on `dev` between cuts. Before #861 this was refused.
+        committed = build.WEBSITE / "updates" / "macos.xml"
+        released = update_feeds.newest_version(committed)
+        ahead = f"{int(released.split('.')[0]) + 1}.0.0"
+        project = self.updates / "project.yml"
+        project.write_text(f'        MARKETING_VERSION: "{ahead}"\n')
+        self.assertIsNone(build.feed_version_refusal(committed, project))
+
     def test_the_committed_feed_agrees_with_the_committed_site(self) -> None:
         site = build.read_json(build.WEBSITE / "site.json")
         self.assertIsNone(build.feed_version_refusal(build.WEBSITE / "updates" / "macos.xml",
