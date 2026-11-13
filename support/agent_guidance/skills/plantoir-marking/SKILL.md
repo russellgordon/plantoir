@@ -1,6 +1,6 @@
 ---
 name: plantoir-marking
-description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and keeps students' names on this computer with scripts, boxes the name line on every scan page that has a name blank after checking it against the blank test, has the teacher look at one check sheet before any paper is read, drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost. Names go onto the sheets only at the end, by script, on the teacher's word.
+description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and keeps students' names on this computer with scripts, boxes the name line on every scanned page whose blank test has a name blank, has the teacher look through the boxed papers and records their yes before any paper is read, drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost. Names go onto the sheets only at the end, by script, on the teacher's word.
 ---
 
 # Marking a test from scanned papers, with students' names kept on this computer
@@ -34,7 +34,7 @@ these four points to the teacher, in these words or very close to them:
 ```text wrap
 Before we start, four things about your students' privacy:
 1. Whatever I read is sent to the AI service I run on, so that I can work on it. That includes every boxed paper. Please turn off model training for the account you use with me (on claude.ai: Settings, Privacy, "Help improve Claude"; on ChatGPT: Settings, Data controls, "Improve the model for everyone", where offered; as of November 2026, so check the names), check what your provider keeps for your kind of account, and check that your school or board allows student work to be processed by this service.
-2. I work with identifiers only (Student A, Student B). I never open your name mapping table, a class list, an original scan, or anything in your teacher-only folder. Before I read a scan, a script boxes the name line at the top of each page whose blank test has a name blank, and stops any page that does not line up with your blank test. Then it makes one check sheet showing the top of every page as it was boxed. Please look at the check sheet before I read anything: you are the check that no part of a name shows, and I never open it. A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.
+2. I work with identifiers only (Student A, Student B). I never open your name mapping table, a class list, an original scan, or anything in your teacher-only folder. Before I read a scan, a script boxes the name line at the top of each page whose blank test has a name blank, and puts all the boxed papers in one file for you. Please look through every page of it before I read anything: your look is what confirms the names are redacted, and I never open that file. A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.
 3. If I see what looks like a name anywhere, I will not repeat it in any message or file. I will tell you only the identifier and the page, and leave that page until you say.
 4. The files I write stay on this computer, in the folders you choose. I never send, upload or publish anything; giving work back to students is yours to do.
 ```
@@ -126,7 +126,7 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
 <teacher-only folder>/
   Name Mapping Table.csv                    section, identifier, name (and optional columns)
   <Assessment>/Originals/Section N/         the scans, Student A.pdf
-  <Assessment>/Check/                       the check sheet (the teacher looks; you never open it)
+  <Assessment>/Check/                       the redacted papers to look through, the record of the teacher's yes
   <Assessment>/Named/                       the named copies
   Quarantine/                               anything the runner caught
 ```
@@ -187,7 +187,7 @@ shipped:
 python3 -B -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" .claude/skills/plantoir-marking/scripts/run_with_names.py
 ```
 
-It must print `6b9507d024646a541e8661a0512203324291782063b2b356a7d8f41c127b6ea8`. If it does not, stop and tell the teacher
+It must print `ff80df8b37bd05f6fa9d15890434643426e25eff145a1305ed6e20bb0de90556`. If it does not, stop and tell the teacher
 the runner has been changed; do not run any script that reads the table.
 
 **Every script that reads the name mapping table is run through
@@ -213,31 +213,32 @@ their counts instead.
 (`python3 -B`; `python` or `py` on Windows, where `python3` may not exist.
 `.agents/` works in place of `.claude/` in every path here.)
 
-## 7. Scans: the blank test, the boxes, the check sheet, the teacher's look, then the papers
+## 7. Scans: box them, the teacher looks through them, then the papers
 
-The teacher's eyes are the proof that a name is boxed, not anything the
-script measures (Russell, 2026-11-12). The script boxes the name line,
-checks each page lines up with the blank test, and makes ONE check sheet;
-the teacher looks at it; only then are papers read.
+Russell, 2026-11-12: "script runs, teacher checks the papers, confirms
+names are redacted, then agent based marking begins. Simple." The script
+places the boxes and puts the boxed papers in one file; the teacher's look
+through every page is what confirms the names are redacted.
 
 1. **Copy `scripts/redact_scans.py`** into `Scripts/` and adapt it if the
-   teacher's header is not the house style's (a label other than "Name",
-   such as `--label Nom`; a different header layout). It finds the name
-   blank on each page of the BLANK test, never a student's paper: the
-   label, however the blank after it is drawn (a line, underscores, dots, a
-   table cell, a frame). The box is generous: the whole line the blank sits
-   on, margin to margin, and the room above it. Check what it finds first:
+   teacher's header is unusual. It finds the name blank on each page of
+   the BLANK test, never a student's paper: a label such as Name, Student
+   Name or Nom, in any case, followed by a place to write (a line,
+   underscores, dots, a table cell, a frame). It boxes that whole line,
+   margin to margin, with room above it. Check what it finds first:
 
    ```text wrap
    python3 -B "<marking folder>/Scripts/redact_scans.py" --box-from "<blank test>.pdf"
    ```
 
-   If the header has no label it can find, give the box in inches from the
-   top-left corner with `--box left,top,right,bottom`, measured with the
-   teacher.
+   If it stops (it cannot find a name blank, or finds two on a page), it
+   says so: ask the teacher, and give the label with `--label "Student
+   Name"`, or the box in inches from the top-left with `--box
+   left,top,right,bottom`. Never guess. A name blank in a footer is not
+   found, and a second name line (Partner Name) is not boxed.
 2. **A whole class in one scan:** split it first, into the teacher-only
    folder. The script writes `Paper 01.pdf`, `Paper 02.pdf` ... in the
-   order scanned, and `Papers to name.pdf` (the top of each paper) for the
+   order scanned, and `Papers to name.pdf` (the first page of each) for the
    teacher, who fills in a `paper` column in the mapping table. Then the
    papers are renamed from that column, through the runner:
 
@@ -246,44 +247,60 @@ the teacher looks at it; only then are papers read.
    python3 -B <this skill>/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/redact_scans.py" --name-papers "<teacher-only>/Name Mapping Table.csv" --section 1 --into "<teacher-only>/<Assessment>/Originals/Section 1"
    ```
 
-3. **Box the papers.** Each page is checked against the blank test first:
-   its size, then where its header and foot are. A page that lines up only
-   when turned upside down is turned upright first. Any other page that
-   does not match (shifted more than 0.1 in, shrunk or enlarged, crooked,
-   another size, sideways) stops that file with `CHECK` and a plain reason,
-   and it is not written:
+3. **Box the papers.**
 
    ```text wrap
    python3 -B "<marking folder>/Scripts/redact_scans.py" "<teacher-only>/<Assessment>/Originals" "<marking folder>/<Assessment>/Redacted" --blank "<blank test>.pdf" --check-dir "<teacher-only>/<Assessment>/Check"
    ```
 
-   It says how many pages were boxed, how many had no name blank on the
-   blank test, and which files were stopped and why. It never says a name
-   is covered. Tell the teacher every `CHECK` by identifier and reason:
-   they rescan that paper, or box it by hand. **Never loosen a tolerance
-   in the script to clear a `CHECK`**: the tolerances are in its "What
-   must not change" block because loosening one lets a page through that
-   the box does not fit. A file not named like an identifier is counted,
-   never named. A line saying a page "has writing beside the name box" is
-   a warning: tell the teacher to look at that page first on the check
-   sheet.
-4. **Stop: the teacher looks at the check sheet, then says yes.** The
-   script writes ONE check sheet, `Check sheet.pdf`, in the teacher-only
-   check folder: the top of every page as it was boxed, captioned by
-   identifier and page, with pages that have no box, and pages with
-   writing beside the box, marked in red. Ask the teacher to open it and
-   look at every strip for any part of a name that shows, then to tell
-   you. **Read no paper until the teacher has looked at the check sheet
-   and said yes.** You never open the check sheet yourself: a name the box
-   missed would be on it. If the teacher sees a name, the paper is boxed
-   by hand or left out, and you are told only its identifier.
+   It checks only that a paper's page count is a whole number of copies of
+   the blank test and that each page is the same way round, and nearly the
+   same shape, as its blank page; a paper that is not is stopped, with the
+   reason. It does NOT detect a page scanned upside down or shifted: the
+   teacher sees that when looking through the papers. It clears the last
+   batch first, writes the boxed papers into `Redacted/`, and writes ONE
+   file, `Redacted papers to look through.pdf`, in the teacher-only check
+   folder: every boxed paper, in order, each after a page naming its
+   identifier. Any line that starts `Stopped:` means stop: nothing may be
+   read, as when Poppler is missing.
+4. **Stop: the teacher looks through every page, then says yes.** Ask the
+   teacher, in these words or very close to them:
 
-**What the box does not do.** The box covers the name line at the top of
-each page whose blank test has a name blank, and nothing else. A name
-written anywhere else on a page (in a margin, inside an answer, on a page
-with no name blank) is not boxed, and you would see it; every page you
-read goes to the AI service you run on. Say it that way; never say a name
-is covered or removed.
+   ```text wrap
+   Please open "Redacted papers to look through.pdf" in your check folder and look through every page of every paper. Look for any part of a name, and anything else that says who wrote it (a signature, initials, a student number). Then tell me "yes, the names are redacted on every page", or the identifier and page where something shows. I will read no paper until you do.
+   ```
+
+   **Read no paper until the teacher has looked through the redacted
+   papers and said yes.** You never open that file yourself: a name the box
+   missed would be in it. "Yes" means every page of every paper in this
+   batch, looked at after the boxing ran; a yes given before the papers
+   were boxed does not count. When the teacher says yes, record it, then
+   check it:
+
+   ```text wrap
+   python3 -B "<marking folder>/Scripts/redact_scans.py" --confirm "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+   ```
+
+   **Before reading any paper, in any session, run the check**, and if it
+   does not say the teacher's look is recorded for these papers (a new
+   batch, a changed file, a re-run, or no record), ask the teacher again:
+
+   ```text wrap
+   python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+   ```
+
+   If the teacher says no (a name shows on Student C, page 2): they rescan
+   that paper, or you move the box with `--box` and run the boxing again;
+   either way the teacher looks again. A paper boxed by hand goes into the
+   originals folder in place of the scan and is boxed with the rest. Never
+   loosen the shape tolerance in the script to let a paper through.
+
+**What the box does not do.** It covers the name line at the top of each
+page whose blank test has a name blank, and nothing else. A name written
+anywhere else on a page (in a margin, inside an answer, on a page with no
+name blank) is not boxed, and you would see it; every page you read goes to
+the AI service you run on. Say it that way; never say a name is covered,
+removed or safe.
 
 **If the script cannot run, stop.** If Poppler (`pdftoppm`, `pdfinfo`,
 `pdftotext`, `pdfunite`, `pdfseparate`) is missing, the script says which
@@ -332,7 +349,7 @@ apply it to every paper.
 
 ## 9. Marking the papers
 
-Mark from the boxed papers in `Redacted/` only, and only after the teacher has said yes to the check sheet (section 7). For each paper, copy the
+Mark from the boxed papers in `Redacted/` only, and only when `--verify` says the teacher's look is recorded for them (section 7). For each paper, copy the
 kit's `marks-template.json` to `Marks/Section N/Student A.json` and fill
 it in, as the kit's `FORMAT.md` says. `earned` is 0 or 1 (0.5 only where
 `Marking Settings.md` records `- Half marks: yes`); every point that

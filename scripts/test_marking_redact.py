@@ -2,36 +2,34 @@
 """
 The plantoir-marking skill's scan redaction (#750, piece 750a): scripts/redact_scans.py.
 
-A scan is blanked only after each page has been compared with the BLANK test (750 plan review R2:
-the first design printed OK on pages where the box missed the name). This builds invented "scans"
-from the committed blank tests with the standard library alone (an invented name written as ink
-strokes in the Name blank of every page, and in the body of page 2), then makes the nine kinds of
-scan the plan review measured: upright, shifted down 0.15 in and 0.30 in, scaled 94 percent,
-rotated 1.5 and 3 degrees, upside down on page 2 (a duplex scan on the wrong flip), an A4 page
-with the letter test centred, and a phone crop stretched back to size. Every variant either
-prints CHECK and writes nothing, or is written with NONE of the name's ink left visible outside
-the box; the upright paper and the upside-down one must be written.
+Russell, 2026-11-12, on #750: "script runs, teacher checks the papers, confirms names are redacted, then
+agent based marking begins. Simple." and "Teacher confirms full redacted papers." The script places boxes
+from the BLANK test, makes the teacher's look easy (one combined PDF of the redacted papers, in the
+teacher-only folder), records the teacher's yes against exactly those files, and says only what is true.
 
-Also: the box read from the blank letter and legal tests; the box's pixels black and nothing
-drawn over them (no picture is placed across the box, so nothing sits under the black); no text
-and no font in a blanked file; a page turned sideways refused; a file not named like an
-identifier counted, and its name never printed; the body of page 2 left as it was; the check
-files written; the stack split and the papers renamed from a table's paper column; and the
-script's own --self-test.
+Every paper here has ANSWERS written down every page to the bottom (the review of the second fixes found
+the old line-up stopped 8 of 8 such papers), on two layouts: the house style's Quiz (the title just under
+the name line) and a plain one with its name blank drawn six ways. Each case of contracts/shared-rules.json
+-> assessment -> redaction -> scanCases is built from the blank with an invented name written on each page's
+name line, and must be written or stopped as the case says; where `nameInsideTheBox` is true, none of the
+name's ink may show outside the box. The other cases: the box read from each blank (boxCases), the combined
+PDF, a previous batch cleared, the teacher's yes recorded and checked, a failed write leaving nothing to
+read, no line claiming a name is covered, the box black with nothing under it, a name in the body left as
+it is, files not named like an identifier, the stack split, a working folder refused, and the self-test.
 
-Needs Poppler (pdftoppm, pdfinfo, pdftotext, pdfunite, pdfseparate); every case skips, saying
-so, where it is missing. Stdlib only otherwise. Windows' PythonToolchainTests discovers this file.
+Needs Poppler (pdftoppm, pdfinfo, pdftotext, pdfunite, pdfseparate); every case skips, saying so, where it is
+missing. Stdlib only otherwise. Windows' PythonToolchainTests discovers this file.
 """
 import json
 import math
-import random
 import os
+import random
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 import zlib
 from pathlib import Path
@@ -40,20 +38,15 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 SKILL = REPOSITORY / "support" / "agent_guidance" / "skills" / "plantoir-marking"
 SCRIPT = SKILL / "scripts" / "redact_scans.py"
 FIXTURES = REPOSITORY / "scripts" / "fixtures" / "marking"
-BLANK_LETTER = FIXTURES / "blank-quiz-letter.pdf"
-BLANK_LEGAL = FIXTURES / "blank-quiz-legal.pdf"
+SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
+BLANKS = {"house": FIXTURES / "blank-quiz-letter.pdf", "plain": FIXTURES / "blank-name-styles.pdf"}
+BLANK_LETTER = BLANKS["house"]
 TOOLS = ("pdftoppm", "pdfinfo", "pdftotext", "pdfunite", "pdfseparate")
 MISSING = [tool for tool in TOOLS if shutil.which(tool) is None]
 SKIP_REASON = "Poppler is not installed here (" + ", ".join(MISSING) + " not found); the redaction cases need it"
-SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
-BOX = (0.30, 0.15, 8.20, 0.98)
 DPI = 100
 INVENTED = ("Testpupil", "Alphaname")
-
-# Where the invented name is written, in inches from the top-left: on the Name blank of the header
-# (the label ends at 3.93 in; its rule runs to 5.19 in), and in the body of page 2.
-NAME_STROKES = [(3.98, 0.56, 4.30, 0.74), (4.36, 0.58, 4.62, 0.75), (4.68, 0.55, 5.02, 0.73)]
-BODY_STROKES = [(1.6, 3.1, 3.2, 3.3)]
+COMBINED = "Redacted papers to look through.pdf"
 
 
 def redaction():
@@ -131,24 +124,46 @@ def transform(image, out_width, out_height, inverse, fill):
     return out_width, out_height, out
 
 
+
+def labels_of(blank):
+    """{page: (x1, y0, y1) in inches} of each page's Name label, from the blank's own text."""
+    xml = subprocess.run(["pdftotext", "-bbox", str(blank), "-"], capture_output=True, text=True).stdout
+    found = {}
+    for number, page in enumerate(xml.split("<page ")[1:], start=1):
+        match = re.search(r'xMin="[\d.]+" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">Name:?<', page)
+        if match:
+            found[number] = (float(match.group(2)) / 72, float(match.group(1)) / 72, float(match.group(3)) / 72)
+    return found
+
+
+def answers(image, seed):
+    """Handwriting-like answers down the page, every half inch from 1.3 in to the foot (10.3 in)."""
+    strokes = []
+    rows = random.Random(seed)
+    y = 1.3
+    while y < 10.35:
+        x = 1.5
+        while x < 6.8:
+            length = rows.uniform(0.15, 0.45)
+            strokes.append((x, y, x + length, y + rows.uniform(0.06, 0.12)))
+            x += length + rows.uniform(0.08, 0.15)
+        y += 0.5
+    paint(image, strokes, 30)
+
+
+def name_strokes(label):
+    x1, y0, y1 = label
+    return [(x1 + 0.1, y0 - 0.02, x1 + 0.6, y1 + 0.02), (x1 + 0.7, y0, x1 + 1.5, y1 + 0.03)]
+
+
 def variants(width, height):
     """name -> (function of (image, fill) -> image, which pages it applies to)."""
-    centre_x, centre_y = width / 2, height / 2
-
     def shift(down_in):
         return lambda image, fill: transform(image, width, height, lambda x, y: (x, y - down_in * DPI), fill)
 
     def scale(factor):
         return lambda image, fill: transform(
-            image, width, height, lambda x, y: ((x - centre_x) / factor + centre_x, (y - centre_y) / factor + centre_y), fill)
-
-    def rotate(degrees):
-        angle = math.radians(degrees)
-        cos, sin = math.cos(angle), math.sin(angle)
-        return lambda image, fill: transform(
-            image, width, height,
-            lambda x, y: (cos * (x - centre_x) + sin * (y - centre_y) + centre_x,
-                          -sin * (x - centre_x) + cos * (y - centre_y) + centre_y), fill)
+            image, width, height, lambda x, y: ((x - width / 2) / factor + width / 2, (y - height / 2) / factor + height / 2), fill)
 
     def upside_down(image, fill):
         return image[0], image[1], bytearray(reversed(image[2]))
@@ -158,113 +173,46 @@ def variants(width, height):
         left, top = (out_width - width) // 2, (out_height - height) // 2
         return transform(image, out_width, out_height, lambda x, y: (x - left, y - top), fill)
 
-    def phone_crop(image, fill):
-        cut = 0.35 * DPI
-        return transform(image, width, height, lambda x, y: (x, cut + y * (height - cut) / height), fill)
+    def landscape(image, fill):
+        return transform(image, height, width, lambda x, y: (y, height - 1 - x), fill)
 
     def grey_and_speckled(image, fill):
         if fill == 0:
             return image
         speckle = random.Random(7)
-        width_now, height_now, pixels = image
-        out = bytearray(len(pixels))
-        for position, value in enumerate(pixels):
+        out = bytearray(len(image[2]))
+        for position, value in enumerate(image[2]):
             value = 40 + value * 185 // 255
             if speckle.random() < 0.004:
                 value = speckle.randint(60, 160)
             out[position] = value
-        return width_now, height_now, out
-
-    def shift_right(right_in):
-        return lambda image, fill: transform(image, width, height, lambda x, y: (x - right_in * DPI, y), fill)
-
-    def faint_past_the_box(image, fill):
-        width_now, height_now, pixels = image
-        if fill == 0:
-            out = (width_now, height_now, bytearray(pixels))
-            paint(out, [(5.02, 0.57, 5.62, 0.73)], 255)
-            return out
-        out = (width_now, height_now, bytearray(pixels))
-        for row in range(height_now):
-            for column in range(width_now):
-                if pixels[row * width_now + column] == 15:
-                    out[2][row * width_now + column] = 178   # the name, in light pencil
-        paint(out, [(5.02, 0.57, 5.62, 0.73)], 178)
-        return out
-
-    def paper_marks(image, fill):
-        if fill == 0:
-            return image
-        grain = random.Random(11)
-        width_now, height_now, pixels = image
-        out = bytearray(len(pixels))
-        for position, value in enumerate(pixels):
-            out[position] = max(0, min(255, value - grain.randint(0, 18)))
-        page = (width_now, height_now, out)
-        paint(page, [(0.0, 0.98, width_now / DPI, 1.0)], 150)        # a ruled line across the page, under the box
-        paint(page, [(5.9, 0.0, 5.91, 1.4)], 160)                    # a fold line, down past the box's right
-        for step in range(25):                                       # a staple's shadow at the top left
-            paint(page, [(0.2 + step * 0.012, 0.15 + step * 0.006, 0.22 + step * 0.012, 0.17 + step * 0.006)], 90)
-        centre_x, centre_y, radius = 0.375 * DPI, 1.25 * DPI, 0.13 * DPI  # a three-hole punch's top hole
-        for row in range(int(centre_y - radius), int(centre_y + radius)):
-            for column in range(int(centre_x - radius), int(centre_x + radius)):
-                if (row - centre_y) ** 2 + (column - centre_x) ** 2 <= radius ** 2:
-                    out[row * width_now + column] = 40
-        return page
-
-    def under_the_line(image, fill):
-        width_now, height_now, pixels = image
-        out = (width_now, height_now, bytearray(pixels))
-        paint(out, [(3.0, 1.02, 4.6, 1.16)], 15 if fill == 255 else 255)
-        return out
-
-    def written_past_the_box(image, fill):
-        width_now, height_now, pixels = image
-        out = (width_now, height_now, bytearray(pixels))
-        paint(out, [(5.02, 0.57, 5.62, 0.73)], 15 if fill == 255 else 255)
-        return out
+        return image[0], image[1], out
 
     return {
-        "upright": (lambda image, fill: image, (1, 2)),
-        "shifted down 0.15 in": (shift(0.15), (1, 2)),
-        "shifted down 0.30 in": (shift(0.30), (1, 2)),
-        "scaled 94% (fit to page)": (scale(0.94), (1, 2)),
-        "rotated 1.5 degrees": (rotate(1.5), (1, 2)),
-        "rotated 3 degrees": (rotate(3), (1, 2)),
-        "page 2 upside down": (upside_down, (2,)),
-        "A4, letter test centred": (a4, (1, 2)),
-        "phone crop, stretched": (phone_crop, (1, 2)),
-        # Three a scanner gives every day, which must NOT be stopped: a small shift, a small shrink, and
-        # a grey, speckled page from a phone.
-        "shifted down 0.05 in": (shift(0.05), (1, 2)),
-        "scaled 99%": (scale(0.99), (1, 2)),
-        "grey and speckled": (grey_and_speckled, (1, 2)),
-        # A name written longer than the blank runs past the box (750 plan review L2).
-        "a name written past the box": (written_past_the_box, (1,)),
-        # The same in light pencil (750a review H1: 80 levels darker than the paper missed it).
-        "a faint pencil name past the box": (faint_past_the_box, (1,)),
-        # Everyday scans the check after writing stopped (750a review M1).
-        "shifted right 0.04 in": (shift_right(0.04), (1, 2)),
-        "rotated 0.5 degrees": (rotate(0.5), (1, 2)),
-        # Paper and its marks near the header that are not writing (750a review H1, the other direction).
-        "paper grain, a ruled line, a staple and a punched hole": (paper_marks, (1, 2)),
-        # A name written under the name line, outside the box: written, with the warning (Russell, 2026-11-12).
-        "a name written under the name line": (under_the_line, (1,)),
+        "upright, answers on every page": (lambda image, fill: image, "all"),
+        "grey and speckled": (grey_and_speckled, "all"),
+        "shifted down 0.15 in": (shift(0.15), "all"),
+        "shifted down 0.40 in": (shift(0.40), "all"),
+        "scaled 94% (fit to page)": (scale(0.94), "all"),
+        "the last page upside down": (upside_down, "last"),
+        "A4, letter test centred": (a4, "all"),
+        "the last page landscape": (landscape, "last"),
     }
 
 
-def build_scans(blank, folder, names):
-    """Write one invented scan per variant into folder/Section 1/<identifier>.pdf.
+def build_scans(blank, folder, names, extra_copies=False):
+    """One invented paper with answers on every page per variant, in folder/Section 1/<identifier>.pdf.
 
-    Returns {identifier: (variant, [(mask pixels as a set, page size in pixels, turned) per page])}."""
+    Returns {identifier: (variant, [(name ink pixels, (width, height), turned) per page])}."""
+    labels = labels_of(blank)
     pages = []
-    for page in range(1, page_count(blank) + 1):
-        image = render(blank, page)
-        paint(image, NAME_STROKES, 15)
-        if page == 2:
-            paint(image, BODY_STROKES, 25)
+    for number in range(1, page_count(blank) + 1):
+        image = render(blank, number)
+        answers(image, number)
         mask = (image[0], image[1], bytearray(image[0] * image[1]))
-        paint(mask, NAME_STROKES, 255)
+        if number in labels:
+            paint(image, name_strokes(labels[number]), 15)
+            paint(mask, name_strokes(labels[number]), 255)
         pages.append((image, mask))
     width, height = pages[0][0][0], pages[0][0][1]
     section = Path(folder) / "Section 1"
@@ -273,22 +221,38 @@ def build_scans(blank, folder, names):
     for index, (variant, (change, which)) in enumerate(variants(width, height).items()):
         if variant not in names:
             continue
-        identifier = "Student " + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index]
-        scan_pages = []
-        masks = []
+        identifier = "Student " + "ABCDEFGHIJKLMNOP"[index]
+        scan_pages, masks = [], []
         for number, (image, mask) in enumerate(pages, start=1):
-            if number in which:
+            if which == "all" or (which == "last" and number == len(pages)):
                 image, mask = change(image, 255), change(mask, 0)
             scan_pages.append(image)
-            spots = set()
-            mask_width = mask[0]
-            for position, value in enumerate(mask[2]):
-                if value:
-                    spots.add((position % mask_width, position // mask_width))
-            masks.append((spots, (mask[0], mask[1]), variant == "page 2 upside down" and number == 2))
-        write_image_pdf(section / (identifier + ".pdf"), scan_pages)
+            spots = {(position % mask[0], position // mask[0]) for position, value in enumerate(mask[2]) if value}
+            masks.append((spots, (mask[0], mask[1])))
+        write_image_pdf(section / (identifier + ".pdf"), scan_pages + (scan_pages if extra_copies else []))
         made[identifier] = (variant, masks)
     return made
+
+
+def boxes_of(blank):
+    out = run_script(SCRIPT, "--box-from", blank).stdout
+    boxes = []
+    for line in out.splitlines():
+        boxes.append(tuple(float(value) for value in line.split("box in inches ")[1].split(",")) if "box in inches" in line else None)
+    return boxes
+
+
+def name_ink_outside_the_box(redacted, masks, boxes):
+    """How many pixels of the name's ink show in a written paper outside its page's box."""
+    left = 0
+    for number, (spots, _size) in enumerate(masks, start=1):
+        box = boxes[(number - 1) % len(boxes)]
+        width, height, pixels = render(redacted, number)
+        for x, y in spots:
+            inside = box is not None and box[0] * DPI <= x < box[2] * DPI and box[1] * DPI <= y < box[3] * DPI
+            if not inside and 0 <= x < width and 0 <= y < height and pixels[y * width + x] < 128:
+                left += 1
+    return left
 
 
 def run_script(script, *arguments):
@@ -296,25 +260,8 @@ def run_script(script, *arguments):
                           capture_output=True, text=True, encoding="utf-8")
 
 
-def turned_pages(line):
-    """The pages the script's own line says it turned upright."""
-    match = re.search(r"; pages? ([\d, ]+) turned upright", line)
-    return {int(number) for number in match.group(1).split(", ")} if match else set()
-
-
-def ink_left_outside_the_box(blanked, masks, turned_by_the_script):
-    """How many pixels of the name's ink are visible in a blanked file outside its box. The ink is looked
-    for where the page the SCRIPT wrote puts it: turned half a turn only on the pages it says it turned."""
-    left = 0
-    for number, (spots, (width, height), _scanned_upside_down) in enumerate(masks, start=1):
-        out_width, out_height, pixels = render(blanked, number)
-        for x, y in spots:
-            if number in turned_by_the_script:
-                x, y = width - 1 - x, height - 1 - y
-            inside = BOX[0] * DPI <= x < BOX[2] * DPI and BOX[1] * DPI <= y < BOX[3] * DPI
-            if not inside and 0 <= x < out_width and 0 <= y < out_height and pixels[y * out_width + x] < 128:
-                left += 1
-    return left
+def pdf_words(pdf):
+    return subprocess.run(["pdftotext", str(pdf), "-"], capture_output=True, text=True).stdout
 
 
 def placed_pictures(pdf_bytes):
@@ -327,124 +274,117 @@ def placed_pictures(pdf_bytes):
 
 
 @unittest.skipIf(MISSING, SKIP_REASON)
-class RedactionTests(unittest.TestCase):
+class ScanCaseTests(unittest.TestCase):
+    """Every scanCases case, on both layouts, with answers on every page."""
 
     @classmethod
     def setUpClass(cls):
         cls.root = Path(tempfile.mkdtemp(prefix="marking-redact-"))
-        cls.originals = cls.root / "Originals"
-        cls.made = build_scans(BLANK_LETTER, cls.originals, set(variants(850, 1100)))
-        (cls.originals / "Section 1" / (INVENTED[0] + " " + INVENTED[1] + ".pdf")).write_bytes(
-            (cls.originals / "Section 1" / "Student A.pdf").read_bytes())
-        started = time.time()
-        cls.outcome = run_script(SCRIPT, cls.originals, cls.root / "Redacted", "--blank", BLANK_LETTER,
-                             "--check-dir", cls.root / "Teacher only" / "Check")
-        cls.seconds = time.time() - started
+        cls.runs = {}
+        names = set(variants(850, 1100))
+        for layout, blank in BLANKS.items():
+            originals = cls.root / layout / "Originals"
+            made = build_scans(blank, originals, names)
+            (originals / "Section 1" / (INVENTED[0] + " " + INVENTED[1] + ".pdf")).write_bytes(
+                (originals / "Section 1" / "Student A.pdf").read_bytes())
+            outcome = run_script(SCRIPT, originals, cls.root / layout / "Redacted", "--blank", blank,
+                                 "--check-dir", cls.root / layout / "Teacher only" / "Check")
+            cls.runs[layout] = (made, outcome, boxes_of(blank))
 
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.root, ignore_errors=True)
 
-    def line_for(self, identifier):
-        for line in self.outcome.stdout.splitlines():
+    def line_for(self, layout, identifier):
+        for line in self.runs[layout][1].stdout.splitlines():
             if line.startswith(f"Section 1/{identifier}.pdf:"):
                 return line
-        self.fail(f"no line for {identifier}:\n{self.outcome.stdout}")
+        self.fail(f"{layout}: no line for {identifier}:\n{self.runs[layout][1].stdout}")
 
-    def test_every_variant_is_stopped_or_blanked_with_no_name_ink_left(self):
+    def test_every_case_is_written_or_stopped_as_the_contract_says(self):
         cases = redaction()["scanCases"]["cases"]
-        self.assertEqual(sorted(case["variant"] for case in cases), sorted(variant for variant, _masks in self.made.values()),
-                         "the contract's scan cases and the variants this test builds are the same list")
-        by_variant = {variant: identifier for identifier, (variant, _masks) in self.made.items()}
         report = []
-        for case in cases:
-            identifier = by_variant[case["variant"]]
-            masks = self.made[identifier][1]
-            line = self.line_for(identifier)
-            blanked = self.root / "Redacted" / "Section 1" / (identifier + ".pdf")
-            if "CHECK" in line:
-                self.assertNotEqual(case["expect"], "written", f"{case['variant']} must be written: {line}")
-                self.assertFalse(blanked.exists(), f"{case['variant']}: a CHECK file must not be written")
-                report.append(f"{case['variant']}: CHECK")
-                continue
-            self.assertNotEqual(case["expect"], "CHECK", f"{case['variant']} must be stopped: {line}")
-            self.assertIn("header matches your blank test", line, case["variant"])
-            self.assertNotIn(" OK", line, "the line says what was measured, never OK")
-            warned = "has writing beside the name box" in line
-            if case.get("warns"):
-                self.assertTrue(warned, f"{case['variant']} must warn: {line}")
-            left = ink_left_outside_the_box(blanked, masks, turned_pages(line))
-            report.append(f"{case['variant']}: written{', warned' if warned else ''}, {left} name pixels left")
-            if not case.get("warns"):
-                self.assertEqual(left, 0, f"{case['variant']}: name ink is visible in a written file")
-        print("\n" + "\n".join(report) + f"\n({self.seconds:.1f} s for {2 * len(self.made)} pages)")
+        for layout in BLANKS:
+            made, _outcome, boxes = self.runs[layout]
+            self.assertEqual(sorted(case["variant"] for case in cases), sorted(variant for variant, _masks in made.values()))
+            by_variant = {variant: identifier for identifier, (variant, _masks) in made.items()}
+            for case in cases:
+                identifier = by_variant[case["variant"]]
+                line = self.line_for(layout, identifier)
+                redacted = self.root / layout / "Redacted" / "Section 1" / (identifier + ".pdf")
+                if case["expect"] == "stopped":
+                    self.assertIn("stopped (", line, f"{layout}: {case['variant']}")
+                    self.assertFalse(redacted.exists())
+                    report.append(f"{layout}, {case['variant']}: stopped")
+                    continue
+                self.assertNotIn("stopped", line, f"{layout}: {case['variant']} must be written: {line}")
+                left = name_ink_outside_the_box(redacted, made[identifier][1], boxes)
+                report.append(f"{layout}, {case['variant']}: written, {left} name pixels outside the box")
+                if case.get("nameInsideTheBox"):
+                    self.assertEqual(left, 0, f"{layout}: {case['variant']}")
+        print("\n" + "\n".join(report))
 
-    def test_the_duplex_paper_has_its_page_turned_upright(self):
-        self.assertIn("2 pages, 2 boxed; header matches your blank test", self.line_for("Student A"))
-        self.assertIn("page 2 turned upright", self.line_for("Student G"))
+    def test_papers_with_answers_on_every_page_are_not_stopped(self):
+        # 750a fix review 2, H1: answers to the foot of a page stopped 8 of 8 papers under the old line-up.
+        for layout in BLANKS:
+            self.assertIn("boxed", self.line_for(layout, "Student A"))
+            self.assertNotIn("stopped", self.line_for(layout, "Student A"))
+
+    def test_one_combined_file_holds_every_written_paper_in_order(self):
+        for layout in BLANKS:
+            check = self.root / layout / "Teacher only" / "Check"
+            redacted = self.root / layout / "Redacted"
+            written = sorted(redacted.rglob("*.pdf"))
+            self.assertEqual(sorted(path.name for path in check.iterdir()), ["Batch.json", COMBINED])
+            pages = sum(page_count(path) for path in written)
+            self.assertEqual(page_count(check / COMBINED), pages + len(written), "a page naming each paper, then the paper")
+            text = pdf_words(check / COMBINED)
+            positions = [text.find(f"Section 1/{path.stem}") for path in written]
+            self.assertNotIn(-1, positions)
+            self.assertEqual(positions, sorted(positions))
+
+    def test_nothing_it_says_claims_a_name_is_covered(self):
+        for layout in BLANKS:
+            said = (self.runs[layout][1].stdout + self.runs[layout][1].stderr).casefold()
+            for claim in ("covered", "covers", "removed", "safe", "no names", " ok", "redacted the name", "names are hidden"):
+                self.assertNotIn(claim, said, f"the run must not claim '{claim}'")
+            last = self.runs[layout][1].stdout.strip().splitlines()[-1]
+            self.assertIn("The teacher's look is what confirms the names are redacted", last)
+            self.assertIn("A name written anywhere else on a page is not boxed and would be seen", last)
+            self.assertIn("goes to its service", last)
 
     def test_the_box_is_black_and_nothing_sits_under_it(self):
-        blanked = self.root / "Redacted" / "Section 1" / "Student A.pdf"
-        data = blanked.read_bytes()
+        redacted = self.root / "house" / "Redacted" / "Section 1" / "Student A.pdf"
+        box = self.runs["house"][2][0]
+        data = redacted.read_bytes()
         self.assertNotIn(b"/Font", data)
-        text = subprocess.run(["pdftotext", str(blanked), "-"], capture_output=True, text=True).stdout.strip()
-        self.assertEqual(text, "")
-        box_pt = (BOX[0] * 72, 792 - BOX[3] * 72, BOX[2] * 72, 792 - BOX[1] * 72)
-        pictures = placed_pictures(data)
-        self.assertGreater(len(pictures), 0)
-        for x0, y0, x1, y1 in pictures:
+        self.assertEqual(pdf_words(redacted).strip(), "")
+        box_pt = (box[0] * 72, 792 - box[3] * 72, box[2] * 72, 792 - box[1] * 72)
+        for x0, y0, x1, y1 in placed_pictures(data):
             overlap_x = min(x1, box_pt[2]) - max(x0, box_pt[0])
             overlap_y = min(y1, box_pt[3]) - max(y0, box_pt[1])
             self.assertFalse(overlap_x > 0.5 and overlap_y > 0.5, "a picture is placed across the box")
-        for page in (1, 2):
-            width, _height, pixels = render(blanked, page, 150)
-            for row in range(round(BOX[1] * 150) + 1, round(BOX[3] * 150) - 1):
-                self.assertEqual(max(pixels[row * width + round(BOX[0] * 150) + 1: row * width + round(BOX[2] * 150) - 1]), 0)
+        width, _height, pixels = render(redacted, 1, 150)
+        for row in range(round(box[1] * 150) + 1, round(box[3] * 150) - 1):
+            self.assertEqual(max(pixels[row * width + round(box[0] * 150) + 1: row * width + round(box[2] * 150) - 1]), 0)
 
-    def test_the_body_of_page_two_is_left_as_it_was(self):
-        blanked = self.root / "Redacted" / "Section 1" / "Student A.pdf"
-        width, _height, pixels = render(blanked, 2)
-        x0, y0, x1, y1 = BODY_STROKES[0]
-        dark = 0
-        for row in range(int(y0 * DPI) + 2, int(y1 * DPI) - 2):
-            for column in range(int(x0 * DPI) + 2, int(x1 * DPI) - 2):
-                if pixels[row * width + column] < 100:
-                    dark += 1
-        self.assertGreater(dark, 100, "a name written in the body is not boxed, and the skill says so")
+    def test_the_answers_are_left_as_they_were(self):
+        redacted = self.root / "house" / "Redacted" / "Section 1" / "Student A.pdf"
+        width, _height, pixels = render(redacted, 2)
+        dark = sum(1 for row in range(int(9.8 * DPI), int(10.4 * DPI)) for column in range(150, 680)
+                   if pixels[row * width + column] < 100)
+        self.assertGreater(dark, 200, "answers, and a name written among them, are not boxed: the teacher's look finds a name")
 
     def test_a_file_not_named_like_an_identifier_is_counted_and_never_named(self):
-        said = self.outcome.stdout + self.outcome.stderr
-        for token in INVENTED:
-            self.assertNotIn(token.casefold(), said.casefold())
-        self.assertIn("1 files or folders not named like an identifier were left alone", said)
-        written = sorted(path.name for path in (self.root / "Redacted").rglob("*.pdf"))
-        for name in written:
-            self.assertRegex(name, r"^Student [A-Z]{1,2}\.pdf$")
-
-    def test_one_check_sheet_shows_the_top_of_every_page(self):
-        # Russell, 2026-11-12: the teacher's look at ONE check sheet is the proof; it shows every page.
-        check = self.root / "Teacher only" / "Check"
-        self.assertEqual(sorted(path.name for path in check.iterdir()), ["Check sheet.pdf"])
-        sheet = check / "Check sheet.pdf"
-        self.assertEqual(page_count(sheet), math.ceil(2 * len(self.made) / 6))
-        text = subprocess.run(["pdftotext", str(sheet), "-"], capture_output=True, text=True).stdout
-        for identifier in self.made:
-            for page in (1, 2):
-                self.assertIn(f"Section 1/{identifier}, page {page}", text, "every page of every paper is on the sheet")
-        self.assertNotEqual(self.outcome.returncode, 0, "a run with any CHECK exits 1")
-
-    def test_nothing_it_says_claims_a_name_is_covered(self):
-        said = (self.outcome.stdout + self.outcome.stderr).casefold()
-        for claim in ("covered", "covers", "removed", "names are", "no names", " ok", "blanked the name", "safe to read"):
-            self.assertNotIn(claim, said, f"the run must not claim '{claim}'")
-        last = self.outcome.stdout.strip().splitlines()[-1]
-        self.assertIn("is waiting for the teacher's look", last)
-        self.assertIn("A name written anywhere else on a page is not boxed", last)
-        self.assertIn("goes to the assistant's service", last)
+        for layout in BLANKS:
+            said = self.runs[layout][1].stdout + self.runs[layout][1].stderr
+            for token in INVENTED:
+                self.assertNotIn(token.casefold(), said.casefold())
+            self.assertIn("1 files or folders not named like an identifier were left alone", said)
 
 
 @unittest.skipIf(MISSING, SKIP_REASON)
-class BoxAndRefusalTests(unittest.TestCase):
+class BoxTests(unittest.TestCase):
 
     def test_the_box_cases(self):
         for case in redaction()["boxCases"]:
@@ -456,20 +396,23 @@ class BoxAndRefusalTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, case["name"])
                 self.assertIn(case["refused"], result.stdout, case["name"])
                 continue
-            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(result.returncode, 0, f"{case['name']}: {result.stdout}")
             lines = result.stdout.splitlines()
-            self.assertEqual(len(lines), page_count(FIXTURES / case["blank"]), case["name"])
-            for line in lines:
+            self.assertEqual(len(lines), len(case["pages"]), case["name"])
+            for line, expected in zip(lines, case["pages"]):
+                if expected is None:
+                    self.assertIn("no name blank on your blank test, so no box", line, case["name"])
+                    continue
                 values = [float(value) for value in line.split("box in inches ")[1].split(",")]
-                for found, expected in zip(values, case["box"]):
-                    self.assertAlmostEqual(found, expected, delta=case["within"], msg=f"{case['name']}: {line}")
+                for found, wanted in zip(values, expected):
+                    self.assertAlmostEqual(found, wanted, delta=0.02, msg=f"{case['name']}: {line}")
 
     def test_only_files_named_like_an_identifier_are_papers(self):
         cases = assessment()["identifiers"]["cases"]
         with tempfile.TemporaryDirectory() as root:
             originals = Path(root) / "Originals"
             originals.mkdir()
-            build_scans(BLANK_LETTER, Path(root) / "made", {"upright"})
+            build_scans(BLANK_LETTER, Path(root) / "made", {"upright, answers on every page"})
             scan = (Path(root) / "made" / "Section 1" / "Student A.pdf").read_bytes()
             for case in cases:
                 (originals / case["file"]).write_bytes(scan)
@@ -483,34 +426,91 @@ class BoxAndRefusalTests(unittest.TestCase):
                     self.assertNotIn(stem, result.stdout, f"{case['file']} must be counted, never named")
             self.assertIn(f"{len(cases) - len(papers)} files or folders not named like an identifier were left alone", result.stdout)
 
-    def test_a_page_turned_sideways_refuses(self):
+    def test_two_copies_of_the_blank_in_one_file_are_both_boxed(self):
         with tempfile.TemporaryDirectory() as root:
-            originals = Path(root) / "Originals"
-            originals.mkdir()
-            pages = [render(BLANK_LETTER, 1), render(BLANK_LETTER, 2)]
-            width, height, pixels = pages[1]
-            turned = transform(pages[1], height, width, lambda x, y: (y, height - 1 - x), 255)
-            write_image_pdf(originals / "Student A.pdf", [pages[0], turned])
-            result = run_script(SCRIPT, originals, Path(root) / "Redacted", "--blank", BLANK_LETTER,
+            build_scans(BLANK_LETTER, Path(root) / "Originals", {"upright, answers on every page"}, extra_copies=True)
+            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", BLANK_LETTER,
                                 "--check-dir", Path(root) / "Check")
-            self.assertIn("Student A.pdf: CHECK (page 2 is turned sideways)", result.stdout)
-            self.assertFalse((Path(root) / "Redacted" / "Student A.pdf").exists())
+            self.assertIn("Section 1/Student A.pdf: 4 pages, 4 boxed", result.stdout)
 
-    def test_a_legal_paper_is_blanked_against_its_legal_blank(self):
+    def test_a_page_count_that_is_not_whole_copies_is_stopped(self):
         with tempfile.TemporaryDirectory() as root:
-            made = build_scans(BLANK_LEGAL, Path(root) / "Originals", {"upright"})
-            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", BLANK_LEGAL,
+            (Path(root) / "Originals").mkdir()
+            write_image_pdf(Path(root) / "Originals" / "Student A.pdf", [render(BLANK_LETTER, 1)] * 3)
+            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", BLANK_LETTER,
                                 "--check-dir", Path(root) / "Check")
-            self.assertIn("Section 1/Student A.pdf: 2 pages, 2 boxed; header matches your blank test", result.stdout)
-            self.assertEqual(ink_left_outside_the_box(Path(root) / "Redacted" / "Section 1" / "Student A.pdf",
-                                                      made["Student A"][1], set()), 0)
+            self.assertIn("Student A.pdf: stopped (it has 3 pages, which is not a whole number of copies of your blank "
+                          "test's 2); not written", result.stdout)
 
-    def test_a_letter_paper_against_a_legal_blank_refuses(self):
+    def test_a_page_with_no_name_blank_is_said(self):
+        blank = FIXTURES / "blank-quiz-letter-name-on-page-1.pdf"
         with tempfile.TemporaryDirectory() as root:
-            build_scans(BLANK_LETTER, Path(root) / "Originals", {"upright"})
-            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", BLANK_LEGAL,
+            build_scans(blank, Path(root) / "Originals", {"upright, answers on every page"})
+            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank,
                                 "--check-dir", Path(root) / "Check")
-            self.assertIn("CHECK (page 1 is a different size from your blank test)", result.stdout)
+            self.assertIn("Section 1/Student A.pdf: 2 pages, 1 boxed; 1 with no name blank on your blank test, so no box",
+                          result.stdout)
+
+
+@unittest.skipIf(MISSING, SKIP_REASON)
+class BatchAndRecordTests(unittest.TestCase):
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="marking-batch-"))
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.originals = self.root / "Originals"
+        build_scans(BLANK_LETTER, self.originals, {"upright, answers on every page", "grey and speckled"})
+        self.redacted = self.root / "Redacted"
+        self.check = self.root / "Teacher only" / "Check"
+
+    def box(self):
+        return run_script(SCRIPT, self.originals, self.redacted, "--blank", BLANK_LETTER, "--check-dir", self.check)
+
+    def test_the_teachers_yes_is_recorded_against_exactly_this_batch(self):
+        early = run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        self.assertEqual(early.returncode, 1, "a yes before the papers are boxed does not count")
+        self.assertIn("A yes given before the papers were boxed does not count", early.stdout)
+        self.box()
+        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1)
+        confirmed = run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        self.assertEqual(confirmed.returncode, 0, confirmed.stdout)
+        verified = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
+        self.assertEqual(verified.returncode, 0, verified.stdout)
+        record = json.loads((self.check / "Teacher confirmed.json").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(record), ["confirmed", "papers"], "names, SHA-256 and the date, and nothing else")
+        paper = self.redacted / "Section 1" / "Student A.pdf"
+        paper.write_bytes(paper.read_bytes() + b"\n")
+        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1,
+                         "a changed file needs the teacher to look again")
+
+    def test_a_new_batch_clears_the_last_one_and_its_record(self):
+        self.box()
+        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        os.remove(self.originals / "Section 1" / "Student B.pdf")
+        self.box()
+        self.assertEqual(sorted(path.name for path in self.redacted.rglob("*.pdf")), ["Student A.pdf"],
+                         "a paper from the last batch never stands in for this one")
+        stale = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
+        self.assertEqual(stale.returncode, 1, "a new batch needs a new look")
+        self.assertIn("Not confirmed", stale.stdout)
+
+    def test_a_failed_write_leaves_nothing_to_read(self):
+        self.box()
+        self.assertTrue(list(self.redacted.rglob("*.pdf")))
+        for path in self.check.iterdir():
+            os.remove(path)
+        self.check.chmod(stat.S_IRUSR | stat.S_IXUSR)
+        try:
+            result = self.box()
+        finally:
+            self.check.chmod(stat.S_IRWXU)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("none may be read", result.stdout)
+        self.assertEqual(list(self.redacted.rglob("*.pdf")), [], "no paper is left where the assistant reads")
+
+
+@unittest.skipIf(MISSING, SKIP_REASON)
+class OtherTests(unittest.TestCase):
 
     def test_a_stack_is_split_and_the_papers_renamed_from_the_table(self):
         with tempfile.TemporaryDirectory() as root:
@@ -543,7 +543,7 @@ class BoxAndRefusalTests(unittest.TestCase):
 
     def test_nothing_is_written_inside_a_working_folder(self):
         with tempfile.TemporaryDirectory() as root:
-            build_scans(BLANK_LETTER, Path(root) / "Originals", {"upright"})
+            build_scans(BLANK_LETTER, Path(root) / "Originals", {"upright, answers on every page"})
             working = Path(root) / "Working"
             (working / "courses").mkdir(parents=True)
             (working / ".toolchain").mkdir()
@@ -552,56 +552,6 @@ class BoxAndRefusalTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("inside the Plantoir working folder", result.stdout)
             self.assertFalse((working / "Marking").exists())
-
-    def test_a_page_with_no_name_box_on_the_blank_is_said(self):
-        # A page whose blank test has no Name label gets no box, and the line and the check sheet say so;
-        # the starter's "School Name" is not a name blank.
-        blank = FIXTURES / "blank-quiz-letter-name-on-page-1.pdf"
-        boxes = run_script(SCRIPT, "--box-from", blank)
-        self.assertIn("page 1: box in inches 0.30,0.15,8.20,0.98", boxes.stdout)
-        self.assertIn("page 2: no 'Name' label on your blank test, so no box", boxes.stdout)
-        with tempfile.TemporaryDirectory() as root:
-            pages = [render(blank, 1), render(blank, 2)]
-            paint(pages[0], NAME_STROKES, 15)
-            (Path(root) / "Originals").mkdir()
-            write_image_pdf(Path(root) / "Originals" / "Student A.pdf", pages)
-            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank,
-                                "--check-dir", Path(root) / "Check")
-            self.assertIn("Student A.pdf: 2 pages, 1 boxed; header matches your blank test; page 2 has no name blank "
-                          "on your blank test, so no box", result.stdout)
-            self.assertIn("1 pages with no name blank on the blank test (not boxed)", result.stdout)
-            sheet = subprocess.run(["pdftotext", str(Path(root) / "Check" / "Check sheet.pdf"), "-"],
-                                   capture_output=True, text=True).stdout
-            self.assertIn("Student A, page 2: no name blank on the blank test, so no box", sheet)
-
-    def test_every_style_of_name_blank_is_boxed(self):
-        # 750a fix review H1 and M4: a rule, underscores, dots, a table cell, a frame, and underscores at the
-        # left margin are each a name blank; a name written in each is inside the box.
-        blank = FIXTURES / "blank-name-styles.pdf"
-        boxes = run_script(SCRIPT, "--box-from", blank)
-        self.assertEqual(boxes.returncode, 0, boxes.stdout)
-        self.assertEqual(boxes.stdout.count("box in inches 0.30,0.15,8.20,"), page_count(blank), boxes.stdout)
-        xml = subprocess.run(["pdftotext", "-bbox", str(blank), "-"], capture_output=True, text=True).stdout
-        labels = re.findall(r'xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">Name:?<', xml)
-        self.assertEqual(len(labels), page_count(blank))
-        with tempfile.TemporaryDirectory() as root:
-            pages = []
-            masks = []
-            for number, (x0, y0, x1, y1) in enumerate(labels, start=1):
-                image = render(blank, number)
-                stroke = [(float(x1) / 72 + 0.1, float(y0) / 72 - 0.03, float(x1) / 72 + 1.9, float(y1) / 72 + 0.03)]
-                paint(image, stroke, 15)
-                mask = (image[0], image[1], bytearray(image[0] * image[1]))
-                paint(mask, stroke, 255)
-                spots = {(position % mask[0], position // mask[0]) for position, value in enumerate(mask[2]) if value}
-                pages.append(image)
-                masks.append((spots, (mask[0], mask[1]), False))
-            (Path(root) / "Originals").mkdir()
-            write_image_pdf(Path(root) / "Originals" / "Student A.pdf", pages)
-            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank,
-                                "--check-dir", Path(root) / "Check")
-            self.assertIn(f"Student A.pdf: {len(pages)} pages, {len(pages)} boxed; header matches your blank test", result.stdout)
-            self.assertEqual(ink_left_outside_the_box(Path(root) / "Redacted" / "Student A.pdf", masks, set()), 0)
 
     def test_its_own_self_test_passes(self):
         result = run_script(SCRIPT, "--self-test")

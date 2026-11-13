@@ -306,6 +306,12 @@ print("3 sheets finished")
 print("the scale is levels 1 to 4; matched every point")
 (Path(sys.argv[2]) / "summary.txt").write_text("3 sheets published", encoding="utf-8")
 """
+SHORT_ALONE = r"""
+import sys
+from pathlib import Path
+print("Mx Ho: 3 sheets finished")
+(Path(sys.argv[2]) / "note.txt").write_text("Student A is Ho in the class list.", encoding="utf-8")
+"""
 NAMED_PAIR = r"""
 print("made Ed Ho")
 """
@@ -345,6 +351,14 @@ class FalseAlarmTests(unittest.TestCase):
         self.assertIn("1 read and clean; 0 files and 0 folders", result.stdout)
         self.assertTrue((marking / "June Exam" / "Student A.pdf").exists(), "an untouched folder stays")
         self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_a_short_surname_on_its_own_is_never_passed_on(self):
+        # 750a fix review 2, M4: "Ng" alone passed through with exit 0.
+        result, marking = self.run_with(SHORT_ALONE)
+        self.assertNotIn("Mx Ho", result.stdout)
+        self.assertIn("1 printed lines and 1 files held a two- or three-letter part of a name", result.stdout)
+        self.assertFalse((marking / "note.txt").exists())
+        self.assertEqual(result.returncode, 1)
 
     def test_a_short_name_with_its_other_part_is_caught(self):
         result, _marking = self.run_with(NAMED_PAIR)

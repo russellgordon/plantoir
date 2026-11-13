@@ -29,7 +29,9 @@ and moved, and not checked and moved unread. Only folders it made, or wrote into
 command's own exit code.
 
 It is a safety net, not a guarantee. It catches the names in the table, and only in what the command
-prints and what it writes in the watched folder. It cannot know a nickname, a family member's name or a
+prints and what it writes in the watched folder. A folder the script writes into whose own name holds a word from the table (an assessment
+folder called June Exam, with a student called June) is moved whole, in the safe direction. It cannot
+know a nickname, a family member's name or a
 name the table does not hold, see what a picture shows, read a name split up, reversed or encoded, notice
 a file rewritten at the same size and time, or stop a script that is run without it or writes somewhere
 else. Python standard library only.
@@ -173,6 +175,15 @@ def holds_a_name(text, names):
         if part in found and (found & partners or not partners):
             return True
     return False
+
+
+def short_part_alone(text, names):
+    """True when a name part of two or three letters (Ng, Li, Ho) is in the text as a whole word without the rest
+    of its name. It cannot be told from an everyday word, so it is never passed on as clean (750a fix review 2, M4):
+    a line holding one is withheld, and a file is moved, each counted on its own."""
+    _words, _anywhere, short = names
+    found = set(re.findall(r"\w+", folded(text)))
+    return any(part in found for part in short)
 
 
 def snapshot(folder):
@@ -368,6 +379,7 @@ def main(arguments):
     clean = 0
     moving = list(named_folders)
     unread_paths = []
+    short_files = []
     unread = {}
     for path in changed:
         if after[path][0] == "folder" or any(folder in path.parents for folder in named_folders):
@@ -377,6 +389,9 @@ def main(arguments):
         if holds_a_name(relative, names) or holds_a_name(text, names):
             moving.append(path)
             continue
+        if short_part_alone(relative, names) or short_part_alone(text, names):
+            short_files.append(path)
+            continue
         if kinds:
             for kind in kinds:
                 unread[kind] = unread.get(kind, 0) + 1
@@ -385,7 +400,7 @@ def main(arguments):
         clean += 1
     held_files = 0
     held_folders = 0
-    for path in moving + unread_paths:
+    for path in moving + unread_paths + short_files:
         target = Path(quarantine) / path.relative_to(Path(watch))
         target.parent.mkdir(parents=True, exist_ok=True)
         if path in moving:
@@ -395,10 +410,13 @@ def main(arguments):
                 held_files += 1
         shutil.move(str(path), str(target))   # a link is moved as a link, never followed
     withheld = 0
+    short_lines = 0
     passed = []
     for line in output.splitlines():
         if holds_a_name(line, names):
             withheld += 1
+        elif short_part_alone(line, names):
+            short_lines += 1
         else:
             passed.append(line)
     for line in passed:
@@ -409,6 +427,10 @@ def main(arguments):
           f"{held_files} files and {held_folders} folders held a word from your table and were moved to the quarantine "
           f"folder; {unread_total} could not be read, so were NOT checked and were moved there unread" +
           (" (" + "; ".join(f"{count} {kind}" for kind, count in sorted(unread.items())) + ")" if unread else "") + ".")
+    if short_lines or short_files:
+        print(f"{short_lines} printed lines and {len(short_files)} files held a two- or three-letter part of a name in "
+              "your table on its own (such as Ng or Li), which cannot be told from an everyday word: not checkable, so "
+              "the lines were withheld and the files moved to the quarantine folder.")
     if withheld or held_files or held_folders:
         print("Something held a word from your table: a name, or an everyday word that is also a name (such as May "
               "or Will). If it was a name, the script needs fixing before it is used again; what was held back is "
@@ -418,7 +440,7 @@ def main(arguments):
               "quarantine folder, or the script can be changed to write text.")
     print("This is a safety net, not a guarantee: it catches the names in your table, in what the script printed "
           "and what it wrote in the marking folder, and nothing else.")
-    if withheld or held_files or held_folders or unread_total:
+    if withheld or held_files or held_folders or unread_total or short_lines or short_files:
         return 1
     return result.returncode
 

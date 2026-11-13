@@ -47,6 +47,59 @@ Name: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\hfill Dice Academy\par\bigskip
 """
 
 
+LABELS = r"""\documentclass[11pt]{article}
+\usepackage[letterpaper,margin=0.75in,top=0.6in]{geometry}
+\usepackage[T1]{fontenc}\usepackage{lmodern}
+\setlength{\parindent}{0pt}\usepackage{fancyhdr}\pagestyle{fancy}\fancyhf{}\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[L]{A Test About Dice $\cdot$ COURSE}\fancyfoot[R]{Page \thepage\ of 5}\setlength{\footskip}{0.4in}
+\newcommand{\question}[1]{{\Large\bfseries A Test About Dice}\par\bigskip #1\par\vfill\hfill Turn over\clearpage}
+\begin{document}
+Dice Academy\hspace{1.2in}Student Name: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\hfill Date\par\bigskip
+\question{1. Roll two dice. How many outcomes are there?}
+Dice Academy\hspace{1.2in}Name: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\hfill Date\par\smallskip
+Name and date go on every page.\par\bigskip
+\question{2. What is the chance of a double six?}
+Dice Academy\hspace{1.2in}Name \rule[-0.1em]{2.2in}{0.4pt}\hfill Date\par\smallskip
+Partner Name: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\par\bigskip
+\question{3. What is the chance of a total of seven?}
+Dice Academy\hspace{1.2in}{\sffamily\bfseries NAME} \rule[-0.1em]{2.2in}{0.4pt}\hfill Date\par\bigskip
+\question{4. Which total is most likely?}
+Dice Academy\hfill Date \rule[-0.1em]{1in}{0.4pt}\par\bigskip
+{\Large\bfseries A Test About Dice}\par\bigskip 5. Draw the table of outcomes.\par\vfill\hfill End
+\end{document}
+"""
+
+TWO_BLANKS = r"""\documentclass[11pt]{article}
+\usepackage[letterpaper,margin=0.75in,top=0.6in]{geometry}
+\usepackage[T1]{fontenc}\usepackage{lmodern}\setlength{\parindent}{0pt}\pagestyle{empty}
+\begin{document}
+Dice Academy\hspace{1.2in}Name \rule[-0.1em]{2.2in}{0.4pt}\par\vspace{0.5in}
+{\Large\bfseries A Test About Dice}\par\bigskip
+Name \rule[-0.1em]{2.2in}{0.4pt}\par\bigskip
+1. Roll two dice. How many outcomes are there?\par
+\end{document}
+"""
+
+
+def compile_to(source, name):
+    with tempfile.TemporaryDirectory() as folder:
+        tex = Path(folder) / "blank.tex"
+        tex.write_text(source, encoding="utf-8")
+        result = subprocess.run(["tectonic", "-c", "minimal", str(tex)], capture_output=True, cwd=folder)
+        if result.returncode != 0:
+            sys.exit(f"{name} did not compile")
+        shutil.copyfile(Path(folder) / "blank.pdf", HERE / name)
+    print(f"{name} written")
+
+
+def make_labels():
+    """blank-label-cases.pdf (five pages: Student Name; Name with an instruction line that starts with Name;
+    Name with a Partner Name line under it; NAME in bold sans; no name blank at all) and
+    blank-two-name-blanks.pdf (a page with two name blanks, which the script must not guess between)."""
+    compile_to(LABELS, "blank-label-cases.pdf")
+    compile_to(TWO_BLANKS, "blank-two-name-blanks.pdf")
+
+
 def make_styles():
     """blank-name-styles.pdf: six pages, each with its Name blank drawn another way (a rule, underscores,
     dots, a table cell, a frame, and underscores at the left margin): every one is a name blank to box
@@ -88,6 +141,9 @@ def main():
 if __name__ == "__main__":
     if sys.argv[1:] == ["--styles"]:
         make_styles()
+    elif sys.argv[1:] == ["--labels"]:
+        make_labels()
     else:
         main()
         make_styles()
+        make_labels()
