@@ -22,6 +22,9 @@ from pathlib import Path
 # build phase runs this script from elsewhere.
 HELP_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(HELP_DIR))
+# Never leave a __pycache__ in help/ (or in the app bundle's copy), even when
+# run without -B.
+sys.dont_write_bytecode = True
 
 import argparse  # noqa: E402
 from typing import List, Optional, Set  # noqa: E402

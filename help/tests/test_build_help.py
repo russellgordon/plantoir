@@ -140,7 +140,17 @@ class ScriptRuleTests(unittest.TestCase):
             shutil.rmtree(elsewhere)
 
     def test_no_bytecode_is_left_in_help(self) -> None:
-        run_build(["--check"])
+        import os
+        import subprocess
+
+        # Run WITHOUT -B and without PYTHONDONTWRITEBYTECODE: the script itself must not write any.
+        environment = dict(os.environ)
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)
+        completed = subprocess.run(
+            [sys.executable, str(HELP_DIR / "build_help.py"), "--check"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout)
         found = []
         for path in HELP_DIR.rglob("__pycache__"):
             found.append(str(path.relative_to(REPO)))
