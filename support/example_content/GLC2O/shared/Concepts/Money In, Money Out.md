@@ -20,6 +20,17 @@ premiums come off. The first time you see a pay stub this is a shock,
 and it should not be a surprise — read the deduction lines once and you
 will understand every pay stub you ever get.
 
+> [!quiz] A pay stub shows gross pay of \$400 and deductions of \$62. Which amount belongs on the income line of your budget?
+> - [ ] \$400
+> - [ ] \$462
+> - [x] \$338
+> - [ ] \$62
+>
+> > [!explain]- Why
+> > Net pay is what lands: gross pay minus the deductions, and 400 less
+> > 62 is 338. A budget built on gross pay comes up short by the
+> > deductions every payday.
+
 Income can also include grants, bursaries, scholarships, awards, and
 support from family or community. Some of that is money you keep and
 some is money you repay, which is the distinction that matters most.

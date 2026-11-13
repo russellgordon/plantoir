@@ -260,7 +260,11 @@ def lint(course_code: str) -> int:
         return 1
 
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    pages = sorted(root.rglob("*.md"))
+    # SOURCES.md beside the manifest is the record of where a course's
+    # pictures and videos came from and under what licence (#878). It is not
+    # under shared/ or per_section/, so the installer never copies it and it
+    # is not a page: no rule below is about it.
+    pages = sorted(page for page in root.rglob("*.md") if page != root / "SOURCES.md")
     page_names = {page.stem for page in pages} | {"index"}
 
     # Folder-qualified targets such as [[Curriculum/index]]. These need the

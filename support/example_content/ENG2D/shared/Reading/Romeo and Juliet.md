@@ -46,6 +46,23 @@ it.
 | Who speaks alone | Which characters get soliloquies, and which never do |
 | Hands and touch | From the shared sonnet at the party to the tomb |
 
+## One line to check before we get there
+
+The most quoted line in the play is also the most often misread. Check
+your reading of it now; nothing you answer here is sent to anyone.
+
+> [!quiz] In Act 2, Scene 2, Juliet says "O Romeo, Romeo, wherefore art thou Romeo?" What is she asking?
+> - [ ] Where Romeo is hiding in the orchard
+> - [ ] Whether Romeo will come back to her
+> - [x] Why he has to be Romeo, a Montague
+> - [ ] What Romeo's real name is
+>
+> > [!explain]- Why
+> > "Wherefore" means "why", not "where". Juliet believes she is alone,
+> > so she cannot be looking for him. Her next line settles it: "Deny thy
+> > father and refuse thy name." The trouble is not where he is. It is
+> > that the boy she met at the party is a Montague.
+
 ## Questions we will argue about
 
 1. Whose tragedy is this? The Prologue blames the parents; the title

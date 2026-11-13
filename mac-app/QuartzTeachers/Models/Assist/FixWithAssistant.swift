@@ -1,10 +1,11 @@
 import Foundation
 
-/// Fix with Claude… and Fix with Codex… on a section's Problems tab (#717,
-/// part two): handing the problems a teacher ticked to an outside assistant
-/// they already have, through the same two doors as Revise With ▸
-/// (`ClaudeCodeLauncher`, `CodexLauncher`), with an opening message that
-/// lists the problems instead of the plain greeting.
+/// Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot… on a
+/// section's Problems tab (#717 part two, #783): handing the problems a
+/// teacher ticked to an outside assistant they already have, through the same
+/// doors as Revise With ▸ (`ClaudeCodeLauncher`, `CodexLauncher`,
+/// `CopilotLauncher`), with an opening message that lists the problems
+/// instead of the plain greeting.
 ///
 /// Everything a teacher or an assistant reads here is
 /// `contracts/app-rules.json` → `outsideAgents.fixWith`, retyped and pinned
@@ -29,10 +30,14 @@ import Foundation
 /// one, and any the rows bring are written as commas.
 nonisolated enum FixWithAssistant {
 
-    /// Which door a button opens.
+    /// Which door a button opens. Declared in the order the doors are shown
+    /// everywhere (Claude, Codex, then GitHub Copilot: Russell, 2026-11-13),
+    /// so `allCases` is that order for anything that lists them (#855's
+    /// set-up pane among them).
     enum Assistant: String, CaseIterable, Sendable {
         case claude
         case codex
+        case copilot
 
         // MARK: - Computed properties
 
@@ -43,6 +48,20 @@ nonisolated enum FixWithAssistant {
                 return FixWithAssistant.claudeButtonTitle
             case .codex:
                 return FixWithAssistant.codexButtonTitle
+            case .copilot:
+                return FixWithAssistant.copilotButtonTitle
+            }
+        }
+
+        /// The title of the alert when this door did not open.
+        var didNotOpenTitle: String {
+            switch self {
+            case .claude:
+                return ClaudeCodeLauncher.didNotOpenTitle
+            case .codex:
+                return CodexLauncher.didNotOpenTitle
+            case .copilot:
+                return CopilotLauncher.didNotOpenTitle
             }
         }
 
@@ -53,6 +72,8 @@ nonisolated enum FixWithAssistant {
                 return "Claude"
             case .codex:
                 return "Codex"
+            case .copilot:
+                return CopilotLauncher.displayName
             }
         }
     }
@@ -103,6 +124,8 @@ nonisolated enum FixWithAssistant {
     static let claudeButtonTitle: String = "Fix with Claude…"
 
     static let codexButtonTitle: String = "Fix with Codex…"
+
+    static let copilotButtonTitle: String = "Fix with GitHub Copilot…"
 
     /// The most rows one message names (`fixWith.mostRowsInThePrompt`).
     static let mostRowsInThePrompt: Int = 10

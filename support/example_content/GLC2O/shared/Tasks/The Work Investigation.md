@@ -59,6 +59,16 @@ you. No slides required.
 > investigation found none of that, you read marketing material rather
 > than sources, and the fix is to ask a person who does the work.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] My sources are named, and at least one of them is a person.
+- [ ] For each trend, I say which task changed and what happened to the people doing it.
+- [ ] I name my gaps as clearly as my strengths.
+- [ ] My profile is something I would really show someone.
+- [ ] My five minutes state one finding plainly enough to be repeated after one hearing.
+
 %%curriculum-start%%
 ## Curriculum connection
 
