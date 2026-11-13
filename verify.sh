@@ -7011,6 +7011,34 @@ if grep -Fq "$TC_BUILT_RULE" "$TC_OUT/section1/index.css" 2>/dev/null; then
 else
   fail "the deployed stylesheet does not carry '$TC_BUILT_RULE' (#746)"
 fi
+# #850: the same deployed folder, served by the app's own Open in Browser,
+# answers every link every page writes. The app is named, never found: a
+# DerivedData bundle may be another checkout's (rule 10), so the gate passes
+# PLANTOIR_APP=<Plantoir.app>, and a named bundle that cannot serve FAILS.
+# Unnamed, it is skipped and says plainly that nothing ran. The crawl starts
+# the bundle with --serve-deployed-folder, which is decided before any
+# application exists (PlantoirMain). Measured 2026-11-13: it does not become
+# an application or take the front (3 of 3, check_headless_modes.py). What
+# took the teacher's key window that day is unknown, so still never set
+# PLANTOIR_APP while the teacher is at the keyboard.
+# against python3 -m http.server, which adds no .html.
+if [[ -n "${PLANTOIR_APP:-}" ]]; then
+  if python3 -I browser-checks/crawl_deployed_folder.py --app "$PLANTOIR_APP" "$TC_OUT/section1" \
+       >/tmp/verify_deployed_folder_crawl.log 2>&1; then
+    pass "the deployed folder, opened in the browser through the app, answers every link it writes: $(head -1 /tmp/verify_deployed_folder_crawl.log) (#850)"
+  else
+    fail "the deployed folder, served by the app, did not answer every link (#850)"
+    head -12 /tmp/verify_deployed_folder_crawl.log
+  fi
+  if python3 -I browser-checks/crawl_deployed_folder.py --plain-server "$TC_OUT/section1" \
+       >/tmp/verify_deployed_folder_plain.log 2>&1; then
+    fail "the crawl's must-fail passed: a server that adds no .html answered every link, so the crawl proves nothing (#850)"
+  else
+    pass "and the crawl's must-fail failed as it should: $(head -1 /tmp/verify_deployed_folder_plain.log) from a server that adds no .html (#850)"
+  fi
+else
+  skip "SKIPPED, NOT A PASS: the deployed folder crawl through the app did not run, because PLANTOIR_APP is not set. Run again with PLANTOIR_APP=<the Plantoir.app built from this tree> (#850)"
+fi
 TC_STAMP="$(tr -d '[:space:]' < "$TC_SECTION/.built-with-toolchain" 2>/dev/null || true)"
 if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then
   pass "and the rebuilt site is stamped with this image again, so the next deploy does not build (#746)"

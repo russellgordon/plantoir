@@ -171,6 +171,21 @@ final class ProgressViewSizeTests: XCTestCase {
         )
     }
 
+    /// The same panel as the app draws it since #850, with Open in Browser
+    /// beside Show in Finder and the new note.
+    @MainActor
+    func testTheFolderResultPanelWithOpenInBrowserDoesNotBalloonWhenSqueezed() {
+        let runner: ScriptRunner = makeFinishedFolderDeployRunner()
+        let claimed: CGFloat = heightClaimedWhenSqueezed(
+            of: TaskProgressView(runner: runner, title: "Deploying ADA1O-S1", openFolderInBrowser: { _ in })
+        )
+        XCTAssertLessThanOrEqual(
+            claimed,
+            ProgressViewSizeTests.squeezedHeightBound,
+            "Squeezed, the folder result panel with Open in Browser claimed \(claimed) points"
+        )
+    }
+
     /// The Netlify / Cloudflare panel, which was safe when #211 was found.
     /// Pinned so it stays that way.
     @MainActor

@@ -271,6 +271,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ScriptRunner.stopEveryLivePreview()
 
+        // A deployed folder open in the browser (#850) ends with the app,
+        // and says so on the trail. Never asked about: nothing can be lost.
+        DeployedFolderShows.shared.stopEverything()
+
         // This app's work leases come down with it (#156) — tidiness
         // rather than safety: a lease whose process has gone is ignored
         // by every reader. A publish left running is not ended here (see
