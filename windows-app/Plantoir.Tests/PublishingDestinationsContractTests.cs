@@ -68,8 +68,11 @@ public class PublishingDestinationsContractTests
         Assert.Equal(sentences["netlifyNote"]!.ToString(), PublishingDestinations.NetlifyNote);
         Assert.Equal(sentences["netlifyScheduleNote"]!.ToString(), PublishingDestinations.NetlifyScheduleNote);
         Assert.Equal(sentences["wizardCaption"]!.ToString(), PublishingDestinations.WizardCaption);
-        // Five today; a sixth added on the mac must be wired here, not ignored.
-        Assert.Equal(5, sentences.AsObject().Count);
+        // The 25 MB sentence under Cloudflare Pages became the contract's on
+        // 2026-11-12 (mac #775, Windows #787): the words Windows already showed.
+        Assert.Equal(sentences["cloudflareSizeNote"]!.ToString(), PublishingDestinations.CloudflareSizeNote);
+        // Six today; a seventh added on the mac must be wired here, not ignored.
+        Assert.Equal(6, sentences.AsObject().Count);
     }
 
     // ---- netlifyNoteCases -------------------------------------------------
