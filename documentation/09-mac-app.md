@@ -11160,8 +11160,9 @@ and it took two reviews to see both:
   took the whole value, so this was a regression; the implementation review
   measured it (H1).
 
-Both passes together leak neither, measured with the real `LogRedactor.swift`
-and `OneLineText.swift` on every probe: `trailLines.cases` holds the three
+Both passes together leak neither for a control the redactor reads as part
+of a value (NUL, ESC, DEL and the other controls that are not white space),
+measured with the real `LogRedactor.swift` and `OneLineText.swift`: `trailLines.cases` holds the three
 hidden secrets and eight with a control inside (`Bearer` with a NUL, an ESC
 and a DEL, a labelled secret with an ESC, a value after a colon with a DEL,
 one wrapped in terminal colour codes, and a Mac and a Windows account name
@@ -11181,7 +11182,11 @@ NUL stood between, and the line written would no longer be the line recorded.
 **What no order catches** (`trailLines.knownLimits`): a rule that matches a
 run of particular characters, the email address, the `nfp_` token, the three
 account-ID rules and the 40-character run, is cut short by a control in the
-middle of the value in every order, as it was in v1.9.3. No case pins these.
+middle of the value in every order, as it was in v1.9.3. So are
+`labelledSecret` and `bearerHeader` when the control inside the value is white
+space to the redactor (a tab, LF, CR, VT, FF, NEL, U+2028 or U+2029): `Bearer
+abc` LF `SECRETTAIL` is written `Bearer [removed: token] SECRETTAIL`, the tail
+v1.9.3 wrote after its own line break. No case pins these.
 
 **The one record that keeps its line breaks** is the assistant's turn
 record, `ActivityTrail.note(… wholeLine: true)`, which passes

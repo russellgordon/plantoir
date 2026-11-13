@@ -227,7 +227,7 @@ final class CourseNameCharactersTests: XCTestCase {
     // MARK: - The trail
 
     /// Each `trailLines` case through the writer the app uses, read back from
-    /// the file: cleaned, then redacted, and one line unless it is the
+    /// the file: redacted, cleaned and redacted again, and one line unless it is the
     /// assistant's turn record.
     func testEveryTrailLineCaseIsWrittenAsTheContractSays() throws {
         let trail: [String: Any] = try XCTUnwrap(rule["trailLines"] as? [String: Any])

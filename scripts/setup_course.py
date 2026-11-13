@@ -2417,13 +2417,15 @@ def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
         if class_pages.scheme_from_config(saved_config) == class_pages.NUMBERED_SCHEME:
             return current
         if current != class_pages.DEFAULT_UNIT_WORD:
-            print(f"\n📘 This course calls its units “{current}”. To change that, use "
+            # Shown cleaned of control characters (#780), as a saved value
+            # from course_config.json; what is returned is the word itself.
+            print(f"\n📘 This course calls its units “{course_names.cleaned(str(current))}”. To change that, use "
                   f"Rename… beside the word in Plantoir's Course Settings, which renames "
                   f"the class pages too.")
         return current
     print("\nClass pages are named like “Unit 1, Day 1”.")
     print("Some teachers organise by Module or Thread instead.")
-    entry = input(f"What do you call a unit? [Default: {current}]: ").strip()
+    entry = input(f"What do you call a unit? [Default: {course_names.cleaned(str(current))}]: ").strip()
     chosen = entry if entry else current
     # A word with a digit in it would make "Module2 1, Day 1", and a word with
     # a comma would make a name no rule can read back. Refusing is kinder than

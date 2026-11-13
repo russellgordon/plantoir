@@ -144,6 +144,61 @@ class TheReaders(unittest.TestCase):
             config = {"course_code": "SPH3U", "course_name": raw, "show_grade_in_title": False}
             self.assertEqual(build_site.computed_landing_title(config, 1, True), "SPH3U, Section 1", repr(raw))
 
+    def test_the_unit_word_is_shown_cleaned(self):
+        import setup_course
+        saved = {"unit_word": "Mod\u001b[2Jule\u202e", "class_page_scheme": "unit_day"}
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            word = setup_course.prompt_unit_word(saved, True)
+        self.assertEqual(word, saved["unit_word"], "the word itself is returned as saved")
+        self.assertIn("Mod [2Jule", printed.getvalue())
+        self.assertNotIn("\u001b", printed.getvalue())
+        self.assertNotIn("\u202e", printed.getvalue())
+
+        shown = []
+        original_input = builtins.input
+
+        def answer(prompt: str = "") -> str:
+            shown.append(prompt)
+            return ""
+
+        builtins.input = answer
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                setup_course.prompt_unit_word(saved, False)
+        finally:
+            builtins.input = original_input
+        self.assertEqual(len(shown), 1)
+        self.assertIn("[Default: Mod [2Jule]", shown[0])
+
+    @unittest.skipUnless(HAS_PILLOW, "the sharing card needs Pillow")
+    def test_a_card_whose_name_is_only_controls_shows_the_code(self):
+        import social_card
+        seen = []
+
+        class Stop(Exception):
+            pass
+
+        def record(text, *arguments, **keywords):
+            seen.append(text)
+            raise Stop()
+
+        original = social_card._title_layout
+        social_card._title_layout = record
+        try:
+            for raw in ("\u0000", "\n\u202e", "   "):
+                with tempfile.TemporaryDirectory() as folder:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        try:
+                            social_card.generate_card(
+                                {"course_code": "SPH3U", "course_name": raw}, 1,
+                                Path(folder) / "card.png")
+                        except Stop:
+                            pass
+        finally:
+            social_card._title_layout = original
+        self.assertEqual(seen, ["SPH3U", "SPH3U", "SPH3U"])
+
     @unittest.skipUnless(HAS_PILLOW, "the sharing card needs Pillow")
     def test_the_sharing_cards_title_is_cleaned(self):
         import social_card
