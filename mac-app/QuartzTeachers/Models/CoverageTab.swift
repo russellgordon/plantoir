@@ -71,8 +71,14 @@ nonisolated enum SectionTabs {
     /// refresh is starting or waiting for its map. A refusal of the teacher's
     /// own Preview press is never taken, whichever tab shows (the 793b
     /// review's M2): the press is the teacher's act, and so is its answer.
-    static func refusalIsTheTabs(refresh: CoverageRefresh) -> Bool {
-        return refresh == .starting || refresh == .pending
+    ///
+    /// Only while the tab's OWN start runs (`ownStartRunning`, set around
+    /// the synchronous start in `SectionCoverage.makeAgain`): every refusal
+    /// of that start is synchronous. A refusal while the press is still
+    /// starting, or while its build runs, is somebody else's press, in this
+    /// window or another, and is delivered to them (the fix review's M1, M2).
+    static func refusalIsTheTabs(refresh: CoverageRefresh, ownStartRunning: Bool) -> Bool {
+        return ownStartRunning && refresh == .pending
     }
 }
 
@@ -617,6 +623,8 @@ nonisolated enum CoverageTabDisplay {
         /// Another window of this app holds the section's preview.
         var otherWindow: Bool = false
         var changed: CoverageChange = .none
+        /// Whether the record says when its build started.
+        var startKnown: Bool = true
         var rulesCompiled: Bool = true
         var obsidianInstalled: Bool = true
     }
@@ -669,10 +677,15 @@ nonisolated enum CoverageTabDisplay {
         // The first line is the map's own date, said only as far as it is
         // true (the 793b review's M1): "last built" only when the map IS the
         // latest build's, and never an empty date.
-        let hasATime: Bool = facts.changed != .unknown
+        // While a build is making the map, the record is another build's
+        // because the new build has already written .build-id: "the latest
+        // build made no map" would then be false (the fix review's M3).
+        let hasATime: Bool = facts.startKnown
         var lines: [String] = []
         if facts.record == .thisBuild {
             lines.append(hasATime ? "asOf" : "asOfNoTime")
+        } else if facts.record == .anotherBuild && making {
+            lines.append(hasATime ? "olderMapWhileBuilding" : "olderMapWhileBuildingNoTime")
         } else if facts.record == .anotherBuild {
             lines.append(hasATime ? "olderMap" : "olderMapNoTime")
         }
@@ -735,6 +748,8 @@ nonisolated enum CoverageTabWording {
     static let asOfNoTime: String = "Made when this section was last built."
     static let olderMap: String = "Made by an earlier build of this section, {when}. The latest build made no map."
     static let olderMapNoTime: String = "Made by an earlier build of this section. The latest build made no map."
+    static let olderMapWhileBuilding: String = "Made by an earlier build of this section, {when}."
+    static let olderMapWhileBuildingNoTime: String = "Made by an earlier build of this section."
     static let making: String = "Making the map again with a new build of this section…"
     static let couldNotMakeAgain: String = "The map could not be made again this time."
     static let couldNotMake: String = "The map could not be made this time."
@@ -777,6 +792,10 @@ nonisolated enum CoverageTabWording {
             text = olderMap
         case "olderMapNoTime":
             text = olderMapNoTime
+        case "olderMapWhileBuilding":
+            text = olderMapWhileBuilding
+        case "olderMapWhileBuildingNoTime":
+            text = olderMapWhileBuildingNoTime
         case "making":
             text = making
         case "couldNotMakeAgain":
@@ -863,6 +882,7 @@ nonisolated enum CoverageTabTrail {
     static let madeAgain: String = "the coverage map was made again"
     static let didNotFinish: String = "the coverage map could not be made again: the build ended before it was made"
     static let refused: String = "the coverage map could not be made again: the preview could not start"
+    static let leftBeforeItsBuild: String = "the coverage map was not made again: the section was left before its build started"
     static let opened: String = "asked Obsidian to open {place}, curriculum expectation {code}, from the Coverage tab"
     static let didNotOpen: String = "did not open {code} from the Coverage tab: {why}"
     static let whyGone: String = "its page is no longer there"
@@ -873,12 +893,12 @@ nonisolated enum CoverageTabTrail {
 
     // MARK: - Functions
 
-    /// The line for one look at the tab.
     /// A trail sentence with this platform's word for the computer.
     static func filled(_ text: String) -> String {
         return text.replacingOccurrences(of: MachineWord.placeholder, with: MachineWord.onThisPlatform)
     }
 
+    /// The line for one look at the tab.
     static func lookedText(reading: CoverageTab.Reading, changed: CoverageChange, rulesCompiled: Bool) -> String {
         if !rulesCompiled {
             return filled(couldNotShow)

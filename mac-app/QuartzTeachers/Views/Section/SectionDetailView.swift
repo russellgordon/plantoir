@@ -136,6 +136,15 @@ struct SectionDetailView: View {
     /// — the assistant can start a preview then — shown once it has gone.
     @State var heldPreviewRefusal: PreviewAlert?
 
+    /// A late "preview did not appear" that arrived while the Coverage tab
+    /// showed (#793, the 793b fix review's M2): shown when the teacher
+    /// leaves the tab, never over it.
+    @State var refusalHeldOnCoverage: PreviewAlert?
+
+    /// This view, as the one that pressed Make the Map Again: another window
+    /// on the same section settles nothing of its press (#793).
+    @State var coverageOwner: UUID = UUID()
+
 
     /// Set by the question's answer, and acted on once the alert has GONE
     /// (`afterThePreviewAlert`): the preview starts then, never from inside
@@ -787,7 +796,9 @@ struct SectionDetailView: View {
                         // Obsidian, on this window's model, as the button does.
                         openInObsidian: {
                             await workspace.openInObsidianAndWait(course: course, sectionNumber: sectionNumber)
-                        }
+                        },
+                        // #793: the Coverage tab's own button.
+                        makeTheCoverageMapAgain: { makeTheCoverageMapAgain() }
                     )
                 )
                 // A function asked for from this row's context menu before this
@@ -3264,7 +3275,7 @@ struct SectionDetailView: View {
             section: sectionNumber
         )
         stopPreview()
-        showPreviewRefusal(
+        showALateRefusal(
             title: PreviewReachability.alertTitle,
             sentence: PreviewReachability.sentence(for: PreviewReachability.verdictWhenNothingWasAnnounced)
         )
@@ -3339,7 +3350,7 @@ struct SectionDetailView: View {
             section: sectionNumber
         )
         stopPreview()
-        showPreviewRefusal(
+        showALateRefusal(
             title: PreviewReachability.alertTitle,
             sentence: PreviewReachability.sentence(for: verdict)
         )

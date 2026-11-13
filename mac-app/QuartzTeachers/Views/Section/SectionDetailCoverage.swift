@@ -256,7 +256,9 @@ extension SectionDetailView {
         guard let folder = folderThisSectionWorksIn ?? workspace.workspaceURL else {
             return
         }
-        SectionCoverage.shared.noteOwnRunEnded(folder: folder, course: course, sectionNumber: sectionNumber)
+        SectionCoverage.shared.noteOwnRunEnded(
+            folder: folder, course: course, sectionNumber: sectionNumber, owner: coverageOwner
+        )
     }
 
     /// Make the Map (Again): the section's ordinary preview build, started
@@ -284,7 +286,13 @@ extension SectionDetailView {
                 folder: folder,
                 course: course,
                 sectionNumber: sectionNumber,
+                owner: coverageOwner,
                 previewIsRunning: previewIsRunning,
+                aBuildIsRunning: {
+                    // A Preview pressed during the stop is the build: it
+                    // writes the map, and its wait stays its own.
+                    return previewLease != nil || previewRunner.isRunning
+                },
                 stop: {
                     await stopPreviewAndWait()
                 },
@@ -307,7 +315,7 @@ extension SectionDetailView {
             return
         }
         let coverage: SectionCoverage = SectionCoverage.shared
-        coverage.abandonRefresh(folder: folder, course: course, sectionNumber: sectionNumber)
+        coverage.abandonRefresh(folder: folder, course: course, sectionNumber: sectionNumber, owner: coverageOwner)
         coverage.noteGone(coverage.key(folder: folder, course: course, sectionNumber: sectionNumber))
     }
 
@@ -355,8 +363,27 @@ extension SectionDetailView {
     /// The teacher left the Coverage tab: what waited while it showed is
     /// raised now, one at a time, the way it would have been.
     func raiseWhatWaitedForCoverage() {
+        if let held = refusalHeldOnCoverage {
+            refusalHeldOnCoverage = nil
+            if case .refusal(let title, let sentence) = held {
+                showPreviewRefusal(title: title, sentence: sentence)
+                return
+            }
+        }
         showAnythingWaiting()
         offerTheLinksChecklistIfWaiting()
+    }
+
+    /// "The preview did not appear", which arrives long after any press:
+    /// held while Coverage shows and raised when the teacher leaves it, as
+    /// the Problems alert is (the 793b fix review's M2). Shown at once on
+    /// any other tab.
+    func showALateRefusal(title: String, sentence: String) {
+        if alertsWaitForCoverage {
+            refusalHeldOnCoverage = .refusal(title: title, sentence: sentence)
+            return
+        }
+        showPreviewRefusal(title: title, sentence: sentence)
     }
 
     /// A preview's refusal: said in the tab, and not as an alert, only when
@@ -368,7 +395,10 @@ extension SectionDetailView {
             return false
         }
         let sectionKey: String = SectionCoverage.shared.key(folder: folder, course: course, sectionNumber: sectionNumber)
-        if !SectionTabs.refusalIsTheTabs(refresh: SectionCoverage.shared.entry(sectionKey).refresh) {
+        if !SectionTabs.refusalIsTheTabs(
+            refresh: SectionCoverage.shared.entry(sectionKey).refresh,
+            ownStartRunning: SectionCoverage.shared.isRunningTheTabsOwnStart(sectionKey)
+        ) {
             return false
         }
         SectionCoverage.shared.noteRefreshRefused(

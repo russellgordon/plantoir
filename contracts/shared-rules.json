@@ -5353,6 +5353,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5378,6 +5379,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "pages",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5404,6 +5406,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "clock",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5430,6 +5433,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "unknown",
+            "startKnown": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5456,6 +5460,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "notKnownYet",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5481,6 +5486,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5507,6 +5513,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": false
           },
@@ -5532,6 +5539,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5558,6 +5566,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5584,6 +5593,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5610,6 +5620,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5617,6 +5628,60 @@
             "kind": "map",
             "lines": [
               "asOf",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the refresh's own build has started and moved .build-id, before its map: the latest build is the one making it",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuilding",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the same with no start time",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "unknown",
+            "startKnown": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuildingNoTime",
+              "making",
               "clickHint"
             ],
             "button": "makeTheMapAgain",
@@ -5635,6 +5700,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5661,6 +5727,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5687,6 +5754,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "unknown",
+            "startKnown": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5714,13 +5782,14 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
           "expect": {
             "kind": "map",
             "lines": [
-              "olderMap",
+              "olderMapWhileBuilding",
               "making",
               "clickHint"
             ],
@@ -5740,6 +5809,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5766,6 +5836,7 @@
             "elsewhere": true,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5792,13 +5863,14 @@
             "elsewhere": true,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
           "expect": {
             "kind": "map",
             "lines": [
-              "olderMap",
+              "olderMapWhileBuilding",
               "making",
               "clickHint"
             ],
@@ -5818,6 +5890,7 @@
             "elsewhere": false,
             "otherWindow": true,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5844,6 +5917,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5871,6 +5945,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5893,6 +5968,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5917,6 +5993,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5941,6 +6018,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5963,6 +6041,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5985,6 +6064,7 @@
             "elsewhere": false,
             "otherWindow": false,
             "changed": "none",
+            "startKnown": true,
             "rulesCompiled": false,
             "obsidianInstalled": true
           },
@@ -5997,7 +6077,7 @@
           }
         }
       ],
-      "stateRule": "making: a refresh is pending, or this window's own build has not yet printed its problems line, or the map is another build's while a build of the section is running (this window's, a deploy's, or another program's). When not making: couldNotMakeAgain (with a map) or couldNotMake (without) when the refresh did not finish or was refused (refused adds the refusal's own sentence, refusedReason), or when the map is another build's and nothing is building; then changedSince or mayBeOutOfDate (with a map); then one of deploying, elsewhere or otherWindow, first that holds. With a map, the first line is asOf and the last is clickHint, or noObsidian when Obsidian is not installed. The button is makeTheMapAgain with a map and makeTheMap without, and is disabled while making, while this window's build runs, while the section deploys, while another program builds the course, and while another window holds the section's preview (and, outside these cases, while the folder is being copied or made ready, with that reason as its help).",
+      "stateRule": "making: a refresh is pending, or this window's own build has not yet printed its problems line, or the map is another build's while a build of the section is running (this window's, a deploy's, or another program's). When not making: couldNotMakeAgain (with a map) or couldNotMake (without) when the refresh did not finish or was refused (refused adds the refusal's own sentence, refusedReason), or when the map is another build's and nothing is building; then changedSince or mayBeOutOfDate (with a map); then one of deploying, elsewhere or otherWindow, first that holds. With a map, the first line is asOf (thisBuild), olderMapWhileBuilding while making (a build in progress has already written .build-id, so 'the latest build made no map' would be false), or olderMap otherwise, each in a NoTime form when the record has no start time (startKnown); the last is clickHint, or noObsidian when Obsidian is not installed. The button is makeTheMapAgain with a map and makeTheMap without, and is disabled while making, while this window's build runs, while the section deploys, while another program builds the course, and while another window holds the section's preview (and, outside these cases, while the folder is being copied or made ready, with that reason as its help).",
       "sequenceCases": [
         {
           "name": "one press with no preview running: the build starts at once",
@@ -6038,7 +6118,77 @@
           }
         },
         {
-          "name": "the OLD run's end arriving while it stops settles nothing",
+          "name": "the OLD run's end arriving while it stops, read as the view reads it (a reading, then the run's end), settles nothing",
+          "previewRunning": true,
+          "duringTheStop": [
+            "reloadThenOwnRunEnded"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a reading while it stops (the app coming to the front, a click) leaves the press alone",
+          "previewRunning": true,
+          "duringTheStop": [
+            "reload"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a Preview the teacher starts while it stops is the build: the refresh starts nothing of its own",
+          "previewRunning": true,
+          "duringTheStop": [
+            "teacherStartsAPreview"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 0,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "another window on the same section leaving while it stops abandons nothing",
+          "previewRunning": true,
+          "duringTheStop": [
+            "anotherWindowLeaves"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "another window stopping its own preview while the refresh builds settles nothing",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [
+            "anotherWindowsRunEnded"
+          ],
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the old run's end without a reading (the store's own rule)",
           "previewRunning": true,
           "duringTheStop": [
             "ownRunEnded"
@@ -6107,9 +6257,31 @@
           }
         }
       ],
-      "sequenceRule": "The press is recorded AT ONCE, before anything is awaited (the 793b review's H1): the refresh is starting, with a token, and the tab says making with the button unavailable from that instant. A preview already running is stopped and waited for; its run ending meanwhile is the old run's and settles nothing. The build starts only if the press's token survives the stop: leaving the section, the course or the window, or quitting, clears it (didNotFinish), so a view that has gone never starts a preview nobody would stop. A second press while starting or pending does nothing, so it never ends the running build's wait (#232's record of a build in progress). A start that did not begin (refused, or the course being copied) is settled at once. In a case, stops and starts count the stop and start the steps asked for, refresh is the state at the end, askedLines the trail lines saying the press was made; a press refused by the preview's own rule is startRefused.",
+      "sequenceInterleavings": {
+        "rule": "Generated, not hand-picked (the 793b fix review's H1): a press with a preview serving, then one event at each of three points, every combination of them. The points are duringTheStop (the old preview is being stopped), afterTheStart (the refresh's build has begun and written .build-id, no map yet) and afterTheMap (that build's map and record are on disk; a build that ended or reported no map at afterTheStart writes none). After the last point the view's own run end arrives (a reading, then noteOwnRunEnded). Expect: one stop and one start, except teacherStartsAPreview, which is the build, so no start of the refresh's own; the refresh stays starting through every event at duringTheStop; it ends didNotFinish exactly when afterTheStart is reloadThenOwnRunEnded or reloadAfterAMarker (the build ended, or ran its map step and made none), and none (the map made again) otherwise; one 'asked' line always.",
+        "duringTheStop": [
+          "nothing",
+          "reload",
+          "reloadThenOwnRunEnded",
+          "anotherWindowLeaves",
+          "teacherStartsAPreview"
+        ],
+        "afterTheStart": [
+          "nothing",
+          "reload",
+          "reloadThenOwnRunEnded",
+          "reloadAfterAMarker"
+        ],
+        "afterTheMap": [
+          "nothing",
+          "reload",
+          "reloadAfterAMarker",
+          "reloadThenOwnRunEnded"
+        ]
+      },
+      "sequenceRule": "The press is recorded AT ONCE, before anything is awaited (the 793b review's H1): the refresh is starting, with a token, and the tab says making with the button unavailable from that instant. A preview already running is stopped and waited for; its run ending meanwhile is the old run's and settles nothing. The build starts only if the press's token survives the stop: leaving the section, the course or the window, or quitting, clears it (didNotFinish), so a view that has gone never starts a preview nobody would stop. A second press while starting or pending does nothing, so it never ends the running build's wait (#232's record of a build in progress). A start that did not begin (refused, or the course being copied) is settled at once. A reading of the record never moves a press out of starting: only its own start or its abandon does (the 793b fix review's H1, where a reading during the stop, which the old run's end always brings, wiped the press and nothing started). A preview somebody started during the stop (the teacher's own Preview, the assistant) is the build: the refresh starts nothing, so that build keeps its wait (⌘Q still asks about it). Only the pressing window's leaving, or its own run ending, settles the press; another window on the same section settles nothing. In a case, stops and starts count the stop and start the steps asked for, refresh is the state at the end, askedLines the trail lines saying the press was made; a press refused by the preview's own rule is startRefused.",
       "refresh": "Make the Map (Again) runs the section's ordinary preview build in the background (Russell, 2026-11-12: no map-only run): a preview already running is stopped and waited for, then the preview starts through the way in every caller but the Preview button uses (mac: startPreview, never pressPreview), so the question about today's class is never asked. The teacher stays on the Coverage tab: no switch to Website, no browser, no focus taken. The refresh is a per-section state driven by events: pending from the press; the map made again when a reading finds the record thisBuild with a buildId other than the one it had at the press (the tab updates in place, before Quartz has finished); didNotFinish when this build printed its problems line and the map is not its own, or when this window's build ended, was stopped or cancelled, or the section's view went away (a switch of section stops its build) before that; refused, with the refusal's sentence, when the preview could not start. A later build's own map clears an earlier didNotFinish or refused. Quitting leaves nothing: the state is memory only, and the map's files are written whole by the build. Between the press and the start the refresh is starting (sequenceRule). A preview serving when the refresh is pressed starts again at the site's front page, as every way in but the Preview button does: the teacher's place in the preview is not kept.",
-      "alertsWait": "While the Coverage tab shows, nothing a build can raise pops up over it (Russell, 2026-11-12): the Problems alert stays due, the links checklist waits, and the refusal of the tab's own refresh (while it is starting or pending) is said in the tab instead (refusedReason) and not shown as an alert. A refusal of the teacher's OWN press of Preview is shown as ever, Coverage or not: that press is the teacher's act, and so is its answer (the 793b review's M2). The Problems tab still appears in the bar. What waited is raised when the teacher next shows Website or Problems, one at a time, as it would have been. The question about today's class is asked only by the Preview button, which a refresh never presses.",
+      "alertsWait": "While the Coverage tab shows, nothing a build can raise pops up over it (Russell, 2026-11-12): the Problems alert stays due, the links checklist waits, and the refusal of the tab's own START (only while that start runs, which is when its refusals come) is said in the tab instead (refusedReason) and not shown as an alert. A refusal of anybody else's press, in this window or another, is shown as ever, Coverage or not, to whoever pressed (the 793b review's M2 and the fix review's M1, M2). A 'preview did not appear', which arrives long after any press, is held while Coverage shows and raised when the teacher leaves it. The Problems tab still appears in the bar. What waited is raised when the teacher next shows Website or Problems, one at a time, as it would have been. The question about today's class is asked only by the Preview button, which a refresh never presses.",
       "whatAPageMayRead": "The map is content Plantoir did not write (it comes from course content), so it is shown by the Planning tab's web view, parameterised, never a second one: unitPlanning.tab.whatAPageMayRead's three guards, with the .coverage-tab folder (every link followed) as the only folder the page may read, a rule list of its own name compiled from the same text, scripts off, nothing stored, and the network blocked. A rule list that cannot be made shows cannotShowTitle and cannotShowDescription and writes a trail line, and no page is ever shown without it.",
       "navigationCases": [
         {
@@ -6467,6 +6639,8 @@
         "asOfNoTime": "Made when this section was last built.",
         "olderMap": "Made by an earlier build of this section, {when}. The latest build made no map.",
         "olderMapNoTime": "Made by an earlier build of this section. The latest build made no map.",
+        "olderMapWhileBuilding": "Made by an earlier build of this section, {when}.",
+        "olderMapWhileBuildingNoTime": "Made by an earlier build of this section.",
         "making": "Making the map again with a new build of this section…",
         "couldNotMakeAgain": "The map could not be made again this time.",
         "couldNotMake": "The map could not be made this time.",
@@ -6504,6 +6678,7 @@
         "madeAgain": "the coverage map was made again",
         "didNotFinish": "the coverage map could not be made again: the build ended before it was made",
         "refused": "the coverage map could not be made again: the preview could not start",
+        "leftBeforeItsBuild": "the coverage map was not made again: the section was left before its build started",
         "opened": "asked Obsidian to open {place}, curriculum expectation {code}, from the Coverage tab",
         "didNotOpen": "did not open {code} from the Coverage tab: {why}",
         "whyGone": "its page is no longer there",

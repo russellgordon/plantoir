@@ -64,6 +64,7 @@ struct CoverageTabView: View {
         facts.elsewhere = entry.elsewhere
         facts.otherWindow = otherWindow
         facts.changed = entry.changed
+        facts.startKnown = entry.reading?.record?.startedAt != nil
         facts.rulesCompiled = !coverage.rulesFailed
         facts.obsidianInstalled = FolderActions.obsidianIsInstalled
         return facts

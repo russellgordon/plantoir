@@ -210,6 +210,34 @@ final class SectionDetailStructureTests: XCTestCase {
         XCTAssertEqual(occurrences(of: "|| !previewTakesCommands", in: view), 3, "Back, Forward and Reload are off when it is not shown")
     }
 
+    /// The refresh's wiring in the real page (the 793b fix review's LOW 5):
+    /// the press goes through `SectionCoverage.makeAgain` with the view's
+    /// own owner and its "a build is already running" check; the page
+    /// leaving abandons a press; a quit does too, before previews are let
+    /// go; and the two late "preview did not appear" alerts wait while
+    /// Coverage shows. To see it fail, delete any one of those calls.
+    func testTheRefreshIsWiredIntoThePage() throws {
+        let view: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
+        let coverage: String = try readSource("QuartzTeachers/Views/Section/SectionDetailCoverage.swift")
+        let delegate: String = try readSource("QuartzTeachers/App/AppDelegate.swift")
+        let press: Range<String.Index> = try XCTUnwrap(coverage.range(of: "func makeTheCoverageMapAgain()"))
+        let afterPress: Substring = coverage[press.upperBound...]
+        let pressEnd: Range<String.Index> = try XCTUnwrap(afterPress.range(of: "\n    }\n"))
+        let pressBody: Substring = afterPress[..<pressEnd.lowerBound]
+        XCTAssertTrue(pressBody.contains("SectionCoverage.makeAgain("), "the press uses the shared steps")
+        XCTAssertTrue(pressBody.contains("owner: coverageOwner"), "with this view as the owner")
+        XCTAssertTrue(pressBody.contains("aBuildIsRunning:"), "and asks whether a build already runs")
+        let disappear: Range<String.Index> = try XCTUnwrap(view.range(of: ".onDisappear {"))
+        let afterDisappear: Substring = view[disappear.upperBound...]
+        let disappearEnd: Range<String.Index> = try XCTUnwrap(afterDisappear.range(of: "\n            }\n"))
+        XCTAssertTrue(afterDisappear[..<disappearEnd.lowerBound].contains("letTheCoverageTabGo()"), "leaving abandons a press")
+        XCTAssertTrue(coverage.contains("willTerminateNotification"), "a quit the page sees abandons a press")
+        let quit: Range<String.Index> = try XCTUnwrap(delegate.range(of: "SectionCoverage.shared.abandonEveryRefresh()"))
+        let letGo: Range<String.Index> = try XCTUnwrap(delegate.range(of: "AppDelegate.letEverythingGo()\n\n        if updateAtQuit"))
+        XCTAssertTrue(quit.lowerBound < letGo.lowerBound, "the quit abandons presses before letting previews go")
+        XCTAssertEqual(occurrences(of: "showALateRefusal(", in: view), 2, "both late alerts wait on Coverage")
+    }
+
     /// The browser commands reach the preview only on Website: the rule the
     /// page's focused value and its toolbar's Back, Forward and Reload read.
     func testOnlyWebsiteOffersThePreviewTheBrowserCommands() {

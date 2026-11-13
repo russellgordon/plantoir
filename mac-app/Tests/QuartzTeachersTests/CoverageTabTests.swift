@@ -174,6 +174,7 @@ final class CoverageTabTests: XCTestCase {
             facts.elsewhere = try XCTUnwrap(given["elsewhere"] as? Bool)
             facts.otherWindow = try XCTUnwrap(given["otherWindow"] as? Bool)
             facts.changed = try XCTUnwrap(CoverageChange(rawValue: try XCTUnwrap(given["changed"] as? String)), name)
+            facts.startKnown = try XCTUnwrap(given["startKnown"] as? Bool, name)
             facts.rulesCompiled = try XCTUnwrap(given["rulesCompiled"] as? Bool)
             facts.obsidianInstalled = try XCTUnwrap(given["obsidianInstalled"] as? Bool)
 
@@ -338,6 +339,8 @@ final class CoverageTabTests: XCTestCase {
             "asOfNoTime": CoverageTabWording.asOfNoTime,
             "olderMap": CoverageTabWording.olderMap,
             "olderMapNoTime": CoverageTabWording.olderMapNoTime,
+            "olderMapWhileBuilding": CoverageTabWording.olderMapWhileBuilding,
+            "olderMapWhileBuildingNoTime": CoverageTabWording.olderMapWhileBuildingNoTime,
             "making": CoverageTabWording.making,
             "couldNotMakeAgain": CoverageTabWording.couldNotMakeAgain,
             "couldNotMake": CoverageTabWording.couldNotMake,
@@ -395,6 +398,7 @@ final class CoverageTabTests: XCTestCase {
             "madeAgain": CoverageTabTrail.madeAgain,
             "didNotFinish": CoverageTabTrail.didNotFinish,
             "refused": CoverageTabTrail.refused,
+            "leftBeforeItsBuild": CoverageTabTrail.leftBeforeItsBuild,
             "opened": CoverageTabTrail.opened,
             "didNotOpen": CoverageTabTrail.didNotOpen,
             "whyGone": CoverageTabTrail.whyGone,
@@ -553,6 +557,91 @@ final class CoverageTabTests: XCTestCase {
         XCTAssertTrue(trail().contains(CoverageTabTrail.refused), trail())
     }
 
+    /// `sequenceInterleavings`: every combination of one event at each
+    /// point between the press and the build's end, generated from the
+    /// contract's lists, with the outcome its rule states. To see it fail:
+    /// delete the `starting` guard at the top of `SectionCoverage.settle`
+    /// (the code the fix review found), and every combination with a reading
+    /// during the stop starts nothing.
+    func testEveryInterleaving() async throws {
+        let block: [String: Any] = try XCTUnwrap(try CoverageTabTests.tab()["sequenceInterleavings"] as? [String: Any])
+        let first: [String] = try XCTUnwrap(block["duringTheStop"] as? [String])
+        let second: [String] = try XCTUnwrap(block["afterTheStart"] as? [String])
+        let third: [String] = try XCTUnwrap(block["afterTheMap"] as? [String])
+        let made: (folder: URL, course: Course) = try fixtureCourse()
+        let store: SectionCoverage = SectionCoverage.shared
+        var ran: Int = 0
+        for during in first {
+            for afterStart in second {
+                for afterMap in third {
+                    let name: String = "\(during) / \(afterStart) / \(afterMap)"
+                    store.reset()
+                    ActivityTrail.store = ProblemReportStore(folderURL: rootURL.appendingPathComponent("trail-\(UUID().uuidString)", isDirectory: true))
+                    try build("b1", course: made.course, withMap: true)
+                    store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+                    let key: String = store.key(folder: made.folder, course: made.course, sectionNumber: 1)
+                    let owner: UUID = UUID()
+                    var teacherPreview: Bool = false
+                    var starts: Int = 0
+                    var stateAfterTheStopsEvent: CoverageRefresh = .none
+                    func happen(_ event: String) {
+                        switch event {
+                        case "reload":
+                            store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+                        case "reloadAfterAMarker":
+                            store.reload(folder: made.folder, course: made.course, sectionNumber: 1, afterAMarker: true)
+                        case "reloadThenOwnRunEnded":
+                            store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+                            store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1, owner: owner)
+                        case "anotherWindowLeaves":
+                            store.abandonRefresh(folder: made.folder, course: made.course, sectionNumber: 1, owner: UUID())
+                        case "teacherStartsAPreview":
+                            teacherPreview = true
+                        default:
+                            break
+                        }
+                    }
+                    await SectionCoverage.makeAgain(
+                        store: store, folder: made.folder, course: made.course, sectionNumber: 1,
+                        owner: owner, previewIsRunning: true,
+                        aBuildIsRunning: {
+                            return teacherPreview
+                        },
+                        stop: {
+                            happen(during)
+                            stateAfterTheStopsEvent = store.entry(key).refresh
+                        },
+                        start: {
+                            starts += 1
+                            return true
+                        }
+                    )
+                    XCTAssertEqual(stateAfterTheStopsEvent, .starting, "\(name): the press survives the stop's event")
+                    // The build (the refresh's, or the teacher's) begins.
+                    try build("b2", course: made.course, withMap: false)
+                    happen(afterStart)
+                    let endedWithoutAMap: Bool = afterStart == "reloadThenOwnRunEnded" || afterStart == "reloadAfterAMarker"
+                    if !endedWithoutAMap {
+                        try build("b2", course: made.course, withMap: true)
+                    }
+                    happen(afterMap)
+                    happen("reloadThenOwnRunEnded")
+                    XCTAssertEqual(starts, during == "teacherStartsAPreview" ? 0 : 1, name)
+                    XCTAssertEqual(store.entry(key).refresh.name, endedWithoutAMap ? "didNotFinish" : "none", name)
+                    var asked: Int = 0
+                    for line in ActivityTrail.store.activityText(includingPrompts: false).components(separatedBy: "\n")
+                        where line.contains(CoverageTabTrail.asked) {
+                        asked += 1
+                    }
+                    XCTAssertEqual(asked, 1, name)
+                    ran += 1
+                }
+            }
+        }
+        XCTAssertEqual(ran, first.count * second.count * third.count)
+        XCTAssertGreaterThanOrEqual(ran, 80)
+    }
+
     // MARK: - A click, through Open in Obsidian's own route
 
     @MainActor
@@ -655,14 +744,36 @@ final class CoverageTabTests: XCTestCase {
         XCTAssertNotNil(CoverageTabRecord.parse(one))
     }
 
-    /// Only the tab's own refresh has its refusal said in the tab; the
-    /// teacher's own Preview press is answered as ever (the 793b review's M2).
-    func testOnlyTheTabsOwnRefreshHasItsRefusalSaidInTheTab() {
-        XCTAssertTrue(SectionTabs.refusalIsTheTabs(refresh: .starting))
-        XCTAssertTrue(SectionTabs.refusalIsTheTabs(refresh: .pending))
-        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .none))
-        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .didNotFinish))
-        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .refused("a reason")))
+    /// Only the tab's own START has its refusal said in the tab; anybody
+    /// else's press, while the press is starting or its build runs, is
+    /// answered as ever (the 793b review's M2, the fix review's M1 and M2).
+    func testOnlyTheTabsOwnStartHasItsRefusalSaidInTheTab() async throws {
+        XCTAssertTrue(SectionTabs.refusalIsTheTabs(refresh: .pending, ownStartRunning: true))
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .starting, ownStartRunning: false), "a press during the stop is somebody else's")
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .pending, ownStartRunning: false), "another press while the build runs")
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .none, ownStartRunning: false))
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .didNotFinish, ownStartRunning: false))
+        // The flag is up only for the start's own call.
+        let made: (folder: URL, course: Course) = try fixtureCourse()
+        try build("b1", course: made.course, withMap: true)
+        let store: SectionCoverage = SectionCoverage.shared
+        store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+        let key: String = store.key(folder: made.folder, course: made.course, sectionNumber: 1)
+        var upDuringTheStart: Bool = false
+        var upDuringTheStop: Bool = true
+        await SectionCoverage.makeAgain(
+            store: store, folder: made.folder, course: made.course, sectionNumber: 1, previewIsRunning: true,
+            stop: {
+                upDuringTheStop = store.isRunningTheTabsOwnStart(key)
+            },
+            start: {
+                upDuringTheStart = store.isRunningTheTabsOwnStart(key)
+                return true
+            }
+        )
+        XCTAssertFalse(upDuringTheStop)
+        XCTAssertTrue(upDuringTheStart)
+        XCTAssertFalse(store.isRunningTheTabsOwnStart(key), "and down again after")
     }
 
     /// A map's web view is kept while its section is shown and released when
@@ -715,30 +826,48 @@ final class CoverageTabTests: XCTestCase {
             store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
             let key: String = store.key(folder: made.folder, course: made.course, sectionNumber: 1)
             let counted: Counted = Counted()
+            let owner: UUID = UUID()
+            let otherWindow: UUID = UUID()
+            var teacherPreview: Bool = false
             let refused: Bool = (testCase["startRefused"] as? Bool) ?? false
             let previewRunning: Bool = try XCTUnwrap(testCase["previewRunning"] as? Bool)
             let duringTheStop: [String] = try XCTUnwrap(testCase["duringTheStop"] as? [String])
             func press(stopSteps: [String]) async {
                 await SectionCoverage.makeAgain(
                     store: store, folder: made.folder, course: made.course, sectionNumber: 1,
+                    owner: owner,
                     previewIsRunning: previewRunning,
+                    aBuildIsRunning: {
+                        return teacherPreview
+                    },
                     stop: {
                         counted.stops += 1
-                        counted.stateDuringTheStop = store.entry(key).refresh
                         for step in stopSteps {
                             switch step {
                             case "press":
                                 await press(stopSteps: [])
                             case "ownRunEnded":
-                                store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1)
+                                store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1, owner: owner)
+                            case "reload":
+                                store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+                            case "reloadThenOwnRunEnded":
+                                store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+                                store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1, owner: owner)
+                            case "teacherStartsAPreview":
+                                teacherPreview = true
+                            case "anotherWindowLeaves":
+                                store.abandonRefresh(folder: made.folder, course: made.course, sectionNumber: 1, owner: otherWindow)
                             case "leave":
-                                store.abandonRefresh(folder: made.folder, course: made.course, sectionNumber: 1)
+                                store.abandonRefresh(folder: made.folder, course: made.course, sectionNumber: 1, owner: owner)
                             case "quit":
                                 store.abandonEveryRefresh()
                             default:
                                 XCTFail("\(name): no step \(step)")
                             }
                         }
+                        // Read AFTER the steps: none but leaving or
+                        // quitting may move the press out of starting.
+                        counted.stateDuringTheStop = store.entry(key).refresh
                     },
                     start: {
                         counted.starts += 1
@@ -747,11 +876,16 @@ final class CoverageTabTests: XCTestCase {
                 )
             }
             await press(stopSteps: duringTheStop)
-            if previewRunning {
-                XCTAssertEqual(counted.stateDuringTheStop, .starting, "\(name): recorded at the press, before the stop")
+            let leftOrQuit: Bool = duringTheStop.contains("leave") || duringTheStop.contains("quit")
+            if previewRunning && !leftOrQuit {
+                XCTAssertEqual(counted.stateDuringTheStop, .starting, "\(name): still starting after every step of the stop")
             }
-            for step in try XCTUnwrap(testCase["afterTheStart"] as? [String]) where step == "press" {
-                await press(stopSteps: [])
+            for step in try XCTUnwrap(testCase["afterTheStart"] as? [String]) {
+                if step == "press" {
+                    await press(stopSteps: [])
+                } else if step == "anotherWindowsRunEnded" {
+                    store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1, owner: otherWindow)
+                }
             }
             let expected: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
             XCTAssertEqual(counted.stops, expected["stops"] as? Int, name)

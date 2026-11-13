@@ -1109,7 +1109,11 @@ Python does); ids are compared for equality only. The first line is the
 map's own date, said only as far as it is true (the 793b review's M1): "made
 when this section was last built" only when the map IS the latest build's;
 "made by an earlier build … the latest build made no map" when it is
-another build's; and a form with no date when the record has none, because
+another build's and nothing is making the map, but only "made by an earlier
+build" while a build is making it, because a build writes `.build-id` as it
+starts and the record reads as another build's until its map is written (the
+fix review's M3); and a form with no date, read from the record's own start
+rather than from the walk (LOW 4), when the record has none, because
 the review measured an empty date rendering as "…last built, .". The last
 line is the click hint, or, with
 Obsidian not installed, the sentence saying a click opens nothing. The hint is
@@ -1153,6 +1157,21 @@ events and never by a clock:
   the refresh from what is on disk);
 - refused, with the preview's own sentence, when it could not start.
 
+**Why the refresh stops a serving preview at all** (asked by the 793b fix
+review, measured by reading the shared Python and the launchers on
+2026-11-12). A serving preview does not run the build again when pages
+change: `build_site.py` runs once, then Quartz serves with its own watcher
+over the builder's copy, so the serve never writes a new map. A
+`preview.sh --build-only` beside a serve does not leave it running either:
+`build_site.py` stops the section's serving preview first
+(`stop_preview_serving`, which closed a race that published a preview), so a
+build-only refresh would end the teacher's preview AND leave the window's
+Website tab with nothing to show. So every path that makes the map again stops
+the serve; stopping it and serving again (the ordinary Preview) is the one
+that leaves the teacher a live preview afterwards, on the site's front page.
+Rejected: a build-only refresh, for that reason; a map-only run, ruled out by
+Russell.
+
 **The press is recorded at once** (the 793b review's H1). The first version
 recorded it only after the old preview had stopped, seconds later: the tab
 said nothing, the button could be pressed again, and a second press ended the
@@ -1166,7 +1185,34 @@ being made and the button is unavailable from that instant; a second press
 does nothing; the old run's end during the stop settles nothing; and the start
 goes ahead only if the token survives the stop. Leaving the section, the course
 or the window (`onDisappear` → `letTheCoverageTabGo`) and quitting
-(`willTerminateNotification`) clear it. `CoverageTabTests.testEverySequenceCase`
+(`finishTerminating`, before previews are let go, which covers a quit that
+waits on a set-aside update; and `willTerminateNotification`) clear it. Only
+the pressing view counts: the press carries the view's own id, so another
+window on the same section leaving, or stopping its own preview, settles
+nothing of it (the fix review's LOW 1).
+
+**No reading moves a press out of starting** (the 793b fix review's H1). The
+first version of the token was wiped by the very next reading of the record,
+because `settle` read any state but pending as an older "could not": the old
+run's end during the stop always brings a reading (`isBusy` changes), so in
+the ordinary case, a preview serving, the press flashed "making", stopped the
+preview and started nothing. The hand-picked sequence cases had no reading in
+them. Now `settle` leaves `starting` alone, and
+`coverageTab.tab.sequenceInterleavings` is GENERATED: every combination of
+one event at each of three points (during the stop, after the build's start,
+after its map; readings, readings after a problems line, the run ending,
+another window leaving, a Preview the teacher starts), 80 runs
+(`CoverageTabTests.testEveryInterleaving`). `CoverageRefreshInThePageTests`
+drives the real section page offscreen with a stand-in `preview.sh` whose
+stop takes a second, so the old run's end and the page's own readings land
+inside the stop: the press starts its build and the map is made again in
+place. With the guard removed, that test and 80 interleavings fail.
+
+**A Preview pressed during the stop is the build** (the fix review's M1).
+After the stop, `makeAgain` asks whether a build is already running (the
+teacher's own Preview, the assistant's); if so the refresh starts nothing, so
+that build keeps its wait and ⌘Q still knows about it, and its map settles
+the refresh. `CoverageTabTests.testEverySequenceCase`
 runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
 test holds open, no window and no delay. A repair's Preview Again
 (`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
@@ -1194,9 +1240,14 @@ review's LOW).
 
 **Nothing pops up over the tab** (Russell, 2026-11-12). While Coverage shows,
 `SectionTabs.alertsWait` holds what a build can raise: the Problems alert stays
-due in its store and the links checklist waits as `pendingLinksChecklist`; the
-refusal of the tab's own refresh (while it is starting or pending,
-`SectionTabs.refusalIsTheTabs`) is said in the tab instead. The Problems tab
+due in its store, the links checklist waits as `pendingLinksChecklist`, and a
+late "the preview did not appear" (`showALateRefusal`, which arrives long
+after any press) is held until the teacher leaves the tab. The refusal of the
+tab's own START is said in the tab instead, and only that: it is taken only
+while the start's own synchronous call runs (`SectionTabs.refusalIsTheTabs`,
+`ownStartRunning`), so a refusal of anybody else's press, in this window or
+another, during the stop or while the build runs, reaches whoever pressed
+(the fix review's M1 and M2). The Problems tab
 still appears in the bar. When the teacher next shows Website or Problems,
 what waited is raised one at a time, the way it would have been
 (`raiseWhatWaitedForCoverage`). The Preview and Deploy buttons themselves are

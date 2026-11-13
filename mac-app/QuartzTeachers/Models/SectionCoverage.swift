@@ -38,7 +38,19 @@ final class SectionCoverage {
 
         /// The press a refresh still starting belongs to (the 793b review's
         /// H1): its start goes ahead only while this is the press's own.
+        /// Written by `beginRefresh`, `refreshMayStart` and `abandon` alone,
+        /// never by a reading (the fix review's H1).
         var refreshToken: UUID?
+
+        /// The section view that pressed, so another window's view leaving
+        /// the section, or stopping its own preview, settles nothing of this
+        /// press's (the fix review's LOW 1).
+        var refreshOwner: UUID?
+
+        /// The course and section the press was for, for the trail line of
+        /// an abandon that has only the key (a quit).
+        var refreshCourse: String?
+        var refreshSection: Int?
 
         /// The build id the last freshness walk was for: a reading of a
         /// different map says nothing about change until its own walk is
@@ -59,6 +71,16 @@ final class SectionCoverage {
     /// Whether the rule list for the map's page could be made: false only
     /// when it could not, and then no map is ever shown.
     private(set) var rulesFailed: Bool = false
+
+    /// The sections whose map web views are kept: for tests.
+    var keptWebViews: Set<String> {
+        return Set(controllers.keys)
+    }
+
+    /// Sections whose tab's OWN start is running right now: a preview
+    /// refusal arriving then is the refresh's, said in the tab (the fix
+    /// review's M1). Set only around the synchronous `start` in `makeAgain`.
+    @ObservationIgnored private var ownStartRunning: Set<String> = []
 
     /// One web view per section being SHOWN, made the first time its tab
     /// shows and kept while the section is on screen, so a switch of tab
@@ -125,11 +147,6 @@ final class SectionCoverage {
         controllers[key] = nil
     }
 
-    /// The sections whose map web views are kept: for tests.
-    var keptWebViews: Set<String> {
-        return Set(controllers.keys)
-    }
-
     // MARK: - The refresh, from the press to the start (the 793b review's H1)
 
     /// Make the Map (Again), pressed: recorded AT ONCE, as `starting` with a
@@ -137,7 +154,7 @@ final class SectionCoverage {
     /// unavailable from this instant. Nil, and nothing recorded, when a
     /// refresh is already starting or waiting for its map: a second press
     /// does nothing, so it can never end the running build's wait.
-    func beginRefresh(folder: URL, course: Course, sectionNumber: Int) -> UUID? {
+    func beginRefresh(folder: URL, course: Course, sectionNumber: Int, owner: UUID? = nil) -> UUID? {
         let sectionKey: String = key(folder: folder, course: course, sectionNumber: sectionNumber)
         var updated: Entry = entry(sectionKey)
         if updated.refresh == .starting || updated.refresh == .pending {
@@ -146,6 +163,9 @@ final class SectionCoverage {
         let token: UUID = UUID()
         updated.refresh = .starting
         updated.refreshToken = token
+        updated.refreshOwner = owner
+        updated.refreshCourse = course.code
+        updated.refreshSection = sectionNumber
         updated.clickLine = nil
         entries[sectionKey] = updated
         ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.asked, course: course.code, section: sectionNumber)
@@ -172,18 +192,25 @@ final class SectionCoverage {
     /// The section's page went away (a switch of section or course, the
     /// window closing): a refresh still starting is abandoned, so its start
     /// never runs from a view that has gone.
-    func abandonRefresh(folder: URL, course: Course, sectionNumber: Int) {
-        abandon(key(folder: folder, course: course, sectionNumber: sectionNumber), course: course.code, sectionNumber: sectionNumber)
+    ///
+    /// Only the pressing view's own leaving counts: another window showing
+    /// the same section may come and go (the fix review's LOW 1).
+    func abandonRefresh(folder: URL, course: Course, sectionNumber: Int, owner: UUID? = nil) {
+        let sectionKey: String = key(folder: folder, course: course, sectionNumber: sectionNumber)
+        if entry(sectionKey).refreshOwner != owner {
+            return
+        }
+        abandon(sectionKey)
     }
 
     /// The app is quitting: every refresh still starting is abandoned.
     func abandonEveryRefresh() {
         for (sectionKey, found) in entries where found.refresh == .starting {
-            abandon(sectionKey, course: nil, sectionNumber: nil)
+            abandon(sectionKey)
         }
     }
 
-    private func abandon(_ sectionKey: String, course: String?, sectionNumber: Int?) {
+    private func abandon(_ sectionKey: String) {
         var updated: Entry = entry(sectionKey)
         if updated.refresh != .starting {
             return
@@ -191,11 +218,16 @@ final class SectionCoverage {
         updated.refresh = .didNotFinish
         updated.refreshToken = nil
         entries[sectionKey] = updated
-        if let course, let sectionNumber {
-            ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.didNotFinish, course: course, section: sectionNumber)
+        if let course = updated.refreshCourse, let sectionNumber = updated.refreshSection {
+            ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.leftBeforeItsBuild, course: course, section: sectionNumber)
         } else {
-            ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.didNotFinish)
+            ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.leftBeforeItsBuild)
         }
+    }
+
+    /// Whether the tab's own start is running for this section now.
+    func isRunningTheTabsOwnStart(_ sectionKey: String) -> Bool {
+        return ownStartRunning.contains(sectionKey)
     }
 
     /// The steps of one press, with the stop and the start handed in, so a
@@ -203,16 +235,24 @@ final class SectionCoverage {
     /// still running and wait for it, then start the build only if the press
     /// still holds, and settle at once a start that did not begin.
     /// `start` answers whether a build began.
+    ///
+    /// `aBuildIsRunning` is asked after the stop: a preview somebody started
+    /// meanwhile (the teacher's own Preview, the assistant) is a build that
+    /// writes the map, so the refresh waits for it and starts nothing of its
+    /// own, which would end that build's wait and be refused (the fix
+    /// review's M1).
     static func makeAgain(
         store: SectionCoverage,
         folder: URL,
         course: Course,
         sectionNumber: Int,
+        owner: UUID? = nil,
         previewIsRunning: Bool,
+        aBuildIsRunning: () -> Bool = { () -> Bool in return false },
         stop: () async -> Void,
         start: () -> Bool
     ) async {
-        guard let token = store.beginRefresh(folder: folder, course: course, sectionNumber: sectionNumber) else {
+        guard let token = store.beginRefresh(folder: folder, course: course, sectionNumber: sectionNumber, owner: owner) else {
             return
         }
         if previewIsRunning {
@@ -221,8 +261,15 @@ final class SectionCoverage {
         if !store.refreshMayStart(token: token, folder: folder, course: course, sectionNumber: sectionNumber) {
             return
         }
-        if !start() {
-            store.noteOwnRunEnded(folder: folder, course: course, sectionNumber: sectionNumber)
+        if aBuildIsRunning() {
+            return
+        }
+        let sectionKey: String = store.key(folder: folder, course: course, sectionNumber: sectionNumber)
+        store.ownStartRunning.insert(sectionKey)
+        let started: Bool = start()
+        store.ownStartRunning.remove(sectionKey)
+        if !started {
+            store.noteOwnRunEnded(folder: folder, course: course, sectionNumber: sectionNumber, owner: owner)
         }
     }
 
@@ -283,16 +330,25 @@ final class SectionCoverage {
     /// This window's preview run ended, was stopped, or the view is going
     /// away (a switch of section stops its build): a refresh still waiting
     /// is settled from what is on disk NOW, so nothing is left half-noted.
-    func noteOwnRunEnded(folder: URL, course: Course, sectionNumber: Int) {
+    ///
+    /// `owner` is the view whose run it was: another window's view stopping
+    /// ITS preview settles nothing of this press's (the fix review's LOW 1).
+    func noteOwnRunEnded(folder: URL, course: Course, sectionNumber: Int, owner: UUID? = nil) {
         let sectionKey: String = key(folder: folder, course: course, sectionNumber: sectionNumber)
         var updated: Entry = entry(sectionKey)
         if updated.refresh != .pending {
+            return
+        }
+        if updated.refreshOwner != owner {
             return
         }
         let reading: CoverageTab.Reading = CoverageTab.read(
             folder: CoverageTab.folder(courseFolder: course.directoryURL, sectionNumber: sectionNumber),
             buildId: CoverageTab.sectionBuildId(courseFolder: course.directoryURL, sectionNumber: sectionNumber)
         )
+        if reading.record?.buildId != updated.walkedFor {
+            updated.changed = .notKnownYet
+        }
         updated.reading = reading
         settle(&updated, reading: reading, afterAMarker: false, runEnded: true, course: course, sectionNumber: sectionNumber)
         entries[sectionKey] = updated
@@ -313,6 +369,13 @@ final class SectionCoverage {
         _ updated: inout Entry, reading: CoverageTab.Reading, afterAMarker: Bool, runEnded: Bool,
         course: Course, sectionNumber: Int
     ) {
+        // A press still waiting for an old preview to stop is not an older
+        // "could not": only its own start, or its abandon, moves it on. A
+        // reading during the stop (the old run's end, the app coming to the
+        // front, a click) must leave it alone (the fix review's H1).
+        if updated.refresh == .starting {
+            return
+        }
         if updated.refresh != .pending {
             if reading.kind == .thisBuild, let id = reading.record?.buildId, id != updated.refreshFrom,
                updated.refresh != .none {
