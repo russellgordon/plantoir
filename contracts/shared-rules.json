@@ -41001,6 +41001,28 @@
       { "name": "a long value is cut", "header": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDE", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ…"] }
     ]
   },
+  "typescriptStrings": {
+    "note": "GitHub #871 (v2.0.0). Every value from a course's settings that the build writes INSIDE a string in a TypeScript file of the site: the title line (the emoji, the course code or a club's short label `custom_short_name`) and `locale`, `baseUrl` (a custom domain), the three font names and the colour values in quartz.config.ts, and `footer_html` in Footer.tsx. Written as typed, a double quote ended the string and the site did not build, a backslash was read as an escape (C:\\Club showed as C:Club, a backslash before a u that is not a hex escape stopped the build), and a dollar brace in the footer's template literal ran as code. Shared Python only: both apps write the settings and neither writes these files, so Windows inherits the rule with its builds.",
+    "rule": "The value is written as a JSON string (`json.dumps(value, ensure_ascii=False)`), which is a valid JavaScript string literal that reads back as exactly the value: a double quote, a backslash and every control character are escaped, and every other character is written as itself. A footer's `</` is then written `<\\/`, the same text in a JavaScript string, so the footer cannot close the `<footer>` element the next build looks for. The patterns that find a value from an earlier build match a whole string literal, escapes included, so a value written escaped is replaced whole. Nothing is cleaned here: removing control characters is `courseNameCharacters`' rule and is applied, where it is applied, before this.",
+    "whereItIsApplied": "`scripts/build_site.py` -> `typescript_string`, called by `update_page_title`, `patch_quartz_locale`, `patch_quartz_base_url`, `patch_typography_fonts` (through `_escape_font`), `format_colors_block` and `inject_custom_footer_components`. The front page's title goes through YAML (`set_landing_title`, python-frontmatter) and the hidden names into quartz.layout.ts through `json.dumps` already, and were not changed. Pinned by `scripts/test_typescript_strings.py`, which every case goes through and which Windows' PythonToolchainTests runs.",
+    "rejected": "Refusing a quote or a backslash in the short label: a teacher may want one (a club called \"The Quad\"), and the short label's field is free text on both apps. Escaping only the double quote, as `_escape_font` did: the backslash was then read as an escape. Keeping the footer's template literal and escaping a dollar brace too: a plain string literal has fewer special characters, and multi-line HTML reads back the same.",
+    "cases": [
+      { "name": "a double quote in a club's short label", "raw": "Chess \"Club\"", "written": "\"Chess \\\"Club\\\"\"" },
+      { "name": "a backslash", "raw": "C:\\Club", "written": "\"C:\\\\Club\"" },
+      { "name": "a backslash at the end, which would escape the closing quote", "raw": "Club\\", "written": "\"Club\\\\\"" },
+      { "name": "a backslash before a u that is not a hex escape", "raw": "C:\\users", "written": "\"C:\\\\users\"" },
+      { "name": "a backslash and a quote together", "raw": "A\\\"B", "written": "\"A\\\\\\\"B\"" },
+      { "name": "a backtick and a dollar brace, which a template literal would run", "raw": "Back`tick ${x}", "written": "\"Back`tick ${x}\"" },
+      { "name": "a single quote is kept as it is", "raw": "Teacher's Club", "written": "\"Teacher's Club\"" },
+      { "name": "a line feed, for a value no rule has cleaned", "raw": "Robotics\nClub", "written": "\"Robotics\\nClub\"" },
+      { "name": "a tab", "raw": "A\tB", "written": "\"A\\tB\"" },
+      { "name": "a NUL", "raw": "A\u0000B", "written": "\"A\\u0000B\"" },
+      { "name": "an emoji and accents are written as themselves", "raw": "📚 Échecs", "written": "\"📚 Échecs\"" },
+      { "name": "the teacher emoji, held together by U+200D", "raw": "👩\u200d🏫 Club", "written": "\"👩\u200d🏫 Club\"" },
+      { "name": "a closing tag in the footer", "raw": "<p>Made by us</p>", "written": "\"<p>Made by us</p>\"", "footerWritten": "\"<p>Made by us<\\/p>\"" },
+      { "name": "an empty value", "raw": "", "written": "\"\"" }
+    ]
+  },
   "courseNameCharacters": {
     "note": "GitHub #780 (v2.0.0), ruled by Russell on 2026-11-12: no control character is legitimate in a course's name. `course_config.json` -> `course_name` is a JSON string, and JSON can carry any code point as an escape, so a script, a hand edit or another tool can put a NUL, a line break or a right-to-left override in it. Both apps clean the name where they READ it, by this one rule, and the shared Python does the same, so no reader is left to remember on its own. The same rule cleans every line the apps write on the breadcrumb trail (`trailLines`).",
     "rule": "Work on Unicode code points (scalars), never on what a reader sees as one character and never on UTF-16 units. Every code point in `spacedOut` becomes ONE space (U+0020); every code point in `removed` is taken out; every other code point is kept as it is. Nothing is trimmed and nothing is collapsed. Applying the rule twice gives the same result as applying it once (`idempotent`).",

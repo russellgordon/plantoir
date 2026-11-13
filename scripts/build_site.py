@@ -58,6 +58,36 @@ def _cmd_example(script_base: str, course, section, host_os: str) -> str:
 # ----------------------------------------------------------------------------
 
 # --- ADD: PATCH LOCALE helper (placed near the bottom of file in the live code) ---
+# --- #871: teacher-typed values written into TypeScript ----------------------
+#
+# A short label, an emoji, a footer, a custom domain, a font or a locale from
+# `course_config.json` lands INSIDE a quoted string in quartz.config.ts or
+# Footer.tsx. Written as it stands, a `"` ended the string early and the site
+# did not build (esbuild: "Unexpected identifier"), a `\` was read as the start
+# of an escape (`C:\Club` showed as "C:Club", a `\u` before a letter that is
+# not hex stopped the build), and in the footer's template literal a `${`
+# was run as code. Every such value goes through `typescript_string`, which is
+# JSON's own quoting: a JSON string is a valid JavaScript string literal that
+# reads back as exactly the text it holds. The rule and its cases are
+# `contracts/shared-rules.json` -> `typescriptStrings`.
+
+# A whole double-quoted or single-quoted string literal as written in a
+# TypeScript file, escapes included, so a value that was written escaped is
+# matched to its closing quote rather than to the first `\"` inside it.
+TS_DOUBLE_QUOTED = r'"(?:[^"\\\n]|\\.)*"'
+TS_SINGLE_QUOTED = r"'(?:[^'\\\n]|\\.)*'"
+
+
+def typescript_string(value: str) -> str:
+    """`value` as a double-quoted TypeScript string literal (#871).
+
+    Reads back as exactly `value`: a quote, a backslash and every control
+    character are escaped; every other character, an emoji or an accented
+    letter included, is written as itself.
+    """
+    return json.dumps(str(value), ensure_ascii=False)
+
+
 def patch_quartz_locale(quartz_config_path: Path, locale_code: str):
     """
     Ensure `locale: "<code>",` in quartz.config.ts matches `locale_code`.
@@ -71,10 +101,9 @@ def patch_quartz_locale(quartz_config_path: Path, locale_code: str):
         src = quartz_config_path.read_text(encoding="utf-8")
 
         # 1) Targeted replacement: locale: "..." or locale: '...'
-        pattern = re.compile(r'(locale\s*:\s*)(["\'])([^"\']*)(\2)')
+        pattern = re.compile(r'(locale\s*:\s*)(' + TS_DOUBLE_QUOTED + '|' + TS_SINGLE_QUOTED + ')')
         def _repl(m: re.Match) -> str:
-            quote = m.group(2)
-            return f'{m.group(1)}{quote}{locale_code}{quote}'
+            return f'{m.group(1)}{typescript_string(locale_code)}'
         new_src, n = pattern.subn(_repl, src, count=1)
 
         # 2) Fallback: inject after the opening of defineConfig({ ... })
@@ -82,7 +111,7 @@ def patch_quartz_locale(quartz_config_path: Path, locale_code: str):
             m = re.search(r'defineConfig\(\s*\{', src)
             if m:
                 insert_at = m.end()
-                new_src = src[:insert_at] + f'\n  locale: "{locale_code}",' + src[insert_at:]
+                new_src = src[:insert_at] + f'\n  locale: {typescript_string(locale_code)},' + src[insert_at:]
                 n = 1
             else:
                 new_src = src
@@ -201,10 +230,10 @@ def patch_quartz_base_url(quartz_config_path: Path, base_url: str):
     try:
         src = quartz_config_path.read_text(encoding="utf-8")
         clean_val = clean_base_url(base_url)
-        replacement = f'"{clean_val}"' if clean_val else 'undefined'
+        replacement = typescript_string(clean_val) if clean_val else 'undefined'
 
         # Match baseUrl: "...", baseUrl: '...', baseUrl: undefined, baseUrl: null
-        pattern = re.compile(r'(baseUrl\s*:\s*)(["\'][^"\']*["\']|undefined|null)')
+        pattern = re.compile(r'(baseUrl\s*:\s*)(' + TS_DOUBLE_QUOTED + '|' + TS_SINGLE_QUOTED + r'|undefined|null)')
         def _repl(m: re.Match) -> str:
             return f'{m.group(1)}{replacement}'
         new_src, n = pattern.subn(_repl, src, count=1)
@@ -258,8 +287,10 @@ def patch_quartz_analytics_off(quartz_config_path: Path):
 
 # --- ADD: Patch typography fonts in quartz.config.ts -------------------------
 def _escape_font(val: str) -> str:
-    # Guard against stray quotes in family names
-    return val.replace('"', r'\"')
+    # The family name as a whole TypeScript string literal, quotes included
+    # (#871): this used to escape a `"` and leave a `\`, which then reached
+    # re.subn as a template escape ("bad escape \s") or ended the string.
+    return typescript_string(val)
 
 def patch_typography_fonts(quartz_config_path: Path, header_font: str, body_font: str, code_font: str):
     """
@@ -289,10 +320,11 @@ def patch_typography_fonts(quartz_config_path: Path, header_font: str, body_font
         def replace_field(src: str, field: str, value: str) -> tuple[str, bool]:
             # Replace the value of e.g. header: "Old"
             pattern = re.compile(
-                rf'(typography\s*:\s*\{{[\s\S]*?{field}\s*:\s*)"(.*?)"',
+                rf'(typography\s*:\s*\{{[\s\S]*?{field}\s*:\s*)' + TS_DOUBLE_QUOTED,
                 flags=re.DOTALL
             )
-            new_src, n = pattern.subn(rf'\1"{value}"', src, count=1)
+            # A function, not a template: the value's own backslashes are text.
+            new_src, n = pattern.subn(lambda match: match.group(1) + value, src, count=1)
             return new_src, (n > 0)
 
         new_content, hit_h = replace_field(content, "header", hf)
@@ -306,12 +338,12 @@ def patch_typography_fonts(quartz_config_path: Path, header_font: str, body_font
             block_re = re.compile(r'typography\s*:\s*\{[\s\S]*?\}\s*,?', flags=re.DOTALL)
             new_block = (
                 'typography: {\n'
-                f'        header: "{hf}",\n'
-                f'        body: "{bf}",\n'
-                f'        code: "{cf}",\n'
+                f'        header: {hf},\n'
+                f'        body: {bf},\n'
+                f'        code: {cf},\n'
                 '      },'
             )
-            new_content2, n2 = block_re.subn(new_block, new_content, count=1)
+            new_content2, n2 = block_re.subn(lambda match: new_block, new_content, count=1)
             if n2 == 0:
                 # As a last resort, try to inject a typography block next to colors/theme
                 # Insert after "theme: {" opening if present
@@ -1060,7 +1092,7 @@ def update_page_title(config_path: Path, header_label: str, section_number: int,
 
     for line in lines:
         if "pageTitle:" in line:
-            new_lines.append(f'  pageTitle: "{new_title}",\n')
+            new_lines.append(f'  pageTitle: {typescript_string(new_title)},\n')
             updated = True
         else:
             new_lines.append(line)
@@ -1434,16 +1466,22 @@ def inject_custom_footer_components(quartz_layout_path: Path, footer_component_p
         with open(footer_component_path, "r", encoding="utf-8") as f:
             footer_code = f.read()
 
-        # Use a JS template literal to preserve multi-line HTML and quotes safely
-        safe_html = footer_html.replace("`", "\\`")
+        # A plain string literal (#871). This used to be a template literal
+        # that escaped only a backtick, so a `${` in the footer ran as code
+        # and a backslash was read as an escape; and the text went through
+        # re.sub as a TEMPLATE, which turned `\1` into the old footer. A
+        # `</` is written `<\/` (the same text in a JavaScript string), so
+        # the footer never closes the `<footer>` this pattern looks for on
+        # the next build.
+        html_literal = typescript_string(footer_html).replace("</", "<\\/")
 
         replacement = f"""<footer class={{displayClass ?? ""}}>
-                <div dangerouslySetInnerHTML={{{{ __html: `{safe_html}` }}}} />
+                <div dangerouslySetInnerHTML={{{{ __html: {html_literal} }}}} />
               </footer>"""
 
         modified_code = re.sub(
             r'<footer class=\{.*?\}>(.*?)</footer>',
-            replacement,
+            lambda match: replacement,
             footer_code,
             flags=re.DOTALL
         )
@@ -1492,7 +1530,7 @@ def format_colors_block(colors: dict) -> str:
             if k in d:
                 v = d[k]
                 if isinstance(v, str):
-                    lines.append(f'{indent}{k}: "{v}",')
+                    lines.append(f'{indent}{k}: {typescript_string(v)},')
         return "\n".join(lines)
 
     lm = colors.get("lightMode", {})

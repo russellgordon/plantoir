@@ -302,8 +302,8 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-4 | **Patched Backlinks component** | `quartz/components/Backlinks.tsx` | Whole-file replacement from `support/Backlinks.tsx` — see D below. |
 | C2-5 | **Sidebar omit set** | `quartz.layout.ts` | First brings the section's copy of the B1 filter up to the current version (`ensure_sidebar_hide_rule_current`), then rewrites the anchor's `const omit = new Set([...])` with the course's `hidden` list AS STORED — `.md` kept, each name a JSON string — plus `Media`, `Curriculum Coverage.md` and every other coverage map's file this build wrote (#128: one map per curriculum folder) (`names_the_sidebar_hides`, never written back). This is the moment "hide from sidebar" choices become real. |
 | C2-6 | **Folder click behaviour** | `quartz.layout.ts` | Sets `folderClickBehavior` on every `Component.Explorer({...})` to `"collapse"` (name click expands) or `"link"` (name click navigates), per `expandOnFolderClick`. |
-| C2-7 | **Custom footer** | `quartz.layout.ts`, `quartz/components/Footer.tsx` | Normalizes the layout to `Component.Footer()` and replaces the footer JSX with the teacher's raw HTML (via `dangerouslySetInnerHTML`, backtick-escaped). Typically a licence notice. |
-| C2-8 | **Page title** | `quartz.config.ts` | Sets `pageTitle` to `"<emoji> <label> S<N>"` — per-section emoji, the uppercased course code (or the club's custom short label when the code has no grade digit), and the optional section marker. |
+| C2-7 | **Custom footer** | `quartz.layout.ts`, `quartz/components/Footer.tsx` | Normalizes the layout to `Component.Footer()` and replaces the footer JSX with the teacher's raw HTML (via `dangerouslySetInnerHTML`, as an escaped string literal since #871: see "Settings written inside a TypeScript string (#871)" below). Typically a licence notice. |
+| C2-8 | **Page title** | `quartz.config.ts` | Sets `pageTitle` to `"<emoji> <label> S<N>"` — per-section emoji, the uppercased course code (or the club's custom short label when the code has no grade digit), and the optional section marker. The whole title is written as an escaped string literal (#871), so a quote or a backslash in a short label or an emoji reads back as typed. |
 | C2-9 | **Locale** | `quartz.config.ts` | Sets `locale:` to the configured code (affects all UI strings via the layer-D locale files, plus date formatting). |
 | C2-10 | **Colour scheme** | `quartz.config.ts` | Replaces the entire `colors: { lightMode: {...}, darkMode: {...} }` block with the section's chosen scheme from `colour_schemes.json` (brace-counting replacement, not regex, to handle the nested object safely). |
 | C2-11 | **Social-media previews toggle** | `quartz.config.ts` | Comments/uncomments the `Plugin.CustomOgImages()` emitter line per the `--include-social-media-previews` flag. Generating Open Graph images roughly doubles build time, so it is opt-in and typically used only for deploys. |
@@ -329,6 +329,51 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-30 | **The sidebar scrolls only itself (#611)** | `quartz/components/scripts/explorer.inline.ts` | `patch_explorer_scroll_in_sidebar_only` (marker `PLANTOIR-SIDEBAR-SCROLL`) replaces Quartz's one `activeElement.scrollIntoView({ behavior: "smooth" })` — which scrolled the PAGE as well as the sidebar, 300-600 px down a long page as it opened — with a scroll of the sidebar's own list: none when the current page's entry is inside a closed folder, none when it is already in view, otherwise `scrollTop` set once, at once, centring it. Every build, idempotent, run straight after C2-3's expand-on-navigate patch; a script of another shape warns and is left alone. `patches/explorer.inline.ts` keeps Quartz's line (A2 unchanged). Section O. |
 | C2-31 | **Font stacks quoted one family at a time, and the system-font choice on the system stack (#629)** | `quartz/util/theme.ts` | Quartz's `joinStyles` wrote `--bodyFont: "<choice>", <fallback>`, quoting the WHOLE choice, so the "System fonts" choice — stored as `"Helvetica, Arial"` by both apps and `setup_course.py` — became ONE family of that name, which no machine has. The browser fell through to the fallback's `system-ui`: Chrome's platform-font query (`CSS.getPlatformFontsForNode`, Chrome for Testing 155.0.8059.39, this Mac, 2026-10-22/23) reports `.SF NS` (San Francisco), so Helvetica was never shown. **Russell's ruling (2026-10-22): those sites keep looking as they do** — San Francisco on a Mac, Segoe UI on Windows. So `patch_font_variable_stacks` adds `cssFontStack`: each family is quoted on its own, CSS keywords (`serif`, `system-ui`, `-apple-system`…) are left bare, and the system choice gets Quartz's fallback ALONE (`system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, …`), which puts system-ui and Segoe UI ahead of Helvetica and Arial. Measured: the same query reports `.SF NS` for the old and the new stack. A single family comes out byte for byte as before, so a Google-font site's stylesheet does not change (`scripts/test_font_variables.py` runs the patched TypeScript under node and compares). Every build, idempotent, anchored on the three v4.5.0 lines (each must match once) and warning without editing anything otherwise; the helper is a RAW Python string, because `/["\\]/g` in an ordinary one loses a backslash and every course's build fails on an unterminated regular expression (caught in review; the test pins the text). **Rejected:** quoting each family with Helvetica first, as the planner first proposed — measured to render Helvetica, a visible change to every system-font site that Russell turned down; changing the STORED value (to `"system-ui, Helvetica, Arial"` or similar) — every existing `course_config.json`, the Windows catalogue, the contract cases in `shared-rules.json`, the mac goldens, `setup_course.py`'s detection, C2-19's filter and `social_card.py` all key on the literal, and old folders would still carry the old one, so the build is the one place that fixes all of them; Python writing the stacks as literals into `theme.ts` — typography lives in `quartz.config.ts` (C1-11, full rebuild only), so two sources could disagree; editing Quartz's `DEFAULT_SANS_SERIF`, which buys nothing. Not affected: the Google request (C2-19 already drops stacks), the printed page (#499's `print.scss` sets its own font variables), the social card. The label for the choice now says "System fonts (each device's own)" in the mac app and in `setup_course.py`, and the mac's font editor previews it in the system font rather than Helvetica. **Windows inherits the CSS free** (shared `build_site.py` against its bundled Quartz v4.5.0; a different `theme.ts` would only warn) and says the same label since #648 (`FontCatalog.PairingLabel`, `WorkspaceTests.SystemPairingLabel`). |
 | C2-32 | **```text wrap: a text block's lines wrap (#653)** | `quartz/plugins/transformers/textWrapRule.ts`, `codeRunner.ts`'s second markdown plugin, `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, every build) | A ```text fence with `wrap` in its info string is wrapped in `div.plantoir-text-wrap` at the markdown stage, on every page; on screen its lines wrap at the window's width with each line's number on its first row and `…` in the gutter on the rest; code fences never wrap and `wrap` after them is ignored silently; print and the handout are untouched. Every other block is byte for byte as before. No new wiring: the plugin rides `CodeRunnerFences`' place straight before `SyntaxHighlighting`. Section P says why and what was measured. |
+
+#### Settings written inside a TypeScript string (#871)
+
+Six C2 patches write a value from `course_config.json` inside a string in a
+TypeScript file: the title (C2-8: the emoji, the course code, a club's
+`custom_short_name`), the locale (C2-9), the colours (C2-10), `baseUrl`
+(C2-24: a custom domain is free text in both apps), the three font names
+(the typography block) and the footer (C2-7). Each goes through
+`build_site.typescript_string`, which is `json.dumps(value,
+ensure_ascii=False)`: a JSON string is a valid JavaScript string literal that
+reads back as exactly the value. A footer's `</` is then written `<\/`, the
+same text, so the footer cannot close the `<footer>` that the next build's
+pattern looks for. The patterns that find a value written by an earlier
+build (`TS_DOUBLE_QUOTED`, `TS_SINGLE_QUOTED`) match a whole literal,
+escapes included, and every replacement is a function rather than a `re`
+template, so a value's own backslashes stay text. The rule and its cases are
+`contracts/shared-rules.json` -> `typescriptStrings`; the test is
+`scripts/test_typescript_strings.py`.
+
+**What was measured on `dev` before the fix** (the writers run over Quartz
+v4.5.0's config head, the line read back with Node 22.6.0): a short label
+`Chess "Club"` wrote `pageTitle: "📚 Chess "Club" S1",`, which Node refuses
+with `SyntaxError: Unexpected identifier 'Club'`, so the site did not build;
+`C:\Club` read back as `📚 C:Club S1`; a label ending in `\` with the section
+marker off left the string unterminated; a `\u` before letters that are not
+hex is `SyntaxError: Invalid Unicode escape sequence`. A font name with a
+backslash raised `bad escape \s` inside `re.subn` and the fonts were not set;
+one ending in `\` wrote `header: "Tail\",`, a syntax error; `G\1x` pasted the
+matched prefix into the value. The locale and the base URL wrote a quote as
+it stood. The footer's template literal escaped only a backtick, so `${x}`
+would run as code, and the footer went through `re.sub` as a template, so
+`<p>a\1b</p>` came out as `<p>a` + the previous footer + `b</p>`.
+
+**What was rejected.** Refusing a quote or a backslash at entry: a club may
+be called "The Quad", and the short label is free text on both apps.
+Escaping only the double quote, as `_escape_font` did: the backslash was
+then read as an escape. Keeping the footer's template literal and escaping
+`${` as well: a plain string literal has fewer special characters and
+multi-line HTML reads back the same.
+
+**Windows owes nothing.** Both apps only write these settings; neither
+writes quartz.config.ts or Footer.tsx (`pageTitle` appears in the apps only
+as the progress marker "Updated pageTitle", whose print line is unchanged),
+and Windows' builds run the same `build_site.py`, so its
+PythonToolchainTests runs the new test.
 
 ### C3. Content-level transformations (every build)
 
