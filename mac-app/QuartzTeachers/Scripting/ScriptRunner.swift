@@ -152,6 +152,17 @@ class ScriptRunner {
     var planShareLists: PlanShareLists?
     var isAskingAboutPlanShareLists: Bool = false
 
+    /// Set by `PlanShareRunner` for a share of unit plans (#833): the
+    /// course's folder, whose year's marker the tables' choices are written
+    /// into before the question is answered, and whether Share must show the
+    /// public-address warning first. Nil and false for every other run.
+    var planShareCourseDirectory: URL?
+    var planShareWarns: Bool = false
+
+    /// What `PLANTOIR_PLAN_PASSWORD_SAVED:` said in this run (#833):
+    /// "waiting" when the dialog after Change Password is owed.
+    var planPasswordSaved: String?
+
     /// The answer the script would use if the teacher simply agreed —
     /// what it showed in square brackets. Offered in the answer field
     /// rather than left in the wording of the question.
@@ -816,6 +827,7 @@ class ScriptRunner {
         announcedPreviewAddress = nil
         planShareLists = nil
         isAskingAboutPlanShareLists = false
+        planPasswordSaved = nil
         pendingLine = ""
     }
 
@@ -916,6 +928,9 @@ class ScriptRunner {
         rememberPreviewAnnouncement(in: completeLines)
         rememberWhatIsWaitedFor(in: completeLines)
         PlanShareLists.read(completeLines, into: &planShareLists)
+        if let outcome = PlanSharing.passwordSavedOutcome(in: completeLines.joined(separator: "\n")) {
+            planPasswordSaved = outcome
+        }
     }
 
     /// Turns the launcher's `PLANTOIR_WAITING_FOR:` lines into the status

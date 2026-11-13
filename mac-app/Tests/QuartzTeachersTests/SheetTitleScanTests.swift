@@ -45,6 +45,10 @@ final class SheetTitleScanTests: XCTestCase {
         // title.
         ("PlanShareConsoleSheet", "Planning/PlanShareConsoleSheet.swift", false),
         ("PlanShareListsSheet", "Planning/PlanShareListsSheet.swift", true),
+        // #833 and #834: the public-address warning and the dialog after
+        // Change Password, each a message under the title and labelled rows.
+        ("PlanSharePublicWarningSheet", "Planning/PlanShareDialogs.swift", true),
+        ("PlanShareNewPasswordSheet", "Planning/PlanShareDialogs.swift", true),
     ]
 
     // MARK: - Tests
@@ -54,7 +58,7 @@ final class SheetTitleScanTests: XCTestCase {
     /// the shape it is listed with — and no title in those files at `.title2`
     /// or larger.
     func testEverySheetIsTitledByTheOneShape() throws {
-        XCTAssertEqual(SheetTitleScanTests.sheets.count, 20)
+        XCTAssertEqual(SheetTitleScanTests.sheets.count, 22)
         var problems: [String] = []
         for sheet in SheetTitleScanTests.sheets {
             let source: String = try SheetTitleScanTests.source(of: sheet.file)
