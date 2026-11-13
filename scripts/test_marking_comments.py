@@ -29,12 +29,29 @@ from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 GUIDANCE = REPOSITORY / "support" / "agent_guidance"
-SKILLS = GUIDANCE / "skills"
-SKILL = SKILLS / "plantoir-report-comments"
-MARKING = SKILLS / "plantoir-marking"
+SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
+
+
+def skill_folder(name):
+    # A skill held out of this release (shared-rules.json -> printablePages.agentGuidance.held, #750) is kept
+    # in held.place, which neither app copies into a working folder; every other skill is in
+    # support/agent_guidance/skills. Bringing a skill back is a folder move and a contract edit, and this
+    # follows both.
+    held = json.loads(SHARED_RULES.read_text(encoding="utf-8"))["printablePages"]["agentGuidance"].get("held", {})
+    if name in held.get("skills", {}):
+        return REPOSITORY / held["place"] / name
+    return GUIDANCE / "skills" / name
+
+
+def is_held(name):
+    held = json.loads(SHARED_RULES.read_text(encoding="utf-8"))["printablePages"]["agentGuidance"].get("held", {})
+    return name in held.get("skills", {})
+
+
+SKILL = skill_folder("plantoir-report-comments")
+MARKING = skill_folder("plantoir-marking")
 SCRIPT = MARKING / "scripts" / "make_named_copies.py"
 RUNNER = MARKING / "scripts" / "run_with_names.py"
-SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
 FIREARMS_WORDS = re.compile(
     r"\b(firearms?|guns?|handguns?|shotguns?|rifles?|pistols?|revolvers?|ammunition|ammo|reload\w*|gunpowder)\b",
     re.IGNORECASE,
@@ -337,7 +354,8 @@ class SkillFileTests(unittest.TestCase):
             self.assertTrue((SKILL / relative).is_file(), relative)
         text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         for relative in guidance["uses"]:
-            self.assertTrue((SKILLS / relative).is_file(), f"{relative} must be in the skill it belongs to")
+            owner, inside = relative.split("/", 1)
+            self.assertTrue((skill_folder(owner) / inside).is_file(), f"{relative} must be in the skill it belongs to")
             self.assertIn(relative.rsplit("/", 1)[1], text, f"the skill must say how to run {relative}")
         for relative in guidance["references"]:
             self.assertIn(relative, text, f"the skill names {relative}")
@@ -357,13 +375,19 @@ class SkillFileTests(unittest.TestCase):
         for pin in pins:
             self.assertEqual(folded.count(re.sub(r"\s+", " ", pin)), 1, pin)
 
-    def test_the_skills_that_mention_it_and_both_root_files_name_it(self):
+    def test_the_skills_that_mention_it_name_it_and_the_root_files_name_it_unless_it_is_held(self):
         name = self.guidance()["skill"]
         for mentioning in self.guidance()["mentionedBy"]:
-            text = (SKILLS / mentioning / "SKILL.md").read_text(encoding="utf-8")
+            text = (skill_folder(mentioning) / "SKILL.md").read_text(encoding="utf-8")
             self.assertTrue("`" + name + "`" in text, f"{mentioning} must name `{name}`")
         for root_file in contract()["printablePages"]["agentGuidance"]["rootFiles"]:
-            self.assertTrue(name in (GUIDANCE / root_file).read_text(encoding="utf-8"), f"{root_file} must name {name}")
+            named = name in (GUIDANCE / root_file).read_text(encoding="utf-8")
+            if is_held(name):
+                # Held from this release (#750): the root files must not send an assistant to a skill that is
+                # not in the working folder.
+                self.assertFalse(named, f"{root_file} must not name the held {name}")
+            else:
+                self.assertTrue(named, f"{root_file} must name {name}")
 
     def test_the_offered_templates_name_is_the_handouts_skills(self):
         name = contract()["printablePages"]["agentGuidance"]["handoutsSkill"]["offeredTemplate"]["name"]
@@ -385,18 +409,23 @@ class SkillFileTests(unittest.TestCase):
     def test_every_shipped_script_compiles_and_self_tests_on_the_systems_own_python(self):
         # 752 implementation review H2 and fix review L2: macOS's own python3 is 3.9, and a regex guard for
         # 3.10-only features missed most of them. The honest check is to run the files there.
-        checker = SKILLS / "plantoir-test-authoring" / "scripts" / "check_kit.py"
-        for path in sorted(SKILLS.rglob("*.py")):
+        checker = skill_folder("plantoir-test-authoring") / "scripts" / "check_kit.py"
+        held = contract()["printablePages"]["agentGuidance"].get("held", {})
+        shipped = sorted((GUIDANCE / "skills").rglob("*.py"))
+        if held:
+            # The held skills' scripts are checked too, so they are ready when they ship again.
+            shipped += sorted((REPOSITORY / held["place"]).rglob("*.py"))
+        for path in shipped:
             compiled = subprocess.run(["/usr/bin/python3", "-B", "-c",
                                        "import sys; compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1], 'exec')",
                                        str(path)], capture_output=True, text=True)
-            self.assertEqual(compiled.returncode, 0, f"{path.relative_to(SKILLS)}: {compiled.stderr[-300:]}")
+            self.assertEqual(compiled.returncode, 0, f"{path.relative_to(REPOSITORY)}: {compiled.stderr[-300:]}")
             source = path.read_text(encoding="utf-8")
             if "--self-test" in source and path.name != "run_with_names.py":
                 result = subprocess.run(["/usr/bin/python3", "-B", str(path), "--self-test", "--checker", str(checker)],
                                         capture_output=True, text=True, cwd=tempfile.gettempdir())
-                self.assertEqual(result.returncode, 0, f"{path.relative_to(SKILLS)}: {(result.stdout + result.stderr)[-300:]}")
-                self.assertIn("self-test passed", result.stdout, str(path.relative_to(SKILLS)))
+                self.assertEqual(result.returncode, 0, f"{path.relative_to(REPOSITORY)}: {(result.stdout + result.stderr)[-300:]}")
+                self.assertIn("self-test passed", result.stdout, str(path.relative_to(REPOSITORY)))
 
     def test_no_file_carries_a_firearms_context(self):
         for path in sorted(SKILL.rglob("*")):

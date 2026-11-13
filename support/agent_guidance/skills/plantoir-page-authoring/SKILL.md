@@ -755,12 +755,10 @@ of these pages, whether or not anything is printed.
   put the words in a ` ```text wrap ` block (section 9).
 - Do not edit `course_config.json` unless the teacher asks you to (Plantoir's
   Course Settings write it), or anything in a folder whose name starts with
-  a dot. (The three exceptions are `plantoir-handouts`' own
+  a dot. (The two exceptions are `plantoir-handouts`' own
   `.internal/handouts/handouts.json`, the folder where a course's handouts
-  are kept, `plantoir-unit-planning`'s `.internal/planning/`, where a
-  course's unit plans are kept, and `plantoir-marking`'s
-  `.internal/marking/marking.json`, the two folders where a course's
-  marking is kept.)
+  are kept, and `plantoir-unit-planning`'s `.internal/planning/`, where a
+  course's unit plans are kept.)
 
 ## 24. Check it
 

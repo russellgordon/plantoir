@@ -70,11 +70,10 @@ the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
 
     `folder` is the full path, `teacherSaid` their own words, `recorded`
     today's date. A new answer replaces the file. The places under a folder
-    whose name starts with a dot that a Plantoir skill may write are three:
-    `.internal/handouts/handouts.json` (this skill's), `.internal/planning/`
-    (the `plantoir-unit-planning` skill's) and
-    `.internal/marking/marking.json` (the `plantoir-marking` skill's, paths
-    only); leave everything else under `.internal` alone. It lives there because
+    whose name starts with a dot that a Plantoir skill may write are two:
+    `.internal/handouts/handouts.json` (this skill's) and `.internal/planning/`
+    (the `plantoir-unit-planning` skill's); leave everything else under
+    `.internal` alone. It lives there because
     it travels with the course (a backup, an archive, a restore) and is
     never copied to the class website.
 - **On the class website, only the PDF a page hands out.** Copy it into
@@ -320,7 +319,7 @@ pdftoppm -png -r 80 "Name - Answers.pdf" /tmp/handout-check/Answers
 comes with Poppler: `brew install poppler` on a Mac.) If you
 cannot render the pages, tell the teacher they have not been looked at.
 Render and look at everything you make, except anything in a teacher-only
-folder (the `plantoir-marking` skill's), which is never opened.
+folder, which is never opened.
 
 Leave no build files behind. Of THIS handout's files, only `Name.tex`,
 `Name - Answers.tex`, `Name.pdf` and `Name - Answers.pdf` (and a merged

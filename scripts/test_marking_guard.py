@@ -25,9 +25,22 @@ import unittest
 from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-SKILL = REPOSITORY / "support" / "agent_guidance" / "skills" / "plantoir-marking"
-RUNNER = SKILL / "scripts" / "run_with_names.py"
 SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
+
+
+def skill_folder(name):
+    # A skill held out of this release (shared-rules.json -> printablePages.agentGuidance.held, #750) is kept
+    # in held.place, which neither app copies into a working folder; every other skill is in
+    # support/agent_guidance/skills. Bringing a skill back is a folder move and a contract edit, and this
+    # follows both.
+    held = json.loads(SHARED_RULES.read_text(encoding="utf-8"))["printablePages"]["agentGuidance"].get("held", {})
+    if name in held.get("skills", {}):
+        return REPOSITORY / held["place"] / name
+    return REPOSITORY / "support" / "agent_guidance" / "skills" / name
+
+
+SKILL = skill_folder("plantoir-marking")
+RUNNER = SKILL / "scripts" / "run_with_names.py"
 TABLE = ("section,identifier,name,first name,email,handles\n"
          "1,Student A,\"Testfamily, Pupilseven\",Pupilseven,pseven.testfamily@school.example,pupil7tf\n"
          "1,Student B,\"Samplefamily-Otherline, Pupileight\",Pupileight,,\n")

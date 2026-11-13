@@ -7,7 +7,8 @@ Writes, inside TRIAL_FOLDER (which must not exist yet and must be outside any re
 
   Working/                         a working folder with the guidance as the app writes it: CLAUDE.md,
                                    AGENTS.md, .claude/skills/ and .agents/skills/ copied from
-                                   support/agent_guidance, and one invented course, courses/MDM4U/
+                                   support/agent_guidance (and the held skills from held/, #750),
+                                   and one invented course, courses/MDM4U/
   Marking/MDM4U/                   the marking folder, empty but for the kit and the blank test
   Marking/MDM4U - Teacher Only/    the teacher-only folder: Name Mapping Table.csv and
                                    Unit 1 Test/Originals/Section 1/ with five scans
@@ -154,8 +155,13 @@ def main():
     originals = teacher / "Unit 1 Test" / "Originals" / "Section 1"
     for folder in (working / "courses" / "MDM4U" / "Section 1", marking, originals):
         folder.mkdir(parents=True)
+    held = json.loads(SHARED_RULES.read_text(encoding="utf-8"))["printablePages"]["agentGuidance"].get("held", {})
     for home in (".claude", ".agents"):
         shutil.copytree(GUIDANCE / "skills", working / home / "skills")
+        # A trial is of the held skills too (#750: marking is held from v1.10.0 until it passes one), so they
+        # are copied beside the rest. The root files below are the shipped ones and do not name them.
+        for name in held.get("skills", {}):
+            shutil.copytree(REPOSITORY / held["place"] / name, working / home / "skills" / name)
     shutil.copyfile(GUIDANCE / "CLAUDE.md", working / "CLAUDE.md")
     shutil.copyfile(GUIDANCE / "AGENTS.md", working / "AGENTS.md")
     (working / "courses" / "MDM4U" / "Section 1" / "Probability.md").write_text(

@@ -30,12 +30,25 @@ import unittest
 from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-SKILLS = REPOSITORY / "support" / "agent_guidance" / "skills"
-SKILL = SKILLS / "plantoir-marking"
 SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
+
+
+def skill_folder(name):
+    # A skill held out of this release (shared-rules.json -> printablePages.agentGuidance.held, #750) is kept
+    # in held.place, which neither app copies into a working folder; every other skill is in
+    # support/agent_guidance/skills. Bringing a skill back is a folder move and a contract edit, and this
+    # follows both.
+    held = json.loads(SHARED_RULES.read_text(encoding="utf-8"))["printablePages"]["agentGuidance"].get("held", {})
+    if name in held.get("skills", {}):
+        return REPOSITORY / held["place"] / name
+    return REPOSITORY / "support" / "agent_guidance" / "skills" / name
+
+
+SKILL = skill_folder("plantoir-marking")
+TEST_AUTHORING = skill_folder("plantoir-test-authoring")
 BUILDER = SKILL / "scripts" / "build_test_sheet.py"
-CHECKER = SKILLS / "plantoir-test-authoring" / "scripts" / "check_kit.py"
-EXAMPLE_KIT = SKILLS / "plantoir-test-authoring" / "templates" / "Marking Kit" / "answers.json"
+CHECKER = TEST_AUTHORING / "scripts" / "check_kit.py"
+EXAMPLE_KIT = TEST_AUTHORING / "templates" / "Marking Kit" / "answers.json"
 EXAMPLE_MARKS = REPOSITORY / "scripts" / "fixtures" / "marking" / "example-marks.json"
 MISSING = [tool for tool in ("tectonic", "pdftotext") if shutil.which(tool) is None]
 SKIP_REASON = ", ".join(MISSING) + " not found here; the sheet cases compile and read PDFs"
@@ -230,7 +243,7 @@ class SkillFileTests(unittest.TestCase):
         # every platform, so a Windows checkout under core.autocrlf hashes the same.
         self.assertNotIn(b"\r", runner.read_bytes())
         attributes = (REPOSITORY / ".gitattributes").read_text(encoding="utf-8")
-        self.assertIn("support/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eol=lf", attributes)
+        self.assertIn(runner.relative_to(REPOSITORY).as_posix() + " text eol=lf", attributes)
 
     def test_the_offered_templates_name_is_the_handouts_skills(self):
         name = contract()["printablePages"]["agentGuidance"]["handoutsSkill"]["offeredTemplate"]["name"]

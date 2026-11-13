@@ -703,6 +703,10 @@ fi
 # or blanked with no name ink left, against the committed blank tests.
 # Report comments (#752): every commentNames case, directly and through the
 # runner, and the plantoir-report-comments skill's files. Stdlib only.
+# Both skills are HELD from v1.10.0 (#750, shared-rules.json ->
+# printablePages.agentGuidance.held): their folders are in
+# held/agent_guidance/skills, which neither app copies into a working folder,
+# and these tests find them there through the contract's held.place.
 for marking_test in redact names guard sheets comments; do
   if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
     pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a; comments #752)"

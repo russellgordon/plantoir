@@ -31,15 +31,6 @@ matches the task before writing:
   a fixed format: the `plantoir-test-authoring` skill
   (`.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the
   `plantoir-handouts` house style for the paper.
-- **Marking a test or quiz from scanned papers, and its feedback sheets**:
-  the `plantoir-marking` skill (`.claude/skills/plantoir-marking/SKILL.md`).
-  Read it before opening any student work: it keeps students' names on
-  this computer.
-- **Report card comments** for a class, drafted from the marking: the
-  `plantoir-report-comments` skill
-  (`.claude/skills/plantoir-report-comments/SKILL.md`), after
-  `plantoir-marking`. Three options per student, identifiers only, the
-  first names put in by script at the end.
 - **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
   parabola beside its parent, two lines meeting), a geometry or
   similar-triangles figure, a number line, a probability tree, a circuit,
