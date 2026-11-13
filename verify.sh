@@ -297,6 +297,13 @@ else
   cat /tmp/verify_recipe_folders_test.log
 fi
 
+if (cd scripts && python3 test_toolchain_bytecode.py) >/tmp/verify_toolchain_bytecode_test.log 2>&1; then
+  pass "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
+else
+  fail "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
+  cat /tmp/verify_toolchain_bytecode_test.log
+fi
+
 if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_starting_content_test.log 2>&1; then
   pass "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
 else
