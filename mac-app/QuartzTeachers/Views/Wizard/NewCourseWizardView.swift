@@ -896,11 +896,13 @@ struct NewCourseWizardView: View {
                     adoptSkeletonStructure()
                 }
             }
-            .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchor in
+            .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchors in
                 GeometryReader { proxy in
-                    if courseCodeSuggestionsAreShown, let anchor {
+                    if courseCodeSuggestionsAreShown, let field = anchors.field {
                         CourseCodeSuggestionsOverlay(
-                            fieldFrame: proxy[anchor],
+                            fieldFrame: proxy[field],
+                            // Below the sentence under the field (#832).
+                            rowBottom: rowBottom(of: anchors, in: proxy),
                             province: province,
                             entries: courseCodeSuggestions,
                             onSelect: selectCourseCodeSuggestion,
@@ -1112,6 +1114,12 @@ struct NewCourseWizardView: View {
                     } else {
                         ExampleCaption("Type a code, or type what the course is called — e.g. “chem” finds SCH3U. Or type a club name like CODING.")
                     }
+                }
+                // The field's row with its sentence, which the popup opens
+                // below (#832): a transform, so the field's own anchor
+                // inside it is kept.
+                .transformAnchorPreference(key: CourseCodeFieldAnchorKey.self, value: .bounds) { anchors, row in
+                    anchors.row = row
                 }
                 .padding(.bottom, 8)
                 referenceChoiceRow
@@ -1626,6 +1634,15 @@ struct NewCourseWizardView: View {
     }
 
     // MARK: - Functions
+
+    /// The bottom of the code's row as `proxy` sees it, or nil before the
+    /// row has published its anchor.
+    func rowBottom(of anchors: CourseCodeAnchors, in proxy: GeometryProxy) -> CGFloat? {
+        guard let row = anchors.row else {
+            return nil
+        }
+        return proxy[row].maxY
+    }
 
     /// A row picked from `CourseCodeSuggestionsOverlay` — sets the code
     /// exactly like finishing typing one by hand, then drops focus so

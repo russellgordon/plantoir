@@ -916,27 +916,26 @@ final class ReferenceShelfTests: XCTestCase {
         }
     }
 
-    /// Cancel is the default button of both of the groups' questions, as the
-    /// contract says and as the replace warning does: the button carries the
-    /// default key itself, rather than leaving SwiftUI to choose.
-    func testCancelIsTheDefaultButtonOfBothQuestions() throws {
+    /// Escape is Cancel on both of the groups' questions, and Return
+    /// presses neither button, as the contract says (#832). In an alert a
+    /// button takes ONE key: Cancel given Return (the shape until #832) took
+    /// Escape off it, measured. So the action is destructive, which takes no
+    /// key, and Cancel is the cancel button with no other key. The keys
+    /// themselves are pressed in `QuestionKeysTests`; this pins the shape
+    /// the contract's rule names.
+    func testEscapeIsCancelAndReturnPressesNothingOnBothQuestions() throws {
         let url: URL = ReferenceShelfTests.repositoryURL()
             .appendingPathComponent("mac-app/QuartzTeachers/Views/Wizard/ReferenceGroupPresenter.swift")
-        let lines: [String] = try String(contentsOf: url, encoding: .utf8).components(separatedBy: "\n")
-        var cancels: Int = 0
-        for index in 0..<lines.count where lines[index].contains("Button(ReferenceGroupWording.cancelButton, role: .cancel)") {
-            cancels += 1
-            var found: Bool = false
-            for next in (index + 1)..<min(index + 5, lines.count) where lines[next].contains(".keyboardShortcut(.defaultAction)") {
-                found = true
-            }
-            XCTAssertTrue(found, "line \(index + 1): a Cancel without the default key")
-        }
-        XCTAssertEqual(cancels, 2, "the removal question and the start-again question")
+        let text: String = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertEqual(text.components(separatedBy: "Button(ReferenceGroupWording.cancelButton, role: .cancel)").count - 1, 2,
+                       "the removal question and the start-again question")
+        XCTAssertNil(text.range(of: ".keyboardShortcut(.defaultAction)"), "a Cancel given Return loses Escape in an alert")
+        XCTAssertNotNil(text.range(of: "Button(ReferenceGroupWording.removeButton, role: .destructive)"))
+        XCTAssertNotNil(text.range(of: "Button(ReferenceGroupWording.startAgainButton, role: .destructive)"))
         let rule: String = try XCTUnwrap(
             (try ReferenceShelfTests.groupRules()["wording"] as? [String: Any])?["rule"] as? String
         )
-        XCTAssertTrue(rule.contains("Cancel is the default button of the removal question and of the start-again question"))
+        XCTAssertTrue(rule.contains("Escape is Cancel on the removal question and on the start-again question, and Return presses neither button"), rule)
     }
 
     // MARK: - The three arrival doors, for real (implementation review L5)

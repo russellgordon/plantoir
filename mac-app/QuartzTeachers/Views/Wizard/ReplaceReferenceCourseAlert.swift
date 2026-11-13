@@ -4,9 +4,11 @@ import SwiftUI
 /// shared by the three doors that offer Replace It…: the New Course wizard,
 /// Keep a Copy for Reference… and a one-course import.
 ///
-/// Cancel is the default button, so Return never replaces anything; Replace
-/// is the destructive one. Nothing is made, backed up or moved until Replace
-/// is pressed.
+/// Escape is Cancel, and Return presses neither button, so a Return never
+/// replaces anything; Replace is the destructive one. (Until #832 Cancel
+/// carried Return, which in an alert takes Escape off it: measured, the
+/// warning could not be closed with Escape.) Nothing is made, backed up or
+/// moved until Replace is pressed.
 struct ReplaceReferenceCourseAlert: ViewModifier {
 
     // MARK: - Stored properties
@@ -46,9 +48,11 @@ struct ReplaceReferenceCourseAlert: ViewModifier {
                     onReplace(shown.folderName)
                 }
                 .accessibilityIdentifier("replaceReferenceCourseConfirm")
+                // Escape is Cancel; Return presses neither (#832): an alert
+                // gives each button one key, and a Cancel given Return
+                // lost Escape (measured, `QuestionKeysTests`).
                 Button(ReferenceReplaceWording.cancelButton, role: .cancel) {
                 }
-                .keyboardShortcut(.defaultAction)
             } message: { shown in
                 Text(shown.message)
             }
