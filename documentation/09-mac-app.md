@@ -1105,8 +1105,13 @@ there is no map; a version other than 1 is no map, said in its own words; page
 null is "the last build found no curriculum to map". The map is this build's
 only when `about.json`'s `buildId` equals the section's `.build-id`
 (`coverageTab.mapOfThisBuild`, whose cases `CoverageTabTests` runs as the
-Python does); ids are compared for equality only. The first line is always the
-map's own date (`asOf`, from `startedNs`); the last is the click hint, or, with
+Python does); ids are compared for equality only. The first line is the
+map's own date, said only as far as it is true (the 793b review's M1): "made
+when this section was last built" only when the map IS the latest build's;
+"made by an earlier build … the latest build made no map" when it is
+another build's; and a form with no date when the record has none, because
+the review measured an empty date rendering as "…last built, .". The last
+line is the click hint, or, with
 Obsidian not installed, the sentence saying a click opens nothing. The hint is
 said by the app above the page, never on the page, because it is false without
 Obsidian and on Windows until its tab is wired (the plan review's L1).
@@ -1134,7 +1139,10 @@ class is never asked. The teacher stays on the tab: no switch to Website, no
 browser, no focus taken. The refresh is a state in `SectionCoverage`, driven by
 events and never by a clock:
 
-- pending from the press, with the record's build id as it was;
+- starting AT the press, with a token, before anything is awaited (the 793b
+  review's H1, below);
+- pending once the old preview has stopped, with the record's build id as it
+  was;
 - made again when a reading finds the record this build's with another id; the
   map updates in place, before Quartz has finished, because the map is written
   before the build's `PLANTOIR_PROBLEMS:` line and a reading follows that line;
@@ -1144,6 +1152,26 @@ events and never by a clock:
   (a switch of section stops its build, through `stopPreview`, which settles
   the refresh from what is on disk);
 - refused, with the preview's own sentence, when it could not start.
+
+**The press is recorded at once** (the 793b review's H1). The first version
+recorded it only after the old preview had stopped, seconds later: the tab
+said nothing, the button could be pressed again, and a second press ended the
+RUNNING build's wait (#232's record of a build in progress), reported "could
+not be made again" while the map was being made, and raised a false "Cannot
+Preview Yet" later; a switch of section during the stop started a preview from
+a view that had gone, which nothing then stopped, so the section read as
+previewed in another window. Now `SectionCoverage.makeAgain` records
+`starting` with a token before it awaits anything; the tab says the map is
+being made and the button is unavailable from that instant; a second press
+does nothing; the old run's end during the stop settles nothing; and the start
+goes ahead only if the token survives the stop. Leaving the section, the course
+or the window (`onDisappear` → `letTheCoverageTabGo`) and quitting
+(`willTerminateNotification`) clear it. `CoverageTabTests.testEverySequenceCase`
+runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
+test holds open, no window and no delay. A repair's Preview Again
+(`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
+A preview serving when the refresh is pressed starts again at the site's front
+page, as every way in but the Preview button does.
 
 The wait's end is noticed on `isWaitingForServer` turning false, asked again
 inside the callback, because the stop that a refresh makes first ends the OLD
@@ -1166,13 +1194,23 @@ review's LOW).
 
 **Nothing pops up over the tab** (Russell, 2026-11-12). While Coverage shows,
 `SectionTabs.alertsWait` holds what a build can raise: the Problems alert stays
-due in its store, the links checklist waits as `pendingLinksChecklist`, and a
-preview's refusal is held, or, when it refuses the tab's own refresh, said in
-the tab instead and dropped. The Problems tab still appears in the bar. When
-the teacher next shows Website or Problems, what waited is raised one at a
-time, the way it would have been (`raiseWhatWaitedForCoverage`). The Preview
-and Deploy buttons themselves are untouched: pressing one is the teacher's
-own act, and its question and refusals are its own.
+due in its store and the links checklist waits as `pendingLinksChecklist`; the
+refusal of the tab's own refresh (while it is starting or pending,
+`SectionTabs.refusalIsTheTabs`) is said in the tab instead. The Problems tab
+still appears in the bar. When the teacher next shows Website or Problems,
+what waited is raised one at a time, the way it would have been
+(`raiseWhatWaitedForCoverage`). The Preview and Deploy buttons themselves are
+untouched: pressing one is the teacher's own act, and its question and
+refusals are its own, shown at once whichever tab is chosen. (The first
+version held every refusal while Coverage showed, so a teacher's own press
+was answered minutes later, or not at all after a switch of section: the
+793b review's M2, where the code was wrong and this paragraph right.)
+
+**Web views.** One map web view per section on screen, kept across a switch
+of tab so the map keeps its scroll, and released when no window shows the
+section (`noteShown` / `noteGone`; the 793b review's LOW 2). A new map's
+"changed since" is not known until its own walk is back, and says nothing
+meanwhile (`notKnownYet`; LOW 1).
 
 **The viewer.** The map comes from course content, so it is shown by the
 Planning tab's web view, parameterised rather than copied
@@ -1215,7 +1253,10 @@ inside the course, is said above the map.
 cannot be shown; "asked to make a section's coverage map again" at the press
 and once more when it settles; a click writes "page opened in Obsidian", the
 event every section press writes, with the code and the page's place, or why
-nothing opened. Never an expectation's words or a page's words
+nothing opened. A click that goes ahead says Obsidian was ASKED to open the
+page, not that it opened: the route cannot confirm it (#721), and the tab adds
+no silent success of its own. The trail words that name the computer carry
+`{machine}`, so Windows says its own word. Never an expectation's words or a page's words
 (`coverageTab.tab.trailWords`).
 
 **Not done.** The tab has no Print (not asked for; with the focused preview nil

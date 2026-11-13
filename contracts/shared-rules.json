@@ -984,7 +984,7 @@
       },
       {
         "event": "page opened in Obsidian",
-        "carries": "the course and section, and EITHER the place in the course folder of the file Open in Obsidian opened for the page the preview showed (without .md), with '(hidden from students)' when the page is hidden, OR why it opened the section as before instead: no preview page was showing, the list of pages could not be read, the page is not one of the course's own files, two files make that address, the file is outside the course folder, or it is gone. The exact words are obsidianOpensThePreviewedPage.trail and .fallbacks. Since #793 (793b) also a click on a code on a section's Coverage tab, which goes through the same route: the place of the expectation's page (without .md) and its code, or that it did not open that code and why (its page is no longer there, is not inside the course folder, the map on screen was older than its record, the map names no page for it, or Obsidian is not on this Mac); the exact words are coverageTab.tab.trailWords (opened, didNotOpen and the why words). Written for every SECTION press (the section window's button, Section > Open in Obsidian, a section row's menu, and since #610 the in-app assistant's open_in_obsidian, which presses that window's button through the same route, so its press writes this one line and no other) that goes ahead - a press turned away while the add-ons scan is still running writes nothing - the fallback included (ruling 5) - and never for a course press. NEVER anything written on the page.",
+        "carries": "the course and section, and EITHER the place in the course folder of the file Open in Obsidian opened for the page the preview showed (without .md), with '(hidden from students)' when the page is hidden, OR why it opened the section as before instead: no preview page was showing, the list of pages could not be read, the page is not one of the course's own files, two files make that address, the file is outside the course folder, or it is gone. The exact words are obsidianOpensThePreviewedPage.trail and .fallbacks. Since #793 (793b) also a click on a code on a section's Coverage tab, which goes through the same route: that Obsidian was ASKED to open the expectation's page (its place without .md, and its code; the route cannot confirm it opened, #721), or that it did not open that code and why (its page is no longer there, is not inside the course folder, the map on screen was older than its record, the map names no page for it, or Obsidian is not on this Mac); the exact words are coverageTab.tab.trailWords (opened, didNotOpen and the why words). Written for every SECTION press (the section window's button, Section > Open in Obsidian, a section row's menu, and since #610 the in-app assistant's open_in_obsidian, which presses that window's button through the same route, so its press writes this one line and no other) that goes ahead - a press turned away while the add-ons scan is still running writes nothing - the fallback included (ruling 5) - and never for a course press. NEVER anything written on the page.",
         "line": "ICS3U/1 · opened Unit 1/Lesson 3 in Obsidian, the page the preview shows",
         "why": "#518. Which file opened is decided out of sight - the build's list, the address on screen, the front page's embed - so 'I pressed Open in Obsidian and got the wrong page' (or the front page) has its answer only here, and which of the reasons it was says whether anything is wrong at all."
       },
@@ -5420,7 +5420,7 @@
           }
         },
         {
-          "name": "the record has no start time",
+          "name": "the record has no start time: no empty date",
           "facts": {
             "record": "thisBuild",
             "refresh": "none",
@@ -5436,12 +5436,63 @@
           "expect": {
             "kind": "map",
             "lines": [
-              "asOf",
+              "asOfNoTime",
               "mayBeOutOfDate",
               "clickHint"
             ],
             "button": "makeTheMapAgain",
             "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "a new map whose walk for changes has not come back yet: no line, and no claim it is current",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "notKnownYet",
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "pressed, and a preview still running is being stopped first: making, from the press",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "starting",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "making",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
             "description": null
           }
         },
@@ -5616,8 +5667,35 @@
           "expect": {
             "kind": "map",
             "lines": [
-              "asOf",
+              "olderMap",
               "couldNotMakeAgain",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "an earlier build's map with no start time",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "unknown",
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapNoTime",
+              "couldNotMakeAgain",
+              "mayBeOutOfDate",
               "clickHint"
             ],
             "button": "makeTheMapAgain",
@@ -5642,7 +5720,7 @@
           "expect": {
             "kind": "map",
             "lines": [
-              "asOf",
+              "olderMap",
               "making",
               "clickHint"
             ],
@@ -5720,7 +5798,7 @@
           "expect": {
             "kind": "map",
             "lines": [
-              "asOf",
+              "olderMap",
               "making",
               "clickHint"
             ],
@@ -5920,8 +5998,118 @@
         }
       ],
       "stateRule": "making: a refresh is pending, or this window's own build has not yet printed its problems line, or the map is another build's while a build of the section is running (this window's, a deploy's, or another program's). When not making: couldNotMakeAgain (with a map) or couldNotMake (without) when the refresh did not finish or was refused (refused adds the refusal's own sentence, refusedReason), or when the map is another build's and nothing is building; then changedSince or mayBeOutOfDate (with a map); then one of deploying, elsewhere or otherWindow, first that holds. With a map, the first line is asOf and the last is clickHint, or noObsidian when Obsidian is not installed. The button is makeTheMapAgain with a map and makeTheMap without, and is disabled while making, while this window's build runs, while the section deploys, while another program builds the course, and while another window holds the section's preview (and, outside these cases, while the folder is being copied or made ready, with that reason as its help).",
-      "refresh": "Make the Map (Again) runs the section's ordinary preview build in the background (Russell, 2026-11-12: no map-only run): a preview already running is stopped and waited for, then the preview starts through the way in every caller but the Preview button uses (mac: startPreview, never pressPreview), so the question about today's class is never asked. The teacher stays on the Coverage tab: no switch to Website, no browser, no focus taken. The refresh is a per-section state driven by events: pending from the press; the map made again when a reading finds the record thisBuild with a buildId other than the one it had at the press (the tab updates in place, before Quartz has finished); didNotFinish when this build printed its problems line and the map is not its own, or when this window's build ended, was stopped or cancelled, or the section's view went away (a switch of section stops its build) before that; refused, with the refusal's sentence, when the preview could not start. A later build's own map clears an earlier didNotFinish or refused. Quitting leaves nothing: the state is memory only, and the map's files are written whole by the build.",
-      "alertsWait": "While the Coverage tab shows, nothing a build can raise pops up over it (Russell, 2026-11-12): the Problems alert stays due, the links checklist waits, and a preview's refusal is held, or, when it is the refusal of the tab's own refresh, said in the tab instead (refusedReason) and not shown again. The Problems tab still appears in the bar. What waited is raised when the teacher next shows Website or Problems, one at a time, as it would have been. The question about today's class is asked only by the Preview button, which a refresh never presses.",
+      "sequenceCases": [
+        {
+          "name": "one press with no preview running: the build starts at once",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "one press with a preview serving: it is stopped and waited for, then the build starts",
+          "previewRunning": true,
+          "duringTheStop": [],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a second press while the old preview stops does nothing: one build, its wait left alone",
+          "previewRunning": true,
+          "duringTheStop": [
+            "press"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the OLD run's end arriving while it stops settles nothing",
+          "previewRunning": true,
+          "duringTheStop": [
+            "ownRunEnded"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a switch of section or course, or the window closing, while the old preview stops: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "leave"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 0,
+            "refresh": "didNotFinish",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "quitting while the old preview stops: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "quit"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 0,
+            "refresh": "didNotFinish",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "a press while the refresh's own build runs does nothing",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [
+            "press"
+          ],
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
+          "name": "the preview could not start: settled at once, never left waiting",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "afterTheStart": [],
+          "startRefused": true,
+          "expect": {
+            "stops": 0,
+            "starts": 1,
+            "refresh": "didNotFinish",
+            "askedLines": 1
+          }
+        }
+      ],
+      "sequenceRule": "The press is recorded AT ONCE, before anything is awaited (the 793b review's H1): the refresh is starting, with a token, and the tab says making with the button unavailable from that instant. A preview already running is stopped and waited for; its run ending meanwhile is the old run's and settles nothing. The build starts only if the press's token survives the stop: leaving the section, the course or the window, or quitting, clears it (didNotFinish), so a view that has gone never starts a preview nobody would stop. A second press while starting or pending does nothing, so it never ends the running build's wait (#232's record of a build in progress). A start that did not begin (refused, or the course being copied) is settled at once. In a case, stops and starts count the stop and start the steps asked for, refresh is the state at the end, askedLines the trail lines saying the press was made; a press refused by the preview's own rule is startRefused.",
+      "refresh": "Make the Map (Again) runs the section's ordinary preview build in the background (Russell, 2026-11-12: no map-only run): a preview already running is stopped and waited for, then the preview starts through the way in every caller but the Preview button uses (mac: startPreview, never pressPreview), so the question about today's class is never asked. The teacher stays on the Coverage tab: no switch to Website, no browser, no focus taken. The refresh is a per-section state driven by events: pending from the press; the map made again when a reading finds the record thisBuild with a buildId other than the one it had at the press (the tab updates in place, before Quartz has finished); didNotFinish when this build printed its problems line and the map is not its own, or when this window's build ended, was stopped or cancelled, or the section's view went away (a switch of section stops its build) before that; refused, with the refusal's sentence, when the preview could not start. A later build's own map clears an earlier didNotFinish or refused. Quitting leaves nothing: the state is memory only, and the map's files are written whole by the build. Between the press and the start the refresh is starting (sequenceRule). A preview serving when the refresh is pressed starts again at the site's front page, as every way in but the Preview button does: the teacher's place in the preview is not kept.",
+      "alertsWait": "While the Coverage tab shows, nothing a build can raise pops up over it (Russell, 2026-11-12): the Problems alert stays due, the links checklist waits, and the refusal of the tab's own refresh (while it is starting or pending) is said in the tab instead (refusedReason) and not shown as an alert. A refusal of the teacher's OWN press of Preview is shown as ever, Coverage or not: that press is the teacher's act, and so is its answer (the 793b review's M2). The Problems tab still appears in the bar. What waited is raised when the teacher next shows Website or Problems, one at a time, as it would have been. The question about today's class is asked only by the Preview button, which a refresh never presses.",
       "whatAPageMayRead": "The map is content Plantoir did not write (it comes from course content), so it is shown by the Planning tab's web view, parameterised, never a second one: unitPlanning.tab.whatAPageMayRead's three guards, with the .coverage-tab folder (every link followed) as the only folder the page may read, a rule list of its own name compiled from the same text, scripts off, nothing stored, and the network blocked. A rule list that cannot be made shows cannotShowTitle and cannotShowDescription and writes a trail line, and no page is ever shown without it.",
       "navigationCases": [
         {
@@ -6276,8 +6464,11 @@
       "words": {
         "tabCoverage": "Coverage",
         "asOf": "Made when this section was last built, {when}.",
+        "asOfNoTime": "Made when this section was last built.",
+        "olderMap": "Made by an earlier build of this section, {when}. The latest build made no map.",
+        "olderMapNoTime": "Made by an earlier build of this section. The latest build made no map.",
         "making": "Making the map again with a new build of this section…",
-        "couldNotMakeAgain": "The map could not be made again this time. This is the map from {when}.",
+        "couldNotMakeAgain": "The map could not be made again this time.",
         "couldNotMake": "The map could not be made this time.",
         "changedSince": "Pages in the course have changed since then, so the map may be out of date.",
         "mayBeOutOfDate": "Plantoir cannot tell whether pages have changed since then, so the map may be out of date.",
@@ -6308,18 +6499,18 @@
         "noMapYet": "no map made yet",
         "otherVersion": "the map was made by another version of Plantoir",
         "noCurriculum": "the last build found no curriculum to map",
-        "couldNotShow": "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet on this Mac",
+        "couldNotShow": "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet on this {machine}",
         "asked": "asked to make the coverage map again from the Coverage tab",
         "madeAgain": "the coverage map was made again",
         "didNotFinish": "the coverage map could not be made again: the build ended before it was made",
         "refused": "the coverage map could not be made again: the preview could not start",
-        "opened": "opened {place} in Obsidian, curriculum expectation {code} from the Coverage tab",
+        "opened": "asked Obsidian to open {place}, curriculum expectation {code}, from the Coverage tab",
         "didNotOpen": "did not open {code} from the Coverage tab: {why}",
         "whyGone": "its page is no longer there",
         "whyOutside": "its page is not inside the course folder",
         "whyOlder": "the map on screen was older than its record",
         "whyNotListed": "the map names no page for it",
-        "whyNoObsidian": "Obsidian is not on this Mac"
+        "whyNoObsidian": "Obsidian is not on this {machine}"
       },
       "trail": "activityTrail.mustRecord: 'looked at a section's curriculum coverage' once each time the tab appears (looked, with counts across every map: how many maps, expectations and not yet addressed, and the map's start as yyyy-MM-dd HH:mm in the Mac's time zone, plus changedSince when the walk had already said so and notThisBuild when the map is another build's; or noMapYet, otherVersion, noCurriculum), and once when the map cannot be shown (couldNotShow). 'asked to make a section's coverage map again' when Make the Map (Again) is pressed (asked), and once more when it settles (madeAgain, didNotFinish or refused). A click writes 'page opened in Obsidian' (opened, with the page's place in the course folder without .md and the code; or didNotOpen with one of whyGone, whyOutside, whyOlder, whyNotListed, whyNoObsidian). Never an expectation's words or a page's words.",
       "rejected": [
@@ -6329,6 +6520,8 @@
         "A second web view class for the map: the Planning tab's is parameterised, so a fix to its network block reaches both tabs.",
         "Opening the page with obsidianOpening.openPage directly from the tab: it would skip the reference course's note and the add-ons offer that Open in Obsidian's route asks first.",
         "Putting the click hint on the page: it would be false on a Mac without Obsidian, and on Windows until its tab is wired (the plan review's L1).",
+        "Holding every preview refusal while Coverage shows: a refusal of the teacher's own Preview press then arrived minutes later, out of context, or never (the 793b review's M2).",
+        "Recording the press only once the old preview had stopped: for those seconds the tab said nothing and the button could be pressed again, and a second press ended the running build's wait (the 793b review's H1).",
         "Printing the map: not asked for. The tab has no Print; with the focused preview nil, the preview's own cannot be reached from it either."
       ]
     },

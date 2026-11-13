@@ -36,6 +36,15 @@ final class SectionCoverage {
         /// with another id, and this build's, is the map made again.
         var refreshFrom: String?
 
+        /// The press a refresh still starting belongs to (the 793b review's
+        /// H1): its start goes ahead only while this is the press's own.
+        var refreshToken: UUID?
+
+        /// The build id the last freshness walk was for: a reading of a
+        /// different map says nothing about change until its own walk is
+        /// back (the 793b review's LOW 1).
+        var walkedFor: String?
+
         /// What the last click on a code could not open, said above the
         /// map until the next reading.
         var clickLine: String?
@@ -51,9 +60,14 @@ final class SectionCoverage {
     /// when it could not, and then no map is ever shown.
     private(set) var rulesFailed: Bool = false
 
-    /// One web view per section, made the first time its tab shows and kept
-    /// while the app is open, so a switch back finds the page and its scroll.
+    /// One web view per section being SHOWN, made the first time its tab
+    /// shows and kept while the section is on screen, so a switch of tab
+    /// finds the page and its scroll; released when no window shows the
+    /// section any longer (the 793b review's LOW 2).
     @ObservationIgnored private var controllers: [String: PlanWebController] = [:]
+
+    /// How many section views show each section now.
+    @ObservationIgnored private var showing: [String: Int] = [:]
 
     /// Which freshness walk is the current one, per section.
     @ObservationIgnored private var walkGenerations: [String: Int] = [:]
@@ -94,6 +108,124 @@ final class SectionCoverage {
         return made
     }
 
+    /// A section's page appeared.
+    func noteShown(_ key: String) {
+        showing[key] = (showing[key] ?? 0) + 1
+    }
+
+    /// A section's page went away: its map's web view goes when no window
+    /// shows the section.
+    func noteGone(_ key: String) {
+        let left: Int = (showing[key] ?? 1) - 1
+        if left > 0 {
+            showing[key] = left
+            return
+        }
+        showing[key] = nil
+        controllers[key] = nil
+    }
+
+    /// The sections whose map web views are kept: for tests.
+    var keptWebViews: Set<String> {
+        return Set(controllers.keys)
+    }
+
+    // MARK: - The refresh, from the press to the start (the 793b review's H1)
+
+    /// Make the Map (Again), pressed: recorded AT ONCE, as `starting` with a
+    /// token, so the tab says the map is being made and the button is
+    /// unavailable from this instant. Nil, and nothing recorded, when a
+    /// refresh is already starting or waiting for its map: a second press
+    /// does nothing, so it can never end the running build's wait.
+    func beginRefresh(folder: URL, course: Course, sectionNumber: Int) -> UUID? {
+        let sectionKey: String = key(folder: folder, course: course, sectionNumber: sectionNumber)
+        var updated: Entry = entry(sectionKey)
+        if updated.refresh == .starting || updated.refresh == .pending {
+            return nil
+        }
+        let token: UUID = UUID()
+        updated.refresh = .starting
+        updated.refreshToken = token
+        updated.clickLine = nil
+        entries[sectionKey] = updated
+        ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.asked, course: course.code, section: sectionNumber)
+        return token
+    }
+
+    /// The old preview has stopped: whether the press's build may start now.
+    /// Only while the press's token is still the section's (nobody left the
+    /// section, the course or the window, and the app is not quitting); then
+    /// the refresh waits for its map, from the record's id as it is now.
+    func refreshMayStart(token: UUID, folder: URL, course: Course, sectionNumber: Int) -> Bool {
+        let sectionKey: String = key(folder: folder, course: course, sectionNumber: sectionNumber)
+        var updated: Entry = entry(sectionKey)
+        if updated.refresh != .starting || updated.refreshToken != token {
+            return false
+        }
+        updated.refresh = .pending
+        updated.refreshToken = nil
+        updated.refreshFrom = updated.reading?.record?.buildId
+        entries[sectionKey] = updated
+        return true
+    }
+
+    /// The section's page went away (a switch of section or course, the
+    /// window closing): a refresh still starting is abandoned, so its start
+    /// never runs from a view that has gone.
+    func abandonRefresh(folder: URL, course: Course, sectionNumber: Int) {
+        abandon(key(folder: folder, course: course, sectionNumber: sectionNumber), course: course.code, sectionNumber: sectionNumber)
+    }
+
+    /// The app is quitting: every refresh still starting is abandoned.
+    func abandonEveryRefresh() {
+        for (sectionKey, found) in entries where found.refresh == .starting {
+            abandon(sectionKey, course: nil, sectionNumber: nil)
+        }
+    }
+
+    private func abandon(_ sectionKey: String, course: String?, sectionNumber: Int?) {
+        var updated: Entry = entry(sectionKey)
+        if updated.refresh != .starting {
+            return
+        }
+        updated.refresh = .didNotFinish
+        updated.refreshToken = nil
+        entries[sectionKey] = updated
+        if let course, let sectionNumber {
+            ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.didNotFinish, course: course, section: sectionNumber)
+        } else {
+            ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.didNotFinish)
+        }
+    }
+
+    /// The steps of one press, with the stop and the start handed in, so a
+    /// test can run them with no window: record the press, stop a preview
+    /// still running and wait for it, then start the build only if the press
+    /// still holds, and settle at once a start that did not begin.
+    /// `start` answers whether a build began.
+    static func makeAgain(
+        store: SectionCoverage,
+        folder: URL,
+        course: Course,
+        sectionNumber: Int,
+        previewIsRunning: Bool,
+        stop: () async -> Void,
+        start: () -> Bool
+    ) async {
+        guard let token = store.beginRefresh(folder: folder, course: course, sectionNumber: sectionNumber) else {
+            return
+        }
+        if previewIsRunning {
+            await stop()
+        }
+        if !store.refreshMayStart(token: token, folder: folder, course: course, sectionNumber: sectionNumber) {
+            return
+        }
+        if !start() {
+            store.noteOwnRunEnded(folder: folder, course: course, sectionNumber: sectionNumber)
+        }
+    }
+
     /// Reads the section's record again, and whether the course has
     /// curriculum, then, off the main actor, whether pages changed since the
     /// map's build started (`BuildFreshness.changedSince`, #768's rule over
@@ -113,6 +245,10 @@ final class SectionCoverage {
         updated.hasCurriculum = !CurriculumFolderRule.resolvedFolders(for: course).isEmpty
         updated.elsewhere = WorkLeaseRegistry.anotherProgramIsBuilding(folderPath: folder.path, courseCode: course.code)
         updated.clickLine = nil
+        let mapId: String? = reading.record?.buildId
+        if mapId != updated.walkedFor {
+            updated.changed = .notKnownYet
+        }
         settle(&updated, reading: reading, afterAMarker: afterAMarker, runEnded: false, course: course, sectionNumber: sectionNumber)
         if updated != entry(sectionKey) {
             entries[sectionKey] = updated
@@ -204,12 +340,13 @@ final class SectionCoverage {
     private func walkForChanges(_ sectionKey: String, reading: CoverageTab.Reading, courseFolder: URL) {
         let generation: Int = (walkGenerations[sectionKey] ?? 0) + 1
         walkGenerations[sectionKey] = generation
+        let mapId: String? = reading.record?.buildId
         guard let record = reading.record, reading.kind == .thisBuild || reading.kind == .anotherBuild else {
-            setChanged(.none, key: sectionKey)
+            setChanged(.none, key: sectionKey, walkedFor: mapId)
             return
         }
         guard let startedAt = record.startedAt else {
-            setChanged(.unknown, key: sectionKey)
+            setChanged(.unknown, key: sectionKey, walkedFor: mapId)
             return
         }
         Task.detached(priority: .utility) {
@@ -219,16 +356,17 @@ final class SectionCoverage {
             let changed: CoverageChange = SectionCoverage.change(for: reason)
             await MainActor.run {
                 if self.walkGenerations[sectionKey] == generation {
-                    self.setChanged(changed, key: sectionKey)
+                    self.setChanged(changed, key: sectionKey, walkedFor: mapId)
                 }
             }
         }
     }
 
-    private func setChanged(_ changed: CoverageChange, key sectionKey: String) {
+    private func setChanged(_ changed: CoverageChange, key sectionKey: String, walkedFor: String?) {
         var updated: Entry = entry(sectionKey)
-        if updated.changed != changed {
+        if updated.changed != changed || updated.walkedFor != walkedFor {
             updated.changed = changed
+            updated.walkedFor = walkedFor
             entries[sectionKey] = updated
         }
     }
@@ -252,6 +390,7 @@ final class SectionCoverage {
     func reset() {
         entries = [:]
         controllers = [:]
+        showing = [:]
         walkGenerations = [:]
         rulesFailed = false
     }

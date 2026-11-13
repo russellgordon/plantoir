@@ -171,6 +171,45 @@ final class SectionDetailStructureTests: XCTestCase {
         }
     }
 
+    // MARK: - The real page's wiring (the 793b review's M3)
+
+    private func readSource(_ relativePath: String) throws -> String {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func occurrences(of needle: String, in text: String) -> Int {
+        return text.components(separatedBy: needle).count - 1
+    }
+
+    /// The tests above draw `SectionTabContent` with stand-ins; this reads
+    /// the real page's source, so a preview drawn OUTSIDE the chosen-tab
+    /// switch, or a focused value that no longer asks which tab shows,
+    /// fails here. To see it fail: in `SectionDetailView.sectionLayout`,
+    /// wrap `SectionTabContent(…)` in `ZStack { websiteLayers; … }`, or
+    /// delete `&& previewTakesCommands` from the focused value.
+    func testThePagesPreviewIsDrawnOnlyThroughTheChosenTab() throws {
+        let view: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
+        let coverage: String = try readSource("QuartzTeachers/Views/Section/SectionDetailCoverage.swift")
+        XCTAssertEqual(occurrences(of: "WebPreviewView(", in: view), 0, "the page draws no preview of its own")
+        XCTAssertEqual(occurrences(of: "WebPreviewView(", in: coverage), 1, "one preview, in websiteLayers")
+        let layers: Range<String.Index> = try XCTUnwrap(coverage.range(of: "var websiteLayers: some View {"))
+        let problems: Range<String.Index> = try XCTUnwrap(coverage.range(of: "var coverageTab: some View {"))
+        let preview: Range<String.Index> = try XCTUnwrap(coverage.range(of: "WebPreviewView("))
+        XCTAssertTrue(preview.lowerBound > layers.lowerBound && preview.lowerBound < problems.lowerBound,
+                      "the preview is inside websiteLayers")
+        XCTAssertEqual(occurrences(of: "websiteLayers", in: view), 1, "websiteLayers is used once in the page")
+        let content: Range<String.Index> = try XCTUnwrap(view.range(of: "SectionTabContent(showing: selectedTab) {\n                websiteLayers\n"),
+                                                         "and only as the Website branch of SectionTabContent")
+        XCTAssertFalse(view[view.startIndex..<content.lowerBound].hasSuffix("ZStack {\n            "), "not layered")
+        XCTAssertEqual(occurrences(of: "ProblemsTableView(", in: view), 0, "Problems is drawn through problemsTab")
+        XCTAssertTrue(view.contains(".focusedSceneValue(\\.previewController, previewURL != nil && previewTakesCommands ? previewController : nil)"),
+                      "the browser commands reach the preview only on Website")
+        XCTAssertEqual(occurrences(of: "|| !previewTakesCommands", in: view), 3, "Back, Forward and Reload are off when it is not shown")
+    }
+
     /// The browser commands reach the preview only on Website: the rule the
     /// page's focused value and its toolbar's Back, Forward and Reload read.
     func testOnlyWebsiteOffersThePreviewTheBrowserCommands() {

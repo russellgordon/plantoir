@@ -225,7 +225,17 @@ extension SectionDetailView {
                     raiseWhatWaitedForCoverage()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                // Quitting while a refresh waits for the old preview to stop:
+                // nothing may start after this.
+                SectionCoverage.shared.abandonEveryRefresh()
+            }
             .task {
+                if let folder = workspace.workspaceURL {
+                    SectionCoverage.shared.noteShown(
+                        SectionCoverage.shared.key(folder: folder, course: course, sectionNumber: sectionNumber)
+                    )
+                }
                 reloadTheCoverage(afterThisRunsMarker: false)
             }
     }
@@ -256,23 +266,49 @@ extension SectionDetailView {
     /// stopped first and waited for, as a repair's rebuild does, since a
     /// second one cannot have its port. The teacher stays on this tab;
     /// nothing is opened and no alert is raised (`alertsWaitForCoverage`).
+    ///
+    /// The press is recorded at once, before anything is awaited
+    /// (`SectionCoverage.makeAgain`; the 793b review's H1): from that instant
+    /// the tab says the map is being made and the button is unavailable, a
+    /// second press does nothing, and leaving the section, the course or the
+    /// window during the stop (`onDisappear`) abandons the press, so the
+    /// start never runs from a view that has gone.
     func makeTheCoverageMapAgain() {
         guard let folder = workspace.workspaceURL else {
             return
         }
+        let previewIsRunning: Bool = previewLease != nil || previewRunner.isRunning
         Task { @MainActor in
-            if previewLease != nil || previewRunner.isRunning {
-                await stopPreviewAndWait()
-            }
-            SectionCoverage.shared.noteRefreshAsked(folder: folder, course: course, sectionNumber: sectionNumber)
-            startPreview()
-            // `startPreview` returns without starting anything while the
-            // course is being copied: the refresh is settled at once rather
-            // than left waiting.
-            if previewLease == nil {
-                SectionCoverage.shared.noteOwnRunEnded(folder: folder, course: course, sectionNumber: sectionNumber)
-            }
+            await SectionCoverage.makeAgain(
+                store: SectionCoverage.shared,
+                folder: folder,
+                course: course,
+                sectionNumber: sectionNumber,
+                previewIsRunning: previewIsRunning,
+                stop: {
+                    await stopPreviewAndWait()
+                },
+                start: {
+                    startPreview()
+                    // `startPreview` returns without starting anything while
+                    // the course is being copied, or when it refuses: then
+                    // no lease is held.
+                    return previewLease != nil
+                }
+            )
         }
+    }
+
+    /// The section's page is going away: a refresh still starting is
+    /// abandoned, and the map's web view released when no other window
+    /// shows the section.
+    func letTheCoverageTabGo() {
+        guard let folder = folderThisSectionRegisteredIn ?? workspace.workspaceURL else {
+            return
+        }
+        let coverage: SectionCoverage = SectionCoverage.shared
+        coverage.abandonRefresh(folder: folder, course: course, sectionNumber: sectionNumber)
+        coverage.noteGone(coverage.key(folder: folder, course: course, sectionNumber: sectionNumber))
     }
 
     /// A click on a code in the map: the record read again, the file it
@@ -319,34 +355,25 @@ extension SectionDetailView {
     /// The teacher left the Coverage tab: what waited while it showed is
     /// raised now, one at a time, the way it would have been.
     func raiseWhatWaitedForCoverage() {
-        if let held = refusalHeldOnCoverage {
-            refusalHeldOnCoverage = nil
-            if case .refusal(let title, let sentence) = held {
-                showPreviewRefusal(title: title, sentence: sentence)
-                return
-            }
-        }
         showAnythingWaiting()
         offerTheLinksChecklistIfWaiting()
     }
 
-    /// A preview's refusal while Coverage shows: said in the tab when it is
-    /// the refusal of the tab's own refresh, otherwise kept until the
-    /// teacher leaves the tab. Answers whether it was taken.
+    /// A preview's refusal: said in the tab, and not as an alert, only when
+    /// it refuses the tab's OWN refresh (`SectionTabs.refusalIsTheTabs`). A
+    /// refusal of the teacher's own Preview press is shown as ever, Coverage
+    /// or not (the 793b review's M2). Answers whether it was taken.
     func takeARefusalOnCoverage(title: String, sentence: String) -> Bool {
-        if !alertsWaitForCoverage {
+        guard let folder = workspace.workspaceURL else {
             return false
         }
-        if let folder = workspace.workspaceURL {
-            let sectionKey: String = SectionCoverage.shared.key(folder: folder, course: course, sectionNumber: sectionNumber)
-            if SectionCoverage.shared.entry(sectionKey).refresh == .pending {
-                SectionCoverage.shared.noteRefreshRefused(
-                    folder: folder, course: course, sectionNumber: sectionNumber, reason: sentence
-                )
-                return true
-            }
+        let sectionKey: String = SectionCoverage.shared.key(folder: folder, course: course, sectionNumber: sectionNumber)
+        if !SectionTabs.refusalIsTheTabs(refresh: SectionCoverage.shared.entry(sectionKey).refresh) {
+            return false
         }
-        refusalHeldOnCoverage = .refusal(title: title, sentence: sentence)
+        SectionCoverage.shared.noteRefreshRefused(
+            folder: folder, course: course, sectionNumber: sectionNumber, reason: sentence
+        )
         return true
     }
 }

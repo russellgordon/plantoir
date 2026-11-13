@@ -136,9 +136,6 @@ struct SectionDetailView: View {
     /// — the assistant can start a preview then — shown once it has gone.
     @State var heldPreviewRefusal: PreviewAlert?
 
-    /// A refusal that arrived while the Coverage tab showed (#793), not the
-    /// tab's own refresh's: shown when the teacher leaves the tab.
-    @State var refusalHeldOnCoverage: PreviewAlert?
 
     /// Set by the question's answer, and acted on once the alert has GONE
     /// (`afterThePreviewAlert`): the preview starts then, never from inside
@@ -838,6 +835,10 @@ struct SectionDetailView: View {
                     )
                 }
                 stopPreview()
+                // A Coverage tab refresh still waiting for the old preview to
+                // stop is abandoned, so it starts nothing from a view that
+                // has gone (#793, the 793b review's H1).
+                letTheCoverageTabGo()
             }
     }
 
@@ -1610,8 +1611,8 @@ struct SectionDetailView: View {
     /// about today's class is up, so the question is not replaced under the
     /// teacher's pointer.
     func showPreviewRefusal(title: String, sentence: String) {
-        // Not over the Coverage tab (#793): said in the tab when it refuses
-        // the tab's own refresh, otherwise shown when the teacher leaves it.
+        // The refusal of a Coverage tab refresh is said in the tab, not as
+        // an alert (#793); every other refusal is shown as ever.
         if takeARefusalOnCoverage(title: title, sentence: sentence) {
             return
         }

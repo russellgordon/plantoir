@@ -157,6 +157,8 @@ final class CoverageTabTests: XCTestCase {
             var facts: CoverageTabDisplay.Facts = CoverageTabDisplay.Facts()
             facts.record = try XCTUnwrap(CoverageTab.RecordKind(rawValue: try XCTUnwrap(given["record"] as? String)), name)
             switch try XCTUnwrap(given["refresh"] as? String) {
+            case "starting":
+                facts.refresh = .starting
             case "pending":
                 facts.refresh = .pending
             case "didNotFinish":
@@ -333,6 +335,9 @@ final class CoverageTabTests: XCTestCase {
         let mine: [String: String] = [
             "tabCoverage": CoverageTabWording.tabCoverage,
             "asOf": CoverageTabWording.asOf,
+            "asOfNoTime": CoverageTabWording.asOfNoTime,
+            "olderMap": CoverageTabWording.olderMap,
+            "olderMapNoTime": CoverageTabWording.olderMapNoTime,
             "making": CoverageTabWording.making,
             "couldNotMakeAgain": CoverageTabWording.couldNotMakeAgain,
             "couldNotMake": CoverageTabWording.couldNotMake,
@@ -428,7 +433,7 @@ final class CoverageTabTests: XCTestCase {
         XCTAssertFalse(line.contains("Secret"), "never a page's name or words")
         XCTAssertEqual(
             CoverageTabTrail.lookedText(reading: reading, changed: .none, rulesCompiled: false),
-            CoverageTabTrail.couldNotShow
+            CoverageTabTrail.filled(CoverageTabTrail.couldNotShow)
         )
         let none: CoverageTab.Reading = CoverageTab.Reading(kind: .noRecord, record: nil, page: nil, folder: rootURL)
         XCTAssertEqual(CoverageTabTrail.lookedText(reading: none, changed: .none, rulesCompiled: true),
@@ -615,11 +620,149 @@ final class CoverageTabTests: XCTestCase {
     }
 
     /// The trail line for each click that opens nothing names the code and
-    /// why, never the path.
-    func testAClickThatOpensNothingSaysWhy() {
-        XCTAssertEqual(CoverageTabTrail.clickText(.gone, code: "A1.2"), "did not open A1.2 from the Coverage tab: its page is no longer there")
-        XCTAssertEqual(CoverageTabTrail.clickText(.outside, code: "A1.3"), "did not open A1.3 from the Coverage tab: its page is not inside the course folder")
-        XCTAssertEqual(CoverageTabTrail.clickText(.reload, code: "A1.1"), "did not open A1.1 from the Coverage tab: the map on screen was older than its record")
-        XCTAssertEqual(CoverageTabTrail.clickText(.notListed, code: "C9.9"), "did not open C9.9 from the Coverage tab: the map names no page for it")
+    /// why, never the path, built from the contract's keys; and the line
+    /// for a click that goes ahead says what was ASKED of Obsidian, not that
+    /// it opened, which nothing here can confirm (#721).
+    func testAClickThatOpensNothingSaysWhy() throws {
+        let words: [String: Any] = try XCTUnwrap(try CoverageTabTests.tab()["trailWords"] as? [String: Any])
+        func line(_ code: String, _ whyKey: String) throws -> String {
+            let template: String = try XCTUnwrap(words["didNotOpen"] as? String)
+            let why: String = try XCTUnwrap(words[whyKey] as? String)
+            return template.replacingOccurrences(of: "{code}", with: code).replacingOccurrences(of: "{why}", with: why)
+        }
+        XCTAssertEqual(CoverageTabTrail.clickText(.gone, code: "A1.2"), try line("A1.2", "whyGone"))
+        XCTAssertEqual(CoverageTabTrail.clickText(.outside, code: "A1.3"), try line("A1.3", "whyOutside"))
+        XCTAssertEqual(CoverageTabTrail.clickText(.reload, code: "A1.1"), try line("A1.1", "whyOlder"))
+        XCTAssertEqual(CoverageTabTrail.clickText(.notListed, code: "C9.9"), try line("C9.9", "whyNotListed"))
+        let opened: String = CoverageTabTrail.clickText(.open(file: rootURL, place: "Curriculum/A1.1"), code: "A1.1")
+        XCTAssertFalse(opened.hasPrefix("opened"), "a click cannot confirm Obsidian opened: \(opened)")
+        let noObsidian: String = CoverageTabTrail.didNotOpenText(code: "A1.1", why: CoverageTabTrail.whyNoObsidian)
+        XCTAssertFalse(noObsidian.contains("{machine}"), noObsidian)
+        XCTAssertTrue(noObsidian.hasSuffix("on this Mac"), noObsidian)
+        XCTAssertFalse(CoverageTabTrail.lookedText(
+            reading: CoverageTab.Reading(kind: .noRecord, record: nil, page: nil, folder: rootURL),
+            changed: .none, rulesCompiled: false
+        ).contains("{machine}"))
+    }
+
+    /// `"version": true` is not version 1: JSON's true bridges to a number
+    /// that reads as 1 (the 793b review's LOW 6).
+    func testATrueVersionIsNotVersionOne() throws {
+        let data: Data = try JSONSerialization.data(withJSONObject: ["version": true, "buildId": "b", "page": NSNull(), "maps": []])
+        XCTAssertNil(CoverageTabRecord.parse(data))
+        XCTAssertFalse(CoverageTabRecord.isAnotherVersion(data))
+        let one: Data = try JSONSerialization.data(withJSONObject: ["version": 1, "buildId": "b", "page": NSNull(), "maps": []])
+        XCTAssertNotNil(CoverageTabRecord.parse(one))
+    }
+
+    /// Only the tab's own refresh has its refusal said in the tab; the
+    /// teacher's own Preview press is answered as ever (the 793b review's M2).
+    func testOnlyTheTabsOwnRefreshHasItsRefusalSaidInTheTab() {
+        XCTAssertTrue(SectionTabs.refusalIsTheTabs(refresh: .starting))
+        XCTAssertTrue(SectionTabs.refusalIsTheTabs(refresh: .pending))
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .none))
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .didNotFinish))
+        XCTAssertFalse(SectionTabs.refusalIsTheTabs(refresh: .refused("a reason")))
+    }
+
+    /// A map's web view is kept while its section is shown and released when
+    /// no window shows it (the 793b review's LOW 2).
+    func testAMapsWebViewGoesWithItsSection() {
+        let store: SectionCoverage = SectionCoverage.shared
+        store.noteShown("one")
+        store.noteShown("one")
+        _ = store.controller("one", open: { (_: URL) in }, cannotShow: {})
+        store.noteShown("two")
+        _ = store.controller("two", open: { (_: URL) in }, cannotShow: {})
+        XCTAssertEqual(store.keptWebViews, ["one", "two"])
+        store.noteGone("one")
+        XCTAssertEqual(store.keptWebViews, ["one", "two"], "a second window still shows section one")
+        store.noteGone("one")
+        store.noteGone("two")
+        XCTAssertEqual(store.keptWebViews, [])
+    }
+
+    // MARK: - The press, its stop and its start (the 793b review's H1)
+
+    /// What the steps did: how often they stopped and started.
+    @MainActor
+    final class Counted {
+
+        // MARK: - Stored properties
+
+        var stops: Int = 0
+        var starts: Int = 0
+        var stateDuringTheStop: CoverageRefresh?
+    }
+
+    /// `sequenceCases`, through the real steps. The stop the test hands in
+    /// does the case's "during the stop" steps itself, which is exactly the
+    /// moment between the press and the start, with no window, no run loop
+    /// and no delay. To see it fail: in `SectionCoverage.makeAgain`, call
+    /// `noteRefreshAsked` after the stop instead of `beginRefresh` before
+    /// it (the code the review found), and the second-press, leave and quit
+    /// cases start a build.
+    func testEverySequenceCase() async throws {
+        let cases: [[String: Any]] = try XCTUnwrap(try CoverageTabTests.tab()["sequenceCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        let made: (folder: URL, course: Course) = try fixtureCourse()
+        try build("b1", course: made.course, withMap: true)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let store: SectionCoverage = SectionCoverage.shared
+            store.reset()
+            ActivityTrail.store = ProblemReportStore(folderURL: rootURL.appendingPathComponent("trail-\(UUID().uuidString)", isDirectory: true))
+            store.reload(folder: made.folder, course: made.course, sectionNumber: 1)
+            let key: String = store.key(folder: made.folder, course: made.course, sectionNumber: 1)
+            let counted: Counted = Counted()
+            let refused: Bool = (testCase["startRefused"] as? Bool) ?? false
+            let previewRunning: Bool = try XCTUnwrap(testCase["previewRunning"] as? Bool)
+            let duringTheStop: [String] = try XCTUnwrap(testCase["duringTheStop"] as? [String])
+            func press(stopSteps: [String]) async {
+                await SectionCoverage.makeAgain(
+                    store: store, folder: made.folder, course: made.course, sectionNumber: 1,
+                    previewIsRunning: previewRunning,
+                    stop: {
+                        counted.stops += 1
+                        counted.stateDuringTheStop = store.entry(key).refresh
+                        for step in stopSteps {
+                            switch step {
+                            case "press":
+                                await press(stopSteps: [])
+                            case "ownRunEnded":
+                                store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1)
+                            case "leave":
+                                store.abandonRefresh(folder: made.folder, course: made.course, sectionNumber: 1)
+                            case "quit":
+                                store.abandonEveryRefresh()
+                            default:
+                                XCTFail("\(name): no step \(step)")
+                            }
+                        }
+                    },
+                    start: {
+                        counted.starts += 1
+                        return !refused
+                    }
+                )
+            }
+            await press(stopSteps: duringTheStop)
+            if previewRunning {
+                XCTAssertEqual(counted.stateDuringTheStop, .starting, "\(name): recorded at the press, before the stop")
+            }
+            for step in try XCTUnwrap(testCase["afterTheStart"] as? [String]) where step == "press" {
+                await press(stopSteps: [])
+            }
+            let expected: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+            XCTAssertEqual(counted.stops, expected["stops"] as? Int, name)
+            XCTAssertEqual(counted.starts, expected["starts"] as? Int, name)
+            XCTAssertEqual(store.entry(key).refresh.name, expected["refresh"] as? String, name)
+            let lines: [String] = ActivityTrail.store.activityText(includingPrompts: false).components(separatedBy: "\n")
+            var asked: Int = 0
+            for line in lines where line.contains(CoverageTabTrail.asked) {
+                asked += 1
+            }
+            XCTAssertEqual(asked, expected["askedLines"] as? Int, name)
+        }
     }
 }

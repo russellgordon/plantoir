@@ -65,6 +65,15 @@ nonisolated enum SectionTabs {
     static func alertsWait(showing: SectionTab) -> Bool {
         return showing == .coverage
     }
+
+    /// Whether a preview's refusal belongs to the Coverage tab's own refresh,
+    /// and so is said in the tab rather than as an alert: only while that
+    /// refresh is starting or waiting for its map. A refusal of the teacher's
+    /// own Preview press is never taken, whichever tab shows (the 793b
+    /// review's M2): the press is the teacher's act, and so is its answer.
+    static func refusalIsTheTabs(refresh: CoverageRefresh) -> Bool {
+        return refresh == .starting || refresh == .pending
+    }
 }
 
 /// `about.json`, the record of the map a section's Coverage tab shows
@@ -932,7 +941,7 @@ nonisolated enum CoverageTabTrail {
     static func clickText(_ outcome: CoverageItem.Outcome, code: String) -> String {
         switch outcome {
         case .open(_, let place):
-            return opened.replacingOccurrences(of: "{place}", with: place).replacingOccurrences(of: "{code}", with: code)
+            return filled(opened.replacingOccurrences(of: "{place}", with: place).replacingOccurrences(of: "{code}", with: code))
         case .reload:
             return didNotOpenText(code: code, why: whyOlder)
         case .notListed:
