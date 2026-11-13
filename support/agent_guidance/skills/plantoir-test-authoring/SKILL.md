@@ -162,8 +162,7 @@ file, if it is missing), one folder per test:
   choice question.
 - **The marking kit**: copy `templates/Marking Kit/` beside this file into
   the test's folder and rewrite it for this test. `FORMAT.md` there is the
-  format, which the `plantoir-marking` skill reads when it is in this
-  working folder; the checker refuses any key the format does not define. In short: every point is one mark, its ID the
+  format; the checker refuses any key the format does not define. In short: every point is one mark, its ID the
   same in every version (`B1.2` is the same mark on Version A and Version
   B); every version answers every point; and no file in the kit has a key
   for a name, ever. A paper is named by its identifier (`Student A`) when
@@ -234,18 +233,12 @@ the site too is the teacher's call; a test's own solutions never do.
 Tell the teacher where the folder is, what was checked and by whom, and
 anything still open.
 
-**Marking is another skill's, and only when it is here.** Look for
-`.claude/skills/plantoir-marking/SKILL.md` (or
-`.agents/skills/plantoir-marking/SKILL.md`) in this working folder; the
-root `CLAUDE.md` and `AGENTS.md` list the skills that are here. If it is
-there, when the kit is finished and the teacher has looked at it, you may
-mention once, in one sentence, that when the papers are written you can
-help mark them onto feedback sheets with the plantoir-marking skill. Do
-not raise it again in this session if they do not take it up. If it is not
-there, say nothing about marking, and do not mark papers from this kit:
-marking follows that skill's rules about students' names, and without them
-it does not happen. If the teacher asks about marking, say that it needs
-the plantoir-marking skill, which is not in this folder.
+**Marking is the teacher's own.** Do not offer to mark, and do not mark
+from this kit, in this session or any other. If the teacher asks you to
+mark, or asks about report card comments, tell them in these words:
+"This version of Plantoir does not help with marking or with report card
+comments; the files in this kit are for your own marking." Say nothing
+more about it.
 
 If the teacher asks what you can help with, answer plainly from what this
 skill describes, and claim nothing it does not.

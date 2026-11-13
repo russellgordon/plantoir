@@ -30,7 +30,10 @@ right and this file is corrected.
   first, always: a force-push, a history rewrite, `git branch -D`. A cut, a
   tag, a merge into `main`, signing and a website deploy happen only when
   Russell asks for that cut or that deploy; after a cut, `main` is merged
-  back into `dev` in the same session.
+  back into `dev` in the same session, and then the number of each platform
+  that SHIPPED in the cut is raised on `dev` to that platform's next
+  release; a platform that shipped nothing keeps its number until its own
+  cut (`RELEASING.md` → "When the number is raised", #861).
 - **If this harness cannot run Fable as the main session, you are not a
   Fable director**: rule 6's ordinary rule applies, and each merge into
   `dev` is Russell's. Where the model names differ, use the strongest model
@@ -43,6 +46,9 @@ right and this file is corrected.
 1. Read `CLAUDE.md`, your platform's bootstrap file, the milestone's
    description (it is the brief for the run) and every issue in the
    milestone, body and comments. Rulings are comments on the issues.
+   Check that the project file's version on `dev` already names this
+   milestone's release (`MARKETING_VERSION` on the Mac, `<Version>` on
+   Windows); if it does not, raising it is the run's first commit (#861).
 2. Tell Russell briefly: the order you propose and why, what can overlap, an
    estimate in agent-hours and clock time, and each decision that is his.
 3. Wait until he agrees the order. On Windows this is `WINDOWS-BOOTSTRAP.md`
@@ -145,7 +151,7 @@ A change to documents alone needs no gate unless a test reads the document
 |---|---|---|
 | Never edit | `windows-app/` | `mac-app/` |
 | The other side's work goes in | a `windows` issue | a `mac` issue |
-| Gates | the mac suite, `verify.sh` (with `PLANTOIR_APP` naming the bundle built from the tree under test, or #850's crawl is skipped; never with it set while Russell is at the keyboard: the crawl starts the app binary headless, measured not to take the front, but what took his key window on 2026-11-13 is still unknown), and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
+| Gates | the mac suite, `PLANTOIR_REQUIRE_ENGINES=chromium,webkit PLANTOIR_APP=<the bundle built from the tree under test> script -q /dev/null ./verify.sh` (the first so the rendered check's two engines, #597, are a failure when missing, never a SKIP: fetch them once with `./browser-checks/fetch-browsers.sh`; it does not cover the network, so read the summary's SKIP lines; the second so #850's crawl through the app is not skipped: never set it while Russell is at the keyboard, since the crawl starts the app binary headless, measured not to take the front, but what took his key window on 2026-11-13 is still unknown), and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
 | Not a gate | the UI test target: opt-in, alone on a quiet machine | `run-ui-tests.ps1`: opt-in, needs the screen, closes Plantoir |
 | The image (Dockerfile, baked files) | gated by `verify.sh` | not gated here: a change made on Windows needs a `mac` issue |
 | Generated contract halves | `Plantoir --write-contracts` | cannot regenerate: propose authored cases, open a `mac` issue |
