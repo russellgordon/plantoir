@@ -2625,6 +2625,146 @@
     "say": "shared-rules#appUpdates.wording.okButton"
    },
    "windows": null
+  },
+  "fixWithClaudeButton": {
+   "label": "Fix with Claude\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.fixWith.buttons[0].title"
+   },
+   "windows": null
+  },
+  "fixWithCodexButton": {
+   "label": "Fix with Codex\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.fixWith.buttons[1].title"
+   },
+   "windows": null
+  },
+  "fixWithGitHubCopilotButton": {
+   "label": "Fix with GitHub Copilot\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.fixWith.buttons[2].title"
+   },
+   "windows": null
+  },
+  "planAUnitWithClaudeButton": {
+   "label": "Plan a Unit with Claude\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.planAUnit.buttons[0].title"
+   },
+   "windows": null
+  },
+  "planAUnitWithCodexButton": {
+   "label": "Plan a Unit with Codex\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.planAUnit.buttons[1].title"
+   },
+   "windows": null
+  },
+  "planAUnitWithGitHubCopilotButton": {
+   "label": "Plan a Unit with GitHub Copilot\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.planAUnit.buttons[2].title"
+   },
+   "windows": null
+  },
+  "planningTabUnitPopUp": {
+   "label": "Unit",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.unitPopup"
+   },
+   "windows": null
+  },
+  "planningTabAllPlansChoice": {
+   "label": "All Plans",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.allPlans"
+   },
+   "windows": null
+  },
+  "planningTabBackButton": {
+   "label": "Back",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.back"
+   },
+   "windows": null
+  },
+  "planningTabForwardButton": {
+   "label": "Forward",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.forward"
+   },
+   "windows": null
+  },
+  "planningTabReloadButton": {
+   "label": "Reload",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.reload"
+   },
+   "windows": null
+  },
+  "planningTabOpenInBrowserButton": {
+   "label": "Open in Browser",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.openInBrowser"
+   },
+   "windows": null
+  },
+  "planningTabNoUnitPlansYetTitle": {
+   "label": "No Unit Plans Yet",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.emptyTitle"
+   },
+   "windows": null
+  },
+  "planningTabUnitPlansCannotBeShownTitle": {
+   "label": "Unit Plans Can\u2019t Be Shown",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.cannotShowTitle"
+   },
+   "windows": null
+  },
+  "outsideAssistantClaudeDidNotOpenTitle": {
+   "label": "Claude didn\u2019t open",
+   "mac": {
+    "say": "app-rules#outsideAgents.agents[0].didNotOpenTitle"
+   },
+   "windows": null
+  },
+  "outsideAssistantCodexDidNotOpenTitle": {
+   "label": "Codex didn\u2019t open",
+   "mac": {
+    "say": "app-rules#outsideAgents.agents[1].didNotOpenTitle"
+   },
+   "windows": null
+  },
+  "outsideAssistantGitHubCopilotDidNotOpenTitle": {
+   "label": "GitHub Copilot didn\u2019t open",
+   "mac": {
+    "say": "app-rules#outsideAgents.agents[2].didNotOpenTitle"
+   },
+   "windows": null
+  },
+  "agentGuidanceSheetShowWhatWouldBeAdded": {
+   "label": "Show what would be added",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/AgentGuidance.swift"
+   },
+   "windows": null
+  },
+  "agentGuidanceSheetNotNowButton": {
+   "label": "Not Now",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/AgentGuidance.swift"
+   },
+   "windows": null
+  },
+  "agentGuidanceSheetAddButton": {
+   "label": "Add",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/AgentGuidance.swift"
+   },
+   "windows": null
   }
  },
  "keys": {}

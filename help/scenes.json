@@ -1616,6 +1616,318 @@
    "setup": "",
    "windows": null,
    "raw": false
+  },
+  "subject-english-1": {
+   "page": "subject-english",
+   "shows": "The self-check question on ENG2D's page Romeo and Juliet, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-english-2": {
+   "page": "subject-english",
+   "shows": "ENG2D's page The Prologue, Line by Line on the class website, with its Print button and a folded answer",
+   "labels": [
+    "Print",
+    "Folded answer"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-canadian-and-world-studies-1": {
+   "page": "subject-canadian-and-world-studies",
+   "shows": "The part A film to practise on, on CHC2D's page Photographs, on the class website",
+   "labels": [
+    "Film from YouTube"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-canadian-and-world-studies-2": {
+   "page": "subject-canadian-and-world-studies",
+   "shows": "The self-check question on CHC2D's page Newspapers and Propaganda, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-visual-art-1": {
+   "page": "subject-visual-art",
+   "shows": "The part Three works to look at twice, on AVI1O's page Looking Twice, on the class website",
+   "labels": [
+    "Picture",
+    "Credit line"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-visual-art-2": {
+   "page": "subject-visual-art",
+   "shows": "AVI1O's page A Looking Sheet on the class website, with its picture, questions and Print button",
+   "labels": [
+    "Print"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-drama-1": {
+   "page": "subject-drama",
+   "shows": "The part Tableau on the professional stage, on ADA1O's page Tableau, on the class website",
+   "labels": [
+    "Interview from YouTube"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-drama-2": {
+   "page": "subject-drama",
+   "shows": "The self-check question on ADA1O's page Thought Tracking, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-business-1": {
+   "page": "subject-business",
+   "shows": "BOH4M's page The New Supervisor on the class website, with its Print button and a folded note",
+   "labels": [
+    "Print",
+    "Folded note"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-business-2": {
+   "page": "subject-business",
+   "shows": "The self-check question on BOH4M's page Levels of Management, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-guidance-and-careers-1": {
+   "page": "subject-guidance-and-careers",
+   "shows": "The success criteria at the end of GLC2O's page The Budget, on the class website",
+   "labels": [
+    "Success criteria",
+    "Tick boxes"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-guidance-and-careers-2": {
+   "page": "subject-guidance-and-careers",
+   "shows": "The My Progress page on the website of a section made from GLC2O",
+   "labels": [
+    "My Progress",
+    "Ticked"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-dance-1": {
+   "page": "subject-dance",
+   "shows": "One part of ATC1O's page Four Forms on Film, on the class website, with the film's player and its questions",
+   "labels": [
+    "Film from YouTube",
+    "Questions"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-dance-2": {
+   "page": "subject-dance",
+   "shows": "ATC1O's page Four Forms on Film in Obsidian, with the line that holds a film's address",
+   "labels": [
+    "The film's address"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "assistants-1": {
+   "page": "assistants",
+   "shows": "The Course menu with its Revise With submenu open, listing the assistants found on this Mac",
+   "labels": [
+    "Claude\u2026",
+    "Codex\u2026",
+    "GitHub Copilot\u2026",
+    "Local AI Assistant\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Claude Code, Codex and GitHub Copilot's command-line tool all installed; a course row selected.",
+   "windows": null,
+   "raw": false
+  },
+  "revise-with-1": {
+   "page": "revise-with",
+   "shows": "Revise With in the Course menu, with a course selected in the sidebar",
+   "labels": [
+    "Revise With \u25b8 Claude\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course row selected; at least Claude Code installed.",
+   "windows": null,
+   "raw": false
+  },
+  "revise-with-2": {
+   "page": "revise-with",
+   "shows": "A course's How I Teach page open in Obsidian",
+   "labels": [
+    "How I Teach"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "fix-with-1": {
+   "page": "fix-with",
+   "shows": "A section's Problems tab, with ticked rows and the Fix with buttons under the table",
+   "labels": [
+    "Fix with Claude\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A section whose last preview found problems; Claude Code installed.",
+   "windows": null,
+   "raw": false
+  },
+  "plan-a-unit-1": {
+   "page": "plan-a-unit",
+   "shows": "The Planning tab of a course, showing one unit's plan",
+   "labels": [
+    "Planning",
+    "Unit",
+    "Open in Browser"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course with at least one unit plan built.",
+   "windows": null,
+   "raw": false
+  },
+  "plan-a-unit-2": {
+   "page": "plan-a-unit",
+   "shows": "The Planning tab with All Plans chosen in the Unit pop-up",
+   "labels": [
+    "All Plans"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course with plans for two or more units.",
+   "windows": null,
+   "raw": false
+  },
+  "copilot-1": {
+   "page": "copilot",
+   "shows": "A GitHub Copilot session opened from Plantoir in a Terminal window, with the opening message already sent",
+   "labels": [
+    "GitHub Copilot"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Needs a real GitHub Copilot session opened from Revise With (FS-13 doubt 1: not yet seen running).",
+   "windows": null,
+   "raw": false
+  },
+  "copilot-2": {
+   "page": "copilot",
+   "shows": "GitHub Copilot asking in its own window before it runs a command",
+   "labels": [
+    "Yes",
+    "No"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Needs a real GitHub Copilot session (FS-13 doubt 1); the labels are GitHub's own answers and must be checked against the window.",
+   "windows": null,
+   "raw": false
+  },
+  "github-education-1": {
+   "page": "github-education",
+   "shows": "GitHub's public page for teachers, at github.com/education/teachers",
+   "labels": [
+    "GitHub Education"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "GitHub's public page, not signed in.",
+   "windows": null,
+   "raw": false
+  },
+  "github-education-2": {
+   "page": "github-education",
+   "shows": "GitHub's public instructions for applying to GitHub Education as a teacher",
+   "labels": [
+    "Start an application"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "GitHub's public documentation page, not signed in. The form itself is behind sign-in and is not pictured.",
+   "windows": null,
+   "raw": false
+  },
+  "github-education-3": {
+   "page": "github-education",
+   "shows": "GitHub's public instructions for turning on GitHub Copilot Pro as a verified teacher",
+   "labels": [
+    "Copilot settings"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "GitHub's public documentation page, not signed in.",
+   "windows": null,
+   "raw": false
   }
  }
 }

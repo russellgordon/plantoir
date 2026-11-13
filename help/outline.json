@@ -5,8 +5,8 @@
  "voice": "Documentation, not marketing: one task a page, steps in order, what you see after each, what to do when it goes wrong. Written by Fable from an Opus fact sheet; reviewed adversarially for accuracy, clarity, simple language and tone.",
  "anchorRule": "One anchor a page, written <a name=\"<anchor>\"></a> before the title; the file is <anchor>.html; a Help button opens a PAGE, never a place inside one (measured 2026-11-13: every anchor on a page resolves to its first).",
  "pageCount": 104,
- "sceneCount": 203,
- "pictureFilesMac": 406,
+ "sceneCount": 195,
+ "pictureFilesMac": 390,
  "readingTimeTotalMinutes": 277,
  "landingPage": {
   "indexed": false,
@@ -3210,7 +3210,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (ENG2D, ENG3U, ENG4U, ENL1W): readings written once in Reading and linked from class pages (ENG2D Romeo and Juliet; link one-lesson), checklists, coverage, diagrams from text (ENG2D Plot and Structure). NOT shown: self-check questions, handouts (none). WITH C2 (question 1): ENG2D gains a self-check on a Reading page and one printable handout with folded answers.",
      "id": "subject-english",
@@ -3230,10 +3230,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-english-1",
-      "subject-english-2",
-      "subject-english-3"
+      "subject-english-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The self-check question on ENG2D's page Romeo and Juliet, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-english-1"
+      },
+      {
+       "shows": "ENG2D's page The Prologue, Line by Line on the class website, with its Print button and a folded answer",
+       "labels": [
+        "Print",
+        "Folded answer"
+       ],
+       "scene": "subject-english-2"
+      }
+     ]
     },
     {
      "anchor": "subject-science",
@@ -3343,7 +3359,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (CGC1W, CGF3M, CHA3U, CHC2D, CHV2O, CIA4U): shared pages linked from class pages (CHC2D Sources, CGF3M Case Studies, CIA4U Models), coverage (CHC2D, 90 expectation pages), checklists, diagrams from text (CIA4U Circular Flow). NOT: videos (CHC2D mentions a film, embeds none; the plan was wrong). WITH C3 (question 1): CHC2D gains an embedded, openly licensed video on a Sources page and a self-check question.",
      "id": "subject-canadian-and-world-studies",
@@ -3363,10 +3379,25 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-canadian-and-world-studies-1",
-      "subject-canadian-and-world-studies-2",
-      "subject-canadian-and-world-studies-3"
+      "subject-canadian-and-world-studies-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The part A film to practise on, on CHC2D's page Photographs, on the class website",
+       "labels": [
+        "Film from YouTube"
+       ],
+       "scene": "subject-canadian-and-world-studies-1"
+      },
+      {
+       "shows": "The self-check question on CHC2D's page Newspapers and Propaganda, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-canadian-and-world-studies-2"
+      }
+     ]
     },
     {
      "anchor": "subject-music",
@@ -3410,7 +3441,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (AVI1O): shared Techniques, Studio Time and Critiques pages linked from class pages, checklists, coverage, diagrams from text (The Creative Process), tables and boxes (What This Site Can Do; link tables-boxes-footnotes). NOT: pictures, printing (none). WITH C1 (question 1): AVI1O gains a few public-domain artwork images in Media, embedded on a Techniques or Critiques page, and a printable critique sheet.",
      "id": "subject-visual-art",
@@ -3430,10 +3461,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-visual-art-1",
-      "subject-visual-art-2",
-      "subject-visual-art-3"
+      "subject-visual-art-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The part Three works to look at twice, on AVI1O's page Looking Twice, on the class website",
+       "labels": [
+        "Picture",
+        "Credit line"
+       ],
+       "scene": "subject-visual-art-1"
+      },
+      {
+       "shows": "AVI1O's page A Looking Sheet on the class website, with its picture, questions and Print button",
+       "labels": [
+        "Print"
+       ],
+       "scene": "subject-visual-art-2"
+      }
+     ]
     },
     {
      "anchor": "subject-drama",
@@ -3443,7 +3490,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (ADA1O): shared Conventions and Warm-Ups pages written once (Tableau), checklists, coverage, diagrams from text (Tableau Story Sequence). NOT: videos. WITH C4 (question 1): ADA1O gains an openly licensed video of a convention and a self-check question on Conventions.",
      "id": "subject-drama",
@@ -3463,10 +3510,25 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-drama-1",
-      "subject-drama-2",
-      "subject-drama-3"
+      "subject-drama-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The part Tableau on the professional stage, on ADA1O's page Tableau, on the class website",
+       "labels": [
+        "Interview from YouTube"
+       ],
+       "scene": "subject-drama-1"
+      },
+      {
+       "shows": "The self-check question on ADA1O's page Thought Tracking, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-drama-2"
+      }
+     ]
     },
     {
      "anchor": "subject-dance",
@@ -3476,7 +3538,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (ATC1O): shared Technique, Choreography and Warm-Ups pages, checklists, coverage, diagrams from text (7 pages); no video. WITH C0 (ruled): a page of openly licensed dance videos, YouTube today and Vimeo with #692; Fable picks them, Russell approves at the UI review (ruled 17:54).",
      "id": "subject-dance",
@@ -3497,10 +3559,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-dance-1",
-      "subject-dance-2",
-      "subject-dance-3"
+      "subject-dance-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "One part of ATC1O's page Four Forms on Film, on the class website, with the film's player and its questions",
+       "labels": [
+        "Film from YouTube",
+        "Questions"
+       ],
+       "scene": "subject-dance-1"
+      },
+      {
+       "shows": "ATC1O's page Four Forms on Film in Obsidian, with the line that holds a film's address",
+       "labels": [
+        "The film's address"
+       ],
+       "scene": "subject-dance-2"
+      }
+     ]
     },
     {
      "anchor": "subject-business",
@@ -3510,7 +3588,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (BOH4M): shared Cases and Simulations pages, coverage (90 pages with a Curriculum connection), checklists, diagrams from text (Levels of Management), tables and boxes, amounts of money written with \\$ (link notation). NOT: handouts, self-check questions. WITH C5 (question 1): BOH4M gains one printable case handout with its answers folded and a self-check question.",
      "id": "subject-business",
@@ -3530,10 +3608,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-business-1",
-      "subject-business-2",
-      "subject-business-3"
+      "subject-business-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "BOH4M's page The New Supervisor on the class website, with its Print button and a folded note",
+       "labels": [
+        "Print",
+        "Folded note"
+       ],
+       "scene": "subject-business-1"
+      },
+      {
+       "shows": "The self-check question on BOH4M's page Levels of Management, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-business-2"
+      }
+     ]
     },
     {
      "anchor": "subject-guidance-and-careers",
@@ -3543,7 +3637,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (GLC2O): Activities and Tasks pages linked from class pages, checklists on all 42 class pages, coverage, diagrams from text (The Pathway Plan), tables and amounts of money (The Cost of a Month). NOT: My Progress (no success-criteria boxes in any course). WITH C6 (question 1): success-criteria tick boxes on GLC2O's task pages give its sections a My Progress page (myProgress.knownLimits in the contract then changes) and a self-check question.",
      "id": "subject-guidance-and-careers",
@@ -3563,10 +3657,27 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-guidance-and-careers-1",
-      "subject-guidance-and-careers-2",
-      "subject-guidance-and-careers-3"
+      "subject-guidance-and-careers-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The success criteria at the end of GLC2O's page The Budget, on the class website",
+       "labels": [
+        "Success criteria",
+        "Tick boxes"
+       ],
+       "scene": "subject-guidance-and-careers-1"
+      },
+      {
+       "shows": "The My Progress page on the website of a section made from GLC2O",
+       "labels": [
+        "My Progress",
+        "Ticked"
+       ],
+       "scene": "subject-guidance-and-careers-2"
+      }
+     ]
     }
    ]
   },
@@ -4362,10 +4473,11 @@
      ],
      "pictures": [
       {
-       "shows": "Course ▸ Revise With submenu",
+       "shows": "The Course menu with its Revise With submenu open, listing the assistants found on this Mac",
        "labels": [
         "Claude…",
         "Codex…",
+        "GitHub Copilot…",
         "Local AI Assistant…"
        ],
        "scene": "assistants-1"
@@ -4409,7 +4521,7 @@
       "Set up GitHub Copilot's command-line tool from Plantoir (link set-up-assistant)",
       "What the benefit includes and what it does not"
      ],
-     "scenes": 4,
+     "scenes": 3,
      "readMinutes": 5,
      "notes": "Every fact from GitHub's own documentation, fetched and quoted with the date read; front matter factsChecked and authority; the page prints the date and links GitHub's page as the authority. Pictures from GitHub's public pages; a signed-in view only if Russell walks it once (to ask then). Says first that Plantoir needs no assistant.",
      "id": "github-education",
@@ -4432,10 +4544,32 @@
      "sceneIds": [
       "github-education-1",
       "github-education-2",
-      "github-education-3",
-      "github-education-4"
+      "github-education-3"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "GitHub's public page for teachers, at github.com/education/teachers",
+       "labels": [
+        "GitHub Education"
+       ],
+       "scene": "github-education-1"
+      },
+      {
+       "shows": "GitHub's public instructions for applying to GitHub Education as a teacher",
+       "labels": [
+        "Start an application"
+       ],
+       "scene": "github-education-2"
+      },
+      {
+       "shows": "GitHub's public instructions for turning on GitHub Copilot Pro as a verified teacher",
+       "labels": [
+        "Copilot settings"
+       ],
+       "scene": "github-education-3"
+      }
+     ]
     },
     {
      "anchor": "set-up-assistant",
@@ -4509,7 +4643,24 @@
       "copilot-1",
       "copilot-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A GitHub Copilot session opened from Plantoir in a Terminal window, with the opening message already sent",
+       "labels": [
+        "GitHub Copilot"
+       ],
+       "scene": "copilot-1"
+      },
+      {
+       "shows": "GitHub Copilot asking in its own window before it runs a command",
+       "labels": [
+        "Yes",
+        "No"
+       ],
+       "scene": "copilot-2"
+      }
+     ]
     },
     {
      "anchor": "local-assistant",
@@ -4581,14 +4732,14 @@
      ],
      "pictures": [
       {
-       "shows": "Revise With in the Course menu",
+       "shows": "Revise With in the Course menu, with a course selected in the sidebar",
        "labels": [
         "Revise With ▸ Claude…"
        ],
        "scene": "revise-with-1"
       },
       {
-       "shows": "How I Teach in Obsidian",
+       "shows": "A course's How I Teach page open in Obsidian",
        "labels": [
         "How I Teach"
        ],
@@ -4676,7 +4827,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Planning tab on a unit",
+       "shows": "The Planning tab of a course, showing one unit's plan",
        "labels": [
         "Planning",
         "Unit",
@@ -4685,7 +4836,7 @@
        "scene": "plan-a-unit-1"
       },
       {
-       "shows": "All Plans",
+       "shows": "The Planning tab with All Plans chosen in the Unit pop-up",
        "labels": [
         "All Plans"
        ],
@@ -4896,7 +5047,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Problems tab's Fix with buttons",
+       "shows": "A section's Problems tab, with ticked rows and the Fix with buttons under the table",
        "labels": [
         "Fix with Claude…"
        ],
