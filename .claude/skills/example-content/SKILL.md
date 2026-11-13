@@ -1228,6 +1228,41 @@ is the contract; what EXC2O needed:
   linter's "no class links" notes list it; confirm the list reads as
   deliberate extras, not forgotten links.
 
+## Pictures and videos: openly licensed, and written down
+
+A payload may show a picture or a video only when it is in the public domain
+or openly licensed, and the licence was read on the work's own page (the
+museum's page for the object, the video's page on YouTube) on the day it was
+added. A wrong licence claim is worse than a gap: when a licence cannot be
+verified, choose another work.
+
+- **A video is embedded, never copied**: the YouTube picture form
+  `![](https://www.youtube.com/watch?v=...)` on a line of its own, as the
+  shipped `plantoir-page-authoring` skill gives it. Prefer an institution's
+  own channel (a national arts body, a museum, a school board, a public
+  broadcaster) to an individual's.
+- **A picture is carried by the payload, BESIDE the page that shows it**, in
+  that page's own folder, the way a `.ggb` is (Known traps, below): the
+  installer copies anything that is not `.md` as it is, and the build copies
+  a shared folder whole. Show it with `![[File Name.jpg|what it shows]]`, so
+  it has a description. **Not in a `shared/Media` folder**: the installer
+  drops `Media` from the folders it pours (`setup_course.py`, where the
+  manifest's `shared_folders` are read), and both apps' contract tests refuse
+  a folder under `shared/` the manifest does not name
+  (`contracts/example-content.json`, the allow-list rule), so a picture put
+  there reaches no teacher. Keep each file to a few hundred KB; download it
+  from the museum itself.
+- **Every one is recorded in `SOURCES.md` beside `manifest.json`**: the page
+  that shows it, title, creator, year, the page it was taken from, the
+  licence as stated there, and the date checked. The file is a record for
+  whoever maintains the payload: it sits outside `shared/` and
+  `per_section/`, so it is never installed, and `lint_payload.py` leaves it
+  alone. AVI1O's and ATC1O's are the examples.
+- No picture of a living private person, no real student, and no firearms or
+  ammunition in any picture, video, question or scenario.
+- The owner approves or replaces each one at the review before a release, so
+  say in the piece's closing note which were not watched or seen in full.
+
 ## Known traps
 
 - Wizard structure prompts are SKIPPED when pre-populating — a payload
