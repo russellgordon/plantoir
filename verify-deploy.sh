@@ -1407,6 +1407,8 @@ PLANS_USER="colleague709"
 PLANS_PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)"
 PLANS_PASS2="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)"
 PLANS_BORROWED=false
+PLANS_HAD_INTERNAL=true
+PLANS_HAD_SITES_FOLDER=true
 PLANS_STORED=false
 restore_the_plans_leg() {
   if [ "$PLANS_STORED" = true ]; then
@@ -1420,8 +1422,15 @@ restore_the_plans_leg() {
       mv "$PLANS_DIR.verify-deploy-hidden" "$PLANS_DIR"
     fi
     rm -f "$PLANS_MARKER"
+    if [ -e "$PLANS_MARKER.verify-deploy-hidden" ]; then
+      mv "$PLANS_MARKER.verify-deploy-hidden" "$PLANS_MARKER"
+    fi
+    # Folders the leg made for a course that had none: removed only when
+    # empty, so nothing else that landed in them is lost.
+    [ "$PLANS_HAD_SITES_FOLDER" = true ] || rmdir "$(dirname "$PLANS_MARKER")" 2>/dev/null
+    [ "$PLANS_HAD_INTERNAL" = true ] || rmdir "$(dirname "$PLANS_DIR")" 2>/dev/null
     PLANS_BORROWED=false
-    echo "  ↩︎  put the course's own planning folder back"
+    echo "  ↩︎  put the course's own planning folder back as it was"
   fi
 }
 plan_status() {  # plan_status <url> [credential] -> the HTTP status, or 000
@@ -1461,8 +1470,15 @@ if [ "$HAVE_CLOUDFLARE" != true ]; then
 elif security find-generic-password -s containerized-quartz-unit-plan -a "$PLANS_ACCOUNT" >/dev/null 2>&1; then
   skip "unit plans: this folder already keeps a username and password for $COURSE's plans, which this run will not read or replace"
 else
-  if [ -e "$PLANS_DIR" ]; then mv "$PLANS_DIR" "$PLANS_DIR.verify-deploy-hidden"; fi
+  # Borrowed and put back exactly: a fresh course has no .internal yet, a
+  # taught one may hold a plan of the teacher's own, and either may have
+  # sites already recorded.
+  [ -d "$(dirname "$PLANS_DIR")" ] || PLANS_HAD_INTERNAL=false
+  [ -d "$(dirname "$PLANS_MARKER")" ] || PLANS_HAD_SITES_FOLDER=false
   PLANS_BORROWED=true
+  if [ -e "$PLANS_DIR" ]; then mv "$PLANS_DIR" "$PLANS_DIR.verify-deploy-hidden"; fi
+  if [ -e "$PLANS_MARKER" ]; then mv "$PLANS_MARKER" "$PLANS_MARKER.verify-deploy-hidden"; fi
+  mkdir -p "$(dirname "$PLANS_DIR")"
   cp -R "$REPO/support/agent_guidance/skills/plantoir-unit-planning/template" "$PLANS_DIR"
   mkdir -p "$PLANS_DIR/unit/pdfs"
   printf '%%PDF-1.4 invented quiz\n' >"$PLANS_DIR/unit/pdfs/Quiz 1, Part A.pdf"
