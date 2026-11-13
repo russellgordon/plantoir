@@ -153,6 +153,54 @@ own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
 from the source, since `SectionDetailView` cannot be mounted in a unit test —
 that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
 
+**A sixth and a seventh shipped to `dev` in v1.10.0, and were caught in the
+real window before the cut** (#831, #832, 2026-11-13). On a section whose last
+build made a coverage map, the Coverage tab's column was laid out **2,194**
+points tall inside a 700-point content area; on a course whose class sites go
+to Netlify (or name no destination, which reads as Netlify), the Planning tab's
+was **2,630** points. Squeezed (`sizeThatFits` at 1 × 0), the section page
+claimed **2,165** and the Planning tab **2,565**, of which the share bar alone
+was **2,529**; with Cloudflare chosen the share bar claimed **35** and the tab
+was laid out correctly, which is how the Netlify sentence was found. The cause
+was this section's rule broken twice more: the Coverage header's lines and
+`PlanShareBar`'s sentences each carried `.fixedSize(horizontal: false,
+vertical: true)`. A `WKWebView` reporting its page's height was suspected and
+ruled out by the same measurement: `PlanWebView.sizeThatFits` returns exactly
+what it is proposed, and the web view was laid out to whatever the column was.
+
+Two fixes, each measured to be enough on its own, and both kept:
+
+- **The modifiers are gone** from `CoverageTabView` and `PlanShareBar`
+  (squeezed: 65 and 39 points). At a real width the sentences still wrap in
+  full: the plan's web view is 507 points tall under the Netlify sentence and
+  541 under the shorter Cloudflare one, in the same window.
+- **`TabArea`** (`DetailTabs.swift`) holds every tab's content, in
+  `SectionTabContent` and `CourseDetailContent`, with `minHeight: 0`: the room
+  under a detail view's tabs claims no height of its own whatever a tab inside
+  it asks for (squeezed: 36 and 0 points with the modifiers still in place).
+  This is the structural half: the next rigid sentence, or the next
+  representable that reports an intrinsic height, inside any tab cannot move
+  the tab bar. Height only: the column's smallest width still comes from what
+  the tab needs, so a form is never drawn narrower than it can be.
+
+**Why the tests did not see it.** `SectionDetailStructureTests` and
+`CourseDetailStructureTests` read what is in the view tree; none of them laid a
+frame out. `DetailTabsLayoutTests` now does: the real `SectionDetailView` and
+the real Planning tab under `DetailTabs` in a `NavigationSplitView` window
+sized as the scene sizes it, at 1100 × 720 and 1440 × 860, with a page taller
+than the window loaded, asserting that the tab bar, the web view and every
+AppKit control (the Unit popup, the share bar's checkboxes) are inside the
+window, that the page is below the bar, and that no view outside a scroll
+view's content is taller than the window. Measured failing on the code before
+the fix (the tab bar at y = 1,417 in a 700-point window) and passing after.
+The same file pins that none of the two tabs' files makes a sentence rigid.
+
+**Rejected:** a `ScrollView` around the tab's content (the page scrolls inside
+its own web view already, and a scroll view's ideal height is its content, the
+first row of the table above); capping the web view's height (the web view was
+never the one claiming); and laying the window out again after the page loads,
+which is a race dressed as a fix.
+
 The fourth is the one to learn from, because the third had already produced a
 rule, a comment and a test file, and the fault still shipped twice more in the
 same window. The comment lived on the view it was written for; the test file
@@ -1225,7 +1273,132 @@ apostrophe in it, the trail line against the contract's, a source scan of
 the view, and the disabled buttons' hint in both states with both buttons
 carrying it (#776).
 
+## Return and Escape in this release's questions (#832)
+
+**In a SwiftUI alert each button carries ONE key**, measured in an offscreen
+window by reading each `NSButton`'s key equivalent and sending the keys:
+
+| the buttons | Return | Escape |
+|---|---|---|
+| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v1.10.0 used for "Cancel is the default") | Cancel | **nothing** |
+| a plain action, then Cancel `role: .cancel` | the action | Cancel |
+| Cancel listed first, then a plain action | the action | Cancel |
+| an action `role: .destructive`, then Cancel `role: .cancel` | nothing | Cancel |
+| Cancel + `.defaultAction`, the action + `.cancelAction` | Cancel | **the action** |
+
+A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
+a Return given to it later is dropped. So "Cancel is the default" and "Escape
+closes the question" cannot both hold in an alert, and the v1.10.0 shape had
+kept the first and lost the second without anybody noticing: the structure
+test pinned the modifier, not the key. The questions now use the destructive
+row of the table: **Escape is Cancel, and Return presses neither button**, so
+a Return typed out of habit still removes, replaces, starts again or shares
+nothing. That was #832's answer for Remove Group, Start the Groups Again,
+Replace It… and the public-address warning, whose Share Without a Password
+used to take Return. **Since #834 the first three are sheets, where Cancel
+answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
+below); the public-address warning is still an alert with Escape alone.
+`QuestionKeysTests` presses both keys on each, through the real modifiers.
+
+**A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
+(`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives the sheet
+Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
+console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
+own), measured and pinned, not changed.
+
+**Rejected in #832:** turning the questions into sheets only so that Cancel
+could keep Return as well; and Cancel with Return and no Escape, which is what
+shipped to `dev` and what Russell reported. #834 then made three of them
+sheets for a reason of its own (below), and with that Cancel got both keys.
+
+### Questions as one sentence and labelled facts (#834)
+
+**Ruled by Russell, 2026-11-13**, of the Replace It… warning: "This dialog
+reads as a wall of text. Separate pertinent information from the message the
+app is trying to convey." The shape, `FactsQuestionSheet` with a
+`FactsQuestion`: a title that asks; ONE short sentence, the message, under it
+in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
+`Form` (`LabeledContent`, the system's own form styling, scrolling off); then
+the action and Cancel. A fact that is missing is no row, never a blank one
+(Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
+accessibility element, so VoiceOver reads the title, the message, then
+"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
+the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
+the action takes no key.
+
+Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
+`message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
+Group (`referenceCourses.groups.wording.removeGroupSentence`, then where its
+courses go, none, one or many with no "(s)", and that no course is removed or
+changed) and Start the Groups Again (`startAgainSentence`, then why, the
+groups you made, what is kept, and that nothing inside the courses changes).
+The one-paragraph keys (`body`, `bodyWithoutADate`, `removeGroupMessageNone`,
+`…One`, `…Many`, `startAgainMessage`) are retired, not kept beside the new
+ones.
+
+**The form's height is its rows'**, by `.fixedSize(horizontal: false,
+vertical: true)`, which is allowed here because a sheet is hosted at the width
+it sets itself (460 points), unlike the detail column ("A blank window"). The
+first version gave the form a height of 30 points a row plus 40; measured in
+`FactsQuestionTests` (the form's scroll view against what it holds), it cut
+off the last row of every question, by 20 to 61 points, most where a
+value wrapped. The test fails on that version and passes on this one.
+
+**The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
+shape inside its dialog. When Obsidian is running, Add Them closes the whole of
+Obsidian, so any OTHER course open in it closes too, and only this course
+opens again; the sentence said neither. `offerWhileOpen` and
+`offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
+line as "label: value" (`closesLabel`/`closesValue`,
+`opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
+`obsidianAddOnsForFigures.wording.closingRule`). The offer stays a dialog,
+because its Don't ask again box is a dialog suppression toggle presented from
+a view of its own (#731), and a dialog's message holds lines, not a form.
+Rejected by Russell: leaving Obsidian alone and telling the teacher to
+restart it; offering both at that moment.
+
+**The Reference Courses heading has a visible button** (Russell, 2026-11-13):
+`ReferenceShelfHeading` draws the title and a borderless `ellipsis.circle`
+menu button that opens exactly the heading's right-click menu (both draw
+`ReferenceShelfHeadingMenu`): New Reference Course…, New Group…, and Start
+the Groups Again… while the arrangement cannot be read. Its accessibility
+label and help are `headingMenuLabel`. It is never disabled and never
+absent while the heading is drawn, because New Reference Course… always
+applies there (the heading itself is drawn only when the shelf holds a course
+or a group). The borderless menu style is the sidebar footer's own control
+look, so AppKit draws its hover and pressed states, and Tab reaches it with
+keyboard navigation on; neither was measured in a unit test, which cannot
+hover or open a menu. `FactsQuestionTests` measures that the button is drawn
+inside the heading and enabled, and pins that both doors draw one list. A
+row's own group menu (Rename Group…, Remove Group…) and Move to Group stay on
+the rows and in the Course menu: the heading's button is the door for the
+shelf as a whole.
+
+**Identifiers in the two tabs.** The Planning tab, the share bar, the
+Coverage tab's header and both tabs' empty states carried an
+`.accessibilityIdentifier` on their container without `.contain`, so every
+control inside read back as the container's name (#832; the rule of #353 and
+#366). Each now has `.accessibilityElement(children: .contain)` immediately
+before it, and `ContainerIdentifierTripwireTests` names all five.
+
+**The course-code suggestions** in the New Course wizard opened four points
+under the field, over the orange sentence saying the code is already taken
+(and its Replace It… button), until focus left the field. The field's row,
+field and sentence together, now publishes its own anchor beside the field's
+(`CourseCodeAnchors`, a transform so the field's is kept), and the list opens
+below the row (`CourseCodeSuggestionsOverlay.top`). Measured by the geometry
+function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests`);
+the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
+a unit test can read a frame from.
+
 ## A section's Coverage tab (#793)
+
+**Its layout (#831, #832).** The tab's content sits in `TabArea`, which
+claims no height of its own, and nothing in the tab makes a sentence rigid, so
+the tab bar and the header keep their place at every window size and a long
+page scrolls inside its web view. Measured and rejected shapes: "A blank
+window: when a child claims a size the window cannot give", the sixth and
+seventh cases.
 
 Every build of a section writes, beside the built site, its curriculum
 coverage map as it would be if every existing page were published (793a, doc
@@ -1281,9 +1454,10 @@ only when `about.json`'s `buildId` equals the section's `.build-id`
 Python does); ids are compared for equality only. The first line is the
 map's own date, said only as far as it is true (the 793b review's M1): "made
 when this section was last built" only when the map IS the latest build's;
-"made by an earlier build … the latest build made no map" when it is
-another build's and nothing is making the map, but only "made by an earlier
-build" while a build is making it, because a build writes `.build-id` as it
+`olderMap` ("this map is from an earlier build … the latest build could not
+make a new one", naming Make the Map Again) when it is another build's and
+nothing is making the map, but only the opening of that sentence
+(`olderMapWhileBuilding`) while a build is making it, because a build writes `.build-id` as it
 starts and the record reads as another build's until its map is written (the
 fix review's M3); and a form with no date, read from the record's own start
 rather than from the walk (LOW 4), when the record has none, because
@@ -1412,9 +1586,26 @@ the preview to the browser.
 
 **Another window's build.** While another window's preview of the section
 builds, it has moved `.build-id` before its map, so this window's tab no
-longer says the latest build made no map: the older map is "made by an
-earlier build", with the line that the section is being previewed in another
-window (LOW 4).
+longer says the latest build could not make a new map: the older map carries
+only `olderMapWhileBuilding`, with the line that the section is being
+previewed in another window (LOW 4).
+
+**An older map is a caution (#831, Russell 2026-11-13).** Russell read the
+first wording of `olderMap` ("Made by an earlier build of this section,
+{when}. The latest build made no map.") and found it said neither why nor
+what to do. It now says the latest build could not make a new one and names
+the button by the label it carries in that state, Make the Map Again. The
+`couldNotMakeAgain` line that used to follow it is left out under `olderMap`
+and `olderMapNoTime`, because it said the same thing again (the stateRule and
+two state cases changed with it). The lines that say the map may be out of
+date (`coverageTab.tab.cautionLines`: `olderMap`, `olderMapNoTime`,
+`changedSince`, `mayBeOutOfDate`) are drawn with an orange caution triangle
+before them, whose accessibility label is `cautionLabel`; every other line,
+`asOf` among them, is plain. The words say it too, so the symbol is never the
+only signal. Before this nothing in the header carried a symbol: the request
+to give the older map the treatment `changedSince` has found `changedSince`
+drawn as plain text, so both became cautions together and read as one
+family. `CoverageTabTests.testAMapThatMayBeOutOfDateIsACaution` pins it.
 
 **A late refusal that waited on Coverage** goes to the section's next page
 when the teacher leaves the section from Coverage, through `SectionCoverage`,
@@ -4618,6 +4809,13 @@ as `scripts/test_unit_plan_template.py` is for this one, and a `windows` issue
 mirroring its `PrintablePagesTests` case.
 
 ### The course page's Planning tab (#708)
+
+**Its layout (#831, #832).** The tab's content sits in `TabArea`, which
+claims no height of its own, and nothing in the tab makes a sentence rigid, so
+the tab bar and the header keep their place at every window size and a long
+page scrolls inside its web view. Measured and rejected shapes: "A blank
+window: when a child claims a size the window cannot give", the sixth and
+seventh cases.
 
 A course's page has two tabs while Claude Code or Codex is installed:
 Settings, which is what the page has always shown, and Planning, which shows
@@ -10275,12 +10473,14 @@ real courses; nor does the assistant, which has no tool for it.
 Replace It… first asks whether the course can be replaced at all (it must be
 a reference course, not previewing or being copied, and not open in
 Obsidian), and says why not where the door says its other problems. Then the
-warning: title `wording.title`, body `wording.body`, which gives the
-sections, pages and size, the day the folder was made, the name the backup
-will have in Backups (the folder's), and that restoring that backup puts the
-old course back in place of the new one (plan review M9). Cancel is the
-default button. Composed by `ReferenceReplacer.offer`; the alert is the
-shared `ReplaceReferenceCourseAlert`.
+warning, a facts sheet since #834: title `wording.title`, the sentence
+`wording.message`, and rows for the sections, pages and size, the day the
+folder was made (absent when it cannot be read), the name the backup will
+have in Backups (the folder's), and that restoring that backup undoes it
+(plan review M9). Cancel is the default and answers Return and Escape (see
+"Questions as one sentence and labelled facts (#834)"). Composed by
+`ReferenceReplacer.offer`; presented by the shared
+`ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
 **The order is the design.** `ReferenceReplacer.replace`:
 
@@ -10470,7 +10670,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (Cancel the default). It MOVES the unreadable file aside to
+read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by
@@ -10580,7 +10780,9 @@ Persian and override cases failed; Start the Groups Again deleting instead of
 moving, the kept copy was missing; moving a newer version's file, the newer
 case failed; the duplicate-id entry left in place, removing "Kept" brought
 "Twice" back; the year shape limited to today's years, "2027–28" was
-allowed; Cancel without the default key, the structure test failed; each of
+allowed; (since #832 the keys are pressed for real in `QuestionKeysTests`, and
+the old structure test, which pinned a shape that left Escape doing nothing,
+is replaced); each of
 import, Keep a Copy and a backup restored where its course is gone without
 `recordArrival`, its real test kept the stale group.
 
@@ -15881,6 +16083,8 @@ this is the app's half.
   lists from their marker lines (`PlanShareLists`, kept out of the console)
   and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
   scrolling, the by-name sentence, Share and Cancel with Cancel the default
+  and Escape Cancel too, by `.onExitCommand` (#832: the sheet's
+  `.interactiveDismissDisabled()` had left Escape doing nothing)
   (`TaskProgressView.questionSurface`; fix review H1, after the first fix
   left it to the plain question alert, which showed the `[y/N]` line alone).
 - **A plan's password** is sent from the credential sheet exactly as typed
@@ -15888,7 +16092,9 @@ this is the app's half.
 - **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
   comes before a choice exactly when `PlanSharing.warns` says
   (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
-  nothing and runs nothing.
+  nothing and runs nothing. Share Without a Password is the destructive
+  button, so Escape is Cancel and Return presses neither (#832: it used to
+  take Return).
 - **The run** is `PlanShareRunner`: `deploy.sh` with
   `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
   `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so

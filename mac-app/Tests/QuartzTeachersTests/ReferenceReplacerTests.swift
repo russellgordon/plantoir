@@ -150,20 +150,21 @@ final class ReferenceReplacerTests: XCTestCase {
         XCTAssertEqual(
             ReferenceReplaceWording.title(course: "{course}", group: "{group}"), wording["title"] as? String
         )
+        // #834: one sentence, then the facts as rows; the one-paragraph
+        // body and bodyWithoutADate are retired.
+        XCTAssertEqual(ReferenceReplaceWording.message, wording["message"] as? String)
+        XCTAssertEqual(ReferenceReplaceWording.beingReplacedLabel, wording["beingReplacedLabel"] as? String)
         XCTAssertEqual(
-            ReferenceReplaceWording.body(
-                course: "{course}", group: "{group}", sections: "{sections}", pages: "{pages}",
-                size: "{size}", date: "{date}", folder: "{folder}"
-            ),
-            wording["body"] as? String
+            ReferenceReplaceWording.beingReplacedValue(sections: "{sections}", pages: "{pages}", size: "{size}"),
+            wording["beingReplacedValue"] as? String
         )
-        XCTAssertEqual(
-            ReferenceReplaceWording.bodyWithoutADate(
-                course: "{course}", group: "{group}", sections: "{sections}", pages: "{pages}",
-                size: "{size}", folder: "{folder}"
-            ),
-            wording["bodyWithoutADate"] as? String
-        )
+        XCTAssertEqual(ReferenceReplaceWording.keptOnLabel, wording["keptOnLabel"] as? String)
+        XCTAssertEqual(ReferenceReplaceWording.backedUpLabel, wording["backedUpLabel"] as? String)
+        XCTAssertEqual(ReferenceReplaceWording.backedUpValue(folder: "{folder}"), wording["backedUpValue"] as? String)
+        XCTAssertEqual(ReferenceReplaceWording.toUndoLabel, wording["toUndoLabel"] as? String)
+        XCTAssertEqual(ReferenceReplaceWording.toUndoValue, wording["toUndoValue"] as? String)
+        XCTAssertNil(wording["body"], "retired by #834")
+        XCTAssertNil(wording["bodyWithoutADate"], "retired by #834")
         XCTAssertEqual(ReferenceReplaceWording.confirmButton, wording["confirmButton"] as? String)
         XCTAssertEqual(ReferenceReplaceWording.cancelButton, wording["cancelButton"] as? String)
         XCTAssertEqual(ReferenceReplaceWording.replaceWhileBusy(course: "{course}"), wording["replaceWhileBusy"] as? String)
@@ -202,13 +203,41 @@ final class ReferenceReplacerTests: XCTestCase {
             return XCTFail("Replace It… was refused: \(offer)")
         }
         XCTAssertEqual(warning.title, ReferenceReplaceWording.title(course: "ICS3U", group: "2025–26"))
-        XCTAssertTrue(warning.message.hasPrefix("ICS3U in 2025–26 holds 1 section, 2 pages and "), warning.message)
-        XCTAssertTrue(warning.message.contains("as ICS3U-2025."), warning.message)
+        // #834: the message, then the rows in the contract's order.
+        XCTAssertEqual(warning.question.title, warning.title)
+        XCTAssertEqual(warning.question.message, ReferenceReplaceWording.message)
+        var labels: [String] = []
+        for row in warning.question.rows {
+            labels.append(row.label)
+        }
+        XCTAssertEqual(labels, [
+            ReferenceReplaceWording.beingReplacedLabel, ReferenceReplaceWording.keptOnLabel,
+            ReferenceReplaceWording.backedUpLabel, ReferenceReplaceWording.toUndoLabel,
+        ])
+        XCTAssertTrue(warning.question.rows[0].value.hasPrefix("1 section, 2 pages, "), warning.question.rows[0].value)
+        XCTAssertEqual(warning.question.rows[2].value, ReferenceReplaceWording.backedUpValue(folder: "ICS3U-2025"))
+        XCTAssertEqual(warning.question.rows[3].value, ReferenceReplaceWording.toUndoValue)
+        XCTAssertEqual(warning.question.action, ReferenceReplaceWording.confirmButton)
 
         let live: ReferenceReplacer.Offer = await ReferenceReplacer.offer(
             toReplace: "ICS3U", coursesDirectoryURL: coursesDirectoryURL, world: ReferenceReplacerTests.quietWorld()
         )
         XCTAssertEqual(live, .refused(ReferenceReplaceWording.notOnTheShelf(course: "ICS3U")))
+    }
+
+    /// With no day to say, the "Kept on" row is absent, never blank (#834).
+    func testWithNoDateTheKeptOnRowIsAbsent() {
+        let rows: [FactsQuestionRow] = ReferenceReplaceWording.rows(
+            sections: "1 section", pages: "2 pages", size: "4 KB", date: nil, folder: "ICS3U-2025"
+        )
+        var labels: [String] = []
+        for row in rows {
+            labels.append(row.label)
+            XCTAssertFalse(row.value.isEmpty, row.label)
+        }
+        XCTAssertEqual(labels, [
+            ReferenceReplaceWording.beingReplacedLabel, ReferenceReplaceWording.backedUpLabel, ReferenceReplaceWording.toUndoLabel,
+        ])
     }
 
     // MARK: - Only a reference course

@@ -54,6 +54,12 @@ struct PlanShareListsSheet: View {
         })
         .frame(width: 560)
         .interactiveDismissDisabled()
+        // Escape is Cancel too (#832). Cancel holds Return, and a button
+        // has one key, so Escape is the sheet's own: measured, it did
+        // nothing before (`QuestionKeysTests`).
+        .onExitCommand {
+            onCancel()
+        }
     }
 
     // MARK: - Functions

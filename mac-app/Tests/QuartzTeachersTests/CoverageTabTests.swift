@@ -191,6 +191,50 @@ final class CoverageTabTests: XCTestCase {
         }
     }
 
+    /// #831: a map that may be out of date is drawn as a caution, and the
+    /// lines that are cautions are the contract's. The state Russell read
+    /// ("the latest build ran its map step and made no map") carries one,
+    /// and names the button the tab offers there; the ordinary state
+    /// (`asOf`) carries none; and the older map's sentence is not followed
+    /// by a second line saying the same.
+    func testAMapThatMayBeOutOfDateIsACaution() throws {
+        let tab: [String: Any] = try CoverageTabTests.tab()
+        let listed: [String] = try XCTUnwrap(tab["cautionLines"] as? [String])
+        XCTAssertEqual(Set(listed), CoverageTabWording.cautionLines)
+        XCTAssertNotNil(tab["cautionRule"] as? String)
+
+        var older: CoverageTabDisplay.Facts = CoverageTabDisplay.Facts()
+        older.record = .anotherBuild
+        older.startKnown = true
+        older.changed = .none
+        older.obsidianInstalled = true
+        older.rulesCompiled = true
+        let olderShown: CoverageTabDisplay.Display = CoverageTabDisplay.display(older)
+        XCTAssertEqual(olderShown.lines.first, "olderMap")
+        XCTAssertTrue(CoverageTabWording.cautionLines.contains("olderMap"), "the older map is a caution")
+        XCTAssertFalse(olderShown.lines.contains("couldNotMakeAgain"), "said twice: \(olderShown.lines)")
+        XCTAssertEqual(olderShown.button, "makeTheMapAgain")
+        XCTAssertTrue(olderShown.buttonEnabled)
+        XCTAssertTrue(CoverageTabWording.olderMap.contains(CoverageTabWording.makeTheMapAgain), "the sentence names the button by its label")
+        XCTAssertTrue(CoverageTabWording.olderMapNoTime.contains(CoverageTabWording.makeTheMapAgain))
+
+        var latest: CoverageTabDisplay.Facts = older
+        latest.record = .thisBuild
+        let latestShown: CoverageTabDisplay.Display = CoverageTabDisplay.display(latest)
+        XCTAssertEqual(latestShown.lines.first, "asOf")
+        for line in latestShown.lines {
+            XCTAssertFalse(CoverageTabWording.cautionLines.contains(line), "\(line) is drawn as a caution in the ordinary state")
+        }
+
+        // The view draws the symbol, with its label, for exactly those lines.
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/Section/CoverageTabView.swift")
+        let view: String = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertNotNil(view.range(of: "if CoverageTabWording.cautionLines.contains(line) {"))
+        XCTAssertNotNil(view.range(of: ".accessibilityLabel(CoverageTabWording.cautionLabel)"))
+    }
+
     /// Every key a state can show is a sentence in `words`.
     func testEveryLineAStateShowsIsAWord() throws {
         let words: [String: Any] = try XCTUnwrap(try CoverageTabTests.tab()["words"] as? [String: Any])
@@ -368,6 +412,7 @@ final class CoverageTabTests: XCTestCase {
             "emptyNoCurriculum": CoverageTabWording.emptyNoCurriculum,
             "cannotShowTitle": CoverageTabWording.cannotShowTitle,
             "cannotShowDescription": CoverageTabWording.cannotShowDescription,
+            "cautionLabel": CoverageTabWording.cautionLabel,
         ]
         XCTAssertEqual(Set(words.keys), Set(mine.keys), "every word in the contract is one the tab has, and no more")
         for (key, sentence) in mine {

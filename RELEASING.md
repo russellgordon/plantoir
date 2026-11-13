@@ -235,6 +235,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    decision, `waiting_on` in shots.json — read that issue first).
    `build.py --deploy` refuses without them, and it runs AFTER the release is
    public — checklist step 4a says what that would leave behind.
+   **Before step 5, when the release changes what a teacher sees:** build the UI/UX
+   review page and take Russell through it (the `ui-review` skill,
+   `.claude/skills/ui-review/SKILL.md`). Standing practice since v1.10.0: it found two
+   layout faults every test had passed, and it replaces most of the smoke test.
+
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
    SHA-256 table, creates the GitHub Draft Release, uploads the assets, publishes
    the release, **builds and signs the mac's update feed from the exact DMG it
