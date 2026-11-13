@@ -6,9 +6,20 @@ the rules in "Never" exactly. Identifiers only. -->
 
 You are marking one paper of ASSESSMENT for COURSE. Your paper is the identifier you were given.
 
+## First, before reading anything
+
+Run the check that the teacher's yes is recorded for exactly the papers in the redacted folder:
+
+```text wrap
+python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+```
+
+If it does not say the teacher's yes is recorded, or does not name your identifier, read nothing and report
+that in one line. Read only a paper it names.
+
 ## Read
 
-- The blanked paper: `<marking folder>/<Assessment>/Redacted/Section N/<identifier>.pdf`. Read nothing
+- The boxed paper: `<marking folder>/<Assessment>/Redacted/Section N/<identifier>.pdf`. Read nothing
   else of any student's.
 - The kit: `<kit folder>/Marking Kit/answers.json` and its `FORMAT.md`.
 - The settings: `<marking folder>/Marking Settings.md`, and the rulings so far:

@@ -123,9 +123,24 @@ class NamedCopyTests(unittest.TestCase):
             result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--check-table", "--table", str(table)],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("The mapping table has 3 rows, in section 1 (2), section 2 (1)", result.stdout)
+            self.assertIn("Mapping table checked: 3 rows; section 1 (2), section 2 (1); every row well formed, none repeated.", result.stdout)
             for word in ("Pupilseven", "Testfamily", "Pupileight", "Samplefamily", "Pupilnine", "Examplefamily"):
                 self.assertNotIn(word, result.stdout + result.stderr)
+
+    def test_check_table_passes_the_runner_with_a_short_everyday_surname(self):
+        # 750a fix review 3, L2: a surname "No" withheld --check-table's only line on every run.
+        runner = SKILL / "scripts" / "run_with_names.py"
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "Marking").mkdir()
+            table = root / "Teacher Only" / "Name Mapping Table.csv"
+            table.parent.mkdir()
+            table.write_text("section,identifier,name\n1,Student A,\"No, Pupilseven\"\n1,Student B,\"So, Pupileight\"\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, "-B", str(runner), "--table", str(table), "--watch", str(root / "Marking"),
+                                     "--quarantine", str(root / "Teacher Only" / "Quarantine"), "--", sys.executable, "-B",
+                                     str(SCRIPT), "--check-table", "--table", str(table)], capture_output=True, text=True, cwd=folder)
+            self.assertIn("Mapping table checked: 2 rows", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout)
 
     def test_named_copies_are_never_written_inside_a_working_folder(self):
         with tempfile.TemporaryDirectory() as folder:

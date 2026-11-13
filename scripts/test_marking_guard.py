@@ -356,7 +356,7 @@ class FalseAlarmTests(unittest.TestCase):
         # 750a fix review 2, M4: "Ng" alone passed through with exit 0.
         result, marking = self.run_with(SHORT_ALONE)
         self.assertNotIn("Mx Ho", result.stdout)
-        self.assertIn("1 printed lines and 1 files held a two- or three-letter part of a name", result.stdout)
+        self.assertIn("1 printed lines were withheld and 1 files were moved to the quarantine folder, each holding a two- or three-letter part of a name", result.stdout)
         self.assertFalse((marking / "note.txt").exists())
         self.assertEqual(result.returncode, 1)
 

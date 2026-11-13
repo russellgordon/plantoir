@@ -187,7 +187,7 @@ shipped:
 python3 -B -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" .claude/skills/plantoir-marking/scripts/run_with_names.py
 ```
 
-It must print `ff80df8b37bd05f6fa9d15890434643426e25eff145a1305ed6e20bb0de90556`. If it does not, stop and tell the teacher
+It must print `b61b992c97215daea8e9e6776eb022d8aec685c0546451aae9e1cbe0a0e5818a`. If it does not, stop and tell the teacher
 the runner has been changed; do not run any script that reads the table.
 
 **Every script that reads the name mapping table is run through
@@ -208,7 +208,9 @@ and what it wrote in the marking folder, and nothing else. Tell the
 teacher that, in those words, the first time. A line held back because it
 holds a word from the table that is also an everyday word (a name such as
 May or Will) may be a false alarm: say so, and check the script's lines by
-their counts instead.
+their counts instead. A line withheld, or a file moved, because it holds a
+two- or three-letter part of a name on its own (Ng, Li, No) is counted as
+not checkable: it, too, may be a false alarm.
 
 (`python3 -B`; `python` or `py` on Windows, where `python3` may not exist.
 `.agents/` works in place of `.claude/` in every path here.)
@@ -234,7 +236,11 @@ through every page is what confirms the names are redacted.
    If it stops (it cannot find a name blank, or finds two on a page), it
    says so: ask the teacher, and give the label with `--label "Student
    Name"`, or the box in inches from the top-left with `--box
-   left,top,right,bottom`. Never guess. A name blank in a footer is not
+   left,top,right,bottom`. Never guess. A blank test that is itself a scan
+   has no text to read: give `--box`. You may render the blank test to
+   measure its name line (it holds no student's writing), or ask the
+   teacher; `--box-from` with `--box` shows the box before any paper is
+   boxed. A name blank in a footer is not
    found, and a second name line (Partner Name) is not boxed.
 2. **A whole class in one scan:** split it first, into the teacher-only
    folder. The script writes `Paper 01.pdf`, `Paper 02.pdf` ... in the
@@ -267,7 +273,7 @@ through every page is what confirms the names are redacted.
    teacher, in these words or very close to them:
 
    ```text wrap
-   Please open "Redacted papers to look through.pdf" in your check folder and look through every page of every paper. Look for any part of a name, and anything else that says who wrote it (a signature, initials, a student number). Then tell me "yes, the names are redacted on every page", or the identifier and page where something shows. I will read no paper until you do.
+   Please open "Redacted papers to look through.pdf" in your check folder and look through every page of every paper. Look for any part of a name, and anything else that says who wrote it (a signature, initials, a student number). I do not check how each page was scanned: on a page scanned upside down the name line is at the foot, and on a page scanned shifted or shrunk part of the name can show just below the black box; and a name written anywhere else on a page is not boxed. Then tell me "yes, the names are redacted on every page", or the identifier and page where something shows. I will read no paper until you do.
    ```
 
    **Read no paper until the teacher has looked through the redacted
@@ -275,7 +281,10 @@ through every page is what confirms the names are redacted.
    missed would be in it. "Yes" means every page of every paper in this
    batch, looked at after the boxing ran; a yes given before the papers
    were boxed does not count. When the teacher says yes, record it, then
-   check it:
+   check it. The script cannot know who looked: it records that the
+   teacher said yes. **Run `--confirm` only straight after the teacher's
+   own yes in this conversation, in reply to the ask, and never on your own
+   judgement.**
 
    ```text wrap
    python3 -B "<marking folder>/Scripts/redact_scans.py" --confirm "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
@@ -349,7 +358,7 @@ apply it to every paper.
 
 ## 9. Marking the papers
 
-Mark from the boxed papers in `Redacted/` only, and only when `--verify` says the teacher's look is recorded for them (section 7). For each paper, copy the
+Mark from the boxed papers in `Redacted/` only, and only when `--verify` says the teacher's yes is recorded for them (section 7): read only the files `--verify` names, never any other file in that folder. For each paper, copy the
 kit's `marks-template.json` to `Marks/Section N/Student A.json` and fill
 it in, as the kit's `FORMAT.md` says. `earned` is 0 or 1 (0.5 only where
 `Marking Settings.md` records `- Half marks: yes`); every point that
@@ -379,7 +388,8 @@ Never a total: totals are counted from the points. Check each record with
   `templates/Marker Brief.md` into `<Assessment>/Briefs/`, fill it in once
   (the kit, the settings, the rulings so far, the folders), and give each
   marker only the brief and its identifier, never this conversation. At
-  most three at a time.
+  most three at a time. Both briefs begin by running `--verify`; a marker
+  or reviewer whose check does not name its paper reads nothing.
 - **A reviewer re-checks every claim** against the boxed paper, from
   `templates/Reviewer Brief.md`, and a second reviewer marks the same
   paper from first principles where the first found a fault. Fix what they

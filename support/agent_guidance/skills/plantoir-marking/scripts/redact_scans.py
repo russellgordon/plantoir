@@ -55,7 +55,8 @@ LABELS = ["Student Name", "Name", "Nom"]   # the words a name blank starts with,
 OTHER_NAMES = ["School", "Teacher", "Partner", "Course", "Parent"]   # "<one of these> Name" is not the student's
 BOX_SIDE_IN = 0.3                # the box runs margin to margin: this far in from each side
 BOX_ABOVE_LABEL_IN = 0.35        # from this far above the label (room for handwriting above the line)
-BOX_BELOW_LABEL_PT = 18          # to this far below the label (handwriting falls below the line)
+BOX_BELOW_LABEL_PT = 18          # to this far below the label (handwriting falls below the line), or to the
+                                 # lower border of the cell or frame the label sits in, whichever is lower
 LABEL_SEARCH_DEPTH_IN = 2.0      # the name blank is looked for in the top of each page
 DPI = 150                        # pixels per inch for the boxed pages
 JPEG_QUALITY = 75
@@ -272,6 +273,26 @@ def a_blank_follows(word, words, image, dpi):
     return False
 
 
+def rule_below(image, dpi, word):
+    """Where (in points) the first drawn line under the label is, within 0.6 in, when the label sits in a form
+    cell or a frame with the room to write UNDER it: the cell's lower border. None when there is no such line
+    (750a fix review 3, M6: a name written low in such a cell showed below a box 18 pt under the label)."""
+    width, height, pixels = image
+    scale = dpi / 72
+    left = max(0, int((word[0] - 7) * scale))
+    right = min(width, int((word[0] + 180) * scale))
+    for row in range(int((word[3] + 3) * scale), min(height, int((word[3] + 0.6 * 72) * scale))):
+        run_length = 0
+        for column in range(left, right):
+            if pixels[row * width + column] < 160:
+                run_length += 1
+                if run_length >= int(0.5 * dpi):
+                    return row / scale
+            else:
+                run_length = 0
+    return None
+
+
 def name_blanks(blank, page, labels, folder):
     """[(left, top, bottom) in points] of every name blank at the top of this page of the blank test."""
     words = words_near_top(blank, page)
@@ -295,7 +316,11 @@ def name_blanks(blank, page, labels, folder):
                 image = render_gray(blank, page, 100, folder)
             last = run_of_words[-1]
             if a_blank_follows(last, words, image, 100):
-                found.append((word[0], min(other[1] for other in run_of_words), max(other[3] for other in run_of_words)))
+                bottom = max(other[3] for other in run_of_words) + BOX_BELOW_LABEL_PT
+                cell = rule_below(image, 100, word)
+                if cell is not None:
+                    bottom = max(bottom, cell + 4)   # the label sits in a cell or frame: the box takes all of it
+                found.append((word[0], min(other[1] for other in run_of_words), bottom))
             break
     return found
 
@@ -319,8 +344,11 @@ def boxes_from_blank(blank, labels, given_box, folder):
             boxes.append(None)
             continue
         _left, top, bottom = lines[0]
-        boxes.append((BOX_SIDE_IN, max(0.05, top / 72 - BOX_ABOVE_LABEL_IN), width_pt / 72 - BOX_SIDE_IN,
-                      (bottom + BOX_BELOW_LABEL_PT) / 72))
+        boxes.append((BOX_SIDE_IN, max(0.05, top / 72 - BOX_ABOVE_LABEL_IN), width_pt / 72 - BOX_SIDE_IN, bottom / 72))
+    if all(box_in is None for box_in in boxes) and not any(words_near_top(blank, number) for number in range(1, len(sizes) + 1)):
+        raise Refusal("your blank test has no text in it (is it a scan?), so I cannot read where the name blank is. "
+                      "Give the box with --box (inches from the top-left: left,top,right,bottom), measured with the "
+                      "teacher; --box-from with --box shows it before any paper is boxed.")
     if all(box_in is None for box_in in boxes):
         raise Refusal("I could not find a name blank on your blank test (a label such as Name followed by a line, "
                       "underscores, dots, a table cell or a frame). Tell me its label with --label, or where it is "
@@ -409,35 +437,56 @@ def sha256_of(path):
 
 
 def papers_in(redacted):
-    """{relative path: SHA-256} of every PDF in the redacted folder."""
+    """{relative path: SHA-256, or "link" or "folder"} of EVERY entry in the redacted folder, whatever its name,
+    case or type (750a fix review 3, M1: an unboxed original copied in as Student Q.PDF, or a .png, passed
+    the check when only *.pdf was listed). Links are listed as links, never followed."""
     found = {}
-    for path in sorted(Path(redacted).rglob("*.pdf")):
-        found[str(path.relative_to(redacted))] = sha256_of(path)
-    return found
+    for top, folders, files in os.walk(redacted, followlinks=False):
+        for name in folders + files:
+            path = Path(top) / name
+            relative = str(path.relative_to(redacted))
+            if path.is_symlink():
+                found[relative] = "link"
+            elif path.is_dir():
+                found[relative] = "folder"
+            else:
+                found[relative] = sha256_of(path)
+    return dict(sorted(found.items()))
 
 
 def clear_previous_batch(redacted, check):
-    """Take away a previous batch's papers, combined file and records, so they can never stand in for this one
-    (the papers are copies: the originals are in the teacher-only folder)."""
-    for path in sorted(Path(redacted).rglob("*.pdf")):
-        os.remove(path)
-    try:
-        for name in (COMBINED, BATCH, RECORD):
+    """Take away a previous batch's record, papers, combined file and anything else in the redacted folder, so
+    nothing from before can stand in for this batch. The record goes first, so even a clear that fails part
+    way leaves no recorded yes for what is left (the papers are copies: the originals are teacher-only)."""
+    problem = False
+    for name in (RECORD, COMBINED, BATCH):
+        try:
             if (Path(check) / name).exists():
                 os.remove(Path(check) / name)
-    except OSError:
-        raise Refusal("the check folder could not be written to; no paper was written, and none may be read")
+        except OSError:
+            problem = True
+    for entry in sorted(Path(redacted).iterdir()) if Path(redacted).is_dir() else []:
+        try:
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry)
+            else:
+                os.remove(entry)
+        except OSError:
+            problem = True
+    if problem:
+        raise Refusal("the last batch could not all be cleared away; no paper was written, and none may be read")
 
 
 def redact_folder(originals, redacted, blank, check_dir, labels, given_box, identifier):
-    need_tools()
     refuse_inside_a_working_folder(redacted, check_dir)
+    redacted, check = Path(redacted), Path(check_dir)
+    # The last batch goes FIRST, before any other check can stop the run (750a fix review 3, L1).
+    clear_previous_batch(redacted, check)
+    need_tools()
     for folder_path, what in ((originals, "the originals folder"), (blank, "the blank test")):
         if not Path(folder_path).exists():
-            raise Refusal(f"{what} is not there; nothing was read")
-    redacted, check = Path(redacted), Path(check_dir)
+            raise Refusal(f"{what} is not there; nothing was read, and no paper may be read")
     redacted.mkdir(parents=True, exist_ok=True)
-    clear_previous_batch(redacted, check)
     written = []
     stopped = 0
     with tempfile.TemporaryDirectory() as folder:
@@ -491,8 +540,7 @@ def redact_folder(originals, redacted, blank, check_dir, labels, given_box, iden
                                                        "combined": sha256_of(check / COMBINED),
                                                        "papers": papers_in(redacted)}, indent=1), encoding="utf-8")
         except (OSError, Refusal):
-            for path in sorted(redacted.rglob("*.pdf")):
-                os.remove(path)
+            clear_previous_batch(redacted, check)
             raise Refusal("the boxed papers could not all be written; none was left where they are read, and none "
                           "may be read")
         finally:
@@ -529,7 +577,9 @@ def confirm(redacted, check_dir):
                       "boxing again and ask the teacher to look again. Nothing was recorded")
     record = {"confirmed": datetime.datetime.now().isoformat(timespec="seconds"), "papers": batch["papers"]}
     (check / RECORD).write_text(json.dumps(record, indent=1), encoding="utf-8")
-    print(f"Recorded: the teacher looked through {len(batch['papers'])} papers and said the names are redacted.")
+    papers = [name for name, kind in batch["papers"].items() if kind not in ("link", "folder")]
+    print(f"Recorded the teacher's yes for these {len(papers)} papers. (This script cannot know who looked: it is "
+          "run only on the teacher's own yes, in reply to the ask.)")
     return 0
 
 
@@ -540,10 +590,12 @@ def verify(redacted, check_dir):
     if record_path.exists():
         record = json.loads(record_path.read_text(encoding="utf-8"))
         if record.get("papers") == now and now:
-            print(f"The teacher's look is recorded for these {len(now)} papers ({record.get('confirmed', '')}).")
+            papers = [name[:-4] for name, kind in now.items() if kind not in ("link", "folder") and name.endswith(".pdf")]
+            print(f"The teacher's yes is recorded for these {len(papers)} papers ({record.get('confirmed', '')}); read "
+                  "only these: " + "; ".join(papers) + ".")
             return 0
-    print("Not confirmed: no teacher's yes is recorded for the papers now in the redacted folder (a new batch, a "
-          f"changed file, or no record). Ask the teacher to look through '{COMBINED}' and say yes; read no paper "
+    print("Not confirmed: no teacher's yes is recorded for exactly what is now in the redacted folder (a new batch, "
+          "a changed or added file of any kind, or no record). Ask the teacher to look through '{COMBINED}' and say yes; read no paper "
           "until then.")
     return 1
 
@@ -581,15 +633,23 @@ def split_stack(stack, pages_per_paper, into, check_dir):
     return 0
 
 
+def natural(name):
+    """Section 2 before Section 10, Student B before Student AA, as a class list runs (750a fix review 3, L5)."""
+    key = []
+    for token in re.findall(r"\d+|[^\W\d_]+|[\W_]+", name):
+        key.append((0, int(token), "") if token.isdigit() else (1, len(token), token.casefold()))
+    return key
+
+
 def identifier_files(originals, identifier):
     """[(relative label, path)] for every PDF named like an identifier; and the count left alone."""
     found = []
     left_alone = 0
-    for entry in sorted(Path(originals).iterdir()):
+    for entry in sorted(Path(originals).iterdir(), key=lambda path: natural(path.name)):
         if entry.name.startswith("."):
             continue
         if entry.is_dir() and re.match(SECTION, entry.name):
-            for inner in sorted(entry.iterdir()):
+            for inner in sorted(entry.iterdir(), key=lambda path: natural(path.name)):
                 if inner.name.startswith("."):
                     continue
                 if inner.is_file() and inner.suffix.lower() == ".pdf" and re.match(identifier, inner.stem):
@@ -665,7 +725,7 @@ def name_papers(table, section, into, identifier):
         else:
             unmatched.append(paper.stem)
     print(f"Section {section}: {renamed} papers renamed" +
-          (f"; {len(unmatched)} have no row in the table ({', '.join(unmatched)})" if unmatched else ""))
+          (f"; {len(unmatched)} missing from the table ({', '.join(unmatched)})" if unmatched else ""))
     return 0 if not unmatched else 1
 
 
@@ -764,13 +824,16 @@ def main(arguments):
     if option(arguments, "--box-from") is not None:
         need_tools()
         with tempfile.TemporaryDirectory() as folder:
-            boxes = boxes_from_blank(option(arguments, "--box-from"), labels, None, folder)
+            boxes = boxes_from_blank(option(arguments, "--box-from"), labels, given_box, folder)
         for number, box_in in enumerate(boxes, start=1):
             if box_in is None:
                 print(f"page {number}: no name blank on your blank test, so no box")
             else:
                 print(f"page {number}: box in inches " + ",".join(f"{value:.2f}" for value in box_in))
         return 0
+    if (option(arguments, "--confirm") is not None or option(arguments, "--verify") is not None) and \
+            option(arguments, "--check-dir") is None:
+        raise Refusal("--check-dir is needed: the teacher-only check folder, where the record of the teacher's yes is kept")
     if option(arguments, "--confirm") is not None:
         return confirm(option(arguments, "--confirm"), option(arguments, "--check-dir"))
     if option(arguments, "--verify") is not None:

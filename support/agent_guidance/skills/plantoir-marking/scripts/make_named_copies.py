@@ -157,9 +157,10 @@ def check_table(table):
     sections = {}
     for section, _identifier in names:
         sections[section] = sections.get(section, 0) + 1
-    print(f"The mapping table has {len(names)} rows, in " + ", ".join(
+    # Few short words: a two- or three-letter surname (No, To, So) would make the runner withhold the line.
+    print(f"Mapping table checked: {len(names)} rows; " + ", ".join(
         f"section {section} ({count})" for section, count in sorted(sections.items())) +
-        "; every row is like section 1, Student A, a name, and no section and identifier repeat.")
+        "; every row well formed, none repeated.")
     return 0
 
 

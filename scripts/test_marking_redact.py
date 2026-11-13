@@ -443,6 +443,33 @@ class BoxTests(unittest.TestCase):
             self.assertIn("Student A.pdf: stopped (it has 3 pages, which is not a whole number of copies of your blank "
                           "test's 2); not written", result.stdout)
 
+    def test_a_name_written_low_in_a_form_cell_is_inside_the_box(self):
+        # 750a fix review 3, M6: the box takes the whole cell the label sits in, from the blank's own drawing.
+        blank = FIXTURES / "blank-name-in-a-cell.pdf"
+        box = boxes_of(blank)[0]
+        image = render(blank, 1)
+        low = [(1.0, 1.08, 3.2, 1.25)]
+        paint(image, low, 15)
+        mask = (image[0], image[1], bytearray(image[0] * image[1]))
+        paint(mask, low, 255)
+        spots = {(position % mask[0], position // mask[0]) for position, value in enumerate(mask[2]) if value}
+        with tempfile.TemporaryDirectory() as root:
+            (Path(root) / "Originals").mkdir()
+            write_image_pdf(Path(root) / "Originals" / "Student A.pdf", [image])
+            run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank, "--check-dir", Path(root) / "Check")
+            self.assertEqual(name_ink_outside_the_box(Path(root) / "Redacted" / "Student A.pdf", [(spots, (0, 0))], [box]), 0)
+
+    def test_a_scanned_blank_is_told_to_give_the_box(self):
+        # 750a fix review 3, L3: a blank with no text layer cannot be read; --box can, and --box-from shows it.
+        with tempfile.TemporaryDirectory() as root:
+            scanned = Path(root) / "scanned blank.pdf"
+            write_image_pdf(scanned, [render(BLANK_LETTER, 1), render(BLANK_LETTER, 2)])
+            result = run_script(SCRIPT, "--box-from", scanned)
+            self.assertIn("no text in it (is it a scan?)", result.stdout)
+            self.assertIn("--box", result.stdout)
+            shown = run_script(SCRIPT, "--box-from", scanned, "--box", "0.3,0.25,8.2,0.98")
+            self.assertIn("page 2: box in inches 0.30,0.25,8.20,0.98", shown.stdout)
+
     def test_a_page_with_no_name_blank_is_said(self):
         blank = FIXTURES / "blank-quiz-letter-name-on-page-1.pdf"
         with tempfile.TemporaryDirectory() as root:
@@ -521,6 +548,53 @@ class BatchAndRecordTests(unittest.TestCase):
         self.assertEqual(list(self.redacted.rglob("*.pdf")), [], "no paper is left where the assistant reads")
         self.assertFalse((self.check / COMBINED).exists(), "no old combined file stands in for this batch")
 
+    def test_any_file_the_record_does_not_list_is_refused(self):
+        # 750a fix review 3, M1: an unboxed original copied in as Student Q.PDF, or a .png, passed the check.
+        self.box()
+        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        original = (self.originals / "Section 1" / "Student A.pdf").read_bytes()
+        for planted in ("Section 1/Student Q.PDF", "Section 1/Student Q.png"):
+            path = self.redacted / planted
+            path.write_bytes(original)
+            verified = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
+            self.assertEqual(verified.returncode, 1, f"{planted} must not pass the check")
+            os.remove(path)
+        (self.redacted / "Section 1" / "Student Q.PDF").write_bytes(original)
+        self.box()
+        self.assertFalse((self.redacted / "Section 1" / "Student Q.PDF").exists(), "a new run clears every file")
+
+    def test_the_record_line_says_what_was_recorded_and_no_more(self):
+        # 750a fix review 3, M2: the script cannot know who looked.
+        self.box()
+        confirmed = run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        self.assertIn("Recorded the teacher's yes for these 2 papers", confirmed.stdout)
+        self.assertIn("cannot know who looked", confirmed.stdout)
+        self.assertNotIn("looked through", confirmed.stdout)
+        verified = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
+        self.assertIn("read only these: Section 1/Student A; Section 1/Student B.", verified.stdout)
+
+    def test_a_run_that_stops_early_leaves_the_last_batch_unreadable(self):
+        # 750a fix review 3, L1: a missing blank stopped the run before the last batch was cleared.
+        self.box()
+        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        result = run_script(SCRIPT, self.originals, self.redacted, "--blank", self.root / "missing.pdf", "--check-dir", self.check)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(list(self.redacted.rglob("*")), [])
+        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1)
+
+    def test_the_check_needs_its_folder_said_plainly(self):
+        result = run_script(SCRIPT, "--verify", self.redacted)
+        self.assertIn("--check-dir is needed", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_papers_go_in_class_list_order(self):
+        # 750a fix review 3, L5: Student AA sorted before Student B.
+        section = self.originals / "Section 1"
+        (section / "Student AA.pdf").write_bytes((section / "Student A.pdf").read_bytes())
+        self.box()
+        text = pdf_words(self.check / COMBINED)
+        self.assertLess(text.find("Section 1/Student B"), text.find("Section 1/Student AA"))
+
     def test_a_failed_write_leaves_nothing_to_read(self):
         self.box()
         self.assertTrue(list(self.redacted.rglob("*.pdf")))
@@ -555,7 +629,7 @@ class OtherTests(unittest.TestCase):
             table.write_text("section,identifier,name,paper\n1,Student A,\"Testpupil, Alphaname\",2\n"
                              "1,Student B,\"Zedfamily, Betaname\",1\n2,Student A,\"Other, Person\",1\n", encoding="utf-8")
             named = run_script(SCRIPT, "--name-papers", table, "--section", "1", "--into", into)
-            self.assertIn("Section 1: 2 papers renamed; 1 have no row in the table (Paper 03)", named.stdout)
+            self.assertIn("Section 1: 2 papers renamed; 1 missing from the table (Paper 03)", named.stdout)
             self.assertEqual(sorted(path.name for path in into.iterdir()), ["Paper 03.pdf", "Student A.pdf", "Student B.pdf"])
             for token in ("Testpupil", "Alphaname", "Zedfamily", "Betaname", "Other", "Person"):
                 self.assertNotIn(token, named.stdout + named.stderr)

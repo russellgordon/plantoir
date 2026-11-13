@@ -6,9 +6,20 @@ with one identifier. Keep "Never" exactly. Identifiers only. -->
 You are checking one marked paper of ASSESSMENT against the paper itself. Find where the marking is
 wrong, unfair or inconsistent with the rulings; "nothing to change" is an acceptable answer.
 
+## First, before reading anything
+
+Run the check that the teacher's yes is recorded for exactly the papers in the redacted folder:
+
+```text wrap
+python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+```
+
+If it does not say the teacher's yes is recorded, or does not name your identifier, read nothing and report
+that in one line. Read only a paper it names.
+
 ## Read
 
-- The blanked paper `<marking folder>/<Assessment>/Redacted/Section N/<identifier>.pdf`.
+- The boxed paper `<marking folder>/<Assessment>/Redacted/Section N/<identifier>.pdf`.
 - Its marks record `<marking folder>/<Assessment>/Marks/Section N/<identifier>.json`.
 - The kit, `Marking Settings.md` and `Marking Rules Applied.md`.
 

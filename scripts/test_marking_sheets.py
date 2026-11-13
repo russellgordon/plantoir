@@ -201,6 +201,24 @@ class SkillFileTests(unittest.TestCase):
         for relative in self.guidance()["scripts"] + self.guidance()["templates"] + self.guidance()["references"]:
             self.assertIn(relative.split("/", 1)[1], text, f"the skill names {relative}")
 
+    def test_every_marking_pin_is_in_the_skill_once(self):
+        # The same walk the mac suite makes over both written homes, here over the source, so a sentence taken
+        # out of SKILL.md fails a Python test too.
+        pins = contract()["printablePages"]["agentGuidance"]["mustSay"]["plantoir-marking"]
+        folded = re.sub(r"\s+", " ", (SKILL / "SKILL.md").read_text(encoding="utf-8"))
+        for pin in pins:
+            self.assertEqual(folded.count(re.sub(r"\s+", " ", pin)), 1, pin)
+
+    def test_every_brief_runs_the_check_before_reading_a_paper(self):
+        # 750a fix review 3, M3: a marker started from a saved brief read a paper with no --verify.
+        for name in ("templates/Marker Brief.md", "templates/Reviewer Brief.md"):
+            text = (SKILL / name).read_text(encoding="utf-8")
+            first = text.index("## First, before reading anything")
+            self.assertLess(first, text.index("## Read"), name)
+            self.assertIn("redact_scans.py\" --verify", text, name)
+            self.assertIn("read nothing and report", text, name)
+            self.assertNotIn("blanked", text, name)
+
     def test_the_skill_names_the_runners_own_sha256(self):
         # 750a review L6: the runner can be edited in place until Plantoir next refreshes the folder, so
         # the skill has the assistant check it first; the hash it gives must be the shipped file's.

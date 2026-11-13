@@ -428,9 +428,14 @@ def main(arguments):
           f"folder; {unread_total} could not be read, so were NOT checked and were moved there unread" +
           (" (" + "; ".join(f"{count} {kind}" for kind, count in sorted(unread.items())) + ")" if unread else "") + ".")
     if short_lines or short_files:
-        print(f"{short_lines} printed lines and {len(short_files)} files held a two- or three-letter part of a name in "
-              "your table on its own (such as Ng or Li), which cannot be told from an everyday word: not checkable, so "
-              "the lines were withheld and the files moved to the quarantine folder.")
+        done = []
+        if short_lines:
+            done.append(f"{short_lines} printed lines were withheld")
+        if short_files:
+            done.append(f"{len(short_files)} files were moved to the quarantine folder")
+        print(" and ".join(done) + ", each holding a two- or three-letter part of a name in your table on its own "
+              "(such as Ng or Li), which cannot be told from an everyday word: not checkable, and it may be a false "
+              "alarm.")
     if withheld or held_files or held_folders:
         print("Something held a word from your table: a name, or an everyday word that is also a name (such as May "
               "or Will). If it was a name, the script needs fixing before it is used again; what was held back is "

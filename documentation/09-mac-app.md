@@ -4765,6 +4765,40 @@ the trail, because it would be student data.
   through). The runner now never passes a two- or three-letter surname
   that appears on its own (750a fix review 2, M4): such a line is withheld
   and such a file moved, counted, with exit 1.
+- **The last round (750a fix review 3: 0 HIGH).** The step held on realistic
+  papers; what followed tightened what it promises:
+  - **The limit, said plainly:** the script cannot know who looked. The
+    record proves that someone ran `--confirm` after exactly these files
+    and the combined file existed, which shuts out an advance yes, a stale
+    batch and a swapped file; it does not prove the teacher looked. So the
+    skill has the assistant run `--confirm` only straight after the
+    teacher's own yes in the conversation, never on its own judgement, and
+    the script's line says "Recorded the teacher's yes", not that anyone
+    looked (M2). REJECTED, for now: a code printed on the combined file's
+    first page that the teacher reads back, which would prove the file was
+    opened; it is a small addition if wanted later.
+  - **Every entry is gated (M1):** `--verify` lists every file, link and
+    folder in `Redacted/`, whatever its name or case, and fails on anything
+    the record does not list; MEASURED before, an unboxed original copied
+    in as `Student Q.PDF`, or a `.png`, passed. A run clears everything
+    there, and the record, FIRST, before any other check (L1).
+  - **The briefs begin with `--verify` (M3)**, so a marker started from a
+    saved brief in a later session reads nothing unconfirmed.
+  - **The ask names what the script cannot see (M5):** an upside-down page
+    (its name line at the foot), a shifted or shrunk page (part of the name
+    just below the box), and a name anywhere else.
+  - **A form cell (M6):** where the label sits in a cell or frame with the
+    room to write under it, the box runs to the cell's lower border, found
+    in the blank's own drawing. MEASURED: a name written low in such a cell
+    showed 76 pixels below the old box; now none.
+  - **Smaller:** fixed lines avoid two-letter words a short surname could
+    match ("No" withheld `--check-table`'s only line); a scanned blank is
+    told to use `--box`, and `--box-from` shows a given box; the combined
+    file follows class-list order (Student B before Student AA); a missing
+    `--check-dir` is said plainly.
+  - **The trial** now ends on a true yes: the teacher says no on the
+    upside-down page, a rescan is put in place, the boxing runs again, and
+    only then the yes.
 - **A whole class in one scan (review M4).** `--stack` splits it with
   Poppler into `Paper 01.pdf ...` in the teacher-only folder and writes
   `Papers to name.pdf`; the teacher fills a `paper` column in the mapping

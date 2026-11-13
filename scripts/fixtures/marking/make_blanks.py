@@ -92,12 +92,21 @@ def compile_to(source, name):
     print(f"{name} written")
 
 
+IN_A_CELL = r"""\documentclass[11pt]{article}\usepackage[letterpaper,margin=0.75in,bottom=0.9in]{geometry}\usepackage[T1]{fontenc}\usepackage{lmodern}\usepackage{xcolor}\usepackage{fancyhdr}\setlength{\parindent}{0pt}\pagestyle{fancy}\fancyhf{}\renewcommand{\headrulewidth}{0pt}\fancyfoot[L]{\small\sffamily\color{gray}Dice Quiz $\cdot$ COURSE}\fancyfoot[R]{\small\sffamily\color{gray}Page \thepage}
+\begin{document}
+\begin{tabular}{|p{3in}|p{1.5in}|}\hline \footnotesize Name & \footnotesize Date\\[0.35in]\hline\end{tabular}\par\bigskip {\LARGE\bfseries\sffamily Dice Quiz}\par\medskip{\color{gray}Answer every question. Show your work.}\par\bigskip 1. Two dice are rolled. How many outcomes?\par\vfill 2. What is the chance of a double?\par\vfill
+\end{document}
+"""
+
+
 def make_labels():
     """blank-label-cases.pdf (five pages: Student Name; Name with an instruction line that starts with Name;
     Name with a Partner Name line under it; NAME in bold sans; no name blank at all) and
     blank-two-name-blanks.pdf (a page with two name blanks, which the script must not guess between)."""
     compile_to(LABELS, "blank-label-cases.pdf")
     compile_to(TWO_BLANKS, "blank-two-name-blanks.pdf")
+    # A form cell with a small Name in its corner and the room to write UNDER it (750a fix review 3, M6).
+    compile_to(IN_A_CELL, "blank-name-in-a-cell.pdf")
 
 
 def make_styles():
