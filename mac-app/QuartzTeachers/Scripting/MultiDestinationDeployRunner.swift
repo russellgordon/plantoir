@@ -245,7 +245,7 @@ class MultiDestinationDeployRunner {
         destinations: [CourseConfiguration.DeployDestination],
         cloudflareAccountID: String,
         workingDirectory: URL,
-        needsBuild: Bool,
+        buildReason: BuildFreshness.RebuildReason?,
         unattended: Bool = false
     ) async {
         // The backstop on the function that actually starts `deploy.sh`. Its
@@ -317,7 +317,7 @@ class MultiDestinationDeployRunner {
                 )
             }
 
-            let buildsFirst: Bool = index == 0 && needsBuild
+            let buildsFirst: Bool = index == 0 && buildReason != nil
             if buildsFirst {
                 runner.milestones = MultiDestinationDeployRunner.buildAndDeployMilestones(forDestinationType: destination.type)
                 runner.run(
@@ -360,6 +360,19 @@ class MultiDestinationDeployRunner {
                 }
                 // Still true here on the success path — cleared by the
                 // deploy `run()` call below, as part of its normal reset.
+                //
+                // The build happened, so the trail says why (#768, #748
+                // part 2), in the words for THIS reason: a first build, a
+                // preview's or a changed page each say what they were.
+                // deploy.sh then finds the build current and writes nothing.
+                if let buildReason {
+                    ActivityTrail.note(
+                        .siteBuiltAgainBeforeDeploying,
+                        BuiltBeforeDeployingReport.sentence(for: buildReason),
+                        course: course.code,
+                        section: sectionNumber
+                    )
+                }
             } else {
                 runner.milestones = MultiDestinationDeployRunner.deployOnlyMilestones(forDestinationType: destination.type)
             }

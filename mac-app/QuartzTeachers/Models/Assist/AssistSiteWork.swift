@@ -282,7 +282,7 @@ final class AssistToolchainWork: AssistSiteWork {
         await ToolchainReadiness.shared.waitUntilReady(workspaceURL)
 
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
-        let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
+        let buildReason: BuildFreshness.RebuildReason? = BuildFreshness.whyRebuild(course: course, sectionNumber: sectionNumber)
         // `course` here is already the saved copy — #322's reading at the
         // call — so the deploy follows the file. What an in-app assistant
         // adds is the SAYING (#335): when a window holds unsaved Course
@@ -348,7 +348,7 @@ final class AssistToolchainWork: AssistSiteWork {
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            needsBuild: needsBuild,
+            buildReason: buildReason,
             unattended: true
         )
 

@@ -4492,7 +4492,7 @@ materials API and then the `.ggb` — before saying
 (fewer bytes than its `Content-Length`, or a chunked answer that stops) is
 the same problem, and nothing is kept from it; whatever else a fetch raises
 is that one sketch's problem too, so the teacher's own `file:` sketches on
-the same site are never taken down with it (05 → item 9).
+the same site are never taken down with it (05 → item 9). A saved copy, once made, survives every clear of the course's builds folder, so a link synced from another Mac, or a course restored from a backup, costs this Mac its built sites and not its copies (#789; 05 → "The kept copies of geogebra.org sketches survive the clear").
 
 **The policy.** A published Netlify site is sent `script-src 'self'
 'unsafe-eval' <hashes>` (netlify_badge.py). The stock engine never loads

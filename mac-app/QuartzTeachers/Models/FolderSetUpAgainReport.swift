@@ -41,6 +41,7 @@ struct FolderSetUpAgainReport: Equatable {
         "couldNotSave": "the website builder could not save into 'courses/'",
         "lostConnection": "Plantoir had lost its connection to the website builder",
         "addressTaken": "something else was using its preview addresses",
+        "toolchainId": "it had not been set up to name the version of Plantoir that builds its websites",
     ]
 
     /// The reason word the launcher printed, such as `update`.

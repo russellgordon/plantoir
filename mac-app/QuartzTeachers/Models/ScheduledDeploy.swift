@@ -858,20 +858,25 @@ enum ScheduledDeploy {
 
         // BUILD IF STALE, THEN DEPLOY — exactly what the Deploy button does.
         //
-        // `deploy.sh` refuses outright when there is no built site, and builds
-        // only in two cases this check does not cover for it: a folder publish
-        // of a preview's site, and (since #746) a site an earlier version of
-        // Plantoir built — see the destination leg below. So an agent that ran
-        // it alone would either fail at half six or send whatever was last
-        // previewed.
+        // `deploy.sh` refuses outright when there is no built site. Since #768
+        // it asks the same question as this check before every destination,
+        // and builds in two cases this check does not cover for it: a site an
+        // earlier version of Plantoir built (#746) and a folder publish of a
+        // preview's site. This check is therefore no longer the only guard
+        // against a stale deploy; it is here so the BUILD is its own step, with
+        // its own record kinds (`buildNeededAnAnswer`, `buildDidNotFinish`),
+        // its own `--non-interactive`, and its own line on the trail.
         //
-        // The staleness test is `BuildFreshness.needsRebuild` written out in
+        // The staleness test is `BuildFreshness.whyRebuild` written out in
         // shell, because the app is closed when this runs and cannot be
-        // asked. It has to stay in step with the Swift, so all three of its
-        // parts are here — and the second is the one that matters most.
-        // Its preview check reads the same tree as the Swift's
-        // (`contracts/app-rules.json` → `buildFreshness.previewBuild`), and
-        // `ScheduledPublishOutcomeTests` runs it against every case there.
+        // asked. It has to stay in step with the Swift, so every part of it
+        // is here: no site, an unreadable front page, a preview's build, a
+        // build dated later than now, and anything in the course changed
+        // since the build started. Its preview check reads the same tree as
+        // the Swift's (`contracts/app-rules.json` → `buildFreshness.previewBuild`),
+        // and `ScheduledPublishOutcomeTests` runs it against every case there;
+        // `ReuseTheLastBuildTests` runs it against every
+        // `buildFreshness.reuseTheLastBuild` case.
         let previewPath: String = workspaceURL.appendingPathComponent("preview.sh").path
         let builtIndexPath: String = workspaceURL
             .appendingPathComponent("courses")
@@ -921,15 +926,23 @@ enum ScheduledDeploy {
         lines.append("/bin/rm -f \(shellQuoted(plistPath))")
 
         lines.append("NEEDS_BUILD=1")
+        // Why it builds, for the trail (#768): one of
+        // `BuildFreshness.RebuildReason`'s raw values, printed in the marker
+        // `BuiltBeforeDeployingReport` reads once the build has succeeded.
+        lines.append("BUILD_WHY=\(BuildFreshness.RebuildReason.neverBuilt.rawValue)")
         // What the course is compared with: the START of the build that made
         // the site, when the build noted it and it is not newer than the page
         // — `BuildFreshness.referenceDate` in shell. The page's own time
         // otherwise, as before the start was noted. The page's time alone
         // missed a Save made while a publish was building: that Save is
         // older than the page the build writes at its end.
+        //
+        // Compared with `find -newer`, never `[ -nt ]`: /bin/sh is bash 3.2
+        // on a Mac, whose `-nt` compares whole seconds (measured 2026-11-12),
+        // so a marker a fraction of a second after the page read as not newer.
         lines.append("FRESH_SINCE=\(shellQuoted(builtIndexPath))")
         lines.append("if [ -f \(shellQuoted(buildStartedPath)) ] && [ -f \(shellQuoted(builtIndexPath)) ]"
-            + " && ! [ \(shellQuoted(buildStartedPath)) -nt \(shellQuoted(builtIndexPath)) ]; then")
+            + " && [ -z \"$(/usr/bin/find \(shellQuoted(buildStartedPath)) -newer \(shellQuoted(builtIndexPath)) 2>/dev/null)\" ]; then")
         lines.append("  FRESH_SINCE=\(shellQuoted(buildStartedPath))")
         lines.append("fi")
         lines.append("if [ -f \(shellQuoted(builtIndexPath)) ]; then")
@@ -962,25 +975,60 @@ enum ScheduledDeploy {
         // line by line) in its written script until it is rescheduled. That
         // errs SAFE: a page that merely mentions the address is rebuilt every
         // morning, as it always was.
-        lines.append("  if ! [ -r \(shellQuoted(builtIndexPath)) ] || LC_ALL=C /usr/bin/grep -rzqs"
+        lines.append("  if ! [ -r \(shellQuoted(builtIndexPath)) ]; then")
+        lines.append("    BUILD_WHY=\(BuildFreshness.RebuildReason.frontPageUnreadable.rawValue)")
+        lines.append("  elif LC_ALL=C /usr/bin/grep -rzqs"
             + " --include='*.html' -- \(shellQuoted(BuildFreshness.liveReloadPattern))"
             + " \(shellQuoted(builtPublicPath)); then")
-        lines.append("    NEEDS_BUILD=1")
-        lines.append("  elif [ -z \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath))"
-            + " -type f -newer \"$FRESH_SINCE\" -not -path '*/.*' -print -quit)\" ]; then")
-        // Nothing under the course is newer than the start of the build that
+        lines.append("    BUILD_WHY=\(BuildFreshness.RebuildReason.preview.rawValue)")
+        lines.append("  else")
+        // The build dated later than now (#768's review, M1): while it is, a
+        // clock that was ahead then would hide a change made since; once real
+        // time passes the build's date it no longer fires (knownLimits).
+        // Compared with a file made now, removed again by its own path.
+        lines.append("    DATED_LATER=\"\"")
+        lines.append("    NOW_FILE=\"$(/usr/bin/mktemp \"${TMPDIR:-/tmp}/plantoir-now.XXXXXX\" 2>/dev/null)\" || NOW_FILE=\"\"")
+        lines.append("    if [ -n \"$NOW_FILE\" ]; then")
+        lines.append("      DATED_LATER=\"$(/usr/bin/find \"$FRESH_SINCE\" -newer \"$NOW_FILE\" 2>/dev/null)\"")
+        lines.append("      /bin/rm -f \"$NOW_FILE\"")
+        lines.append("    fi")
+        lines.append("    if [ -n \"$DATED_LATER\" ]; then")
+        lines.append("      BUILD_WHY=\(BuildFreshness.RebuildReason.clock.rawValue)")
+        // The course folder itself, then every entry under it whose NAME
+        // does not start with "." — folders as well as files, modified or
+        // changed — exactly `BuildFreshness.newestChangeDate` (#768, #741):
+        // only a folder's time shows a deleted or renamed page, and only the
+        // change time shows a file copied in with its old time kept. `-H`
+        // reads a course folder that is itself a link through it, as the
+        // build does; without it find stops at the link (the #768 review's M3).
+        // The course folder is asked twice, through the link and as the link,
+        // so pointing a linked course at another folder builds (the fix
+        // review's M1).
+        lines.append("    elif [ -n \"$(/usr/bin/find -H \(shellQuoted(courseDirectoryPath)) -maxdepth 0"
+            + " \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print 2>/dev/null)\" ]"
+            + " || [ -n \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath)) -maxdepth 0"
+            + " \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print 2>/dev/null)\" ]"
+            + " || [ -n \"$(/usr/bin/find -H \(shellQuoted(courseDirectoryPath)) -mindepth 1 -name '.*' -prune"
+            + " -o \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print -quit 2>/dev/null)\" ]; then")
+        lines.append("      BUILD_WHY=\(BuildFreshness.RebuildReason.pages.rawValue)")
+        lines.append("    else")
+        // Nothing in the course changed after the start of the build that
         // made the page (or the page, for a site built before that was noted), so the site
         // on disk already says what the teacher means. Rebuilding it at half
         // six would cost a container start and a full Quartz run to produce
         // the same bytes.
-        lines.append("    NEEDS_BUILD=0")
+        lines.append("      NEEDS_BUILD=0")
+        lines.append("    fi")
         lines.append("  fi")
         lines.append("fi")
 
-        // `-not -path '*/.*'` is the shell's version of skipsHiddenFiles,
-        // and it earns its place: without it, .merged_output is itself
-        // newer than the page it contains, so the site would look stale the
-        // instant it was built and rebuild every single time.
+        // `-name '.*' -prune` is the shell's version of skipsHiddenFiles, and
+        // it earns its place: without it, .merged_output is itself newer than
+        // the page it contains, so the site would look stale the instant it
+        // was built and rebuild every single time. By NAME, not by path:
+        // `-not -path '*/.*'`, the form until #768, matched the whole path, so
+        // in a working folder kept under a hidden folder every entry was
+        // skipped and the answer was always "built".
         let stoppedDirectory: String = ScheduledPublishOutcome
             .directory(inHomeFolder: homeFolder).path
         // Per working folder since #237. Once two folders can each hold ICS3U
@@ -1062,6 +1110,12 @@ enum ScheduledDeploy {
         ) {
             lines.append(completion)
         }
+        // The build succeeded, so the trail says why (#768), from this run's
+        // log: `BuiltBeforeDeployingReport`. The course's one permitted space
+        // is written +, as every launcher marker writes it.
+        lines.append("  else")
+        lines.append("    /bin/echo \"\(BuiltBeforeDeployingReport.markerPrefix) $BUILD_WHY \""
+            + "\(shellQuoted(courseCode.replacingOccurrences(of: " ", with: "+") + "/" + String(sectionNumber)))")
         lines.append("  fi")
         lines.append("fi")
         // Deploy only if there is something good to deploy — the button
@@ -1124,11 +1178,15 @@ enum ScheduledDeploy {
         // update the rebuild happens inside the DESTINATION leg: a build
         // question there is recorded as `neededAnAnswer` and a failed build as
         // `didNotFinish`, against the destination, not as the build's own
-        // kinds. Changing this wrapper would not help the runs that meet it:
-        // a wrapper is written when the deploy is SCHEDULED, so every one set
-        // before 1.9.2 keeps its old text. The advice those outcomes give
-        // (deploy it yourself) still recovers. documentation/05-build-pipeline.md
-        // → "Which toolchain built a site (#746)".
+        // kinds. The advice those outcomes give (deploy it yourself) still
+        // recovers. (This said a wrapper is written when the deploy is
+        // SCHEDULED; since #323 it is written at the run. What stays old is the
+        // folder's own launchers, last mirrored when the folder was opened:
+        // #748 part 4.) The same leg also builds when the folder's launchers
+        // ask the pages question (#768) and this check did not, which only a
+        // change between the two can make happen. documentation/05-build-pipeline.md
+        // → "Which toolchain built a site (#746)" and "A deploy asks for itself
+        // whether anything changed (#768)".
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting
@@ -2904,6 +2962,9 @@ enum ScheduledDeploy {
         // The folder's workspace made again by a launcher of this run, and
         // why (#684): the next preview is slow, and nobody saw it happen.
         FolderSetUpAgainReport.noteOnTheTrail(from: text)
+        // This run's own build first, and why (#768): "why was this
+        // morning's deploy slow?" is the question it answers.
+        BuiltBeforeDeployingReport.noteOnTheTrail(from: text)
         // A section's Cloudflare project made again by this run's publish
         // (2026-09-30): its address may have changed while nobody watched.
         CloudflareProjectRemadeReport.noteOnTheTrail(from: text)

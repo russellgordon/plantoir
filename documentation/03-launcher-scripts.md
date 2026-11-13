@@ -1218,7 +1218,14 @@ it compares the site's `.built-with-toolchain` stamp with its `$IMAGE` and runs
 `update` reason above; every workspace is made with `-e
 PLANTOIR_TOOLCHAIN_ID=$IMAGE` (the PREVIEW PORT BLOCK) so the stamp names the
 image a build really ran in. [05 → "Which toolchain built a site
-(#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746). (Not checking the BINDINGS there
+(#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746). Since #768 the
+same decision also asks whether anything in the course changed since the build
+(`pages_or_clock_ask_for_a_build`, cut out and run by
+`scripts/test_build_freshness_reuse.py`), asked BEFORE `link_course_build_output`
+can move a built site out of the course, and `preview.sh` and `setup.sh` remake a
+workspace that does not carry `PLANTOIR_TOOLCHAIN_ID=$IMAGE` (`toolchainId`,
+#748 part 3): [05 → "A deploy asks for itself whether anything changed
+(#768)"](05-build-pipeline.md#a-deploy-asks-for-itself-whether-anything-changed-768). (Not checking the BINDINGS there
 is the one part that IS a decision, #684: see "Remaking in `deploy.sh` too"
 among the rejected options above.) `preview.sh` has no writability
 check and no comment in it says why.
@@ -1852,6 +1859,69 @@ back in `preview.sh` (1 failure), `setup.sh`'s new line removed (1
 failure, the example course's bar), and "container" put into a `case` arm's
 echo in `workspace_origin_in_words` (1 failure; the scan before the #382 fix
 round passed it).
+
+### The BUILD OUTPUT BLOCK keeps the kept copies of geogebra.org sketches (GitHub #789)
+
+`link_course_build_output`, in the BUILD OUTPUT BLOCK all three launchers
+carry, clears a course's builds folder whenever no link of this Mac's own
+points at it: a course never linked, a link naming another Mac's folder, a
+missing link, a file where the link belongs, and the move of a real
+`.merged_output` out of the working folder. 05 → "Built websites live outside
+the working folder" says why the built sites go. Until #789 the clear also
+took `.geogebra-cache`, the copies of geogebra.org sketches kept beside the
+built sites, which are fetched from the network and cannot be made again
+offline.
+
+The block now keeps that folder (`KEPT_COPIES_FOLDER`) through every one of
+those branches:
+
+- **The clears** call `clear_built_sites_keeping_copies`, which removes every
+  entry of the builds folder except `.geogebra-cache` (`find -mindepth 1
+  -maxdepth 1 ! -name … -exec rm -rf {} +`). The copies stay where they are,
+  so a run stopped halfway leaves fewer built files and never fewer copies.
+- **The move** first carries the copies already outside INTO the site being
+  moved (`carry_kept_copies`), so the clear cannot reach them and the move,
+  and the put-back when the link cannot be made, take them along. Where both
+  hold a copy under one key the moved site's copy wins, because it is the one
+  the course's builds have been using. When a copy cannot be carried the
+  block clears nothing and prints the move's existing line that the built
+  website was left where it is; every copy is then still in one of the two
+  folders.
+
+Only a REAL folder is kept. A `.geogebra-cache` that is a file, a link or a
+link to itself is cleared with the rest, so the course can keep copies again;
+removing a link never touches what it points at. Copies are carried only out
+of a real builds folder, so a builds folder that is itself a link gives up
+nothing of the folder it points at. Every entry is carried, a name starting
+with a dot included, the same in the shell and in the app (the review of
+#789 found the shell's `*` passing over dot names while the app's
+`contentsOfDirectory` moved them).
+
+No new message reaches a teacher, because no branch now loses a copy.
+
+**Measured** 2026-11-12, by running the block extracted from `preview.sh`
+against a scratch folder with a planted copy: before the change a course
+never linked, a link naming another Mac's folder and a missing link each
+lost it, and a course already linked kept it; after it, all five rows keep
+it. A brand-new working copy is the first row, which is why `verify.sh`
+failed its GeoGebra check on the first run in a fresh clone and passed on the
+second; section 6 now checks the planted copy straight after the main build
+and says whether the course had a link before the run. The rule and thirteen
+cases are `contracts/shared-rules.json` → `buildOutputLocation.keptCopiesSurviveTheClear`,
+run against the real block by `scripts/test_build_output_link.sh`; the first eight
+fail on the old block (23 of 66 checks), and the five the review added fail
+on the first version of the fix (8 of 90). The app's `BuildOutputLocation`
+carries the same rule and runs the cases that need no shell fault.
+
+**Rejected:** setting the copies aside in a folder of their own, clearing,
+and putting them back (a run stopped between the steps strands them where
+no build reads, and the app's sweep of the builds folder removes every entry
+that is not a course code, so the next folder-open would throw them away);
+moving the copies into the course folder (Russell's first ruling on #789,
+replaced the same day: a build that fetches a sketch would write into the
+course folder, which the check for a changed course could read as a change,
+and it would add files to whatever syncs the course); keeping
+`.figure-cache` and `.swift-cache` too (both are made again on this Mac with no network: the diagrams from the engines the website builder carries, and the Swift blocks by the Swift toolchain, a first download of about 1.3 GB kept in an image of its own that no clear touches; so a clear costs time, every diagram drawn and every Swift block compiled again on the next build, and nothing else).
 
 ## 5. Per-task specifics
 
@@ -2750,7 +2820,10 @@ and what was measured.
 Most trail lines are written by the app, but a few are written by the
 launcher itself, through `note_on_the_trail` — a refusal (a preview while its
 section deploys, a deploy while that section is busy, a folder spelled two
-ways), and the launcher's own lines from a publish it runs (on the Mac a
+ways), a deploy that built its site first and why (#768: "site built again
+before deploying", one line per reason, written by `deploy.sh` after its
+`preview.sh --build-only` returned 0, so a deploy typed in Terminal is recorded
+too), and the launcher's own lines from a publish it runs (on the Mac a
 scheduled publish is started by the app itself, so those lines are the app's;
 on Windows, Task Scheduler runs `deploy.ps1` and they are the launcher's).
 The function is the same in `setup.sh`, `preview.sh` and `deploy.sh`

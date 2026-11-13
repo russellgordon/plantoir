@@ -29,6 +29,8 @@ Pure stdlib. Run with:
 """
 
 import json
+import hashlib
+import time
 import os
 import shutil
 import stat
@@ -90,8 +92,17 @@ def _a_working_folder(tmp: str) -> Path:
     course.mkdir(parents=True)
     values = {"course_code": "ICS4U", "section_numbers": [1], "num_sections": 1}
     (course / "course_config.json").write_text(json.dumps(values), encoding="utf-8")
-    built = course / ".merged_output" / "section1" / "public"
+    # The built site where deploy.sh keeps it, linked as it links it. Since
+    # #768 a deploy asks whether anything in the course changed since the
+    # build, and moving a built site out of the course changes the course
+    # folder, so a site left inside it would be built again on the next deploy.
+    spelled = subprocess.run(["/bin/pwd", "-P"], cwd=str(folder), capture_output=True, check=True).stdout
+    builds = (folder / "home" / "Library" / "Application Support" / "Plantoir" / "builds"
+              / hashlib.sha256(spelled).hexdigest()[:8] / "ICS4U")
+    built = builds / "section1" / "public"
     built.mkdir(parents=True)
+    os.symlink(builds, course / ".merged_output")
+    time.sleep(0.02)
     for name, text in BUILT_PAGES.items():
         (built / name).write_text(text, encoding="utf-8")
     # Built by the image this test names (#746), so the deploy publishes it

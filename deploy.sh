@@ -117,6 +117,63 @@ note_on_the_trail() {
   printf '%s\n' "$trail_line" >> "$trail/activity.txt" 2>/dev/null || true
 }
 
+# The folder, beside a course's built sites, that holds the copies of
+# geogebra.org sketches its pages name (scripts/geogebra.py CACHE_FOLDER).
+# Unlike everything else under BUILD_ROOT it is NOT derived from the
+# teacher's notes: each copy was fetched from geogebra.org, so a cleared copy
+# can only come back while this Mac is online, and a sketch with no copy
+# and no connection becomes a folder problem. Every copy is named by the
+# key of the fence that asked for it, so a copy is right for any course
+# whose page still carries that fence, however the course folder came to
+# be here; that is why the copies survive every clear below while the
+# built sites do not (GitHub #789; contracts/shared-rules.json ->
+# buildOutputLocation.keptCopiesSurviveTheClear).
+KEPT_COPIES_FOLDER=".geogebra-cache"
+
+# Clears one course's builds folder, keeping its kept copies. The copies
+# stay where they are, rather than being set aside somewhere and put back,
+# so no step can leave them anywhere but their own place: a run stopped
+# halfway leaves fewer built files, never fewer copies. A link or a file
+# standing where the folder belongs is not a folder of copies and goes, and
+# so does a KEPT_COPIES_FOLDER that is not a real folder (a file, a link,
+# a link to itself): left standing, no build could keep a copy in it again,
+# and a link would send the copies out of the builds folder. Only the link
+# or the file itself is removed, never what a link points at.
+clear_built_sites_keeping_copies() {
+  local target="$1"
+  [ -n "$target" ] || return 0
+  if [ -d "$target" ] && [ ! -L "$target" ]; then
+    if [ -L "$target/$KEPT_COPIES_FOLDER" ] || { [ -e "$target/$KEPT_COPIES_FOLDER" ] && [ ! -d "$target/$KEPT_COPIES_FOLDER" ]; }; then
+      rm -f "$target/$KEPT_COPIES_FOLDER" 2>/dev/null || true
+    fi
+    find "$target" -mindepth 1 -maxdepth 1 ! -name "$KEPT_COPIES_FOLDER" -exec rm -rf {} + 2>/dev/null || true
+  else
+    rm -rf "$target" 2>/dev/null || true
+  fi
+}
+
+# Moves the kept copies in folder $1 into folder $2, keeping $2's copy of
+# any key both hold, then removes $1. Every entry moves, a name starting
+# with a dot included, as the app's copy of this rule moves them. Answers 1,
+# having removed nothing, when a copy could not be moved: every copy is
+# then still in one of the two folders.
+carry_kept_copies() {
+  local from="$1" into="$2" entry
+  [ -d "$from" ] && [ ! -L "$from" ] || return 0
+  if [ ! -e "$into" ] && [ ! -L "$into" ]; then
+    mv "$from" "$into" 2>/dev/null || return 1
+    return 0
+  fi
+  [ -d "$into" ] && [ ! -L "$into" ] || return 1
+  for entry in "$from"/* "$from"/.[!.]* "$from"/..?*; do
+    [ -e "$entry" ] || continue
+    [ -e "$into/${entry##*/}" ] && continue
+    mv "$entry" "$into/" 2>/dev/null || return 1
+  done
+  rm -rf "$from" 2>/dev/null || true
+  return 0
+}
+
 # Points courses/<CODE>/.merged_output at this course's folder under
 # BUILD_ROOT, moving an existing built site out of the working folder on
 # the way. Safe to run every time: when the link is already right this
@@ -128,7 +185,8 @@ note_on_the_trail() {
 # and each of them leaves content whose timestamps may be OLDER than the
 # site standing outside. Reusing that build would let a restored course
 # publish last month's pages while every check said it was up to date. So a
-# build folder with no link pointing at it is CLEARED, never adopted.
+# build folder with no link pointing at it is CLEARED, never adopted. Its
+# kept copies of geogebra.org sketches are the one thing the clear leaves.
 link_course_build_output() {
   local course="$1"
   local course_dir link target current
@@ -185,6 +243,19 @@ link_course_build_output() {
     rm -f "$link" 2>/dev/null || return 0
   elif [ -d "$link" ]; then
     echo "📦 Moving ${course}'s built website out of your working folder…"
+    # The kept copies already beside the built sites go INTO the site being
+    # moved first, so the clear below cannot reach them and every later
+    # step carries them along: the move, and the put-back if the link fails.
+    # The moved site's own copy wins where both hold one, because it is the
+    # copy the course's builds have been using; the copies only the builds
+    # folder holds are added to it. If any copy cannot be carried, nothing
+    # is cleared and the built website stays where it is.
+    # Only out of a REAL builds folder: when it is a link, the copies seen
+    # through it belong to whatever it points at, which is left alone.
+    if [ -d "$target" ] && [ ! -L "$target" ] && ! carry_kept_copies "$target/$KEPT_COPIES_FOLDER" "$link/$KEPT_COPIES_FOLDER"; then
+      echo "⚠️  Could not move it; leaving the built website where it is."
+      return 0
+    fi
     rm -rf "$target" 2>/dev/null || true
     # If clearing failed — an unwritable subfolder under it — `mv` would put
     # the site INSIDE the surviving folder instead of at it, the link would
@@ -213,7 +284,8 @@ link_course_build_output() {
     rm -f "$link" 2>/dev/null || return 0
   fi
 
-  rm -rf "$target" 2>/dev/null || true
+  # The built sites go and the kept copies stay: see KEPT_COPIES_FOLDER.
+  clear_built_sites_keeping_copies "$target"
   mkdir -p "$target" 2>/dev/null || return 0
   ln -s "$target" "$link" 2>/dev/null || true
 }
@@ -1261,6 +1333,177 @@ else
   IMAGE="teaching-quartz:src-$(toolchain_hash "$BUILD_CONTEXT")"
 fi
 
+# -------------------- Did THIS version build the site? (#746) ----------
+# A site is deployed as it was built, and nothing a teacher wrote had to
+# change for the toolchain to change: 1.9.1's tick-box rule (#693) and quiz
+# print rule (#733) were in the app, in .toolchain and in a freshly tagged
+# image, and a section redeployed under 1.9.1 still served 1.9.0's
+# stylesheet. The app went straight here (its pages had not changed since
+# the last build), this script started the folder's EXISTING workspace —
+# made from the 1.9.0 image, since only preview.sh and setup.sh remake a
+# workspace whose image is out of date — and the one rebuild deploy.py made
+# ran in it. Measured 2026-11-01: documentation/05-build-pipeline.md ->
+# "Which toolchain built a site (#746)".
+#
+# Every build stamps the folder that holds public/ with the name of the
+# image its workspace was made from (PLANTOIR_TOOLCHAIN_ID, set when the
+# workspace is created). A stamp that is not this run's $IMAGE — or no stamp,
+# which is every site built before 1.9.2 — means preview.sh --build-only
+# first, which builds the image if it is missing, remakes the workspace from
+# it (waiting for, or refusing over, work in it exactly as #94 says) and
+# builds the site. Delegated rather than copied here, so the rules for
+# remaking a workspace stay in the launchers that already own them.
+# Plain string compare and no JSON: scripts/test_deploy_toolchain_stamp.py
+# cuts this definition out of the launcher and runs it.
+# BEGIN site_was_built_by_this_toolchain
+# The stamp is trimmed at both ends and nowhere else, as Python's strip()
+# reads it (toolchain_paths.toolchain_that_built). A stamp that cannot be read
+# is a quiet rebuild: the redirection sits inside the braces so a refusal to
+# open it never reaches the console.
+site_was_built_by_this_toolchain() {
+  local stamp_file="$1/.built-with-toolchain" stamp
+  [[ -f "$stamp_file" && -r "$stamp_file" ]] || return 1
+  stamp="$( { cat -- "$stamp_file"; } 2>/dev/null )" || return 1
+  stamp="${stamp#"${stamp%%[![:space:]]*}"}"
+  stamp="${stamp%"${stamp##*[![:space:]]}"}"
+  [[ -n "$stamp" && "$stamp" == "$2" ]]
+}
+# END site_was_built_by_this_toolchain
+
+# -------------------- Has anything changed since it was built? (#768) --
+# A deploy reuses the last build only when nothing has changed since it was
+# built, and builds again otherwise, however it was started: Deploy pressed
+# in the app, a deploy set for later, or this script typed at a command line
+# (Russell, 2026-11-12). Until #768 only the apps asked about the PAGES, so
+# `./deploy.sh ICS3U 1` after an edit sent the last build and said it had
+# succeeded, and after a page was DELETED the page stayed on the site (#741).
+# The rule and its cases: contracts/app-rules.json ->
+# buildFreshness.reuseTheLastBuild, which toolchain_paths.py explains part by
+# part. scripts/test_build_freshness_reuse.py cuts this definition out and
+# runs every case against it.
+#
+# Prints `clock` or `pages` when the course asks for a build, and nothing
+# (exit 1) when it does not, or when the site has no front page (refused
+# above, or a site deployed as it stands, as before #768):
+#   * the reference is the start of the build that made the site
+#     (.build-started), or its front page when that is earlier or there is
+#     no marker — compared with `find -newer`, not `[ -nt ]`, because the
+#     mac's /bin/bash 3.2 compares whole seconds and find the nanoseconds;
+#   * a reference later than now is `clock`;
+#   * the course folder itself, and every entry under it whose name does not
+#     start with "." (a hidden folder is skipped whole, by its NAME, so a
+#     working folder under a hidden folder is still read), modified (-newer)
+#     or changed (-cnewer, which no copy can set back) after the reference,
+#     is `pages`. Folders count: a deletion or a rename shows only there.
+#   * `find -H`: a course folder that is itself a link is read through it,
+#     as the build reads it. Without it find stops at the link and every
+#     change behind it reads as built (the #768 review's M3). The link's
+#     own times are read as well (a second find without -H), so pointing it
+#     at another folder made before the build builds (the fix review's M1).
+#     A link INSIDE the course is still not followed, by any reader.
+# BEGIN pages_or_clock_ask_for_a_build
+pages_or_clock_ask_for_a_build() {
+  local course="$1" section="$2" front since now changed
+  front="$section/public/index.html"
+  [[ -f "$front" ]] || return 1
+  since="$front"
+  if [[ -f "$section/.build-started" ]] && [[ -z "$(find "$section/.build-started" -newer "$front" 2>/dev/null)" ]]; then
+    since="$section/.build-started"
+  fi
+  now="$(mktemp "${TMPDIR:-/tmp}/plantoir-now.XXXXXX" 2>/dev/null)" || now=""
+  if [[ -n "$now" ]]; then
+    changed="$(find "$since" -newer "$now" 2>/dev/null)"
+    rm -f -- "$now"
+    if [[ -n "$changed" ]]; then
+      echo clock
+      return 0
+    fi
+  fi
+  changed="$(find -H "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
+  if [[ -z "$changed" ]]; then
+    # Without -H: a course folder that is a link, by the link's own times.
+    changed="$(find "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
+  fi
+  if [[ -z "$changed" ]]; then
+    changed="$(find -H "$course" -mindepth 1 -name '.*' -prune -o \( -newer "$since" -o -cnewer "$since" \) -print -quit 2>/dev/null)"
+  fi
+  [[ -n "$changed" ]] || return 1
+  echo pages
+}
+# END pages_or_clock_ask_for_a_build
+
+# -------------------- Is this site a preview's? ------------------------
+# Serve mode bakes a live-reload client into every page it builds, and a site
+# that carries it must never be published (the reasons are where it is used,
+# below). The rule is contracts/app-rules.json -> buildFreshness.previewBuild,
+# read by five other checkers too, and scripts/test_preview_build_detection.py
+# cuts THIS definition out of the launcher and runs it against every case.
+#
+# What is looked for is the client's script TAG followed by its first
+# statement, with only whitespace between (#291). The bare address
+# "ws://localhost:" was the rule until 2026-09-26, and any page whose note
+# MENTIONS it carries that too: one networking lesson, measured in a
+# production build, carried it 20 times on 7 lines (title, meta tags,
+# breadcrumb, heading, prose, code), so a folder publish of that course
+# refused every time and every other publish rebuilt. A page's own words
+# cannot produce the tag, because Quartz writes "<" as "&lt;" in text and in
+# attributes alike.
+#
+# Two details are load-bearing:
+#   -z         Quartz puts the tag and the statement on DIFFERENT lines, so
+#              each page is read as one record rather than line by line.
+#   LC_ALL=C   Under a UTF-8 locale BSD grep -z misses the client in a file
+#              with a byte that is not UTF-8 anywhere BEFORE the client (in
+#              practice nearly the whole page, since Quartz writes the client
+#              at the end of <body>; measured: exit 1, and 0 under LC_ALL=C;
+#              a bad byte after the client does not cause it), and a preview's page read as clean is a
+#              preview PUBLISHED. #136 judged LC_ALL=C here "correct, but not
+#              worth a publishing-path change" when the miss needed the byte on
+#              the same line and erred safe; -z made it whole-file and unsafe,
+#              so that choice is reversed.
+# A basic regex, not -E: the pattern holds a literal "(".
+LIVE_RELOAD_CLIENT_PATTERN=$'<script type="application/javascript">[[:space:]]*const socket = new WebSocket(\'ws://localhost:'
+site_carries_preview_client() {
+  LC_ALL=C grep -rzqs --include='*.html' -- "$LIVE_RELOAD_CLIENT_PATTERN" "$1" 2>/dev/null
+}
+
+# A preview's site first: it is not a site to deploy whatever else is true,
+# and a preview never stamps its site, so a section only ever previewed would
+# otherwise read as "Plantoir had been updated" (the #768 review's M1). Then
+# the toolchain: its rebuild covers a page change as well, so one build at
+# most, and its words are the more surprising. Then the pages and the clock.
+# Not for --reset-token, which deploys nothing and exits further down.
+#
+# Asked HERE, before link_course_build_output below moves a built site out of
+# a course that still holds one: the move puts a link in the course folder,
+# whose own time then changes, and nothing students see has changed. The
+# answer is acted on after the preflight, which refuses a section with no
+# built site first. The paths are spelled out because COURSE_DIR_HOST and the
+# rest are set only after the move.
+#
+# Prints the reason, or nothing (exit 1) to reuse the build. Its arguments are
+# the course folder, the section's build folder and the image this run uses.
+# scripts/test_build_freshness_reuse.py cuts this out with the three questions
+# it calls and runs every case against it.
+# BEGIN why_this_deploy_builds_first
+why_this_deploy_builds_first() {
+  local why
+  if [[ -f "$2/public/index.html" ]] && site_carries_preview_client "$2/public"; then
+    why="preview"
+  elif ! site_was_built_by_this_toolchain "$2" "$3"; then
+    why="toolchain"
+  else
+    why="$(pages_or_clock_ask_for_a_build "$1" "$2")" || return 1
+  fi
+  printf '%s\n' "$why"
+}
+# END why_this_deploy_builds_first
+_REBUILD_FOR=""
+if [[ "$RESET_TOKEN" != "true" ]]; then
+  _ASKED_COURSE="$(pwd)/courses/${COURSE_CODE}"
+  _ASKED_SECTION="${_ASKED_COURSE}/.merged_output/section${SECTION_NUM}"
+  _REBUILD_FOR="$(why_this_deploy_builds_first "${_ASKED_COURSE}" "${_ASKED_SECTION}" "$IMAGE")" || _REBUILD_FOR=""
+fi
 # Settled before the paths below are read: MERGED_DIR_HOST and everything
 # under it resolve THROUGH the link, and a course still holding a real
 # .merged_output folder has to be moved out before the preflight looks.
@@ -1329,47 +1572,28 @@ if [[ "$_BUILT_FOUND" != "true" ]]; then
   exit 1
 fi
 
-# -------------------- Did THIS version build the site? (#746) ----------
-# A site is deployed as it was built, and nothing a teacher wrote had to
-# change for the toolchain to change: 1.9.1's tick-box rule (#693) and quiz
-# print rule (#733) were in the app, in .toolchain and in a freshly tagged
-# image, and a section redeployed under 1.9.1 still served 1.9.0's
-# stylesheet. The app went straight here (its pages had not changed since
-# the last build), this script started the folder's EXISTING workspace —
-# made from the 1.9.0 image, since only preview.sh and setup.sh remake a
-# workspace whose image is out of date — and the one rebuild deploy.py made
-# ran in it. Measured 2026-11-01: documentation/05-build-pipeline.md ->
-# "Which toolchain built a site (#746)".
-#
-# Every build stamps the folder that holds public/ with the name of the
-# image its workspace was made from (PLANTOIR_TOOLCHAIN_ID, set when the
-# workspace is created). A stamp that is not this run's $IMAGE — or no stamp,
-# which is every site built before 1.9.2 — means preview.sh --build-only
-# first, which builds the image if it is missing, remakes the workspace from
-# it (waiting for, or refusing over, work in it exactly as #94 says) and
-# builds the site. Delegated rather than copied here, so the rules for
-# remaking a workspace stay in the launchers that already own them.
-# Plain string compare and no JSON: scripts/test_deploy_toolchain_stamp.py
-# cuts this definition out of the launcher and runs it.
-# BEGIN site_was_built_by_this_toolchain
-# The stamp is trimmed at both ends and nowhere else, as Python's strip()
-# reads it (toolchain_paths.toolchain_that_built). A stamp that cannot be read
-# is a quiet rebuild: the redirection sits inside the braces so a refusal to
-# open it never reaches the console.
-site_was_built_by_this_toolchain() {
-  local stamp_file="$1/.built-with-toolchain" stamp
-  [[ -f "$stamp_file" && -r "$stamp_file" ]] || return 1
-  stamp="$( { cat -- "$stamp_file"; } 2>/dev/null )" || return 1
-  stamp="${stamp#"${stamp%%[![:space:]]*}"}"
-  stamp="${stamp%"${stamp##*[![:space:]]}"}"
-  [[ -n "$stamp" && "$stamp" == "$2" ]]
-}
-# END site_was_built_by_this_toolchain
-
-# Not for --reset-token, which deploys nothing and exits further down.
-if [[ "$RESET_TOKEN" != "true" ]] && ! site_was_built_by_this_toolchain "${SECTION_DIR_HOST}" "$IMAGE"; then
-  echo "🔁 Plantoir has been updated since this site was built, so it is"
-  echo "   building it again before it is deployed…"
+# -------------------- Build first when something changed (#746, #768) ---
+# What was asked above, before the built site could be moved, acted on now.
+if [[ -n "$_REBUILD_FOR" ]]; then
+  # The words differ by reason; none of the new ones holds an anchor
+  # windows-app's LauncherRulesContractTests reads (its toolchain pair is
+  # matched once, so it is written once, here).
+  case "$_REBUILD_FOR" in
+    preview)
+      # The folder deploy's own preview words below, letter for letter, so
+      # Windows' anchor still finds one line.
+      echo "🔁 This site was built by a preview, which adds live updating"
+      echo "   that students' browsers would ask about. Rebuilding it before it is deployed…" ;;
+    toolchain)
+      echo "🔁 Plantoir has been updated since this site was built, so it is"
+      echo "   building it again before it is deployed…" ;;
+    clock)
+      echo "🔁 This site's last build is dated later than now, so this computer's clock"
+      echo "   has changed since and the site is being built again before it is deployed…" ;;
+    *)
+      echo "🔁 Something in this course has changed since its site was last built,"
+      echo "   so the site is being built again before it is deployed…" ;;
+  esac
   _TOOLCHAIN_EXTRA=()
   if [[ "$NON_INTERACTIVE" == "true" ]]; then _TOOLCHAIN_EXTRA+=(--non-interactive); fi
   # The same image this run compares with, or the build would stamp another.
@@ -1385,42 +1609,21 @@ if [[ "$RESET_TOKEN" != "true" ]] && ! site_was_built_by_this_toolchain "${SECTI
     echo "❌ Could not rebuild this site before deploying it."
     exit 1
   fi
+  # Written here, after the build succeeded, so a deploy typed in Terminal
+  # is on the trail too: "why was this morning's deploy slow?" (#748 part 2).
+  # contracts/shared-rules.json -> activityTrail.mustRecord."site built again
+  # before deploying", one line per reason.
+  case "$_REBUILD_FOR" in
+    preview)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — the last build was made by a preview" ;;
+    toolchain)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — Plantoir had been updated since it was last built" ;;
+    clock)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — its last build was dated later than now, so the computer's clock had changed" ;;
+    *)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — something in the course had changed since it was last built" ;;
+  esac
 fi
-
-# -------------------- Is this site a preview's? ------------------------
-# Serve mode bakes a live-reload client into every page it builds, and a site
-# that carries it must never be published (the reasons are where it is used,
-# below). The rule is contracts/app-rules.json -> buildFreshness.previewBuild,
-# read by five other checkers too, and scripts/test_preview_build_detection.py
-# cuts THIS definition out of the launcher and runs it against every case.
-#
-# What is looked for is the client's script TAG followed by its first
-# statement, with only whitespace between (#291). The bare address
-# "ws://localhost:" was the rule until 2026-09-26, and any page whose note
-# MENTIONS it carries that too: one networking lesson, measured in a
-# production build, carried it 20 times on 7 lines (title, meta tags,
-# breadcrumb, heading, prose, code), so a folder publish of that course
-# refused every time and every other publish rebuilt. A page's own words
-# cannot produce the tag, because Quartz writes "<" as "&lt;" in text and in
-# attributes alike.
-#
-# Two details are load-bearing:
-#   -z         Quartz puts the tag and the statement on DIFFERENT lines, so
-#              each page is read as one record rather than line by line.
-#   LC_ALL=C   Under a UTF-8 locale BSD grep -z misses the client in a file
-#              with a byte that is not UTF-8 anywhere BEFORE the client (in
-#              practice nearly the whole page, since Quartz writes the client
-#              at the end of <body>; measured: exit 1, and 0 under LC_ALL=C;
-#              a bad byte after the client does not cause it), and a preview's page read as clean is a
-#              preview PUBLISHED. #136 judged LC_ALL=C here "correct, but not
-#              worth a publishing-path change" when the miss needed the byte on
-#              the same line and erred safe; -z made it whole-file and unsafe,
-#              so that choice is reversed.
-# A basic regex, not -E: the pattern holds a literal "(".
-LIVE_RELOAD_CLIENT_PATTERN=$'<script type="application/javascript">[[:space:]]*const socket = new WebSocket(\'ws://localhost:'
-site_carries_preview_client() {
-  LC_ALL=C grep -rzqs --include='*.html' -- "$LIVE_RELOAD_CLIENT_PATTERN" "$1" 2>/dev/null
-}
 
 # -------------------- Publish to a local folder ------------------------
 # The built site already sits on the host (the working folder is
@@ -1596,6 +1799,8 @@ if [[ -n "$TO_FOLDER" ]]; then
       echo "❌ The rebuilt site has not appeared. Nothing was deployed."
       exit 1
     fi
+    # The same event as the rebuild above, in this reason's words (#768).
+    note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — the last build was made by a preview"
   fi
 
   echo "📦 Deploying ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
@@ -4395,6 +4600,7 @@ docker exec $_EXEC_TTY \
   -e TEAM_SLUG="${TEAM_SLUG}" \
   -e TARGET="${TARGET}" \
   -e CF_ACCOUNT="${CF_ACCOUNT}" \
+  -e PLANTOIR_PAGES_ALREADY_ASKED=1 \
   "$CONTAINER_NAME" \
   sh -lc '
     tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;

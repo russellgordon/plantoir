@@ -103,12 +103,19 @@ struct CourseSettingsCommands: Equatable {
 
     var maySave: Bool
     var mayRevert: Bool
+
+    /// Why Revert is dimmed, when it is for a reason the teacher can act
+    /// on: drawn as a line under it, which VoiceOver reads with the menu
+    /// (#708: on the Planning tab, `PlanningWording.revertOnPlanning`).
+    var revertNote: String? = nil
+
     var perform: (SubjectMenuRules.Item) -> Void
 
     // MARK: - Functions
 
     static func == (left: CourseSettingsCommands, right: CourseSettingsCommands) -> Bool {
         return left.maySave == right.maySave && left.mayRevert == right.mayRevert
+            && left.revertNote == right.revertNote
     }
 }
 

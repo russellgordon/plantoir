@@ -227,13 +227,25 @@ final class ToolchainReadiness {
 
     // MARK: - Functions: the guidance for assistants (#454)
 
+    /// The guidance for assistants the app carries, `support/agent_guidance`
+    /// in its own bundle: what `writeGuidance` copies into a working folder,
+    /// and what the Planning tab refreshes a plan's `assets/` from (#708,
+    /// `PlanningAssets`), so the two read one place. Nil only in a bundle
+    /// built without its support folder.
+    nonisolated static var bundledGuidanceURL: URL? {
+        guard let supportURL = Bundle.main.url(forResource: "support", withExtension: nil) else {
+            return nil
+        }
+        return supportURL.appendingPathComponent("agent_guidance", isDirectory: true)
+    }
+
     /// The guidance pass, from the app's own bundle.
     nonisolated static func writeGuidance(into workspaceURL: URL) -> AgentGuidance.Outcome {
-        guard let supportURL = Bundle.main.url(forResource: "support", withExtension: nil) else {
+        guard let guidanceURL = bundledGuidanceURL else {
             return AgentGuidance.Outcome()
         }
         return AgentGuidance.write(
-            from: supportURL.appendingPathComponent("agent_guidance"),
+            from: guidanceURL,
             into: workspaceURL,
             declined: { path in AgentGuidance.declinedSignature(forPath: path) },
             forgetDeclined: { path in AgentGuidance.forgetDeclined(forPath: path) }

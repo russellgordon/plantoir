@@ -1185,8 +1185,10 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
         # preview.sh's sixth is #310's: an announced address that turned
         # out to be another account's. #684 added one each to setup.sh and
         # preview.sh (previews open to the network), and gave every call
-        # its reason, which must be one the trail has words for.
-        expected = {"setup.sh": 9, "preview.sh": 7, "deploy.sh": 7}
+        # its reason, which must be one the trail has words for. #748 part 3
+        # added one more to setup.sh and preview.sh: a workspace that does
+        # not name the toolchain it runs (toolchainId).
+        expected = {"setup.sh": 10, "preview.sh": 8, "deploy.sh": 7}
         words = remade_trail_words()
         for launcher, count in expected.items():
             text = launcher_text(launcher)

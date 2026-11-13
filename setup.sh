@@ -201,6 +201,63 @@ note_on_the_trail() {
   printf '%s\n' "$trail_line" >> "$trail/activity.txt" 2>/dev/null || true
 }
 
+# The folder, beside a course's built sites, that holds the copies of
+# geogebra.org sketches its pages name (scripts/geogebra.py CACHE_FOLDER).
+# Unlike everything else under BUILD_ROOT it is NOT derived from the
+# teacher's notes: each copy was fetched from geogebra.org, so a cleared copy
+# can only come back while this Mac is online, and a sketch with no copy
+# and no connection becomes a folder problem. Every copy is named by the
+# key of the fence that asked for it, so a copy is right for any course
+# whose page still carries that fence, however the course folder came to
+# be here; that is why the copies survive every clear below while the
+# built sites do not (GitHub #789; contracts/shared-rules.json ->
+# buildOutputLocation.keptCopiesSurviveTheClear).
+KEPT_COPIES_FOLDER=".geogebra-cache"
+
+# Clears one course's builds folder, keeping its kept copies. The copies
+# stay where they are, rather than being set aside somewhere and put back,
+# so no step can leave them anywhere but their own place: a run stopped
+# halfway leaves fewer built files, never fewer copies. A link or a file
+# standing where the folder belongs is not a folder of copies and goes, and
+# so does a KEPT_COPIES_FOLDER that is not a real folder (a file, a link,
+# a link to itself): left standing, no build could keep a copy in it again,
+# and a link would send the copies out of the builds folder. Only the link
+# or the file itself is removed, never what a link points at.
+clear_built_sites_keeping_copies() {
+  local target="$1"
+  [ -n "$target" ] || return 0
+  if [ -d "$target" ] && [ ! -L "$target" ]; then
+    if [ -L "$target/$KEPT_COPIES_FOLDER" ] || { [ -e "$target/$KEPT_COPIES_FOLDER" ] && [ ! -d "$target/$KEPT_COPIES_FOLDER" ]; }; then
+      rm -f "$target/$KEPT_COPIES_FOLDER" 2>/dev/null || true
+    fi
+    find "$target" -mindepth 1 -maxdepth 1 ! -name "$KEPT_COPIES_FOLDER" -exec rm -rf {} + 2>/dev/null || true
+  else
+    rm -rf "$target" 2>/dev/null || true
+  fi
+}
+
+# Moves the kept copies in folder $1 into folder $2, keeping $2's copy of
+# any key both hold, then removes $1. Every entry moves, a name starting
+# with a dot included, as the app's copy of this rule moves them. Answers 1,
+# having removed nothing, when a copy could not be moved: every copy is
+# then still in one of the two folders.
+carry_kept_copies() {
+  local from="$1" into="$2" entry
+  [ -d "$from" ] && [ ! -L "$from" ] || return 0
+  if [ ! -e "$into" ] && [ ! -L "$into" ]; then
+    mv "$from" "$into" 2>/dev/null || return 1
+    return 0
+  fi
+  [ -d "$into" ] && [ ! -L "$into" ] || return 1
+  for entry in "$from"/* "$from"/.[!.]* "$from"/..?*; do
+    [ -e "$entry" ] || continue
+    [ -e "$into/${entry##*/}" ] && continue
+    mv "$entry" "$into/" 2>/dev/null || return 1
+  done
+  rm -rf "$from" 2>/dev/null || true
+  return 0
+}
+
 # Points courses/<CODE>/.merged_output at this course's folder under
 # BUILD_ROOT, moving an existing built site out of the working folder on
 # the way. Safe to run every time: when the link is already right this
@@ -212,7 +269,8 @@ note_on_the_trail() {
 # and each of them leaves content whose timestamps may be OLDER than the
 # site standing outside. Reusing that build would let a restored course
 # publish last month's pages while every check said it was up to date. So a
-# build folder with no link pointing at it is CLEARED, never adopted.
+# build folder with no link pointing at it is CLEARED, never adopted. Its
+# kept copies of geogebra.org sketches are the one thing the clear leaves.
 link_course_build_output() {
   local course="$1"
   local course_dir link target current
@@ -269,6 +327,19 @@ link_course_build_output() {
     rm -f "$link" 2>/dev/null || return 0
   elif [ -d "$link" ]; then
     echo "📦 Moving ${course}'s built website out of your working folder…"
+    # The kept copies already beside the built sites go INTO the site being
+    # moved first, so the clear below cannot reach them and every later
+    # step carries them along: the move, and the put-back if the link fails.
+    # The moved site's own copy wins where both hold one, because it is the
+    # copy the course's builds have been using; the copies only the builds
+    # folder holds are added to it. If any copy cannot be carried, nothing
+    # is cleared and the built website stays where it is.
+    # Only out of a REAL builds folder: when it is a link, the copies seen
+    # through it belong to whatever it points at, which is left alone.
+    if [ -d "$target" ] && [ ! -L "$target" ] && ! carry_kept_copies "$target/$KEPT_COPIES_FOLDER" "$link/$KEPT_COPIES_FOLDER"; then
+      echo "⚠️  Could not move it; leaving the built website where it is."
+      return 0
+    fi
     rm -rf "$target" 2>/dev/null || true
     # If clearing failed — an unwritable subfolder under it — `mv` would put
     # the site INSIDE the surviving folder instead of at it, the link would
@@ -297,7 +368,8 @@ link_course_build_output() {
     rm -f "$link" 2>/dev/null || return 0
   fi
 
-  rm -rf "$target" 2>/dev/null || true
+  # The built sites go and the kept copies stay: see KEPT_COPIES_FOLDER.
+  clear_built_sites_keeping_copies "$target"
   mkdir -p "$target" 2>/dev/null || return 0
   ln -s "$target" "$link" 2>/dev/null || true
 }
@@ -2907,6 +2979,17 @@ probe_container_write() {
      rm -f /teaching/courses/.write_probe'
 }
 
+# Whether this container was made naming the toolchain it runs, as
+# PLANTOIR_TOOLCHAIN_ID=<this run's $IMAGE> (#746). Every site built in a
+# workspace without it is stamped with something else, so every deploy
+# would build it again (#748 part 3). Only a workspace made by hand, or by
+# an older verify.sh, can be missing it while running the current image;
+# the launchers have made every workspace with it since 1.9.2.
+workspace_names_this_toolchain() {
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
+    | grep -Fxq "PLANTOIR_TOOLCHAIN_ID=$IMAGE"
+}
+
 # A container keeps running the version it was created from, so an update
 # only takes effect once the container itself is recreated.
 DESIRED_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null || echo "")
@@ -2950,6 +3033,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
     # the safety net for a workspace the image check passed.
     echo "♻️  Setting this folder up again so its previews can only be opened on this Mac…"
     remake_the_workspace thisMacOnly
+  elif ! workspace_names_this_toolchain; then
+    # Last of the reasons, so any remake above also puts the name right.
+    echo "♻️  Setting this folder up again so the websites it builds name this version of Plantoir…"
+    remake_the_workspace toolchainId
   else
     # Mounts match; only start if not already running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
