@@ -8297,6 +8297,66 @@ points the session at is `plantoir-unit-planning`, written into the working
 folder like the others (`documentation/09-mac-app.md` → "Unit planning
 (#707)").
 
+### A sentence on every door: printed handouts (#859)
+
+Russell ruled on 2026-11-13 that an outside assistant opened from Plantoir
+tells the teacher it can make printed handouts. Since #859 every door carries
+one more sentence, `app-rules.json` → `outsideAgents.greetingHandoutsSentence`:
+an instruction, in the teacher's voice, to say in the first reply that the
+assistant can make printed handouts, worksheets and quizzes for the course,
+each with its answer key, as PDFs with diagrams and graphs, following the
+`plantoir-handouts` guide. It is on every door and for every assistant (Claude
+Code, Codex and GitHub Copilot), in one place by one rule: straight after the
+sentence that holds every change until the teacher agrees.
+
+- **Revise With ▸**: after "…wait for me to agree.", before the
+  reference-courses sentence and the unit-plans sentence, which stays last.
+- **Fix with … on the Problems tab**: after `fixGreeting.planFirst`, before
+  the closing ("When you are done, …").
+- **Plan a Unit with … on the Planning tab**: the message's last sentence,
+  after "Do not build anything until I say go." (`planAUnit.message`'s
+  `{handouts}`).
+
+The cases are `greetingHandoutsCases` (the whole Revise greeting: plain, with
+a reference course, and with a reference course and the unit-plans sentence,
+so the order is pinned), every `fixWith.greetingCases` text and every
+`planAUnit.messageCases` text. On the mac
+`AppRulesContractTests.testTheHandoutsSentenceIsTheContractsOnEveryDoor` runs
+them; `FixWithAssistantTests.testGreetingCases` and
+`PlanningTabTests.testThePlanAUnitMessageIsTheContractsForEveryCase` compare
+the code's message with each case's whole text.
+
+Why it is like this:
+
+- **The same sentence in every session.** The `plantoir-handouts` guide is
+  always written into the working folder, so nothing is read from the disk at
+  the click, as with the How I Teach sentence.
+- **It names the guide**, so an assistant that reads the greeting knows where
+  the instructions are. It says "guide" rather than "skill" for the reason
+  `planAUnit.why` gives.
+- **The place.** Plan a Unit has no plan-first sentence, and its "Do not build
+  anything until I say go." does the same job, so one rule covers all three
+  doors. On a Revise door, putting it before the reference courses keeps the
+  two first-reply sentences apart when a course has reference courses, and
+  leaves `greetingReferenceCourses.casesHow` true as written (the plain
+  greeting already carries the sentence).
+- **No trail clause.** The "assistant opened" line says which assistant
+  started. A sentence every session carries tells a later reader nothing;
+  unit plans have a clause because what their sentence says varies.
+- **Marking and report comments are never in a greeting**, and this sentence
+  names neither. The contract test checks that.
+
+What was MEASURED: the local model's digest
+(`scripts/test_tool_surface_digest.py`) is unchanged, and the greeting is in
+neither `assist-cases.json` nor `assist-wording.json` (0 matches), so nothing
+the built-in assistant is shown moved and no routing re-measurement is owed.
+What was REJECTED: placing it after the reference courses, as the plan first
+had it (it changes `greetingReferenceCourses.casesHow` and sets two
+first-reply sentences side by side); placing it in Plan a Unit's message after
+the How I Teach sentence (it sits between that sentence and "After that, ask
+me…" and muddles the order of the first steps). NOT measured: whether each
+assistant says the sentence in its first reply as asked.
+
 ## Telling an outside assistant how the course is taught (#209)
 
 Asked "How about my teaching style?", both doors' sessions said they did not
@@ -8612,7 +8672,8 @@ applied, and only to a teacher who has shown an interest in both
 constructivist and Thinking Classrooms practice and the reality of a
 school where students often miss class (his ruling on #765, 2026-11-12). The unit-planning skill (#707) already took its lesson
 shape from the page, and the marking (#750) and report-comments (#752)
-skills read it first as well; for report comments the school's own
+skills read it first as well (both held from v2.0.0 to the release after it, so no
+working folder has them yet); for report comments the school's own
 convention is asked next, and one teacher's comment shape is shown only as
 an example (`documentation/09-mac-app.md` → "Tests, marking and report
 comments"). Why, and what was rejected:

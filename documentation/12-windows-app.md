@@ -2975,7 +2975,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `plantoir-test-authoring` (#751, templates for a unit test's marking
   guide and marking kit, and `scripts/check_kit.py`, which an assistant
   runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
-  09 → "Tests, marking and report comments"), `plantoir-marking` (#750
+  09 → "Tests, marking and report comments"). Two more skills are kept in
+  the repository and HELD from v2.0.0, so no working folder on either
+  platform gets them: `plantoir-marking` (#750
   pieces 750a and 750c, five Python scripts in `scripts/` that an assistant
   runs against a teacher's scans and marks records and the app never does,
   four templates and three references; `assessment.agentGuidance.markingSkill`
@@ -2984,7 +2986,21 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `plantoir-marking`'s `make_named_copies.py --comments` through the
   runner, which needs Python only, neither Poppler nor tectonic;
   `assessment.agentGuidance.reportCommentsSkill`, 09 → the same
-  section). A Windows teacher marking scans needs
+  section). Both are in `held/agent_guidance/skills/`, which
+  `AgentGuidance.Write` never reads, so the hold needs no Windows code;
+  their Python tests still run in `PythonToolchainTests` from there, and
+  `scripts/test_held_skills.py` (#750) checks that neither is in
+  `support/agent_guidance/skills` and that no root file, written skill,
+  greeting, app source (this app's `Plantoir`, `Plantoir.Core` and
+  `Plantoir.Mcp` included), Help file or plantoir.app page names or offers
+  them (`held.words`); the test-authoring skill (#751), asked to mark,
+  says `held.saysWhenAsked.sentence`
+  (`printablePages.agentGuidance.held`, 09 → "Held from v2.0.0"). Not
+  measured on Windows: `support\**` is copied with `PreserveNewest`, which
+  does not delete a file from `bin\` when it leaves the source, so an
+  incremental build of a clone that built them before may still carry the
+  two folders; build clean before checking the hold. When
+  they ship (the release after v2.0.0), a Windows teacher marking scans needs
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
   `pdfseparate`) and tectonic on PATH (the class results need Python only
   for their tables, and tectonic and `pdftotext` for their PDF); which installs work, and how a
@@ -2997,9 +3013,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   reads for the Revise doors' greeting (Windows owes that reader: the
   `windows` issue for #707) and shows on the course page's Planning tab
   (Windows owes the tab: the `windows` issue for #708, and 09 → "The course
-  page's Planning tab (#708)"), and the marking skill one more,
-  `courses/<CODE>/.internal/marking/marking.json` (the two marking folders'
-  paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
+  page's Planning tab (#708)"); the held marking skill adds one more when it
+  ships, `courses/<CODE>/.internal/marking/marking.json` (the two marking
+  folders' paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the
   rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes

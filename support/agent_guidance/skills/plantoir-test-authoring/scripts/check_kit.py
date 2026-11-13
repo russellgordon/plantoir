@@ -6,7 +6,7 @@ record, each version's paper and the Marking Guide against the kit.
 
 Run it from the working folder, never import it, and do not copy or change
 it: this is the one script in the skill that is NOT a starting point. A kit
-that passes here is in the format the plantoir-marking skill reads. Change
+that passes here is in the kit format exactly. Change
 the kit, the paper or the guide, never this file.
 
     python3 -B .claude/skills/plantoir-test-authoring/scripts/check_kit.py "<test>/Marking Kit/answers.json"
@@ -69,7 +69,7 @@ MARKS_KEYS = ["kit", "identifier", "section", "version", "points", "voided", "ch
 MARKS_POINT_KEYS = ["earned", "seen", "note", "studentNote"]
 VOIDED_KEYS = ["reason", "intended"]
 # The marks record's byQuestion, focus, strengths and feedback are what a
-# feedback sheet says; plantoir-marking defines what is inside them, so only
+# feedback sheet says; the marker decides what is inside them, so only
 # the person check (walk_every_key, over the whole file) applies there.
 
 
