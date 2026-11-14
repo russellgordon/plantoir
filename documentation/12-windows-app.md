@@ -6094,6 +6094,90 @@ the override disabled it went red naming the file it leaked (that one file was
 deleted). Two orphans from 2026-09-09 (`Plantoir-wraprun-a093729a…`) were left
 on Russell's machine for him to remove.
 
+### A run deletes only the temp folders it owns (#882)
+
+Several test runs share this PC on a release night: the director's gate, an
+implementer's filtered runs, a reviewer's scratch worktree. Until #882,
+`StubProgramCollection` (the stub `probe.exe`, `exitone.exe` and `stay.exe` the
+outside-door tests start) deleted EVERY `%TEMP%\plantoir-probe*` folder the
+first time it was used, as crash cleanup. So any second test process on the PC
+deleted the stubs of a suite that was already running, which then failed with
+`DirectoryNotFoundException … plantoir-probe….\probe.exe` in
+`OutsideDoorRefusalTests..ctor`. It spoiled two full suites on 2026-11-13 (3 of
+4 failures in the director's gate on `aea9bf1d2`). `ObsidianFigureAddOnsTests`
+had the same sweep over `plantoir-581-*`: any root holding a denied case was
+deleted, a running suite's included.
+
+Both now go through `Plantoir.Tests/RunOwnedTempFolders.cs`:
+
+- **A folder is named for its owner**:
+  `<prefix><process id>-<process start, UTC ticks>-<random>`. The stubs use
+  `plantoir-stubs-`, the figure add-ons tests `plantoir-figures-`. Each is
+  deleted by its own process on exit (stubs) or by the test's `Dispose`
+  (figures), as before.
+- **The sweep removes a folder only when its owner is provably gone AND the
+  folder is older than an hour** (`SafeAge`). "Gone" means no live process has
+  that id with that start time: an id alone is recycled, so a match on id
+  with a different start time counts as gone. A process whose start time
+  cannot be read (another account's) counts as ALIVE. A name that does not
+  parse as an owner is never swept.
+- **The prefixes do not match the old patterns, on purpose.** Copies of the
+  suite from before #882 keep running in other worktrees until they merge
+  `dev`, and they still delete `plantoir-probe*` and `plantoir-581-*` (the
+  latter when a denied case is inside). With the new names those old runs
+  cannot hit a new run's folders. The price: a crashed OLD run's
+  `plantoir-probe*` or `plantoir-581-*` leftovers are no longer cleaned by
+  the new code. Sweeping them would be the same fault again, because they may
+  belong to an old run that is still going. `RunOwnedTempFoldersTests` pins
+  all of this: an old orphan is swept; a live run's folder is never swept,
+  however old; a recycled id is not the owner; a young orphan waits; an
+  unparseable name is left alone; the new names do not match the old
+  patterns (`FileSystemName.MatchesWin32Expression`).
+
+Nothing in the product reads these names. A grep of `Plantoir`,
+`Plantoir.Core`, `Plantoir.Mcp` and `PtyDriver` finds no temp-path or
+`probe` match (no redaction rule, no process-table match, no stub guard).
+`PLANTOIR_PROBE_OUTPUT` is the stub's output variable, not a folder name, and
+it is unchanged.
+
+**Rejected:** a fixed per-process parent with no start time (a recycled id
+would adopt and later delete a crashed run's folder, or a live one's after a
+reboot); sweeping by age alone (a long suite under load is older than any
+safe age you can pick); and cleaning nothing at all (one folder per run piles
+up in `%TEMP%` for ever, which is why the old sweep was added).
+
+**Measured** (2026-11-13, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200). Two filtered runs
+(`FullyQualifiedName~OutsideDoor|FullyQualifiedName~StubProgram`) were started
+together, five rounds, with `TEMP`/`TMP` pointed at a private folder the pair
+shared, so the old code's sweep could reach only the pair under test and not
+the director's suite running at the same time
+(`plantoir-v2-windows-run\drafts\882-concurrency-proof.ps1`). **Old code: one
+of the two runs failed in every round, 5 of 5,** with 79 to 84 of its 88 tests
+red (`Win32Exception … cannot find the file specified` on
+`plantoir-probe….\probe.exe`, deleted by the other run's sweep). The other run
+passed. **New code: 10 of 10 runs passed, 88 of 88 each.** The private TEMP has
+to be SHORTER than the real one: the door tests build stub paths near
+`MAX_PATH`, and under a longer TEMP a .NET Framework stub hung, which held its
+test host for 90 minutes until it was stopped.
+
+**A second, separate cause in the same class.**
+`OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`
+also failed when run ALONE, as "the door wrote nothing". `OutsideDoor.Start`
+watches a started `.exe` for at most 400 ms. A reviewer measured that the .NET
+Framework stub takes 1.1 to 1.5 s to exit through ShellExecute, so `Open`
+returned before the stub had written, and the test read the file at once. The
+test now polls for the file for up to 15 s. The product's 400 ms grace is
+unchanged, because it exists so a click does not freeze. `OutsideDoorTests`
+was never exposed: its `Run` waits for the stub to exit (30 s) before reading.
+ALONE-NUMBERS
+
+**Two shared temp paths are left as they are** and filed as findings, because
+neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
+`%TEMP%\plantoir-tests\activity.txt` that every run appends to, and
+`TestAppDataRedirect`'s `plantoir-tests-<pid>` is never deleted, so a recycled
+id inherits a crashed run's settings.
+
 ### Same-second backups wait for the next second (#187)
 
 Two backups stamped in one second used to get `…_221530-2.zip`, a name
