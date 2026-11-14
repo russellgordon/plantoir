@@ -2,7 +2,17 @@
   "activityTrail": {
     "lineShape": {
       "example": "2026-08-16 15:28:55 · COMP/1 · the assistant was ready after 1.8s",
-      "why": "Local time to the second, then the course and section when the line is about one, then a sentence in the words a teacher would use. Not a function name and not a level: the trail is read by a person deciding what went wrong, months later, and 'started preview.sh COMP 1' beats 'DEBUG runScript(preview.sh)'."
+      "why": "Local time to the second, then the course and section when the line is about one, then a sentence in the words a teacher would use. Not a function name and not a level: the trail is read by a person deciding what went wrong, months later, and 'started preview.sh COMP 1' beats 'DEBUG runScript(preview.sh)'.",
+      "placeCases": {
+        "rule": "GitHub #879. What goes between the time and the sentence on a line about one course: '{course}/{section} · ' when a section was named, '{course} · ' when none was (an outside assistant's call that names no section; a section is numbered from 1, so 0 or less is none), and nothing when there is no course either. Never '{course}/0': there is no Section 0, and a teacher reading the line would look for one.",
+        "cases": [
+          { "name": "a section", "course": "ICS3U", "section": 2, "place": "ICS3U/2 · " },
+          { "name": "no section was named", "course": "ICS3U", "section": 0, "place": "ICS3U · " },
+          { "name": "a negative number is no section either", "course": "ICS3U", "section": -1, "place": "ICS3U · " },
+          { "name": "no course", "course": "", "section": 0, "place": "" },
+          { "name": "a course written with spaces around it", "course": " ICS3U ", "section": 1, "place": "ICS3U/1 · " }
+        ]
+      }
     },
     "mustRecord": [
       {
@@ -621,7 +631,7 @@
         "why": "Added with #433 (2026-10-03). An outside assistant's change while the teacher reads the preview is written and the preview left alone, so the page on screen is the page as it was until the teacher presses Stop Preview, then Preview. 'Claude said it changed the page and my preview still shows the old one', or 'my preview closed by itself', arrives next week with the conversation long closed; this line is what says the preview was left alone on purpose, or closed by a deploy that was asked for. The 'assistant chose a tool' line carries the tool, not what it met."
       },
       {
-        "carries": "the course, the section asked about (and, since #835, whether the lease in the way named that section: the line then says 'Section N of the course' where it otherwise says 'the course'), what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy, or - since #433 - an outside assistant's change, named by its tool, held back while the course was being built), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
+        "carries": "the course, the section asked about (none when an outside assistant's call named no section: since #879 the line then starts with the course alone, lineShape.placeCases, where it said '{course}/0') (and, since #835, whether the lease in the way named that section: the line then says 'Section N of the course' where it otherwise says 'the course'), what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy, or - since #433 - an outside assistant's change, named by its tool, held back while the course was being built), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
         "event": "build declined, course busy elsewhere",
         "lineWhenItsSectionIsBeingDeployed": "declined Preview — this section is being deployed by this copy of Plantoir",
         "launcherLineWhenItsSectionIsBeingDeployed": "{course}/{section} · the preview stopped before building — this section was being deployed",
