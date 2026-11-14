@@ -137,16 +137,48 @@ def clean_base_url(val: str | None) -> str:
     val = val.rstrip("/")
     return val
 
+# The address a deploy's own rebuild is for (#799). deploy.py sets it on the
+# build it starts when the build's baseUrl is not the destination's, so that
+# rebuild bakes THAT address in; without it the rebuild resolved the same
+# address again from the records, and a Cloudflare deploy of a course that
+# also had a Netlify record rebuilt on every deploy for an address it never
+# got (measured on Windows, #799). Read only here, and only from the
+# environment of the one build deploy.py runs.
+DEPLOY_BASE_URL_VARIABLE = "PLANTOIR_DEPLOY_BASE_URL"
+
+
 def resolve_section_domain(course_dir: Path, config: dict, section_number: int) -> str:
     """
     Find the public hostname/domain for this course section.
     Checks:
+      0. The address deploy.py's own rebuild is for (DEPLOY_BASE_URL_VARIABLE)
       1. Advanced custom domain in course_config.json
-      2. Netlify site marker in .netlify_sites/sectionN.json (or legacy .netlify_site.json)
-      3. Cloudflare site marker in .cloudflare_sites/sectionN.json
+      2. The PRIMARY destination's site marker: .cloudflare_sites/sectionN.json
+         for a course that deploys to Cloudflare Pages, else
+         .netlify_sites/sectionN.json (or legacy .netlify_site.json)
+      3. The other service's marker
     Returns empty string if not yet published / no domain assigned.
     """
     section_key = f"section{section_number}"
+
+    # 0. A deploy's own rebuild, for the destination it is deploying to. It is
+    # the address deploy.py chose for THIS leg: the leg's own custom domain
+    # when the course records one (custom_domains, by destination type), else
+    # the service's host - so it is used as given, whatever its shape: a
+    # Unicode domain, a trailing dot and a path all stay what deploy.py asked
+    # for. It cannot break quartz.config.ts, because patch_quartz_base_url
+    # writes it through typescript_string (#871), which escapes a quote, a
+    # backslash and a line break (test_typescript_strings.py ->
+    # test_the_base_url_reads_back_and_is_replaced_whole).
+    # REJECTED: a host-name shape check (#799's third review, L2), which
+    # resolved a value it refused as if the variable were unset. Measured
+    # (#799's fourth review, M1): for the second destination of a two-host
+    # course, a Cloudflare domain of `cours.école.ca` or `c.school.ca.` then
+    # fell through to the records, which follow the PRIMARY, so the Cloudflare
+    # site went out carrying the Netlify address and rebuilt on every deploy.
+    asked_for = clean_base_url(os.environ.get(DEPLOY_BASE_URL_VARIABLE, ""))
+    if asked_for:
+        return asked_for
 
     # 1. Custom domain from course_config.json — keyed by destination type
     # since a course may publish to more than one place at once, but the
@@ -173,50 +205,69 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
             if cleaned:
                 return cleaned
 
-    # 2. Netlify site marker (.netlify_sites/sectionN.json or legacy .netlify_site.json)
-    stable_netlify = course_dir / ".netlify_sites" / f"{section_key}.json"
-    if stable_netlify.is_file():
-        try:
-            data = json.loads(stable_netlify.read_text(encoding="utf-8"))
-            if data.get("custom_domain"):
-                return clean_base_url(data["custom_domain"])
-            if data.get("ssl_url"):
-                return clean_base_url(data["ssl_url"])
-            if data.get("url"):
-                return clean_base_url(data["url"])
-            if data.get("name"):
-                return f"{data['name']}.netlify.app"
-        except Exception:
-            pass
+    # 2 and 3. The site markers, the PRIMARY destination's first (#799). The
+    # Netlify marker used to be read first whatever the course deployed to,
+    # so a course that deploys to Cloudflare Pages and had ever been deployed
+    # to Netlify was built with its Netlify address: on the live Cloudflare
+    # site that is the wrong address in every social card, sitemap and feed,
+    # and deploy.py, which compares the build's baseUrl with the destination's,
+    # rebuilt on every Cloudflare deploy. The primary is the one destination
+    # this single build is canonically published as, as for the custom domain.
+    def netlify_marker_domain() -> str:
+        stable_netlify = course_dir / ".netlify_sites" / f"{section_key}.json"
+        if stable_netlify.is_file():
+            try:
+                data = json.loads(stable_netlify.read_text(encoding="utf-8"))
+                if data.get("custom_domain"):
+                    return clean_base_url(data["custom_domain"])
+                if data.get("ssl_url"):
+                    return clean_base_url(data["ssl_url"])
+                if data.get("url"):
+                    return clean_base_url(data["url"])
+                if data.get("name"):
+                    return f"{data['name']}.netlify.app"
+            except Exception:
+                pass
 
-    legacy_netlify = course_dir / section_key / ".netlify_site.json"
-    if legacy_netlify.is_file():
-        try:
-            data = json.loads(legacy_netlify.read_text(encoding="utf-8"))
-            if data.get("custom_domain"):
-                return clean_base_url(data["custom_domain"])
-            if data.get("ssl_url"):
-                return clean_base_url(data["ssl_url"])
-            if data.get("url"):
-                return clean_base_url(data["url"])
-            if data.get("name"):
-                return f"{data['name']}.netlify.app"
-        except Exception:
-            pass
+        legacy_netlify = course_dir / section_key / ".netlify_site.json"
+        if legacy_netlify.is_file():
+            try:
+                data = json.loads(legacy_netlify.read_text(encoding="utf-8"))
+                if data.get("custom_domain"):
+                    return clean_base_url(data["custom_domain"])
+                if data.get("ssl_url"):
+                    return clean_base_url(data["ssl_url"])
+                if data.get("url"):
+                    return clean_base_url(data["url"])
+                if data.get("name"):
+                    return f"{data['name']}.netlify.app"
+            except Exception:
+                pass
+        return ""
 
-    # 3. Cloudflare site marker (.cloudflare_sites/sectionN.json)
-    stable_cf = course_dir / ".cloudflare_sites" / f"{section_key}.json"
-    if stable_cf.is_file():
-        try:
-            data = json.loads(stable_cf.read_text(encoding="utf-8"))
-            if data.get("subdomain"):
-                return clean_base_url(data["subdomain"])
-            if data.get("name"):
-                return f"{data['name']}.pages.dev"
-            if data.get("production_branch_url"):
-                return clean_base_url(data["production_branch_url"])
-        except Exception:
-            pass
+    def cloudflare_marker_domain() -> str:
+        stable_cf = course_dir / ".cloudflare_sites" / f"{section_key}.json"
+        if stable_cf.is_file():
+            try:
+                data = json.loads(stable_cf.read_text(encoding="utf-8"))
+                if data.get("subdomain"):
+                    return clean_base_url(data["subdomain"])
+                if data.get("name"):
+                    return f"{data['name']}.pages.dev"
+                if data.get("production_branch_url"):
+                    return clean_base_url(data["production_branch_url"])
+            except Exception:
+                pass
+        return ""
+
+    if (config.get("deploy_target") or "netlify") == "cloudflare_pages":
+        order = (cloudflare_marker_domain, netlify_marker_domain)
+    else:
+        order = (netlify_marker_domain, cloudflare_marker_domain)
+    for marker_domain in order:
+        found = marker_domain()
+        if found:
+            return found
 
     return ""
 

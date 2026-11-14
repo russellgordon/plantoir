@@ -1710,7 +1710,11 @@ because `AssistAgent.boundToThisSection` writes the window's section into
 every call that declares one before the card is made, so the change is
 defensive: the card names the section `locate` resolves, and none when
 there is a choice. For the same reason the local model never meets
-`noSectionNamed`. Left as it is: the
+`noSectionNamed`. **On Windows (#885)** the SDK refused such a call while
+binding, with "An error occurred invoking '…'."; since #880's batch a call
+filter in `plantoir-mcp` (`MissingArguments`) says these four sentences and
+supplies a one-section course's section, with no schema byte moved
+(`12-windows-app.md` → "A call that names no section"). Left as it is: the
 outside-change gate's trail line (`noteDeclined`) still records section 0 for
 a call with no section; the caller's answer there is right (the course is
 being built), and the line is #879.
@@ -5942,8 +5946,24 @@ that way. Migrating during a restore would mean handing the teacher something
 their backup never contained, in the one operation whose whole promise is that
 it does not.
 
-The section folder is emptied and refilled rather than swapped, for the same
-reason `restoreBackup` documents: Obsidian holds the folder open.
+The section folder itself is never swapped, for the same reason
+`restoreBackup` documents: Obsidian holds the folder open. Its CONTENTS were
+emptied and then refilled until #897 C, and a move that failed part way left
+the section half empty while the window said "Nothing was put back". Since
+then (Russell's ruling on #897, 2026-11-13) the window's restore uses the same
+staged swap as Restore from Backup…: the backup is unpacked beside the
+courses, the live contents move aside, the backup's move in, and a failure
+sends every moved file back. If moving back fails too, the window says the
+restorer's own sentence (`backups.restoreOneSection.wording.stoppedPartWay`, or
+`stoppedPartWayNothingToOpen` when no page is left set aside:
+the section may be a mix, and where the set-aside files are kept) without its
+usual "Nothing was put back:" in front, which would then be untrue, and the
+trail gets `section restore stopped part way`. Nothing the window says on success changed; the
+swap covers the section folder only, so the window still leaves the class
+dates and the published record as they are, and leaves a shared page made
+since the conversation began alone. Those are the menu route's alone
+(`documentation/09-mac-app.md` → "Restoring one section from a backup
+(#897 C)").
 
 **Say the surprising part in the confirmation, not in a doc.** Anything the
 teacher changed in that section during the conversation goes back too,
@@ -8363,6 +8383,19 @@ first-reply sentences side by side); placing it in Plan a Unit's message after
 the How I Teach sentence (it sits between that sentence and "After that, ask
 me…" and muddles the order of the first steps). NOT measured: whether each
 assistant says the sentence in its first reply as asked.
+
+**On Windows since #880's batch (#895, #856, #791's Windows half,
+2026-11-13).** Both Windows doors say the handouts sentence on every door
+and, on a Revise door, the reference-courses sentence (#856), in the order
+above. `OutsideGreetingContractTests` walks `greetingHandoutsCases`,
+`greetingReferenceCourses.cases` and `.listCases`, reads every key
+`greetingMustSay` names, and checks that no message the doors COMPOSE says
+a word in `printablePages.agentGuidance.held.words` (failing by name, #791,
+if that block is deleted before the words have a lasting home). One
+difference the mac need only know: Windows' `Open` reads the folder's
+courses at the click (`ReferenceCoursesToMention.ReadFor`), where the mac
+passes its sidebar's list; the sentence is the same.
+`12-windows-app.md` → "What an outside assistant is told when a door opens".
 
 ## Telling an outside assistant how the course is taught (#209)
 

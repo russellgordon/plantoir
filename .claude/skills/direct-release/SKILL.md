@@ -78,6 +78,20 @@ success is worse than one that refuses.
 
 Small pieces may share one planner and one plan reviewer.
 
+**Batch small related issues** (Russell, 2026-11-13: "record batching as a
+standard strategy"). Small issues that touch the same file, the same contract
+block or the same kind of thing go through as ONE batch: one issue branch
+named for the first issue, one implementer who writes a short plan first, one
+commit per issue, one review, one sweep, one gate. The gate sets the pace, so
+seven small issues gated one by one cost seven gate runs. A batch is never
+held by its hardest member: the implementer leaves out any issue that turns
+out not to be small or needs a ruling, says why, and carries on. Large or
+risky pieces (a new feature, the publishing path, anything with a ruling
+pending) stay separate. Each issue still gets its own closing comment and,
+where owed, its own note for the other platform. Look for batches when
+opening a run and whenever follow-up issues pile up, and stack reviewed
+pieces at the gate, several to a run.
+
 ## The common brief
 
 Keep one file that every agent reads first, so each prompt names only the
@@ -151,7 +165,7 @@ A change to documents alone needs no gate unless a test reads the document
 |---|---|---|
 | Never edit | `windows-app/` | `mac-app/` |
 | The other side's work goes in | a `windows` issue | a `mac` issue |
-| Gates | the mac suite, `PLANTOIR_REQUIRE_ENGINES=chromium,webkit PLANTOIR_APP=<the bundle built from the tree under test> script -q /dev/null ./verify.sh` (the first so the rendered check's two engines, #597, are a failure when missing, never a SKIP: fetch them once with `./browser-checks/fetch-browsers.sh`; it does not cover the network, so read the summary's SKIP lines; the second so #850's crawl through the app is not skipped: never set it while Russell is at the keyboard, since the crawl starts the app binary headless, measured not to take the front, but what took his key window on 2026-11-13 is still unknown), and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
+| Gates | the mac suite, `PLANTOIR_REQUIRE_ENGINES=chromium,webkit PLANTOIR_APP=<the bundle built from the tree under test> script -q /dev/null ./verify.sh` (the first so the rendered check's two engines, #597, are a failure when missing, never a SKIP: fetch them once with `./browser-checks/fetch-browsers.sh`; it does not cover the network, so read the summary's SKIP lines; the second so #850's crawl through the app is not skipped: never set it while Russell is at the keyboard, since the crawl starts the app binary headless, measured not to take the front, but what took his key window on 2026-11-13 is still unknown), and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`), and before a cut `windows-app\publish.ps1 -CheckLedgerOnly`, which refuses while an entry is owed by the release being cut (#862); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
 | Not a gate | the UI test target: opt-in, alone on a quiet machine | `run-ui-tests.ps1`: opt-in, needs the screen, closes Plantoir |
 | The image (Dockerfile, baked files) | gated by `verify.sh` | not gated here: a change made on Windows needs a `mac` issue |
 | Generated contract halves | `Plantoir --write-contracts` | cannot regenerate: propose authored cases, open a `mac` issue |
