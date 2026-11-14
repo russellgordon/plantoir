@@ -15,9 +15,13 @@
 // * html stage - the drawing goes in (the build's own SVG, in abcjs's
 //   container), and under it, for a tune with Play, the controls and the
 //   sounds' credit line (musicFences.credit). A tune inside a quiz's choice
-//   gets neither (musicFences.quizzes): a press on Play there would also
-//   choose the answer. The quizzes' markdown stage has run by now, so a
-//   choice is found by its class.
+//   makes the quiz refused (tuneInAChoice, musicFences.quizzes), and the
+//   build has read that tune as `% play: no`, so it gets neither; were it
+//   given Play, it would still get neither here, since the quizzes'
+//   markdown stage has run by now and a choice is found by its class. The
+//   options the build drew a tune with (the manifest entry's own for a tune
+//   too long for its staff, musicFences.drawing.wrap) go into data-music,
+//   so the drawing made again on a press is the one on the page.
 //
 // A fence the manifest does not know (a site with no tune, one that could
 // not be drawn, a build that could not prepare them) stays the plain code
@@ -43,6 +47,9 @@ type Entry = {
   abc: string
   sounds: string[]
   notes: number
+  // The options it was drawn with when they are not the manifest's own
+  // (musicFences.drawing.wrap: a tune too long for its staff), else null.
+  options?: Record<string, unknown> | null
 }
 type Manifest = {
   words: Record<string, string>
@@ -201,7 +208,9 @@ export const PlantoirMusic: QuartzTransformerPlugin = () => ({
               const title = titleOf(entry, words)
               node.properties.dataMusic = JSON.stringify({
                 abc: entry.abc,
-                options: known.options,
+                // The options the build drew it with, so the drawing made
+                // again on a press is the one on the page.
+                options: entry.options ?? known.options,
                 engine: `${root}/${known.engine}`,
                 sounds: `${root}/${known.soundsFolder}`,
                 // The sound folders this tune's notes are asked from

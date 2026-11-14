@@ -953,9 +953,11 @@ ROW_CHECKS.progress = async ({ page, base, record }) => {
 // never cropped, and PhET's credit line is under it. The own-host row on
 // the same page judges every request the simulation's frame made.
 // Music (#679): every tune is the build's own drawing, there before any
-// script runs, in the page's text colour; Play only where the contract puts
-// it (not with play: no, not in a quiz's choice), and the sounds' credit
-// under it; nothing of the player fetched before a press.
+// script runs, in the page's text colour; a tune written on one long line
+// drawn broken into lines at its own size (musicFences.drawing.wrap); Play
+// only where the contract puts it (not with play: no; in a quiz's question,
+// yes), and the sounds' credit under it; nothing of the player fetched
+// before a press.
 ROW_CHECKS.music = async ({ page, record }) => {
   const absent = process.env.PLANTOIR_RENDERED_NO_SOUNDS
   if (absent) return { skip: `no copy of the sounds on this Mac - ${absent}` }
@@ -976,6 +978,9 @@ ROW_CHECKS.music = async ({ page, record }) => {
       return {
         drawn: svg !== null,
         notes: svg ? svg.querySelectorAll(".abcjs-note").length : 0,
+        height: svg ? Math.round(svg.getBoundingClientRect().height) : 0,
+        width: svg ? Math.round(svg.getBoundingClientRect().width) : 0,
+        inQuiz: figure.closest(".plantoir-quiz") !== null,
         fill: svg ? svg.getAttribute("fill") : null,
         colour: svg ? getComputedStyle(svg).color : null,
         dark,
@@ -993,7 +998,12 @@ ROW_CHECKS.music = async ({ page, record }) => {
   if (seen[0].notes !== fixture.notes) return { fail: `the first tune shows ${seen[0].notes} notes, not its ${fixture.notes}` }
   if (!seen[0].play) return { fail: "the tune with Play has no Play button" }
   if (seen[1].play) return { fail: "the tune with play: no has a Play button" }
-  if (seen.filter((tune) => tune.inChoice).length !== 2 || seen.some((tune) => tune.inChoice && tune.play)) return { fail: "a tune in the quiz's choices has a Play button, or the choices hold no tune" }
+  // The long line: drawn again with abcjs's own line breaks, so it is at
+  // least four staff lines tall, not a sliver (240 bars on a line were 7 px).
+  const long = seen[2]
+  if (long.play) return { fail: "the long tune, which says play: no, has a Play button" }
+  if (long.height < fixture.longLineAtLeast * long.width) return { fail: `too small to read: the tune written on one long line is drawn ${long.height} px tall at ${long.width} px wide, so it was not broken into lines` }
+  if (!seen[3].inQuiz || seen[3].inChoice || !seen[3].play) return { fail: "the tune in the quiz's question has no Play button, or the quiz did not take it" }
   const credit = seen[0].credit
   if (!credit) return { fail: "credit line: the sounds' credit is not under the tune with Play" }
   if (credit.text !== MUSIC.credit.sentence || !credit.links.some((link) => link.href === MUSIC.credit.licenceUrl && /\blicense\b/.test(link.rel))) {
@@ -1001,7 +1011,7 @@ ROW_CHECKS.music = async ({ page, record }) => {
   }
   const early = record.sitePaths.filter((path) => path.startsWith("/static/abcjs/"))
   if (early.length > 0) return { fail: `the player was fetched before any press: ${early[0]}` }
-  return { ok: `${seen.length} tunes drawn by the build (${servedNotes} notes in the page as served), Play on the one that has it, none in the quiz's choices, the sounds' credit under it, nothing of the player fetched` }
+  return { ok: `${seen.length} tunes drawn by the build (${servedNotes} notes in the page as served), the long line broken into lines (${long.height} px tall at ${long.width} px wide), Play on the two that have it, one of them in a quiz's question, the sounds' credit under it, nothing of the player fetched` }
 }
 
 // A real press of Play: the player and the sounds from the site's own copy,

@@ -33086,7 +33086,82 @@
         "jsdom 27 (the planner's 25 drew too): it needs a newer Node than the image's for require of ES modules, and is 4.4 MB to linkedom's 2.8 MB.",
         "Drawing in the browser only (the functionplot pattern): every student downloads 512 KB of abcjs to see a still picture, and nothing is checked at build time.",
         "A drawing cache like .figure-cache: a tune draws in milliseconds, so a cache would add a folder and its failure modes to save less than a second."
-      ]
+      ],
+      "wrap": {
+        "options": {
+          "add_classes": true,
+          "responsive": "resize",
+          "staffwidth": 740,
+          "wrap": {
+            "minSpacing": 1.8,
+            "maxSpacing": 2.7,
+            "preferredMeasuresPerLine": 4
+          }
+        },
+        "widerThan": 780,
+        "rule": "A tune is drawn with `options` first, so the teacher's own line breaks are kept. abcjs fits each line of the tune to its staff by closing the notes up (a drawing 770 wide, at the default staff width of 740), and a line it cannot fit is drawn wider, which `responsive: resize` then shrinks to the page: a tune written on one long line came out 7 px tall (240 bars, #679's implementation review). So when the drawing is wider than `widerThan`, the build draws the tune again with `wrap.options`, abcjs's own line breaking (`staffwidth` and `wrap`: about four bars a line, broken only at bar lines), and that is the drawing students see. The options a tune was drawn with go into the page with it (the figure's data-music), so the loader draws it again on a press of Play with exactly those, and the drawing does not move. The decision is the build's (scripts/music.py, `layout_of`), from the width the helper answers; `cases` pin it.",
+        "measured": "2026-11-14, abcjs 6.7.2 under linkedom 0.18.15 (Node 22.6.0), and the same drawing in headless Chromium 155 and WebKit 2359: a line of quarter notes fits its staff up to 9 bars (770), is 771 to 772 at 10 to 11 bars and 800 at 12, 1,027 at 16 and 13,723 at 240; eighth notes overflow from 7 bars. With `wrap.options` the 240 bars are drawn on 61 staff lines, 770 wide, 4,952 px tall at a print width of 672 px (7 in) in both engines, where the drawing without it was 7 px tall; two voices of 20 bars go from 1,303 wide to six staff lines at 770. A tune of 8 bars written two to a line is drawn as written (770 wide, so `wrap.options` is never used): wrapping it would have joined its lines four bars to a line. In both engines the wrapped drawings of five tunes (240 bars on a line, 16 bars with chord symbols and words, two voices, eight bars two to a line, 160 notes with no bar line) are identical to the build's once attribute order and the spelling of inline styles are set aside (canonical XML), at 743 px and at 360 px wide. Drawing 240 bars with `wrap.options` took 34 ms.",
+        "rejected": [
+          "`wrap.options` for every tune: abcjs then reflows every tune to its own idea of a line, so a tune a teacher set out two bars to a line, a phrase to a line, or with words under each line, would be drawn differently from what was written (measured: eight bars two to a line joined into two lines of four).",
+          "A note when a line holds more than about twelve bars, and nothing else (the review's second option): it tells the teacher, but students still see the sliver until the teacher rewrites the tune.",
+          "A staff width taken from the reader's screen: the build draws once, for every reader, and the loader's drawing on a press must be the build's, so the width is fixed and the page shrinks the drawing to fit, as it shrinks every tune."
+        ]
+      },
+      "readable": {
+        "widerThan": 1000,
+        "rule": "A drawing still wider than `widerThan` after `wrap.options` (a long stretch with no bar line, which abcjs breaks only at bar lines) is shown below about three-quarters of its size on a page as wide as its staff, so it is a folder problem (tooLongToRead) naming the tune, and the tune is still drawn. Measured: 160 notes with no bar line stay 1,793 wide with `wrap.options` and are drawn 55 px tall at a print width of 672 px.",
+        "cases": [
+          {
+            "name": "a tune that fits its staff is drawn as written",
+            "width": 770,
+            "wrappedWidth": null,
+            "drawnWith": "options",
+            "problem": null
+          },
+          {
+            "name": "ten bars of quarter notes, 1 px over: drawn as written",
+            "width": 771,
+            "wrappedWidth": null,
+            "drawnWith": "options",
+            "problem": null
+          },
+          {
+            "name": "twelve bars on a line is drawn again with wrap",
+            "width": 800,
+            "wrappedWidth": 770,
+            "drawnWith": "wrap",
+            "problem": null
+          },
+          {
+            "name": "240 bars on one line, the review's case",
+            "width": 13723,
+            "wrappedWidth": 770,
+            "drawnWith": "wrap",
+            "problem": null
+          },
+          {
+            "name": "no bar lines: wrap cannot break it, so it is a problem",
+            "width": 1793,
+            "wrappedWidth": 1793,
+            "drawnWith": "wrap",
+            "problem": "tooLongToRead"
+          },
+          {
+            "name": "a long bar a little over after wrap is still readable",
+            "width": 1300,
+            "wrappedWidth": 990,
+            "drawnWith": "wrap",
+            "problem": null
+          },
+          {
+            "name": "wrap could not draw it: the first drawing is kept, and judged",
+            "width": 13723,
+            "wrappedWidth": null,
+            "drawnWith": "options",
+            "problem": "tooLongToRead"
+          }
+        ]
+      }
     },
     "download": {
       "hosts": [
@@ -33139,6 +33214,16 @@
           "carries": false
         },
         {
+          "name": "a tune only in a quiz's choice",
+          "pages": [
+            {
+              "page": "> [!quiz] Which of these is a D major chord?\n> - [x] This one\n>   ```abc\n>   % sound: trumpet\n>   X:1\n>   L:1/4\n>   K:D\n>   [DFA]4 |]\n>   ```\n> - [ ] Not this one\n",
+              "hidden": false
+            }
+          ],
+          "carries": false
+        },
+        {
           "name": "a flute tune and a piano tune",
           "pages": [
             {
@@ -33162,15 +33247,15 @@
       "rule": "keptDownloads.stop, kind `sounds`, item the sound in plain words (`flute`, `acoustic guitar nylon`) on each page whose tune with Play needs it. A preview, a deploy and a scheduled deploy stop alike. A fault in the pass itself stops too when a page students can see has a tune with Play (passFails).",
       "passFails": "As phetFences.stop.passFails: carrying on would make a site with a Play button that plays nothing. Its items name each tune's own `% sound:`, else piano, since without drawing nothing better can be told."
     },
-    "quizzes": "A tune works in a self-check question's question and its explanation, with Play. In a CHOICE it is drawn without Play: a choice is a click target, so a press on Play would also choose the answer (geogebraFences.quizzes.whyNotInAChoice). The transformer leaves the controls out of any tune inside a .plantoir-quiz-choice; nothing is refused.",
+    "quizzes": "As phetFences.quizzes, for the same reason: a tune works in a self-check question's QUESTION (before the choices) and in its EXPLANATION, with Play, and is REFUSED in a CHOICE (quizCallouts.words.problems.tuneInAChoice, in quizCallouts.recognise.order straight after simulationInAChoice), found by quizzes.py (an ```abc, ```music-abc, ~~~abc or ~~~music-abc fence opened inside an item of the quiz's boxed list, a callout in the item included) and by the site (quizRules.QuizModel.tuneInAChoice: a plantoirMusic node, or a music code block the build could not draw, inside an item of the first boxed list), whether or not the tune itself can be drawn, so the two agree. A choice is a click target (geogebraFences.quizzes.whyNotInAChoice): a press on Play would also pick the answer. The tune in a refused quiz is still drawn, and never with Play: the build reads it as `% play: no` (music.tunes_in_quiz_choices, by the quiz reader's own lines), so no sound is downloaded for it and it never stops a build that has no internet, and the transformer still leaves the controls out of any tune inside a .plantoir-quiz-choice. The cases are quizCallouts.recognise's aTuneInAChoice, aTuneInACalloutInAChoice and aTuneInTheQuestionWithNoPlay (`% play: no` there, so verify.sh's Quiz Fixture build needs no sound), and musicFences.siteCarries' a tune only in a quiz's choice.",
     "print": "The drawing prints, black on white; the Play controls and the credit line do not.",
     "darkMode": "The drawing is fill and stroke currentColor (measured), so it takes the page's text colour in either colour scheme; Quartz's own rule colours svg <text> with the page's grey, which is kept.",
     "credit": {
-      "sentence": "Sounds: Fluid R3 GM, CC BY 3.0.",
-      "licenceName": "CC BY 3.0",
-      "licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sentence": "Sounds: Fluid R3 GM, CC BY 3.0 US.",
+      "licenceName": "CC BY 3.0 US",
+      "licenceUrl": "https://creativecommons.org/licenses/by/3.0/us/",
       "sourceUrl": "https://github.com/paulrosen/midi-js-soundfonts",
-      "rule": "Under every tune's Play controls, small, a link on the licence's name (plan review item 6: CC BY 3.0 asks for credit reasonable to the medium, and a README in a folder is never seen). The README.txt in static/abcjs/ carries the source and its commit; THIRD_PARTY_LICENSES.md records both licences (the sound set's README says CC BY 3.0; its repository's LICENSE says MIT)."
+      "rule": "Under every tune's Play controls, small, a link on the licence's name (plan review item 6: CC BY 3.0 asks for credit reasonable to the medium, and a README in a folder is never seen). The licence is the one the sound set's own README names and links for Fluid R3 GM at the pinned commit: \"Creative Commons Attribution 3.0 license\", linked to creativecommons.org/licenses/by/3.0/us/, the United States port of version 3.0 (read 2026-11-14; the first build linked the unported /by/3.0/, which the source does not name, #679's implementation review). The README names no author, so none is credited. The README.txt in static/abcjs/ carries the source and its commit; THIRD_PARTY_LICENSES.md records both licences (the sound set's README says CC BY 3.0 US; its repository's LICENSE says MIT)."
     },
     "engine": {
       "version": "6.7.2",
@@ -33200,6 +33285,7 @@
         "emptyTune": "there is no tune in the block, so students see it as text",
         "engineMissing": "this copy of Plantoir cannot draw tunes, so students see the block as text",
         "drawingStopped": "the tune could not be drawn, so students see the block as text",
+        "tooLongToRead": "a stretch of this tune with no bar line is too long for one line of the page, so students see it too small to read; add bar lines (|) to it",
         "tuneNotDrawn": "the tune could not be drawn, so students see the block as text",
         "settingAfterTheTune": "% {name}: is read as a setting only at the top of the block, before the tune begins; here it is an ABC comment",
         "moreThanOneTune": "the block holds more than one tune (an X: line each), and only the first is drawn; put each tune in a block of its own"
@@ -33215,7 +33301,6 @@
       "A per-voice sound follows a V: line on a line of its own; an inline [V:2] in a line of music takes the tune's sound.",
       "Text widths in a drawing are estimated, in the build and in the student's browser alike (drawing.rule), so a long title or line of words can sit a little off centre.",
       "Obsidian shows a tune only with the community plugin \"ABC Music Notation\" installed (Plantoir does not add it: it is AGPL-3.0), and that plugin plays its own default sound, not the `% sound:` named, and draws %% lines the site leaves out.",
-      "A tune that is only in a quiz's choice still makes its site carry the player and the sounds.",
       "The kept sounds belong to one working folder on one computer (keptDownloads.knownLimits): after moving the working folder or changing computers the next build that plays a tune needs the internet.",
       "The first press of Play on an iPad must come from the student's own tap (Safari's rule for sound); it does, since Play is a button, but it is not measured on a device."
     ]
@@ -35923,6 +36008,7 @@
         "choicesAndAnswer",
         "sketchInAChoice",
         "simulationInAChoice",
+        "tuneInAChoice",
         "oneChoice",
         "noCorrectChoice",
         "noAnswerLine",
@@ -36533,6 +36619,43 @@
           "quizzes": [
             {
               "problem": "simulationInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aTuneInAChoice",
+          "markdown": "> [!quiz] Which of these is a D major chord?\n> - [x] This one\n>   ```abc\n>   % alt: The notes D, F sharp and A together, in a choice.\n>   X:1\n>   L:1/4\n>   K:D\n>   [DFA]4 |]\n>   ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "tuneInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aTuneInACalloutInAChoice",
+          "markdown": "> [!quiz] Which of these is a D major chord?\n> - [x] This one\n>   > [!note] The chord\n>   > ~~~music-abc\n>   > % alt: The notes D, F sharp and A together, in a note in a choice.\n>   > X:1\n>   > L:1/4\n>   > K:D\n>   > [DFA]4 |]\n>   > ~~~\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "tuneInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aTuneInTheQuestionWithNoPlay",
+          "markdown": "> [!quiz] Which chord is drawn here?\n> ```abc\n> % alt: The notes D, F sharp and A together, in a question.\n> % play: no\n> X:1\n> L:1/4\n> K:D\n> [DFA]4 |]\n> ```\n> - [x] D major\n> - [ ] G major\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
               "line": 1
             }
           ],
@@ -37294,6 +37417,7 @@
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
         "sketchInAChoice": "a GeoGebra sketch sits inside one of its choices, where dragging the sketch would pick that choice - put the sketch in the question, above the choices, or in its explanation",
         "simulationInAChoice": "a PhET simulation sits inside one of its choices, where a tap on the simulation would pick that choice - put the simulation in the question, above the choices, or in its explanation",
+        "tuneInAChoice": "a tune sits inside one of its choices, where a press on its Play button would pick that choice - put the tune in the question, above the choices, or in its explanation",
         "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
       "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"

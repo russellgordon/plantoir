@@ -10,9 +10,12 @@
 //                                     node_modules/linkedom>
 //
 // First line out: {"ready": true, "abcjs": "<version>"}.
-// Each line in:   {"id": "...", "abc": "<the tune as the site will read it>"}
+// Each line in:   {"id": "...", "abc": "<the tune as the site will read it>",
+//                  "options"?: {...}}  (the options to draw it with; the
+//                  --options given at the start when there are none)
 // Each line out:  {"id", "ok": true, "html": "<div class=abcjs-container ...>
 //                  <svg ...></svg></div>", "notes": n, "staffLines": n,
+//                  "width": the drawing's own width (its viewBox's),
 //                  "programs": [General MIDI programs, 0-based],
 //                  "warnings": [{"line", "column", "said"}]}
 //              or {"id", "ok": false, "reason": "nothingToDraw" | "drawingStopped",
@@ -21,9 +24,12 @@
 // Two rules that make the build's picture the student's picture
 // (contracts/shared-rules.json -> musicFences.drawing):
 //
-// * The options are musicFences.drawing.options, the SAME object the site's
-//   loader passes when a student presses Play and the tune is drawn again in
-//   place (so the notes it lights are the ones on the page).
+// * The options are musicFences.drawing.options, or drawing.wrap.options
+//   for a tune whose lines are too long for the page (scripts/music.py
+//   decides, from the width answered here, and sends the tune again), and
+//   the build hands the SAME object to the site's loader, which passes it
+//   when a student presses Play and the tune is drawn again in place (so
+//   the notes it lights are the ones on the page).
 // * getBBox answers no size here (linkedom has none) and in the student's
 //   browser while the loader draws (music.inline.ts sets it for the length of
 //   the call), so abcjs ESTIMATES every text width the same way in both.
@@ -108,12 +114,29 @@ function programsOf(tune) {
   return Array.from(found).sort((one, other) => one - other)
 }
 
+// The drawing's own width, its viewBox's: abcjs fits a line of music to its
+// staff by closing the notes up, and draws a line it cannot fit wider than
+// that, which a page then shrinks (musicFences.drawing.wrap). Every svg of
+// the tune counts; the widest is the one a reader meets.
+function widthOf(holder) {
+  let widest = 0
+  for (const svg of holder.querySelectorAll("svg")) {
+    const box = String(svg.getAttribute("viewBox") ?? "").trim().split(/\s+/)
+    const width = box.length === 4 ? Number(box[2]) : NaN
+    if (Number.isFinite(width) && width > widest) {
+      widest = width
+    }
+  }
+  return Math.round(widest)
+}
+
 function draw(job) {
   const holder = document.createElement("div")
   document.body.replaceChildren(holder)
   let tunes
   try {
-    tunes = ABCJS.renderAbc(holder, String(job.abc ?? ""), options)
+    const drawWith = job.options !== null && typeof job.options === "object" ? job.options : options
+    tunes = ABCJS.renderAbc(holder, String(job.abc ?? ""), drawWith)
   } catch (error) {
     return { id: job.id, ok: false, reason: "drawingStopped", said: plainWords(error?.message ?? error) }
   }
@@ -133,7 +156,7 @@ function draw(job) {
   } catch (error) {
     return { id: job.id, ok: false, reason: "drawingStopped", said: plainWords(error?.message ?? error) }
   }
-  return { id: job.id, ok: true, html: holder.outerHTML, notes, staffLines, programs, warnings }
+  return { id: job.id, ok: true, html: holder.outerHTML, notes, staffLines, width: widthOf(holder), programs, warnings }
 }
 
 process.stdout.write(JSON.stringify({ ready: true, abcjs: abcjsVersion }) + "\n")

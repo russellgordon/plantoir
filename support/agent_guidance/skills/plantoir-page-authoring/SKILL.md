@@ -722,8 +722,13 @@ w: do re mi fa sol la ti do
 - Under every tune with Play is a small credit line for the sounds; never
   write or remove one.
 - In a self-check question, a tune works in the question and the
-  explanation; in a choice it is drawn without Play (a press would pick the
-  choice).
+  explanation, never inside a choice: a press on Play would pick the
+  choice, so the website refuses that question (the `plantoir-quizzes`
+  skill).
+- Write a tune a few bars to a line, as it is printed. A long line is
+  broken into lines by the website, but a long stretch with NO bar line
+  cannot be broken and is drawn too small to read, which the Problems tab
+  names: put bar lines (`|`) in it.
 - Use music in the public domain or the teacher's own arrangements.
 
 A tune that has a problem is still drawn where the notation can be read,

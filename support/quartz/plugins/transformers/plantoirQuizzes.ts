@@ -484,6 +484,24 @@ function holdsSimulation(node: AnyNode): boolean {
   return false
 }
 
+// A tune anywhere inside a node (#679, musicFences.quizzes): the
+// "plantoirMusic" node the tunes' transformer leaves, or an ```abc or
+// ```music-abc code block the build could not draw, found the same way.
+const TUNE_NODE = "plantoirMusic"
+const TUNE_LANGUAGES = ["abc", "music-abc"]
+
+function holdsTune(node: AnyNode): boolean {
+  if (node.type === TUNE_NODE || (node.type === "code" && TUNE_LANGUAGES.includes(String(node.lang ?? "")))) {
+    return true
+  }
+  for (const child of node.children ?? []) {
+    if (holdsTune(child)) {
+      return true
+    }
+  }
+  return false
+}
+
 function holdsSketch(node: AnyNode): boolean {
   if (node.type === SKETCH_NODE || (node.type === "code" && node.lang === SKETCH_LANGUAGE)) {
     return true
@@ -507,6 +525,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   let htmlChoices = false
   let sketchInAChoice = false
   let simulationInAChoice = false
+  let tuneInAChoice = false
   for (const child of content?.children ?? []) {
     const kind = calloutKind(child)
     if (child.type === "list") {
@@ -521,6 +540,9 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
             }
             if (holdsSimulation(item)) {
               simulationInAChoice = true
+            }
+            if (holdsTune(item)) {
+              tuneInAChoice = true
             }
           }
         }
@@ -546,6 +568,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
     htmlChoices,
     sketchInAChoice,
     simulationInAChoice,
+    tuneInAChoice,
   }
 }
 

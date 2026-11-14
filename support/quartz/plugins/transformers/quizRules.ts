@@ -40,6 +40,9 @@ export type QuizModel = {
   sketchInAChoice?: boolean
   // A PhET simulation inside an item of the first boxed list (#674).
   simulationInAChoice?: boolean
+  // A tune (a music fence, drawn or not) inside an item of the first boxed
+  // list (#679, musicFences.quizzes).
+  tuneInAChoice?: boolean
 }
 
 export type QuizKind = "single" | "multiple" | "short" | "fill"
@@ -273,6 +276,9 @@ export function verdict(model: QuizModel): Verdict {
   }
   if (hasChoices && model.simulationInAChoice) {
     return problem("simulationInAChoice")
+  }
+  if (hasChoices && model.tuneInAChoice) {
+    return problem("tuneInAChoice")
   }
   if (hasChoices) {
     if (model.choices.length === 1) {

@@ -241,6 +241,8 @@ def verdict(model: dict) -> dict:
         return problem("sketchInAChoice")
     if has_choices and model.get("simulationInAChoice"):
         return problem("simulationInAChoice")
+    if has_choices and model.get("tuneInAChoice"):
+        return problem("tuneInAChoice")
     if has_choices:
         if len(model["choices"]) == 1:
             return problem("oneChoice")
@@ -416,15 +418,22 @@ SKETCH_LANGUAGE = "geogebra"
 # A ```phet fence's language (phet.LANGUAGE, #674): a simulation in a choice
 # is refused as a sketch is (phetFences.quizzes).
 SIMULATION_LANGUAGE = "phet"
+# A music fence's languages (musicFences.fences.languages, #679): a tune in a
+# choice is refused as a simulation is (musicFences.quizzes).
+TUNE_LANGUAGES = ("abc", "music-abc")
 
 
-def _note_a_figure_in_a_choice(state: dict, language: str) -> None:
-    """A GeoGebra sketch or a PhET simulation opened inside a choice:
-    refused if this list turns out to be the quiz's choices."""
+def _note_a_figure_in_a_choice(state: dict, language: str, file_line=None) -> None:
+    """A GeoGebra sketch, a PhET simulation or a tune opened inside a choice:
+    refused if this list turns out to be the quiz's choices. A tune's line
+    is kept, so the music pass can leave its Play button out and download
+    no sound for it (music.tunes_in_quiz_choices)."""
     if language == SKETCH_LANGUAGE:
         state["listHasSketch"] = True
     elif language == SIMULATION_LANGUAGE:
         state["listHasSimulation"] = True
+    elif language in TUNE_LANGUAGES:
+        state["listTuneLines"].append(file_line)
 
 
 def _code_spans(text: str) -> list:
@@ -466,6 +475,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
         "listHasBox": False, "listItems": [], "stem": [], "blanks": _blanks_in(title),
         "listHasSketch": False, "sketchInAChoice": False,
         "listHasSimulation": False, "simulationInAChoice": False,
+        "listTuneLines": [], "tuneLinesInChoices": [],
     }
     answers = []
     answer_lines_at = []
@@ -478,11 +488,13 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
                 state["choices"] = list(state["listItems"])
                 state["sketchInAChoice"] = state["listHasSketch"]
                 state["simulationInAChoice"] = state["listHasSimulation"]
+                state["tuneLinesInChoices"] = list(state["listTuneLines"])
         state["listKind"] = None
         state["listHasBox"] = False
         state["listItems"] = []
         state["listHasSketch"] = False
         state["listHasSimulation"] = False
+        state["listTuneLines"] = []
 
     def close_stem():
         if state["stem"]:
@@ -609,7 +621,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             opened = _fence_opens(text)
             if opened is not None:
                 fence = (opened, 0)
-                _note_a_figure_in_a_choice(state, _fence_language(text))
+                _note_a_figure_in_a_choice(state, _fence_language(text), file_line)
             previous_blank = False
             previous_paragraph = opened is None
             index += 1
@@ -624,7 +636,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
                 # A GeoGebra sketch (#578 stage 5) or a PhET simulation
                 # (#674) inside a choice: refused if this list turns out to
                 # be the quiz's choices.
-                _note_a_figure_in_a_choice(state, _fence_language(body))
+                _note_a_figure_in_a_choice(state, _fence_language(body), file_line)
             fence = (opened, 0)
             previous_blank = False
             previous_paragraph = False
@@ -644,7 +656,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             else:
                 quoted_fence = _fence_opens(body)
                 if quoted_fence is not None:
-                    _note_a_figure_in_a_choice(state, _fence_language(body))
+                    _note_a_figure_in_a_choice(state, _fence_language(body), file_line)
         else:
             quoted_fence = None
         if in_item or lazy_in_item:
@@ -675,7 +687,9 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             "htmlChoices": state.get("htmlChoices", False),
             "sketchInAChoice": state["sketchInAChoice"],
             "simulationInAChoice": state["simulationInAChoice"],
+            "tuneInAChoice": bool(state["tuneLinesInChoices"]),
         },
+        "tuneLinesInChoices": state["tuneLinesInChoices"],
         "answerLinesAt": answer_lines_at,
         "nestedQuizzes": nested_quizzes,
     }
@@ -812,7 +826,8 @@ def quizzes_on_page(text: str) -> list:
                 index += 1
             read = _read_quiz(entries, start.group(4), start.group(2))
             result = verdict(read["model"])
-            quiz = {"n": top, "nested": None, "line": file_line, "title": js_trim(start.group(4))}
+            quiz = {"n": top, "nested": None, "line": file_line, "title": js_trim(start.group(4)),
+                    "tuneLinesInChoices": read["tuneLinesInChoices"]}
             if "problem" in result:
                 quiz["problem"] = result["problem"]
                 quiz["fill"] = result["fill"]

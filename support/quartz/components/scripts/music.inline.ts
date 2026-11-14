@@ -17,6 +17,11 @@
 //   document has none (musicFences.drawing): abcjs then estimates text
 //   widths exactly as it did when the site was built, and the picture does
 //   not move on the press (measured identical in Chromium and WebKit).
+// * One audio context for the page, made on the first press and used by
+//   every press after it, and closed when the student leaves the page, so
+//   ten presses hold one context, not ten (iPad Safari limits how many a
+//   page may have open; #679's implementation review counted 10 made and
+//   none closed).
 // * Quartz's page change stops whatever is playing, and frees it.
 // * Printing: the controls never print (music.scss); the drawing does.
 
@@ -42,6 +47,7 @@ type Playing = {
 let musicEngine: Promise<boolean> | null = null
 let musicPlaying: Playing | null = null
 let musicPageChanges = 0
+let musicContext: AudioContext | null = null
 // The sound set's files are quiet; abcjs plays them at three times their
 // level from its own address for that reason, and does the same here.
 const MUSIC_VOLUME = 3.0
@@ -119,6 +125,41 @@ function stopMusic() {
   } catch {}
 }
 
+// The page's one audio context: made on the first press, reused by every
+// press after it, and woken from the press itself (Safari's rule).
+function musicAudioContext(): AudioContext | null {
+  if (musicContext !== null && musicContext.state === "closed") {
+    musicContext = null
+  }
+  if (musicContext === null) {
+    const Context = (window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
+      | typeof AudioContext
+      | undefined
+    try {
+      musicContext = Context ? new Context() : null
+    } catch {
+      musicContext = null
+    }
+  }
+  try {
+    void musicContext?.resume()
+  } catch {}
+  return musicContext
+}
+
+// Closes the page's audio context when the student leaves the page.
+function closeMusicContext() {
+  const context = musicContext
+  musicContext = null
+  if (context === null) {
+    return
+  }
+  try {
+    void context.close().catch(() => {})
+  } catch {}
+}
+
 // Draws the tune again where the build drew it, with getBBox answering no
 // size for the length of the call (musicFences.drawing).
 function redraw(ABCJS: any, holder: HTMLElement, spec: MusicSpec): any {
@@ -159,18 +200,8 @@ async function playTune(figure: HTMLElement) {
   button.disabled = true
   musicSay(figure, spec.gettingReady)
   // The sound must be started from the press itself on Safari: the audio
-  // context is made here, before anything is awaited.
-  const Context = (window.AudioContext ??
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
-    | typeof AudioContext
-    | undefined
-  let context: AudioContext | null = null
-  try {
-    context = Context ? new Context() : null
-    void context?.resume()
-  } catch {
-    context = null
-  }
+  // context is made (or woken) here, before anything is awaited.
+  const context = musicAudioContext()
   const failed = () => {
     if (page !== musicPageChanges || !figure.isConnected) {
       return
@@ -248,5 +279,6 @@ document.addEventListener("nav", () => {
   window.addCleanup(() => {
     musicPageChanges += 1
     stopMusic()
+    closeMusicContext()
   })
 })

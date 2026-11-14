@@ -553,6 +553,22 @@ def music_credit(site: Path) -> str:
     return f"{count} credit line(s) taken out"
 
 
+def music_long_line(site: Path) -> str:
+    """The long tune drawn as a sliver again: its container's height cut to
+    a tenth, the shape a tune on one long line had before the build broke
+    it into lines (musicFences.drawing.wrap)."""
+    path = page_file(site, "Music")
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(r'(<div(?=[^>]*class="abcjs-container pl-music-drawing")[^>]*?padding-bottom:\s*)([0-9.]+)(%'
+                         r'(?:(?!</figure>).)*?plantoir-rendered-music-long)', re.DOTALL)
+    found = pattern.search(text)
+    if found is None:
+        raise SystemExit("sabotage: the Music page has no long tune drawn in a sized container")
+    shrunk = f"{float(found.group(2)) / 10:.3f}"
+    path.write_text(text[:found.start(2)] + shrunk + text[found.end(2):], encoding="utf-8")
+    return f"the long tune's drawing cut from {found.group(2)}% to {shrunk}% of its width tall"
+
+
 def music_engine(site: Path) -> str:
     engine = site / "static" / "abcjs" / "abcjs-basic-min.js"
     if not engine.is_file():
@@ -623,6 +639,7 @@ DOERS = {
     "phet credit": phet_credit,
     "music drawing gone": music_drawing_gone,
     "music credit": music_credit,
+    "music long line": music_long_line,
     "music engine": music_engine,
     "music sound missing": music_sound_missing,
     "cold visit": cold_visit,

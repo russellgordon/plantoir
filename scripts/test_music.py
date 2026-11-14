@@ -74,7 +74,18 @@ for line in sys.stdin:
     for number, text in enumerate(abc.split("\n"), start=1):
         if "[" in text and "]" not in text:
             warnings.append({"line": number, "column": 1, "said": "Expected ']' to end the chords"})
-    print(json.dumps({"id": job["id"], "ok": True, "notes": abc.count(" ") + 1, "staffLines": 1,
+    # Width as abcjs answers it, roughly: 770 for a line it can fit, 77 a
+    # bar beyond ten bars on one line; abcjs's wrap fits any line that has
+    # bar lines, never one without (musicFences.drawing.wrap).
+    widest = 770
+    wrapping = isinstance(job.get("options"), dict) and "wrap" in job["options"]
+    for text in abc.split("\n"):
+        bars = text.count("|")
+        if wrapping and bars > 0:
+            continue
+        widest = max(widest, 77 * bars, 13 * len(text.replace(" ", "")) if bars == 0 and len(text) > 60 else 0)
+    print(json.dumps({"id": job["id"], "ok": True, "notes": abc.count(" ") + 1, "staffLines": 1, "width": widest,
+                      "wrapped": wrapping,
                       "html": '<div class="abcjs-container"><svg class="stand-in"></svg></div>',
                       "programs": programs, "warnings": warnings}), flush=True)
 '''
@@ -322,6 +333,12 @@ class PinTests(unittest.TestCase):
             self.assertIn(f"{name}@{version}", self.pins[name]["dockerfileContains"])
         self.assertEqual(rules("engine", "version"), self.pins["abcjs"]["value"])
 
+    def test_windows_runtime_is_watched_for_both_engine_pins(self):
+        # Plan section 8: Windows' ToolchainContractTests are red until its
+        # runtime recipe names these, which is the contract asking.
+        for name in ("abcjs", "linkedom"):
+            self.assertEqual(self.pins[name].get("windowsRuntimeContains"), f"{name}@{self.pins[name]['value']}")
+
     def test_the_dockerfile_installs_the_engine(self):
         dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
         for name in ("abcjs", "linkedom"):
@@ -366,6 +383,32 @@ class KindTests(unittest.TestCase):
         self.assertEqual(kept_downloads.what(music.KIND, 1), kind["one"])
         self.assertEqual(kept_downloads.what(music.KIND, 3), "3 " + kind["several"])
 
+    def test_the_app_explains_the_sounds_stop_from_what_this_prints(self):
+        # Plan review MUST 4: app-rules.json -> failureExplanations holds a
+        # case for the sounds stop, and its output is exactly what
+        # music.stop_lines prints for it, so the apps' explainers are tested
+        # against the real lines.
+        cases = contracts.load("app-rules")["failureExplanations"]["cases"]
+        ours = [case for case in cases if '"kind":"sounds"' in case["output"]]
+        self.assertEqual(len(ours), 1)
+        missing = []
+        for line in ours[0]["output"].split("\n")[1:]:
+            if line.startswith("   "):
+                item, page = line.strip()[1:-1].split("” on “")
+                missing.append({"item": item, "page": page})
+        course, section = "AMU1O", 1
+        printed = music.stop_lines({"stop": {"reason": "offline", "missing": missing}}, course, section)
+        self.assertEqual(ours[0]["output"], "\n".join(printed))
+        self.assertTrue(ours[0]["expect"].startswith(printed[0][len("❌ "):]))
+
+    def test_the_credit_links_the_licence_the_sound_set_names(self):
+        # The sound set's README at the pinned commit names "Creative Commons
+        # Attribution 3.0 license" and links the United States port.
+        credit = rules("credit")
+        self.assertEqual(credit["licenceUrl"], "https://creativecommons.org/licenses/by/3.0/us/")
+        self.assertIn(credit["licenceName"], credit["sentence"])
+        self.assertEqual(credit["licenceName"], "CC BY 3.0 US")
+
     def test_the_stop_line_is_the_kept_downloads_one(self):
         lines = kept_downloads.stop_lines(music.KIND, "AMU1O", 1, [{"item": "flute", "page": "Unit 1/Scales"}],
                                           "offline")
@@ -386,7 +429,8 @@ class PrepareTests(Scratch):
                 (self.output / "quartz" / "static").mkdir(parents=True)
                 content = self.root / "content" / case["name"].replace(" ", "-").replace(":", "")
                 for index, about in enumerate(case["pages"]):
-                    text = ("---\npublish: false\n---\n" if about["hidden"] else "") + "```abc\n" + about["body"] + "```\n"
+                    body = about["page"] if "page" in about else "```abc\n" + about["body"] + "```\n"
+                    text = ("---\npublish: false\n---\n" if about["hidden"] else "") + body
                     (content / f"Tune {index}.md").parent.mkdir(parents=True, exist_ok=True)
                     (content / f"Tune {index}.md").write_text(text, encoding="utf-8")
                 content.mkdir(parents=True, exist_ok=True)
@@ -521,6 +565,52 @@ class PrepareTests(Scratch):
         self.assertFalse(self.site_folder().exists())
 
 
+    def test_a_tune_in_a_quiz_choice_has_no_play_and_downloads_nothing_even_offline(self):
+        server = self.sounds()
+        music.sound_pin = (lambda pin: (lambda: dict(pin, base="http://127.0.0.1:9/FluidR3_GM")))(music.sound_pin())
+        quiz = ("> [!quiz] Which of these is a D major chord?\n> - [x] This one\n>   ```abc\n"
+                ">   % sound: trumpet\n>   X:1\n>   K:D\n>   [DFA]4 |]\n>   ```\n> - [ ] Not this one\n")
+        outcome, _ = self.prepare([page(quiz)])
+        self.assertIsNone(outcome["stop"], "offline, a tune nothing can play must not stop the build")
+        self.assertEqual((outcome["shown"], outcome["playable"], outcome["sounds"]), (1, 0, []))
+        self.assertEqual(server.asked, [])
+        manifest = json.loads((self.output / "quartz" / music.WORKSPACE / "manifest.json").read_text(encoding="utf-8"))
+        entry = next(iter(manifest["pages"]["Unit 1/Scales.md"].values()))
+        self.assertFalse(entry["play"])
+        self.assertFalse(self.site_folder().exists())
+
+    def test_a_tune_in_a_quizs_question_keeps_its_play(self):
+        self.sounds()
+        quiz = ("> [!quiz] Which chord is this?\n> ```abc\n> X:1\n> K:D\n> [DFA]4 |]\n> ```\n"
+                "> - [x] D major\n> - [ ] G major\n")
+        outcome, _ = self.prepare([page(quiz)])
+        self.assertEqual((outcome["playable"], outcome["sounds"]), (1, ["acoustic_grand_piano"]))
+
+    def test_every_layout_case(self):
+        for case in rules("drawing", "readable", "cases"):
+            with self.subTest(case["name"]):
+                self.assertEqual(music.layout_of(case["width"], case["wrappedWidth"]),
+                                 {"drawnWith": case["drawnWith"], "problem": case["problem"]})
+
+    def test_a_tune_on_one_long_line_is_drawn_again_with_wrap_and_the_page_carries_its_options(self):
+        self.sounds()
+        long_line = "X:1\nT:Long\nM:4/4\nL:1/4\nK:D\n" + "D E F G | " * 240 + "]\n"
+        outcome, _ = self.prepare([page("```abc\n" + long_line + "```\n" + "```abc\n" + SCALE + "```\n")])
+        self.assertEqual(outcome["problems"], [])
+        manifest = json.loads((self.output / "quartz" / music.WORKSPACE / "manifest.json").read_text(encoding="utf-8"))
+        entries = list(manifest["pages"]["Unit 1/Scales.md"].values())
+        self.assertEqual([entry["options"] for entry in entries], [rules("drawing", "wrap", "options"), None])
+
+    def test_a_long_stretch_with_no_bar_line_is_a_problem_and_still_drawn(self):
+        self.sounds()
+        no_bars = "X:1\nT:No bars\nL:1/8\nK:C\n" + "CDEFGABc " * 20 + "\n"
+        outcome, lines = self.prepare([page("Intro\n\n```abc\n" + no_bars + "```\n")])
+        self.assertEqual(outcome["shown"], 1)
+        self.assertEqual([(p["reason"], p["line"]) for p in outcome["problems"]], [("tooLongToRead", 3)])
+        self.assertIn("plantoir: error: Unit 1/Scales.md: abc block 1, line 3: "
+                      + rules("words", "reasons", "tooLongToRead"), lines)
+
+
 class BuildStopTests(Scratch):
     def test_the_build_stops_before_anything_is_said_or_quartz_runs(self):
         import contextlib
@@ -609,6 +699,22 @@ class ProblemTests(unittest.TestCase):
         self.assertIn("musicTunesNotRight", section_problems._MAKERS)
 
 
+class LoaderTests(unittest.TestCase):
+    def test_the_page_keeps_one_audio_context_and_closes_it_on_leaving(self):
+        # #679's implementation review: ten presses made ten contexts and
+        # closed none. Measured since: one made, closed on leaving the page,
+        # in both engines (documentation/05-build-pipeline.md).
+        source = (REPO / "support" / "quartz" / "components" / "scripts" / "music.inline.ts").read_text(
+            encoding="utf-8")
+        self.assertEqual(source.count("new Context()"), 1)
+        made = source.index("function musicAudioContext()")
+        self.assertGreater(source.index("new Context()"), made)
+        self.assertIn("musicContext = null", source)
+        cleanup = source[source.index("window.addCleanup(() => {\n    musicPageChanges += 1"):]
+        self.assertIn("closeMusicContext()", cleanup[:200])
+        self.assertIn("context.close()", source)
+
+
 # ---- The real engine, where it is installed ------------------------------------------------
 
 def _real_engine():
@@ -641,6 +747,32 @@ class RealEngineTests(unittest.TestCase):
         self.assertEqual(answer["notes"], 8)
         self.assertIn('fill="currentColor"', answer["html"])
         self.assertTrue(answer["html"].startswith("<div"))
+
+    def test_the_reviewers_240_bars_on_one_line_are_wrapped_and_readable(self):
+        long_line = "X:1\nT:Long\nM:4/4\nL:1/4\nK:D\n" + "D E F G | A B c d | c B A G | F E D2 | " * 60 + "]\n"
+        first = music.draw_all([{"id": "1", "abc": long_line}], self.command)["1"]
+        self.assertGreater(first["width"], rules("drawing", "wrap", "widerThan"))
+        wrapped = music.draw_all([{"id": "1", "abc": long_line, "options": rules("drawing", "wrap", "options")}],
+                                 self.command)["1"]
+        self.assertTrue(wrapped["ok"])
+        self.assertLessEqual(wrapped["width"], rules("drawing", "wrap", "widerThan"))
+        self.assertEqual(music.layout_of(first["width"], wrapped["width"]), {"drawnWith": "wrap", "problem": None})
+        self.assertEqual(wrapped["notes"], 900)
+        height = float(wrapped["html"].split('viewBox="0 0 ')[1].split('"')[0].split()[1])
+        # At the page's width the drawing keeps its own size: 61 staff lines,
+        # where the drawing as written was 138 high at 13,723 wide (7 px tall).
+        self.assertGreater(height, 5000)
+
+    def test_a_tune_set_out_two_bars_to_a_line_is_drawn_as_written(self):
+        two = "X:1\nT:t\nM:4/4\nL:1/4\nK:D\n" + "D E F G | A B c d |\n" * 4
+        answer = music.draw_all([{"id": "1", "abc": two}], self.command)["1"]
+        self.assertLessEqual(answer["width"], rules("drawing", "wrap", "widerThan"))
+
+    def test_no_bar_lines_stay_too_long_even_wrapped(self):
+        no_bars = "X:1\nT:t\nL:1/8\nK:C\n" + "CDEFGABc " * 20 + "\n"
+        options = rules("drawing", "wrap", "options")
+        wrapped = music.draw_all([{"id": "1", "abc": no_bars, "options": options}], self.command)["1"]
+        self.assertEqual(music.layout_of(wrapped["width"], wrapped["width"])["problem"], "tooLongToRead")
 
     def test_what_abcjs_says_is_read_with_its_line(self):
         answer = music.draw_all([{"id": "1", "abc": "X:1\nK:G\nG A [B c | d e f g |]\n"}], self.command)["1"]

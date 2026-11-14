@@ -62,6 +62,7 @@ import contracts
 import figures
 import kept_downloads
 import markdown_code
+import quizzes
 import site_health
 import toolchain_paths
 
@@ -119,6 +120,22 @@ def tunes_on_page(text: str) -> list:
         found.append({"block": len(found) + 1, "line": block["line"], "body": block["body"],
                       "key": figures.key_of(block["body"]), "lang": block["lang"]})
     return found
+
+
+def tunes_in_quiz_choices(text: str) -> set:
+    """The lines of `text` on which a music fence opens inside a choice of a
+    top-level self-check question (musicFences.quizzes), read by the quiz
+    reader itself (quizzes.quizzes_on_page), so the two never disagree about
+    what a choice is. Such a quiz is refused (tuneInAChoice), and its tune
+    is drawn without Play: no sound is downloaded for it."""
+    lines = set()
+    if "[!" not in text:
+        return lines
+    for quiz in quizzes.quizzes_on_page(text):
+        for line in quiz.get("tuneLinesInChoices") or []:
+            if line is not None:
+                lines.add(line)
+    return lines
 
 
 def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None) -> list:
@@ -452,7 +469,10 @@ def draw_all(jobs: list, command: list, job_seconds=JOB_SECONDS, start_seconds=S
                     results[left["id"]] = {"ok": False, "reason": "engineMissing"}
                 helper = None
                 break
-        if not helper.send({"id": job["id"], "abc": job["abc"]}):
+        message = {"id": job["id"], "abc": job["abc"]}
+        if job.get("options") is not None:
+            message["options"] = job["options"]
+        if not helper.send(message):
             helper.kill()
             helper = None
             results[job["id"]] = {"ok": False, "reason": "drawingStopped"}
@@ -470,6 +490,57 @@ def draw_all(jobs: list, command: list, job_seconds=JOB_SECONDS, start_seconds=S
     if helper is not None:
         helper.close()
     return results
+
+
+# ---- Laying a tune out on the page ------------------------------------------------------
+
+def layout_of(width, wrapped_width) -> dict:
+    """
+    How a tune is laid out (musicFences.drawing.wrap and .readable): drawn
+    with the teacher's own line breaks when its drawing fits the staff
+    (`width` no wider than wrap.widerThan), else drawn again with abcjs's own
+    line breaking, and a folder problem when even that is wider than
+    readable.widerThan. `wrapped_width` is the second drawing's width, or None
+    when there was none or it failed (the first drawing is then kept, and
+    judged). Answers {"drawnWith": "options" | "wrap", "problem": None |
+    "tooLongToRead"}.
+    """
+    drawing = rules("drawing")
+    drawn_with = "options"
+    final = int(width or 0)
+    if final > drawing["wrap"]["widerThan"] and wrapped_width is not None:
+        drawn_with = "wrap"
+        final = int(wrapped_width)
+    problem = "tooLongToRead" if final > drawing["readable"]["widerThan"] else None
+    return {"drawnWith": drawn_with, "problem": problem}
+
+
+def _laid_out(tunes: list, answers: dict, command: list, job_seconds, start_seconds, printer) -> dict:
+    """Each tune whose first drawing is wider than its staff drawn again
+    with wrap.options, and the drawing to keep chosen by layout_of. Answers
+    {tune id: {"answer", "options", "problem"}}."""
+    wrap = rules("drawing", "wrap")
+    again = []
+    for tune in tunes:
+        answer = answers.get(tune["id"]) or {}
+        if answer.get("ok") and int(answer.get("width") or 0) > wrap["widerThan"]:
+            again.append({"id": tune["id"], "abc": tune["played"]["abc"], "options": wrap["options"]})
+    wrapped = draw_all(again, command, job_seconds=job_seconds, start_seconds=start_seconds,
+                       printer=printer) if again else {}
+    chosen = {}
+    for tune in tunes:
+        answer = answers.get(tune["id"]) or {"ok": False, "reason": "drawingStopped"}
+        second = wrapped.get(tune["id"])
+        if not answer.get("ok"):
+            chosen[tune["id"]] = {"answer": answer, "options": None, "problem": None}
+            continue
+        second_width = second.get("width") if second and second.get("ok") else None
+        decided = layout_of(answer.get("width"), second_width)
+        if decided["drawnWith"] == "wrap":
+            chosen[tune["id"]] = {"answer": second, "options": wrap["options"], "problem": decided["problem"]}
+        else:
+            chosen[tune["id"]] = {"answer": answer, "options": None, "problem": decided["problem"]}
+    return chosen
 
 
 # ---- Sounds: kept, or downloaded -------------------------------------------------------
@@ -665,12 +736,17 @@ def prepare(pages: list, output_dir, kept_root, course="", section=None, fetcher
         if not found_here:
             continue
         source_found = tunes_on_page(page["source"]) if page.get("source") else []
+        in_choices = tunes_in_quiz_choices(page["text"])
         for found in found_here:
             outcome["tunes"] += 1
             found["place"] = page["place"]
             found["path"] = page["path"]
             found["fileLine"] = _file_line_of(found, source_found)
             settings = read_settings(found["body"])
+            if found["line"] in in_choices:
+                # In a quiz's choice: the quiz is refused, and the tune is
+                # drawn without Play, so nothing is downloaded for it.
+                settings["play"] = False
             for note in settings["notes"]:
                 outcome["notes"].append(_located(found, note))
             if found["fileLine"] is not None:
@@ -688,15 +764,19 @@ def prepare(pages: list, output_dir, kept_root, course="", section=None, fetcher
         _write_site_files(output_dir, None, {}, engine_dir(vendor_dir), pin)
         return outcome
 
-    answers = draw_all([{"id": tune["id"], "abc": tune["played"]["abc"]} for tune in tunes],
-                       command or helper_command(vendor_dir), job_seconds=job_seconds,
-                       start_seconds=start_seconds, printer=printer)
+    the_command = command or helper_command(vendor_dir)
+    jobs = []
+    for tune in tunes:
+        jobs.append({"id": tune["id"], "abc": tune["played"]["abc"]})
+    first_answers = draw_all(jobs, the_command, job_seconds=job_seconds, start_seconds=start_seconds,
+                             printer=printer)
+    laid_out = _laid_out(tunes, first_answers, the_command, job_seconds, start_seconds, printer)
     names = sound_names()
     needed = []
     entries = {}
     pages_shown = set()
     for tune in tunes:
-        answer = answers.get(tune["id"]) or {"ok": False, "reason": "drawingStopped"}
+        answer = laid_out[tune["id"]]["answer"]
         if not answer.get("ok"):
             reason = answer.get("reason") or "drawingStopped"
             if reason == "nothingToDraw":
@@ -706,6 +786,8 @@ def prepare(pages: list, output_dir, kept_root, course="", section=None, fetcher
             continue
         for problem in _tune_problems(tune, tune["played"], answer):
             outcome["problems"].append(_located(tune, problem))
+        if laid_out[tune["id"]]["problem"] is not None:
+            outcome["problems"].append(_located(tune, {"reason": laid_out[tune["id"]]["problem"]}))
         if _header(tune["body"], "K") is None:
             outcome["problems"].append(_located(tune, {"reason": "noKey"}))
         if len(re.findall(r"(?m)^[ \t]*X:", tune["body"])) > 1:
@@ -729,6 +811,9 @@ def prepare(pages: list, output_dir, kept_root, course="", section=None, fetcher
             "abc": tune["played"]["abc"] if play else "",
             "sounds": sounds if play else [],
             "notes": int(answer.get("notes") or 0),
+            # The options it was drawn with, when they are not the site's
+            # own (drawing.wrap): the loader draws it again with these.
+            "options": laid_out[tune["id"]]["options"],
         }
         tune["sounds"] = sounds
         pages_shown.add(tune["path"])

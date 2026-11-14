@@ -5700,16 +5700,22 @@ PhET's are:
   caption, so Description and the quiz reader see the description alone.
   Html stage: the build's drawing goes in (abcjs's own container, classed
   `pl-music-drawing`), then, for a tune with Play, the controls and the
-  sounds' credit line (`musicFences.credit`). A tune inside a
-  `.plantoir-quiz-choice` gets neither (`musicFences.quizzes`): the quizzes'
-  markdown stage has run by then, so the choice is found by its class, and
-  nothing is refused. A fence the manifest does not know stays the code
-  block it was.
+  sounds' credit line (`musicFences.credit`). A tune in a quiz's choice is
+  refused, as a PhET simulation is: `plantoirQuizzes.ts`' `holdsTune` finds a
+  `plantoirMusic` node or an undrawn music code block in a choice, and
+  `quizRules.verdict` says `tuneInAChoice` (`musicFences.quizzes`). The
+  build has already read that tune as `% play: no`, so it is drawn without
+  controls; a tune inside a `.plantoir-quiz-choice` would get none either.
+  The figure's `data-music` carries the options the build drew the tune
+  with (the manifest entry's own, `drawing.wrap.options`, for a tune too
+  long for its staff; the manifest's otherwise). A fence the manifest does
+  not know stays the code block it was.
 - **`components/scripts/music.inline.ts`**, riding `PlantoirMetaLine` as
-  PhET's does: nothing until a press. The press makes the audio context
-  first (Safari's rule), loads `static/abcjs/abcjs-basic-min.js` once
+  PhET's does: nothing until a press. The press makes the page's one audio
+  context, or wakes it, first (Safari's rule); every later press reuses it,
+  and leaving the page closes it. It loads `static/abcjs/abcjs-basic-min.js` once
   (`spa-preserve`), draws the tune again in place with the manifest's
-  options and getBBox answering no size for the length of the call (so the
+  options the build drew it with and getBBox answering no size for the length of the call (so the
   picture is the build's, `musicFences.drawing`), primes abcjs's synth with
   `soundFontUrl` the site's own `static/abcjs/sounds/` and the sound set's
   usual level (3.0, which abcjs gives its own address), and lights each note
@@ -5724,19 +5730,24 @@ PhET's are:
 
 **The rendered check** (section R) has two rows on the Music page
 (`browser-checks/fixtures/rendered/Music.md`: a flute tune with piano
-chords, a `% play: no` tune, two tunes as a quiz's choices, a program that
+chords, of four bars written for the fixture; a `% play: no` tune; 24 bars
+written on one line; a quiz whose question holds a tune; a program that
 isolates the page): `music` (the drawing is in the page as served, in the
-page's colour, Play only where it belongs, the credit, nothing of the player
+page's colour, the long line broken into lines at least 0.6 times as tall as
+it is wide, Play only where it belongs, the credit, nothing of the player
 fetched before a press) and `music play` (a real press, the player and both
 sounds from the site's own host, each 200, the drawing unmoved, a note lit,
 Stop). Its sounds are planted from the dev cache
 (`browser-checks/lib/plant_sounds.py`). The check aborts every media request
 so nothing plays; a tune's notes are the one exception, and only as data
 (XMLHttpRequest) from the site's own `static/abcjs/sounds/`, decoded into
-the suspended audio context `SILENT_AUDIO` makes. Four sabotages, each
-measured red for its own reason in both engines on 2026-11-14 against a
-standalone copy of the page: `music drawing gone`, `music credit`,
-`music engine`, `music sound missing`.
+the suspended audio context `SILENT_AUDIO` makes. Five sabotages: `music drawing gone`, `music credit`, `music engine` and
+`music sound missing`, each measured red for its own reason in both engines
+on 2026-11-14 against a standalone copy of the page, and `music long line`
+(the long tune's container cut to a tenth of its height, the sliver the
+first build drew), added after the implementation review and not yet run
+against a built folder: it is the director's `verify.sh` run that proves it
+red.
 
 ## E. Summary: what is *not* customized
 

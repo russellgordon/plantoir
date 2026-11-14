@@ -4312,7 +4312,21 @@ download one stops, by #674's pattern. The contract is
    (`setUpAudio`), which decides what is downloaded: chord symbols play on
    their own program, so a reading of the settings alone would miss piano
    for a flute tune's chords (plan review M2; measured `[0, 73]` without
-   chordprog, `[73]` with it).
+   chordprog, `[73]` with it). It also answers the drawing's own width.
+4a. **Laying a tune out on the page** (`musicFences.drawing.wrap` and
+   `.readable`, `music.layout_of`). abcjs draws each line of the ABC source
+   as one staff line and fits it to the staff by closing the notes up; a
+   line it cannot fit is drawn wider, and `responsive: resize` then shrinks
+   the whole drawing to the page. #679's implementation review measured a
+   tune of 240 bars written on one line drawn 7 px tall, with no word from
+   the build. So every tune is drawn first with the teacher's own line
+   breaks, and one whose drawing is wider than 780 (its staff is 770) is
+   drawn again with abcjs's own line breaking (`staffwidth` 740 and `wrap`,
+   about four bars a line, broken only at bar lines). The options a tune was
+   drawn with go into its manifest entry and the page (`data-music`), so the
+   loader draws it again on a press with exactly those. A drawing still
+   wider than 1000 after that (a long stretch with no bar line) is a folder
+   problem, `tooLongToRead`, and the tune is still drawn.
 5. **Kept sounds.** Each sound is one file, `<name>-mp3.js` (every note as
    base64), fetched from the pinned commit through `kept_downloads.Fetcher`,
    refused unless its SHA-256 is the pin's, kept as it arrived in
@@ -4329,8 +4343,20 @@ download one stops, by #674's pattern. The contract is
    the added directive lines to the teacher's line, and how many more), a
    `%%` line (read from the RAW file, so a pair the site removed whole is
    still named; the sentence points at `% sound:`), no K: line, an empty
-   tune (left as code), a missing engine. A tune abcjs reads with a problem
-   is still drawn, as the Obsidian plugin shows it.
+   tune (left as code), a stretch too long to read (4a), a missing engine.
+   A tune abcjs reads with a problem is still drawn, as the Obsidian plugin
+   shows it.
+7. **A tune in a quiz's choice** is refused as PhET's simulation is
+   (`musicFences.quizzes`, `quizCallouts.words.problems.tuneInAChoice`): the
+   quiz reader (`quizzes._read_quiz`) and the site (`quizRules.verdict`)
+   both find it, and the quiz is a `quizzesNotReady` folder problem. The
+   music pass asks the quiz reader which lines open a tune inside a choice
+   (`music.tunes_in_quiz_choices`) and reads those tunes as `% play: no`:
+   drawn, never with Play, so no sound is downloaded for them and an offline
+   build never stops for one. Until the review, a tune there was drawn
+   without Play by the site alone, while the build still downloaded its
+   sound and could stop for it offline (the review measured a trumpet chord
+   in a choice carrying 2.3 MB and stopping an offline build).
 
 **What a site carries.** `static/abcjs/` (abcjs-basic-min.js 511,968 bytes,
 147,981 gzipped; LICENSE.md; README.txt) and the sounds its tunes with Play
@@ -4368,6 +4394,24 @@ WebKit 2359; nothing played).**
   new; it names paulrosen.github.io as its default sound address, which the
   loader never uses (it always names the site's own folder).
 - Drawing takes 2 to 17 ms a tune once the helper is up.
+- **Long lines** (4a). A line of quarter notes fits its staff up to 9 bars
+  (770 wide), is 771 to 772 at 10 to 11 bars, 800 at 12, 1,027 at 16 and
+  13,723 at 240; eighth notes overflow from 7 bars. Drawn again with
+  `wrap.options`, the 240 bars are 61 staff lines, 770 wide: 5,475 px tall at
+  743 px and 4,952 px at a print width of 672 px (7 in) in both engines,
+  where the drawing as written was 7 px tall. Two voices of 20 bars go from
+  1,303 wide to six staff lines at 770. Eight bars written two to a line
+  stay as written (770 wide); `wrap.options` would have joined them four to
+  a line. 160 notes with no bar line stay 1,793 wide with or without it
+  (55 px tall at 672 px): the `tooLongToRead` problem. The wrapped drawings
+  of five tunes are identical in the build and in headless Chromium 155 and
+  WebKit 2359 (canonical XML), at 743 px and at 360 px wide. Wrapping 240
+  bars took 34 ms. A phone shrinks every drawing to its width (a 770-wide
+  drawing is about half size at 360 px), wrapped or not.
+- **One audio context a page.** Ten Play and Stop presses made one context
+  in both engines, and leaving the page closed it; the first build's loader
+  made ten and closed none (the review's count, re-measured on 04d3dda52's
+  `music.inline.ts`).
 
 **Rejected.**
 
@@ -4386,6 +4430,17 @@ WebKit 2359; nothing played).**
   brief named, so the first build that plays any tune needs the internet,
   piano included, and says so. Question 1 in the closing note offers the
   other way, which is a pin and a layer.
+- `wrap.options` for every tune: abcjs then reflows every tune its own
+  way, so a tune set out a phrase to a line is drawn differently from what
+  the teacher wrote (eight bars two to a line came out as two lines of four).
+- Only a note when a line holds more than about twelve bars (the review's
+  second option): students would still see the sliver until the teacher
+  rewrote the tune.
+- A staff width from the reader's screen: the build draws once for every
+  reader, and the redraw on a press must be the build's drawing.
+- Drawing a tune in a quiz's choice without Play and leaving the quiz
+  alone (the first build): the build still downloaded its sound, and the
+  rule differed from PhET's and GeoGebra's for no reason a teacher sees.
 - Inventing `% drums:` now: abcjs reaches the drum kit only through
   `%%MIDI drum`, which Quartz removes (a known limit).
 - Carrying the Obsidian plugin as #495 carries TikZJax: it is AGPL-3.0.

@@ -143,8 +143,8 @@ whose choices refer to their position ("All of the above", "Both A and B",
 ## 4. Graphs, pictures and code inside a question
 
 Anything a page can hold works inside a question, a choice and an
-explanation - except a GeoGebra sketch or a PhET simulation in a choice
-(below). Put it on the
+explanation - except a GeoGebra sketch, a PhET simulation or a tune in a
+choice (below). Put it on the
 lines under its choice, lined up under the choice's `[`: after the `> `
 that starts every line of the quiz, two more spaces (`>   ```functionplot`,
 as below). How to write the graph itself is in the `plantoir-math-graphs`
@@ -227,6 +227,13 @@ QUESTION or the EXPLANATION, **never inside a choice**, where a tap on the
 simulation would pick the choice. The website refuses it and the folder
 problem says "a PhET simulation sits inside one of its choices". How to
 write the block is in the `plantoir-page-authoring` skill.
+
+**A tune** (an ` ```abc ` block) follows the same rule too: in the QUESTION
+or the EXPLANATION, with its Play button, **never inside a choice**, where a
+press on Play would pick the choice. The website refuses it and the folder
+problem says "a tune sits inside one of its choices". Ask "which chord is
+this?" with the tune in the question and the chord names as the choices.
+How to write the block is in the `plantoir-page-authoring` skill.
 
 ````markdown
 > [!quiz] Drag A along the line. What is the line's slope?

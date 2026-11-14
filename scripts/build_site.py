@@ -2006,9 +2006,10 @@ def _wire_music_transformer(config_ts: Path) -> None:
     """Put the tunes' transformer (#679) straight AFTER the PhET
     simulations' and so before the self-check quizzes', for GeoGebra's
     reason: a tune in a question is a finished figure when the quiz
-    transformer packages the question, and its html stage runs before the
-    quizzes', where it finds a tune inside a choice (and leaves out its
-    Play controls, musicFences.quizzes) by the choice's class, which the
+    transformer packages the question (and the quizzes' reader finds a
+    tune inside a choice as a plantoirMusic node, and refuses the quiz,
+    musicFences.quizzes), and its html stage runs before the quizzes', where
+    a tune inside a choice is still found by the choice's class, which the
     quizzes' markdown stage has already given it. Anchored on PlantoirPhet,
     wired before it in wire_quartz_additions. Idempotent."""
     text = config_ts.read_text(encoding="utf-8")
