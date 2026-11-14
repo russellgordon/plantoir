@@ -51,6 +51,10 @@ extension SectionVerbSheet {
             Text(AssistWording.menuRollOverDeploysToAFolder)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("sectionVerbSheetRollOverNoQuestion")        case .aNewWebsiteWouldReuseItsAddress:
+            Text(AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("sectionVerbSheetRollOverNoQuestion")
         }
     }

@@ -510,7 +510,7 @@ extension SectionDetailView {
         case .makeRoom:
             return model.howMany == 1 ? "room for 1" : "room for \(model.howMany)"
         case .rollOver:
-            return RollOverFromTheMenu.counts(model.rollOver.website, answer: model.rollOver.answer)
+            return RollOverFromTheMenu.counts(model.rollOver.website, sent: model.rollOver.websiteSent ?? "")
         case .addClass:
             // How it was added, never the class's title (#897).
             switch model.way {

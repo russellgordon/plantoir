@@ -1303,7 +1303,7 @@
       "Section > Re-date Classes… moves EVERY class in the section onto the class dates on file, in order; nothing is chosen",
       "Check the plan before you agree",
       "To put new classes in front of planned ones, use Make Room for Classes… instead (link make-room)",
-      "At the start of a new year, Section > Roll Over to a New Year… re-dates the same way and also settles the website: keep last year's address, or start a new one; it asks only when the section has a website",
+      "At the start of a new year, Section > Roll Over to a New Year… re-dates the same way and also settles the website: keep last year's address, or start a new one; it asks only when the section has a website, and not when a new website would get the address the section's website already has (a Cloudflare website started earlier the same calendar year)",
       "Preview, then deploy"
      ],
      "pictures": [

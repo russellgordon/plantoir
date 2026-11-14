@@ -4861,18 +4861,36 @@ final class AssistToolRunner {
         var website: String = newWebsite
         if answer == "same" {
             website = AssistWording.menuRollOverPlanKeepsTheWebsite
+            // A course that deploys only to a folder keeps deploying to its
+            // folder, whatever marker an old web host left (the
+            // implementation review's M2).
+            if RollOverFromTheMenu.deploysOnlyToAFolder(located.course) {
+                website = AssistWording.menuRollOverDeploysToAFolder
+            }
         }
-        // A section with no website yet, or deploying only to a folder, is
-        // told so rather than about a website it does not have.
-        switch RollOverFromTheMenu.website(forSection: located.sectionNumber, in: located.course) {
+        // A section with no website yet, or deploying only to a folder, or
+        // whose new website would take this one's address, is told so rather
+        // than about a website it does not have or cannot start.
+        switch RollOverFromTheMenu.website(forSection: located.sectionNumber, in: located.course, today: today) {
         case .asked:
             break
         case .notDeployedYet:
             website = AssistWording.menuRollOverNotDeployedYet
         case .deploysToAFolder:
             website = AssistWording.menuRollOverDeploysToAFolder
+        case .aNewWebsiteWouldReuseItsAddress:
+            website = AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress
         }
         return website + "\n\n" + AssistWording.menuRollOverPlanSetsTheRecordAside
+    }
+
+    /// A rollover from the menu whose copy of the course could not be saved
+    /// first (the director's ruling on the implementation review's I2: the
+    /// most consequential item on the menu errs toward refusing). Nothing has
+    /// been written when this is said, and the sentence is the start of the
+    /// year's own refusal for the same fact, by key.
+    static func menuRolloverRefusedWithoutACopy(_ course: Course) -> AssistToolOutcome {
+        return AssistToolOutcome.refused(AssistWording.startOfYearNeedsABackup(course: course.code))
     }
 
     /// The name of the ONE change a rollover from the menu records (#897
@@ -4889,7 +4907,12 @@ final class AssistToolRunner {
     private func menuRolloverWithTheDatesAlreadyRight(
         _ arguments: [String: Any], located: Located, already: String
     ) async -> AssistToolOutcome {
-        _ = await backUpOnceForThisConversation(located.course, forSection: located.sectionNumber)
+        // No copy, no rollover (the director's ruling on the implementation
+        // review's I2): refused before anything is written.
+        let backedUp: Bool = await backUpOnceForThisConversation(located.course, forSection: located.sectionNumber)
+        if !backedUp {
+            return AssistToolRunner.menuRolloverRefusedWithoutACopy(located.course)
+        }
         var files: [AssistSavedFile] = PublishedPagesRecord.release(
             courseDirectory: located.course.directoryURL, section: located.sectionNumber
         )
@@ -4980,6 +5003,13 @@ final class AssistToolRunner {
             let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // From the menu, a rollover with no copy saved first is refused
+            // here, before the preview is stopped or a page is touched (the
+            // director's ruling on the implementation review's I2). The
+            // window's path is unchanged: it says so in `detail` and goes on.
+            if !backedUp && surface == .menu && isARollover(arguments) {
+                return AssistToolRunner.menuRolloverRefusedWithoutACopy(asked.located.course)
+            }
             _ = await stopThePreviewBeforeWriting(
                 for: asked.located.course, sectionNumber: asked.located.sectionNumber
             )
@@ -5240,15 +5270,25 @@ final class AssistToolRunner {
         guard isARollover(arguments) else {
             return ("", [])
         }
-        if answer == "same" {
+        // From the menu: the website rule decides what a "same" is said as,
+        // and a "new" that would take this website's own address is not
+        // carried out (W1; the sheet never sends one, but a deploy between
+        // opening the sheet and pressing Roll Over can make it so).
+        var menuWebsite: RollOverFromTheMenu.Website? = nil
+        if fromTheMenu {
+            menuWebsite = RollOverFromTheMenu.website(forSection: sectionNumber, in: course, today: today)
+        }
+        let wouldReuseItsAddress: Bool = menuWebsite == .aNewWebsiteWouldReuseItsAddress
+        if answer == "same" || (answer == "new" && wouldReuseItsAddress) {
+            if fromTheMenu {
+                return (menuSaysTheWebsiteIsKept(course: course, sectionNumber: sectionNumber,
+                                                 wouldReuseItsAddress: wouldReuseItsAddress), [])
+            }
             ActivityTrail.note(
                 .sectionKeptItsWebsiteOnRollover,
                 "kept last year's website when rolling the section over",
                 course: course.code, section: sectionNumber
             )
-            if fromTheMenu && RollOverFromTheMenu.website(forSection: sectionNumber, in: course) == .deploysToAFolder {
-                return (AssistWording.rolloverDeploysToAFolderFromTheMenu, [])
-            }
             return (AssistWording.rolloverKeptTheSameWebsite, [])
         }
         guard answer == "new" else {
@@ -5266,11 +5306,19 @@ final class AssistToolRunner {
             if release.somethingIsStillPinned {
                 return (couldNotStartANewWebsite(release, fromTheMenu: fromTheMenu), [])
             }
+            // From the menu the line says what is true of a course that also
+            // deploys to a folder, or whose website a rollover set aside
+            // before (the implementation review's M1); the window's is as it was.
             ActivityTrail.note(
                 .sectionStartedANewWebsiteOnRollover,
-                "rolled the section over onto a new website — it had not been deployed anywhere yet",
+                fromTheMenu
+                    ? "rolled the section over onto a new website — it was not on a website at the moment"
+                    : "rolled the section over onto a new website — it had not been deployed anywhere yet",
                 course: course.code, section: sectionNumber
             )
+            if fromTheMenu {
+                return (AssistWording.menuRollOverNotDeployedYet, [])
+            }
             return (AssistWording.rolloverHadNoWebsiteYet, [])
         }
 
@@ -5310,7 +5358,61 @@ final class AssistToolRunner {
             + release.keptFiles.joined(separator: ", "),
             course: course.code, section: sectionNumber
         )
-        return (said, release.savedFiles)
+        if recordsItsOwnChange {
+            return (said, release.savedFiles)
+        }
+        return (said, AssistToolRunner.onlyTheHalvesMovedAway(release.savedFiles))
+    }
+
+    /// The menu's rollover records only the half of each marker's move that
+    /// left the marker's own place (`before` the marker, `after` nothing),
+    /// never the kept copy's half (the implementation review's I1, measured
+    /// there). Undo Last Change puts a marker back only where its place is
+    /// still empty and never deletes a kept copy: with both halves recorded,
+    /// a deploy between the rollover and the undo wrote a new marker in the
+    /// place, the place's half was left alone, and the kept copy's half
+    /// matched and was DELETED, so last year's website's only record went.
+    /// An undo now leaves the kept copy beside the marker it put back, where
+    /// nothing reads it (`releasedMarkerName`). The window keeps both halves,
+    /// as before; #899's journal reverses a move as a pair
+    /// (`S/drafts/899-seams-from-other-pieces.md`).
+    static func onlyTheHalvesMovedAway(_ files: [AssistSavedFile]) -> [AssistSavedFile] {
+        var movedAway: [AssistSavedFile] = []
+        for file in files {
+            if file.before != nil && file.after == nil {
+                movedAway.append(file)
+            }
+        }
+        return movedAway
+    }
+
+    /// What the menu says, and leaves on the trail, when a rollover keeps the
+    /// section where it deploys: a folder is a folder (amendment 12, and the
+    /// implementation review's M1 and M2), a website a new one would replace
+    /// says why (W1), and anything else is the window's own sentence.
+    private func menuSaysTheWebsiteIsKept(course: Course, sectionNumber: Int, wouldReuseItsAddress: Bool) -> String {
+        if wouldReuseItsAddress {
+            ActivityTrail.note(
+                .sectionKeptItsWebsiteOnRollover,
+                "kept the section's website when rolling it over — a new one would have had the same address",
+                course: course.code, section: sectionNumber
+            )
+            return AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress
+        }
+        if RollOverFromTheMenu.deploysOnlyToAFolder(course) {
+            ActivityTrail.note(
+                .sectionKeptItsWebsiteOnRollover,
+                "kept deploying the section to its folder when rolling it over",
+                course: course.code, section: sectionNumber
+            )
+            return AssistWording.rolloverDeploysToAFolderFromTheMenu
+        }
+        ActivityTrail.note(
+            .sectionKeptItsWebsiteOnRollover,
+            "kept last year's website when rolling the section over",
+            course: course.code, section: sectionNumber
+        )
+        return AssistWording.rolloverKeptTheSameWebsite
     }
 
     /// The sentence for a marker that could not be moved: the window's, or

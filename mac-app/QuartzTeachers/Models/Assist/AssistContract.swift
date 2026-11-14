@@ -817,9 +817,9 @@ enum AssistContract {
             "menuRollOverTitle": AssistWording.menuRollOverTitle(course: course, section: section),
             "menuRollOverIntro": AssistWording.menuRollOverIntro(),
             "menuRollOverIntroForAMeeting": AssistWording.menuRollOverIntro(noun: .meeting),
-            "menuRollOverDates": AssistWording.menuRollOverDates(first: "2026-09-08", last: "2027-06-24"),
+            "menuRollOverDates": AssistWording.menuRollOverDates(first: "2026-09-08 (Tuesday)", last: "2027-06-24 (Thursday)"),
             "menuRollOverDatesForAMeeting": AssistWording.menuRollOverDates(
-                first: "2026-09-08", last: "2027-06-24", noun: .meeting
+                first: "2026-09-08 (Tuesday)", last: "2027-06-24 (Thursday)", noun: .meeting
             ),
             "menuRollOverDatesAreOld": AssistWording.menuRollOverDatesAreOld(),
             "menuRollOverDatesAreOldForAMeeting": AssistWording.menuRollOverDatesAreOld(noun: .meeting),
@@ -827,6 +827,7 @@ enum AssistContract {
             "menuRollOverNewWebsite": AssistWording.menuRollOverNewWebsite,
             "menuRollOverNotDeployedYet": AssistWording.menuRollOverNotDeployedYet,
             "menuRollOverDeploysToAFolder": AssistWording.menuRollOverDeploysToAFolder,
+            "menuRollOverANewWebsiteWouldReuseItsAddress": AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress,
             "menuRollOverButton": AssistWording.menuRollOverButton,
             "menuRollOverPlanKeepsTheWebsite": AssistWording.menuRollOverPlanKeepsTheWebsite,
             "menuRollOverPlanSetsTheRecordAside": AssistWording.menuRollOverPlanSetsTheRecordAside,

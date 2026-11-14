@@ -2589,10 +2589,23 @@ nonisolated enum AssistWording {
     static let menuRollOverNewWebsite: String =
         "Start a new website, and leave last year's as it is"
 
-    /// No question: the section has never been deployed to a web host.
+    /// No question: no record ties the section to a website at the moment.
+    /// True of a section never deployed, of one whose website a rollover
+    /// already set aside, of a course that deploys to a folder AND a web host
+    /// (the folder half has been deployed, a website has not), and of
+    /// Cloudflare, which asks for no name (the implementation review's W2).
     static let menuRollOverNotDeployedYet: String =
-        "This section has not been deployed yet, so there is no website to keep. Plantoir asks what "
-        + "to call it the first time it is deployed."
+        "This section is not on a website at the moment, so there is no website to keep. A new "
+        + "website is made the next time it is deployed."
+
+    /// No question: a new website started now would get the address the
+    /// section's website already has, and replace it (the implementation
+    /// review's W1; the deploy path's fix is GitHub #915). Said in the sheet,
+    /// in the plan and when it is done, which is why it is in the present.
+    static let menuRollOverANewWebsiteWouldReuseItsAddress: String =
+        "This section's website was started this calendar year, and a new website started now "
+        + "would get the same address. It keeps deploying to the same website, so links students "
+        + "saved keep working."
 
     /// No question: the section deploys only to a folder.
     static let menuRollOverDeploysToAFolder: String =

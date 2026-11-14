@@ -40,14 +40,17 @@ final class RollOverFromTheMenuTests: XCTestCase {
         }
         XCTAssertEqual(Set(websites.keys), appWebsites)
         let cases: [[String: Any]] = try XCTUnwrap(sheet["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        var seen: Set<String> = []
         for contractCase in cases {
             let why: String = try XCTUnwrap(contractCase["why"] as? String)
             let facts: [String: Bool] = try XCTUnwrap(contractCase["facts"] as? [String: Bool], why)
             let website: RollOverFromTheMenu.Website = RollOverFromTheMenu.website(
                 sectionIsPinned: try XCTUnwrap(facts["sectionIsPinned"], why),
-                hasAHostedDestination: try XCTUnwrap(facts["hasAHostedDestination"], why)
+                hasAHostedDestination: try XCTUnwrap(facts["hasAHostedDestination"], why),
+                aNewWebsiteWouldReuseItsAddress: try XCTUnwrap(facts["aNewWebsiteWouldReuseItsAddress"], why)
             )
+            seen.insert(website.rawValue)
             XCTAssertEqual(website.rawValue, contractCase["website"] as? String, why)
             var answer: RollOverFromTheMenu.Answer? = nil
             if let spelled = contractCase["answer"] as? String {
@@ -55,6 +58,28 @@ final class RollOverFromTheMenuTests: XCTestCase {
             }
             let sent: String? = RollOverFromTheMenu.websiteSent(website, answer: answer)
             XCTAssertEqual(sent, contractCase["websiteSent"] as? String, why)
+        }
+        XCTAssertEqual(seen, appWebsites, "every website the sheet can draw has a case")
+    }
+
+    /// Every case of `subjectMenus.rollOverSheet.cloudflareAddressReuse`:
+    /// whether a new Cloudflare website this year would get a name a record
+    /// already holds (the implementation review's W1).
+    func testTheCloudflareNameRuleIsTheContracts() throws {
+        let section: [String: Any] = try SubjectMenuRulesTests.section()
+        let sheet: [String: Any] = try XCTUnwrap(section["rollOverSheet"] as? [String: Any])
+        let reuse: [String: Any] = try XCTUnwrap(sheet["cloudflareAddressReuse"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(reuse["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 7)
+        for contractCase in cases {
+            let why: String = try XCTUnwrap(contractCase["why"] as? String)
+            let answer: Bool = RollOverFromTheMenu.aNewWebsiteWouldReuseItsAddress(
+                keptNames: try XCTUnwrap(contractCase["keptNames"] as? [String], why),
+                courseCode: try XCTUnwrap(contractCase["courseCode"] as? String, why),
+                section: try XCTUnwrap(contractCase["section"] as? Int, why),
+                year: try XCTUnwrap(contractCase["year"] as? Int, why)
+            )
+            XCTAssertEqual(answer, try XCTUnwrap(contractCase["wouldReuse"] as? Bool, why), why)
         }
     }
 
@@ -143,7 +168,11 @@ final class RollOverFromTheMenuTests: XCTestCase {
         let early: RollOverFromTheMenu.Choice = RollOverFromTheMenu.choice(
             forSection: 1, in: made.course, today: try XCTUnwrap(CalendarDay(text: "2026-09-08"))
         )
-        XCTAssertEqual(early.datesLine, AssistWording.menuRollOverDates(first: "2026-09-08", last: "2026-09-10"))
+        XCTAssertEqual(
+            early.datesLine,
+            AssistWording.menuRollOverDates(first: "2026-09-08 (Tuesday)", last: "2026-09-10 (Thursday)"),
+            "the days are written as the re-date's plan writes them (the review's M3)"
+        )
         XCTAssertFalse(early.datesAreOld)
         XCTAssertTrue(RollOverFromTheMenu.datesAreOld(
             last: try XCTUnwrap(CalendarDay(text: "2026-09-10")), today: try XCTUnwrap(CalendarDay(text: "2026-09-11"))
@@ -315,7 +344,153 @@ final class RollOverFromTheMenuTests: XCTestCase {
         XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(plan.forTheCard), plan.forTheCard)
     }
 
+    // MARK: - A new website that would not be new (W1)
+
+    /// Deployed to Cloudflare in February 2026 and rolled over in September
+    /// 2026: a new website would be given February's name and replace it.
+    /// The sheet asks nothing and sends "same", the plan and the finished
+    /// line say why, and the marker stays where deploying reads it.
+    func testACloudflareSectionFromEarlierThisYearIsNotOfferedANewWebsite() async throws {
+        let made = try AssistFixture.makeSectionNeedingReDating(withMarker: false, surface: .menu, for: self)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        _ = RollOverFromTheMenuTests.countCopies(of: made)
+        let course: Course = try RollOverFromTheMenuTests.deployingTo("cloudflare_pages", made.course)
+        let marker: URL = try RollOverFromTheMenuTests.writeCloudflareMarker(
+            named: "ics3u-s1-2026-lastname", file: "section1.json", in: course
+        )
+        let september: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-08"))
+        let choice: RollOverFromTheMenu.Choice = RollOverFromTheMenu.choice(forSection: 1, in: course, today: september)
+        XCTAssertEqual(choice.website, .aNewWebsiteWouldReuseItsAddress)
+        XCTAssertEqual(choice.websiteSent, "same")
+        XCTAssertEqual(
+            RollOverFromTheMenu.counts(choice.website, sent: "same"),
+            "website: kept, a new one would have the same address"
+        )
+
+        // A new calendar year names a new website: asked again.
+        let january: CalendarDay = try XCTUnwrap(CalendarDay(text: "2027-01-04"))
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: course, today: january).website, .asked)
+
+        let plan: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "same", planning: true)
+        )
+        XCTAssertTrue(plan.forTheCard.contains(AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress), plan.forTheCard)
+        XCTAssertFalse(plan.forTheCard.contains(AssistWording.menuRollOverPlanKeepsTheWebsite), plan.forTheCard)
+
+        // Even a "new" (a deploy between opening the sheet and pressing Roll
+        // Over) does not move the marker onto a name the deploy would reuse.
+        let outcome: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "new", planning: false)
+        )
+        XCTAssertTrue(outcome.summary.contains(AssistWording.menuRollOverANewWebsiteWouldReuseItsAddress), outcome.summary)
+        XCTAssertFalse(outcome.summary.contains(AssistWording.rolloverKeptTheSameWebsite), outcome.summary)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "the marker deploying reads stays")
+        XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(outcome.summary), outcome.summary)
+    }
+
+    /// Rolled onto a new website once this year and not deployed since: only
+    /// the set-aside record holds this year's name, and it still counts.
+    func testASetAsideRecordFromThisYearCountsToo() throws {
+        let made = try AssistFixture.makeRunner(hasDeployedBefore: false, surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let course: Course = try RollOverFromTheMenuTests.deployingTo("cloudflare_pages", made.course)
+        try RollOverFromTheMenuTests.writeCloudflareMarker(
+            named: "ics3u-s1-2026-lastname", file: "section1.previous-20260901T120000Z.json", in: course
+        )
+        XCTAssertFalse(DeployCommand.sectionIsPinned(forSection: 1, in: course))
+        let today: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-08"))
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: course, today: today).website, .aNewWebsiteWouldReuseItsAddress)
+        // On Netlify the same record says nothing: its names are not by year.
+        let onNetlify: Course = try RollOverFromTheMenuTests.deployingTo("netlify", course)
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: onNetlify, today: today).website, .notDeployedYet)
+    }
+
+    // MARK: - "Not on a website at the moment" (W2)
+
+    /// The sentence is drawn for Cloudflare never deployed and for a course
+    /// that deploys to a folder and a web host; it promises no question
+    /// about a name, and the finished line from the menu is the same.
+    func testNotDeployedYetIsTrueForCloudflareAndForAFolderWithAHost() async throws {
+        let made = try AssistFixture.makeSectionNeedingReDating(withMarker: false, surface: .menu, for: self)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        _ = RollOverFromTheMenuTests.countCopies(of: made)
+        let today: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-08"))
+        let cloudflare: Course = try RollOverFromTheMenuTests.deployingTo("cloudflare_pages", made.course)
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: cloudflare, today: today).website, .notDeployedYet)
+        let folderAndHost: Course = try RollOverFromTheMenuTests.deployingTo(
+            "local_folder", made.course, alsoTo: "netlify"
+        )
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: folderAndHost, today: today).website, .notDeployedYet)
+        XCTAssertFalse(AssistWording.menuRollOverNotDeployedYet.contains("asks"), "Cloudflare asks for no name")
+        XCTAssertFalse(AssistWording.menuRollOverNotDeployedYet.contains("not been deployed"), "a folder half has been")
+
+        let outcome: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "new", planning: false)
+        )
+        XCTAssertTrue(outcome.summary.contains(AssistWording.menuRollOverNotDeployedYet), outcome.summary)
+        XCTAssertFalse(outcome.summary.contains(AssistWording.rolloverHadNoWebsiteYet), outcome.summary)
+    }
+
+    /// A course that deploys only to a folder, with a marker an old web host
+    /// left: asked, and "same" is said as the folder's line, never "the same
+    /// website as last year" (the review's M2).
+    func testSameOnAFolderCourseWithAnOldMarkerSaysFolder() async throws {
+        let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        _ = RollOverFromTheMenuTests.countCopies(of: made)
+        _ = try RollOverFromTheMenuTests.deployingToAFolder(made.course)
+        let plan: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "same", planning: true)
+        )
+        XCTAssertTrue(plan.forTheCard.contains(AssistWording.menuRollOverDeploysToAFolder), plan.forTheCard)
+        XCTAssertFalse(plan.forTheCard.contains(AssistWording.menuRollOverPlanKeepsTheWebsite), plan.forTheCard)
+        let outcome: AssistToolOutcome = await made.runner.run(
+            call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "same", planning: false)
+        )
+        XCTAssertTrue(outcome.summary.contains(AssistWording.rolloverDeploysToAFolderFromTheMenu), outcome.summary)
+    }
+
     // MARK: - Functions
+
+    /// The course, saved as deploying to `type` (and `alsoTo`, when given),
+    /// and read back.
+    static func deployingTo(_ type: String, _ course: Course, alsoTo additional: String? = nil) throws -> Course {
+        let configURL: URL = course.directoryURL.appendingPathComponent("course_config.json")
+        var values: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: configURL)) as? [String: Any]
+        )
+        values["deploy_target"] = type
+        if type == "local_folder" {
+            values["deploy_folder_path"] = course.directoryURL.deletingLastPathComponent().path + "/deployed"
+        }
+        if let additional {
+            values["additional_deploy_targets"] = [["type": additional, "path": ""]]
+        } else {
+            values.removeValue(forKey: "additional_deploy_targets")
+        }
+        try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted]).write(to: configURL)
+        return Course(code: course.code, directoryURL: course.directoryURL, configuration: try CourseConfiguration(contentsOf: configURL))
+    }
+
+    /// A Cloudflare record for Section 1 holding `name`, as `deploy.py`
+    /// writes one.
+    @discardableResult
+    static func writeCloudflareMarker(named name: String, file: String, in course: Course) throws -> URL {
+        let marker: URL = course.directoryURL.appendingPathComponent(".cloudflare_sites").appendingPathComponent(file)
+        try FileManager.default.createDirectory(at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "{\"name\": \"\(name)\", \"id\": \"x\", \"subdomain\": \"\(name).pages.dev\"}".write(
+            to: marker, atomically: true, encoding: .utf8
+        )
+        return marker
+    }
 
     /// How many copies the runner saved before a change.
     final class CopiesSaved {

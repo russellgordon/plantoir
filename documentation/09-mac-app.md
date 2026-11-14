@@ -7247,6 +7247,39 @@ dates), then the website by ONE rule, `RollOverFromTheMenu.website`
 | any marker on disk (`.netlify_sites`, `.cloudflare_sites`, or the legacy `.merged_output/section<N>/.netlify_site.json`; an unreadable one counts) | the window's question over two radio buttons, NOTHING chosen; Continue is off until one is | the answer |
 | no marker, a web host among its destinations | "not deployed yet", no question | `new` |
 | no marker, folders only | "deploys to a folder", no question | `same` |
+| Cloudflare among its destinations, and a record the section keeps there (its own, or one a rollover set aside) holds the name a new website would get THIS calendar year | "a new website would get the same address", no question | `same` |
+
+**The last row exists because a "new" Cloudflare website would not be new**
+(the implementation review's W1, measured with `deploy.py`'s own functions):
+`suggest_pages_name` names a new project for the course, the section and the
+calendar year, and `ensure_pages_project` reuses a project of that name, so a
+section first deployed in February and rolled over in September is given
+`ics3u-s1-2026-<surname>` both times and the "new" website is February's. A
+semestered teacher would overwrite the site last term's students read while
+the sheet said "leave last year's as it is". The fault is in the deploy path
+and its fix is GitHub #915; this piece only stops the sheet promising it. The
+app does not keep the surname (it is saved with the teacher's sign-in details,
+which the app does not read), so a kept name matches when it is the stem
+`<course>-s<section>-<year>`, cleaned as `sanitize_pages_name` cleans it, or
+begins with the stem and a hyphen (`RollOverFromTheMenu.aNewWebsiteWouldReuseItsAddress`,
+contract `cloudflareAddressReuse`). That errs toward keeping the website
+students use. A rollover in late December deployed in January is told the
+website is kept when the January deploy would in fact have made a new one; the
+year is read when the sheet opens because that is the only moment the app
+knows. Netlify is not affected: its names are global and a taken one is asked
+again. REJECTED: offering "new" with a warning beside it (an answer whose
+result is the opposite of its words is not an answer), and changing the name
+rule here (#915).
+
+**"Not on a website at the moment"** (`menuRollOverNotDeployedYet`, reworded
+after the review's W2): the first wording said the section "has not been
+deployed yet" and that Plantoir "asks what to call it". Both were false in
+cases that reach the row: Cloudflare asks for no name, a course that deploys
+to a folder AND a web host has deployed its folder half, and a section whose
+website an earlier rollover set aside was deployed before. The sentence now
+says only what is true of all of them, and it is also the finished line where
+the window would say `rolloverHadNoWebsiteYet` (whose Cloudflare clause is the
+window's, frozen).
 
 The marker test is `DeployCommand.sectionIsPinned`, over the same URLs
 `releaseSite` walks (its legacy path is now `legacyMarkerURL`, shared), so the
@@ -7267,13 +7300,47 @@ amendment 1; the window and an outside assistant are unchanged, and
 - **A copy of the course first when the dates are already right** (amendment
   11): the window's path saves none there, and a teacher who ran Re-date
   Classes… first lands exactly there.
-- **The website is settled before the preview is rebuilt**, so the legacy
-  marker in the built output is read before a rebuild can touch it.
+- **No copy, no rollover** (the director's ruling on the review's I2): when
+  that copy cannot be saved (a full disk, a folder that cannot be written),
+  the rollover is REFUSED before the preview is stopped or a file is written,
+  with `startOfYearNeedsABackup`, the start of the year's sentence for the
+  same fact. The window's path says so in `detail` and goes on, as #457 set
+  it; the menu's errs toward refusing because it is the most consequential
+  item on the menu. Pinned by
+  `RollOverFromTheMenuTests.testARolloverWithNoCopyIsRefusedBeforeAnythingChanges`.
+- **The undo entry holds only the half of each marker's move that left the
+  marker's place** (`AssistToolRunner.onlyTheHalvesMovedAway`; the review's
+  I1, measured there and reproduced by
+  `RollOverFromTheMenuTests.testAnUndoAfterADeployNeverDeletesTheKeptMarker`).
+  With both halves recorded, a deploy between the rollover and Undo Last
+  Change wrote a new marker in the place, Undo left that alone as edited, and
+  DELETED the kept copy because it still matched, so last year's site id and
+  admin address survived only in the backup zip (and the legacy marker in
+  `.merged_output` in no backup at all). Now an undo puts a marker back only
+  where its place is empty and never deletes a kept copy; after an undo with
+  no deploy between, the kept copy stays beside the restored marker, where
+  nothing reads it. The window keeps both halves. #899's journal reverses a
+  move as a PAIR, never the destination half alone.
+- **The website is settled before the preview is rebuilt.** The measured
+  reason is Quit-safety (the implementation review): every write of the
+  menu's rollover follows its last `await`, so a Quit lands before any write
+  or after all of them, where the window's path awaits the rebuild between
+  the re-date and the website. A side effect is that the preview the menu
+  builds no longer bakes last year's address from the marker
+  (`build_site.resolve_section_domain`). The first reason written here, that
+  the legacy marker is read "before a rebuild can touch it", was not measured
+  and is not true of an ordinary rebuild, which does not clear
+  `.merged_output/section<N>/`.
 - **The plan's card says what happens to the website and what is set aside**
   (amendment 14): for "same" the window's card is the plain re-date's.
 - **Its own sentences** where the window's speak in the first person
   (`rolloverCouldNotStartANewWebsiteFromTheMenu`, amendment 13) or call a
-  folder a website (`rolloverDeploysToAFolderFromTheMenu`, amendment 12).
+  folder a website (`rolloverDeploysToAFolderFromTheMenu`, amendment 12, also
+  for "same" on a course that deploys only to a folder when an old host's
+  marker made the question appear, the review's M2).
+- **The days are written as the re-date's plan writes them**,
+  "2026-09-08 (Tuesday)", so the dates line and the card after it read alike
+  (the review's M3).
 
 **A known limit.** A deploy scheduled from this folder is turned off by "new"
 (as in the window), and Undo Last Change does not set it again: the finished
@@ -7283,8 +7350,20 @@ operation #899's journal does not have yet (amendment 15), so it is listed for
 
 The trail line is `ran from a menu` with "Section ▸ Roll Over to a New Year…"
 and the website in its counts ("website: new", "website: kept", "website: not
-deployed yet", "website: deploys to a folder"); the tool's own `section kept
-its website` and `section started a new website` lines are written as before.
+deployed yet", "website: deploys to a folder", "website: kept, a new one would
+have the same address"), read from what the call sent, so an unanswered
+question can write no count `mustRecord` does not list (the review's M4). The
+tool's own `section kept its website` and `section started a new website`
+lines are the window's, except that from the menu a folder-only course writes
+"kept deploying the section to its folder", the address case says a new one
+would have had the same address, and a section not on a website "was not on a
+website at the moment" rather than "had not been deployed anywhere yet" (M1).
+
+**Left as it is, for Russell to rule** (drafted as follow-ups): a custom
+domain (`custom_domains.sections.section<N>` in `course_config.json`) survives
+"new", as it does from the window, so the new site names last year's address
+(I3); and `PublishedPagesRecord.release` skips a fragment it cannot move
+without a word (M6). Both are the window's behaviour too.
 
 REJECTED: deciding by markers alone (the plan's first version told every
 teacher who deploys to a folder that the section had never been deployed); a
