@@ -198,13 +198,26 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
             .ToList();
         var naming = new List<string>();
         var unread = new List<string>();
-        foreach (string file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+        // The browser lets go of its folder a moment after the probe exits; in
+        // a full suite on this PC that moment was measured longer than one
+        // second (its lock files still held), so files still held are asked
+        // again for up to a minute, and only then reported, by name.
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        var toRead = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).ToList();
+        while (true)
         {
-            byte[] bytes;
-            try { bytes = File.ReadAllBytes(file); }
-            catch (IOException) { unread.Add(file); continue; }
-            catch (UnauthorizedAccessException) { unread.Add(file); continue; }
-            if (needles.Any(needle => bytes.AsSpan().IndexOf(needle) >= 0)) naming.Add(file);
+            unread.Clear();
+            foreach (string file in toRead)
+            {
+                byte[] bytes;
+                try { bytes = File.ReadAllBytes(file); }
+                catch (IOException) { unread.Add(file); continue; }
+                catch (UnauthorizedAccessException) { unread.Add(file); continue; }
+                if (needles.Any(needle => bytes.AsSpan().IndexOf(needle) >= 0)) naming.Add(file);
+            }
+            if (unread.Count == 0 || DateTime.UtcNow > deadline) break;
+            toRead = unread.ToList();
+            Thread.Sleep(1000);
         }
         Assert.True(unread.Count == 0, "could not be read, so not shown clean: " + string.Join(", ", unread));
         Assert.True(naming.Count == 0, "names the plan: " + string.Join(", ", naming));
@@ -405,10 +418,12 @@ public sealed class PlanFixture : IDisposable
         // Junctions first, so deleting the tree never walks into what they point at.
         foreach (string link in new[] { Folder("unit-1", "shortcut"), Folder("unit-1", "shared") })
             try { Directory.Delete(link); } catch { }
-        for (int attempt = 0; attempt < 10; attempt++)
+        // The browser lets go of its user-data folder a while after the probe
+        // exits (more than a second under a full suite): up to a minute.
+        for (int attempt = 0; attempt < 60; attempt++)
         {
             try { Directory.Delete(Root, recursive: true); return; }
-            catch { Thread.Sleep(300); }   // the browser lets go of its user-data folder a moment after the probe exits
+            catch { Thread.Sleep(1000); }
         }
     }
 }
