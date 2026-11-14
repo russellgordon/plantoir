@@ -269,6 +269,19 @@
    "windows": null,
    "raw": false
   },
+  "add-next-class-3": {
+   "page": "add-next-class",
+   "shows": "The Add Class sheet with its three ways, the first chosen",
+   "labels": [
+    "The three ways",
+    "Add"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course with units and at least one class page in the section, so no way is greyed",
+   "windows": null,
+   "raw": false
+  },
   "publish-pages-1": {
    "page": "publish-pages",
    "shows": "The Publish Pages sheet with its list of hidden pages, two of them ticked",

@@ -40,7 +40,7 @@ When the section's preview is showing a page, Obsidian opens on that same page. 
 {{picture:write-in-obsidian-2}}
 alt: Obsidian with a class page open from the All Classes folder, and the page's settings at the top of the page.
 
-If the page for the next class does not exist yet, make it in Plantoir first. See [Add the next class](page:add-next-class). [Class pages: Unit 1, Day 1](page:class-pages) says how these pages are named and dated.
+If the page for the next class does not exist yet, make it in Plantoir first. See [Add a class](page:add-next-class). [Class pages: Unit 1, Day 1](page:class-pages) says how these pages are named and dated.
 
 ## Write the page
 

@@ -5,8 +5,8 @@
  "voice": "Documentation, not marketing: one task a page, steps in order, what you see after each, what to do when it goes wrong. Written by Fable from an Opus fact sheet; reviewed adversarially for accuracy, clarity, simple language and tone.",
  "anchorRule": "One anchor a page, written <a name=\"<anchor>\"></a> before the title; the file is <anchor>.html; a Help button opens a PAGE, never a place inside one (measured 2026-11-13: every anchor on a page resolves to its first).",
  "pageCount": 102,
- "sceneCount": 194,
- "pictureFilesMac": 388,
+ "sceneCount": 195,
+ "pictureFilesMac": 390,
  "readingTimeTotalMinutes": 272,
  "landingPage": {
   "indexed": false,
@@ -741,8 +741,8 @@
     },
     {
      "anchor": "add-next-class",
-     "title": "Add the next class",
-     "question": "How do I make the page for the next class, numbered and dated?",
+     "title": "Add a class",
+     "question": "How do I add the next class, start a new unit, or copy a class?",
      "about": "Section > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
      "steps": [
       "Select the section (it needs class dates on file: link class-dates)",
@@ -765,9 +765,17 @@
         "The new page"
        ],
        "scene": "add-next-class-2"
+      },
+      {
+       "shows": "The Add Class sheet with its three ways, the first chosen",
+       "labels": [
+        "The three ways",
+        "Add"
+       ],
+       "scene": "add-next-class-3"
       }
      ],
-     "scenes": 2,
+     "scenes": 3,
      "readMinutes": 2,
      "notes": "Needs class dates first (link to Give Plantoir your class dates); the fact sheet says what happens without them (class-planning contract).",
      "id": "add-next-class",
@@ -787,7 +795,8 @@
      "needsPictures": true,
      "sceneIds": [
       "add-next-class-1",
-      "add-next-class-2"
+      "add-next-class-2",
+      "add-next-class-3"
      ],
      "indexed": true
     },

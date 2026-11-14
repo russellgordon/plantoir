@@ -27,7 +27,7 @@ description: Ask Claude, Codex or GitHub Copilot to draft a unit test, its solut
 ---
 An assistant can draft a unit test for you: the test paper, its solutions and a marking guide. It builds them from only what your class was taught, following guidance that Plantoir gives it. The test is paper. Its files are kept in a folder outside the course, so that none of them reaches a class website.
 
-This page is about Claude Code, Codex and GitHub Copilot, which you install yourself. See [Revise a course with Claude or Codex](page:revise-with).
+This page is about Claude Code, Codex and GitHub Copilot, which you install yourself. See [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with).
 
 ## Ask for the test
 

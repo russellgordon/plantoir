@@ -67,7 +67,7 @@ Each row is one problem. The columns are:
 Click a column's heading to sort by it.
 
 {{assistant}}
-The ticks in {{control:problemsTabColumnInclude}} choose the rows that are handed to an assistant with the Fix with buttons under the table. There is one button for each of Claude Code, Codex and GitHub Copilot that is installed. See [Fix a problem with Claude or Codex](page:fix-with).
+The ticks in {{control:problemsTabColumnInclude}} choose the rows that are handed to an assistant with the Fix with buttons under the table. There is one button for each of Claude Code, Codex and GitHub Copilot that is installed. See [Fix a problem with Claude Code, Codex or GitHub Copilot](page:fix-with).
 {{/assistant}}
 
 ## Two kinds Plantoir can repair

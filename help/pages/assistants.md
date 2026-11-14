@@ -51,8 +51,8 @@ Plantoir looks for each program on this {{machine}} and finds it where its insta
 
 ## Where each appears
 
-- **In the Course menu and the Section menu**, under Revise With. The same items are in the menu that opens when you right-click a course's row or a section's row in the sidebar. See [Revise a course with Claude or Codex](page:revise-with).
-- **On a section's {{control:problemsTab}} tab**, as buttons under the table that hand the problems you ticked to an assistant. See [Fix a problem with Claude or Codex](page:fix-with).
+- **In the Course menu and the Section menu**, under Revise With. The same items are in the menu that opens when you right-click a course's row or a section's row in the sidebar. See [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with).
+- **On a section's {{control:problemsTab}} tab**, as buttons under the table that hand the problems you ticked to an assistant. See [Fix a problem with Claude Code, Codex or GitHub Copilot](page:fix-with).
 - **On a course's {{control:courseDetailPlanningTab}} tab**, as buttons that start the planning of a unit. The tab itself shows only while one of the three is installed. See [Plan a unit](page:plan-a-unit).
 
 {{picture:assistants-1}}
@@ -80,8 +80,8 @@ Plantoir also has an assistant of its own, which runs on this {{machine}}. Nothi
 
 ## Read next
 
-- [Revise a course with Claude or Codex](page:revise-with): open an assistant on a course, and what the course cannot do meanwhile.
-- [Fix a problem with Claude or Codex](page:fix-with)
+- [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with): open an assistant on a course, and what the course cannot do meanwhile.
+- [Fix a problem with Claude Code, Codex or GitHub Copilot](page:fix-with)
 - [Plan a unit](page:plan-a-unit)
 - [Use GitHub Copilot with Plantoir](page:copilot): what is particular to GitHub Copilot.
 - [Apply for GitHub's education benefits](page:github-education): what GitHub's own pages say about teachers.

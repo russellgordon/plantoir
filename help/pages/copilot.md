@@ -35,8 +35,8 @@ You install the tool and sign in to it yourself, with your own GitHub account. P
 
 Once GitHub's program is installed, GitHub Copilot is listed after Claude and Codex in three places.
 
-- **Revise With.** {{menu:courseReviseWithCopilot}} in the menu bar, and {{menu:sectionReviseWithCopilot}} for a section. See [Revise a course with Claude or Codex](page:revise-with).
-- **The {{control:problemsTab}} tab of a section.** {{control:fixWithGitHubCopilotButton}} is under the table. See [Fix a problem with Claude or Codex](page:fix-with).
+- **Revise With.** {{menu:courseReviseWithCopilot}} in the menu bar, and {{menu:sectionReviseWithCopilot}} for a section. See [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with).
+- **The {{control:problemsTab}} tab of a section.** {{control:fixWithGitHubCopilotButton}} is under the table. See [Fix a problem with Claude Code, Codex or GitHub Copilot](page:fix-with).
 - **The {{control:courseDetailPlanningTab}} tab of a course.** {{control:planAUnitWithGitHubCopilotButton}} is there until the course has a plan. See [Plan a unit](page:plan-a-unit).
 
 Plantoir writes the name in full, GitHub Copilot, so that it is not taken for another product with a similar name.
