@@ -367,8 +367,8 @@ nonisolated enum UnitWordRenamer {
     }
 
     @MainActor
-    static func interruptedRenameTarget(in course: Course) -> String? {
-        return interruptedRenameTarget(facts: facts(for: course))
+    static func interruptedRenameTarget(in course: Course, clearingAStaleRecord: Bool = true) -> String? {
+        return interruptedRenameTarget(facts: facts(for: course), clearingAStaleRecord: clearingAStaleRecord)
     }
 
     // MARK: - The record of a rename under way
@@ -408,7 +408,16 @@ nonisolated enum UnitWordRenamer {
     /// — or one a restored backup has undone — and "some class pages have the
     /// new word" would be false. Either is cleared rather than believed, so
     /// it cannot live forever and cannot prefill a word from another day.
-    static func interruptedRenameTarget(facts: UnitWordRenameCourseFacts) -> String? {
+    ///
+    /// `clearingAStaleRecord: false` judges without clearing (#897a): Add
+    /// Class… asks from any window, and a rename running in ANOTHER window has
+    /// written its record but not yet moved its first page — a gap one
+    /// frontmatter write long, in which the record reads as stale. Clearing
+    /// there would leave that rename running without its record. The rename
+    /// sheet, which owns the record, keeps clearing as it always has.
+    static func interruptedRenameTarget(
+        facts: UnitWordRenameCourseFacts, clearingAStaleRecord: Bool = true
+    ) -> String? {
         let marker: URL = renameMarkerURL(courseDirectory: facts.directoryURL)
         guard let data = try? Data(contentsOf: marker),
               let note = try? JSONSerialization.jsonObject(with: data) as? [String: String],
@@ -417,7 +426,9 @@ nonisolated enum UnitWordRenamer {
             return nil
         }
         if from != facts.currentWord || to.isEmpty || to == from {
-            clearRenameRecord(courseDirectory: facts.directoryURL)
+            if clearingAStaleRecord {
+                clearRenameRecord(courseDirectory: facts.directoryURL)
+            }
             return nil
         }
         var somethingMoved: Bool = false
@@ -435,7 +446,9 @@ nonisolated enum UnitWordRenamer {
             }
         }
         if !somethingMoved {
-            clearRenameRecord(courseDirectory: facts.directoryURL)
+            if clearingAStaleRecord {
+                clearRenameRecord(courseDirectory: facts.directoryURL)
+            }
             return nil
         }
         return to

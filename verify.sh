@@ -146,7 +146,8 @@ fi
 # (Measured under /bin/bash 3.2: the EXIT trap alone already runs on INT,
 # TERM and HUP — scripts/test_verify_lock.py passes with the three signal
 # traps removed and fails with the EXIT trap removed. The three are kept so
-# the exit status says which signal ended the run.)
+# the exit status says which signal ended the run, and since #906 so the
+# check running at that moment is ended too: stop_for_signal, below.)
 VERIFY_LOCK="${PLANTOIR_VERIFY_LOCK:-/tmp/plantoir-verify-$(id -u).lock}"
 
 release_verify_lock() {
@@ -158,6 +159,38 @@ release_verify_lock() {
     rm -f "$VERIFY_LOCK/holder"
     rmdir "$VERIFY_LOCK" 2>/dev/null || true
   fi
+}
+
+# The check running now (#906), started by run_check, so a signal to this
+# run reaches it. Without this a signal waited: bash runs a trap only after
+# its foreground child ends, so a TERM to verify.sh alone left the check
+# running to its own end (measured: a 6 s child, the trap 6 s later). Now the
+# check runs in the background and the run waits on it, which a signal
+# interrupts at once; the trap passes the signal on to that one pid and to
+# nothing else, waits for it to end (each browser check then ends its own
+# Chrome, browser-checks/lib/own_processes.mjs), and exits. An INT is passed
+# on as TERM, because a command bash starts in the background with no job
+# control ignores INT. The pid is cleared when the check ends, so the trap
+# never signals a number another process may have taken.
+RUNNING_CHECK_PID=""
+
+run_check() {
+  "$@" &
+  RUNNING_CHECK_PID=$!
+  local status=0
+  wait "$RUNNING_CHECK_PID" || status=$?
+  RUNNING_CHECK_PID=""
+  return "$status"
+}
+
+stop_for_signal() {
+  local passed_on="$1" status="$2"
+  if [[ -n "$RUNNING_CHECK_PID" ]]; then
+    kill -s "$passed_on" "$RUNNING_CHECK_PID" 2>/dev/null || true
+    wait "$RUNNING_CHECK_PID" 2>/dev/null || true
+    RUNNING_CHECK_PID=""
+  fi
+  exit "$status"
 }
 
 take_verify_lock() {
@@ -209,9 +242,9 @@ take_verify_lock() {
     fi
   fi
   trap release_verify_lock EXIT
-  trap 'exit 129' HUP
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
+  trap 'stop_for_signal HUP 129' HUP
+  trap 'stop_for_signal TERM 130' INT
+  trap 'stop_for_signal TERM 143' TERM
   printf '%s %s (started %s)\n' "$$" "$(pwd -P)" "$(date '+%Y-%m-%d %H:%M:%S')" > "$VERIFY_LOCK/holder"
 }
 # <<< VERIFY LOCK <<<
@@ -664,6 +697,38 @@ else
   cat /tmp/verify_swift_launcher_marker_test.log
 fi
 
+# Runnable Swift on Windows (#570), run here as well as in Windows'
+# PythonToolchainTests (#802): the fetch, the compile wrapper's Windows
+# environment and its tidy, against fake installs that run nothing. The parts
+# that need Windows' own expand.exe or msvcrt are skipped here and say so.
+if (cd scripts && python3 test_swift_windows.py) >/tmp/verify_swift_windows_test.log 2>&1; then
+  pass "runnable Swift on Windows: the fetch's pins and trim, the compile wrapper's environment (the toolchain's bin and System32 and nothing else), its tidy and what it caches, read on this Mac against fake installs (scripts/test_swift_windows.py, #570, #802)"
+else
+  fail "runnable Swift on Windows: the fetch, the compile wrapper's environment, its tidy or what it caches does not hold (scripts/test_swift_windows.py, #570, #802)"
+  cat /tmp/verify_swift_windows_test.log
+fi
+
+# The seven shared tests this run takes into the image because they need
+# python-frontmatter say so when run directly on a Mac without it (#907): one
+# line and exit 77, while in the image and on Windows a missing module stays a
+# failure. Read here, on the host, with the modules kept from the child.
+if (cd scripts && python3 test_image_only_tests_say_so.py) >/tmp/verify_image_only_tests_say_so.log 2>&1; then
+  pass "the shared tests that need python-frontmatter open with one block: on a Mac without it, one line naming the module and verify.sh, exit 77; anywhere else a missing module stays a failure (scripts/test_image_only_tests_say_so.py, #907)"
+else
+  fail "a shared test that needs python-frontmatter does not say so on a Mac, or turns a missing module into something other than a failure elsewhere (scripts/test_image_only_tests_say_so.py, #907)"
+  cat /tmp/verify_image_only_tests_say_so.log
+fi
+
+# No launcher a test runs writes the teacher's real trail (#738): every test
+# file that runs one imports launcher_test_trail, and deploy.sh's own
+# note_on_the_trail, run under a scratch HOME, writes into the helper's folder.
+if (cd scripts && python3 test_launcher_tests_keep_their_trail.py) >/tmp/verify_launcher_tests_trail.log 2>&1; then
+  pass "every test that runs a launcher keeps its trail in a temporary folder: each imports launcher_test_trail, and deploy.sh's own note_on_the_trail writes there and not into HOME, which it does with the redirect taken away (scripts/test_launcher_tests_keep_their_trail.py, #738)"
+else
+  fail "a test that runs a launcher could write the teacher's real trail (scripts/test_launcher_tests_keep_their_trail.py, #738)"
+  cat /tmp/verify_launcher_tests_trail.log
+fi
+
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
@@ -816,6 +881,16 @@ else
   fail "GeoGebra sketches: the fences, settings, commands, files, keys, gate or folder problem (scripts/test_geogebra.py, #578)"
   cat /tmp/verify_geogebra_test.log
 fi
+# PhET simulations (#674), and the folder every file a page downloads is kept
+# in (keptDownloads): every phetFences and keptDownloads case, against a PhET
+# of the test's own (never phet.colorado.edu), the stop and where it stands
+# in the build, and the folder problem. Stdlib only.
+if (cd scripts && python3 test_phet.py) >/tmp/verify_phet_test.log 2>&1; then
+  pass "PhET simulations and kept downloads: the fences, settings, names, languages, the address that always starts yotta=false&allowLinks=false, the kept folder and its checks, prune, marker and stop lines, the build stopping before Quartz when a simulation cannot be downloaded, the site's files and the folder problem - $(grep '^Ran ' /tmp/verify_phet_test.log) (scripts/test_phet.py, #674)"
+else
+  fail "PhET simulations or kept downloads (scripts/test_phet.py, #674)"
+  cat /tmp/verify_phet_test.log
+fi
 
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
@@ -920,6 +995,18 @@ if (cd scripts && python3 test_deploy_token_refusal.py) >/tmp/verify_deploy_toke
 else
   fail "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
   cat /tmp/verify_deploy_token_refusal_test.log
+fi
+
+# The teacher's deploy tokens from Settings (GitHub #696): deploy.sh's --token
+# mode, the paste rule, the end date, and the check against the folder's class
+# websites before a token is saved, at Settings and at a deploy's own paste,
+# all run from contracts/shared-rules.json -> deployTokens with the Keychain
+# and curl stubbed.
+if (cd scripts && python3 test_deploy_tokens.py) >/tmp/verify_deploy_tokens_test.log 2>&1; then
+  pass "deploy.sh: a deploy token is checked before it is saved, from Settings and at a deploy's paste (scripts/test_deploy_tokens.py, #696)"
+else
+  fail "deploy.sh: a deploy token is checked before it is saved, from Settings and at a deploy's paste (scripts/test_deploy_tokens.py, #696)"
+  cat /tmp/verify_deploy_tokens_test.log
 fi
 
 # Two deploys, two writers, two previews at once (GitHub #835): each deploy's
@@ -1490,6 +1577,7 @@ echo ""
 echo "🔎 Checking the coverage map Plantoir shows for a section…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_coverage_tab.py" /opt/scripts/test_coverage_tab.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/launcher_test_trail.py" /opt/scripts/launcher_test_trail.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_deploy_non_interactive.py" /opt/scripts/test_deploy_non_interactive.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/preview.sh" /opt/preview.sh),readonly" \
@@ -1509,6 +1597,7 @@ echo ""
 echo "🔎 Checking the record of pages that have been published…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_published_pages_record.py" /opt/scripts/test_published_pages_record.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/launcher_test_trail.py" /opt/scripts/launcher_test_trail.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/test_published_pages_record.py >/tmp/verify_published_pages_record_test.log 2>&1; then
   pass "build_site.py, deploy.py, deploy.sh: the pages a publish put on a site are recorded, and only then (scripts/test_published_pages_record.py, #379)"
@@ -1661,6 +1750,31 @@ if docker run --rm \
 else
   fail "a geogebraFences key or fence case reads differently through the site's own Markdown reader (scripts/check_geogebra_rules_against_the_site.py, #578)"
   cat /tmp/verify_geogebra_rules_site.log
+fi
+# #674: the key every PhET simulation's card is found by, through the SITE's
+# own Markdown reader in Node, as GeoGebra's above.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_phet_rules_against_the_site.py" /opt/scripts/check_phet_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_phet_rules_against_the_site.py \
+  >/tmp/verify_phet_rules_site.log 2>&1; then
+  pass "every phetFences key and fence case holds through the site's own Markdown reader: the site and the build find each simulation by the same key (scripts/check_phet_rules_against_the_site.py, #674)"
+else
+  fail "a phetFences key or fence case reads differently through the site's own Markdown reader (scripts/check_phet_rules_against_the_site.py, #674)"
+  cat /tmp/verify_phet_rules_site.log
+fi
+
+# #692: every videoEmbeds case through the SITE's own pipeline in Node: the
+# Markdown reader, PlantoirVideo, then Quartz's own OFM html plugins (its
+# YouTube step included), bundled from their sources with the image's
+# esbuild; and the titles, attributes and note as videoRules.js has them.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_video_rules_against_the_site.py" /opt/scripts/check_video_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_video_rules_against_the_site.py \
+  >/tmp/verify_video_rules_site.log 2>&1; then
+  pass "every videoEmbeds case holds through the site's own Markdown reader, the videos' transformer and Quartz's own YouTube step - $(tail -1 /tmp/verify_video_rules_site.log | sed 's/^PASS: //') (scripts/check_video_rules_against_the_site.py, #692)"
+else
+  fail "a videoEmbeds case reads differently through the site's own pipeline (scripts/check_video_rules_against_the_site.py, #692)"
+  cat /tmp/verify_video_rules_site.log
 fi
 
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
@@ -2053,6 +2167,9 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 # helper, its lockfile and the site's transformer, script and styles.
 check_baked scripts/figures.py            /opt/scripts/figures.py
 check_baked scripts/geogebra.py           /opt/scripts/geogebra.py
+# PhET simulations (#674): the pass, and the folder every download is kept in.
+check_baked scripts/phet.py               /opt/scripts/phet.py
+check_baked scripts/kept_downloads.py     /opt/scripts/kept_downloads.py
 # Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
 # recipe, which the build hashes for its toolchain id, and the page's thread.
 check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
@@ -2731,7 +2848,7 @@ else:
     "$SWIFT_GATE_TAG" python3 /opt/plantoir-swift/compile.py "$SWIFT_GATE_DIR/jobs" "$SWIFT_GATE_DIR/out" \
     >/tmp/verify_swift_compile.log 2>&1
   SWIFT_COMPILE_SECONDS=$(( $(date +%s) - SWIFT_COMPILE_STARTED ))
-  if node browser-checks/wasi_run.mjs swift-gate "$SWIFT_GATE_DIR/out" >/tmp/verify_swift_gate.log 2>&1; then
+  if run_check node browser-checks/wasi_run.mjs swift-gate "$SWIFT_GATE_DIR/out" >/tmp/verify_swift_gate.log 2>&1; then
     pass "the Swift gate: all $(ls swift-gate/*.swift | wc -l | tr -d ' ') fragments compiled in ${SWIFT_COMPILE_SECONDS} s with the library swift-gate/expected.json names, ran through the site's WASI shim as expected, traps kept their Fatal error line, input echoed after its prompt, and the G5 must-fail failed (browser-checks/wasi_run.mjs, #493)"
   else
     fail "the Swift gate: a fragment did not compile, chose the wrong library, printed the wrong thing or lost its Fatal error line (browser-checks/wasi_run.mjs, #493)"
@@ -2847,7 +2964,18 @@ restore_hit_fixture() {
   fi
   rm -f "$HIT_CONFIG_BACKUP" "$HIT_CONFIG_BACKUP_BACKUP"
 }
-trap 'restore_hit_fixture; release_verify_lock' EXIT
+# The page server the browser checks below share (#906): ended by the EXIT
+# trap as well as after the last check that uses it, so a run stopped part way
+# leaves no python3 -m http.server behind. The pid is cleared once it has been
+# ended, so the trap never signals a number another process may have taken.
+PRINT_SERVER_PID=""
+end_print_server() {
+  if [[ -n "$PRINT_SERVER_PID" ]]; then
+    kill "$PRINT_SERVER_PID" 2>/dev/null || true
+    PRINT_SERVER_PID=""
+  fi
+}
+trap 'end_print_server; restore_hit_fixture; release_verify_lock' EXIT
 printf 'I teach by plantoir-hit-sentinel-course-7f3a.\n' > "$HIT_COURSE/How I Teach.md"
 printf 'I teach by plantoir-hit-sentinel-section-7f3a.\n' > "$HIT_COURSE/section1/HOW I TEACH.md"
 printf 'A look-alike page: plantoir-hit-sentinel-lookalike-7f3a.\n' > "$HIT_COURSE/How I Teach 1.md"
@@ -4084,6 +4212,33 @@ def blocks(flag):
     "---\ntitle: Wrap Plain Twin\n---\nThe same blocks without the word (plantoir-text-wrap-twin-653).\n\n" + blocks(""),
     encoding="utf-8")
 WRAPPLANTS
+# ---- #674: the PhET simulation the skill's example and the rendered check name ----
+# The repository carries no PhET file (PhET's licence; Russell's ruling of
+# 2026-11-13), so the copy comes from the dev cache (fetched once, pinned by
+# SHA-256: browser-checks/lib/plant_phet.py) and is planted where the build
+# keeps what its pages download (keptDownloads.where): the builds below ask
+# PhET nothing. No copy and no network to fetch one: the skill's PhET example
+# is left out and 6n's claim for it, and the rendered check's phet row, are
+# SKIPS by name; PLANTOIR_REQUIRE_ENGINES makes it a failure.
+PHET_COPY_MISSING=""
+if ! python3 browser-checks/lib/plant_phet.py check >/dev/null 2>&1; then
+  python3 browser-checks/lib/plant_phet.py fetch >/tmp/verify_phet_fetch.log 2>&1 || true
+fi
+if ! python3 browser-checks/lib/plant_phet.py check >/dev/null 2>&1; then
+  PHET_COPY_MISSING="$(tail -1 /tmp/verify_phet_fetch.log 2>/dev/null || echo 'no copy in the dev cache')"
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "PhET's simulation for the skill's example and the rendered check (#674): no copy on this Mac and none could be fetched ($PHET_COPY_MISSING), and PLANTOIR_REQUIRE_ENGINES asks for every row"
+  else
+    skip "PhET's simulation for the skill's example and the rendered check (#674): no copy on this Mac and none could be fetched ($PHET_COPY_MISSING); run python3 browser-checks/lib/plant_phet.py fetch"
+  fi
+elif python3 browser-checks/lib/plant_phet.py plant "${HOME%/}/Library/Application Support/Plantoir/builds/$(/bin/pwd -P | shasum -a 256 | cut -c1-8)" >/tmp/verify_phet_plant.log 2>&1; then
+  pass "PhET's simulation planted where the build keeps its downloads, from the dev cache, its SHA-256 the pinned one: the builds below ask PhET nothing (browser-checks/lib/plant_phet.py, #674)"
+else
+  PHET_COPY_MISSING="it could not be planted"
+  fail "PhET's simulation could not be planted where the build keeps its downloads (#674)"
+  cat /tmp/verify_phet_plant.log
+fi
+export PHET_COPY_MISSING
 # ---- #596: every example in the page-authoring skill, planted for the same build ----
 # The skill's examples are read from the skill ITSELF, so an example edited
 # there is the example built here: every ```markdown / ````markdown fence and
@@ -4096,7 +4251,7 @@ WRAPPLANTS
 # listed in /tmp/verify_authoring_planted.txt, which restore_hit_fixture reads.
 # 6n reads each back.
 python3 - "$HIT_COURSE" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md /tmp/verify_authoring_planted.txt <<'AUTHORPLANTS'
-import re, struct, sys, zlib
+import os, re, struct, sys, zlib
 from pathlib import Path
 course, skill_path, record = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
 lines = skill_path.read_text(encoding="utf-8").split("\n")
@@ -4125,6 +4280,10 @@ def plant(relative, data):
     planted.append(relative)
 for number, text in enumerate(examples, start=1):
     name = f"Authoring Example {number:02d}"
+    if os.environ.get("PHET_COPY_MISSING") and "```phet" in text:
+        # No copy of the simulation on this Mac (#674): a build of this
+        # example would have to download it, and stops without the internet.
+        continue
     if text.startswith("---\n"):
         page = re.sub(r"^title: (.*)$", lambda m: f"title: {name} - {m.group(1)}", text, count=1, flags=re.M)
         if page == text:
@@ -5619,7 +5778,7 @@ fi
 # not, a spaced `$ x $` is typeset, a [words](Page Name.md) link is not a
 # link, and an unknown callout kind is still a callout with its own title.
 if python3 - "$SITE_PUBLIC" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md <<'AUTHORPY'
-import re, sys
+import os, re, sys
 from pathlib import Path
 public, skill_path = Path(sys.argv[1]), Path(sys.argv[2])
 lines = skill_path.read_text(encoding="utf-8").split("\n")
@@ -5648,6 +5807,15 @@ def tasks(html):
     return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
 def has_file(href):
     return (public / href.lstrip("./")).is_file()
+def phet_credit_reads(html_text):
+    """Every PhET credit line on the page reads PhET's sentence, as the
+    contract has it (phetFences.attribution.sentence), its links' words
+    included; at least one is there (#674)."""
+    import html as html_module, json
+    sentence = json.loads(Path("contracts/shared-rules.json").read_text(encoding="utf-8"))["phetFences"]["attribution"]["sentence"]
+    lines = re.findall(r'<p class="pl-phet-attribution">(.*?)</p>', html_text or "", re.S)
+    read = [" ".join(html_module.unescape(re.sub(r"<[^>]+>", "", line)).split()) for line in lines]
+    return len(read) > 0 and all(one == sentence for one in read)
 def geogebra_specs(html_text):
     import html as html_module, json
     return [json.loads(html_module.unescape(spec)) for spec in
@@ -5708,9 +5876,17 @@ claims = [
      lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
      and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
      and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
-    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo and PhET players, and no GeoGebra iframe (#578)",
-     lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
-     and 'geogebra.org' not in a and '<iframe src="https://phet.colorado.edu/' in a),
+    ("https://www.youtube.com/watch?v=WUvTyaaNkzM&t=30", "YouTube and Vimeo players from the picture form, privately addressed and titled, a pasted Vimeo player left as written, and no GeoGebra or PhET iframe (#578, #674, #692)",
+     lambda a, p: 'src="https://www.youtube-nocookie.com/embed/WUvTyaaNkzM?start=30" title="Slope in two minutes" loading="lazy"' in a
+     and 'src="https://player.vimeo.com/video/76979871?dnt=1" title="Mitosis in three minutes" loading="lazy"' in a
+     and 'src="https://player.vimeo.com/video/123456789?h=abcdef1234&amp;dnt=1" title="Vimeo video"' in a
+     and a.count('class="external-embed plantoir-video ') == 3 and 'www.youtube.com/embed/' not in a
+     and '<iframe src="https://player.vimeo.com/video/22439234" width="640" height="360"' in a
+     and 'geogebra.org' not in a and 'phet.colorado.edu/sims' not in a),
+    ("sim: gas-properties", "a PhET simulation from the site's own copy, with PhET's credit line (#674)",
+     lambda a, p: 'class="pl-figure pl-phet"' in a and "static/phet/gas-properties/" in a
+     and phet_credit_reads(a)
+     and has_file("static/phet/gas-properties/index.html") and has_file("static/phet/gas-properties/ABOUT.txt")),
     ("file: Slope Angle Conjecture.ggb", "two GeoGebra sketches: a file found in Media and one from commands (#578)",
      lambda a, p: [spec.get("sketch") for spec in geogebra_specs(a)] == ["Media/Slope-Angle-Conjecture.ggb", None]
      and [line["text"] for line in geogebra_specs(a)[1].get("commands", [])] == ["f(x) = 2x + 1", "A = Point(f)"]
@@ -5737,6 +5913,10 @@ for number, text in enumerate(examples, start=1):
     if marker in used:
         problems.append(f"two examples match the claim {marker!r}")
     used.add(marker)
+    if os.environ.get("PHET_COPY_MISSING") and "```phet" in text:
+        # Left out of the build: no copy of the simulation on this Mac (#674).
+        print(f"   example {number} ({what}) not built: no copy of PhET's simulation on this Mac")
+        continue
     body = article(slug)
     full = (public / f"{slug}.html").read_text(encoding="utf-8", errors="replace") if body is not None else ""
     if body is None and marker != "title: Unit 3 Test Review":
@@ -6005,6 +6185,36 @@ fi
 # It needs a browser on this Mac, so it runs when one is found (PLANTOIR_CHROME,
 # or the copy documentation/06 F7 installs) and says SKIPPED otherwise.
 PRINT_CHROME="${PLANTOIR_CHROME:-}"
+# #906: every browser check below starts its Chrome through
+# browser-checks/lib/own_processes.mjs, which ends it on any exit a check can
+# answer (SIGINT, SIGTERM and SIGHUP included). SIGKILL cannot be answered, so
+# a browser left by an earlier check of this checkout killed that way is NAMED
+# here, with the command that ends it; this run did not start it, so it is
+# ended only when PLANTOIR_END_LEFTOVER_BROWSERS=1 asks for that.
+if command -v node >/dev/null 2>&1; then
+  if [[ "${PLANTOIR_END_LEFTOVER_BROWSERS:-0}" == "1" ]]; then
+    LEFTOVER_BROWSERS="$(node browser-checks/lib/own_processes.mjs leftovers --end 2>&1 || true)"
+  else
+    LEFTOVER_BROWSERS="$(node browser-checks/lib/own_processes.mjs leftovers 2>&1 || true)"
+  fi
+  case "$LEFTOVER_BROWSERS" in
+    NONE:*) ;;
+    *) echo "⚠️  $LEFTOVER_BROWSERS" ;;
+  esac
+  if run_check node browser-checks/lib/test_own_processes.mjs >/tmp/verify_own_processes.log 2>&1; then
+    pass "a browser check ended from outside ends what it started and nothing else: its child gone after SIGTERM, SIGINT, SIGHUP, process.exit and an uncaught error, a bystander left running, a plain spawn's child outliving it (the must-fail), a SIGKILLed check's child named as this checkout's leftover - $(grep -c '^ok' /tmp/verify_own_processes.log) cases (browser-checks/lib/test_own_processes.mjs, #906)"
+    # The self-test's real-Chrome case is a SKIP of its own, so the last
+    # lines count it with every other SKIP rather than inside a PASS.
+    if grep -q '^SKIP' /tmp/verify_own_processes.log; then
+      skip "a check's real Chrome is ended with it: no Chrome for Testing on this Mac (browser-checks/lib/test_own_processes.mjs, #906)"
+    fi
+  else
+    fail "a browser check ended from outside leaves what it started running, or ends what it did not start (browser-checks/lib/test_own_processes.mjs, #906)"
+    cat /tmp/verify_own_processes.log
+  fi
+else
+  skip "a browser check ended from outside ends what it started and nothing else: no node on this Mac (browser-checks/lib/test_own_processes.mjs, #906)"
+fi
 if [[ -z "$PRINT_CHROME" ]]; then
   for candidate in "$HOME"/Library/Caches/Plantoir-dev/browsers/chrome/*/chrome-mac-*/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"; do
     [[ -x "$candidate" ]] && PRINT_CHROME="$candidate"
@@ -6017,7 +6227,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   PRINT_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
   ( cd "$SITE_PUBLIC" && exec python3 -m http.server "$PRINT_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
   PRINT_SERVER_PID=$!
-  if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
+  if run_check node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
        "http://127.0.0.1:$PRINT_PORT/Printable-Not-Opted.html" \
        "http://127.0.0.1:$PRINT_PORT/Printable-Too-Tall.html" >/tmp/verify_print_handout.log 2>&1; then
     pass "printable pages: each way of printing on portrait and landscape paper, printed to PDF and read back - the print layout ran and laid out every piece, nothing cut off; every question, answer, table row and the words around every picture, drawing, diagram and formula on paper; 110 lines of code each with its own number in a hairline box; page labels on every page where a printer reaches; Latin Modern; no boxes but the worked example's (#499); the diagram DRAWN (#454); no Curriculum connection in any handout or under ⌘P (#498); the menu prints nothing until a choice and remembers the paper; ⌘P leaves orientation to the browser's dialog (browser-checks/print_handout.mjs)"
@@ -6026,7 +6236,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_print_handout.log
   fi
   # #501: ⌘P on a long page that is NOT printable, read back by its ink.
-  if node browser-checks/print_plain_page.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Plain-Long-Page.html" \
+  if run_check node browser-checks/print_plain_page.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Plain-Long-Page.html" \
        >/tmp/verify_print_plain_page.log 2>&1; then
     pass "⌘P on a page that is not printable: a 40-paragraph page loaded in a laptop-sized window, printed on portrait and landscape letter paper - no sidebar's words on paper, every paragraph whole in the text, ink under every paragraph's first word, nothing past the paper's edge (#501, browser-checks/print_plain_page.mjs)"
   else
@@ -6036,7 +6246,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # #502: graphs drawn on a page whose own ids answered the names
   # function-plot reads, and on the next page the site's own page change
   # reaches from it.
-  if node browser-checks/graphs_draw.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Figures-Math-Heading.html" \
+  if run_check node browser-checks/graphs_draw.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Figures-Math-Heading.html" \
        "http://127.0.0.1:$PRINT_PORT/Figures-Fixture.html" \
        "http://127.0.0.1:$PRINT_PORT/Figures-Exports-Heading.html" >/tmp/verify_graphs_draw.log 2>&1; then
     pass "graphs on a page with a heading named Math, then on the Figures Fixture reached by the site's own page change from it, then on a page with a heading named Exports: every curve drawn, and the page's ids given back (#502, figureFences.pageIds, browser-checks/graphs_draw.mjs)"
@@ -6054,7 +6264,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   rm -f "$MERMAID_SITE/_headers"
   (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$MERMAID_SITE") >/tmp/verify_mermaid_draws.log 2>&1 || true
   MERMAID_STATUS=0
-  node browser-checks/mermaid_draws.mjs "$PRINT_CHROME" "$MERMAID_SITE" /Printable-Fixture.html >>/tmp/verify_mermaid_draws.log 2>&1 || MERMAID_STATUS=$?
+  run_check node browser-checks/mermaid_draws.mjs "$PRINT_CHROME" "$MERMAID_SITE" /Printable-Fixture.html >>/tmp/verify_mermaid_draws.log 2>&1 || MERMAID_STATUS=$?
   if [[ "$MERMAID_STATUS" == "0" ]]; then
     pass "Mermaid diagrams drawn under the policy a Netlify publish sends to keep its ad badge off, read from the _headers the publish writes: the engine imported from cdnjs, no request refused by the policy - $(grep '^OK: ' /tmp/verify_mermaid_draws.log | head -1 | sed 's/^OK: //') (#594, browser-checks/mermaid_draws.mjs)"
   elif [[ "$MERMAID_STATUS" == "3" ]]; then
@@ -6071,7 +6281,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   cp -Rc "$SITE_PUBLIC/." "$GEOGEBRA_SITE/" 2>/dev/null || cp -R "$SITE_PUBLIC/." "$GEOGEBRA_SITE/"
   rm -f "$GEOGEBRA_SITE/_headers"
   (cd scripts && python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$GEOGEBRA_SITE") >/tmp/verify_geogebra_applet.log 2>&1 || true
-  if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
+  if run_check node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
        /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
        /Investigations/Quiz-GeoGebra.html >>/tmp/verify_geogebra_applet.log 2>&1; then
     pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, the first sketch pressed for real and, while its engine was held, the contract's two lines inside its card in a polite live region, readable in light and dark, the page not moved by 1 px until it drew, and a sketch whose file was refused back to its button with couldNotLoad below (#756), a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, then no shade of GeoGebra's left on the page, the sketch's own canvas at its centre and its slider moved by a real drag - and the must-fail, a dialog removed the way the loader did before #755, leaving the same drag unmoved (#755), GeoGebra's reset icon pressed for real on the commands sketch and the file sketch, each back as it opened and taking a drag again, and real Shift+Tab and Space while a 150-line sketch's lines ran leaving every point (#792), the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, #755, #792, #756, browser-checks/geogebra_applet.mjs)"
@@ -6081,7 +6291,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   fi
   rm -rf "$GEOGEBRA_SITE"
   # #515: the sidebar's page dot, on the rows the browser draws.
-  if node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
+  if run_check node browser-checks/sidebar_page_marker.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Discussions/Marker-Fixture-Long.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/index.html" "Discussions" "Tasks" \
        "Marker Fixture Page With A Title Long Enough To Wrap Onto A Second Line" >/tmp/verify_sidebar_page_marker.log 2>&1; then
     pass "the sidebar's page dot: every page row in an open folder and a folder inside it has its dot, no folder row and no page at the top level does, a wrapped title's second line starts under its first letter, every dot is level with its title's first line (a too-wide first word included), the current page and a hovered link keep Quartz's colours, in light and dark, on a folder page, and every dot at least 3:1 under forced colours - $(head -1 /tmp/verify_sidebar_page_marker.log | sed 's/^OK: //') against the sidebar; and as the sidebar drew, neither the page nor a closed folder's list scrolled by itself (#515, #611, browser-checks/sidebar_page_marker.mjs)"
@@ -6090,7 +6300,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     cat /tmp/verify_sidebar_page_marker.log
   fi
   # #653: a ```text wrap block as a reader sees it.
-  if node browser-checks/text_wrap.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Wrap-Fixture.html" \
+  if run_check node browser-checks/text_wrap.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Wrap-Fixture.html" \
        >/tmp/verify_text_wrap.log 2>&1; then
     pass "text that wraps, in a browser: Wrap Fixture's text wrap block does not scroll while its text and python wrap blocks do, every line's rows hold its text, every row starts at one x, the URL line's first row is full, each line's number sits on its first row and its ellipses run its full height on one hairline, highlighted lines keep their tint, the folded callout's, the list item's and the quiz explanation's blocks wrap too, in light, dark and at 390 px; on paper and in the handout it is laid out as a plain block; its copy button, pressed by a real pointer at 1512 and 390 px, is what the pointer hits, its write succeeds and the headless browser's own clipboard reads back the block as written, the plain block's button the same, and the must-fail, the button stacked as before #759, is missed - $(head -1 /tmp/verify_text_wrap.log | sed 's/^OK: //') (#653, #759, browser-checks/text_wrap.mjs)"
   else
@@ -6099,7 +6309,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   fi
   # #494: maths offline from the site's own KaTeX, and (#455 review S1)
   # print after a change of page keeps the stylesheets.
-  if node browser-checks/maths_offline.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
+  if run_check node browser-checks/maths_offline.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
        "http://127.0.0.1:$PRINT_PORT/Runner-Playground.html" \
        "http://127.0.0.1:$PRINT_PORT/Discussions/Runner-Printable.html" >/tmp/verify_maths_offline.log 2>&1; then
     pass "maths with every other website refused: set in KaTeX's own faces from the site, nothing asked of a CDN; and a page printed after the site's own page change from a page one folder up keeps KaTeX's and the site's stylesheets (#494, #455 review S1, browser-checks/maths_offline.mjs)"
@@ -6107,17 +6317,17 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "maths did not render from the site's own KaTeX offline, or print after a page change lost its stylesheets (browser-checks/maths_offline.mjs, #494)"
     cat /tmp/verify_maths_offline.log
   fi
-  kill "$PRINT_SERVER_PID" 2>/dev/null || true
+  end_print_server
   # #455: runnable code as a student runs it, against a server the check
   # starts itself so it can also play the hosts that break it.
-  if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
+  if run_check node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \
        >/tmp/verify_code_runner.log 2>&1; then
     pass "runnable code in a browser: nothing of the engine fetched on load; Run prints, a traceback names the editor's line, input() echoes and ends in EOFError, Stop ends a loop and Run works again, one program at a time, each Run from a reset interpreter, too much output stopped and one huge print cut at the cap; a queued autorun started by hand runs once; edits kept, printed and Reset, a teacher's change sets them aside once; five page changes leave one thread; live input on an isolated page (#583: the field focused at Run, the prompt before it, the transcript byte for byte the box's, Ctrl-D and the end button, a two-line paste, IME and Escape, Stop and another block while it waits, echoes counted, an autorun that asks takes no focus and holds the queue, whole loads across the isolation line both ways, the handout's KaTeX), and the box's line where the page is not isolated; the editor's colours and line numbers (#585: Shiki's own lines untouched, the tokenizer's typed, the copy in step through undo, an input method, a saved edit, Reset and scrolling, 0 pixels off the typed letters, the frame's focus ring, one gutter style, no ligatures, an edited block printed coloured and numbered); a missing worker, a wrong .wasm type and a CSP without wasm each end in the contract's words - $(head -1 /tmp/verify_code_runner.log | sed 's/^OK: //') (#455, browser-checks/code_runner.mjs)"
   else
     fail "runnable code did not run in a browser as the contract says (browser-checks/code_runner.mjs, #455)"
     cat /tmp/verify_code_runner.log
   fi
-  if node browser-checks/swift_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Swift-Playground.html \
+  if run_check node browser-checks/swift_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Swift-Playground.html \
        >/tmp/verify_swift_runner.log 2>&1; then
     pass "runnable Swift in a browser: nothing fetched on load; read-only with its note; Run with input echoes it after each prompt, changed input changes the output, Stop ends a loop and Run works again, an index out of range shows its Fatal error line and the crash words, exit(3) its exit code, a block that did not compile says it is not ready; live input on an isolated page with the box's transcript, Embedded, full library and a prompt on the answer's line, Ctrl-D as nil, Stop while it waits (#583) - $(head -1 /tmp/verify_swift_runner.log | sed 's/^OK: //') (#493, browser-checks/swift_runner.mjs)"
   else
@@ -6126,21 +6336,21 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   fi
   # #563: the self-check quizzes as a student answers them, against a server
   # the check starts itself.
-  if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
+  if run_check node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
     pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only, every blank on paper drawn and about two lines tall with the room above it (#733) - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
   else
     fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
     cat /tmp/verify_quiz_check.log
   fi
   # #519: task boxes ticked in a browser, by mouse and keyboard, and on paper.
-  if node browser-checks/task_boxes.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_task_boxes.log 2>&1; then
+  if run_check node browser-checks/task_boxes.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_task_boxes.log 2>&1; then
     pass "task boxes in a browser: the Markdown's state until a box is changed and nothing written on load, the contract's key written and kept across a reload, the words, a link inside them, Tab and Space, a transcluded copy setting its source's tick in step, five page changes and one listener, a page the router built from the last one's elements showing its own ticks, a tick under old words ignored, a not-ready quiz left alone, storage refused, and ink for a tick on paper in both themes - $(head -1 /tmp/verify_task_boxes.log | sed 's/^OK: //') (#519, browser-checks/task_boxes.mjs)"
   else
     fail "task boxes did not tick in a browser as the contract says (browser-checks/task_boxes.mjs, #519)"
     cat /tmp/verify_task_boxes.log
   fi
   # #604: a link to a heading lands on it once the late content has its size.
-  if node browser-checks/heading_anchor.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_heading_anchor.log 2>&1; then
+  if run_check node browser-checks/heading_anchor.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_heading_anchor.log 2>&1; then
     pass "a link to a heading lands on it: Anchor Fixture loaded with its heading's hash, eight runnable blocks above it, with Chrome's own re-anchoring off as Safari and Arc have none - $(head -1 /tmp/verify_heading_anchor.log | sed 's/^OK: //') (#604, browser-checks/heading_anchor.mjs)"
   else
     fail "a link to a heading did not land on it once the page settled (browser-checks/heading_anchor.mjs, #604)"
@@ -6151,7 +6361,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # when it does (Safari has no scroll anchoring to hide the shift; the
   # layout is the same in Chrome, which is asked here), and a sized picture
   # keeps its own shape in a phone's width.
-  if node browser-checks/picture_heights.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_picture_heights.log 2>&1; then
+  if run_check node browser-checks/picture_heights.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_picture_heights.log 2>&1; then
     pass "pictures keep their place before their bytes arrive and before they are scrolled to, so the text below them does not jump: Picture Fixture with its two PNGs' downloads held, then every picture arrived and nothing scrolled, the page not even by itself as it opened, then a 390 px window - $(head -1 /tmp/verify_picture_heights.log | sed 's/^OK: //') (#612, #609, #611, browser-checks/picture_heights.mjs)"
   else
     fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, a sized picture lost its shape in a narrow window, or the page moved by itself as it opened (browser-checks/picture_heights.mjs, #612, #609, #611)"
@@ -6161,14 +6371,14 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # asked to print the way each browser answers print(): faces and pictures
   # loaded before print(), the frame kept for a print put off, the page put
   # back by the 30 s budget, and words.couldNotPrepare only when no print began.
-  if node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
+  if run_check node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
     pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes, pictures that never arrive and a print layout that never finishes put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
   else
     fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up (on either path) or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
     cat /tmp/verify_print_fallback.log
   fi
   # #545: My Progress in a browser - Progress Fixture's own row, by name.
-  if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
+  if run_check node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
     pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
   else
     fail "My Progress did not count a student's ticks in a browser as the contract says (browser-checks/my_progress.mjs, #545)"
@@ -6177,6 +6387,122 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
 else
   RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
   echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
+fi
+
+# ---- 6h-v. YouTube and Vimeo players, in Chrome and in Safari's engine (#692) ----
+# Players made from the picture form, at the size Russell set (600 px wide
+# at most, 16:9), titled, lazy and privately addressed, on the skill's video
+# example as 6n built it, in Chrome for Testing and Playwright's WebKit
+# (browser-checks/video_players.mjs). Every request to another host is
+# refused, so no player loads and nothing plays. Then the check proven to
+# SEE, on copies of the site broken one way each: the size rule taken out of
+# index.css (the old 650 px player), the title and loading taken off (the
+# shape of Quartz's own player), and the old youtube.com address put back.
+# An engine that is not on this Mac is a SKIP by name, never a pass.
+echo ""
+echo "🎬 YouTube and Vimeo players, in Chrome and in Safari's engine (#692)…"
+# The engines a log says ran, in the words 6h-r uses (rendered_engines,
+# defined with 6h-r below and so not yet here).
+video_engine_words() {
+  case "$1" in
+    chromium,webkit|webkit,chromium) echo "in Chrome for Testing and WebKit" ;;
+    chromium) echo "in Chrome for Testing ONLY (WebKit did not run)" ;;
+    webkit) echo "in WebKit ONLY (Chrome for Testing did not run)" ;;
+    *) echo "in no engine" ;;
+  esac
+}
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+  else
+    skip "YouTube and Vimeo players from the picture form in Chrome and Safari's engine (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac"
+  fi
+else
+  # verify.sh runs under set -euo pipefail: every exit is caught here, so a
+  # missing engine is a SKIP and a fault a FAIL, never the end of the run.
+  VIDEO_PLAYERS_EXIT=0
+  run_check node browser-checks/video_players.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_video_players.log 2>&1 || VIDEO_PLAYERS_EXIT=$?
+  VIDEO_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_players.log | tail -1 | sed 's/^ENGINES: //' || true)"
+  while IFS= read -r VIDEO_SKIPPED_LINE; do
+    VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_LINE#SKIPPED: }"
+    VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_ENGINE%%:*}"
+    if [[ ",${PLANTOIR_REQUIRE_ENGINES:-}," == *",${VIDEO_SKIPPED_ENGINE},"* ]]; then
+      fail "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) did not run in ${VIDEO_SKIPPED_LINE#SKIPPED: }, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+    else
+      skip "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) in ${VIDEO_SKIPPED_LINE#SKIPPED: }"
+    fi
+  done < <(grep '^SKIPPED: ' /tmp/verify_video_players.log || true)
+  if [[ $VIDEO_PLAYERS_EXIT -eq 3 ]]; then
+    :
+  elif [[ $VIDEO_PLAYERS_EXIT -eq 0 && -n "$VIDEO_ENGINES" && "$VIDEO_ENGINES" != "none" ]]; then
+    pass "YouTube and Vimeo players from the picture form, $(video_engine_words "$VIDEO_ENGINES"): $(head -1 /tmp/verify_video_players.log | sed 's/^OK: //') (#692, browser-checks/video_players.mjs)"
+  else
+    fail "a YouTube or Vimeo player was the wrong size, untitled, not lazy or not privately addressed, or the check did not finish (browser-checks/video_players.mjs, #692)"
+    cat /tmp/verify_video_players.log
+  fi
+  # The sabotages run only when the clean check passed, as 6h-r's do: a
+  # check already red proves nothing by failing again.
+  if [[ $VIDEO_PLAYERS_EXIT -eq 0 && -n "$VIDEO_ENGINES" && "$VIDEO_ENGINES" != "none" ]]; then
+    VIDEO_SABOTAGE_SITE="/tmp/plantoir-verify-video-sabotage"
+    for VIDEO_SABOTAGE in size player address; do
+      rm -rf "$VIDEO_SABOTAGE_SITE"
+      cp -R "$SITE_PUBLIC" "$VIDEO_SABOTAGE_SITE"
+      case "$VIDEO_SABOTAGE" in
+        size) VIDEO_SABOTAGE_REASON="px wide, not 600" ;;
+        player) VIDEO_SABOTAGE_REASON="a player has no title" ;;
+        address) VIDEO_SABOTAGE_REASON="neither privacy-enhanced YouTube nor do-not-track Vimeo" ;;
+      esac
+      if ! python3 - "$VIDEO_SABOTAGE_SITE" "$VIDEO_SABOTAGE" <<'VIDEOPY'
+import re, sys
+from pathlib import Path
+site, kind = Path(sys.argv[1]), sys.argv[2]
+if kind == "size":
+    css = site / "index.css"
+    text = css.read_text(encoding="utf-8")
+    changed = re.sub(r"html body iframe\.external-embed\.plantoir-video\{[^}]*\}", "", text)
+    css.write_text(changed, encoding="utf-8")
+    sys.exit(0 if changed != text else 1)
+for page in sorted(site.glob("Authoring-Example-*.html")):
+    text = page.read_text(encoding="utf-8")
+    if "plantoir-video" not in text:
+        continue
+    if kind == "player":
+        changed = re.sub(r' title="[^"]*" loading="lazy"', "", text)
+    else:
+        changed = text.replace("https://www.youtube-nocookie.com/embed/", "https://www.youtube.com/embed/")
+    page.write_text(changed, encoding="utf-8")
+    sys.exit(0 if changed != text else 1)
+sys.exit(1)
+VIDEOPY
+      then
+        fail "the video players' sabotage '$VIDEO_SABOTAGE' found nothing to break (browser-checks/video_players.mjs, #692)"
+        continue
+      fi
+      if run_check node browser-checks/video_players.mjs "$PRINT_CHROME" "$VIDEO_SABOTAGE_SITE" >/tmp/verify_video_sabotage.log 2>&1; then
+        fail "the video players' check passed on a site broken by '$VIDEO_SABOTAGE', so it cannot see that fault (browser-checks/video_players.mjs, #692)"
+        continue
+      fi
+      # Red for its own reason in EVERY engine the clean check ran in, and
+      # the sabotage's own run must say it ran in those same engines: a log
+      # with no ENGINES line is a failure, never a pass.
+      VIDEO_SABOTAGE_SEEN=yes
+      VIDEO_SABOTAGE_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_sabotage.log | tail -1 | sed 's/^ENGINES: //' || true)"
+      if [[ "$VIDEO_SABOTAGE_ENGINES" != "$VIDEO_ENGINES" ]]; then
+        VIDEO_SABOTAGE_SEEN=no
+      fi
+      for VIDEO_ENGINE in ${VIDEO_ENGINES//,/ }; do
+        if ! tr '|' '\n' </tmp/verify_video_sabotage.log | grep "\[${VIDEO_ENGINE}\]" | grep -q "$VIDEO_SABOTAGE_REASON"; then
+          VIDEO_SABOTAGE_SEEN=no
+        fi
+      done
+      if [[ "$VIDEO_SABOTAGE_SEEN" == "yes" ]]; then
+        pass "the video players' check sees the '$VIDEO_SABOTAGE' sabotage for its own reason, $(video_engine_words "$VIDEO_ENGINES") (#692)"
+      else
+        fail "the video players' check failed the '$VIDEO_SABOTAGE' sabotage for another reason, or not in every engine (#692): $(head -c 300 /tmp/verify_video_sabotage.log)"
+      fi
+    done
+    rm -rf "$VIDEO_SABOTAGE_SITE"
+  fi
 fi
 
 # ---- 6h-r. The rendered check, in Chrome and in Safari's engine (#597, #807) ----
@@ -6230,12 +6556,27 @@ rendered_lines() {
     "$verb" "rendered check: ${line#"${kind}: "}"
   done < <(grep "^${kind}: " "$log")
 }
+# The Simulation page's PhET simulation (#674), planted where the fixture
+# build keeps its downloads, so the build asks PhET nothing; with no copy
+# on this Mac (PHET_COPY_MISSING, set before 6n) the page is taken out, and
+# the phet row, its sabotages and the every-page rows for that page are
+# SKIPS by name (rendered_features.mjs runPage does not open it).
+rendered_phet_copy() {
+  if [[ -n "${PHET_COPY_MISSING:-}" ]]; then
+    rm -f "$RENDERED_DIR/courses/EXC2O/Rendered Check/Simulation.md"
+    export PLANTOIR_RENDERED_NO_PHET="$PHET_COPY_MISSING"
+    return 0
+  fi
+  unset PLANTOIR_RENDERED_NO_PHET
+  mkdir -p "$RENDERED_BUILDS"
+  python3 browser-checks/lib/plant_phet.py plant "$RENDERED_BUILDS"
+}
 echo ""
 echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
 rendered_cleanup
 RENDERED_STARTED=$SECONDS
 if python3 browser-checks/lib/test_rendered_lib.py >/tmp/verify_rendered_lib.log 2>&1; then
-  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row but the deployed-only embeds has one, a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
+  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row has one (the deployed-only embeds row's on its hosts only, #692), a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
 else
   fail "the rendered check's planting or sabotages (browser-checks/lib/test_rendered_lib.py, #597)"
   tail -20 /tmp/verify_rendered_lib.log
@@ -6256,10 +6597,11 @@ if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0
     skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
   fi
   RENDERED_NOT_RUN="chromium and webkit (no Node 22)"
-elif ! node browser-checks/lib/test_site_server.mjs >/tmp/verify_rendered_server.log 2>&1; then
+elif ! run_check node browser-checks/lib/test_site_server.mjs >/tmp/verify_rendered_server.log 2>&1; then
   fail "the rendered check's server does not serve a site as the hosts do (browser-checks/lib/test_site_server.mjs, #597)"
   grep '^FAIL' /tmp/verify_rendered_server.log
 elif ! python3 browser-checks/lib/plant_rendered.py plant "$RENDERED_DIR/courses/EXC2O" >/tmp/verify_rendered_build.log 2>&1 \
+     || ! rendered_phet_copy >>/tmp/verify_rendered_build.log 2>&1 \
      || ! (cd "$RENDERED_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) >>/tmp/verify_rendered_build.log 2>&1 \
      || [[ ! -f "$RENDERED_BUILDS/EXC2O/section1/public/Rendered-Check/Diagrams.html" ]]; then
   # A build that failed is a failure, never a skip: the rows never ran.
@@ -6276,7 +6618,7 @@ else
     tail -5 /tmp/verify_rendered_build.log
   else
     RENDERED_STATUS=0
-    node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
+    run_check node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
       >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
     RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
     RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p')"
@@ -6295,7 +6637,7 @@ else
     # proves nothing by failing again.
     if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]] && grep -q '^OK: ' /tmp/verify_rendered_features.log; then
       RED_STATUS=0
-      node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
+      run_check node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
         >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
       RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
       if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
@@ -7313,6 +7655,13 @@ echo ""
 echo "==================== verify.sh summary ===================="
 for line in "${RESULTS[@]}"; do echo "$line"; done
 echo "==========================================================="
+# A browser left by an earlier check of this checkout (#906) was named once,
+# before the browser checks; it is named again here, where the last lines are
+# read, whether the run passed or not.
+case "${LEFTOVER_BROWSERS:-NONE:}" in
+  NONE:*) ;;
+  *) echo "⚠️  $LEFTOVER_BROWSERS" ;;
+esac
 if [[ "$FAILED" == "true" ]]; then
   echo "❌ Verification FAILED — see items above."
   exit 1

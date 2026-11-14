@@ -29,6 +29,7 @@ verify.sh's step 0. Run with:
 """
 
 import os
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import shutil
 import signal
 import subprocess
@@ -45,6 +46,9 @@ BLOCK_START = "# >>> TOKEN HAND-OFF BLOCK >>>"
 BLOCK_END = "# <<< TOKEN HAND-OFF BLOCK <<<"
 ON_A_MAC = sys.platform == "darwin"
 PAIRS = 30
+
+sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
+from test_deploy_sh_questions import no_request_was_made, the_network_refused  # noqa: E402
 
 
 def the_block() -> str:
@@ -128,7 +132,10 @@ class EachDeployGetsItsOwnToken(unittest.TestCase):
             handed = where.read_text(encoding="utf-8").strip()
             if handed.startswith("/tmp/deploy_pat.") and handed.endswith("/pat"):
                 shutil.rmtree(os.path.dirname(handed), ignore_errors=True)
-        shutil.rmtree(self.scratch, ignore_errors=True)
+        try:
+            no_request_was_made(self.scratch)
+        finally:
+            shutil.rmtree(self.scratch, ignore_errors=True)
         self.assertEqual(left, [], "a process group this test started was still running")
 
     def start(self, name: str, token: str, ending: str, extra=None, shell: str = "bash") -> subprocess.Popen:
@@ -140,6 +147,8 @@ class EachDeployGetsItsOwnToken(unittest.TestCase):
                            TOKEN_FOR_THIS_TEST=token,
                            PLANTOIR_TRAIL_DIR=str(self.trail))
         environment.update(extra or {})
+        # No request leaves this computer (the fix review's M-a on #696).
+        environment = the_network_refused(self.scratch, environment)
         # A group of its own, so a signal can go to it the way a terminal's
         # does, and tearDown can end everything it started.
         process = subprocess.Popen([shell, "-c", a_deploy(self.block, ending)],

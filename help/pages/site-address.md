@@ -34,9 +34,9 @@ Plantoir puts four things together, with hyphens between them:
 | The course's code, in small letters | `mcv4u` |
 | The letter s and the section's number | `s1` |
 | The calendar year at the first deploy | `2026` |
-| Your surname | `gordon` |
+| Your surname | `quillfeather` |
 
-Together they make `mcv4u-s1-2026-gordon`. On Netlify the website's address ends in `netlify.app`. On Cloudflare Pages it ends in `pages.dev`.
+Together they make `mcv4u-s1-2026-quillfeather`. On Netlify the website's address ends in `netlify.app`. On Cloudflare Pages it ends in `pages.dev`.
 
 ## The surname question
 

@@ -657,6 +657,41 @@ final class BuildOutputLocationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "the marker is not a course")
     }
 
+    /// The files a working folder's pages had downloaded (#674) are not a
+    /// course: the sweep for courses that are gone keeps them, for every
+    /// case `buildOutputLocation.keptDownloadsSurviveTheSweep` names, and the
+    /// folder is the one the build keeps them in (`keptDownloads.where`).
+    func testKeptDownloadsSurviveTheSweepForCoursesThatAreGone() throws {
+        let rules: [String: Any] = try buildOutputRules()
+        let sweep: [String: Any] = try XCTUnwrap(rules["keptDownloadsSurviveTheSweep"] as? [String: Any])
+        XCTAssertEqual(sweep["folder"] as? String, BuildOutputLocation.keptDownloadsFolderName)
+        let cases: [[String: Any]] = try XCTUnwrap(sweep["cases"] as? [[String: Any]])
+        XCTAssertGreaterThan(cases.count, 0)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let entries: [String] = try XCTUnwrap(testCase["entries"] as? [String])
+            let present: [String] = try XCTUnwrap(testCase["coursesPresent"] as? [String])
+            let kept: [String] = try XCTUnwrap(testCase["kept"] as? [String])
+            let builds: URL = BuildOutputLocation.buildsFolder(forWorkingFolder: workingFolder)
+            try? FileManager.default.removeItem(at: builds)
+            try FileManager.default.createDirectory(at: builds, withIntermediateDirectories: true)
+            for entry in entries {
+                if entry.hasSuffix(".txt") {
+                    try Data("folder\n".utf8).write(to: builds.appendingPathComponent(entry))
+                } else {
+                    let folder: URL = builds.appendingPathComponent(entry)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try Data("kept".utf8).write(to: folder.appendingPathComponent("kept.json"))
+                }
+            }
+            BuildOutputLocation.discardBuildsForMissingCourses(
+                workingFolderURL: workingFolder, courseCodesPresent: present
+            )
+            let left: [String] = try FileManager.default.contentsOfDirectory(atPath: builds.path).sorted()
+            XCTAssertEqual(left, kept.sorted(), name)
+        }
+    }
+
     /// The marker says which working folder a builds folder serves, because
     /// the identifier is a hash and cannot be read backwards.
     func testTheBuildsFolderSaysWhichWorkingFolderItServes() throws {

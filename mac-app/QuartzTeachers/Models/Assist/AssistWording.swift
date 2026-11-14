@@ -2227,7 +2227,8 @@ nonisolated enum AssistWording {
     //
     // The assistant's own functions, reached from Section ▸ Publish Pages…,
     // Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
-    // Change, Add Next Class, Re-date Classes… and Make Room for Classes… —
+    // Change, Add Class… (Add Next Class until #897), Re-date Classes… and
+    // Make Room for Classes… —
     // the same tool code, called with a call built in code and never through
     // a model (`AssistToolRunner.Surface.menu`). What a teacher reads there is
     // not a conversation: nobody said "undo that", there is no "me" to ask
@@ -2422,6 +2423,133 @@ nonisolated enum AssistWording {
     static let menuUndoLastChangeTitle: String = "Undo last change"
     static func menuAddNextClassTitle(noun: ClassNoun = .class) -> String {
         return "Add next \(noun.singular)"
+    }
+
+    // #897: what only the built-in assistant's window could do before,
+    // in the menu's voice. The window's own sentences are unchanged.
+
+    /// Section ▸ Add Class…'s sheet: its title, the question, and one
+    /// line per way (`SubjectMenuRules.AddClassWay`), in the sheet's order.
+    static func menuAddClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Add a \(noun.singular) to \(course) Section \(section)"
+    }
+
+    static func menuHowToAddAClass(noun: ClassNoun = .class) -> String {
+        return "How should the new \(noun.singular) be added? It is dated for this section's next "
+             + "\(noun.singular) day and starts hidden."
+    }
+
+    /// The first way: what Add Next Class did. In a numbered course (a club)
+    /// there are no units, and the line says only "the next". `unit` is the
+    /// course's own word, as a teacher reads it in a sentence ("module" in a
+    /// course that calls its units modules; #897a review, finding 10).
+    static func menuAddClassNextInThisUnit(
+        noun: ClassNoun = .class, unit: String = "unit", numbered: Bool = false
+    ) -> String {
+        if numbered {
+            return "As the next \(noun.singular)"
+        }
+        return "As the next \(noun.singular) in the \(unit) under way"
+    }
+
+    /// The second way: Unit 5, Day 1 after Unit 4, in the course's word.
+    static func menuAddClassInANewUnit(noun: ClassNoun = .class, unit: String = "unit") -> String {
+        return "In a new \(unit), as its first \(noun.singular)"
+    }
+
+    /// Under the ways: why one is greyed, in a sentence a teacher can act on
+    /// (`SubjectMenuRules.AddClassGreyedBecause`, #897a review, finding 1).
+    static func menuAddClassGreyedNoUnits(noun: ClassNoun = .class) -> String {
+        return "This course numbers its \(noun.plural) one after another, without units, so there is "
+             + "no new unit to start."
+    }
+
+    static func menuAddClassGreyedNothingToCopy(noun: ClassNoun = .class) -> String {
+        return "This section has no \(noun.singular) pages yet, so there is nothing to copy."
+    }
+
+    /// The rename's line names only the ways the rename holds back
+    /// (`SubjectMenuRules.AddClassReasonLine`): a way greyed for another
+    /// reason is not promised back by finishing it (the fix review's
+    /// finding 1). In a numbered course the word renamed is the pages' own
+    /// name, so the line says that, and only a copy can be held back there.
+    static func menuAddClassGreyedRenameUnfinished(
+        noun: ClassNoun = .class, unit: String = "unit", newUnit: Bool = true, copy: Bool = true,
+        numbered: Bool = false
+    ) -> String {
+        var what: String = "a copy"
+        if newUnit && copy {
+            what = "a new \(unit) or a copy"
+        } else if newUnit {
+            what = "a new \(unit)"
+        }
+        if numbered {
+            return "A rename of what this course calls its \(noun.plural) stopped part way, so some are "
+                 + "named the old way and some the new. Finish the rename in the course's settings to add "
+                 + "\(what)."
+        }
+        return "A rename of what this course calls a \(unit) stopped part way, so some \(noun.plural) "
+             + "are named the old way. Finish the rename in the course's settings to add \(what)."
+    }
+
+    /// A copy asked for after the section's class dates went missing.
+    /// The menu item is titled Class Dates… in every course, a club
+    /// included, and a club's sentences never say "class"
+    /// (`ClubNounTests.testEveryMeetingKeyHasItsClassTwin`), so a club is
+    /// pointed at the Section menu without the item's title.
+    static func menuNeedsClassDatesFirst(noun: ClassNoun = .class) -> String {
+        let firstSentence: String = "This section has no \(noun.singular) dates on file, so nothing was copied."
+        if noun == .meeting {
+            return firstSentence + " Add them from the Section menu, then try again."
+        }
+        return firstSentence + " Add them with Section ▸ Class Dates…, then try again."
+    }
+
+    /// The third way: a copy of one of this section's classes.
+    static func menuAddClassAsACopy(noun: ClassNoun = .class) -> String {
+        return "As a copy of a \(noun.singular) in this section"
+    }
+
+    static func menuPickClassToDuplicate(noun: ClassNoun = .class) -> String {
+        return "Choose the \(noun.singular) to copy. The copy becomes the next \(noun.singular), dated for "
+             + "this section's next \(noun.singular) day, and starts hidden. Nothing else moves."
+    }
+
+    /// The default button for a way that adds at once (a new unit).
+    static let menuAddButton: String = "Add"
+
+    static let menuDuplicateButton: String = "Duplicate"
+
+    /// The finished sheet: the copy's name, its date, and that it is hidden
+    /// (the plan review's amendment 7: `duplicated` alone says neither).
+    static func duplicatedFromTheMenu(page: String, as copy: String, on date: String) -> String {
+        return "Duplicated “\(page)” as “\(copy)”, dated \(date). The copy is hidden: write it, then "
+             + "publish it when it is ready."
+    }
+
+    /// The copy's visibility could not be read back as hidden, so nothing
+    /// was written: the menu writes the copy only once it reads hidden.
+    static func theCopyCouldNotBeMadeHiddenFromTheMenu(page: String) -> String {
+        return "“\(page)” was not copied, and nothing was written: the copy could not be made certainly "
+             + "hidden, and a lesson students can already see must not turn up somewhere new where they "
+             + "can read it. The settings at the top of “\(page)” are written in a way Plantoir cannot "
+             + "read for certain; open it in Obsidian to look."
+    }
+
+    /// The page the copy would become is already there.
+    static func menuTheNextPageIsAlreadyThere(page: String) -> String {
+        return "A page called “\(page)” is already where the copy would go, so nothing was copied. "
+             + "A page is never written over."
+    }
+
+    /// A unit-word rename stopped part way: Add Class… waits for it. Said
+    /// the same way in every course, a numbered one (a club) included, whose
+    /// renamed word is the pages' own name and never a unit (the Fable
+    /// sweep's finding 5): the names given to the pages is true of both.
+    static func menuUnitWordRenameUnfinished(noun: ClassNoun = .class) -> String {
+        return "A rename of the names this course gives its \(noun.plural) stopped part way, so some are "
+             + "named the old way and some the new. Nothing was changed. Finish the rename in the "
+             + "course's settings, then choose this again."
     }
 
     /// Help ▸ Publishing and Deploying…: the difference, said to the teacher

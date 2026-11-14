@@ -45,8 +45,8 @@
    "mac": "Section \u25b8 Undo Last Change",
    "windows": null
   },
-  "addNextClass": {
-   "mac": "Section \u25b8 Add Next Class",
+  "addClass": {
+   "mac": "Section \u25b8 Add Class\u2026",
    "windows": null
   },
   "publishingAndDeploying": {

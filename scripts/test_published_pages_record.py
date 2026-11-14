@@ -23,6 +23,7 @@ Run with:
     python3 scripts/test_published_pages_record.py
 """
 import inspect
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import json
 import re
 import shutil

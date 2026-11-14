@@ -101,7 +101,8 @@ struct CredentialRequest: Equatable {
                     + "you get back if you skip this does not mention accounts at all.",
                 "Under “TTL”, set the end date to after the end of your school year — next "
                     + "July is a safe choice — or leave it with no end date. An expired token "
-                    + "stops your deploys working, with nothing on screen to say why.",
+                    + "stops your deploys working. Plantoir shows the end date in Settings and "
+                    + "warns you on the Deploy screen for the last 30 days before it.",
                 "Choose “Continue to summary”, then “Create Token”.",
                 "Copy the long code Cloudflare shows you — it is only shown once — and paste it below.",
             ],
@@ -179,16 +180,16 @@ struct CredentialRequest: Equatable {
             name: "teacherSurname",
             title: "Teacher Surname",
             explanation: "Your surname is used to create a clear, recognizable web address for your "
-                       + "students and families (such as mcv4u-s1-2026-gordon), and to prevent naming "
+                       + "students and families (such as mcv4u-s1-2026-quillfeather), and to prevent naming "
                        + "conflicts with other classes. It is saved on this computer and only asked once.",
             steps: [
-                "Type your surname below using letters only (for example, “Gordon”).",
+                "Type your surname below using letters only (for example, “Quillfeather”).",
                 "It will be combined with course codes and the school year to name your class websites.",
             ],
             linkTitle: "",
             linkAddress: nil,
             fieldLabel: "Surname",
-            fieldPlaceholder: "e.g. Gordon",
+            fieldPlaceholder: "e.g. Quillfeather",
             isSecret: false
         )
     }
@@ -202,14 +203,14 @@ struct CredentialRequest: Equatable {
                        + "(*.pages.dev) needs a unique web address. On Netlify, this name is shared "
                        + "globally with all users across the world.",
             steps: [
-                "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-gordon)",
-                "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. lcs-mcv4u-s1-2026-gordon)",
+                "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-quillfeather)",
+                "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. jhc-mcv4u-s1-2026-quillfeather)",
                 "Use only lowercase letters, numbers, and hyphens.",
             ],
             linkTitle: "",
             linkAddress: nil,
             fieldLabel: "Website address",
-            fieldPlaceholder: "e.g. mcv4u-s1-2026-gordon",
+            fieldPlaceholder: "e.g. mcv4u-s1-2026-quillfeather",
             isSecret: false
         )
     }
@@ -223,13 +224,13 @@ struct CredentialRequest: Equatable {
                        + "add a number suffix or include your school's initials to make it unique.",
             steps: [
                 "Add a number suffix (such as -01, pre-filled below).",
-                "Or add your school's initials (e.g. lcs-mcv4u-s1-2026-gordon).",
+                "Or add your school's initials (e.g. jhc-mcv4u-s1-2026-quillfeather).",
                 "Use only lowercase letters, numbers, and hyphens.",
             ],
             linkTitle: "",
             linkAddress: nil,
             fieldLabel: "Website address",
-            fieldPlaceholder: "e.g. mcv4u-s1-2026-gordon-01",
+            fieldPlaceholder: "e.g. mcv4u-s1-2026-quillfeather-01",
             isSecret: false
         )
     }

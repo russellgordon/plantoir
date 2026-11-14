@@ -22,8 +22,7 @@ import Observation
 /// class goes out — #694),
 /// shows the class dates sheet when a function needs dates first
 /// (`.classDates`), and shows the answer of a function that has no sheet of
-/// its own (`.result`: Undo Last Change, a refused Rebuild Preview, Add Next
-/// Class). One `.sheet` rather than several, because a view presents one
+/// its own (`.result`: Undo Last Change, a refused Rebuild Preview). One `.sheet` rather than several, because a view presents one
 /// sheet at a time anyway and modelling that is what keeps them in order.
 @Observable
 @MainActor
@@ -37,6 +36,9 @@ final class SectionVerbSheetModel: Identifiable {
         case publishClass
         case reDateClasses
         case makeRoom
+        /// Add Class… (#897): how the class is added, then — for a copy —
+        /// the class to copy and the plan.
+        case addClass
         case laterClassesAtDeploy
         case classDates
         case result
@@ -92,6 +94,28 @@ final class SectionVerbSheetModel: Identifiable {
         }
     }
 
+    /// A class page Add Class… can copy (#897): one of this
+    /// section's own, named by its FILE (`path`), never by its title.
+    struct SourceRow: Identifiable, Equatable {
+
+        // MARK: - Stored properties
+
+        /// The page's path inside the course, `.md` included
+        /// (`SectionVerbs.coursePath(ofPageAt:in:)`): what the call carries.
+        let path: String
+
+        /// The file name without `.md`, as Make Room's list shows a class.
+        let title: String
+
+        let date: CalendarDay?
+
+        // MARK: - Computed properties
+
+        var id: String {
+            return path
+        }
+    }
+
     // MARK: - Stored properties
 
     let id: UUID = UUID()
@@ -115,6 +139,15 @@ final class SectionVerbSheetModel: Identifiable {
     var classRows: [ClassRow] = []
     var chosenClass: String = ""
     var howMany: Int = 1
+
+    /// Add Class…'s ways (#897): the ones this section can use now, in the
+    /// sheet's order (`SubjectMenuRules.addClassWays`), and the one chosen.
+    var addClassFacts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts()
+    var way: SubjectMenuRules.AddClassWay?
+
+    /// Add Class…'s classes to copy, and the one chosen, by path.
+    var sourceRows: [SourceRow] = []
+    var chosenSource: String?
 
     /// #475: the classes asked about at Deploy, and the ones ticked to GO
     /// OUT (all, to begin with — a ticked box always means included, #694).
@@ -173,6 +206,69 @@ final class SectionVerbSheetModel: Identifiable {
         return shown
     }
 
+    /// The ways Add Class… can use now, in the sheet's order.
+    var availableWays: [SubjectMenuRules.AddClassWay] {
+        return SubjectMenuRules.addClassWays(addClassFacts)
+    }
+
+    /// The course's word for a unit, as a sentence says it ("module").
+    /// "unit" in a numbered course, whose word is the pages' whole name
+    /// ("Week") and never a unit (the fix review's finding 1). A word in
+    /// capitals (an acronym) is left as it is.
+    var unitWord: String {
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            return "unit"
+        }
+        if naming.word.count > 1 && naming.word == naming.word.uppercased() {
+            return naming.word
+        }
+        return naming.word.lowercased()
+    }
+
+    /// The line a way is drawn with (`SubjectMenuRules.label(of:_:)`).
+    func label(of way: SubjectMenuRules.AddClassWay) -> String {
+        return SectionVerbSheet.sentence(for: SubjectMenuRules.label(of: way, addClassFacts), noun: noun, unit: unitWord)
+    }
+
+    /// Why each greyed way is greyed, one sentence per reason, in the ways'
+    /// order (#897a review, finding 1): a greyed radio button alone says
+    /// "no" and not what to do about it.
+    var greyedReasons: [(line: SubjectMenuRules.AddClassReasonLine, sentence: String)] {
+        var reasons: [(line: SubjectMenuRules.AddClassReasonLine, sentence: String)] = []
+        for line in SubjectMenuRules.reasonLines(addClassFacts) {
+            reasons.append((line, SectionVerbSheet.sentence(for: line, noun: noun, unit: unitWord)))
+        }
+        return reasons
+    }
+
+    /// The search for Add Class…'s list. A chosen class the search hides is
+    /// let go, so Continue never copies a row the teacher cannot see
+    /// (#897a review, finding 13).
+    func searchTheSources(for text: String) {
+        search = text
+        var stillShown: Bool = false
+        for row in shownSourceRows where row.path == chosenSource {
+            stillShown = true
+        }
+        if !stillShown {
+            chosenSource = nil
+        }
+    }
+
+    /// The classes Add Class… shows for the search.
+    var shownSourceRows: [SourceRow] {
+        let wanted: String = search.trimmingCharacters(in: .whitespaces).lowercased()
+        if wanted.isEmpty {
+            return sourceRows
+        }
+        var shown: [SourceRow] = []
+        for row in sourceRows where row.title.lowercased().contains(wanted) {
+            shown.append(row)
+        }
+        return shown
+    }
+
     /// The pages ticked, in the rows' order.
     var tickedRows: [PageRow] {
         var chosen: [PageRow] = []
@@ -199,6 +295,8 @@ final class SectionVerbSheetModel: Identifiable {
             return AssistWording.menuPickClassDay(noun: noun)
         case .makeRoom:
             return AssistWording.menuMakeRoomAt(noun: noun)
+        case .addClass:
+            return AssistWording.menuHowToAddAClass(noun: noun)
         default:
             return ""
         }
@@ -208,6 +306,11 @@ final class SectionVerbSheetModel: Identifiable {
     var defaultButtonTitle: String {
         switch stage {
         case .choosing:
+            // A way that adds at once says so on its button; a copy has a
+            // plan to show first.
+            if kind == .addClass && (way == .nextInThisUnit || way == .inANewUnit) {
+                return AssistWording.menuAddButton
+            }
             return AssistWording.menuContinueButton
         case .askingAboutLaterClasses:
             return AssistWording.deployTickedButton
@@ -219,6 +322,8 @@ final class SectionVerbSheetModel: Identifiable {
                 return AssistWording.menuReDateButton
             case .makeRoom:
                 return AssistWording.menuMakeRoomButton
+            case .addClass:
+                return AssistWording.menuDuplicateButton
             default:
                 return AssistWording.menuPublishButton
             }
@@ -236,6 +341,11 @@ final class SectionVerbSheetModel: Identifiable {
                 return !ticked.isEmpty
             case .makeRoom:
                 return !chosenClass.isEmpty
+            case .addClass:
+                guard let way, availableWays.contains(way) else {
+                    return false
+                }
+                return way != .asACopyOfAClass || chosenSource != nil
             default:
                 return true
             }
@@ -351,6 +461,22 @@ final class SectionVerbSheetModel: Identifiable {
                 return first.unit < second.unit
             }
             return first.day < second.day
+        }
+        return found
+    }
+
+    /// The classes Add Class… can copy (#897): every page in
+    /// this section's class folders, numbered or not (the plan review's
+    /// amendment 8), in `ClassPages.list`'s order — dated ones by date, the
+    /// rest by name after them. This section's only (Russell's ruling).
+    static func sourceRows(course: Course, sectionNumber: Int) -> [SourceRow] {
+        var found: [SourceRow] = []
+        for page in ClassPages.list(forSection: sectionNumber, in: course) {
+            found.append(SourceRow(
+                path: SectionVerbs.coursePath(ofPageAt: page.fileURL, in: course),
+                title: page.title,
+                date: page.date
+            ))
         }
         return found
     }
@@ -487,6 +613,11 @@ struct SectionVerbSheet: View {
     /// the line follows it.
     var verbs: SectionVerbs?
 
+    /// How many rows Add Class…'s copy list shows before it scrolls
+    /// (`mostSourceRowsShown`); a test lays the sheet out at twelve too, so
+    /// the cap is a measured choice (the fix review's finding 2).
+    var sourceRowsShown: Int = SectionVerbSheet.mostSourceRowsShown
+
     /// The plan table's order: plan order to begin with; a column header
     /// sorts by that column (#524, the `AllBackupsView` precedent).
     @State var planSortOrder: [KeyPathComparator<AssistPlanTable.Row>] = [KeyPathComparator(\.position)]
@@ -601,6 +732,27 @@ struct SectionVerbSheet: View {
         var shown: Int = model.pageRows.count
         if shown > SectionVerbSheet.mostPickerRowsShown {
             shown = SectionVerbSheet.mostPickerRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
+
+    /// How many classes Add Class…'s list shows before it scrolls inside
+    /// itself (#897). Fewer than the picker's twelve: this sheet also carries
+    /// the three ways, a line saying why one is greyed and the copy's own
+    /// instruction above the search, an ESTIMATED 150 pt more than Publish
+    /// Pages…'s picker, whose forty-page case is measured against the 620 pt
+    /// a 13-inch screen allows (`CopyPageChecklist.tallestSheet`). Seven rows
+    /// give back 120 of them (`ListTableMetrics`: 24 pt a row).
+    /// `DuplicateAsNextClassTests.testTheTallestAddClassSheetStaysOnTheScreen`
+    /// lays it out at seven and at twelve and prints both, which is the
+    /// measurement this number waits on (deferred: it needs the test host).
+    static let mostSourceRowsShown: Int = 7
+
+    /// Add Class…'s list of classes to copy (#897), the same way.
+    var sourceTableHeight: CGFloat {
+        var shown: Int = model.sourceRows.count
+        if shown > sourceRowsShown {
+            shown = sourceRowsShown
         }
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
@@ -830,9 +982,71 @@ struct SectionVerbSheet: View {
                     .monospacedDigit()
             }
             .accessibilityIdentifier("sectionVerbSheetHowMany")
+        case .addClass:
+            // One line per way, in the contract's order; a way this section
+            // cannot use is drawn greyed, never left out, so the sheet reads
+            // the same every time.
+            Picker("", selection: Binding(
+                get: { return model.way },
+                set: { chosen in model.way = chosen }
+            )) {
+                ForEach(SubjectMenuRules.AddClassWay.allCases, id: \.self) { (way: SubjectMenuRules.AddClassWay) in
+                    Text(model.label(of: way))
+                        .tag(Optional(way))
+                        .disabled(!model.availableWays.contains(way))
+                }
+            }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            .accessibilityIdentifier("sectionVerbSheetAddClassWay")
+            // Each line its own identifier, by its reason (the fix review's
+            // finding 8), so a test can tell two apart.
+            ForEach(model.greyedReasons, id: \.line) { (reason: (line: SubjectMenuRules.AddClassReasonLine, sentence: String)) in
+                Text(reason.sentence)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("sectionVerbSheetAddClassGreyed-\(reason.line.rawValue)")
+            }
+            if model.way == .asACopyOfAClass && !model.sourceRows.isEmpty {
+                Text(AssistWording.menuPickClassToDuplicate(noun: model.noun))
+                    .fixedSize(horizontal: false, vertical: true)
+                TextField(AssistWording.menuFindAPage, text: Binding(
+                    get: { return model.search },
+                    set: { text in model.searchTheSources(for: text) }
+                ))
+                .borderedTextField()
+                .accessibilityIdentifier("sectionVerbSheetSearch")
+                sourceTable
+            }
         default:
             EmptyView()
         }
+    }
+
+    /// The classes to copy (#897): one chosen by selecting its row, in the
+    /// picker's look (#608) — Page and Date — with no checkboxes, because
+    /// exactly one class is copied.
+    var sourceTable: some View {
+        Table(model.shownSourceRows, selection: Binding(
+            get: { return model.chosenSource },
+            set: { path in model.chosenSource = path }
+        )) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (row: SectionVerbSheetModel.SourceRow) in
+                Text(row.title)
+                    .lineLimit(1)
+                    .help(row.title)
+                    .accessibilityIdentifier("sectionVerbSource-\(row.path)")
+            }
+            .width(min: 120, ideal: 220)
+            TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.SourceRow) in
+                Text(sourceDateCell(for: row))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 180)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .flexibleTableHeight(sourceTableHeight)
+        .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
 
     /// The pages to tick (#608): a bordered, banded table — Page (with its
@@ -949,6 +1163,50 @@ struct SectionVerbSheet: View {
     /// there are some, and something else to read above them.
     static func foldsAlreadyRight(_ table: AssistPlanTable) -> Bool {
         return !table.rowsAlreadyRight.isEmpty && !table.rowsToRead.isEmpty
+    }
+
+    /// One way's line in Add Class…'s sheet (#897).
+    /// A way's line. `unit` is the course's own word, as a sentence says it.
+    static func sentence(for label: SubjectMenuRules.AddClassLabel, noun: ClassNoun, unit: String) -> String {
+        switch label {
+        case .nextInTheUnitUnderWay:
+            return AssistWording.menuAddClassNextInThisUnit(noun: noun, unit: unit)
+        case .nextInANumberedCourse:
+            return AssistWording.menuAddClassNextInThisUnit(noun: noun, numbered: true)
+        case .inANewUnitInTheCoursesWord:
+            return AssistWording.menuAddClassInANewUnit(noun: noun, unit: unit)
+        case .inANewUnitPlainly:
+            return AssistWording.menuAddClassInANewUnit(noun: noun)
+        case .asACopy:
+            return AssistWording.menuAddClassAsACopy(noun: noun)
+        }
+    }
+
+    /// One line under the ways (#897).
+    static func sentence(for line: SubjectMenuRules.AddClassReasonLine, noun: ClassNoun, unit: String) -> String {
+        switch line {
+        case .theCourseHasNoUnits:
+            return AssistWording.menuAddClassGreyedNoUnits(noun: noun)
+        case .thereIsNoClassToCopy:
+            return AssistWording.menuAddClassGreyedNothingToCopy(noun: noun)
+        case .aRenameHoldsBackANewUnitAndACopy:
+            return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, unit: unit)
+        case .aRenameHoldsBackANewUnit:
+            return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, unit: unit, copy: false)
+        case .aRenameHoldsBackACopy:
+            // Reached only in a numbered course: anywhere else the rename
+            // holds the new unit back too (`whyGreyed`'s order). There the
+            // renamed word is the pages' own name.
+            return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, newUnit: false, numbered: true)
+        }
+    }
+
+    /// The source list's Date cell (#897), as the picker writes a day.
+    func sourceDateCell(for row: SectionVerbSheetModel.SourceRow) -> String {
+        if let date = row.date {
+            return AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
+        }
+        return ""
     }
 
     /// The picker's Date cell: a class's day, as the later-classes question

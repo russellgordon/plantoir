@@ -258,9 +258,8 @@ struct SectionMenu: Commands {
             // tools' own code by the section window (`SectionVerbs`) — never
             // through a model, so a teacher who declined the assistant has
             // every one of them. The ellipsis items show the plan before
-            // anything changes; Rebuild Preview, Undo Last Change and Add
-            // Next Class act at once (Russell's decision 11: a new class
-            // page arrives hidden and can be undone).
+            // anything changes; Rebuild Preview and Undo Last Change act
+            // at once.
             item("Publish Pages…", .publishPages, enabled)
             item("Hide Pages…", .hidePages, enabled)
             item("Publish Class for a Date…", .publishClassForADate, enabled)
@@ -276,7 +275,11 @@ struct SectionMenu: Commands {
 
             Divider()
 
-            item("Add Next Class", .addNextClass, enabled)
+            // #897: ONE item whose sheet asks how the class is added — the
+            // next class in this unit, in a new unit, or a copy (Russell,
+            // 2026-11-13 night). It replaces Add Next Class, which had no key
+            // equivalent, so it has none either. An ellipsis: a choice follows.
+            item("Add Class…", .addClass, enabled)
             item("Re-date Classes…", .reDateClasses, enabled)
             item("Make Room for Classes…", .makeRoomForClasses, enabled)
             item("Class Dates…", .classDates, enabled)
@@ -346,7 +349,8 @@ struct SectionMenu: Commands {
             switch item {
             case .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder,
                  .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-                 .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+                 .addClass,
+                 .reDateClasses, .makeRoomForClasses, .classDates:
                 site?.perform(item)
             default:
                 sidebar?.perform(item)

@@ -1791,7 +1791,10 @@ struct SidebarView: View {
             sectionVerbItem("Publish Pages…", .publishPages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
-            sectionVerbItem("Add Next Class", .addNextClass, course: course, sectionNumber: sectionNumber, row: row)
+            // #897: Add Class… is here as well as in the Section menu, in the
+            // place Add Next Class had (Russell, 2026-11-13 night). The
+            // request reaches `performVerb`, which opens the same sheet.
+            sectionVerbItem("Add Class…", .addClass, course: course, sectionNumber: sectionNumber, row: row)
             Divider()
         }
         // One item or the other, never a
@@ -2221,7 +2224,8 @@ struct SidebarView: View {
              .saveCourseSettings, .revertCourseSettings, .courseReviseWithLocalAssistant,
              .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder, .back, .forward, .reloadPage,
              .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+             .addClass,
+             .reDateClasses, .makeRoomForClasses, .classDates:
             // Not the sidebar's: File, Course Settings and the section
             // window own these — the assistant's functions run in the
             // section window, which shows their sheets (#457 batch B). Local

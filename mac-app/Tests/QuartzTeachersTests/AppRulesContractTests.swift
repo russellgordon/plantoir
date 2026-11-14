@@ -799,7 +799,7 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(CredentialRequest.matching("Paste your Cloudflare token:")?.name, "cloudflareToken")
         XCTAssertEqual(CredentialRequest.matching("Paste your Cloudflare Account ID:")?.name, "cloudflareAccountID")
         XCTAssertEqual(CredentialRequest.matching("First time setup... what is your last name? (letters only):")?.name, "teacherSurname")
-        XCTAssertEqual(CredentialRequest.matching("Please enter letters only for your last name (e.g., 'Gordon'):")?.name, "teacherSurname")
+        XCTAssertEqual(CredentialRequest.matching("Please enter letters only for your last name (e.g., 'Quillfeather'):")?.name, "teacherSurname")
         XCTAssertEqual(CredentialRequest.matching("Enter Netlify site name:")?.name, "siteName")
         XCTAssertEqual(CredentialRequest.matching("Choose a different Netlify site name (or 'q' to cancel):")?.name, "siteNameConflict")
     }
@@ -1006,6 +1006,163 @@ final class AppRulesContractTests: XCTestCase {
             } else {
                 XCTAssertEqual(told, plain, name)
             }
+        }
+    }
+
+    /// `outsideAgents.greetingMustSay` (#791): every entry is checked against
+    /// the greeting each Revise door really sends, read off the command line
+    /// its script starts the assistant with, in the variants
+    /// `greetingMustSayHow` names. Each of `greetingMustNotSay`'s expressions
+    /// (Russell's ruling on #750) is matched against the same greetings. The four sentences that
+    /// gained a key are compared with their named constants as well.
+    func testEveryDoorsGreetingSaysWhatTheContractSays() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let entries: [[String: Any]] = try XCTUnwrap(section["greetingMustSay"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(entries.count, 8)
+        let agents: [[String: Any]] = try XCTUnwrap(section["agents"] as? [[String: Any]])
+        XCTAssertEqual(agents.count, 3)
+
+        let opening: [String: Any] = try XCTUnwrap(section["greetingOpening"] as? [String: Any])
+        let withName: String = try XCTUnwrap(opening["withName"] as? String)
+        let withoutName: String = try XCTUnwrap(opening["withoutName"] as? String)
+        let planFirst: String = try XCTUnwrap(section["greetingPlanFirstSentence"] as? String)
+        let handouts: String = try XCTUnwrap(section["greetingHandoutsSentence"] as? String)
+        let unitPlans: [String: Any] = try XCTUnwrap(section["greetingUnitPlans"] as? [String: Any])
+        let noUnitPlanYet: String = try XCTUnwrap(unitPlans["none"] as? String)
+        let references: [String: Any] = try XCTUnwrap(section["greetingReferenceCourses"] as? [String: Any])
+        let referencesTemplate: String = try XCTUnwrap(references["sentence"] as? String)
+        let referencesSeparator: String = try XCTUnwrap(references["separator"] as? String)
+        let referencesFirstWords: String = referencesTemplate.components(separatedBy: "{course}")[0]
+        XCTAssertFalse(referencesFirstWords.isEmpty)
+
+        // The sentences that had no key until #791, each the named constant.
+        XCTAssertEqual(ClaudeCodeLauncher.openingWithNameTemplate, withName)
+        XCTAssertEqual(ClaudeCodeLauncher.openingWithoutNameTemplate, withoutName)
+        XCTAssertEqual(ClaudeCodeLauncher.planFirstGreetingSentence, planFirst)
+        XCTAssertEqual(ClaudeCodeLauncher.toolsGreetingSentence, section["greetingToolsSentence"] as? String)
+        XCTAssertEqual(ClaudeCodeLauncher.sectionsGreetingSentence, section["greetingSectionsSentence"] as? String)
+
+        let mustNotSay: [String: Any] = try XCTUnwrap(section["greetingMustNotSay"] as? [String: Any])
+        let forbiddenPatterns: [String] = try XCTUnwrap(mustNotSay["expressions"] as? [String])
+        XCTAssertFalse(forbiddenPatterns.isEmpty)
+        var forbidden: [NSRegularExpression] = []
+        for pattern in forbiddenPatterns {
+            forbidden.append(try NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))
+        }
+
+        // The variants greetingMustSayHow names.
+        let variants: [GreetingVariant] = [
+            GreetingVariant(
+                name: "a name that differs from the code", courseCode: "MUSTSAY_A",
+                courseName: "Grade 11 Computer Science", referenceCourses: [], unitPlans: nil
+            ),
+            GreetingVariant(
+                name: "a reference course and no unit plan yet", courseCode: "MUSTSAY_B",
+                courseName: "Grade 11 Computer Science", referenceCourses: ["MUSTSAY_B-2025 (2025–26)"],
+                unitPlans: UnitPlans.Reading(plans: [], unreadable: 0)
+            ),
+            GreetingVariant(
+                name: "a name that is the code", courseCode: "MUSTSAY_C",
+                courseName: "MUSTSAY_C", referenceCourses: [], unitPlans: nil
+            ),
+        ]
+
+        var greetingsChecked: Int = 0
+        for agent in agents {
+            let door: String = try XCTUnwrap(agent["key"] as? String)
+            let arguments: [String] = try XCTUnwrap(agent["arguments"] as? [String])
+            let greetingIndex: Int = try XCTUnwrap(arguments.firstIndex(of: "{greeting}"), door)
+            for variant in variants {
+                let label: String = door + ", " + variant.name
+                let greeting: String = try AppRulesContractTests.greetingSent(
+                    byDoor: door, variant: variant, atArgument: greetingIndex
+                )
+                greetingsChecked += 1
+
+                for entry in entries {
+                    let key: String = try XCTUnwrap(entry["key"] as? String, label)
+                    let place: String = try XCTUnwrap(entry["where"] as? String, label + ": " + key)
+                    XCTAssertNotNil(section[key], label + ": greetingMustSay names \(key), which the contract does not carry")
+                    switch place {
+                    case "first":
+                        var expected: String = withoutName
+                        if variant.courseName != variant.courseCode && !variant.courseName.isEmpty {
+                            expected = withName.replacingOccurrences(of: "{courseName}", with: variant.courseName)
+                        }
+                        expected = expected.replacingOccurrences(of: "{course}", with: variant.courseCode)
+                        XCTAssertTrue(greeting.hasPrefix(expected + " "), label + ": " + key + "\n" + greeting)
+                    case "contains":
+                        let sentence: String = try XCTUnwrap(section[key] as? String, label + ": " + key)
+                        XCTAssertTrue(greeting.contains(sentence), label + ": " + key + "\n" + greeting)
+                    case "afterPlanFirst":
+                        let sentence: String = try XCTUnwrap(section[key] as? String, label + ": " + key)
+                        XCTAssertTrue(greeting.contains(planFirst + " " + sentence), label + ": " + key + "\n" + greeting)
+                    case "whenReferenceCourses":
+                        if variant.referenceCourses.isEmpty {
+                            XCTAssertFalse(greeting.contains(referencesFirstWords), label + ": " + key + "\n" + greeting)
+                        } else {
+                            let sentence: String = referencesTemplate
+                                .replacingOccurrences(of: "{course}", with: variant.courseCode)
+                                .replacingOccurrences(
+                                    of: "{courses}",
+                                    with: variant.referenceCourses.joined(separator: referencesSeparator)
+                                )
+                            XCTAssertTrue(greeting.contains(sentence), label + ": " + key + "\n" + greeting)
+                        }
+                    case "last":
+                        if variant.unitPlans == nil {
+                            XCTAssertFalse(greeting.contains(noUnitPlanYet), label + ": " + key + "\n" + greeting)
+                            XCTAssertTrue(greeting.hasSuffix(handouts), label + ": " + key + "\n" + greeting)
+                        } else {
+                            XCTAssertTrue(greeting.hasSuffix(" " + noUnitPlanYet), label + ": " + key + "\n" + greeting)
+                        }
+                    default:
+                        XCTFail(label + ": greetingMustSay has a 'where' this suite does not know: " + place)
+                    }
+                }
+
+                let whole: NSRange = NSRange(greeting.startIndex..., in: greeting)
+                for expression in forbidden {
+                    XCTAssertNil(
+                        expression.firstMatch(in: greeting, options: [], range: whole),
+                        label + ": the greeting matches greetingMustNotSay's " + expression.pattern + "\n" + greeting
+                    )
+                }
+            }
+        }
+        XCTAssertEqual(greetingsChecked, agents.count * variants.count)
+    }
+
+    /// `outsideAgents.greetingMustNotSay` (#791, the batch review): each
+    /// `mustMatch` sentence is caught by at least one expression, and no
+    /// `mustNotMatch` sentence by any. Matched without regard to case, as
+    /// the greetings are.
+    func testTheGreetingsForbiddenExpressionsCatchTheirCases() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let mustNotSay: [String: Any] = try XCTUnwrap(section["greetingMustNotSay"] as? [String: Any])
+        let patterns: [String] = try XCTUnwrap(mustNotSay["expressions"] as? [String])
+        var forbidden: [NSRegularExpression] = []
+        for pattern in patterns {
+            forbidden.append(try NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))
+        }
+        let mustMatch: [String] = try XCTUnwrap(mustNotSay["mustMatch"] as? [String])
+        let mustNotMatch: [String] = try XCTUnwrap(mustNotSay["mustNotMatch"] as? [String])
+        XCTAssertFalse(mustMatch.isEmpty)
+        XCTAssertFalse(mustNotMatch.isEmpty)
+
+        for sentence in mustMatch {
+            let caughtBy: [String] = AppRulesContractTests.patternsMatching(sentence, among: forbidden)
+            XCTAssertFalse(caughtBy.isEmpty, "greetingMustNotSay misses a mustMatch sentence: " + sentence)
+        }
+        for sentence in mustNotMatch {
+            let caughtBy: [String] = AppRulesContractTests.patternsMatching(sentence, among: forbidden)
+            XCTAssertTrue(
+                caughtBy.isEmpty,
+                "greetingMustNotSay catches a mustNotMatch sentence: " + sentence
+                    + " (" + caughtBy.joined(separator: ", ") + ")"
+            )
         }
     }
 
@@ -1459,6 +1616,79 @@ final class AppRulesContractTests: XCTestCase {
         )
     }
 
+    /// The patterns among `expressions` that find `sentence`, in order.
+    private static func patternsMatching(_ sentence: String, among expressions: [NSRegularExpression]) -> [String] {
+        var caughtBy: [String] = []
+        let whole: NSRange = NSRange(sentence.startIndex..., in: sentence)
+        for expression in expressions {
+            if expression.firstMatch(in: sentence, options: [], range: whole) != nil {
+                caughtBy.append(expression.pattern)
+            }
+        }
+        return caughtBy
+    }
+
+    /// The greeting one Revise door really sends for `variant`:
+    /// `prepareSession` writes the door's script, and the greeting is the
+    /// argument at `index` (where the contract's `arguments` put
+    /// `{greeting}`) on the line that starts the assistant. What the door
+    /// wrote for the connection is removed again.
+    private static func greetingSent(byDoor door: String, variant: GreetingVariant, atArgument index: Int) throws -> String {
+        let folder: String = "/Users/teacher/Teaching"
+        let server: String = "/Applications/Plantoir.app/Contents/MacOS/Plantoir"
+        var toolPath: String = ""
+        var scriptPath: String = ""
+        var connectionFile: String = ""
+        switch door {
+        case "claude":
+            toolPath = "/usr/local/bin/claude"
+            scriptPath = try ClaudeCodeLauncher.prepareSession(
+                workspacePath: folder, courseCode: variant.courseCode, courseName: variant.courseName,
+                claudePath: toolPath, serverPath: server,
+                referenceCourses: variant.referenceCourses, unitPlans: variant.unitPlans
+            )
+            connectionFile = "mcp-\(variant.courseCode).json"
+        case "codex":
+            toolPath = "/opt/homebrew/bin/codex"
+            scriptPath = try CodexLauncher.prepareSession(
+                workspacePath: folder, courseCode: variant.courseCode, courseName: variant.courseName,
+                codexPath: toolPath, serverPath: server,
+                referenceCourses: variant.referenceCourses, unitPlans: variant.unitPlans
+            )
+        case "copilot":
+            toolPath = "/opt/homebrew/bin/copilot"
+            scriptPath = try CopilotLauncher.prepareSession(
+                workspacePath: folder, courseCode: variant.courseCode, courseName: variant.courseName,
+                copilotPath: toolPath, serverPath: server,
+                referenceCourses: variant.referenceCourses, unitPlans: variant.unitPlans
+            )
+            connectionFile = "mcp-\(variant.courseCode)-copilot.json"
+        default:
+            XCTFail("The contract describes a door \"\(door)\" this app does not implement.")
+            return ""
+        }
+        defer {
+            try? FileManager.default.removeItem(atPath: scriptPath)
+            if !connectionFile.isEmpty, let support = try? ClaudeCodeLauncher.supportDirectory() {
+                try? FileManager.default.removeItem(at: support.appendingPathComponent(connectionFile))
+            }
+        }
+        let script: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
+        var commandLine: String = ""
+        for line in script.components(separatedBy: "\n")
+        where line.hasPrefix(ClaudeCodeLauncher.escapeForShell(toolPath) + " ") {
+            commandLine = line
+        }
+        var argv: [String] = try XCTUnwrap(splitShellWords(commandLine), door + ": no line starts the assistant\n" + script)
+        XCTAssertFalse(argv.isEmpty, door)
+        argv.removeFirst()
+        XCTAssertGreaterThan(argv.count, index, door + "\n" + script)
+        if argv.count <= index {
+            return ""
+        }
+        return argv[index]
+    }
+
     private static func readRules() throws -> [String: Any] {
         let url: URL = repositoryRoot()
             .appendingPathComponent("contracts")
@@ -1467,4 +1697,16 @@ final class AppRulesContractTests: XCTestCase {
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
     }
+}
+
+/// One of the greetings `outsideAgents.greetingMustSayHow` names (#791).
+struct GreetingVariant {
+
+    // MARK: - Stored properties
+
+    let name: String
+    let courseCode: String
+    let courseName: String
+    let referenceCourses: [String]
+    let unitPlans: UnitPlans.Reading?
 }

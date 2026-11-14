@@ -935,12 +935,23 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertLessThan(claim.lowerBound, stop.lowerBound, "The Deploy stops the preview before claiming the course.")
         XCTAssertNil(deploy.range(of: "CourseActivity.beginPublish("), "A second, later bracket crept back.")
 
+        // Since #812 the window records its build and takes its lease through
+        // `PreviewStartRecords.begin`, so the two are read there, and the
+        // window is read for the call and for the look that follows it.
         let preview: String = try WorkLeaseDecliningTests.body(of: "func startPreview(at request:", in: source)
-        let build: Range<String.Index> = try XCTUnwrap(preview.range(of: "previewBuildWait.begin("))
-        let lease: Range<String.Index> = try XCTUnwrap(preview.range(of: "PreviewLeases.lease("))
+        XCTAssertNil(preview.range(of: "previewBuildWait.begin("), "The Preview records its build outside PreviewStartRecords.begin.")
+        XCTAssertNil(preview.range(of: "PreviewLeases.lease("), "The Preview takes its lease outside PreviewStartRecords.begin.")
+        let taken: Range<String.Index> = try XCTUnwrap(preview.range(of: "PreviewStartRecords.begin("))
         let look: Range<String.Index> = try XCTUnwrap(preview.range(of: "WorkLeaseRegistry.whatBlocksABuild("))
+        XCTAssertLessThan(taken.lowerBound, look.lowerBound, "The Preview looks before it has taken both.")
+
+        let recordsURL: URL = url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Models/PreviewStartRecords.swift")
+        let records: String = try String(contentsOf: recordsURL, encoding: .utf8)
+        let begin: String = try WorkLeaseDecliningTests.body(of: "static func begin(", in: records)
+        let build: Range<String.Index> = try XCTUnwrap(begin.range(of: "wait.begin("))
+        let lease: Range<String.Index> = try XCTUnwrap(begin.range(of: "PreviewLeases.lease("))
         XCTAssertLessThan(build.lowerBound, lease.lowerBound, "The preview lease goes down before the build lease.")
-        XCTAssertLessThan(lease.lowerBound, look.lowerBound, "The Preview looks before it has taken both.")
     }
 
     /// The text of a function, from its signature to the next `    func `.

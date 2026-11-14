@@ -128,27 +128,18 @@ def _cmd_example(script_base: str, course, section, host_os: str) -> str:
         return f"./{script_base}.sh {course} {section}"
 # ----------------------------------------------------------------------------
 
-# The factory defaults are deliberately school-neutral. One switch brings
-# back LCS's own set-up — its terms (Grove Time, SIC) and the College Board
-# folder its AP courses use. These four lists are the whole difference.
+# The factory defaults are school-neutral. Until 2.0.0 a question here
+# offered one school's own folder and file names instead; it was removed
+# (#891), and a course made with it keeps the names already in its settings,
+# since a re-run offers the saved lists, never the factory ones.
 DEFAULT_SHARED_FOLDERS = [
     "Concepts", "Discussions", "Examples", "Exercises", "Media",
     "Ontario Curriculum", "Portfolios",
     "Recaps", "Setup", "Style", "Tasks", "Tutorials"
 ]
 
-LCS_SHARED_FOLDERS = [
-    "Concepts", "Discussions", "Examples", "Exercises", "Media",
-    "Ontario Curriculum", "College Board Curriculum", "Portfolios",
-    "Recaps", "Setup", "Style", "Tasks", "Tutorials"
-]
-
 DEFAULT_SHARED_FILES = [
     "Extra Help.md", "Learning Goals.md"
-]
-
-LCS_SHARED_FILES = [
-    "SIC Drop-In Sessions.md", "Grove Time.md", "Learning Goals.md"
 ]
 
 DEFAULT_PER_SECTION_FOLDERS = ["All Classes"]
@@ -439,7 +430,32 @@ def render_scheme_preview_for_section(scheme, idx, total, section_number):
 
     print("Use ← / → (or 'p' / 'n') to browse, Enter to select. Press 'q' to keep previous choice.")
 
+def schemes_to_list(schemes, section_scheme_id):
+    """The schemes the picker offers a section whose stored scheme id is
+    `section_scheme_id`, in the file's order (shared-rules.json ->
+    colourSchemePicker, #891). Every listed scheme is offered. An entry
+    marked "listed": false is offered only when it is the section's own
+    scheme, and then it takes the place of the scheme its "sameAs" names, so
+    the name is shown once and Enter keeps the id the course already has."""
+    own_unlisted = None
+    for scheme in schemes:
+        if scheme.get("id") == section_scheme_id and scheme.get("listed", True) is False:
+            own_unlisted = scheme
+    result = []
+    for scheme in schemes:
+        if scheme.get("listed", True) is False:
+            if scheme.get("id") == section_scheme_id:
+                result.append(scheme)
+            continue
+        if own_unlisted is not None and own_unlisted.get("sameAs") == scheme.get("id"):
+            continue
+        result.append(scheme)
+    return result
+
 def interactive_pick_scheme_for_section(schemes, section_number, default_id=None):
+    if not schemes:
+        return default_id
+    schemes = schemes_to_list(schemes, default_id)
     if not schemes:
         return default_id
     start = 0
@@ -3233,9 +3249,6 @@ def setup_course(no_backup: bool = False, reference_staging_folder=None):
         # cosmetic — fonts, colours, emoji, footer — is still the
         # teacher's, above and below.)
         curriculum_folder = example_manifest.get("curriculum_folder")
-        # The example content names its own files, so the terminology
-        # switch has nothing to decide here; the choice is only carried.
-        use_lcs_terminology = bool(saved_config.get("use_lcs_terminology", False))
         shared_folders = [x for x in example_manifest.get("shared_folders", []) if x != "Media"]
         shared_files = list(example_manifest.get("shared_files", []))
         per_section_folders = list(example_manifest.get("per_section_folders", []))
@@ -3252,16 +3265,11 @@ def setup_course(no_backup: bool = False, reference_staging_folder=None):
         print(f"   Per-section folders: {', '.join(per_section_folders) or '—'}")
         print(f"   Per-section files: {', '.join(per_section_files) or '—'}")
     else:
-        # ---------- Terminology for the factory defaults ---------------------
-        # The factory defaults are school-neutral; one switch brings back
-        # LCS's own set-up. Saved lists always win over either factory set —
-        # the switch only decides what a fresh course is offered.
-        use_lcs_terminology = prompt_yes_no_default(
-            "Use LCS-specific terminology (e.g. “Grove Time” instead of “Extra Help”)?",
-            bool(saved_config.get("use_lcs_terminology", False))
-        )
-        factory_shared_folders = LCS_SHARED_FOLDERS if use_lcs_terminology else DEFAULT_SHARED_FOLDERS
-        factory_shared_files = LCS_SHARED_FILES if use_lcs_terminology else DEFAULT_SHARED_FILES
+        # ---------- The factory defaults ------------------------------------
+        # School-neutral. Saved lists always win over them, so a re-run
+        # offers a course its own folders and files.
+        factory_shared_folders = DEFAULT_SHARED_FOLDERS
+        factory_shared_files = DEFAULT_SHARED_FILES
 
         # A skeleton knows which folders its own pages were written for, so
         # it offers those instead of the school-neutral factory list. The
@@ -3272,12 +3280,7 @@ def setup_course(no_backup: bool = False, reference_staging_folder=None):
         factory_per_section_files = DEFAULT_PER_SECTION_FILES
         if skeleton_manifest:
             factory_shared_folders = list(skeleton_manifest.get("shared_folders", factory_shared_folders))
-            skeleton_files = list(skeleton_manifest.get("shared_files", []))
-            if use_lcs_terminology:
-                for name in LCS_SHARED_FILES:
-                    if name not in skeleton_files:
-                        skeleton_files.append(name)
-            factory_shared_files = skeleton_files
+            factory_shared_files = list(skeleton_manifest.get("shared_files", []))
             factory_per_section_folders = list(skeleton_manifest.get("per_section_folders", factory_per_section_folders))
             factory_per_section_files = list(skeleton_manifest.get("per_section_files", factory_per_section_files))
 
@@ -3309,18 +3312,11 @@ def setup_course(no_backup: bool = False, reference_staging_folder=None):
 
         all_selected = shared_folders + shared_files + per_section_folders + per_section_files
 
-        if use_lcs_terminology:
-            factory_hidden = [
-                "Media", "Ontario Curriculum", "College Board Curriculum",
-                "SIC Drop-In Sessions.md", "Grove Time.md", "Learning Goals.md",
-                "Private Notes.md", "Scratch Page.md", "Key Links.md"
-            ]
-        else:
-            factory_hidden = [
-                "Media", "Ontario Curriculum",
-                "Extra Help.md", "Learning Goals.md",
-                "Private Notes.md", "Scratch Page.md", "Key Links.md"
-            ]
+        factory_hidden = [
+            "Media", "Ontario Curriculum",
+            "Extra Help.md", "Learning Goals.md",
+            "Private Notes.md", "Scratch Page.md", "Key Links.md"
+        ]
         if skeleton_manifest:
             factory_hidden = ["Media"] + list(skeleton_manifest.get("hidden", []))
         default_hidden = factory_hidden if not saved_config else saved_config.get("hidden", [])
@@ -3420,8 +3416,8 @@ def setup_course(no_backup: bool = False, reference_staging_folder=None):
         "include_curriculum_coverage": include_curriculum_coverage,
         "include_coverage_notes": include_coverage_notes,
         "include_curriculum_pages": include_curriculum,
-        # NEW: whether the default file names use LCS's own words
-        "use_lcs_terminology": use_lcs_terminology,
+        # `use_lcs_terminology` is no longer written (#891). A course that
+        # has it keeps it, through the saved-keys loop below; nothing reads it.
     }
     # The course's curriculum folders (#128), written as the LIST
     # `curriculum_folders` — see curriculum_folders_to_record.

@@ -623,7 +623,9 @@ class WorkspaceModel {
 
     /// One of the assistant's functions asked for from a section row's
     /// context menu (#457 batch B) — Publish Pages…, Hide Pages…, Publish
-    /// Class for a Date…, Add Next Class. The row is selected first, so the
+    /// Class for a Date… and Add Class…, which took Add Next Class's place
+    /// in #897 (ruled by Russell on 2026-11-13). The row is
+    /// selected first, so the
     /// section window that answers it is the one for that section: it takes
     /// the request only when it names its own course and section
     /// (`SectionDetailView.takeAVerbRequestIfItIsMine`).

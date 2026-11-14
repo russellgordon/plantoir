@@ -102,11 +102,18 @@ class Sabotages(unittest.TestCase):
                 self.assertIn(other, rows, one["name"])
             self.assertTrue(one["reason"].strip(), one["name"])
 
-    def test_every_row_but_embeds_is_proven_red_by_some_sabotage(self):
+    def test_every_row_is_proven_red_by_some_sabotage(self):
         aimed = {one["aims"] for one in ROWS["sabotages"]}
         unproven = [row["name"] for row in ROWS["rows"] if row["name"] not in aimed]
-        # Embeds run on deployed sites only; their proof is #597's second half.
-        self.assertEqual(unproven, ["embeds"])
+        self.assertEqual(unproven, [])
+
+    def test_a_deployed_only_row_is_proven_only_on_its_hosts(self):
+        # Embeds run on deployed sites only (597b): their sabotage names the
+        # same hosts, so verify.sh's local --expect-red all says NOTE for it.
+        rows = {row["name"]: row for row in ROWS["rows"]}
+        for one in ROWS["sabotages"]:
+            if rows[one["aims"]].get("hosts"):
+                self.assertEqual(one.get("hosts"), rows[one["aims"]]["hosts"], one["name"])
 
     def test_every_fixture_page_is_named(self):
         pages = {path.stem for path in plant_rendered.PAGES.glob("*.md")}

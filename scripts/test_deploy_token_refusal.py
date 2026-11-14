@@ -49,7 +49,6 @@ and the run is stopped before the website builder. Run with:
     python3 scripts/test_deploy_token_refusal.py
 """
 
-import atexit
 import os
 import re
 import shutil
@@ -59,13 +58,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-# Every launcher run here keeps its trail in a folder of its own (#737, #738):
-# a run refused by a deploy elsewhere on this Mac must never write the
-# teacher's real activity log. Set on this process, so every launcher run
-# below inherits it, whichever way its environment is built.
-_TRAIL_FOLDER = tempfile.mkdtemp(prefix="plantoir-test-trail-")
-os.environ["PLANTOIR_TRAIL_DIR"] = _TRAIL_FOLDER
-atexit.register(shutil.rmtree, _TRAIL_FOLDER, True)
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
@@ -74,6 +67,7 @@ os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts
 
 import contracts  # noqa: E402
 import test_deploy_non_interactive as launcher_harness  # noqa: E402
+from test_deploy_sh_questions import no_request_was_made, the_network_refused  # noqa: E402
 
 # The words that find each pair of lines. They are the launchers' own, and the
 # Swift explainer matches on the same ones (FailureExplainer.tokenRefusedMarker
@@ -234,13 +228,14 @@ class ASavedTokenIsClearedOnlyWhenTheServiceSaysNo(unittest.TestCase):
     def run_with(self, target: str, status: str, body: str = ""):
         with tempfile.TemporaryDirectory() as tmp:
             folder = _a_stubbed_working_folder(tmp)
-            environment = dict(os.environ, FAKE_STATUS=status, FAKE_BODY=body)
+            environment = the_network_refused(folder, dict(os.environ, FAKE_STATUS=status, FAKE_BODY=body))
             result = subprocess.run(
                 ["bash", str(folder / "deploy.sh"), "ICS3U", "1", "--image", "unused:tag",
                  "--target", target, "--non-interactive"],
                 capture_output=True, timeout=180, cwd=str(folder),
                 stdin=subprocess.DEVNULL, env=environment,
             )
+            no_request_was_made(folder)
             return (result.returncode,
                     result.stdout.decode("utf-8", "replace") + result.stderr.decode("utf-8", "replace"))
 

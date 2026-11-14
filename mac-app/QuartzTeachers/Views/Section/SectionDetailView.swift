@@ -55,8 +55,17 @@ struct SectionDetailView: View {
     /// the record cannot outlive the wait — see `PreviewBuildWait`.
     @State var previewBuildWait: PreviewBuildWait = PreviewBuildWait()
 
+    /// This section page's own id for a repair's Preview Again (#813), so
+    /// leaving the page abandons its press and nobody else's.
+    @State var previewAgainOwner: UUID = UUID()
+
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
+
+    /// The id of this window's latest start. A start parked while old stops
+    /// finish runs only if it is still the latest: two starts can hold leases
+    /// equal in every field (`PreviewStartRecords.theStartStillBelongs`).
+    @State var previewStartID: UUID?
 
     /// The folder this view REGISTERED itself under in
     /// `SectionWindowControllers`, and the only thing the unregister may read.
@@ -283,7 +292,7 @@ struct SectionDetailView: View {
     @State var afterTheVerbSheet: (() -> Void)?
 
     /// The answer of a function with no sheet of its own (Undo Last Change,
-    /// a refused Rebuild Preview, Add Next Class) that arrived while
+    /// a refused Rebuild Preview) that arrived while
     /// something else was on the window — shown when that has gone, never
     /// dropped (#457 batch B's review, note 4).
     @State var pendingVerbResult: SectionVerbSheetModel?
@@ -594,6 +603,9 @@ struct SectionDetailView: View {
             // While this section's deployed folder is open in the browser,
             // with Stop (#850).
             deployedFolderNotice
+            // The Cloudflare token ends in under 30 days, or has ended
+            // (#696), from the date Plantoir last read.
+            deployTokenEndNotice
             if let unsavedSettingsNotice {
                 // Its own view, and never `fixedSize` — see the view. Since
                 // #335 it may be a deploy's sentence, named for UI tests by
@@ -986,6 +998,9 @@ struct SectionDetailView: View {
                 }
             }
             .onDisappear {
+                // A repair's Preview Again still waiting for its stop starts
+                // nothing once this page has gone (#813).
+                PreviewAgainPresses.shared.abandon(owner: previewAgainOwner)
                 // FIRST, and unconditionally: the wait, and with it ⌘Q's record
                 // of a preview being built (issue #232). `stopPreview()` below
                 // ends it too; saying so here keeps a window that is going away
@@ -1433,7 +1448,15 @@ struct SectionDetailView: View {
     /// rather than unfortunate, and largely moot anyway: the repair itself puts
     /// content back, which forces a rebuild regardless.
     func rebuildAfterRepair() {
+        // The press is recorded AT ONCE, before anything is awaited (#813):
+        // leaving the section during the stop below abandons it, and so does
+        // quitting, so the start never runs from a view that has gone.
+        let owner: UUID = previewAgainOwner
+        let press: UUID = PreviewAgainPresses.shared.press(owner: owner)
         Task { @MainActor in
+            defer {
+                PreviewAgainPresses.shared.finish(press, owner: owner)
+            }
             // Every other way into a preview is gated — the toolbar button is
             // disabled while the section is busy, and Deploy while a deploy
             // runs. This was the one path with neither, so it could start a
@@ -1517,10 +1540,23 @@ struct SectionDetailView: View {
             // (`stopWaitingForThePreview`, issue #225); what is left holding a
             // port in silence is the outer ten-minute bound — a run that never
             // announced a server at all.
-            if previewLease != nil || previewRunner.isRunning {
-                await stopPreviewAndWait()
-            }
-            startPreview()
+            //
+            // The stop is waited for, then the start runs only if this press
+            // still holds (#813): `PreviewAgainPresses` says why.
+            _ = await PreviewAgainPresses.carryOut(
+                store: PreviewAgainPresses.shared,
+                owner: owner,
+                token: press,
+                courseCode: course.code,
+                sectionNumber: sectionNumber,
+                previewIsRunning: previewLease != nil || previewRunner.isRunning,
+                stop: {
+                    await stopPreviewAndWait()
+                },
+                start: {
+                    startPreview()
+                }
+            )
         }
     }
 
@@ -1886,7 +1922,8 @@ struct SectionDetailView: View {
         case .stopShowingDeployedFolder:
             stopShowingTheDeployedFolder()
         case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+             .addClass,
+             .reDateClasses, .makeRoomForClasses, .classDates:
             performVerb(item)
         default:
             break
@@ -2269,6 +2306,23 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // A start of this window's own is still under way: waiting for a
+        // stop to finish, or building. The button reads Preview, not Stop,
+        // until the run has begun, and the assistant and Course Settings see
+        // no running preview then either, so this is reached. Asked FIRST,
+        // before anything is written: a second start used to end the first
+        // one's record of a build and be refused by its lease, and ⌘Q then
+        // quit through that build without asking (#812). The start the
+        // teacher is waiting for goes on; this one does nothing.
+        if PreviewStartRecords.aStartIsUnderWay(wait: previewBuildWait, heldLease: previewLease) {
+            ActivityTrail.note(
+                .previewAlreadyStarting,
+                "asked to preview while this window's preview was still starting: the start already under way goes on, and nothing else was started",
+                course: course.code,
+                section: sectionNumber
+            )
+            return
+        }
         // Every way in, not only the button (#351): see its `.disabled`.
         if workspace.isBeingCopied(course.code) {
             return
@@ -2318,26 +2372,27 @@ struct SectionDetailView: View {
         // window would see it as earlier than its build and decline, and the
         // other program would see this window's preview as earlier than its
         // build and decline too. Build first, and exactly one goes ahead.
-        previewBuildWait.begin(
+        //
+        // Each preview runs on its own port, so several windows can show
+        // sections side by side without taking each other down. A refused
+        // lease ends this start's own claim on the record and nobody else's
+        // (#812): another window's start of this section stays recorded.
+        let lease: PreviewLeases.Lease
+        switch PreviewStartRecords.begin(
+            wait: previewBuildWait,
             folderPath: workspaceURL.path,
             courseCode: course.code,
             sectionNumber: sectionNumber
-        )
-        // Each preview runs on its own port, so several windows can show
-        // sections side by side without taking each other down.
-        let lease: PreviewLeases.Lease
-        do {
-            lease = try PreviewLeases.lease(
-                folderPath: workspaceURL.path,
-                courseCode: course.code,
-                sectionNumber: sectionNumber
-            )
-        } catch {
-            previewBuildWait.end()
-            showPreviewRefusal(title: "Cannot Preview Yet", sentence: error.localizedDescription)
+        ) {
+        case .began(let taken):
+            lease = taken
+        case .refused(let sentence):
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: sentence)
             return
         }
         previewLease = lease
+        let thisStart: UUID = UUID()
+        previewStartID = thisStart
         previewURL = nil
         previewRoot = nil
         // ANOTHER program on this Mac — an assistant working from another
@@ -2410,8 +2465,25 @@ struct SectionDetailView: View {
             // the stops finished, and the view has not gone (a view going
             // away releases its lease). Otherwise this start belongs to no
             // one, and running it would leave a preview nothing stops
-            // (#793, the 793b fix review 2's LOW 2).
-            if previewLease != lease {
+            // (#793, the 793b fix review 2's LOW 2). Since #812's review it
+            // must also be the window's LATEST start, since a later one can
+            // hold an equal lease, and the quit must not have gone ahead.
+            let stillBelongs: Bool = PreviewStartRecords.theStartStillBelongs(
+                heldLease: previewLease,
+                lease: lease,
+                heldStart: previewStartID,
+                start: thisStart,
+                appIsQuitting: WorkspaceModel.isTerminating
+            )
+            if !stillBelongs {
+                // Only a quit that went ahead leaves this start still holding
+                // its own record and lease, so hand them back. Any other way
+                // here, they are already another start's, or gone.
+                let stillHoldsItsOwn: Bool = previewLease == lease && previewStartID == thisStart
+                if stillHoldsItsOwn {
+                    previewBuildWait.end()
+                    releasePreviewLease()
+                }
                 return
             }
             // What the built page looked like BEFORE this build — so we can
@@ -3200,10 +3272,39 @@ struct SectionDetailView: View {
         // and install npm dependencies.
         var waitedSeconds: Int = 0
         while waitedSeconds < 600 {
-            if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
+            let standing: PreviewStartRecords.RunStanding = PreviewStartRecords.howTheRunStands(
+                isRunning: previewRunner.isRunning,
+                lastExitCode: previewRunner.lastExitCode,
+                launchProblem: previewRunner.launchProblem
+            )
+            if standing == .ended {
                 // The script exited before the server came up: show output.
                 previewBuildWait.end()
                 releasePreviewLease()
+                return
+            }
+            if case .couldNotStart(let problem) = standing {
+                // The run never started (#812's review). It used to hold the
+                // wait, the record and the lease for ten minutes, so quitting
+                // asked about nothing and every later Preview did nothing.
+                // End them now, and say why in an alert as well as on the
+                // console, since the console is not always on screen. What
+                // lies behind it (the missing piece's file name, or what the
+                // system said) goes to the trail only: the sentence is the
+                // one the teacher can act on.
+                previewBuildWait.end()
+                releasePreviewLease()
+                var trailLine: String = "the preview could not start, and the teacher was told why: " + problem
+                if let detail = previewRunner.launchProblemDetail {
+                    trailLine += " (" + detail + ")"
+                }
+                ActivityTrail.note(
+                    .previewCouldNotStart,
+                    trailLine,
+                    course: course.code,
+                    section: sectionNumber
+                )
+                showPreviewRefusal(title: "Cannot Preview Yet", sentence: problem)
                 return
             }
             if let announced = previewRunner.previewAddress {

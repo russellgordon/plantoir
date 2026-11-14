@@ -104,11 +104,22 @@ final class PreviewWhileDeployingTests: XCTestCase {
             body.range(of: "SectionDetailView.refusalWhileThisSectionDeploys("),
             "startPreview no longer asks whether its section is being deployed"
         )
-        for later in ["previewBuildWait.begin(", "PreviewLeases.lease(", "WorkLeaseRegistry.whatBlocksABuild(",
+        // Since #812 the build is recorded and the lease taken inside
+        // `PreviewStartRecords.begin`, so that call is what must come after
+        // the question, and a direct call left in the view must as well.
+        for later in ["PreviewStartRecords.begin(", "WorkLeaseRegistry.whatBlocksABuild(",
                       "ReferenceLock.ensureLockedInBackground("] {
             let found: Range<String.Index> = try XCTUnwrap(body.range(of: later), later)
             XCTAssertLessThan(asked.lowerBound, found.lowerBound, "asked after \(later)")
         }
+        for direct in ["previewBuildWait.begin(", "PreviewLeases.lease("] {
+            if let found = body.range(of: direct) {
+                XCTAssertLessThan(asked.lowerBound, found.lowerBound, "asked after \(direct)")
+            }
+        }
+        let begin: String = try codeLines(of: "PreviewStartRecords.swift", from: "    static func begin(", to: "\n}")
+        XCTAssertTrue(begin.contains("wait.begin("), "PreviewStartRecords.begin no longer records the build")
+        XCTAssertTrue(begin.contains("PreviewLeases.lease("), "PreviewStartRecords.begin no longer takes the lease")
         XCTAssertTrue(body.contains("WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys("))
     }
 

@@ -303,6 +303,39 @@ nonisolated enum ClaudeCodeLauncher {
     static let howITeachGreetingSentence: String =
         "Then read my How I Teach page for this course, and keep to it in anything you write for me."
 
+    /// The greeting's first sentence, naming the course by code and by its
+    /// name when that differs, filled from `contracts/app-rules.json` →
+    /// `outsideAgents.greetingOpening` (#791): `withName` or `withoutName`.
+    static let openingWithNameTemplate: String = "I'm a teacher working on {course} ({courseName}) in Plantoir."
+    static let openingWithoutNameTemplate: String = "I'm a teacher working on {course} in Plantoir."
+
+    /// The sentence pointing the session at the plantoir tools, verbatim from
+    /// `outsideAgents.greetingToolsSentence` (#791).
+    static let toolsGreetingSentence: String = "Use the plantoir tools for anything to do with this course."
+
+    /// The sentence asking the session to list the course's sections first,
+    /// verbatim from `outsideAgents.greetingSectionsSentence` (#791).
+    static let sectionsGreetingSentence: String = "Start by listing its sections so we both know what's there."
+
+    /// The sentence that holds every change until a plan has been shown and
+    /// agreed to, verbatim from `outsideAgents.greetingPlanFirstSentence`
+    /// (#791). The handouts sentence comes straight after it.
+    static let planFirstGreetingSentence: String =
+        "Before changing anything, use the matching plan tool first and show me what it says, "
+        + "in plain words, and wait for me to agree."
+
+    /// The greeting's first sentence for one course: the name in brackets
+    /// only when there is one and it is not the code itself.
+    static func greetingOpening(courseCode: String, courseName: String) -> String {
+        let trimmedName: String = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedName.isEmpty && trimmedName != courseCode {
+            return openingWithNameTemplate
+                .replacingOccurrences(of: "{course}", with: courseCode)
+                .replacingOccurrences(of: "{courseName}", with: trimmedName)
+        }
+        return openingWithoutNameTemplate.replacingOccurrences(of: "{course}", with: courseCode)
+    }
+
     /// The sentence that has the session tell the teacher it can make printed
     /// handouts (#859), verbatim from `contracts/app-rules.json` →
     /// `outsideAgents.greetingHandoutsSentence`.
@@ -338,16 +371,11 @@ nonisolated enum ClaudeCodeLauncher {
         referenceCourses: [String] = [],
         unitPlans: [UnitPlans.Plan]? = nil
     ) -> String {
-        var text: String = "I'm a teacher working on \(courseCode)"
-        let trimmedName: String = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedName.isEmpty && trimmedName != courseCode {
-            text.append(" (\(trimmedName))")
-        }
-        text.append(" in Plantoir. Use the plantoir tools for anything to do with this course. ")
-        text.append("Start by listing its sections so we both know what's there. ")
-        text.append(ClaudeCodeLauncher.howITeachGreetingSentence + " ")
-        text.append("Before changing anything, use the matching plan tool first and show me what it says, ")
-        text.append("in plain words, and wait for me to agree.")
+        var text: String = ClaudeCodeLauncher.greetingOpening(courseCode: courseCode, courseName: courseName)
+        text.append(" " + ClaudeCodeLauncher.toolsGreetingSentence)
+        text.append(" " + ClaudeCodeLauncher.sectionsGreetingSentence)
+        text.append(" " + ClaudeCodeLauncher.howITeachGreetingSentence)
+        text.append(" " + ClaudeCodeLauncher.planFirstGreetingSentence)
         // The handouts sentence (#859) comes straight after the plan-first
         // sentence, before the reference courses and the unit plans, so the
         // greeting with reference courses is still the plain greeting, a

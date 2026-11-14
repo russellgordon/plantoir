@@ -138,8 +138,11 @@ class WiringTests(unittest.TestCase):
         # #578: the GeoGebra sketches' transformer stands between the two.
         self.assertEqual(config.count("Plugin.PlantoirGeoGebra(),"), 1)
         self.assertEqual(self.text("transformers").count('export { PlantoirGeoGebra } from "./plantoirGeoGebra"'), 1)
+        # #674: the PhET simulations' transformer straight after GeoGebra's.
+        self.assertEqual(config.count("Plugin.PlantoirPhet(),"), 1)
+        self.assertEqual(self.text("transformers").count('export { PlantoirPhet } from "./plantoirPhet"'), 1)
         self.assertIn("      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirGeoGebra(),\n"
-                      "      Plugin.PlantoirQuizzes(),\n", config,
+                      "      Plugin.PlantoirPhet(),\n      Plugin.PlantoirQuizzes(),\n", config,
                       "the quizzes' transformer goes straight after the figures', so after Description, at its indent")
         self.assertEqual(self.text("transformers").count('export { PlantoirTasks } from "./plantoirTasks"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirTasks(),"), 1)
@@ -213,7 +216,20 @@ class WiringTests(unittest.TestCase):
         build_site.wire_quartz_additions(self.output)
         config = self.text("config")
         self.assertEqual(config.count("Plugin.PlantoirFigures("), 1)
-        self.assertIn("Plugin.PlantoirFigures(),\n      Plugin.PlantoirGeoGebra(),\n      Plugin.PlantoirQuizzes(),\n", config)
+        self.assertIn("Plugin.PlantoirFigures(),\n      Plugin.PlantoirGeoGebra(),\n      Plugin.PlantoirPhet(),\n"
+                      "      Plugin.PlantoirQuizzes(),\n", config)
+
+    def test_a_section_wired_before_674_gets_the_simulations_after_its_sketches(self):
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Description(),\n",
+            "      Plugin.Description(),\n      Plugin.PlantoirFigures(),\n      Plugin.PlantoirGeoGebra(),\n"
+            "      Plugin.PlantoirQuizzes(),\n", 1),
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirPhet("), 1)
+        self.assertIn("Plugin.PlantoirGeoGebra(),\n      Plugin.PlantoirPhet(),\n      Plugin.PlantoirQuizzes(),\n", config)
 
     def test_a_section_wired_before_519_gets_the_task_boxes_after_its_quizzes(self):
         self.files["config"].write_text(CONFIG.replace(
@@ -296,6 +312,57 @@ class WiringTests(unittest.TestCase):
                 rules.append(line.strip())
         self.assertEqual(rules, ["html body img {", "content-visibility: visible;", "}",
                                  "html body img[data-pl-sized] {", "height: auto;", "}"])
+
+    def test_the_videos_transformer_goes_straight_before_obsidian_flavored_markdown(self):
+        # #692: OFM's own YouTube step replaces a picture's properties, so the
+        # words in its brackets (the player's title) survive only if the
+        # videos' transformer runs FIRST. Quartz runs html plugins in list order.
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirVideo(),"), 1)
+        self.assertIn("      Plugin.PlantoirVideo(),\n      Plugin.ObsidianFlavoredMarkdown(", config,
+                      "the videos' transformer goes straight before OFM, at its indent")
+        self.assertEqual(self.text("transformers").count('export { PlantoirVideo } from "./plantoirVideo"'), 1)
+
+    def test_a_section_wired_before_692_gets_the_videos_before_obsidian_flavored_markdown(self):
+        build_site.wire_quartz_additions(self.output)
+        wired = self.text("config").replace("      Plugin.PlantoirVideo(),\n", "", 1)
+        self.files["config"].write_text(wired, encoding="utf-8")
+        self.files["transformers"].write_text(self.text("transformers").replace(
+            'export { PlantoirVideo } from "./plantoirVideo" // PLANTOIR-ADDITIONS\n', "", 1), encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.PlantoirVideo("), 1)
+        self.assertIn("      Plugin.PlantoirVideo(),\n      Plugin.ObsidianFlavoredMarkdown(", config)
+        self.assertEqual(self.text("transformers").count("PlantoirVideo"), 1)
+
+    def test_videos_without_the_obsidian_flavored_markdown_anchor_are_said_and_left_out(self):
+        import contextlib
+        import io
+        changed = CONFIG.replace("Plugin.ObsidianFlavoredMarkdown(", "Plugin.ObsidianMarkdown(")
+        self.files["config"].write_text(changed, encoding="utf-8")
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            build_site.wire_quartz_additions(self.output)
+        self.assertNotIn("PlantoirVideo", self.text("config"))
+        self.assertIn("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.",
+                      said.getvalue())
+
+    def test_the_print_buttons_component_carries_the_video_rule(self):
+        # #692: every player 600 px wide at most and 16:9. The selector must
+        # outrank Quartz's `.external-embed.youtube` (width: 100%), because
+        # this stylesheet comes BEFORE base.scss in index.css.
+        components = Path(build_site.__file__).resolve().parent.parent / "support" / "quartz" / "components"
+        component = (components / "PlantoirMetaLine.tsx").read_text(encoding="utf-8")
+        self.assertIn('import videosStyle from "./styles/videos.scss"', component)
+        self.assertIn("inner.css, style, videosStyle, figuresStyle", component)
+        rules = []
+        for line in (components / "styles" / "videos.scss").read_text(encoding="utf-8").splitlines():
+            if not line.strip().startswith("//") and line.strip() != "":
+                rules.append(line.strip())
+        self.assertEqual(rules, ["html body iframe.external-embed.plantoir-video {", "display: block;",
+                                 "width: 600px;", "max-width: 100%;", "height: auto;", "aspect-ratio: 16 / 9;",
+                                 "border: 0;", "border-radius: 5px;", "}"])
 
     def test_quizzes_without_the_figures_anchor_are_said_and_left_out(self):
         changed = CONFIG.replace("Plugin.Description(),", "Plugin.Summary(),")

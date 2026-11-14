@@ -193,8 +193,16 @@ class CompileWrapperTests(unittest.TestCase):
     def test_the_environment_is_a_windows_one_and_run_uses_it(self):
         environment = self.module.environment()
         self.assertIn("SystemRoot", environment)
-        self.assertNotIn("/usr/bin", environment["PATH"])
-        self.assertTrue(environment["PATH"].startswith(str(fetch.tool_paths(self.space.install)["bin"])))
+        # PATH is the toolchain's bin and System32, joined the Windows way,
+        # and nothing else: compile.py's own POSIX PATH ("...:/usr/bin:/bin")
+        # is one entry here and fails the comparison. Compared as entries so
+        # the fake install's own folder (".../toolchain/usr/bin" on a Mac's
+        # temporary folder) is not read as /usr/bin (#802).
+        entries = environment["PATH"].split(";")
+        self.assertEqual(entries, [str(fetch.tool_paths(self.space.install)["bin"]),
+                                   str(Path(environment["SystemRoot"]) / "System32")])
+        for posix_folder in ("/usr/bin", "/bin"):
+            self.assertNotIn(posix_folder, entries)
         self.assertEqual(environment["TEMP"], environment["TMP"])
         seen = {}
 
@@ -250,7 +258,11 @@ class CompileWrapperTests(unittest.TestCase):
         return line, sorted(path.name for path in cache.iterdir())
 
     def test_a_compile_error_with_an_error_in_it_is_cached(self):
-        line, cached = self.run_a_job(f"{self.space.work}\\{'b' * 64}\\main.swift:1:7: error: cannot find 'nmae' in scope")
+        # The compiler names the job's own work folder as this computer
+        # writes it, then its file after a backslash: built from the Path, so
+        # the folder is the one tidy() strips on a Mac too (#802).
+        job_folder = self.space.work / ("b" * 64)
+        line, cached = self.run_a_job(f"{job_folder}\\main.swift:1:7: error: cannot find 'nmae' in scope")
         self.assertIn("compile error", line)
         self.assertEqual(cached, ["b" * 64 + ".json"])
         entry = json.loads((self.space.root / "cache" / ("b" * 64 + ".json")).read_text())

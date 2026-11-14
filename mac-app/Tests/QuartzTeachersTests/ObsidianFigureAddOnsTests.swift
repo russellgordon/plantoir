@@ -16,6 +16,24 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
 
     var rootURL: URL = URL(fileURLWithPath: "/")
 
+    /// How many times the cost of reading every page the scan of 4,000
+    /// pages may take (#905): a bound relative to the Mac running it, set
+    /// at about four times the worst ratio measured under load.
+    static let scanCostsAtMostThisManyReads: Double = 10
+
+    /// How many times its cost per read on 500 pages the scan of 4,000
+    /// pages may cost per read (#905). A scan whose work grows with the
+    /// pages measured 2.71 to 6.45; today's measured 0.58 to 1.98 under
+    /// load (with `smallCourseTimingsPerRound` timings of 500 pages).
+    static let perPageCostGrowsAtMost: Double = 2.5
+
+    /// How many times the 500-page pair is timed in each of the five
+    /// rounds (#905). Reading 500 pages takes about 10 ms, so one timing
+    /// per round let a burst of load catch all five and shrink the
+    /// denominator of the growth figure: 5 of 75 loaded runs failed that
+    /// way. Four timings per round add about 0.2 s.
+    static let smallCourseTimingsPerRound: Int = 4
+
     // MARK: - Setting up
 
     override func setUp() async throws {
@@ -171,23 +189,111 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         XCTAssertFalse(ObsidianFigureAddOns.pageIsEvicted(courseURL.appendingPathComponent("Figures.md")))
     }
 
-    /// Measured, not asserted: a cold scan of 2,000 pages (doc 09 records
-    /// the number). Generous bound, so a slow machine does not fail it.
-    func testTheScanOfTwoThousandPagesIsQuick() throws {
-        let courseURL: URL = try makeCourse(named: "BIG")
-        let page: String = String(repeating: "A line of a lesson with `code` and [[a link]].\n", count: 60)
-        for index in 0..<2000 {
-            let folder: URL = courseURL.appendingPathComponent("Unit \(index % 20)")
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Data((page + (index == 1999 ? "\n```functionplot\ny = x\n```\n" : "")).utf8)
-                .write(to: folder.appendingPathComponent("Page \(index).md"))
+    /// What the scan must not do, on any Mac (#905), pinned with no clock:
+    /// read a page twice, read a file that is not a page, or reach into a
+    /// folder whose name starts with a dot. Both doors the scan has to a
+    /// page are injected and counted: `isEvicted` is asked of every page
+    /// once, and `readPage` reads every page once. A read that went around
+    /// `readPage` would not be counted here; the next test pins that the
+    /// scan has no other way to read.
+    func testTheScanOfTwoThousandPagesReadsEachPageOnce() throws {
+        let courseURL: URL = try makePages(count: 2000, named: "BIG")
+        let trashURL: URL = courseURL.appendingPathComponent(".trash")
+        try FileManager.default.createDirectory(at: trashURL, withIntermediateDirectories: true)
+        try Data("```tikz\n\\begin{document}\n\\end{document}\n```\n".utf8).write(to: trashURL.appendingPathComponent("Old.md"))
+        try Data("```tikz\n\\begin{document}\n\\end{document}\n```\n".utf8)
+            .write(to: courseURL.appendingPathComponent("Unit 0/Not a page.txt"))
+        var askedOf: [String] = []
+        var readsOfEachPage: [String: Int] = [:]
+        let kinds: Set<String> = ObsidianFigureAddOns.kindsUsed(
+            inCourseAt: courseURL,
+            among: ["tikz", "functionplot"],
+            isEvicted: { (fileURL: URL) -> Bool in
+                askedOf.append(fileURL.standardizedFileURL.path)
+                return false
+            },
+            readPage: { (fileURL: URL) -> Data? in
+                let path: String = fileURL.standardizedFileURL.path
+                let readsSoFar: Int = readsOfEachPage[path] ?? 0
+                readsOfEachPage[path] = readsSoFar + 1
+                return ObsidianFigureAddOns.readPage(fileURL)
+            }
+        )
+        XCTAssertEqual(kinds, ["functionplot"], "nothing in .trash or in a file that is not a page was read")
+        XCTAssertEqual(askedOf.count, 2000, "every page asked of, and nothing else")
+        XCTAssertEqual(Set(askedOf).count, askedOf.count, "no page asked of twice")
+        XCTAssertEqual(readsOfEachPage.count, 2000, "every page read, and nothing else")
+        for (path, reads) in readsOfEachPage {
+            XCTAssertEqual(reads, 1, "\(path) was read \(reads) times")
+            XCTAssertTrue(path.hasSuffix(".md"), path)
+            XCTAssertFalse(path.contains("/.trash/"), path)
         }
-        let started: Date = Date()
-        let kinds: Set<String> = ObsidianFigureAddOns.kindsUsed(inCourseAt: courseURL, among: ["tikz", "functionplot"])
-        let seconds: Double = Date().timeIntervalSince(started)
-        XCTAssertEqual(kinds, ["functionplot"])
-        print("obsidian add-ons scan: 2000 pages in \(String(format: "%.0f", seconds * 1000)) ms")
-        XCTAssertLessThan(seconds, 5)
+    }
+
+    /// The count above sees only reads that go through `readPage`, so the
+    /// scan must have no other way to read a page (#905): its body names
+    /// `readPage` and no reading call of its own.
+    func testTheScanReadsPagesOnlyThroughItsReader() throws {
+        let sourceURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Models/ObsidianFigureAddOns.swift")
+        let source: String = try String(contentsOf: sourceURL, encoding: .utf8)
+        let startRange: Range<String.Index> = try XCTUnwrap(source.range(of: "static func kindsUsed("))
+        let endRange: Range<String.Index> = try XCTUnwrap(
+            source.range(of: "\n    }\n", range: startRange.upperBound..<source.endIndex)
+        )
+        let body: String = String(source[startRange.lowerBound..<endRange.upperBound])
+        XCTAssertTrue(body.contains("readPage(fileURL)"), "the scan reads through readPage")
+        let readingCalls: [String] = ["contentsOf", "FileHandle", "InputStream", "mmap", "fopen", "read("]
+        for call in readingCalls {
+            XCTAssertFalse(body.contains(call), "the scan reads a page with \(call) as well as through readPage")
+        }
+    }
+
+    /// Quick against this Mac rather than against a number of seconds, and
+    /// no worse per page in a big course than in a small one (#905). The
+    /// scan and plain reading (`readEveryPage`, the least any scan that
+    /// reads the pages must cost) are timed on 500 pages and on 4,000 in
+    /// the same run, in five interleaved rounds, and the fastest of each
+    /// kept, so a burst of load slows both or neither. The 500-page pair is
+    /// timed `smallCourseTimingsPerRound` times a round, since one quick
+    /// sample a round could be caught by load all five times. Two bounds,
+    /// neither in seconds: on 4,000 pages the scan costs under
+    /// `scanCostsAtMostThisManyReads` reads; and its cost per read on 4,000
+    /// pages is under `perPageCostGrowsAtMost` times its cost per read on
+    /// 500, which a scan whose work per page grows with the course cannot
+    /// meet. Measured standalone at -Onone on the M4 Pro (12 cores), four
+    /// timings a round: 0 of 55 runs failed with 24 busy loops, 0 of 148
+    /// with 6 and 0 of 100 with none (growth at most 1.98); a scan that
+    /// searched a list of the pages it had read failed 8 of 8, 21 of 21
+    /// and 20 of 20. With one timing a round, 5 of 75 loaded runs failed.
+    func testTheScanIsQuickAndGrowsNoFasterThanThePages() throws {
+        let smallCourseURL: URL = try makePages(count: 500, named: "SMALL")
+        let largeCourseURL: URL = try makePages(count: 4000, named: "LARGE")
+        var fastestSmallRead: Double = Double.infinity
+        var fastestSmallScan: Double = Double.infinity
+        var fastestLargeRead: Double = Double.infinity
+        var fastestLargeScan: Double = Double.infinity
+        for _ in 0..<5 {
+            for _ in 0..<ObsidianFigureAddOnsTests.smallCourseTimingsPerRound {
+                fastestSmallRead = min(fastestSmallRead, ObsidianFigureAddOnsTests.secondsToReadEveryPage(inCourseAt: smallCourseURL))
+                fastestSmallScan = min(fastestSmallScan, ObsidianFigureAddOnsTests.secondsToScan(courseAt: smallCourseURL))
+            }
+            fastestLargeRead = min(fastestLargeRead, ObsidianFigureAddOnsTests.secondsToReadEveryPage(inCourseAt: largeCourseURL))
+            fastestLargeScan = min(fastestLargeScan, ObsidianFigureAddOnsTests.secondsToScan(courseAt: largeCourseURL))
+        }
+        let smallRatio: Double = fastestSmallScan / fastestSmallRead
+        let largeRatio: Double = fastestLargeScan / fastestLargeRead
+        let growth: Double = largeRatio / smallRatio
+        print("obsidian add-ons scan: 4000 pages in \(String(format: "%.0f", fastestLargeScan * 1000)) ms, reading them alone \(String(format: "%.0f", fastestLargeRead * 1000)) ms, \(String(format: "%.2f", largeRatio)) times; 500 pages \(String(format: "%.2f", smallRatio)) times; growth \(String(format: "%.2f", growth))")
+        XCTAssertLessThan(
+            largeRatio, ObsidianFigureAddOnsTests.scanCostsAtMostThisManyReads,
+            "the scan of 4,000 pages took \(String(format: "%.2f", largeRatio)) times as long as reading every page"
+        )
+        XCTAssertLessThan(
+            growth, ObsidianFigureAddOnsTests.perPageCostGrowsAtMost,
+            "per page, the scan of 4,000 pages cost \(String(format: "%.2f", growth)) times what the scan of 500 cost"
+        )
     }
 
     // MARK: - What a pass writes
@@ -1058,6 +1164,62 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         let courseURL: URL = rootURL.appendingPathComponent(UUID().uuidString).appendingPathComponent(code)
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
         return courseURL
+    }
+
+    /// `count` pages in 20 unit folders, the last one with a functionplot
+    /// fence and none with a tikz one, so a scan reads every page.
+    func makePages(count: Int, named code: String) throws -> URL {
+        let courseURL: URL = try makeCourse(named: code)
+        let page: String = String(repeating: "A line of a lesson with `code` and [[a link]].\n", count: 60)
+        for index in 0..<count {
+            let folder: URL = courseURL.appendingPathComponent("Unit \(index % 20)")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data((page + (index == count - 1 ? "\n```functionplot\ny = x\n```\n" : "")).utf8)
+                .write(to: folder.appendingPathComponent("Page \(index).md"))
+        }
+        return courseURL
+    }
+
+    /// The least any scan that reads the pages must cost: walk the course
+    /// the way the scan walks it and read every page's bytes. Answers the
+    /// bytes read, so the work cannot be left out.
+    static func readEveryPage(inCourseAt courseURL: URL) -> Int {
+        var bytesRead: Int = 0
+        guard let walker = FileManager.default.enumerator(
+            at: courseURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return bytesRead
+        }
+        for case let fileURL as URL in walker {
+            if fileURL.pathExtension.lowercased() != "md" {
+                continue
+            }
+            if let data = try? Data(contentsOf: fileURL) {
+                bytesRead += data.count
+            }
+        }
+        return bytesRead
+    }
+
+    /// How long `readEveryPage` takes on the course, in seconds.
+    static func secondsToReadEveryPage(inCourseAt courseURL: URL) -> Double {
+        let started: Date = Date()
+        let bytesRead: Int = ObsidianFigureAddOnsTests.readEveryPage(inCourseAt: courseURL)
+        let seconds: Double = Date().timeIntervalSince(started)
+        XCTAssertGreaterThan(bytesRead, 0)
+        return seconds
+    }
+
+    /// How long the scan takes on the course, in seconds; it must find the
+    /// one functionplot fence on the last page.
+    static func secondsToScan(courseAt courseURL: URL) -> Double {
+        let started: Date = Date()
+        let kinds: Set<String> = ObsidianFigureAddOns.kindsUsed(inCourseAt: courseURL, among: ["tikz", "functionplot"])
+        let seconds: Double = Date().timeIntervalSince(started)
+        XCTAssertEqual(kinds, ["functionplot"])
+        return seconds
     }
 
     func defaultsURL() -> URL? {

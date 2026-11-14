@@ -137,6 +137,9 @@ class TheCapHolds(unittest.TestCase):
             "PLANTOIR_SWIFT: " + json.dumps({"course": long_code, "downloadedBytes": 99999999999, "ready": True,
                                              "seconds": 99999, "section": 99}, sort_keys=True),
             "PLANTOIR_CLOUDFLARE_REMADE: " + long_code + "/99 " + "a" * 58 + " " + "a" * 58 + ".pages.dev",
+            # #674: counts and a reason, never a page or a name.
+            "PLANTOIR_DOWNLOADED: " + json.dumps({"kind": "phet", "course": long_code, "section": 99,
+                                                  "downloaded": 99999, "bytes": 99999999999, "seconds": 99999.9}),
         ]
         for line in worst:
             with self.subTest(line=line[:30]):

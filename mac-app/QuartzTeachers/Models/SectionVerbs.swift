@@ -4,8 +4,9 @@ import Observation
 /// The assistant's functions, run from the Section menu (#457 batch B).
 ///
 /// Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview,
-/// Undo Last Change, Add Next Class, Re-date Classes… and Make Room for
-/// Classes… are the assistant's tools, and they were reachable ONLY through
+/// Undo Last Change, Add Class… (Add Next Class until #897; it also adds a
+/// class in a new unit or as a copy of one), Re-date Classes… and Make Room
+/// for Classes… are the assistant's tools, and they were reachable ONLY through
 /// the assistant — so a teacher who declined its download could not publish
 /// a page by name, take a change back, or make room for a class at all.
 ///
@@ -219,8 +220,8 @@ final class SectionVerbs {
             return "Section ▸ Rebuild Preview"
         case .undoLastChange:
             return "Section ▸ Undo Last Change"
-        case .addNextClass:
-            return "Section ▸ Add Next Class"
+        case .addClass:
+            return "Section ▸ Add Class…"
         case .reDateClasses:
             return "Section ▸ Re-date Classes…"
         case .makeRoomForClasses:
@@ -279,6 +280,26 @@ final class SectionVerbs {
         return call("add_next_class", ["course": course, "section": section])
     }
 
+    /// Add Class… in a new unit (#897): `unit: "next"`, the argument the
+    /// window's "Start a new unit for the next class" phrasing sends. The
+    /// runner already read it; no schema shows it, so nothing the local
+    /// model is shown moves.
+    static func addNextClassInANewUnit(course: String, section: Int) -> AssistToolCall {
+        return call("add_next_class", ["course": course, "section": section, "unit": "next"])
+    }
+
+    /// Add Class… as a copy of a class (or its plan, #897): the source named by its
+    /// FILE inside the course (`coursePath(ofPageAt:in:)`), in an argument
+    /// the runner reads from the menu only
+    /// (`AssistToolRunner.menuDuplicateFileArgument`). Never `duplicate`,
+    /// the window's title-named argument: a title can fit two pages, and that
+    /// path puts the copy right after the source and moves later classes,
+    /// where Russell's ruling puts it at the end.
+    static func duplicateAsNextClass(course: String, section: Int, sourcePath: String, planning: Bool) -> AssistToolCall {
+        return call(planning ? "plan_add_next_class" : "add_next_class",
+                    ["course": course, "section": section, AssistToolRunner.menuDuplicateFileArgument: sourcePath])
+    }
+
     /// Re-date Classes… (or its plan). No `website` key, ever: that key
     /// makes it a rollover, which the menu is not.
     static func reDateClasses(course: String, section: Int, planning: Bool) -> AssistToolCall {
@@ -298,6 +319,71 @@ final class SectionVerbs {
             of: fileURL, courseDirectoryURL: course.directoryURL, courseCode: course.code
         )
         return folder + "/" + fileURL.deletingPathExtension().lastPathComponent
+    }
+
+    /// A page's path inside its course folder, `.md` included —
+    /// "section1/All Classes/Unit 2, Day 3.md" — for Add Class…'s copy
+    /// (#897), which names exactly one file.
+    ///
+    /// Both sides in the disk's own spelling (`FolderIdentity.canonicalPath`,
+    /// how the rest of the app compares folders): the class folders are
+    /// listed with links in their ancestors RESOLVED, and a working folder
+    /// opened through a link (a cloud folder linked into the home folder)
+    /// otherwise shares no prefix with its pages (the implementation
+    /// review's finding 8, measured).
+    static func coursePath(ofPageAt fileURL: URL, in course: Course) -> String {
+        // The page's FOLDER in the disk's spelling, and its own name as it is:
+        // canonicalising the whole path would resolve a page that is itself a
+        // link to wherever it points (the fix review's finding 3).
+        let page: String = SectionVerbs.canonicalPageSpelling(fileURL)
+        let folder: String = FolderIdentity.canonicalPath(course.directoryURL.standardizedFileURL.path) + "/"
+        if page.hasPrefix(folder) {
+            return String(page.dropFirst(folder.count))
+        }
+        return fileURL.lastPathComponent
+    }
+
+    /// A page's path with its FOLDER in the disk's own spelling
+    /// (`FolderIdentity.canonicalPath`) and its file name left as it is, so a
+    /// linked working folder matches and a page that is a link is still the
+    /// page in this folder (#897a).
+    static func canonicalPageSpelling(_ fileURL: URL) -> String {
+        let standard: URL = fileURL.standardizedFileURL
+        let folder: String = FolderIdentity.canonicalPath(standard.deletingLastPathComponent().path)
+        return folder + "/" + standard.lastPathComponent
+    }
+
+    // MARK: - What Add Class… is greyed by (#897)
+
+    /// The facts Add Class…'s sheet decides its ways from, read when it
+    /// OPENS: one listing of the class folders' names and the rename's own
+    /// judgement (`UnitWordRenamer.interruptedRenameTarget`), which reads a
+    /// record left by a rename that finished, or by a word edited by hand, as
+    /// stale, so a stale record never greys a way (the implementation
+    /// review's finding 1). It judges WITHOUT clearing: a rename running in
+    /// another window has a record and, for one frontmatter write, no page
+    /// moved yet, which reads as stale (the fix review's finding 5); the
+    /// rename sheet that owns the record still clears it. REJECTED: greying
+    /// on the record FILE alone, which a stale record held greyed with no way
+    /// out from the sheet, since a greyed way never reaches the runner.
+    static func addClassFacts(forSection sectionNumber: Int, in course: Course) -> SubjectMenuRules.AddClassFacts {
+        var facts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts()
+        facts.classPagesAreNumbered = course.configuration.classPageNaming.isNumbered
+        facts.unitWordRenameUnfinished = UnitWordRenamer.interruptedRenameTarget(in: course, clearingAStaleRecord: false) != nil
+        facts.hasAClassPage = hasAClassPage(forSection: sectionNumber, in: course)
+        return facts
+    }
+
+    /// Whether the section's class folders hold any page but their landing
+    /// pages: the names only, no page read.
+    static func hasAClassPage(forSection sectionNumber: Int, in course: Course) -> Bool {
+        for folderName in ClassFolder.names(for: course) {
+            let root: URL = course.sectionDirectoryURL(forSection: sectionNumber).appendingPathComponent(folderName)
+            for pageURL in ClassPages.markdownPages(under: root) where pageURL.lastPathComponent.lowercased() != "index.md" {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Class dates

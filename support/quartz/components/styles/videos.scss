@@ -1,0 +1,30 @@
+// #692: every YouTube and Vimeo player the site's transformer writes
+// (plantoirVideo.ts, class `plantoir-video`) is 600 px wide at most and
+// 16:9 (Russell, 2026-10-24), narrower in a narrow window. Rides on
+// PlantoirMetaLine.tsx, as pictures.scss does: Quartz writes ONE index.css
+// for every page.
+//
+// Why the long selector: Quartz v4.5.0's base.scss gives
+// `.external-embed.youtube` `width: 100%; height: 100%`, and this file's
+// rules come BEFORE base.scss's in index.css, so this one must win by
+// SPECIFICITY (two classes and three elements against two classes). Do not
+// shorten it.
+//
+// Measured before this (2026-11-13, the verify fixture's YouTube player,
+// Chromium and WebKit alike): 650 x 366 at a 1300 px window, 358 x 201 at
+// 390 px, because base.scss's width: 100% won over the width="600px" the
+// player carried. The target: 600 x 338 at 1300 px, 358 x 201 at 390 px.
+//
+// Rejected: a per-video width (the size is ruled); a width attribute on the
+// player (it loses to base.scss, which is how the old player came out at
+// 650 px).
+
+html body iframe.external-embed.plantoir-video {
+  display: block;
+  width: 600px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 5px;
+}

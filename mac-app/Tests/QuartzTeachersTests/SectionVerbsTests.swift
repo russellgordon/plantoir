@@ -477,7 +477,7 @@ final class SectionVerbsFixesTests: XCTestCase {
     func testARequestNotTakenIsDropped() throws {
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         workspace.selection = SidebarSelection.section("ICS3U", 1)
-        workspace.sectionVerbRequest = SectionVerbRequest(item: .addNextClass, courseCode: "ICS3U", sectionNumber: 1)
+        workspace.sectionVerbRequest = SectionVerbRequest(item: .addClass, courseCode: "ICS3U", sectionNumber: 1)
         workspace.selection = SidebarSelection.section("ICS3U", 1)
         XCTAssertNotNil(workspace.sectionVerbRequest, "the same row: still waiting for its window")
         workspace.selection = SidebarSelection.section("ICS3U", 2)

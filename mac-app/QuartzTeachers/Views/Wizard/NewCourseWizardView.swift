@@ -119,10 +119,6 @@ struct NewCourseWizardView: View {
     @State var includesCurriculumCoverage: Bool = true
     @State var includesCoverageNotes: Bool = true
 
-    /// Whether the factory structure uses LCS's own words and folders
-    /// (Grove Time, SIC, College Board Curriculum) instead of the
-    /// school-neutral defaults.
-    @State var usesLCSTerminology: Bool = false
     @State var fontChoice: FontChoice = FontChoice.systemDefault
 
     /// Where this course's sections deploy: Cloudflare Pages (the default
@@ -864,9 +860,8 @@ struct NewCourseWizardView: View {
             // skeleton` branch of the Starting Content section, and that
             // branch LEAVES the hierarchy the moment the typed code stops
             // having a skeleton — a handler that is not there cannot fire.
-            // (Re-evaluating a body does not cost a handler: the LCS
-            // switch's own `.onChange` sits inside a branch and works.
-            // Disappearing is the case this avoids.)
+            // (Re-evaluating a body does not cost a handler; disappearing
+            // is the case this avoids.)
             .onChange(of: startsFromSkeleton) { _, startsFromASkeletonNow in
                 if startsFromASkeletonNow {
                     adoptSkeletonStructure()
@@ -1513,33 +1508,6 @@ struct NewCourseWizardView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("structureFromExampleNote")
                 } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle("Use LCS-specific terminology", isOn: $usesLCSTerminology)
-                            .accessibilityIdentifier("lcsTerminologyToggle")
-                        ExampleCaption("e.g. “Grove Time” instead of “Extra Help”, plus the College Board Curriculum folder")
-                    }
-                    .onChange(of: usesLCSTerminology) { wasLCS, isLCS in
-                        sharedFolders = WizardDefaults.switchingFactoryItems(
-                            in: sharedFolders,
-                            toFactory: isLCS ? WizardDefaults.lcsSharedFolders : WizardDefaults.sharedFolders,
-                            fromFactory: wasLCS ? WizardDefaults.lcsSharedFolders : WizardDefaults.sharedFolders
-                        )
-                        sharedFiles = WizardDefaults.switchingFactoryItems(
-                            in: sharedFiles,
-                            toFactory: isLCS ? WizardDefaults.lcsSharedFiles : WizardDefaults.sharedFiles,
-                            fromFactory: wasLCS ? WizardDefaults.lcsSharedFiles : WizardDefaults.sharedFiles
-                        )
-                        // A club has no curriculum folder, whichever
-                        // terminology's factory list just came back (#267).
-                        if isClubCourse {
-                            var kept: [String] = []
-                            for folder in sharedFolders where !ClubFill.curriculumFolders.contains(folder) {
-                                kept.append(folder)
-                            }
-                            sharedFolders = kept
-                        }
-                    }
-
                     // The lists are long, so they stay collapsed until needed.
                     DisclosureGroup("Folders and files") {
                         StringListEditorView(
@@ -1741,12 +1709,11 @@ struct NewCourseWizardView: View {
     /// The toggle went off: the skeleton's folders leave the editor and the
     /// generic defaults come back, list by list against what the adoption put
     /// there. The rule — and what it deliberately costs — is in
-    /// `WizardStructure.restoringDefaults(in:adopted:usesLCSTerminology:)`.
+    /// `WizardStructure.restoringDefaults(in:adopted:)`.
     func restoreGenericStructure() {
         let restored: WizardStructure.Lists = WizardStructure.restoringDefaults(
             in: currentStructure,
-            adopted: adoptedStructure,
-            usesLCSTerminology: usesLCSTerminology
+            adopted: adoptedStructure
         )
         putIntoEditor(restored)
         adoptedStructure = nil
@@ -1767,8 +1734,7 @@ struct NewCourseWizardView: View {
                 sharedFolders: sharedFolders, perSectionFolders: perSectionFolders,
                 classFolder: classFolderName, unitWord: unitWord,
                 frontPageHeading: frontPageHeading, noun: classNoun
-            ),
-            usesLCSTerminology: usesLCSTerminology
+            )
         )
         sharedFolders = filled.sharedFolders
         perSectionFolders = filled.perSectionFolders
@@ -2243,7 +2209,6 @@ struct NewCourseWizardView: View {
                 curriculumCoverageEnabled: coverageEnabled,
                 includesCoverageNotes: includesCoverageNotes
             ),
-            "use_lcs_terminology": usesLCSTerminology,
             "deploy_target": deployTarget,
             "deploy_folder_path": deployTarget == "local_folder"
                 ? deployFolderPath.trimmingCharacters(in: .whitespaces)
@@ -2336,10 +2301,11 @@ struct NewCourseWizardView: View {
             // Narrowed once more as the file is written, the way Windows does
             // it (NewCourseDialog.BuildConfiguration). The editor narrows the
             // pool wherever it changes the folder lists — a removal, a
-            // skeleton given up — but the terminology switch does not, so a
-            // teacher who ticked College Board Curriculum and then turned LCS
-            // off would otherwise have that folder written into a course that
-            // has no such folder. This is the ONLY net: since GitHub issue
+            // skeleton given up — but not every change goes through those
+            // paths (a terminology switch, removed in #891, was one that
+            // did not), and a folder ticked and then taken away would
+            // otherwise be written into a course that has no such folder.
+            // This is the ONLY net: since GitHub issue
             // #192 `setup_course.py` writes a saved pool back as it was
             // (gradedFolders.rerunningSetup), and it also makes both apps
             // write the same file.

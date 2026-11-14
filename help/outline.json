@@ -532,7 +532,7 @@
       "Each section's All Classes folder holds one page per class, named Unit 1, Day 1, Unit 1, Day 2 and so on",
       "The first word is the course's word for a unit, chosen in New Course (What do you call a unit?): Unit, or Module, or Thread",
       "Each section has its own copy of each class, dated for that section: in the example, Unit 1, Day 13 is 24 September in Section 1 and 25 September in Section 2",
-      "Section ▸ Add Next Class makes the next one, numbered and dated",
+      "Section ▸ Add Class… makes the next one, numbered and dated",
       "The front page shows Most Recent Class: the newest class students can see",
       "A page named another way (Field Trip, Exam Review) is kept as it is and never renumbered"
      ],
@@ -592,7 +592,7 @@
       "Its agenda links to shared pages: concepts, exercises, tasks",
       "Open a linked concept page: its backlinks list every class that used it (class pages show no backlinks)",
       "Fix a mistake on the concept page once and every section's site has the fix at its next deploy",
-      "To start a new reference page (a concept, an exercise, a task), duplicate the _DUPLICATE ME page in that folder; new class pages come from Section > Add Next Class"
+      "To start a new reference page (a concept, an exercise, a task), duplicate the _DUPLICATE ME page in that folder; new class pages come from Section > Add Class…"
      ],
      "pictures": [
       {
@@ -743,19 +743,19 @@
      "anchor": "add-next-class",
      "title": "Add the next class",
      "question": "How do I make the page for the next class, numbered and dated?",
-     "about": "Section > Add Next Class: the page made, numbered and dated, unpublished, backed up first, undoable.",
+     "about": "Section > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
      "steps": [
       "Select the section (it needs class dates on file: link class-dates)",
-      "Section > Add Next Class",
+      "Section > Add Class… (also in the section row's right-click menu)",
       "Plantoir saves a copy of the course to Backups, then makes the page, numbered and dated from the class dates",
       "The new page arrives unpublished: open it in Obsidian and write it",
       "Publish it when it is written (Publish Pages… or Publish Class for a Date…); Section > Undo Last Change takes the new page away again"
      ],
      "pictures": [
       {
-       "shows": "The Section menu open on Add Next Class",
+       "shows": "The Section menu open on Add Class…",
        "labels": [
-        "Add Next Class"
+        "Add Class…"
        ],
        "scene": "add-next-class-1"
       },
@@ -781,7 +781,7 @@
      "waitsOn": [],
      "revisitAfter": [],
      "opensFrom": [
-      "sheet: SectionVerbSheet (.result after Add Next Class)"
+      "sheet: SectionVerbSheet (.addClass: the ways, then the answer or the copy's plan)"
      ],
      "assistant": false,
      "needsPictures": true,
@@ -1456,7 +1456,7 @@
       "Appearance (applied to every section, changed later per section: link section-look) and Behaviour",
       "Units: What do you call a unit?",
       "Deploying: where the sections deploy (link destinations)",
-      "Structure: the folder and file lists (link course-folders), Folders whose work counts for marks, and one school's terminology option, named for what it is",
+      "Structure: the folder and file lists (link course-folders), and Folders whose work counts for marks",
       "Footer, and Advanced: Language and region",
       "Create Course; it appears in the sidebar"
      ],
@@ -1604,7 +1604,7 @@
      "question": "Where do I change a course's name, footer, printing, folders or sidebar?",
      "about": "Course Settings' course-wide parts (Overall, Deploying, Footer, Printing, Content Structure, Marks, Sidebar Visibility), Save and Revert.",
      "steps": [
-      "Select the course row: its settings show (a Settings and Planning tab bar appears only when Claude Code or Codex is installed)",
+      "Select the course row: its settings show (a Settings and Planning tab bar appears only when Claude Code, Codex or GitHub Copilot is installed)",
       "The parts in order: Overall (Course name, Language and region, read times, the coverage map, the unit word), Deploying, Footer, Printing, Content Structure, Marks, Sidebar Visibility, then one part per section (link section-look)",
       "Press Save (⌘S, also Course > Save Course Settings) or Revert",
       "A preview or deploy started with unsaved changes uses the settings as last saved; after a save while previewing, Preview Again appears",
@@ -2156,10 +2156,12 @@
      "question": "How do I change the token Plantoir uses for Netlify or Cloudflare?",
      "about": "Seeing, changing or removing a saved Netlify or Cloudflare token in Settings > Deploying (#696).",
      "steps": [
-      "Plantoir > Settings > Deploying",
-      "Connected or Not connected",
-      "Change Token...: the same steps a first deploy shows, checked before it is saved",
-      "Remove Token"
+      "Plantoir > Settings > Deploying: a Netlify part and a Cloudflare Pages part",
+      "The status line: Connected, the end date where Cloudflare gives one, or what is wrong; Check Again",
+      "Change Token...: the same steps a first deploy shows, then Check and Save; Cancel waits while the token is checked",
+      "A new token that cannot reach your class websites: Keep My Old Token (or Don't Save It), or Use the New Token",
+      "Remove Token, and what it means for a deploy set for later",
+      "The Deploy screen's warning when a Cloudflare token ends in under 30 days, with Open Settings..."
      ],
      "scenes": 2,
      "readMinutes": 2,
@@ -2176,7 +2178,8 @@
      ],
      "revisitAfter": [],
      "opensFrom": [
-      "settings: Settings > Deploying pane (after #696)"
+      "settings: Settings > Deploying pane (after #696)",
+      "sheet: the Change Token sheet's Help button (DeployTokenWording.helpAnchor)"
      ],
      "assistant": false,
      "needsPictures": true,
@@ -2955,7 +2958,7 @@
      ],
      "scenes": 2,
      "readMinutes": 2,
-     "notes": "",
+     "notes": "Facts the page must carry (#674): the four keys sim, alt, locale, screens and their defaults; the first build that uses a simulation needs the internet and later ones do not; one copy serves every course in the working folder; a build with no internet and a simulation not downloaded yet stops and names the page and the simulation (keptDownloads.stop); a fault while making the simulations ready also stops (notReady), and points at the Help menu's Report a Problem item (helpReportAProblem); preview once after adding a simulation, before scheduling a deploy; a course left unbuilt about 90 days (a summer) needs the internet again; a working folder moved or renamed, copied to a new computer, or opened on the other platform starts with nothing kept, so preview once with the internet after moving it; a simulation in a self-check question works in the question and the explanation, not in a choice (Problems tab, Self-check question); a misspelt name is a Problems tab row of the kind Science simulation; the credit line and the licence in plain words (free for teaching, not for anything sold or carrying ads); nothing is sent to PhET from students' browsers; a pasted PhET frame still works but contacts PhET and Google.",
      "id": "phet",
      "section": "What a page can show",
      "status": "new",
@@ -4721,11 +4724,11 @@
     },
     {
      "anchor": "revise-with",
-     "title": "Revise a course with Claude or Codex",
-     "question": "How do I open Claude or Codex on a course, and tell it how I teach?",
-     "about": "Course or Section > Revise With > Claude or Codex: the terminal session and the guidance sheet.",
+     "title": "Revise a course with Claude Code, Codex or GitHub Copilot",
+     "question": "How do I open Claude Code, Codex or GitHub Copilot on a course, and tell it how I teach?",
+     "about": "Course or Section > Revise With > Claude…, Codex… or GitHub Copilot…: the terminal session and the guidance sheet.",
      "steps": [
-      "Course ▸ Revise With ▸ Claude… (or Codex…)",
+      "Course ▸ Revise With ▸ Claude…, Codex… or GitHub Copilot…",
       "The session opens in your working folder on that course",
       "Write a How I Teach page at the top of the course",
       "Preview what it changed before you deploy"
@@ -4819,8 +4822,8 @@
      "question": "How do I plan a unit with an assistant and see the plan in Plantoir?",
      "about": "Planning a unit with an assistant and reading it on the Planning tab.",
      "steps": [
-      "Ask Claude Code or Codex to plan the unit (Revise With, or Plan a Unit with Claude… on an empty Planning tab)",
-      "Select the course and open its Planning tab (shown only when Claude Code or Codex is installed)",
+      "Ask Claude Code, Codex or GitHub Copilot to plan the unit (Revise With, or Plan a Unit with Claude… on an empty Planning tab)",
+      "Select the course and open its Planning tab (shown only when Claude Code, Codex or GitHub Copilot is installed)",
       "Choose the unit in the Unit pop-up, or All Plans",
       "Open in Browser to read or print it",
       "Use the section's Coverage tab to see what the course's pages reach"
@@ -4925,7 +4928,7 @@
      "question": "How do I get a test, its solutions and a marking guide drafted?",
      "about": "Asking an assistant for a unit test, its solutions and a marking guide, as paper made outside the course.",
      "steps": [
-      "Revise With > Claude… (or Codex…) on the course",
+      "Revise With > Claude…, Codex… or GitHub Copilot… on the course",
       "Ask for the unit test (also: versions, a practice test, a quiz for marks with a marking guide); it shows back what was taught first",
       "Read every question and answer yourself: it says everything is a suggestion",
       "The test is paper made outside the course, not a page with Print; where its files are saved: TODO(fact) until FS-11's open doubt 1 is settled"
@@ -4965,12 +4968,12 @@
     },
     {
      "anchor": "fix-with",
-     "title": "Fix a problem with Claude or Codex",
+     "title": "Fix a problem with Claude Code, Codex or GitHub Copilot",
      "question": "Can an assistant fix the problems on the Problems tab?",
-     "about": "Fix with Claude or Codex on the Problems tab.",
+     "about": "Fix with Claude…, Fix with Codex… or Fix with GitHub Copilot… on the Problems tab.",
      "steps": [
       "Open the Problems tab",
-      "Fix with Claude… or Fix with Codex…",
+      "Fix with Claude…, Fix with Codex… or Fix with GitHub Copilot…",
       "Preview the result"
      ],
      "pictures": [

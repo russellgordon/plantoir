@@ -83,6 +83,22 @@ nonisolated enum ActivityTrail {
         /// Preview Again, pressed beside the sentence Course Settings shows
         /// after a Save that an open preview could not see (#265).
         case previewAgainAfterSettingsSaved = "preview again after settings saved"
+        /// A preview was asked for while this window's own start was still
+        /// waiting for a stop or building, and nothing more was done (#812).
+        /// That ask used to end the first start's record and raise a refusal
+        /// about another window; now nothing shows, and this line is the
+        /// only sign it was made.
+        case previewAlreadyStarting = "preview already starting"
+        /// A repair's Preview Again started nothing, because the section's
+        /// page went away or the app was quitting before the old preview had
+        /// stopped, or a later Preview Again took its place (#813).
+        case previewAgainAbandoned = "preview again abandoned"
+        /// A section window's preview never started: the runner recorded why
+        /// and was not running. The wait, the record and the lease are
+        /// handed back at once and the teacher is shown the runner's own
+        /// sentence (#812's review). Until then the window waited ten
+        /// minutes in silence and every later Preview in it did nothing.
+        case previewCouldNotStart = "preview could not start"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
@@ -100,6 +116,25 @@ nonisolated enum ActivityTrail {
         /// Cloudflare Pages is the new-course default. Carries whether the
         /// ID is missing or not a whole ID — never the ID.
         case deployRefusedForTheAccountID = "deploy refused for the Cloudflare Account ID"
+        /// A deploy token changed in Plantoir ▸ Settings ▸ Deploying (#696):
+        /// the destination, and whether the teacher chose to use it though it
+        /// could not reach some class websites. NEVER the token.
+        case deployTokenChanged = "deploy token changed in Settings"
+        /// A deploy token removed in Settings ▸ Deploying (#696): the
+        /// destination only.
+        case deployTokenRemoved = "deploy token removed in Settings"
+        /// A new token not saved from Settings ▸ Deploying (#696): the
+        /// destination and the problem key the teacher was shown.
+        case deployTokenChangeRefused = "deploy token change refused in Settings"
+        /// Keep My Old Token, after a new one could not reach the folder's
+        /// class websites (#696, the second ruling): the destination and how
+        /// many websites, never which.
+        case deployTokenKeptOld = "old deploy token kept in Settings"
+        /// The Cloudflare token's end date the app keeps changed (#696,
+        /// review I4): the date (not a secret) or that there is none, and
+        /// what read it (Settings, a deploy, a scheduled deploy). Written
+        /// only on a change. NEVER the token.
+        case deployTokenEndDateLearned = "Cloudflare token end date learned"
         case assistantOpened = "assistant opened"
         /// A Claude, Codex or GitHub Copilot session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
@@ -423,6 +458,9 @@ nonisolated enum ActivityTrail {
         /// Named for the OUTCOME rather than for today's single cause, the way
         /// `folderProblemNotRepaired` is: a second reason a copy is not made
         /// joins this line rather than earning a rename on both platforms.
+        /// The second arrived with #897: Section ▸ Add Class…, as a copy of a
+        /// class, reads its copy back before writing anything, and when the copy
+        /// cannot be made certainly hidden it writes nothing and says so here.
         case classCopyNotMade = "class copy not made"
 
         /// A teacher copied one or more pages out of one course and into
@@ -1059,8 +1097,10 @@ nonisolated enum ActivityTrail {
         /// Mac holds a build, publish or preview lease on it (#156) — Preview
         /// or Deploy in the window, the in-app assistant's rebuild or deploy,
         /// or an outside assistant's (`--mcp-stdio`). Carries the course, the
-        /// section asked about, what was asked for, what the other holds and
-        /// its process id. Never anything on a page.
+        /// section asked about (none when an outside assistant's call named
+        /// no section: the line then starts with the course alone, #879),
+        /// what was asked for, what the other holds and its process id.
+        /// Never anything on a page.
         ///
         /// Recorded because the other program is invisible from here: a
         /// teacher who reports "Preview said somebody else was using it"
@@ -1199,6 +1239,15 @@ nonisolated enum ActivityTrail {
         /// folder was not found, nothing was deployed there, no address on
         /// this computer was free, or the browser did not open it.
         case deployedFolderCouldNotBeOpened = "deployed folder could not be opened"
+        /// The app-wide undo list (#899) could not write a step down: the
+        /// action's key, the course and section, and a word for why. While
+        /// the list is switched off the change went ahead regardless, and the
+        /// line says so; never page text.
+        case undoCouldNotRecordAStep = "undo could not record a step"
+        /// The undo list put files back that a change, an undo or a redo
+        /// left part way when it stopped (#899): the course and section, which
+        /// of the three, and how many files. Never page text.
+        case undoRolledBack = "undo rolled back"
         /// Setting up an outside assistant was opened (#855): from where (the
         /// Settings pane, the Help menu, Revise With), so a report shows how
         /// the teacher got there.
@@ -1484,7 +1533,8 @@ nonisolated enum ActivityTrail {
         /// One of the assistant's functions run from the Section menu or a
         /// section's context menu (#457 batch B) — Publish Pages…, Hide
         /// Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
-        /// Change, Add Next Class, Re-date Classes…, Make Room for Classes…,
+        /// Change, Add Class… (#897, which replaced Add Next Class; the
+        /// counts say which way), Re-date Classes…, Make Room for Classes…,
         /// Class Dates… — and Help ▸ Publishing and Deploying…. Carries where
         /// it is in the menus, how it ended (carried out, changed nothing,
         /// cancelled at the plan, rebuilt or not) and counts — never a page's
@@ -1578,6 +1628,19 @@ nonisolated enum ActivityTrail {
         /// ready, and this says whether that was the network, the disk or
         /// the download.
         case swiftCouldNotBeGotReady = "Swift could not be got ready"
+
+        // ---- Files a page downloads the first time it uses them (#674) ----
+
+        /// A build downloaded what its pages use for the first time and kept
+        /// it on this computer for later builds: how many of what kind (a
+        /// science simulation), how many megabytes and seconds, read from the
+        /// build's `PLANTOIR_DOWNLOADED:` line by `KeptDownloadsReport`. It
+        /// dates when the computer gained them and why one build was slower.
+        case filesForTheSiteDownloaded = "files for the site downloaded"
+        /// A build STOPPED because something its pages use was not on this
+        /// computer and could not be downloaded (`keptDownloads.stop`): how
+        /// many of what kind, and why, as offline, damaged or notReady.
+        case filesForTheSiteCouldNotBeDownloaded = "files for the site could not be downloaded"
     }
 
     // MARK: - Stored properties
@@ -1626,7 +1689,24 @@ nonisolated enum ActivityTrail {
     /// Notes something about one section, so the trail says which course and
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
-        ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+        ActivityTrail.note(event, ActivityTrail.place(course: course, section: section) + what, at: moment)
+    }
+
+    /// What goes in front of a line about one course: "ICS3U/2 · " for a
+    /// section, "ICS3U · " when no section was named, and nothing when there
+    /// is no course either (`shared-rules.json` → `activityTrail.lineShape.
+    /// placeCases`, #879). A section is numbered from 1, so 0 or less is
+    /// "none was named": an outside assistant's call that names no section
+    /// used to be written "ICS3U/0", a section that does not exist.
+    static func place(course: String, section: Int) -> String {
+        let trimmedCourse: String = course.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedCourse.isEmpty {
+            return ""
+        }
+        if section <= 0 {
+            return "\(trimmedCourse) · "
+        }
+        return "\(trimmedCourse)/\(section) · "
     }
 
     /// The words for `deployRefusedForTheAccountID` (#668), or nil when the
