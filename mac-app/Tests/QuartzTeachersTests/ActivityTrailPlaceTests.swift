@@ -7,6 +7,7 @@ import XCTest
 ///
 /// The cases are `contracts/shared-rules.json` → `activityTrail.lineShape.
 /// placeCases`, read rather than retyped, so Windows runs the same ones.
+@MainActor
 final class ActivityTrailPlaceTests: XCTestCase {
 
     // MARK: - Functions
@@ -32,7 +33,6 @@ final class ActivityTrailPlaceTests: XCTestCase {
     /// section, declined while the course was being built elsewhere, written
     /// through `WorkLeaseRegistry.noteDeclined` into a scratch trail. The
     /// line starts with the course alone and says "the course".
-    @MainActor
     func testADeclineThatNamedNoSectionNamesTheCourseAlone() throws {
         let scratchFolderURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("trail-place-\(UUID().uuidString)", isDirectory: true)
