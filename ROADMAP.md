@@ -132,6 +132,13 @@ ready.
   ([#840](https://github.com/russellgordon/plantoir/issues/840), [#486](https://github.com/russellgordon/plantoir/issues/486), [#841](https://github.com/russellgordon/plantoir/issues/841))
 - **plantoir.app shows off science**, alongside the maths and coding it
   already shows ([#485](https://github.com/russellgordon/plantoir/issues/485)).
+- **My Progress, settings and more.** A switch and the list of
+  success-criteria headings in Course Settings, a way for students to narrow
+  the page to a date or a unit, and a check that it prints well.
+  ([#595](https://github.com/russellgordon/plantoir/issues/595))
+- **A course that could not be opened in Obsidian is reported as such** on
+  the Mac, where a failed open used to read as one that worked.
+  ([#721](https://github.com/russellgordon/plantoir/issues/721))
 - **Mac fixes:**
   - the first Preview after the Mac wakes from sleep should start promptly
     ([#517](https://github.com/russellgordon/plantoir/issues/517));
@@ -186,18 +193,13 @@ ready.
 
 ## Version 2.1
 
-- **My Progress, settings and more.** A switch and the list of
-  success-criteria headings in Course Settings, a way for students to narrow
-  the page to a date or a unit, and a check that it prints well.
-  ([#595](https://github.com/russellgordon/plantoir/issues/595))
 - **Archives you can browse.** Backups and archives stay two separate
   features, and archives gain what backups already have: a list, what each
   one holds, and a way to open, compare, restore or carefully delete one.
   Nothing you have today moves or is renamed.
   ([#573](https://github.com/russellgordon/plantoir/issues/573))
 - **The assistant:** "Open my website" opens it rather than deploying it
-  ([#688](https://github.com/russellgordon/plantoir/issues/688)), and a course that could not be opened in Obsidian is
-  reported as such ([#721](https://github.com/russellgordon/plantoir/issues/721)).
+  ([#688](https://github.com/russellgordon/plantoir/issues/688)).
 - Behind the scenes: a move to the newer version of the engine Plantoir
   builds sites with, made only once built sites are compared before and
   after ([#512](https://github.com/russellgordon/plantoir/issues/512)).
