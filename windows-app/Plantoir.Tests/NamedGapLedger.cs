@@ -75,13 +75,17 @@ namespace Plantoir.Tests;
 /// work a LATER BATCH of that catch-up owns, on the milestone that work shipped
 /// in on the mac (v1.5.0 … v1.7.1). Every one of those must be gone by the
 /// 1.7.1 cut, and that is not left to memory:
-/// <c>NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild</c>
-/// reads <c>&lt;Version&gt;</c> from <c>Plantoir.csproj</c> and fails for any
-/// entry whose milestone is not LATER than the version being built. Setting the
-/// version to 1.7.1 therefore turns every v1.5.0–v1.7.1 entry still here red,
-/// while an entry owed by a genuinely later release (a v2.0.0, say) rightly
-/// survives the cut. This replaced the single "Windows: parity with mac v1.4.0"
-/// milestone, whose burn-down list the ledger was until v1.4.0 shipped.</para>
+/// <c>NamedGapLedgerTests</c> read <c>&lt;Version&gt;</c> from
+/// <c>Plantoir.csproj</c> and failed for any entry whose milestone was not
+/// LATER than the version being built, so setting the version to 1.7.1 turned
+/// every v1.5.0–v1.7.1 entry still here red. Since #862 (2026-11-13)
+/// <c>&lt;Version&gt;</c> names the release in progress, so
+/// <c>NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease</c>
+/// compares with the last release Windows SHIPPED (<c>site.json</c> and
+/// <c>updates/windows.xml</c>), and <c>publish.ps1 -Sign</c> runs it against
+/// <c>&lt;Version&gt;</c> and refuses the cut. This replaced the single
+/// "Windows: parity with mac v1.4.0" milestone, whose burn-down list the
+/// ledger was until v1.4.0 shipped.</para>
 /// </remarks>
 internal static class NamedGapLedger
 {
@@ -199,7 +203,8 @@ internal static class NamedGapLedger
 
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
     // parses each entry's milestone as a version and requires it to be LATER
-    // than Plantoir.csproj's <Version>; anything that is not a version fails
+    // than the last Windows release (and, at a signed cut, than
+    // Plantoir.csproj's <Version>, #862); anything that is not a version fails
     // there. (Until 2026-10-15 every entry named one milestone, "Windows:
     // parity with mac v1.4.0", and the ledger was its burn-down list.)
     private const string V150 = "v1.5.0";
@@ -216,9 +221,10 @@ internal static class NamedGapLedger
     /// <param name="Key">The event name or sentence key, spelled as the contract spells it.</param>
     /// <param name="Issue">The open GitHub issue that owns the work.</param>
     /// <param name="Milestone">The milestone that issue carries, spelled as its
-    /// GitHub title ("v1.6.0"). It must be LATER than the version being built,
-    /// which <c>NamedGapLedgerTests</c> checks against <c>Plantoir.csproj</c>,
-    /// so an entry still here when its release is cut fails the suite
+    /// GitHub title ("v1.6.0"). It must be LATER than the last release Windows
+    /// shipped, which <c>NamedGapLedgerTests</c> checks in every run, and later
+    /// than <c>Plantoir.csproj</c>'s <c>&lt;Version&gt;</c> at a signed cut,
+    /// where <c>publish.ps1 -Sign</c> refuses an entry still here
     /// (<c>contracts/README.md</c> → "Named gaps").</param>
     /// <param name="Reason">Why it is not built here yet, in a sentence.</param>
     internal sealed record Entry(string Area, string Key, int Issue, string Milestone, string Reason);
