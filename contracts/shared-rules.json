@@ -588,6 +588,24 @@
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
       {
+        "carries": "the course, the backup's FILE NAME (a course code, a moment and who made it), how many of its Media files the shared store already kept, how many were added and their size - never a Media file's name, which is the teacher's own and can carry a student's",
+        "event": "backup kept its Media files once",
+        "line": "{course} · saved {backup}, keeping its Media files once: {n} already kept, {m} added ({size})",
+        "why": "Added with #785 (Russell's ruling, 2026-11-13: every backup Plantoir makes on its own keeps each Media file once in a store shared by the working folder's backups). It dates when the store grew and by how much, which is what 'my disk filled up' and 'my backups stopped growing' are both answered by. Written by the store's own writer (SharedMediaStore.writeSmallBackup on the mac), so no route to a small backup can leave it out; nothing calls that writer until piece 785b, and Windows records it when it writes small backups too. No appliesOn: the same store is written by both apps."
+      },
+      {
+        "carries": "how many store files no backup needs were removed and what they took, and how many lists that kept nothing were removed; or that the sweep kept EVERYTHING, and why: the list of a named backup could not be read, a named list file could not be read, a backup or a restore was using the store, or a part of the store could not be read - never a Media file's name",
+        "event": "shared backup Media swept",
+        "line": "removed {n} files no backup needs from the backups' shared Media ({size}), and {k} lists that kept nothing any more | kept every file in the backups' shared Media: {why}",
+        "why": "Added with #785. Deleting a store file is the one step that can lose a teacher's only copy of a picture, so 'the pictures of an old backup are gone' must be answerable: this line says when files left and how many, and a sweep that kept everything says why, so a store that never shrinks can be explained too. Written only when something was removed or everything was kept; a sweep with nothing to do writes nothing. No appliesOn."
+      },
+      {
+        "carries": "the course, the small backup's FILE NAME, and how many of how many listed Media files could be found neither in the shared store nor in the course's current Media - a count, never which; the paths are shown to the teacher on screen",
+        "event": "backup Media not found",
+        "line": "{course} · restoring {backup}: {n} of {total} Media files could not be found in the backups' shared Media or in the course",
+        "why": "Added with #785. A restore that could not put every picture back must never read as a plain success, and the trail is where a report next week finds out which restore it was. The #785 plan review (amendment 5) moved the file names OFF the trail: a picture's name can carry a student's, and problem reports hand the trail over. No appliesOn."
+      },
+      {
         "event": "preview closed for a deploy",
         "carries": "the course and section of the preview that ended - never anything on a page",
         "why": "Added with #433's stack review (2026-10-04). A deploy run by ANOTHER program - an outside assistant's deploy_section, or a deploy set for later - stops the serving preview of the section it builds (build_site.stop_preview_serving). The window shows that end as 'Closed for a deploy', not as a failure, only when ALL hold: the preview had been serving; its output shows the server killed the way that stop kills it; and another program holds a build lease on the course. This line is what says the end was read that way, so 'my preview closed by itself' is answered, and a misread can be found. Residual: a lease names the course, not the section, so a coinciding deploy of another section could mask a section's own serving failure of that exact shape; accepted, and the output stays one click away."

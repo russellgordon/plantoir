@@ -6,7 +6,7 @@
     "teacherBackupsPruned": "never",
     "teacherBackupsPrunedWhy": "A backup made on purpose before a risky change should not vanish because ten more were made after it - deciding on a teacher's behalf that last month's copy has expired is not the app's call. The fault was never that they are kept but that nothing SHOWED the space, so the space is shown and deleting old ones is made easy; the teacher decides what goes. A cap for teacher backups with the oldest shown before removal was the alternative considered and not chosen.",
     "mediaIsAlwaysIncluded": true,
-    "mediaIsAlwaysIncludedWhy": "Every backup carries the whole course, Media included - measured at 467 MB and 9.7 s for a real course with 487 MB of Media. REJECTED, and recorded so it is not proposed again: a lighter backup that leaves Media out. Restoring one would DELETE the course's Media.",
+    "mediaIsAlwaysIncludedWhy": "Every backup carries the whole course, Media included - measured at 467 MB and 9.7 s for a real course with 487 MB of Media. REJECTED, and recorded so it is not proposed again: a lighter backup that leaves Media out. Restoring one would DELETE the course's Media. Superseded in design by #785 (Russell's ruling, 2026-11-13): a backup Plantoir makes on its own keeps its Media files once in a shared store (sharedMedia below), and its restore puts them back from there, so nothing is deleted. Until piece 785b moves those backups onto the store, every backup is still written whole, and this stays true.",
     "sizeIsLogical": true,
     "sizeIsLogicalWhy": "The size shown is the file's LOGICAL size (on the mac, fileSize), never what it occupies on this disk. A working folder kept in iCloud Drive can have its backups evicted to the cloud, where they take almost nothing on this disk while costing their whole size in the teacher's cloud storage - and costing it on this disk again the moment one is restored. Measured on the sparse shape of an evicted file: logical 244.84 GB, on disk 'Zero KB'. The on-disk number would tell that teacher their backups take nothing. Not measured on a real evicted file, and whether a deleted file keeps costing cloud storage while in that service's own recently-deleted folder is not measured either - so nothing promises the space is freed at once.",
     "neverDeletedWhileAConversationCanRestoreFromIt": true,
@@ -228,6 +228,654 @@
         "why": "Only the backups the OPEN conversation made are held. An assistant backup from an earlier conversation about the same section is an ordinary backup now, and a rule keyed on 'made by the assistant' or 'this section' would refuse it for nothing."
       }
     ],
+    "sharedMedia": {
+      "note": "Backups that keep each Media file once, in a store shared by the working folder's backups (#785). Russell's ruling, 2026-11-13: every backup Plantoir makes on its own becomes small - the assistant's, the Section menu's, and those saved before adding a class, starting a new year, renaming the unit word, replacing a reference course and Copy a Page - and only a Back Up the teacher presses stays a whole zip. AUTHORED; edit as text. The store's FORMAT is file-formats.json -> sharedMediaStore; this block is the rules. nameCases run the name rule (and that every OLDER Plantoir's parser leaves a small backup unlisted); sweepCases run the rule that decides which store files may be deleted, with nothing asked of a disk (SharedMediaSweepRule.decide on the mac); restoreCases run putting a small backup's Media back through a real store. Piece 785a (2026-11-13) built the store, the sweep and these cases; NOTHING writes a small backup until piece 785b moves the automatic backups onto it, so every backup on disk is still a whole zip and mediaIsAlwaysIncluded above stays true until then.",
+      "smallWhenMadeBy": [
+        "the assistant (in the window, or an outside assistant's back_up_course)",
+        "the Section menu",
+        "Plantoir, before adding a class",
+        "Plantoir, before getting the course ready for a new year",
+        "Plantoir, before renaming the word for a unit",
+        "Plantoir, before replacing a reference course",
+        "Plantoir, before Copy a Page"
+      ],
+      "wholeWhenMadeBy": [
+        "the teacher pressing Back Up"
+      ],
+      "whichWhy": "Russell's ruling on #785 (2026-11-13, question dialog). REJECTED there: only the two kinds that are pruned (the others are never pruned and fill the disk just the same); every backup including Back Up (the copy a teacher presses is the one they carry to another computer or keep apart, and a small one is useless away from its store).",
+      "nameEnding": "_shared-media",
+      "nameEndingWhy": "A small backup is named as a whole one of the same maker would be, with _shared-media before .zip: ICS3U_backup_2026-11-13_183800_assistant-section1_shared-media.zip. Every parser Plantoir has released (BackupItem at v1.0.0, v1.1.0, v1.4.5, v1.7.1, v1.9.3 on the mac; BackupItem.From on Windows) refuses a name with a fourth _ piece after _backup_, and a third piece that is not a maker it knows, so an older version never lists one: it can neither restore a small backup without its pictures nor delete or prune it. Checked by the #785 plan review against each tag. REJECTED: a new extension (.plantoirbackup), which an older app ignores just as well but which a teacher cannot open in Finder or Explorer at all.",
+      "nameCases": [
+        {
+          "name": "ICS3U_backup_2026-11-13_183800_assistant-section1_shared-media.zip",
+          "small": true,
+          "readByOlderVersions": false,
+          "why": "The assistant's backup, small."
+        },
+        {
+          "name": "ICS3U_backup_2026-11-13_183800-2_menu-section2_shared-media.zip",
+          "small": true,
+          "readByOlderVersions": false,
+          "why": "The Section menu's second backup in one second, small: the -2 comes before the maker, as for a whole one."
+        },
+        {
+          "name": "ICS3U_backup_2026-11-13_183800_shared-media.zip",
+          "small": true,
+          "readByOlderVersions": false,
+          "why": "Never written (a teacher's own backup stays whole), and still left unlisted by an older version: shared-media is not a maker it knows."
+        },
+        {
+          "name": "ICS3U_backup_2026-11-13_183800_assistant-section1.zip",
+          "small": false,
+          "readByOlderVersions": true,
+          "why": "A whole backup, as every version has written and read it."
+        },
+        {
+          "name": "ICS3U_backup_2026-11-13_183800.zip",
+          "small": false,
+          "readByOlderVersions": true,
+          "why": "A teacher's own Back Up: whole."
+        },
+        {
+          "name": ".ICS3U_backup_2026-11-13_183800_menu-section2_shared-media.zip.icloud",
+          "small": false,
+          "behindPlaceholder": "ICS3U_backup_2026-11-13_183800_menu-section2_shared-media.zip",
+          "readByOlderVersions": false,
+          "why": "iCloud Drive's placeholder for an evicted zip. The sweep counts it as the small backup it stands for, so its pictures are kept while it is in the cloud; its list is read from the store's lists/ copy, and when there is none the sweep deletes nothing."
+        },
+        {
+          "name": ".writing-6F1C2A6E-2B7D-4C1A-9E55-0A1B2C3D4E5F.zip",
+          "small": false,
+          "readByOlderVersions": false,
+          "why": "A small backup being written, under its temporary name in _backups/<CODE>/. Never listed, never protecting anything: it is renamed to its real name only once whole and tested."
+        }
+      ],
+      "honoured": {
+        "pendingListHours": 24,
+        "listWithoutItsZipHours": 24,
+        "undoListDays": 31,
+        "unneededBeforeDeletedHours": 24
+      },
+      "sweepRule": "Applied in this order. (1) A small backup whose list cannot be read, or any file in lists/ or pending/ that cannot be read or is of a kind this version does not know, stops the sweep: NOTHING is deleted or removed, and the trail says why. (2) Needed: every checksum named by a small backup that is in _backups/<any folder>/ (or its sync placeholder); by a backup's list in lists/ whose zip is not there but which was written less than listWithoutItsZipHours ago (another computer's list that synced before its zip); by an Undo list written less than undoListDays ago, whichever computer wrote it (#899 plan 4.5); and by a pending list written less than pendingListHours ago, or older while the process it names still runs on THIS computer (a process id means nothing on another). Every age is the list's own writtenAt, never a file's date. (3) A store file that is not needed is deleted only when THIS computer first found it unneeded unneededBeforeDeletedHours or more ago, by its own record (sweep-<computer>.json); the first sweep to find it writes the moment down. A moment in this computer's future is replaced by now. (4) A name in files/ that is neither a checksum nor an unfinished copy (.incoming-...) is never touched. (5) Lists and pending lists that protect nothing are removed after the files. The sweep takes the store's lock exclusively and never waits: while a backup or a restore holds it, the sweep deletes nothing.",
+      "sweepRuleWhy": "Deleting a store file is the one step that can lose a teacher's only copy of a picture, so every doubt keeps the file: what cannot be read stops everything, and nothing is deleted the first time it is found unneeded. The day's wait is recorded by the sweeping computer itself because a file's own dates cannot carry it: a copy keeps the source's modification date (#785 plan review, amendment 1: a picture taken in 2024 and copied in today looks two years old), and a file another computer has just started to rely on looks unneeded until that computer's list arrives (amendment 6, two Macs on one synced folder). REJECTED: a guard on the store file's modification date (copies keep the source's), an added/ record of when each file entered the store (it protects a NEW file and not an old one another computer has just listed again), honouring a pending list by its process id on any computer (meaningless on another).",
+      "howToRunASweepCase": "Each single letter a to f stands for a checksum of 64 of that letter; store lists files/ entries, as a letter or as a literal name (kept under files/aa/). backups are the small backups present, each with the letters its list names or unreadable true. listsWithoutTheirZips, undoLists and pendingLists give each list's age (hoursAgo or daysAgo; a negative age is in the future), its computer (this or another) and, for a pending list, whether its process still runs on this computer. unneededSinceHoursAgo is this computer's record before the sweep. Expected: expectKeptEverything (and nothing deleted or removed), expectDeleted (letters or names), expectStillRecorded (entries the record holds after the sweep, by letter or name), expectListsRemoved (by their index: undo0, pending1, withoutZip0).",
+      "sweepCases": [
+        {
+          "name": "a file a small backup names is kept",
+          "store": [
+            "a"
+          ],
+          "backups": [
+            {
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {},
+          "expectDeleted": [],
+          "expectStillRecorded": []
+        },
+        {
+          "name": "a file nothing names is not deleted the first time it is found",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {},
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "a"
+          ]
+        },
+        {
+          "name": "a file nothing names is deleted a day after it was first found unneeded",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {
+            "a": 25
+          },
+          "expectDeleted": [
+            "a"
+          ],
+          "expectStillRecorded": []
+        },
+        {
+          "name": "found unneeded 23 hours ago: kept, and the first moment is kept too",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {
+            "a": 23
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "a"
+          ]
+        },
+        {
+          "name": "one of two backups that share a file is deleted: the shared file is kept, the other goes after its day",
+          "store": [
+            "a",
+            "b"
+          ],
+          "backups": [
+            {
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 30,
+            "b": 30
+          },
+          "expectDeleted": [
+            "b"
+          ],
+          "expectStillRecorded": []
+        },
+        {
+          "name": "a small backup whose list cannot be read stops the whole sweep",
+          "store": [
+            "a",
+            "b"
+          ],
+          "backups": [
+            {
+              "lists": [
+                "a"
+              ]
+            },
+            {
+              "unreadable": true
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "b": 30
+          },
+          "expectKeptEverything": true,
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "b"
+          ]
+        },
+        {
+          "name": "a list in lists/ that cannot be read stops the whole sweep",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "unreadableListFiles": 1,
+          "unneededSinceHoursAgo": {
+            "a": 30
+          },
+          "expectKeptEverything": true,
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "a"
+          ]
+        },
+        {
+          "name": "a backup's list whose zip has not arrived, written 2 hours ago, keeps its files",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "listsWithoutTheirZips": [
+            {
+              "hoursAgo": 2,
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 30
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": []
+        },
+        {
+          "name": "a backup's list whose zip is gone, written 30 hours ago, keeps nothing and is removed",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "listsWithoutTheirZips": [
+            {
+              "hoursAgo": 30,
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 30
+          },
+          "expectDeleted": [
+            "a"
+          ],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "withoutZip0"
+          ]
+        },
+        {
+          "name": "a course's backups folder deleted by an older version: its files go after their day",
+          "store": [
+            "a",
+            "b"
+          ],
+          "backups": [],
+          "listsWithoutTheirZips": [
+            {
+              "hoursAgo": 50,
+              "lists": [
+                "a"
+              ]
+            },
+            {
+              "hoursAgo": 50,
+              "lists": [
+                "b"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {},
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "a",
+            "b"
+          ],
+          "expectListsRemoved": [
+            "withoutZip0",
+            "withoutZip1"
+          ]
+        },
+        {
+          "name": "an Undo list from another computer, written 10 days ago, keeps its files",
+          "store": [
+            "c"
+          ],
+          "backups": [],
+          "undoLists": [
+            {
+              "daysAgo": 10,
+              "computer": "another",
+              "lists": [
+                "c"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "c": 48
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": []
+        },
+        {
+          "name": "an Undo list written 32 days ago keeps nothing and is removed",
+          "store": [
+            "c"
+          ],
+          "backups": [],
+          "undoLists": [
+            {
+              "daysAgo": 32,
+              "computer": "this",
+              "lists": [
+                "c"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "c": 48
+          },
+          "expectDeleted": [
+            "c"
+          ],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "undo0"
+          ]
+        },
+        {
+          "name": "an Undo list with no zip of its own is honoured as an Undo list, not removed as an orphan",
+          "store": [
+            "c"
+          ],
+          "backups": [],
+          "undoLists": [
+            {
+              "daysAgo": 2,
+              "computer": "this",
+              "lists": [
+                "c"
+              ]
+            }
+          ],
+          "listsWithoutTheirZips": [
+            {
+              "hoursAgo": 48,
+              "lists": [
+                "c"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "c": 48
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "withoutZip0"
+          ]
+        },
+        {
+          "name": "a pending list written 3 hours ago by another computer keeps its files",
+          "store": [
+            "d"
+          ],
+          "backups": [],
+          "pendingLists": [
+            {
+              "hoursAgo": 3,
+              "computer": "another",
+              "running": false,
+              "lists": [
+                "d"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "d": 30
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": []
+        },
+        {
+          "name": "a pending list 30 hours old whose process still runs on this computer keeps its files",
+          "store": [
+            "d"
+          ],
+          "backups": [],
+          "pendingLists": [
+            {
+              "hoursAgo": 30,
+              "computer": "this",
+              "running": true,
+              "lists": [
+                "d"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "d": 30
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": []
+        },
+        {
+          "name": "a pending list 30 hours old whose process has gone keeps nothing and is removed",
+          "store": [
+            "d"
+          ],
+          "backups": [],
+          "pendingLists": [
+            {
+              "hoursAgo": 30,
+              "computer": "this",
+              "running": false,
+              "lists": [
+                "d"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "d": 30
+          },
+          "expectDeleted": [
+            "d"
+          ],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "pending0"
+          ]
+        },
+        {
+          "name": "a pending list 30 hours old from another computer keeps nothing, whatever runs here",
+          "store": [
+            "d"
+          ],
+          "backups": [],
+          "pendingLists": [
+            {
+              "hoursAgo": 30,
+              "computer": "another",
+              "running": true,
+              "lists": [
+                "d"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "d": 30
+          },
+          "expectDeleted": [
+            "d"
+          ],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "pending0"
+          ]
+        },
+        {
+          "name": "two computers: a file another computer added an hour ago, its lists not here yet, is kept",
+          "store": [
+            "e"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {},
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "e"
+          ]
+        },
+        {
+          "name": "an unfinished copy left by a write that stopped goes after its day, like an unneeded file",
+          "store": [
+            ".incoming-1"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {
+            ".incoming-1": 25
+          },
+          "expectDeleted": [
+            ".incoming-1"
+          ],
+          "expectStillRecorded": []
+        },
+        {
+          "name": "a name that is neither a checksum nor an unfinished copy is never touched",
+          "store": [
+            "aaaa 2"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {},
+          "expectDeleted": [],
+          "expectStillRecorded": []
+        },
+        {
+          "name": "a first moment in this computer's future starts the day again",
+          "store": [
+            "f"
+          ],
+          "backups": [],
+          "unneededSinceHoursAgo": {
+            "f": -5
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [
+            "f"
+          ]
+        },
+        {
+          "name": "an Undo list written in the future, by a computer whose clock runs ahead, keeps its files",
+          "store": [
+            "c"
+          ],
+          "backups": [],
+          "undoLists": [
+            {
+              "daysAgo": -3,
+              "computer": "another",
+              "lists": [
+                "c"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "c": 48
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": []
+        }
+      ],
+      "restoreRule": "Putting a small backup's Media back: the zip is unpacked as a whole one is; then, under the store's shared lock (no sweep until the restore ends), each listed file is looked for in the store and checked against its checksum, and when the store's copy is missing or does not match, in the course's CURRENT Media folder by checksum (#785 plan review, amendment 4), before anything in the course changes. A file found in neither is missing. When the list names files and NONE can be found, the restore is refused and nothing changes: the backup was carried away from the store its pictures are kept in, and restoring its pages over the course would take every picture away. When some are missing, the teacher is asked before the swap, and shown which. Each file is copied in under a temporary name, checked again, moved to its name, and given its listed date and permissions; every listed folder is made, empty ones too. The trail carries the count of missing files, never their names (amendment 5).",
+      "howToRunARestoreCase": "Each file is a Media path and where its bytes are before the restore: store (a good copy in the store), damagedInStore (a copy in the store whose bytes do not match), course (only in the course's current Media folder), nowhere. expectMissing lists the paths that cannot be put back; expectCanBeRestored is false when the restore is refused; expectFromTheCourse counts files taken from the course's current Media.",
+      "restoreCases": [
+        {
+          "name": "every file is in the store: all put back",
+          "files": [
+            {
+              "path": "Media/cell.png",
+              "where": "store"
+            },
+            {
+              "path": "Media/unit 2/graph.png",
+              "where": "store"
+            }
+          ],
+          "expectMissing": [],
+          "expectCanBeRestored": true,
+          "expectFromTheCourse": 0
+        },
+        {
+          "name": "one file is nowhere: the rest are put back and that one is named",
+          "files": [
+            {
+              "path": "Media/cell.png",
+              "where": "store"
+            },
+            {
+              "path": "Media/map.jpg",
+              "where": "nowhere"
+            }
+          ],
+          "expectMissing": [
+            "Media/map.jpg"
+          ],
+          "expectCanBeRestored": true,
+          "expectFromTheCourse": 0
+        },
+        {
+          "name": "a damaged copy in the store counts as missing",
+          "files": [
+            {
+              "path": "Media/cell.png",
+              "where": "store"
+            },
+            {
+              "path": "Media/map.jpg",
+              "where": "damagedInStore"
+            }
+          ],
+          "expectMissing": [
+            "Media/map.jpg"
+          ],
+          "expectCanBeRestored": true,
+          "expectFromTheCourse": 0
+        },
+        {
+          "name": "missing from the store but still in the course's Media: taken from the course",
+          "files": [
+            {
+              "path": "Media/cell.png",
+              "where": "store"
+            },
+            {
+              "path": "Media/map.jpg",
+              "where": "course"
+            }
+          ],
+          "expectMissing": [],
+          "expectCanBeRestored": true,
+          "expectFromTheCourse": 1
+        },
+        {
+          "name": "none can be found anywhere: refused, nothing changes",
+          "files": [
+            {
+              "path": "Media/cell.png",
+              "where": "nowhere"
+            },
+            {
+              "path": "Media/map.jpg",
+              "where": "nowhere"
+            }
+          ],
+          "expectMissing": [
+            "Media/cell.png",
+            "Media/map.jpg"
+          ],
+          "expectCanBeRestored": false,
+          "expectFromTheCourse": 0
+        },
+        {
+          "name": "an empty Media folder restores as an empty folder",
+          "files": [],
+          "expectMissing": [],
+          "expectCanBeRestored": true,
+          "expectFromTheCourse": 0
+        }
+      ],
+      "writeRule": "Writing a small backup, in this order, so a crash at any step leaves store files nothing names (swept after their day) and never a zip whose files are missing: the store's lock, shared; every Media file read and its checksum taken, every time; a pending list naming every checksum; each file not already kept copied into files/<aa>/ under a temporary name, checked against its checksum, and moved to its name (a kept file is checked too, and replaced when damaged; a copy that does not match fails the backup); the pages zipped under a temporary name with the list added at the zip's root, the zip tested, then moved to its name, refusing a name already there; the list copied to lists/; the pending list removed. What a whole zip leaves out (excludedFromArchives anywhere in a path, Plantoir's own Obsidian add-ons) a small backup leaves out too, from the same list; symbolic links in Media are followed and a link that leads nowhere is left out, as zip -r does.",
+      "rejected": [
+        {
+          "option": "Git under the hood",
+          "why": "Ruled out on the issue (2026-11-12): a program shipped and signed on both platforms, no empty folders or file dates, easily damaged inside a synced folder."
+        },
+        {
+          "option": "hard links instead of a store",
+          "why": "Not on FAT or exFAT drives, and a picture edited in place through one link changes every backup that links to it."
+        },
+        {
+          "option": "compressing the store",
+          "why": "Pictures do not compress: the whole zip of 526 MB of stand-in pictures was 553 MB."
+        },
+        {
+          "option": "one store per course",
+          "why": "The same picture in two courses after Copy a Page would be kept twice; one store per working folder costs nothing more."
+        },
+        {
+          "option": "trusting an unchanged size and date instead of reading every file",
+          "why": "0.02 s against 0.25 s for 526 MB, measured by the plan; a picture edited by a tool that keeps its date would be restored as the old one."
+        },
+        {
+          "option": "restoring the pages and reporting the missing pictures afterwards",
+          "why": "By then the course's own copies have been replaced (#785 plan review, amendment 4); the restore finds them first and asks before the swap."
+        }
+      ]
+    },
     "restoringOneSectionsKeys": {
       "note": "Putting ONE section back from an assistant conversation's backup (\"Restore Section N…\") swaps that section's per-section keys on every page SHARED by the course's sections - the pages outside the section<N> folders - and leaves every other byte alone (CourseRestorer.settingPerSectionKeys on the mac). `live` is the page as it is now, `backup` as the backup has it, `after` the page the restore must write, compared as BYTES. A key's value can live on the lines below it (issue #182): both halves of the swap carry and drop a key WITH the lines it owns - the continuation walk, except that an indented `# note` under a key that is REMOVED goes with it - and restored lines go after the last line any per-section key OWNS. When the live page has no line of this section and its block has no column-0 level for a new key (issue #186's shape), the page is left exactly as it is and `expectCouldNotBePutBack` is true: the restore COUNTS those pages and says so after it is done (AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack). `expectSite` is what the built site does with `after`, per section, `visible` or `hidden` - measured 2026-09-25 (python-frontmatter 1.3.0 / PyYAML 6.0.3, then js-yaml on JSON_SCHEMA and patches/publish.ts) and re-judged by scripts/check_visibility_against_the_site.py inside the image on every verify.sh run. Every `after` differs from what the restore wrote before #182 except the last case, which is the guard. Windows' CourseRestorer still finds the block with its own strict FrontmatterBounds (#177) and copies key LINES only; wiring these in is the acceptance for both (the windows issue from #182).",
       "cases": [
