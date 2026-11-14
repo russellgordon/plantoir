@@ -2792,11 +2792,33 @@ when the runner is not running and has a launch problem (asked before the
 exit code, since a run that did start always clears the problem and an exit
 code beside it is an earlier run's). The window then ends the wait, hands
 the lease back, writes `preview could not start` with the sentence, and
-shows that sentence under "Cannot Preview Yet", since once the wait is over
-the console may not be showing (a run that never launched leaves an empty
-transcript). Two `pressCases` pin it, "a run that could not start" and "a
+shows that sentence under "Cannot Preview Yet". The console shows the same
+sentence (`TaskConsoleView` puts `launchProblem` above the transcript), but
+the console is not always on screen, and a Preview press that produced
+nothing visible is the fault this fixes. Two `pressCases` pin it, "a run that could not start" and "a
 run that could not start, then a press"; with `howTheRunStands` answering
 the old meaning both fail.
+
+Raising the sentence in an alert made one old wording wrong. Two of the five
+returns, the pseudo-terminal that would not open and the process that would
+not launch, said "Could not get started:" followed by the system's own
+description of the error. Measured on a copy of `PseudoTerminalError`
+compiled under the module name `QuartzTeachers`, that reads "The operation
+couldn’t be completed. (QuartzTeachers.PseudoTerminalError error 0.)", which
+names the app's module and error type and gives nothing to act on (rule 1).
+Both returns now give `ScriptRunner.couldNotGetStarted`, whose remedy is the
+one the launchers already give when the website builder will not start
+(`app-rules.json` → `hostBlockClash.saysWhenAStartIsRefused`), and keep the
+system's description in `launchProblemDetail`, which only the trail reads:
+`preview could not start` adds it after the sentence, and the trail redacts
+it on the way in. `ScriptRunnerLaunchProblemTests` walks every launch
+problem, meeting the launch failure for real through `ScriptRunner.shell`
+pointed at a program that is not there, and finds no machinery word in any
+of them. Rejected: giving `PseudoTerminalError` a `LocalizedError` sentence
+(the process launch failure's description, "The file “bash” doesn’t exist.",
+would still reach the alert), and a `FailureExplainer` match (it reads a
+run's output, and these runs have none; its rule for what it does not
+recognise is to say nothing, which an alert cannot do).
 
 The same harness confirmed two older faults, both on `dev` as well, and both
 were a few lines inside `startPreview`'s guard after

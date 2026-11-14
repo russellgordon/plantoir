@@ -3283,13 +3283,19 @@ struct SectionDetailView: View {
                 // The run never started (#812's review). It used to hold the
                 // wait, the record and the lease for ten minutes, so quitting
                 // asked about nothing and every later Preview did nothing.
-                // End them now, and say why in the refusal, since the console
-                // may not be showing once the wait is over.
+                // End them now, and say why in an alert as well as on the
+                // console, since the console is not always on screen. What
+                // the system said, when it said anything, goes to the trail
+                // only: the sentence is the one the teacher can act on.
                 previewBuildWait.end()
                 releasePreviewLease()
+                var trailLine: String = "the preview could not start, and the teacher was told why: " + problem
+                if let detail = previewRunner.launchProblemDetail {
+                    trailLine += " (the system said: " + detail + ")"
+                }
                 ActivityTrail.note(
                     .previewCouldNotStart,
-                    "the preview could not start, and the teacher was told why: " + problem,
+                    trailLine,
                     course: course.code,
                     section: sectionNumber
                 )

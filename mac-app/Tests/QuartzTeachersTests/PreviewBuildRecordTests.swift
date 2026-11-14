@@ -447,7 +447,7 @@ final class PreviewBuildRecordTests: XCTestCase {
     /// never started ends the start and shows a refusal.
     static func couldNotStart(_ window: Window, counted: inout Counted) {
         let standing: PreviewStartRecords.RunStanding = PreviewStartRecords.howTheRunStands(
-            isRunning: false, lastExitCode: nil, launchProblem: "This working folder is missing a piece it needs."
+            isRunning: false, lastExitCode: nil, launchProblem: "a launch problem invented for this test"
         )
         switch standing {
         case .couldNotStart:

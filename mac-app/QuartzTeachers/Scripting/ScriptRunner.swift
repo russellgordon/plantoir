@@ -23,7 +23,15 @@ class ScriptRunner {
     var lastExitCode: Int32?
 
     /// A launch failure message, if the script could not start at all.
+    /// Always a sentence a teacher can read: it reaches the console, the
+    /// preview's "Cannot Preview Yet" alert and the assistant, so it never
+    /// carries the system's own description of an error (#812's review).
     var launchProblem: String?
+
+    /// What the system said when a run could not get started, for the
+    /// trail only (it is redacted on the way in). Nil for every other
+    /// launch problem, and cleared at the start of every run.
+    var launchProblemDetail: String?
 
     /// When output last arrived — used to sense a stalled prompt.
     var lastOutputAt: Date = Date()
@@ -230,6 +238,24 @@ class ScriptRunner {
     /// build was stopped, and outlive the process with no lease saying so.
     static var refusesNewRuns: Bool = false
 
+    /// What a teacher reads when the system would not open a terminal for a
+    /// run, or would not launch it (#812's review). It used to be followed
+    /// by the system's own description, which named the app's internal
+    /// module and error type ("QuartzTeachers.PseudoTerminalError error 0")
+    /// and gave nothing to act on; that description now goes to the trail
+    /// through `launchProblemDetail`. The remedy is the one the launchers
+    /// already give when the website builder will not start
+    /// (`hostBlockClash.saysWhenAStartIsRefused` in `app-rules.json`):
+    /// both failures are the Mac running short of something, which a
+    /// restart puts right.
+    static let couldNotGetStarted: String =
+        "Could not get started. Try again, or restart this Mac if it happens again."
+
+    /// The shell every launcher runs under. A variable only so a test can
+    /// point it at a program that is not there and meet the launch failure
+    /// for real (`ScriptRunnerLaunchProblemTests`); nothing else sets it.
+    static var shell: URL = URL(fileURLWithPath: "/bin/bash")
+
     /// The launcher's process id while it runs, or nil.
     var processIdentifier: Int32? {
         guard let process else {
@@ -314,6 +340,7 @@ class ScriptRunner {
         if isRunning {
             return
         }
+        launchProblemDetail = nil
         if ScriptRunner.refusesNewRuns {
             launchProblem = "Plantoir is closing, so nothing new was started."
             return
@@ -368,12 +395,13 @@ class ScriptRunner {
         do {
             newTerminal = try PseudoTerminal()
         } catch {
-            launchProblem = "Could not get started: \(error.localizedDescription)"
+            launchProblem = ScriptRunner.couldNotGetStarted
+            launchProblemDetail = error.localizedDescription
             return
         }
 
         let newProcess: Process = Process()
-        newProcess.executableURL = URL(fileURLWithPath: "/bin/bash")
+        newProcess.executableURL = ScriptRunner.shell
         var fullArguments: [String] = [scriptURL.path]
         for argument in arguments {
             fullArguments.append(argument)
@@ -415,7 +443,8 @@ class ScriptRunner {
         do {
             try newProcess.run()
         } catch {
-            launchProblem = "Could not get started: \(error.localizedDescription)"
+            launchProblem = ScriptRunner.couldNotGetStarted
+            launchProblemDetail = error.localizedDescription
             return
         }
 

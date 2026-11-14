@@ -96,7 +96,7 @@
         "why": "Issue #813: a repair's Preview Again stops a preview that is up and starts it again, and since #813 the start runs only if the press still holds after the stop (quittingWhileWorkIsUnderWay.previewBuildRecord.previewAgainCases). A press that starts nothing shows nothing either, so this line is the only answer to 'I pressed Preview Again and nothing came up'."
       },
       {
-        "carries": "the course code and the section, and the sentence the teacher was shown about why the preview could not start",
+        "carries": "the course code and the section, the sentence the teacher was shown about why the preview could not start, and, when the system would not open a terminal for the run or launch it, what the system said (on the trail only, never in the sentence the teacher is shown)",
         "event": "preview could not start",
         "why": "Issue #812's review: when a section window's preview never starts (the runner records why and is not running, sometimes with no exit code), the window ends its wait, hands back its record and its lease, and shows that sentence as a refusal (quittingWhileWorkIsUnderWay.previewBuildRecord.pressCases, \"a run that could not start, then a press\"). It used to wait ten minutes in silence, and every later Preview in the window did nothing, so this line is the record of what the teacher was told."
       },
