@@ -102,12 +102,9 @@ ready.
   handout are brought up to date: copyable text that wraps, lettered parts
   that line up on quizzes and tests, and a settled shape for a lesson page.
   ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
-- **Guidance for writing tests, marking, and report comments.** Three more
-  sets of notes for an assistant working beside Plantoir: writing a unit
-  test with its solutions, marking guide and practice test; marking tests
-  and coding assignments onto feedback sheets; and drafting report comments
-  from the marks. Student names stay on your computer.
-  ([#751](https://github.com/russellgordon/plantoir/issues/751), [#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
+- **Guidance for writing tests.** Notes for an assistant working beside
+  Plantoir on writing a unit test with its solutions, marking guide and
+  practice test. ([#751](https://github.com/russellgordon/plantoir/issues/751))
 - **The assistant:** "Open my website" opens it rather than deploying it
   ([#688](https://github.com/russellgordon/plantoir/issues/688)), and a course that could not be opened in Obsidian is
   reported as such ([#721](https://github.com/russellgordon/plantoir/issues/721)).
@@ -140,6 +137,14 @@ ready.
 
 ## Version 2.1
 
+- **Guidance for marking and report comments.** Notes for an assistant
+  working beside Plantoir on marking tests and coding assignments onto
+  feedback sheets, and on drafting report comments from the marks. These
+  were planned for 2.0.0; they moved here so that the steps that touch
+  your students' names can be made simpler and checked again, on the Mac
+  and on Windows, before anyone relies on them. Student names stay on your
+  computer.
+  ([#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
 - **PhET science simulations on your pages**, from the University of
   Colorado's collection — projectile motion, gas laws, circuits, natural
   selection and more. Students tap to open them; nothing loads until then.

@@ -81,3 +81,7 @@ site/updates/
 # (#578: GeoGebra's 33.5 MB bundle). build.py fills it from a cache outside the repository;
 # the repository ships recipes, not binaries (website/mirror.py).
 site/mirror/
+
+# The rendered check's driver (#597) is installed OUTSIDE the repository by
+# browser-checks/fetch-browsers.sh; a node_modules here is a mistake.
+browser-checks/node_modules/

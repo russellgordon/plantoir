@@ -85,4 +85,5 @@ website/updates/*.xml.signature  -text
 # would give it CRLF and a different hash, and the skill would then refuse to run it. So this one file
 # is checked out with LF everywhere: the bytes on disk are the bytes git stores, which are the ones the
 # hash was taken from (750a fix review M5). scripts/test_marking_sheets.py checks the file has no CR.
-support/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eol=lf
+# The skill is held out of v1.10.0 in held/agent_guidance/skills (#750); the rule moves with it.
+held/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eol=lf

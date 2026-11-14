@@ -34,10 +34,6 @@
    "why": "unit planning (#804)"
   },
   {
-   "pattern": "\\breport card comments?\\b",
-   "why": "an assistant task"
-  },
-  {
    "pattern": "\\bCoverage\\b",
    "why": "the Coverage tab (#804)"
   }
