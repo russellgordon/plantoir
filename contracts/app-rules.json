@@ -1081,14 +1081,14 @@
         "title" : "Where to find your Account ID"
       },
       {
-        "explanation" : "Your surname is used to create a clear, recognizable web address for your students and families (such as mcv4u-s1-2026-gordon), and to prevent naming conflicts with other classes. It is saved on this computer and only asked once.",
+        "explanation" : "Your surname is used to create a clear, recognizable web address for your students and families (such as mcv4u-s1-2026-quillfeather), and to prevent naming conflicts with other classes. It is saved on this computer and only asked once.",
         "fieldLabel" : "Surname",
         "isSecret" : false,
         "linkAddress" : "",
         "linkTitle" : "",
         "name" : "teacherSurname",
         "steps" : [
-          "Type your surname below using letters only (for example, “Gordon”).",
+          "Type your surname below using letters only (for example, “Quillfeather”).",
           "It will be combined with course codes and the school year to name your class websites."
         ],
         "title" : "Teacher Surname"
@@ -1101,8 +1101,8 @@
         "linkTitle" : "",
         "name" : "siteName",
         "steps" : [
-          "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-gordon)",
-          "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. lcs-mcv4u-s1-2026-gordon)",
+          "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-quillfeather)",
+          "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. jhc-mcv4u-s1-2026-quillfeather)",
           "Use only lowercase letters, numbers, and hyphens."
         ],
         "title" : "Choose a Website Address"
@@ -1116,7 +1116,7 @@
         "name" : "siteNameConflict",
         "steps" : [
           "Add a number suffix (such as -01, pre-filled below).",
-          "Or add your school's initials (e.g. lcs-mcv4u-s1-2026-gordon).",
+          "Or add your school's initials (e.g. jhc-mcv4u-s1-2026-quillfeather).",
           "Use only lowercase letters, numbers, and hyphens."
         ],
         "title" : "Website Address Already Taken"
