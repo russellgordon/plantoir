@@ -766,7 +766,7 @@ nonisolated enum RestoreSwap {
             record.keepsWhatWasReplaced = true
         }
         if let began = context.archiveBegan {
-            record.archiveBegan = RestoreSettle.momentText(began)
+            record.archiveBegan = momentTextRoundedDown(began)
         }
         let unpacked: URL = staging.appendingPathComponent(unpackName)
         let payload: URL
@@ -1148,7 +1148,17 @@ nonisolated enum RestoreSwap {
                 moment = latest
             }
         }
-        return RestoreSettle.momentText(moment)
+        return momentTextRoundedDown(moment)
+    }
+
+    /// A moment as a record writes it, to the millisecond, rounded DOWN, so
+    /// a file written in the same millisecond is judged written after it:
+    /// the side that keeps. Measured: a page saved within a millisecond of
+    /// the moment was kept in one run of the harness and not in the next
+    /// before this.
+    static func momentTextRoundedDown(_ moment: Date) -> String {
+        let milliseconds: Double = (moment.timeIntervalSinceReferenceDate * 1000).rounded(.down)
+        return RestoreSettle.momentText(Date(timeIntervalSinceReferenceDate: milliseconds / 1000))
     }
 
     /// A record's `writtenAfter`, or for a record an older build wrote,

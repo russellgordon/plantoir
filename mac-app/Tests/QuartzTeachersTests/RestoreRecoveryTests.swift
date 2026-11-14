@@ -366,11 +366,9 @@ final class RestoreRecoveryTests: XCTestCase {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
         let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        let writtenAfter: Date = Date()
-        _ = try StagedRestore.make(
-            fixture, phase: .swapping, movesMade: Int.max,
-            extraRecordKeys: ["writtenAfter": RestoreSettle.momentText(writtenAfter)]
-        )
+        _ = try StagedRestore.make(fixture, phase: .swapping, movesMade: Int.max)
+        // As the engine writes it, once the backup is unpacked.
+        let writtenAfter: Date = try StagedRestore.recordWrittenAfter(in: fixture)
         let folder: URL = fixture.courseURL.appendingPathComponent("section1/All Classes")
         let edited: URL = folder.appendingPathComponent("Unit 1, Day 1.md")
         XCTAssertEqual(try String(contentsOf: edited, encoding: .utf8), "BACKUP class\n")
@@ -404,12 +402,8 @@ final class RestoreRecoveryTests: XCTestCase {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
         let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        let writtenAfter: String = RestoreSwap.writtenAfterMoment(
-            swapping: RestoreSettle.momentText(Date()), zipURL: fixture.zipURL
-        )
-        _ = try StagedRestore.make(
-            fixture, phase: .swapping, movesMade: Int.max, extraRecordKeys: ["writtenAfter": writtenAfter]
-        )
+        _ = try StagedRestore.make(fixture, phase: .swapping, movesMade: Int.max)
+        _ = try StagedRestore.recordWrittenAfter(in: fixture)
 
         let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
 
@@ -488,6 +482,21 @@ struct StagedRestore {
             made += 1
         }
         return StagedRestore(stagingURL: staging, moves: moves)
+    }
+
+    /// Gives every record in the fixture's staging folders the
+    /// `writtenAfter` the engine writes at `swapping` (now, or the zip's own
+    /// time plus the rounding), after the unpack, and returns it.
+    static func recordWrittenAfter(in fixture: WholeCourseFixture) throws -> Date {
+        let moment: String = RestoreSwap.writtenAfterMoment(swapping: RestoreSettle.momentText(Date()), zipURL: fixture.zipURL)
+        let restoring: URL = RestoreSwap.restoringFolder(fixture.coursesDirectoryURL)
+        for name in try FileManager.default.contentsOfDirectory(atPath: restoring.path) {
+            let recordURL: URL = restoring.appendingPathComponent(name).appendingPathComponent(RestoreSwap.recordName)
+            var record: RestoreSwap.Record = try XCTUnwrap(RestoreSwap.readRecord(at: recordURL))
+            record.writtenAfter = moment
+            try RestoreSwap.writeRecord(record, to: recordURL, flushes: false)
+        }
+        return try XCTUnwrap(RestoreSettle.parsedMoment(moment))
     }
 
     /// Rewrites every record in the fixture's staging folders so its owner

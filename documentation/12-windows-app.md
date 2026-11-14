@@ -6583,6 +6583,21 @@ Windows session to check against File Explorer. Explorer can also write
 `.DS_Store`: the way back keeps them as newcomers, and whether
 `keptInPlace` should name them is a contract case to propose.
 
+Round three (2026-11-14) adds, as data: nothing a restore removes may exist
+nowhere else (`backups.restoreWholeCourse.keptFolders`): the record's
+`keepsWhatWasReplaced`, `archiveBegan` and `writtenAfter`, the four kept
+folder names, and the trail event `course restore kept files`. And one
+mechanism the contract can only describe: of two restores of one course
+started together on one computer exactly one goes on, by an advisory lock
+on `courses\_backups\<CODE>\` taken before the first record is written.
+The mac's is `flock`, which the system releases when the process ends;
+Windows needs the same property (a file opened with `FileShare.None` and
+`DeleteOnClose` beside the folder is the likely shape, released by the
+system on exit), measured there before it is trusted. The whole-course
+confirmation's paragraph on what happens to the course as it is now is in
+the contract, one of three by what truly happens (`confirmArchived`,
+`confirmKeptWithItsBackups`, `confirmNoCourseFolder`).
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived

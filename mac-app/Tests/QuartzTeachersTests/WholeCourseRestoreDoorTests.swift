@@ -41,7 +41,10 @@ final class WholeCourseRestoreDoorTests: XCTestCase {
             try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit),
             "the course is the backup's, every file and nothing else"
         )
-        XCTAssertFalse(fixture.somethingWasKept(), "the archive holds the course as it was; nothing else is kept")
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), [:],
+            "the archive holds the course as it was; nothing else is kept"
+        )
         XCTAssertEqual(fixture.leftInRestoring(), 0, "nothing is left staged")
         XCTAssertTrue(fixture.trailText().contains("restored ICS3U (ICS3U) from \(fixture.zipURL.lastPathComponent)"), fixture.trailText())
         XCTAssertFalse(fixture.trailText().contains("did not go ahead"), fixture.trailText())

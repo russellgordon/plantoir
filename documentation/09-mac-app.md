@@ -12897,8 +12897,13 @@ into the kill harness). The order is `contracts/course-management.json` →
    from the central directory, `real 0.00` for 100 MB) against
    `volumeAvailableCapacityForImportantUsage`. Short, it says
    `notEnoughSpace` and nothing is archived.
-3. The archive, as before; the refusals again.
-4. `courses/.internal/restoring/<id>/` and its record (`restore.json`,
+3. The archive, as before (the moment it began is kept for step 7); the
+   refusals again.
+4. The course is HELD (`RestoreSwap.holdTheCourse`, round three's m-1): an
+   advisory `flock` on `courses/_backups/<CODE>/`, so of two restores of one
+   course started together in two copies of Plantoir exactly one goes on;
+   the other is refused with `anotherRestoreUnderWay`, having written
+   nothing. Then `courses/.internal/restoring/<id>/` and its record (`restore.json`,
    `file-formats.json` → `restoreRecord`), written to a temporary file,
    `F_FULLFSYNC`, renamed, the folder flushed. The unpack (`ditto`) into
    `backup/`; the settings checked; 785b's Media slot (nothing today); the
@@ -12923,10 +12928,14 @@ into the kill harness). The order is `contracts/course-management.json` →
 7. The swap. A failure runs the way back (below). Then `done`, flushed: the
    restore has happened. Then the rename records are cleared (moved here
    from BEFORE the restore, so a failed restore keeps them), the course is
-   locked again if kept for reference, and the old copy is removed by
-   `RestoreSwap.removeUnlocking`, which clears Locked and makes folders
-   writable on the way and never follows a link (M7, tested with a link to
-   a locked file outside).
+   locked again if kept for reference, and what the old copy holds that
+   exists nowhere else is KEPT (round three, below): all of it when the
+   record says `keepsWhatWasReplaced`, otherwise what the archive may not
+   hold. Only then is the old copy removed by `RestoreSwap.removeUnlocking`,
+   which clears Locked and makes folders writable on the way and never
+   follows a link (M7, tested with a link to a locked file outside). A keep
+   that fails stops there: nothing is removed, and the `done` record waits
+   for the next reading.
 
 **What stays where it is** (Russell's held question M12, behind
 `WholeCourseRestore.leavesWhatBackupsLeaveOut`): every name in
@@ -12955,6 +12964,10 @@ is back** (the implementation review's I1): the course's own
 earlier move back failed; the backup's `course_config.json` is the first
 move back, and when it will not leave, the way back stops there, so the
 course is the backup's whole rather than a mix under the backup's settings.
+After any way back, a file in the backup's items with a time later than the
+record's `writtenAfter` (a page the teacher wrote into a folder of the
+backup's in the hours before the next reading) moves to the newcomers'
+folder before staging is removed (round three, below).
 A course that is a mix therefore never has its settings, and the sidebar,
 `build_site.py`, `deploy.sh` and the scheduled deploy all read it as no
 course. A refusal on a lock or a permission at the top of the
@@ -13041,8 +13054,10 @@ can touch its date).
 **Known limits.** A power cut's ordering of APFS metadata after
 `F_FULLFSYNC` is not something a SIGKILL proves; the R7 guard (an original
 at neither end: nothing moves) is the defence. Edits made during the
-archive are replaced and are in neither the archive nor the backup, as
-before. The archive itself is still a `zip -r` that follows links, so a
+archive were replaced and were in neither the archive nor the backup
+before; since round three, the ones Finder shows that were saved after the
+archive began are kept in `<CODE> not in the archive <stamp>` (a hidden file
+is not, see round three). The archive itself is still a `zip -r` that follows links, so a
 link loop can hang a restore before the staged part begins (#908); this
 piece does not make it worse. The unpack runs on the main actor (2 s on
 exFAT; longer from a backup iCloud must download), so a Force Quit is the
@@ -13086,10 +13101,11 @@ was reproduced first; each fix has a test proven red on 7769cb7a7.
   The teacher is told `stoppedPartWay`, `notInTheSidebar` and
   `restoreAgainToPutItRight`; the trail has `course restore stopped part
   way`. The way out is to restore a backup again: over a course folder the
-  sidebar does not list nothing is archived first, so `CourseRestorer
-  .restoreBackup` passes `keepingWhatWasReplaced` and the set-aside copy is
-  kept in `courses/_backups/<CODE>/<CODE> before a restore <stamp>` rather
-  than removed. Rejected: archiving the folder anyway (`CourseArchiver`
+  sidebar does not list nothing is archived first, so the set-aside copy is
+  kept rather than removed. (As built in round two this was a closure whose
+  result was ignored, run under the stop's own folder name; round three
+  made it a fact of the record, `courses/_backups/<CODE>/<CODE> as it was
+  before restoring again <stamp>`, see below.) Rejected: archiving the folder anyway (`CourseArchiver`
   takes a listed course, and a second full zip of a mix adds nothing the
   kept folder lacks); moving the settings back and marking the course
   unsafe to deploy (a third state every reader would have to learn).
@@ -13149,14 +13165,108 @@ backup's whole, not a mix); the settle killed at each of its moves back, 39
 of 39; two settlers at once, 60 of 60 as they were with no false sentence
 and no kept folder; a newcomer after a crash, 46 of 46 files in place.
 
+**After the fix review** (round three, 2026-11-14). The review found a
+promise in a sentence that the code did not keep, and the director's ruling
+was that a promise in a sentence is a property of the code: nothing a
+restore removes may exist nowhere else. Each case was reproduced first in
+`909/round3/harness/` on db38ed112's engine (`promises.py`, `two_restores.py`,
+with `bin/staged-old`), and each fix has an XCTest proven red on a mutant of
+the final file that puts db38ed112's behaviour back (`909/round3/mustfail/`).
+
+- **I-a: "kept first, not deleted" removed 45 of 45 files twice.** The keep
+  was a closure run after `done` whose result was ignored, so a backups
+  folder that refused the move had the copy removed anyway; and a crash
+  between `done` and the keep was finished by a settle that passed no keep.
+  Both removed every file of the folder, a page written after the stop
+  among them. Now the keep is `Record.keepsWhatWasReplaced`, written in the
+  FIRST record, before anything moves; `finishAfterTheCommit` moves the copy
+  to `<CODE> as it was before restoring again <stamp>` and, when that move
+  fails, returns not tidied with nothing removed; the `done` record waits,
+  and the next reading's settle keeps it from the record.
+- **The third case**, found by enumerating every removal in the restore code
+  (the table below) and asking of each what it removes that exists nowhere
+  else. Three did: names backups leave out found BELOW the top of the course
+  (a section's sample project's `.git`, `build`, `out`), which went aside
+  with their parent and are in neither the backup nor the archive; a page
+  saved while the archive was being zipped; and, after a crash mid-swap, a
+  page the teacher added to or edited in one of the backup's folders before
+  the next reading, which the way back carried into staging. The first two
+  are moved, at their paths inside the course, to `<CODE> not in the archive
+  <stamp>` before the copy is removed (`keepWhatTheArchiveMayNotHold`); the
+  third to the newcomers' folder before staging is removed
+  (`keepWhatWasWrittenIntoTheBackupsItems`). Measured with ditto on
+  2026-11-14: an unpacked file's creation and content times are the zip's on
+  APFS and its inode time the unpack's; on exFAT its creation time is the
+  unpack's and its content and inode times the zip's. So "written since" is
+  any of the three later than the record's `writtenAfter`, which is the
+  `swapping` moment or the zip file's own time plus two seconds (a zip
+  stores times to the even second, rounded up), whichever is later; the
+  inode time is not asked of an item at the top, whose own renames change
+  it. `.DS_Store`, `__pycache__`, `.cache`, `.quartz-cache` and the built
+  site's link are made again and are removed as before; a hidden file
+  changed while the archive was made is not kept, because Obsidian rewrites
+  its layout file every few seconds while open and that would leave a kept
+  folder after nearly every restore.
+- **I-b: the way out said "moves to Archived", and the kept folder could not
+  be found.** The confirmation's paragraph on the course as it is now is
+  chosen by what will truly happen, with the test the door uses before it
+  archives (`WorkspaceModel.wholeCourseRestoreConfirmation`):
+  `confirmArchived` (the paragraph it always had), `confirmKeptWithItsBackups`
+  for a folder that is not a course the sidebar lists, `confirmNoCourseFolder`
+  when there is no folder. A restore that kept files says where, once, in
+  the backup alert titled `restoredTitle` (`keptWhatWasInTheFolder`,
+  `keptWhatTheArchiveMayNotHold`), and writes `course restore kept files`.
+  The kept folder's name differs from a stop's. It follows the rule the
+  one-section restore's set-aside folders already follow (`keptFolders`):
+  it is not a `.zip`, so `BackupItem` and `ArchivedItem` never read it and
+  `pruneBackups` never counts or deletes it, nothing in the app deletes it,
+  and the sentence names it rather than a listing showing it. Rejected:
+  listing kept folders in Backups (a row that cannot be restored, deleted
+  or sized like a backup would be a second kind of row for one rare case).
+- **m-1: two restores of one course at once were sometimes both refused**
+  (2 or 3 in 10 on APFS, 10 in 10 on exFAT), because each wrote its record
+  and then saw the other's. `RestoreSwap.holdTheCourse` takes an advisory
+  `flock` on `courses/_backups/<CODE>/` (made if missing; `courses/` itself
+  when it cannot be) before the first record, so the loser writes nothing
+  and is refused with `anotherRestoreUnderWay`, which is then true.
+  Measured: a second process's `LOCK_NB` is refused with EWOULDBLOCK on APFS
+  and on exFAT (fskit), and granted at once after the holder is SIGKILLed.
+  Rejected: telling the two apart by their records' times (a record write
+  that straddles the other's whole check lets both through), a lock file in
+  `courses/.internal/restoring/` (it stops that folder being removed when
+  empty, and removing it races the next restore), and the course folder
+  itself (an arrival has none). Another computer is not held: a synced
+  folder carries no lock, and its record is what the third refusal counts.
+- **m-2:** the door tests compare the whole course both ways, with a page
+  the backup does not have, and the reference course test compares the
+  whole course and every page's lock.
+
+Every removal in the restore code, and where what it removes exists first:
+
+| Removal | What it removes | Exists first in |
+|---|---|---|
+| `RestoreSwap.restore`, either catch before the swap (`removeStaging`) | the record and the unpack; nothing of the course has moved | the zip |
+| the live way back, every file back (`removeStaging` after `keepNewcomers`) | the backup's items moved back, the empty set-aside folder | the zip; what was written into them is with the newcomers first, and when that cannot all be moved nothing is removed |
+| a live stop (`keepTheSetAside`) and a settle's blocked way back | what is left of staging after the set-aside copy and newcomers moved | the same |
+| `finishAfterTheCommit`, `removeUnlocking(aside)` | the course as it was | all of it in `<CODE> as it was before restoring again` when the record keeps it; otherwise the archive made first, with what it may not hold moved out first; a failed move stops the removal |
+| `finishAfterTheCommit`, `removeStaging` | the record and the backup's leftovers | the zip |
+| a settle's `remove` (an `unpacking` record, or a day-old folder holding only `backup/`) | the unpack | the zip |
+| a settle's `putBack` with every file back | as the live way back | as the live way back |
+| a settle's `keep` of this computer's record | what is left after the copy and newcomers moved | as a live stop |
+| `releaseClaim`, a settle's `keep` of another computer's record | the settler's own lease file | nothing of a course |
+| `CourseRestorer.restore` of an Archived item, `removeItem(at: item.fileURL)` | the archive zip, after the restore worked | the course, every file of the zip moved in |
+
+MEASURED_TABLE
+
 **For Undo (#899, U5).** U5 must land after this. An undo of a whole-course
 restore is a staged restore of the archive made first, a redo one of the
 backup again: `WholeCourseRestore.restore(fromZipAt:…)` takes a zip URL. What
 was replaced is that archive, in `courses/_backups/<CODE>/` until the
-teacher deletes it; nothing else is kept. `keepingWhatWasReplaced` is
-handed the set-aside copy before it is deleted; one door passes one,
-Restore from Backup… over a course folder no archive was made of (I1,
-below), and every other passes none (M8).
+teacher deletes it, and what round three keeps (the kept folders, below).
+`keepingWhatWasReplaced` is handed the set-aside copy before it is deleted,
+and no door passes one (M8): the keep over a course folder no archive was
+made of is the record's `keepsWhatWasReplaced` since round three, so a
+settle makes it too.
 The record carries the archive's name and an empty `journalStep`. U5's
 recovery calls `settleUnfinishedRestores(in:onlyCourse:)` before its own. No
 journal call is made here.
