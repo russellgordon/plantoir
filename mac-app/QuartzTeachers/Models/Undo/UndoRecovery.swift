@@ -1,34 +1,36 @@
 import Foundation
 
-/// Settles steps whose process died part way (plan 2.4).
+/// Settles steps whose process died part way (plan 2.4; `undo.rule.recovery`).
 ///
-/// Run inside the lock before every new step, every undo and every redo.
-/// For each unfinished event whose process is gone, it reads what each op
-/// changed and decides from the CONTENT, never from times:
+/// Run inside the lock before every new step, undo and redo. For each
+/// unfinished event whose process is gone, it reads where each FILE the step
+/// changed stands, by its content, never its times:
 ///
-/// - none of it took effect: the step `failed` (or the undo or redo is
-///   ended and the step goes back to where it stood);
-/// - all of it took effect: the step is completed (`applied`, `undone`,
+/// - every file where the work started: nothing took effect, `failed` (an
+///   undo or redo ends, and the step is back where it stood);
+/// - every file where the work was going: completed (`applied`, `undone`,
 ///   `redone`);
-/// - some of it took effect: what took effect is put back, and the step is
-///   `rolledBack`, with one trail line;
-/// - something it changed is now neither: nothing is written, and the step
-///   is ended where nothing of it is trusted.
+/// - some of each: what took effect is put back, `rolledBack`, a trail line;
+/// - any file neither (changed by hand since the process died): every file
+///   that CAN be verified is put back where the work started, the step is
+///   `interrupted` naming the files in the way by path, the whole list is
+///   CLEARED (reason `interrupted`, as ruling 13 clears for a refused step)
+///   and a trail line is written. The journal never says done or failed
+///   for a step that is half applied (the core review's I1).
 ///
-/// So a process that dies leaves the files as they were before its step or
-/// as they were after it, never in between: the contract's
-/// `undo.recoveryCases`. In SHADOW mode nothing is ever written into a
-/// working folder: a step that partly took effect is marked `failed` and the
-/// files are left exactly as the action left them.
+/// In SHADOW nothing is written into a working folder: the outcome is
+/// recorded and the files are left as the action left them.
 ///
-/// A step whose working folder cannot be reached is left as it is, unsettled:
-/// it waits, and Undo waits behind it (rulings 9 and 10).
+/// Recovery's own repair is made inside the lock: the one exception to
+/// "never while a change is applied", so two processes cannot repair the
+/// same step at once. It is rare (a crash) and bounded by the step's size.
+///
+/// A step whose working folder cannot be reached, or that this version
+/// cannot read, is left as it is.
 nonisolated enum UndoRecovery {
 
     // MARK: - Functions
 
-    /// Settles what can be settled. Never throws: a journal event that
-    /// cannot be written is left for the next run.
     @discardableResult
     static func run(
         _ writer: UndoJournalWriter,
@@ -43,7 +45,10 @@ nonisolated enum UndoRecovery {
             if writer.journal.processIsAlive(process) {
                 continue
             }
-            guard let root = resolveRoot(record.step.workingFolder) else {
+            if !record.isReadable {
+                continue
+            }
+            guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
                 continue
             }
             if let result = settle(record, root: root, writer: writer, mode: mode) {
@@ -53,18 +58,42 @@ nonisolated enum UndoRecovery {
         return results
     }
 
-    /// Where every content op of a step stands now.
-    static func census(of step: UndoStep, root: URL) -> (before: Int, after: Int, neither: Int) {
+    /// Where each file of a step stands: before, after or neither.
+    static func fileStates(of step: UndoStep, root: URL) -> [(path: String, state: UndoOpState)] {
+        var order: [String] = []
+        var states: [String: UndoOpState] = [:]
         var items: [String: UndoItem] = [:]
+        for op in step.ops {
+            guard let kind = op.knownKind, kind != .recompute, let path = op.path else {
+                continue
+            }
+            if items[path] == nil {
+                items[path] = UndoItem.read(at: root.appendingPathComponent(path))
+                order.append(path)
+            }
+            let state: UndoOpState = UndoCheck.state(of: op, in: items[path] ?? .absent)
+            if let earlier = states[path] {
+                if earlier != state {
+                    states[path] = .neither
+                }
+            } else {
+                states[path] = state
+            }
+        }
+        var result: [(path: String, state: UndoOpState)] = []
+        for path in order {
+            result.append((path: path, state: states[path] ?? .neither))
+        }
+        return result
+    }
+
+    /// Where every content op of a step stands now, counted by file.
+    static func census(of step: UndoStep, root: URL) -> (before: Int, after: Int, neither: Int) {
         var before: Int = 0
         var after: Int = 0
         var neither: Int = 0
-        for op in step.ops where op.knownKind != .recompute {
-            if items[op.path] == nil {
-                items[op.path] = UndoItem.read(at: root.appendingPathComponent(op.path))
-            }
-            let state: UndoOpState = UndoCheck.state(of: op, in: items[op.path] ?? .absent)
-            switch state {
+        for file in fileStates(of: step, root: root) {
+            switch file.state {
             case .before:
                 before += 1
             case .after:
@@ -100,27 +129,39 @@ nonisolated enum UndoRecovery {
         }
         var urls: [URL] = []
         for op in step.ops {
-            urls.append(root.appendingPathComponent(op.path))
+            if let path = op.path {
+                urls.append(root.appendingPathComponent(path))
+            }
         }
         if mode == .live {
             UndoSwap.tidyLeftovers(label: label, beside: urls)
         }
 
-        let counts: (before: Int, after: Int, neither: Int) = census(of: step, root: root)
-        // Which state the step was moving FROM and TO.
+        // Which state the work was moving FROM, and TO.
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
-        let atStart: Int = startedFromBefore ? counts.before : counts.after
-        let atEnd: Int = startedFromBefore ? counts.after : counts.before
+        let startState: UndoOpState = startedFromBefore ? .before : .after
+        let files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root)
+        var atStart: Int = 0
+        var atEnd: Int = 0
+        var inTheWay: [String] = []
+        var endPaths: Set<String> = []
+        for file in files {
+            if file.state == .neither {
+                inTheWay.append(file.path)
+            } else if file.state == startState {
+                atStart += 1
+            } else {
+                atEnd += 1
+                endPaths.insert(file.path)
+            }
+        }
 
         var outcome: UndoRecoveryResult.Outcome
-        var event: UndoEventLine
-        if counts.neither > 0 {
-            outcome = .leftAlone
-            event = UndoEventLine(seq: step.seq, event: .failed, phase: phase, reason: "changedDuring")
-        } else if atEnd == 0 {
+        var events: [UndoEventLine] = []
+        if inTheWay.isEmpty && atEnd == 0 {
             outcome = .nothingTookEffect
-            event = UndoEventLine(seq: step.seq, event: .failed, phase: phase, reason: "nothingTookEffect")
-        } else if atStart == 0 {
+            events.append(UndoEventLine(seq: step.seq, event: .failed, phase: phase, reason: "nothingTookEffect"))
+        } else if inTheWay.isEmpty && atStart == 0 {
             outcome = .completed
             let finishing: UndoEventKind
             switch phase {
@@ -131,28 +172,54 @@ nonisolated enum UndoRecovery {
             case .redoing:
                 finishing = .redone
             }
-            event = UndoEventLine(seq: step.seq, event: finishing)
-        } else if mode == .shadow {
-            outcome = .leftAlone
-            event = UndoEventLine(seq: step.seq, event: .failed, phase: phase, reason: "partlyTookEffect")
+            if finishing == .applied {
+                JournaledWrite.dropTheRedoBranch(below: step.seq, writer)
+            }
+            events.append(UndoEventLine(seq: step.seq, event: finishing))
         } else {
-            // Put back what took effect: an undo that died part way goes
-            // forward again; a step or a redo goes backward.
-            let back: UndoDirection = startedFromBefore ? .backward : .forward
-            let plan: UndoPlan = UndoCheck.plan(step.ops, direction: back, root: root, journal: writer.journal)
-            guard case .ready(let targets, _) = plan else {
-                return nil
+            // Put back every file that took effect and can be verified.
+            var putBack: Int = 0
+            if mode == .live && !endPaths.isEmpty {
+                var opsToPutBack: [UndoOp] = []
+                for op in step.ops {
+                    if let path = op.path, endPaths.contains(path) {
+                        opsToPutBack.append(op)
+                    }
+                }
+                let back: UndoDirection = startedFromBefore ? .backward : .forward
+                let plan: UndoPlan = UndoCheck.plan(opsToPutBack, direction: back, root: root, journal: writer.journal)
+                guard case .ready(let targets, _) = plan else {
+                    return nil
+                }
+                if UndoSwap.swap(targets, label: label + "-recover") != UndoSwapResult.swapped {
+                    return nil
+                }
+                putBack = targets.count
             }
-            let swapped: UndoSwapResult = UndoSwap.swap(targets, label: label + "-recover")
-            if swapped != UndoSwapResult.swapped {
-                return nil
+            if inTheWay.isEmpty && mode == .live {
+                outcome = .rolledBack(files: putBack)
+                events.append(UndoEventLine(seq: step.seq, event: .rolledBack, phase: phase, reason: "partlyTookEffect"))
+                UndoTrailHook.rolledBackLine?(step.course ?? "", step.section, phase, putBack)
+            } else if inTheWay.isEmpty {
+                // Shadow: recorded, never repaired.
+                outcome = .leftAlone
+                events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "partlyTookEffect", paths: Array(endPaths).sorted()))
+                events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
+            } else {
+                outcome = .interrupted(filesInTheWay: inTheWay.count, filesPutBack: putBack)
+                events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "changedByHand", paths: inTheWay))
+                events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
+                UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, putBack, inTheWay.count)
             }
-            outcome = .rolledBack(files: targets.count)
-            event = UndoEventLine(seq: step.seq, event: .rolledBack, phase: phase, reason: "partlyTookEffect")
-            UndoTrailHook.rolledBackLine?(step.course, step.section, phase, targets.count)
         }
         do {
-            try writer.append(event)
+            for event in events {
+                var written: UndoEventLine = event
+                if written.event == UndoEventKind.cleared.rawValue {
+                    written.seq = max(writer.fold.highestSeq, step.seq)
+                }
+                try writer.append(written)
+            }
             try writer.sync()
         } catch {
             return nil
@@ -176,54 +243,75 @@ nonisolated struct UndoRecoveryResult: Equatable, Sendable {
         case nothingTookEffect
         case completed
         case rolledBack(files: Int)
+        case interrupted(filesInTheWay: Int, filesPutBack: Int)
         case leftAlone
     }
 }
 
-/// The limits: fifty steps and thirty days, across the app (rulings 3, 5).
+/// The limits on the DISK (rulings 3 and 5, `undo.rule.limits`). What is
+/// OFFERED is judged when the list is read (`UndoFold.offer`); this decides
+/// what may be deleted, later and more carefully.
 nonisolated enum UndoPruning {
 
     // MARK: - Functions
 
-    /// Prunes the oldest steps past the limits, then deletes the content and
-    /// the old segments nothing on the list needs. Inside the lock only.
-    /// Never fails a caller: what it cannot delete is tried next time.
+    /// Prunes one OLDEST run of the list: past the newest fifty, or made
+    /// more than thirty days plus a grace of thirty before the clock (never
+    /// while the clock is behind the journal). It stops at the first step
+    /// that stays, so no step newer than one kept is ever pruned. Then it
+    /// deletes content and old segments nothing kept can name, unless the
+    /// journal holds anything this version cannot read. Inside the lock
+    /// only, and never failing a caller.
     static func prune(_ writer: UndoJournalWriter) {
-        let cutoff: Date = writer.journal.now().addingTimeInterval(-Double(UndoSwitch.daysKept) * 86_400)
-        var settled: [UndoStepRecord] = []
-        for record in writer.fold.stepsOnTheList where !record.phase.isInFlight {
-            settled.append(record)
-        }
-        var excess: Int = settled.count - UndoSwitch.stepsKept
-        for record in settled {
+        let fold: UndoFold = writer.fold
+        let now: Date = writer.journal.now()
+        let ageLimit: Double = Double(UndoSwitch.daysKept + UndoFold.deletionGraceDays) * 86_400
+        let ageCutoff: Date = now.addingTimeInterval(-ageLimit)
+        let trustTheClock: Bool = !fold.clockIsBehindTheJournal(now: now)
+        let times: [Int: Date] = fold.effectiveTimes()
+        let list: [UndoStepRecord] = fold.stepsOnTheList
+        var remaining: Int = list.count
+        for record in list {
+            if record.phase.isInFlight || !record.isReadable {
+                break
+            }
+            let tooMany: Bool = remaining > UndoSwitch.stepsKept
             var tooOld: Bool = false
-            if let made = UndoMoment.date(record.step.madeAt), made < cutoff {
+            if trustTheClock, let time = times[record.step.seq], time < ageCutoff {
                 tooOld = true
             }
-            if excess > 0 || tooOld {
-                let reason: String = excess > 0 ? "tooMany" : "tooOld"
-                do {
-                    try writer.append(UndoEventLine(seq: record.step.seq, event: .pruned, reason: reason))
-                } catch {
-                    return
-                }
-                excess -= 1
+            if !tooMany && !tooOld {
+                break
             }
+            do {
+                try writer.append(UndoEventLine(seq: record.step.seq, event: .pruned, reason: tooMany ? "tooMany" : "tooOld"))
+            } catch {
+                return
+            }
+            remaining -= 1
+        }
+        if writer.fold.holdsAnythingUnreadable {
+            return
         }
         deleteUnneededContent(writer)
         deleteUnneededSegments(writer)
     }
 
-    /// Blobs no step still on the list (or still being made) names.
+    /// Whether a step's content is still needed: while it is on the list.
+    static func stillNeeds(_ record: UndoStepRecord) -> Bool {
+        return record.phase.isOnTheList
+    }
+
+    /// Blobs no step still on the list names.
     static func deleteUnneededContent(_ writer: UndoJournalWriter) {
         var needed: Set<String> = []
-        for record in writer.fold.stepsOnTheList {
+        for seq in writer.fold.orderedSeqs {
+            guard let record = writer.fold.records[seq], stillNeeds(record) else {
+                continue
+            }
             for op in record.step.ops {
-                if let sha = op.beforeSha {
-                    needed.insert(sha)
-                }
-                if let sha = op.afterSha {
-                    needed.insert(sha)
+                for name in op.namedBlobs {
+                    needed.insert(name)
                 }
             }
         }
@@ -243,16 +331,17 @@ nonisolated enum UndoPruning {
     }
 
     /// Old segments, from the oldest end only, while they hold no event of a
-    /// step still on the list. Deleting from the oldest end keeps every
-    /// later event of a step whose `begin` is still there, so a step can
-    /// never come back to life because the line that ended it was deleted.
-    /// The newest segment is never deleted: it carries the highest number.
+    /// step still on the list and are older than the segment holding the
+    /// highest step number (so a number is never used twice).
     static func deleteUnneededSegments(_ writer: UndoJournalWriter) {
         guard let numbers = try? writer.journal.segmentNumbers(), numbers.count > 1 else {
             return
         }
         var needed: Set<Int> = []
-        for record in writer.fold.stepsOnTheList {
+        for seq in writer.fold.orderedSeqs {
+            guard let record = writer.fold.records[seq], stillNeeds(record) else {
+                continue
+            }
             for segment in record.segments {
                 needed.insert(segment)
             }
@@ -260,10 +349,11 @@ nonisolated enum UndoPruning {
         var index: Int = 0
         while index < numbers.count - 1 {
             let number: Int = numbers[index]
-            if needed.contains(number) {
+            if needed.contains(number) || number >= writer.fold.highestSeqSegment {
                 return
             }
             try? FileManager.default.removeItem(at: writer.journal.segmentURL(number: number))
+            UndoFoldCache.forget(writer.journal.folderURL)
             index += 1
         }
     }

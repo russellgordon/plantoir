@@ -89,10 +89,11 @@ final class UndoShadowPublishTests: XCTestCase {
         XCTAssertEqual(fold.records.count, 1)
         let record: UndoStepRecord = try XCTUnwrap(fold.records[1])
         XCTAssertEqual(record.phase, .done)
-        XCTAssertEqual(record.step.action.key, "publishPages")
+        XCTAssertEqual(record.step.action?.key, "publishPages")
         XCTAssertEqual(record.step.course, "ICS3U")
         XCTAssertEqual(record.step.section, 1)
-        XCTAssertTrue(record.step.madeBy.hasPrefix("builtInAssistant:"), record.step.madeBy)
+        let madeBy: String = record.step.madeBy ?? ""
+        XCTAssertTrue(madeBy.hasPrefix("builtInAssistant:"), madeBy)
         var kinds: [String] = []
         for op in record.step.ops {
             kinds.append(op.kind)
@@ -110,7 +111,7 @@ final class UndoShadowPublishTests: XCTestCase {
 
         let outside: (made: AssistFixture.Made, list: URL) = try makeCourse(surface: .mcp, writableList: true)
         _ = await AssistFixture.run("publish_pages", with: ["pages": ["Unit 1, Day 1"]], on: outside.made.runner)
-        let madeBy: String = try XCTUnwrap(try UndoJournal(folderURL: outside.list).read().records[1]?.step.madeBy)
+        let madeBy: String = try XCTUnwrap(try UndoJournal(folderURL: outside.list).read().records[1]?.step.madeBy ?? nil)
         XCTAssertTrue(madeBy.hasPrefix("outsideAssistant::"), madeBy)
     }
 

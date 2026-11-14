@@ -178,8 +178,8 @@ nonisolated enum UndoContractReplay {
             return "nothingToRedo"
         case .anotherChangeIsUnderWay:
             return "anotherChangeIsUnderWay"
-        case .cannotReachTheFolder:
-            return "cannotReachTheFolder"
+        case .notAvailable:
+            return "notAvailable"
         case .refused(let refusal, _):
             switch refusal {
             case .changedSince:
@@ -188,6 +188,8 @@ nonisolated enum UndoContractReplay {
                 return "fileIsInUse"
             case .contentMissing:
                 return "contentMissing"
+            case .notReadable:
+                return "notReadable"
             }
         case .listUnavailable:
             return "listUnavailable"
@@ -304,9 +306,9 @@ nonisolated enum UndoContractReplay {
                     failures.append("\(where_): unknown call \(kind)")
                 }
 
-                let fold: UndoFold = try journal.read()
-                let head: Int? = fold.head?.step.seq
-                let redo: Int? = fold.redoCandidate?.step.seq
+                let offer: UndoOffer = try journal.offer()
+                let head: Int? = offer.head?.step.seq
+                let redo: Int? = offer.redoCandidate?.step.seq
                 if head != int(call["head"]) {
                     failures.append("\(where_): head \(String(describing: head)), not \(String(describing: int(call["head"])))")
                 }
@@ -359,6 +361,10 @@ nonisolated enum UndoContractReplay {
 
     // MARK: - undo.checkCases
 
+    /// Every key a check case may carry: anything else is a case the replay
+    /// would silently not check (the contract review's MINOR 9).
+    static let checkKeys: Set<String> = ["name", "op", "current", "undo", "redo"]
+
     static func runCheckCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
         let cases: [[String: Any]] = try undoBlock()["checkCases"] as? [[String: Any]] ?? []
         var failures: [String] = []
@@ -366,10 +372,12 @@ nonisolated enum UndoContractReplay {
         for testCase in cases {
             number += 1
             let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: checkKeys, list: "checkCases", name: name)
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "check-\(number)")
-            let relativePath: String = "page.md"
-            let url: URL = place.root.appendingPathComponent(relativePath)
             let current: [String: Any] = testCase["current"] as? [String: Any] ?? [:]
+            var given: [String: Any] = testCase["op"] as? [String: Any] ?? [:]
+            let relativePath: String = string(given["path"]) ?? "page.md"
+            let url: URL = place.root.appendingPathComponent(UndoOp.isSafeRelativePath(relativePath) ? relativePath : "page.md")
             if let text = string(current["text"]) {
                 try Data(text.utf8).write(to: url)
             } else if let hex = string(current["bytesHex"]) {
@@ -378,31 +386,35 @@ nonisolated enum UndoContractReplay {
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             }
 
-            let given: [String: Any] = testCase["op"] as? [String: Any] ?? [:]
-            var op: UndoOp
+            // The op is DECODED from the case's JSON, so the lenient reader
+            // is what is tested: a kind it does not know, a path that climbs
+            // out, a number where text belongs.
             if string(given["kind"]) == "writeFile" {
-                var beforeSha: String? = nil
+                var names: [String] = []
                 if let text = string(given["beforeText"]) {
-                    beforeSha = UndoHash.sha256(of: Data(text.utf8))
+                    given["beforeSha"] = UndoHash.sha256(of: Data(text.utf8))
+                    names.append(UndoHash.sha256(of: Data(text.utf8)))
                 }
-                var afterSha: String? = nil
                 if let text = string(given["afterText"]) {
-                    afterSha = UndoHash.sha256(of: Data(text.utf8))
+                    given["afterSha"] = UndoHash.sha256(of: Data(text.utf8))
+                    names.append(UndoHash.sha256(of: Data(text.utf8)))
                 }
-                op = UndoOp.writeFile(path: relativePath, beforeSha: beforeSha, afterSha: afterSha)
-            } else {
-                op = UndoOp.editLine(
-                    path: relativePath,
-                    key: string(given["key"]) ?? "",
-                    before: string(given["before"]),
-                    after: string(given["after"]),
-                    afterKey: string(given["afterKey"]),
-                    createdTheBlock: given["createdTheBlock"] as? Bool == true
-                )
+                given["blobs"] = names
+                given["beforeText"] = nil
+                given["afterText"] = nil
             }
-            let state: UndoOpState = UndoCheck.state(of: op, in: UndoItem.read(at: url))
-            let undo: String = UndoCheck.verdict(for: state, direction: .backward).rawValue
-            let redo: String = UndoCheck.verdict(for: state, direction: .forward).rawValue
+            var clean: [String: Any] = [:]
+            for (key, value) in given where !(value is NSNull) {
+                clean[key] = value
+            }
+            let op: UndoOp = try JSONDecoder().decode(UndoOp.self, from: JSONSerialization.data(withJSONObject: clean))
+            var undo: String = "notReadable"
+            var redo: String = "notReadable"
+            if op.isReadable {
+                let state: UndoOpState = UndoCheck.state(of: op, in: UndoItem.read(at: url))
+                undo = UndoCheck.verdict(for: state, direction: .backward).rawValue
+                redo = UndoCheck.verdict(for: state, direction: .forward).rawValue
+            }
             if undo != string(testCase["undo"]) {
                 failures.append("checkCases '\(name)': undo is \(undo), not \(string(testCase["undo"]) ?? "?")")
             }
@@ -411,6 +423,14 @@ nonisolated enum UndoContractReplay {
             }
         }
         return (cases: cases.count, failures: failures)
+    }
+
+    static func unknownKeys(in testCase: [String: Any], allowed: Set<String>, list: String, name: String) -> [String] {
+        var failures: [String] = []
+        for (key, _) in testCase where !allowed.contains(key) {
+            failures.append("\(list) '\(name)': the key '\(key)' is one this replay does not check")
+        }
+        return failures
     }
 
     static func bytes(fromHex hex: String) -> Data {
@@ -431,6 +451,23 @@ nonisolated enum UndoContractReplay {
 
     // MARK: - undo.stackCases
 
+    static let stackKeys: Set<String> = [
+        "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
+        "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
+        "blobKept", "pendingRuling",
+    ]
+
+    static func intList(_ value: Any?) -> [Int]? {
+        guard let numbers = value as? [NSNumber] else {
+            return nil
+        }
+        var result: [Int] = []
+        for number in numbers {
+            result.append(number.intValue)
+        }
+        return result
+    }
+
     static func runStackCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
         let cases: [[String: Any]] = try undoBlock()["stackCases"] as? [[String: Any]] ?? []
         let traces: [String: Any] = try contract("undo-traces.json")
@@ -440,36 +477,54 @@ nonisolated enum UndoContractReplay {
             pagePath = string(page["path"]) ?? ""
             pageText = string(page["text"]) ?? ""
         }
+        let secondPagePath: String = pagePath.replacingOccurrences(of: "TST1O", with: "TST2O")
         var failures: [String] = []
         var number: Int = 0
         for testCase in cases {
             number += 1
             let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: stackKeys, list: "stackCases", name: name)
+            if !testCase.keys.contains("head") || !testCase.keys.contains("redo") {
+                failures.append("stackCases '\(name)': no head or redo to check")
+            }
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "stack-\(number)")
             let root: URL = place.root
+            let second: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "stack-\(number)-b")
+            let rootB: URL = second.root
+            let rootBAway: URL = rootB.deletingLastPathComponent().appendingPathComponent("wf-away", isDirectory: true)
             try write(pageText, to: pagePath, in: root)
-            let journal: UndoJournal = UndoJournal(folderURL: place.journalFolder)
+            try write(pageText, to: secondPagePath, in: rootB)
+            var clockDays: Double = 0
             var last: String = ""
             var linesBeforeClearing: Int = -1
             var linesAfterClearing: Int = -1
+            var held: (seq: Int, change: UndoFileChange)? = nil
+            var foreignBlob: String? = nil
+            let folderOfB: String = rootB.path
 
-            func oneStep(daysAgo: Int) {
+            func journal(daysAgo: Int = 0) -> UndoJournal {
+                let moment: Date = Date().addingTimeInterval((clockDays - Double(daysAgo)) * 86_400)
+                return UndoJournal(folderURL: place.journalFolder, now: { moment })
+            }
+
+            func resolve(_ folder: UndoWorkingFolder) -> URL? {
+                return UndoReach.root(for: folder)
+            }
+
+            func flip(in folderRoot: URL, at path: String) -> [UndoFileChange] {
                 var line: String = "publish: true"
-                if let data = UndoItem.read(at: root.appendingPathComponent(pagePath)).data,
+                if let data = UndoItem.read(at: folderRoot.appendingPathComponent(path)).data,
                    let text = UndoText.decode(data),
                    UndoLineOps.reading(key: "publish", in: text) == .entry("publish: true") {
                     line = "publish: false"
                 }
-                let stepJournal: UndoJournal
-                if daysAgo == 0 {
-                    stepJournal = journal
-                } else {
-                    let then: Date = Date().addingTimeInterval(-Double(daysAgo) * 86_400)
-                    stepJournal = UndoJournal(folderURL: place.journalFolder, now: { then })
-                }
+                return changes(setting: [(path: path, key: "publish", line: line)], in: folderRoot)
+            }
+
+            func oneStep(folderRoot: URL, path: String, daysAgo: Int) {
                 let outcome: JournaledWriteOutcome = JournaledWrite.perform(
-                    draft(changes: changes(setting: [(path: pagePath, key: "publish", line: line)], in: root), root: root, action: "publishPages"),
-                    in: stepJournal, mode: .live
+                    draft(changes: flip(in: folderRoot, at: path), root: folderRoot, action: "publishPages"),
+                    in: journal(daysAgo: daysAgo), mode: .live
                 )
                 if case .applied = outcome {
                     last = "applied"
@@ -480,74 +535,154 @@ nonisolated enum UndoContractReplay {
 
             for value in testCase["calls"] as? [String] ?? [] {
                 if value == "step" {
-                    oneStep(daysAgo: 0)
-                } else if value == "step:31daysAgo" {
-                    oneStep(daysAgo: 31)
+                    oneStep(folderRoot: root, path: pagePath, daysAgo: 0)
+                } else if value == "step@B" {
+                    oneStep(folderRoot: rootB, path: secondPagePath, daysAgo: 0)
+                } else if value.hasPrefix("step:") && value.hasSuffix("daysAgo") {
+                    let days: Int = Int(value.dropFirst("step:".count).dropLast("daysAgo".count)) ?? 0
+                    oneStep(folderRoot: root, path: pagePath, daysAgo: days)
                 } else if value.hasPrefix("steps:") {
                     let count: Int = Int(value.dropFirst("steps:".count)) ?? 0
                     var made: Int = 0
                     while made < count {
-                        oneStep(daysAgo: 0)
+                        oneStep(folderRoot: root, path: pagePath, daysAgo: 0)
                         made += 1
                     }
+                } else if value.hasPrefix("clock:") {
+                    clockDays = Double(value.dropFirst("clock:".count).replacingOccurrences(of: "+", with: "")) ?? 0
                 } else if value == "undo" {
-                    last = outcomeWord(journal.undoNewest(resolveRoot: { _ in root }))
+                    last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
                 } else if value == "redo" {
-                    last = outcomeWord(journal.redoNewest(resolveRoot: { _ in root }))
+                    last = outcomeWord(journal().redoNewest(resolveRoot: resolve))
                 } else if value == "editTheLineByHand" {
                     try handEdit("sameLine", at: pagePath, in: root)
                 } else if value.hasPrefix("clear:") {
                     let reason: UndoClearing = UndoClearing(rawValue: String(value.dropFirst("clear:".count))) ?? .deploy
-                    linesBeforeClearing = try lineCount(in: journal)
-                    try journal.clearTheList(because: reason)
-                    linesAfterClearing = try lineCount(in: journal)
+                    linesBeforeClearing = try lineCount(in: journal())
+                    try journal().clearTheList(because: reason)
+                    linesAfterClearing = try lineCount(in: journal())
+                } else if value == "moveFolder:B" {
+                    try FileManager.default.moveItem(at: rootB, to: rootBAway)
+                } else if value == "restoreFolder:B" {
+                    try FileManager.default.moveItem(at: rootBAway, to: rootB)
+                } else if value == "foreignLine" {
+                    let next: Int = try journal().read().highestSeq + 1
+                    try appendRaw("{\"v\":2,\"seq\":\(next),\"event\":\"begin\",\"step\":{\"seq\":\(next),\"later\":true}}", to: journal())
+                } else if value == "foreignStep" {
+                    let next: Int = try journal().read().highestSeq + 1
+                    let blob: Data = Data("content a newer Plantoir keeps".utf8)
+                    let sha: String = UndoHash.sha256(of: blob)
+                    try journal().withLock { writer in
+                        try writer.writeBlob(blob)
+                    }
+                    foreignBlob = sha
+                    let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: root)
+                    let begin: String = "{\"v\":1,\"seq\":\(next),\"event\":\"begin\",\"at\":\"\(UndoMoment.text(Date()))\",\"step\":{\"seq\":\(next),\"madeAt\":\"\(UndoMoment.text(Date()))\",\"workingFolder\":{\"id\":\"\(folderID)\",\"pathAtTheTime\":\"\(root.path)\"},\"ops\":[{\"kind\":\"move\",\"from\":\"a.md\",\"to\":\"b.md\",\"blobs\":[\"\(sha)\"]}]}}"
+                    try appendRaw(begin, to: journal())
+                    try appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal())
+                } else if value == "begin:held" {
+                    let change: [UndoFileChange] = flip(in: root, at: pagePath)
+                    let heldDraft: UndoStepDraft = draft(changes: change, root: root, action: "publishPages")
+                    let seq: Int = try JournaledWrite.begin(heldDraft, ops: JournaledWrite.ops(for: heldDraft), in: journal(), mode: .live)
+                    if let first = change.first {
+                        held = (seq: seq, change: first)
+                    }
+                } else if value == "finish:held" {
+                    if let held {
+                        try (held.change.after ?? Data()).write(to: root.appendingPathComponent(held.change.relativePath))
+                        JournaledWrite.finish(seq: held.seq, with: .applied, phase: nil, reason: nil, in: journal(), mode: .live)
+                    }
                 } else {
                     failures.append("stackCases '\(name)': unknown call \(value)")
                 }
             }
+            _ = folderOfB
 
-            let fold: UndoFold = try journal.read()
-            if fold.head?.step.seq != int(testCase["head"]) {
-                failures.append("stackCases '\(name)': head \(String(describing: fold.head?.step.seq))")
+            let fold: UndoFold = try journal().read()
+            let offer: UndoOffer = fold.offer(now: journal().now())
+            if offer.head?.step.seq != int(testCase["head"]) {
+                failures.append("stackCases '\(name)': head \(String(describing: offer.head?.step.seq))")
             }
-            if fold.redoCandidate?.step.seq != int(testCase["redo"]) {
-                failures.append("stackCases '\(name)': redo \(String(describing: fold.redoCandidate?.step.seq))")
+            if offer.redoCandidate?.step.seq != int(testCase["redo"]) {
+                failures.append("stackCases '\(name)': redo \(String(describing: offer.redoCandidate?.step.seq))")
             }
             var listed: [Int] = []
-            for record in fold.stepsOnTheList {
+            for record in offer.offered {
                 listed.append(record.step.seq)
             }
-            if let wanted = testCase["onTheList"] as? [NSNumber] {
-                var wantedInts: [Int] = []
-                for number in wanted {
-                    wantedInts.append(number.intValue)
-                }
-                if listed != wantedInts {
-                    failures.append("stackCases '\(name)': on the list \(listed), not \(wantedInts)")
-                }
+            if let wanted = intList(testCase["onTheList"]), listed != wanted {
+                failures.append("stackCases '\(name)': offered \(listed), not \(wanted)")
             }
             if let count = int(testCase["onTheListCount"]) {
                 if listed.count != count || listed.first != int(testCase["oldestOnTheList"]) {
-                    failures.append("stackCases '\(name)': \(listed.count) on the list from \(String(describing: listed.first))")
+                    failures.append("stackCases '\(name)': \(listed.count) offered from \(String(describing: listed.first))")
+                }
+            }
+            if let wanted = intList(testCase["onTheDisk"]) {
+                var onDisk: [Int] = []
+                for record in fold.stepsOnTheList {
+                    onDisk.append(record.step.seq)
+                }
+                if onDisk != wanted {
+                    failures.append("stackCases '\(name)': on the disk \(onDisk), not \(wanted)")
+                }
+            }
+            if let wanted = intList(testCase["physicallyPruned"]) {
+                var pruned: [Int] = []
+                for seq in fold.orderedSeqs where fold.records[seq]?.phase == .pruned {
+                    pruned.append(seq)
+                }
+                if pruned != wanted {
+                    failures.append("stackCases '\(name)': pruned \(pruned), not \(wanted)")
                 }
             }
             if let expectLast = string(testCase["expectLast"]), expectLast != last {
                 failures.append("stackCases '\(name)': the last call came to \(last), not \(expectLast)")
             }
+            let clearings: [UndoEventLine] = try clearingLines(in: journal())
             if let cleared = string(testCase["cleared"]) {
-                let reasons: [String] = try clearingReasons(in: journal)
+                var reasons: [String] = []
+                for line in clearings {
+                    reasons.append(line.reason ?? "")
+                }
                 if !reasons.contains(cleared) {
                     failures.append("stackCases '\(name)': no clearing for \(cleared) (found \(reasons))")
                 }
             }
-            if int(testCase["linesWritten"]) == 0 && linesAfterClearing != linesBeforeClearing {
-                failures.append("stackCases '\(name)': a clearing of an empty list wrote a line")
+            if let wantedSeq = int(testCase["clearedSeq"]), clearings.last?.seq != wantedSeq {
+                failures.append("stackCases '\(name)': the clearing's seq is \(String(describing: clearings.last?.seq)), not \(wantedSeq)")
             }
-            if fold.unreadableLines != 0 || fold.ignoredEvents != 0 {
-                failures.append("stackCases '\(name)': \(fold.unreadableLines) unreadable, \(fold.ignoredEvents) ignored")
+            if let written = int(testCase["linesWritten"]), linesAfterClearing - linesBeforeClearing != written {
+                failures.append("stackCases '\(name)': a clearing wrote \(linesAfterClearing - linesBeforeClearing) lines, not \(written)")
+            }
+            if let kept = testCase["blobKept"] as? Bool {
+                let present: Bool = foreignBlob != nil && journal().readBlob(sha: foreignBlob ?? "") != nil
+                if present != kept {
+                    failures.append("stackCases '\(name)': the newer version's blob kept is \(present)")
+                }
+            }
+            if fold.ignoredEvents != 0 {
+                failures.append("stackCases '\(name)': \(fold.ignoredEvents) ignored events")
             }
         }
         return (cases: cases.count, failures: failures)
+    }
+
+    /// Appends a line exactly as given: the stand-in for a newer version.
+    static func appendRaw(_ line: String, to journal: UndoJournal) throws {
+        try journal.withLock { writer in
+            let numbers: [Int] = try journal.segmentNumbers()
+            let number: Int = numbers.last ?? 1
+            let url: URL = journal.segmentURL(number: number)
+            if !FileManager.default.fileExists(atPath: url.path) {
+                FileManager.default.createFile(atPath: url.path, contents: Data())
+            }
+            let handle: FileHandle = try FileHandle(forWritingTo: url)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data((line + "\n").utf8))
+            try handle.close()
+            _ = writer
+        }
     }
 
     static func lines(in journal: UndoJournal) throws -> [UndoEventLine] {
@@ -567,9 +702,17 @@ nonisolated enum UndoContractReplay {
         return try lines(in: journal).count
     }
 
+    static func clearingLines(in journal: UndoJournal) throws -> [UndoEventLine] {
+        var found: [UndoEventLine] = []
+        for event in try lines(in: journal) where event.event == UndoEventKind.cleared.rawValue {
+            found.append(event)
+        }
+        return found
+    }
+
     static func clearingReasons(in journal: UndoJournal) throws -> [String] {
         var reasons: [String] = []
-        for event in try lines(in: journal) where event.event == UndoEventKind.cleared.rawValue {
+        for event in try clearingLines(in: journal) {
             reasons.append(event.reason ?? "")
         }
         return reasons
@@ -579,6 +722,11 @@ nonisolated enum UndoContractReplay {
 
     /// A process that never existed, standing for one that died.
     static let goneProcess: UndoProcess = UndoProcess(host: "", pid: 2_000_000_001, name: "gone", started: "1.000000")
+
+    static let recoveryKeys: Set<String> = [
+        "name", "work", "stopAt", "mode", "processAlive", "files", "phase", "head", "undo",
+        "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery",
+    ]
 
     static func runRecoveryCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
         let cases: [[String: Any]] = try undoBlock()["recoveryCases"] as? [[String: Any]] ?? []
@@ -590,10 +738,12 @@ nonisolated enum UndoContractReplay {
         for testCase in cases {
             number += 1
             let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: recoveryKeys, list: "recoveryCases", name: name)
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "recovery-\(number)")
             let root: URL = place.root
             let first: String = "courses/TST1O/Section 1/Classes/A.md"
             let second: String = "courses/TST1O/Section 1/Classes/B.md"
+            let pathOf: [String: String] = ["first": first, "second": second]
             let beforeText: String = "---\ntitle: A\npublish: false\n---\nBody.\n"
             try write(beforeText, to: first, in: root)
             try write(beforeText.replacingOccurrences(of: "title: A", with: "title: B"), to: second, in: root)
@@ -622,13 +772,9 @@ nonisolated enum UndoContractReplay {
                 if outcome != .stoppedByATest {
                     failures.append("recoveryCases '\(name)': the step was not stopped (\(outcome))")
                 }
-                let probe: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "recovery-\(number)-after")
-                try write(beforeText, to: first, in: probe.root)
-                try write(beforeText.replacingOccurrences(of: "title: A", with: "title: B"), to: second, in: probe.root)
                 for change in stepDraft.changes {
-                    try (change.after ?? Data()).write(to: probe.root.appendingPathComponent(change.relativePath))
+                    afterHashes.append(UndoHash.sha256(ofOptional: change.after))
                 }
-                afterHashes = [hash(of: first, in: probe.root), hash(of: second, in: probe.root)]
             } else {
                 _ = JournaledWrite.perform(stepDraft, in: dying, mode: .live)
                 afterHashes = [hash(of: first, in: root), hash(of: second, in: root)]
@@ -644,7 +790,12 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': the \(work) was not stopped (\(outcome))")
                 }
             }
+            if let page = string(testCase["handEdit"]), let path = pathOf[page] {
+                try handEdit("sameLine", at: path, in: root)
+            }
             let asLeft: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
+            let reachable: Bool = testCase["moveFolderBeforeRecovery"] as? Bool != true
+            let resolveRoot: (UndoWorkingFolder) -> URL? = { _ in reachable ? root : nil }
 
             // Another process, which sees the first as gone, runs recovery.
             let survivor: UndoJournal = UndoJournal(
@@ -652,40 +803,64 @@ nonisolated enum UndoContractReplay {
                 processIsAlive: { process in process.pid != 2_000_000_001 || alive }
             )
             try survivor.withLock { writer in
-                UndoRecovery.run(writer, mode: mode, resolveRoot: { _ in root })
+                UndoRecovery.run(writer, mode: mode, resolveRoot: resolveRoot)
             }
 
             let now: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
-            let wanted: [String?]
+            var wanted: [String?]? = nil
             switch string(testCase["files"]) ?? "" {
             case "before":
                 wanted = beforeHashes
             case "after":
                 wanted = afterHashes
-            default:
+            case "asLeft":
                 wanted = asLeft
+            case "firstBeforeSecondEdited":
+                wanted = [beforeHashes[0], asLeft[1]]
+            case "secondAfterFirstEdited":
+                wanted = [asLeft[0], afterHashes[1]]
+            case "unchecked":
+                wanted = nil
+            default:
+                failures.append("recoveryCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows")
             }
-            if now != wanted {
+            if let wanted, now != wanted {
                 failures.append("recoveryCases '\(name)': the files are not \(string(testCase["files"]) ?? "?")")
-            }
-            if now != beforeHashes && now != afterHashes && string(testCase["files"]) != "asLeft" {
-                failures.append("recoveryCases '\(name)': the files are BETWEEN before and after")
             }
             let fold: UndoFold = try survivor.read()
             let phase: String = fold.records[1]?.phase.rawValue ?? "missing"
             if phase != string(testCase["phase"]) {
                 failures.append("recoveryCases '\(name)': the step is \(phase), not \(string(testCase["phase"]) ?? "?")")
             }
-            if testCase.keys.contains("head") && fold.head?.step.seq != int(testCase["head"]) {
-                failures.append("recoveryCases '\(name)': head \(String(describing: fold.head?.step.seq))")
+            let offer: UndoOffer = fold.offer(now: Date())
+            if testCase.keys.contains("head") && offer.head?.step.seq != int(testCase["head"]) {
+                failures.append("recoveryCases '\(name)': head \(String(describing: offer.head?.step.seq))")
+            }
+            if let cleared = string(testCase["cleared"]) {
+                if !(try clearingReasons(in: survivor)).contains(cleared) {
+                    failures.append("recoveryCases '\(name)': no clearing for \(cleared)")
+                }
+            }
+            if let named = testCase["pathsNamed"] as? [String] {
+                var wantedPaths: [String] = []
+                for page in named {
+                    wantedPaths.append(pathOf[page] ?? page)
+                }
+                var foundPaths: [String] = []
+                for line in try lines(in: survivor) where line.event == UndoEventKind.interrupted.rawValue {
+                    foundPaths = line.paths ?? []
+                }
+                if foundPaths != wantedPaths {
+                    failures.append("recoveryCases '\(name)': the interrupted line names \(foundPaths)")
+                }
             }
             if let undo = string(testCase["undo"]) {
-                let outcome: String = outcomeWord(survivor.undoNewest(resolveRoot: { _ in root }))
+                let outcome: String = outcomeWord(survivor.undoNewest(resolveRoot: resolveRoot))
                 if outcome != undo {
                     failures.append("recoveryCases '\(name)': undo came to \(outcome), not \(undo)")
                 }
             }
-            if mode == .live && !alive && staysBeside(root) {
+            if mode == .live && !alive && reachable && staysBeside(root) {
                 failures.append("recoveryCases '\(name)': recovery left a staged file beside a page")
             }
         }
@@ -714,6 +889,10 @@ nonisolated enum UndoContractReplay {
 
     // MARK: - undo.stepCases
 
+    static let stepKeys: Set<String> = [
+        "name", "pages", "handEdit", "undo", "named", "others", "files", "phase", "fileInUseAtSwap", "why",
+    ]
+
     static func runStepCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
         let cases: [[String: Any]] = try undoBlock()["stepCases"] as? [[String: Any]] ?? []
         var failures: [String] = []
@@ -724,9 +903,13 @@ nonisolated enum UndoContractReplay {
         for testCase in cases {
             number += 1
             let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: stepKeys, list: "stepCases", name: name)
+            guard let pageCount = int(testCase["pages"]), pageCount > 0 else {
+                failures.append("stepCases '\(name)': no number of pages")
+                continue
+            }
             let place: (root: URL, journalFolder: URL) = try scratch(under: parent, named: "steps-\(number)")
             let root: URL = place.root
-            let pageCount: Int = int(testCase["pages"]) ?? 2
             var paths: [String] = []
             var edits: [(path: String, key: String, line: String)] = []
             var index: Int = 1
@@ -743,9 +926,10 @@ nonisolated enum UndoContractReplay {
             var edited: [Int] = []
             if handEdit == "line of page 2" {
                 edited = [2]
-            }
-            if handEdit == "lines of pages 1 and 3" {
+            } else if handEdit == "lines of pages 1 and 3" {
                 edited = [1, 3]
+            } else if handEdit != "none" {
+                failures.append("stepCases '\(name)': handEdit '\(handEdit)' is not a value this replay knows")
             }
             for page in edited {
                 try UndoContractReplay.handEdit("sameLine", at: paths[page - 1], in: root)
@@ -762,21 +946,40 @@ nonisolated enum UndoContractReplay {
             if outcomeWord(outcome) != string(testCase["undo"]) {
                 failures.append("stepCases '\(name)': undo came to \(outcomeWord(outcome))")
             }
-            if let named = string(testCase["named"]), case .refused(.changedSince(let first, let others), _) = outcome {
+            if let named = string(testCase["named"]) {
                 let wantedPage: Int = Int(named.dropFirst("page ".count)) ?? 0
-                if wantedPage < 1 || first != paths[wantedPage - 1] {
-                    failures.append("stepCases '\(name)': named \(first)")
+                var namedPath: String? = nil
+                var others: Int? = nil
+                if case .refused(.changedSince(let first, let count), _) = outcome {
+                    namedPath = first
+                    others = count
+                }
+                if case .refused(.fileIsInUse(let path), _) = outcome {
+                    namedPath = path
+                    others = 0
+                }
+                if wantedPage < 1 || wantedPage > paths.count || namedPath != paths[wantedPage - 1] {
+                    failures.append("stepCases '\(name)': named \(namedPath ?? "nothing")")
                 }
                 if others != int(testCase["others"]) {
-                    failures.append("stepCases '\(name)': \(others) others")
+                    failures.append("stepCases '\(name)': \(String(describing: others)) others")
                 }
             }
             var now: [String?] = []
             for path in paths {
                 now.append(hash(of: path, in: root))
             }
-            if string(testCase["files"]) == "unchanged" && now != snapshot {
-                failures.append("stepCases '\(name)': files were written")
+            switch string(testCase["files"]) ?? "" {
+            case "unchanged":
+                if now != snapshot {
+                    failures.append("stepCases '\(name)': files were written")
+                }
+            case "changed":
+                if now == snapshot {
+                    failures.append("stepCases '\(name)': no file was written")
+                }
+            default:
+                failures.append("stepCases '\(name)': files '\(string(testCase["files"]) ?? "")' is not a value this replay knows")
             }
             if let phase = string(testCase["phase"]) {
                 let fold: UndoFold = try journal.read()
@@ -868,8 +1071,8 @@ nonisolated enum UndoContractReplay {
         for (_, record) in fold.records where record.phase != .done && record.phase != .pruned {
             failures.append("step \(record.step.seq) is \(record.phase.rawValue)")
         }
-        if fold.stepsOnTheList.count != min(total, UndoSwitch.stepsKept) {
-            failures.append("\(fold.stepsOnTheList.count) on the list, not \(min(total, UndoSwitch.stepsKept))")
+        if fold.offer(now: Date()).offered.count != min(total, UndoSwitch.stepsKept) {
+            failures.append("\(fold.offer(now: Date()).offered.count) offered, not \(min(total, UndoSwitch.stepsKept))")
         }
         if fold.unreadableLines != 0 || fold.ignoredEvents != 0 {
             failures.append("\(fold.unreadableLines) unreadable lines, \(fold.ignoredEvents) ignored events")

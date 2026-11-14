@@ -13,7 +13,12 @@ import Foundation
 /// checks refuse over them).
 ///
 /// Made exclusively (`UndoIdentifierFile.readOrCreate`): two processes
-/// making it at once agree on one. Not a step, and never undone.
+/// making it at once agree on one, on a volume with hard links or without
+/// (exFAT, FAT, SMB). A file there that holds no identifier is set aside
+/// and a new one made, so a damaged file never blocks the folder for good;
+/// steps recorded under the old identifier then cannot reach the folder,
+/// and Undo waits for them as for an unplugged drive (ruling 10). Not a
+/// step, and never undone.
 nonisolated enum FolderIdentityFile {
 
     // MARK: - Functions
@@ -51,7 +56,7 @@ nonisolated enum UndoReach {
         guard let found = FolderIdentityFile.existingIdentifier(forWorkingFolder: candidate) else {
             return nil
         }
-        if found != folder.id {
+        if found != folder.id.lowercased() {
             return nil
         }
         return candidate

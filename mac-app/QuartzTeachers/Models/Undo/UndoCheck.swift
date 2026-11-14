@@ -158,32 +158,37 @@ nonisolated enum UndoCheck {
         var recomputes: [UndoOp] = []
 
         for op in ordered {
-            if op.knownKind == .recompute {
+            guard let kind = op.knownKind, let path = op.path else {
+                // Never guessed at: a step this version cannot read is not
+                // undone or redone (the director's ruling 1).
+                return .refused(.notReadable)
+            }
+            if kind == .recompute {
                 recomputes.append(op)
                 continue
             }
-            if original[op.path] == nil {
-                let item: UndoItem = UndoItem.read(at: root.appendingPathComponent(op.path))
-                original[op.path] = item
-                working[op.path] = item
-                pathsInOrder.append(op.path)
+            if original[path] == nil {
+                let item: UndoItem = UndoItem.read(at: root.appendingPathComponent(path))
+                original[path] = item
+                working[path] = item
+                pathsInOrder.append(path)
             }
-            let current: UndoItem = working[op.path] ?? .absent
+            let current: UndoItem = working[path] ?? .absent
             let state: UndoOpState = UndoCheck.state(of: op, in: current)
             let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
             if verdict == .alreadyBack || verdict == .alreadyRedone {
                 continue
             }
             if verdict == .changedSince {
-                if !inTheWay.contains(op.path) {
-                    inTheWay.append(op.path)
+                if !inTheWay.contains(path) {
+                    inTheWay.append(path)
                 }
                 continue
             }
             guard let moved = UndoCheck.moved(op, from: current, direction: direction, journal: journal) else {
-                return .refused(.contentMissing(path: op.path))
+                return .refused(.contentMissing(path: path))
             }
-            working[op.path] = moved
+            working[path] = moved
         }
 
         if let first = inTheWay.first {
@@ -487,10 +492,12 @@ nonisolated enum UndoOutcome: Equatable, Sendable {
     /// A newer step is still being made, undone or redone
     /// (`undo.wording.anotherChangeIsUnderWay`).
     case anotherChangeIsUnderWay
-    /// The step's working folder cannot be reached (ruling 10: greyed).
-    case cannotReachTheFolder
-    /// Refused, nothing written. For an undo refused because the page was
-    /// changed by hand, `clearedTheList` is true (ruling 13).
+    /// The step's working folder cannot be reached, or the list holds at or
+    /// above the head something this version cannot read: greyed, plain
+    /// "Undo", nothing said (ruling 10; the director's ruling 1).
+    case notAvailable
+    /// Refused, nothing written. For a step whose page was changed by hand,
+    /// `clearedTheList` is true (ruling 13).
     case refused(UndoRefusal, clearedTheList: Bool)
     /// The list itself could not be read or written.
     case listUnavailable
@@ -504,10 +511,14 @@ nonisolated enum UndoClearing: String, Sendable, CaseIterable {
     /// hand since (ruling 13).
     case changedSince
     /// A deploy happened: it cannot be undone and cuts the list off
-    /// (ruling 14).
+    /// (ruling 14, which replaced ruling 1).
     case deploy
     /// Unit plans were shared: the same as a deploy (ruling 16).
     case shareUnitPlans
+    /// A step's process died part way and a file changed by hand stopped
+    /// recovery putting the step wholly back (the director's ruling 7 on
+    /// U1's review).
+    case interrupted
 }
 
 /// Undo, Redo and clearing, as the list does them.
@@ -532,19 +543,36 @@ nonisolated extension UndoJournal {
     }
 
     /// Clears the whole list for a reason: nothing before this can be undone
-    /// or redone. Steps being made right now are left to finish.
+    /// or redone. The line's `seq` is the highest step number in the journal
+    /// when it is written, read or not.
     func clearTheList(because reason: UndoClearing) throws {
         try withLock { writer in
-            var hasAnything: Bool = false
-            for record in writer.fold.stepsOnTheList where !record.phase.isInFlight {
-                hasAnything = true
-            }
-            if !hasAnything {
-                return
-            }
-            try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason.rawValue))
+            UndoJournal.appendClearing(reason, writer)
             UndoPruning.prune(writer)
         }
+    }
+
+    /// Appends a clearing when anything is on the list to clear.
+    static func appendClearing(_ reason: UndoClearing, _ writer: UndoJournalWriter) {
+        var hasAnything: Bool = false
+        for record in writer.fold.stepsOnTheList {
+            if !record.phase.isInFlight || UndoFold.clearingTakesStepsBegunBeforeIt {
+                hasAnything = true
+            }
+        }
+        if !hasAnything {
+            return
+        }
+        try? writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason.rawValue))
+    }
+
+    /// What Undo or Redo would act on now: for the menu, which greys the
+    /// item for anything but a step.
+    func availability(_ direction: UndoDirection) -> UndoAvailability {
+        guard let offer = try? offer() else {
+            return .notReadable
+        }
+        return direction == .backward ? offer.undo : offer.redo
     }
 
     private func move(
@@ -553,38 +581,46 @@ nonisolated extension UndoJournal {
         recompute: (UndoOp, URL) -> Void
     ) -> UndoOutcome {
         // 1. Find the step, inside the lock, with recovery run first.
-        let found: UndoStepRecord?
-        var blocked: Bool = false
+        let found: UndoAvailability
         do {
-            found = try withLock { writer -> UndoStepRecord? in
+            found = try withLock { writer -> UndoAvailability in
                 UndoRecovery.run(writer, mode: .live, resolveRoot: resolveRoot)
-                if writer.fold.newestNotUndone?.phase.isInFlight == true {
-                    blocked = true
-                    return nil
-                }
-                if direction == .backward {
-                    return writer.fold.head
-                }
-                return writer.fold.redoCandidate
+                let offer: UndoOffer = writer.fold.offer(now: now())
+                return direction == .backward ? offer.undo : offer.redo
             }
         } catch {
             return .listUnavailable
         }
-        if blocked {
-            return .anotherChangeIsUnderWay
-        }
-        guard let record = found else {
+        let record: UndoStepRecord
+        switch found {
+        case .nothing:
             return direction == .backward ? .nothingToUndo : .nothingToRedo
+        case .notReadable:
+            return .notAvailable
+        case .anotherChangeIsUnderWay(let busy):
+            // A dead process's step whose folder cannot be reached is not
+            // "under way": it waits for its folder, and Undo is greyed.
+            if let process = busy.process, !processIsAlive(process) {
+                if let folder = busy.step.workingFolder, resolveRoot(folder) == nil {
+                    return .notAvailable
+                }
+            }
+            return .anotherChangeIsUnderWay
+        case .step(let step):
+            record = step
         }
         let seq: Int = record.step.seq
-        guard let root = resolveRoot(record.step.workingFolder) else {
-            return .cannotReachTheFolder
+        guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
+            return .notAvailable
         }
 
         // 2. Check every op, writing nothing.
         let plan: UndoPlan = UndoCheck.plan(record.step.ops, direction: direction, root: root, journal: self)
         guard case .ready(let targets, let recomputes) = plan else {
             if case .refused(let refusal) = plan {
+                if refusal == .notReadable {
+                    return .notAvailable
+                }
                 var cleared: Bool = false
                 if direction == .backward, case .changedSince = refusal {
                     cleared = (try? clearAfterARefusal(of: seq)) == true
@@ -600,8 +636,9 @@ nonisolated extension UndoJournal {
         let phase: UndoPhase = direction == .backward ? .undoing : .redoing
         do {
             try withLock { writer in
-                let stillTheOne: UndoStepRecord? = direction == .backward ? writer.fold.head : writer.fold.redoCandidate
-                if stillTheOne?.step.seq != seq || writer.fold.newestNotUndone?.phase.isInFlight == true {
+                let offer: UndoOffer = writer.fold.offer(now: now())
+                let stillTheOne: UndoAvailability = direction == .backward ? offer.undo : offer.redo
+                guard case .step(let current) = stillTheOne, current.step.seq == seq else {
                     throw UndoJournalError.notTheNewestStep(seq)
                 }
                 try writer.append(UndoEventLine(seq: seq, event: starting, process: process))
@@ -621,7 +658,13 @@ nonisolated extension UndoJournal {
         switch UndoSwap.swap(targets, label: label) {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
-            return .refused(refusal, clearedTheList: false)
+            var cleared: Bool = false
+            if direction == .backward, case .changedSince = refusal {
+                // Caught at the swap rather than the check: the same hand
+                // edit, so the same answer (ruling 13; the core review's M2).
+                cleared = (try? clearAfterARefusal(of: seq)) == true
+            }
+            return .refused(refusal, clearedTheList: cleared)
         case .stoppedByATest:
             return .stoppedByATest
         case .swapped:
@@ -640,10 +683,10 @@ nonisolated extension UndoJournal {
     /// Ruling 13: the refused step is still the head, so the list is cleared.
     private func clearAfterARefusal(of seq: Int) throws -> Bool {
         return try withLock { writer -> Bool in
-            if writer.fold.head?.step.seq != seq {
+            if writer.fold.offer(now: now()).head?.step.seq != seq {
                 return false
             }
-            try writer.append(UndoEventLine(seq: seq, event: .cleared, reason: UndoClearing.changedSince.rawValue))
+            try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: UndoClearing.changedSince.rawValue))
             UndoPruning.prune(writer)
             return true
         }

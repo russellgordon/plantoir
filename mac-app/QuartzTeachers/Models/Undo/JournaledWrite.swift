@@ -1,110 +1,5 @@
 import Foundation
 
-/// One thing a step changed, recorded so it can be checked and reversed.
-///
-/// U1 builds two kinds that change content, `writeFile` and `editLine`, and
-/// records a third, `recompute`, which changes nothing by itself. The rest of
-/// plan section 3.1 (`replaceText`, `editJSON`, `move`, the tree operations,
-/// `external`) arrive with U2. Every kind records what it expects to find
-/// before it may be undone (its `after`) and before it may be redone (its
-/// `before`), and the check compares the CONTENT of exactly what it changed:
-/// for a line, that line; for a file, its SHA-256. Never a time (ruling 4,
-/// Windows' fact 6).
-nonisolated struct UndoOp: Codable, Equatable, Sendable {
-
-    // MARK: - Stored properties
-
-    /// `writeFile`, `editLine` or `recompute`.
-    var kind: String
-
-    /// Inside the working folder, with forward slashes:
-    /// `courses/ICS3U/Section 1/Classes/Unit 1, Day 1.md`.
-    var path: String
-
-    /// `writeFile`: the file's SHA-256 before and after, each nil when there
-    /// was no file. The bytes are blobs under the journal's `content/`.
-    var beforeSha: String?
-    var afterSha: String?
-
-    /// `editLine`: the top-level front-matter key, and its entry before and
-    /// after (the key's line and any lines its value runs on to, joined with
-    /// a line feed, carriage returns kept), each nil when the key was absent.
-    var key: String?
-    var before: String?
-    var after: String?
-
-    /// `editLine`: the key whose entry this one follows, in the text where
-    /// this one exists, so an entry that was added or removed goes back in
-    /// the same place. Nil for the first entry in the block.
-    var afterKey: String?
-
-    /// `editLine`: the step gave the page its front matter, so undoing the
-    /// last entry takes the fences away too.
-    var createdTheBlock: Bool?
-
-    /// `recompute`: which maintainer re-derives the file from the rule it is
-    /// kept true by (`sectionFrontPage` for the section's landing page), and
-    /// for which section. No check; run after the other ops (U2 runs it).
-    var maintainer: String?
-    var section: Int?
-
-    // MARK: - Functions
-
-    static func writeFile(path: String, beforeSha: String?, afterSha: String?) -> UndoOp {
-        return UndoOp(kind: UndoOpKind.writeFile.rawValue, path: path, beforeSha: beforeSha, afterSha: afterSha)
-    }
-
-    static func editLine(
-        path: String,
-        key: String,
-        before: String?,
-        after: String?,
-        afterKey: String?,
-        createdTheBlock: Bool
-    ) -> UndoOp {
-        var op: UndoOp = UndoOp(kind: UndoOpKind.editLine.rawValue, path: path)
-        op.key = key
-        op.before = before
-        op.after = after
-        op.afterKey = afterKey
-        if createdTheBlock {
-            op.createdTheBlock = true
-        }
-        return op
-    }
-
-    static func recompute(path: String, maintainer: String, section: Int?) -> UndoOp {
-        var op: UndoOp = UndoOp(kind: UndoOpKind.recompute.rawValue, path: path)
-        op.maintainer = maintainer
-        op.section = section
-        return op
-    }
-
-    init(
-        kind: String,
-        path: String,
-        beforeSha: String? = nil,
-        afterSha: String? = nil
-    ) {
-        self.kind = kind
-        self.path = path
-        self.beforeSha = beforeSha
-        self.afterSha = afterSha
-    }
-
-    /// The kind, or nil for one this app does not know.
-    var knownKind: UndoOpKind? {
-        return UndoOpKind(rawValue: kind)
-    }
-}
-
-/// The kinds of op U1 knows.
-nonisolated enum UndoOpKind: String, Sendable {
-    case writeFile
-    case editLine
-    case recompute
-}
-
 /// One file before and after a change, as the action that made it saw it.
 nonisolated struct UndoFileChange: Equatable, Sendable {
 
@@ -185,6 +80,9 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
 
     /// Content the step needs is missing from the list.
     case contentMissing(path: String)
+
+    /// The step holds an op this version cannot read.
+    case notReadable
 }
 
 /// The one door every write into a working folder goes through once the
@@ -308,8 +206,10 @@ nonisolated enum JournaledWrite {
         return .applied(seq: seq)
     }
 
-    /// Phase one: under the lock, run recovery, cut the redo branch, take
-    /// the next number, store the content, append `begin`, and sync.
+    /// Phase one: under the lock, run recovery, take the next number, store
+    /// the content, append `begin`, and sync. The redo branch is cut when the
+    /// step is APPLIED, not here, so a step that is refused or never written
+    /// leaves Redo as it was (the core review's M3).
     static func begin(
         _ draft: UndoStepDraft,
         ops: [UndoOp],
@@ -318,17 +218,13 @@ nonisolated enum JournaledWrite {
     ) throws -> Int {
         let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: draft.workingFolderURL)
         let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
-        return try journal.withLock(waitingAtMost: wait) { writer in
+        return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
             UndoRecovery.run(writer, mode: mode, resolveRoot: UndoReach.root)
-            for record in writer.fold.redoBranch {
-                try writer.append(UndoEventLine(seq: record.step.seq, event: .dropped, reason: "newStep"))
-            }
-            for record in writer.fold.staleUndone {
-                try writer.append(UndoEventLine(seq: record.step.seq, event: .dropped, reason: "newStep"))
-            }
             var wholeFilePaths: Set<String> = []
             for op in ops where op.knownKind == .writeFile {
-                wholeFilePaths.insert(op.path)
+                if let path = op.path {
+                    wholeFilePaths.insert(path)
+                }
             }
             for change in draft.changes where wholeFilePaths.contains(change.relativePath) {
                 if let before = change.before {
@@ -357,9 +253,11 @@ nonisolated enum JournaledWrite {
         }
     }
 
-    /// Phase three: append the closing event and prune. A failure here
-    /// leaves the step unfinished, which recovery settles from the content
-    /// once this process has gone.
+    /// Phase three: append the closing event and prune. When the event is
+    /// `applied`, every undone step below it is dropped first: the new step
+    /// cut the redo branch. When the lock cannot be had, the closing event
+    /// is kept and written at this process's next lock, so the step is not
+    /// left in flight for the life of the process (the core review's I3).
     static func finish(
         seq: Int,
         with event: UndoEventKind,
@@ -371,13 +269,25 @@ nonisolated enum JournaledWrite {
         // Longer than a begin waits: a step left unfinished holds Undo back
         // until its process has gone and recovery settles it.
         let wait: Double = mode == .live ? UndoSwitch.finishWaitSeconds : UndoSwitch.shadowLockWaitSeconds
+        let closing: UndoEventLine = UndoEventLine(seq: seq, event: event, phase: phase, reason: reason)
         do {
-            try journal.withLock(waitingAtMost: wait) { writer in
-                try writer.append(UndoEventLine(seq: seq, event: event, phase: phase, reason: reason))
+            try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
+                if event == .applied {
+                    JournaledWrite.dropTheRedoBranch(below: seq, writer)
+                }
+                try writer.append(closing)
                 UndoPruning.prune(writer)
             }
         } catch {
+            UndoFoldCache.keepPendingClosing(closing, for: journal.folderURL)
             UndoTrailHook.couldNotFinish(seq: seq, problem: error)
+        }
+    }
+
+    /// Drops every undone step below a step that has just taken effect.
+    static func dropTheRedoBranch(below seq: Int, _ writer: UndoJournalWriter) {
+        for record in writer.fold.stepsOnTheList where record.phase == .undone && record.step.seq < seq {
+            try? writer.append(UndoEventLine(seq: record.step.seq, event: .dropped, reason: "newStep"))
         }
     }
 
@@ -466,7 +376,16 @@ nonisolated enum JournaledWrite {
     /// the traces in `contracts/undo-traces.json` describe their steps with,
     /// so both apps make byte-identical changes from the same data. Nil when
     /// the key is there more than once.
-    static func settingEntry(key: String, to line: String, in text: String) -> String? {
+    ///
+    /// A leading byte-order mark is DROPPED first, because that is what
+    /// today's publish does: it reads the page with `String(contentsOf:)`,
+    /// which drops one (measured), as .NET's `File.ReadAllText` does, and
+    /// writes the text back without it (the contract review's INCOMPLETE 5).
+    static func settingEntry(key: String, to line: String, in pageText: String) -> String? {
+        var text: String = pageText
+        if text.unicodeScalars.first == "\u{FEFF}" {
+            text = String(String.UnicodeScalarView(text.unicodeScalars.dropFirst()))
+        }
         guard let layout = UndoFrontMatter.layout(of: text) else {
             return "---\n" + line + "\n---\n" + text
         }
@@ -851,25 +770,6 @@ nonisolated enum UndoLineOps {
     }
 }
 
-/// The one spelling of a moment in the journal: UTC, to the second.
-nonisolated enum UndoMoment {
-
-    // MARK: - Functions
-
-    static func text(_ moment: Date) -> String {
-        let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: moment)
-    }
-
-    static func date(_ text: String) -> Date? {
-        let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: text)
-    }
-}
-
 /// The places a test or the harness stops a step, to prove what recovery
 /// does with a process that dies there. Nil in the app: reaching a point
 /// costs one check.
@@ -922,6 +822,11 @@ nonisolated enum UndoTrailHook {
     /// what it ended, and how many files.
     nonisolated(unsafe) static var rolledBackLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ files: Int) -> Void)?
 
+    /// Recovery found a step half applied with a file changed by hand in the
+    /// way: the course and section, what it ended, how many files were put
+    /// back and how many were in the way. The list was cleared.
+    nonisolated(unsafe) static var interruptedLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ putBack: Int, _ inTheWay: Int) -> Void)?
+
     // MARK: - Functions
 
     static func couldNotRecord(draft: UndoStepDraft, mode: UndoMode, problem: Error) {
@@ -946,6 +851,8 @@ nonisolated enum UndoTrailHook {
                 return "the step could not be written as a line"
             case .notTheNewestStep:
                 return "the list had moved on"
+            case .identifierBeingMade:
+                return "the working folder's identifier was being made"
             }
         }
         if problem is UndoShadowMismatch {

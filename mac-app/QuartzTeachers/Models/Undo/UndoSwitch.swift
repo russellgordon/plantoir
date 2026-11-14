@@ -43,7 +43,7 @@ nonisolated enum UndoSwitch {
     /// the switch is off a busy lock must never make a teacher's action
     /// noticeably slower, and a step that is not written costs nothing
     /// anybody can see (plan 4.9).
-    static let shadowLockWaitSeconds: Double = 0.25
+    static let shadowLockWaitSeconds: Double = 0.05
 
     // MARK: - Computed properties
 

@@ -153,7 +153,12 @@ enum UndoShadowPublish {
                 continue
             }
             guard let relative = relativePath(of: edit.url, under: root) else {
-                // A page outside the working folder cannot be named in a step.
+                // A page outside the working folder cannot be named in a
+                // step: said on the trail, never silently skipped.
+                UndoTrailHook.couldNotRecordLine?(
+                    plan.publishes ? "publishPages" : "hidePages", course.code, sectionNumber,
+                    .shadow, "a page is outside the working folder"
+                )
                 return []
             }
             result.append(UndoFileChange(relativePath: relative, before: disk, after: Data(text.utf8)))
@@ -162,9 +167,12 @@ enum UndoShadowPublish {
     }
 
     /// The path inside the working folder, with forward slashes, or nil.
+    /// Both sides have their links resolved the same way, so a folder
+    /// reached through `/var` or a linked folder is still the same folder
+    /// (the core review: a differently spelled root recorded nothing).
     static func relativePath(of url: URL, under root: URL) -> String? {
-        let rootPath: String = root.standardizedFileURL.path + "/"
-        let path: String = url.standardizedFileURL.path
+        let rootPath: String = root.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let path: String = url.resolvingSymlinksInPath().standardizedFileURL.path
         if !path.hasPrefix(rootPath) {
             return nil
         }

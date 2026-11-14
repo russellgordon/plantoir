@@ -44,7 +44,27 @@ nonisolated enum UndoTrail {
 
     // MARK: - Functions
 
+    /// Set once, the first time the app's list is made (the core review's M7:
+    /// it used to be set again on every publish).
+    nonisolated(unsafe) private static var installed: Bool = false
+
+    private static let guardLock: NSLock = NSLock()
+
     static func install() {
+        guardLock.lock()
+        defer {
+            guardLock.unlock()
+        }
+        if installed {
+            return
+        }
+        installed = true
+        UndoTrailHook.interruptedLine = { course, section, phase, putBack, inTheWay in
+            ActivityTrail.note(
+                .undoRolledBack,
+                UndoTrail.interruptedLine(course: course, section: section, phase: phase, putBack: putBack, inTheWay: inTheWay)
+            )
+        }
         UndoTrailHook.couldNotRecordLine = { action, course, section, mode, why in
             ActivityTrail.note(
                 .undoCouldNotRecordAStep,
@@ -77,6 +97,14 @@ nonisolated enum UndoTrail {
             line += "Nothing was changed."
         }
         return line
+    }
+
+    /// `ICS3U/1 · the undo list put back 2 files left part way by a change
+    /// that stopped, found 1 changed by hand since, and cleared the list`.
+    static func interruptedLine(course: String, section: Int?, phase: UndoPhase, putBack: Int, inTheWay: Int) -> String {
+        let counted: String = inTheWay == 1 ? "1 file" : "\(inTheWay) files"
+        return rolledBackLine(course: course, section: section, phase: phase, files: putBack)
+            + ", found \(counted) changed by hand since, and cleared the list"
     }
 
     /// `ICS3U/1 · the undo list put back 2 files left part way by a change

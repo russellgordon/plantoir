@@ -16,7 +16,11 @@ implementation's accidents, decide the outcome.
 
 Deterministic: the same seed gives the same bytes, every run, on any
 machine (scripts/test_make_undo_traces.py runs it twice and compares).
-Pure stdlib.
+Pure stdlib. It lives in scripts/, which ships inside the app and each
+working folder's .toolchain/, only because Windows' suite discovers every
+scripts/test_*.py there (PythonToolchainTests); teachers never run it.
+A checkout with CR LF line endings (Windows' core.autocrlf) is compared
+as LF.
 
     python3 scripts/make_undo_traces.py            # rewrite the contract
     python3 scripts/make_undo_traces.py --check    # exit 1 if it is stale
@@ -61,7 +65,7 @@ FIXTURE = [
      "no front matter: the step makes the block"),
     ("p6", SECTION + "Unit 1, Day 6.md",
      "\ufeff---\ntitle: Unit 1, Day 6\npublish: false\n---\n\nA byte-order mark before the fence.\n",
-     "a byte-order mark: the reader sees no block, so the step makes one and the mark stays"),
+     "a byte-order mark: today's publish reads the page without it and writes it back without it, so the step is the whole file and its undo puts the mark back"),
     ("p7", SECTION + "Unit 1, Day 7.md",
      "---\ntitle: Unit 1, Day 7\ntags:\n  - review\n  - quiz\npublish: false\n---\n\nAn entry that runs on to the lines below it.\n",
      "a key whose value runs on to indented lines"),
@@ -325,7 +329,10 @@ def ops_for_change(path, before, after):
 
 
 def setting_entry(key, line, text):
-    """JournaledWrite.settingEntry: the traces' writer."""
+    """JournaledWrite.settingEntry: the traces' writer. A leading byte-order
+    mark is dropped first, as today's publish drops it."""
+    if text.startswith("\ufeff"):
+        text = text[1:]
     layout = layout_of(text)
     if layout is None:
         return "---\n" + line + "\n---\n" + text
@@ -404,39 +411,153 @@ def plan(ops, backward, pages_by_path):
 # The list: linear, one for the app.
 # --------------------------------------------------------------------------
 
+GRACE_DAYS = 30
+CLOCK_TOLERANCE_DAYS = 1.0
+CLEARING_TAKES_STEPS_BEGUN_BEFORE_IT = True   # pending Russell: UndoFold.clearingTakesStepsBegunBeforeIt
+
+
 class Model:
-    def __init__(self):
-        self.pages = {PATHS[page_id]: START[page_id] for page_id in PAGE_IDS}
-        self.steps = []     # [seq, ops, phase]
-        self.next_seq = 1
+    """The list, as UndoFold and UndoPruning keep it. Times are in days
+    from an arbitrary zero; `clock` is what the computer's clock reads."""
+
+    def __init__(self, pages=None):
+        if pages is None:
+            pages = {PATHS[page_id]: START[page_id] for page_id in PAGE_IDS}
+        self.pages = pages
+        self.steps = []        # dicts: seq, ops, phase, made, readable, clearedInFlight
+        self.barriers = []     # seq numbers of lines this version cannot read
+        self.highest = 0
+        self.last_clearing = 0
+        self.clock = 0.0
+        self.newest_written = None
+        self.unreachable = set()   # working folders that cannot be reached
+
+    # -- the fold -----------------------------------------------------
+
+    def write_line(self):
+        if self.newest_written is None or self.clock > self.newest_written:
+            self.newest_written = self.clock
 
     def on_list(self):
-        return [step for step in self.steps if step[2] in ("done", "undone")]
+        return [step for step in self.steps if step["phase"] in ("done", "undone", "begun")]
+
+    def effective_times(self):
+        result = {}
+        running = None
+        for step in self.steps:
+            if running is None or step["made"] > running:
+                running = step["made"]
+            result[step["seq"]] = running
+        return result
+
+    def reference_time(self):
+        judged = self.clock
+        for time in self.effective_times().values():
+            if time > judged and time - self.clock <= CLOCK_TOLERANCE_DAYS:
+                judged = time
+        return judged
+
+    def offer(self):
+        """UndoFold.offer: (undo, redo, offered seqs); undo and redo are a
+        step dict, 'nothing', 'busy' or 'notReadable'."""
+        judged = self.reference_time()
+        times = self.effective_times()
+        listed = self.on_list()
+        expired = 0
+        for step in listed:
+            if times[step["seq"]] < judged - DAYS_KEPT:
+                expired = step["seq"]
+        remaining = [step for step in listed if step["seq"] > expired]
+        skip = max(0, len(remaining) - STEPS_KEPT)
+        if skip:
+            expired = max(expired, remaining[skip - 1]["seq"])
+        offered = remaining[skip:]
+        newest = None
+        for step in offered:
+            if step["phase"] != "undone":
+                newest = step
+        blocked = False
+        for seq in self.barriers:
+            if seq <= self.last_clearing or seq <= expired:
+                continue
+            if newest is None or seq >= newest["seq"]:
+                blocked = True
+        for step in listed:
+            if not step["readable"] and step["seq"] > expired and (newest is None or step["seq"] >= newest["seq"]):
+                blocked = True
+        if newest is not None and newest["phase"] == "begun":
+            return ("busy", "busy", offered)
+        floor = newest["seq"] if newest else 0
+        redo = "nothing"
+        for step in offered:
+            if step["phase"] == "undone" and step["seq"] > floor:
+                redo = step
+                break
+        undo = newest if newest is not None else "nothing"
+        if blocked:
+            return ("notReadable", "notReadable", offered)
+        if undo != "nothing" and not undo["readable"]:
+            return ("notReadable", "notReadable", offered)
+        if redo != "nothing" and not redo["readable"]:
+            redo = "notReadable"
+        return (undo, redo, offered)
 
     def head(self):
         found = None
-        for step in self.on_list():
-            if step[2] == "done":
+        for step in self.offer()[2]:
+            if step["phase"] == "done":
                 found = step
         return found
 
-    def redo_candidate(self):
-        for step in self.on_list():
-            if step[2] == "undone":
+    def summary(self):
+        head = self.head()
+        redo = self.offer()[1]
+        return {"head": head["seq"] if head else None,
+                "redo": redo["seq"] if isinstance(redo, dict) else None}
+
+    def offered_seqs(self):
+        return [step["seq"] for step in self.offer()[2]]
+
+    # -- writing --------------------------------------------------------
+
+    def begin(self, ops, readable=True, made=None):
+        self.highest += 1
+        seq = self.highest
+        self.steps.append({"seq": seq, "ops": ops, "phase": "begun",
+                           "made": self.clock if made is None else made,
+                           "readable": readable, "clearedInFlight": False})
+        self.write_line()
+        return seq
+
+    def finish(self, seq, phase="done"):
+        step = self.find(seq)
+        for other in self.steps:
+            if other["phase"] == "undone" and other["seq"] < seq and phase == "done":
+                other["phase"] = "dropped"
+        if step["clearedInFlight"] and phase in ("done", "undone"):
+            phase = "cleared"
+        step["phase"] = phase
+        self.write_line()
+        self.prune()
+
+    def find(self, seq):
+        for step in self.steps:
+            if step["seq"] == seq:
                 return step
         return None
 
-    def summary(self):
-        head = self.head()
-        redo = self.redo_candidate()
-        return {"head": head[0] if head else None, "redo": redo[0] if redo else None}
+    def foreign_line(self):
+        """A line from a newer version: its number counts, nothing else."""
+        self.highest += 1
+        self.barriers.append(self.highest)
+        self.write_line()
+        return self.highest
 
-    def step(self, edits, days_ago=0):
-        """edits: [(page id, key, line)] -> ('applied', seq) or ('changedNothing',)."""
+    def step(self, edits, days_ago=0, pages_key=None):
+        """edits: [(path, key, line)] -> ('applied', seq) or ('changedNothing',)."""
         ops = []
         new_pages = dict(self.pages)
-        for page_id, key, line in edits:
-            path = PATHS[page_id]
+        for path, key, line in edits:
             text = new_pages.get(path)
             if text is None:
                 continue
@@ -449,55 +570,88 @@ class Model:
                 ops.extend(ops_for_change(path, self.pages.get(path), new_pages[path]))
         if not ops:
             return ("changedNothing",)
-        for step in self.steps:
-            if step[2] == "undone":
-                step[2] = "dropped"
-        seq = self.next_seq
-        self.next_seq += 1
-        self.steps.append([seq, ops, "done", days_ago])
+        seq = self.begin(ops, made=self.clock - days_ago)
         self.pages = new_pages
-        self.prune()
+        self.finish(seq)
         return ("applied", seq)
 
     def prune(self):
-        """UndoPruning.prune: past 50 steps, oldest first; and older than 30 days."""
+        """UndoPruning.prune: one oldest run, past 50 or past 30 + 30 days."""
+        trust = self.newest_written is None or self.newest_written - self.clock <= CLOCK_TOLERANCE_DAYS
+        times = self.effective_times()
         listed = self.on_list()
-        excess = len(listed) - STEPS_KEPT
+        remaining = len(listed)
         for step in listed:
-            if excess > 0 or step[3] > DAYS_KEPT:
-                step[2] = "pruned"
-                excess -= 1
+            if step["phase"] == "begun" or not step["readable"]:
+                break
+            too_many = remaining > STEPS_KEPT
+            too_old = trust and times[step["seq"]] < self.clock - (DAYS_KEPT + GRACE_DAYS)
+            if not too_many and not too_old:
+                break
+            step["phase"] = "pruned"
+            remaining -= 1
 
     def clear(self):
+        if not any(step["phase"] in ("done", "undone") or
+                   (step["phase"] == "begun" and CLEARING_TAKES_STEPS_BEGUN_BEFORE_IT) for step in self.steps):
+            return False
+        self.last_clearing = self.highest
         for step in self.steps:
-            if step[2] in ("done", "undone"):
-                step[2] = "cleared"
+            if step["phase"] in ("done", "undone"):
+                step["phase"] = "cleared"
+            elif step["phase"] == "begun" and CLEARING_TAKES_STEPS_BEGUN_BEFORE_IT:
+                step["clearedInFlight"] = True
+        self.write_line()
+        return True
+
+    def folder_of(self, step):
+        for op in step["ops"]:
+            if op.get("path", "").startswith("@"):
+                return op["path"].split("/", 1)[0]
+        return "@A"
 
     def undo(self, dry=False):
-        head = self.head()
-        if head is None:
+        undo, _, _ = self.offer()
+        if undo == "nothing":
             return ("nothingToUndo",)
-        result = plan(head[1], True, self.pages)
+        if undo == "busy":
+            return ("anotherChangeIsUnderWay",)
+        if undo == "notReadable":
+            return ("notAvailable",)
+        if self.folder_of(undo) in self.unreachable:
+            return ("notAvailable",)
+        result = plan(undo["ops"], True, self.pages)
         if result[0] == "changedSince":
             if not dry:
                 self.clear()
+                self.prune()
             return result
         if not dry:
             self.write(result[1])
-            head[2] = "undone"
-        return ("undone", head[0])
+            undo["phase"] = "undone"
+            self.write_line()
+            self.prune()
+        return ("undone", undo["seq"])
 
     def redo(self, dry=False):
-        candidate = self.redo_candidate()
-        if candidate is None:
+        _, candidate, _ = self.offer()
+        if candidate == "nothing":
             return ("nothingToRedo",)
-        result = plan(candidate[1], False, self.pages)
+        if candidate == "busy":
+            return ("anotherChangeIsUnderWay",)
+        if candidate == "notReadable":
+            return ("notAvailable",)
+        if self.folder_of(candidate) in self.unreachable:
+            return ("notAvailable",)
+        result = plan(candidate["ops"], False, self.pages)
         if result[0] == "changedSince":
             return result
         if not dry:
             self.write(result[1])
-            candidate[2] = "done"
-        return ("redone", candidate[0])
+            candidate["phase"] = "done"
+            self.write_line()
+            self.prune()
+        return ("redone", candidate["seq"])
 
     def write(self, changes):
         for path, text in changes.items():
@@ -507,7 +661,9 @@ class Model:
                 self.pages[path] = text
 
     def hand_edit(self, kind, page_id):
-        path = PATHS[page_id]
+        return self.hand_edit_path(kind, PATHS[page_id])
+
+    def hand_edit_path(self, kind, path):
         text = self.pages.get(path)
         if text is None:
             return False
@@ -550,7 +706,7 @@ def one_trace(rng, number):
             chosen = rng.sample(PAGE_IDS, rng.randint(1, 3))
             line = "publish: true" if published else "publish: false"
             edits = [(page_id, "publish", line) for page_id in sorted(chosen)]
-            outcome = model.step(edits)
+            outcome = model.step([(PATHS[page_id], key, value) for page_id, key, value in edits])
             call = {"call": "step", "action": "publishPages" if published else "hidePages",
                     "set": [{"page": page_id, "key": key, "line": value} for page_id, key, value in edits],
                     "expect": outcome[0]}
@@ -585,6 +741,7 @@ def one_trace(rng, number):
         else:
             reason = rng.choice(["deploy", "shareUnitPlans"])
             model.clear()
+            model.prune()
             call = {"call": "clear", "reason": reason}
         call.update(model.summary())
         calls.append(call)
@@ -685,7 +842,7 @@ def main(arguments):
         sys.stdout.buffer.write(data)
         return 0
     if "--check" in arguments:
-        if CONTRACT.read_bytes() != data:
+        if CONTRACT.read_bytes().replace(b"\r\n", b"\n") != data:
             print("contracts/undo-traces.json is not what scripts/make_undo_traces.py writes; run it again.")
             return 1
         print("contracts/undo-traces.json is current.")

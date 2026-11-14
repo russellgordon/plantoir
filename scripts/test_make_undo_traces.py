@@ -46,11 +46,30 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_the_committed_traces_are_what_the_generator_writes(self):
-        written = (REPO / "contracts" / "undo-traces.json").read_bytes()
+        # Read as LF: a Windows checkout with core.autocrlf has CR LF on disk
+        # (the contract review's WRONG 5; documentation/12 on reading text).
+        written = (REPO / "contracts" / "undo-traces.json").read_bytes().replace(b"\r\n", b"\n")
         self.assertEqual(
             written, traces.render(traces.generate()),
             "contracts/undo-traces.json is stale: run python3 scripts/make_undo_traces.py",
         )
+
+    def test_a_checkout_with_crlf_line_endings_is_still_current(self):
+        # Windows' checkout (core.autocrlf=true) has CR LF on disk; --check
+        # and the comparison above must still call it current.
+        import io
+        import tempfile
+        from contextlib import redirect_stdout
+        original = traces.CONTRACT
+        with tempfile.TemporaryDirectory() as folder:
+            crlf = Path(folder) / "undo-traces.json"
+            crlf.write_bytes(traces.render(traces.generate()).replace(b"\n", b"\r\n"))
+            traces.CONTRACT = crlf
+            try:
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(traces.main(["--check"]), 0)
+            finally:
+                traces.CONTRACT = original
 
     def test_another_seed_gives_other_traces(self):
         self.assertNotEqual(traces.render(traces.generate(seed=1)), traces.render(traces.generate()))
@@ -126,6 +145,23 @@ class LineModelTests(unittest.TestCase):
         self.assertEqual(result, ("ready", {path: text + "Written since.\n"}))
 
 
+def readable_op(op):
+    """UndoOp.shapeIsKnown, as the contract's opKinds and unknown say."""
+    kind = op.get("kind")
+    path = op.get("path")
+    if kind not in ("writeFile", "editLine", "recompute") or not isinstance(path, str):
+        return False
+    parts = path.split("/")
+    if path.startswith("/") or "\\" in path or any(part in ("", ".", "..") for part in parts):
+        return False
+    for key in ("before", "after", "key", "afterKey"):
+        if key in op and op[key] is not None and not isinstance(op[key], str):
+            return False
+    if kind == "editLine":
+        return isinstance(op.get("key"), str) and (op.get("before") is not None or op.get("after") is not None)
+    return True
+
+
 class ContractCaseTests(unittest.TestCase):
 
     def current_text(self, current):
@@ -145,6 +181,10 @@ class ContractCaseTests(unittest.TestCase):
         for case in cases:
             with self.subTest(case=case["name"]):
                 op = dict(case["op"])
+                if not readable_op(op):
+                    self.assertEqual(case["undo"], "notReadable")
+                    self.assertEqual(case["redo"], "notReadable")
+                    continue
                 if op["kind"] == "writeFile":
                     op["beforeSha"] = None if op["beforeText"] is None else traces.sha(op["beforeText"])
                     op["afterSha"] = None if op["afterText"] is None else traces.sha(op["afterText"])
@@ -160,67 +200,107 @@ class ContractCaseTests(unittest.TestCase):
                 self.assertEqual(undo, case["undo"])
                 self.assertEqual(redo, case["redo"])
 
+    STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
+                  "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
+                  "blobKept", "pendingRuling"}
+
     def test_stack_cases(self):
+        folder_b = "@B/"
         for case in shared_undo()["stackCases"]:
             with self.subTest(case=case["name"]):
-                model = traces.Model()
+                unknown = set(case) - self.STACK_KEYS
+                self.assertEqual(unknown, set(), "a key the replay does not check")
+                self.assertIn("head", case)
+                self.assertIn("redo", case)
+                p1 = traces.PATHS["p1"]
+                pages = {p1: traces.START["p1"], folder_b + p1: traces.START["p1"]}
+                model = traces.Model(pages)
                 last = None
-                written_before = None
+                cleared = []
+                held = None
+                lines_before = None
 
-                def one_step(days_ago=0):
-                    now = traces.reading("publish", model.pages[traces.PATHS["p1"]])
+                def one_step(path, days_ago=0):
+                    now = traces.reading("publish", model.pages[path])
                     line = "publish: false" if now == ("entry", "publish: true") else "publish: true"
-                    return model.step([("p1", "publish", line)], days_ago=days_ago)
+                    return model.step([(path, "publish", line)], days_ago=days_ago)
 
-                cleared = None
                 for call in case["calls"]:
                     if call == "step":
-                        last = one_step()
-                    elif call == "step:31daysAgo":
-                        last = one_step(days_ago=31)
+                        last = one_step(p1)
+                    elif call == "step@B":
+                        last = one_step(folder_b + p1)
+                    elif call.startswith("step:") and call.endswith("daysAgo"):
+                        last = one_step(p1, days_ago=int(call[len("step:"):-len("daysAgo")]))
                     elif call.startswith("steps:"):
                         for _ in range(int(call.split(":")[1])):
-                            last = one_step()
+                            last = one_step(p1)
+                    elif call.startswith("clock:"):
+                        model.clock = float(call.split(":")[1])
                     elif call == "undo":
-                        before = model.head()
+                        had = model.highest
                         last = model.undo()
-                        if last[0] == "changedSince" and before is not None:
-                            cleared = "changedSince"
+                        if last[0] == "changedSince":
+                            cleared.append(("changedSince", had))
                     elif call == "redo":
                         last = model.redo()
                     elif call == "editTheLineByHand":
-                        self.assertTrue(model.hand_edit("sameLine", "p1"))
+                        self.assertTrue(model.hand_edit_path("sameLine", p1))
                     elif call.startswith("clear:"):
-                        written_before = len(model.on_list())
-                        model.clear()
-                        cleared = call.split(":")[1]
+                        lines_before = len(cleared)
+                        if model.clear():
+                            cleared.append((call.split(":")[1], model.highest))
+                        model.prune()
+                    elif call == "moveFolder:B":
+                        model.unreachable.add("@B")
+                    elif call == "restoreFolder:B":
+                        model.unreachable.discard("@B")
+                    elif call == "foreignLine":
+                        model.foreign_line()
+                    elif call == "foreignStep":
+                        seq = model.begin([{"kind": "move", "from": "a", "to": "b"}], readable=False)
+                        model.find(seq)["phase"] = "done"
+                    elif call == "begin:held":
+                        now = traces.reading("publish", model.pages[p1])
+                        line = "publish: false" if now == ("entry", "publish: true") else "publish: true"
+                        after = traces.setting_entry("publish", line, model.pages[p1])
+                        held = (model.begin(traces.ops_for_change(p1, model.pages[p1], after)), after)
+                    elif call == "finish:held":
+                        model.pages[p1] = held[1]
+                        model.finish(held[0])
                     else:
                         self.fail("unknown call " + call)
                 summary = model.summary()
                 self.assertEqual(summary["head"], case["head"])
                 self.assertEqual(summary["redo"], case["redo"])
-                listed = [step[0] for step in model.on_list()]
+                listed = model.offered_seqs()
                 if "onTheList" in case:
                     self.assertEqual(listed, case["onTheList"])
                 if "onTheListCount" in case:
                     self.assertEqual(len(listed), case["onTheListCount"])
                     self.assertEqual(listed[0], case["oldestOnTheList"])
+                if "onTheDisk" in case:
+                    self.assertEqual([step["seq"] for step in model.on_list()], case["onTheDisk"])
+                if "physicallyPruned" in case:
+                    self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "pruned"], case["physicallyPruned"])
                 if "expectLast" in case:
                     self.assertEqual(last[0], case["expectLast"])
                 if "cleared" in case:
-                    self.assertEqual(cleared, case["cleared"])
-                if case.get("linesWritten") == 0:
-                    self.assertEqual(written_before, 0)
+                    self.assertIn(case["cleared"], [reason for reason, _ in cleared])
+                if "clearedSeq" in case:
+                    self.assertEqual(cleared[-1][1], case["clearedSeq"])
+                if "linesWritten" in case:
+                    self.assertEqual(len(cleared) - (lines_before or 0), case["linesWritten"])
 
-    def test_the_clear_reasons_are_the_three_ruled(self):
-        self.assertEqual(shared_undo()["clearReasons"], ["changedSince", "deploy", "shareUnitPlans"])
+    def test_the_clear_reasons_are_the_four_ruled(self):
+        self.assertEqual(shared_undo()["clearReasons"], ["changedSince", "deploy", "shareUnitPlans", "interrupted"])
 
     def test_the_format_names_every_event_and_the_clearing(self):
         with open(REPO / "contracts" / "file-formats.json", encoding="utf-8") as handle:
             journal = json.load(handle)["undoJournal"]
         events = set(journal["events"])
-        self.assertEqual(events, {"begin", "applied", "rolledBack", "undoing", "undone", "redoing",
-                                  "redone", "failed", "dropped", "pruned", "cleared"})
+        self.assertEqual(events, {"begin", "applied", "rolledBack", "interrupted", "undoing", "undone",
+                                  "redoing", "redone", "failed", "dropped", "pruned", "cleared"})
 
 
 if __name__ == "__main__":
