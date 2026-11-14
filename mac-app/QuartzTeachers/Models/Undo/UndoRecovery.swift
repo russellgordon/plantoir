@@ -102,9 +102,10 @@ nonisolated enum UndoRecovery {
     }
 
     /// Removes the staged files of every step closed `interrupted` that this
-    /// process has not yet looked for and whose folder it can reach. Each is
-    /// looked for once per process: a few folder listings, and only for the
-    /// rare step that was closed.
+    /// process has not yet tidied and whose folder it can reach. Each is
+    /// tidied once per process, a few folder listings for the rare step that
+    /// was closed; one whose file could not be removed (held, or made
+    /// immutable) is looked for again at the next lock.
     static func tidyClosedSteps(_ writer: UndoJournalWriter, resolveRoot: (UndoWorkingFolder) -> URL?) {
         for seq in writer.fold.orderedSeqs {
             guard let record = writer.fold.records[seq], record.phase == .interrupted else {
@@ -120,7 +121,10 @@ nonisolated enum UndoRecovery {
             guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
                 continue
             }
-            tidyStagedFiles(of: record.step, root: root)
+            if !tidyStagedFiles(of: record.step, root: root) {
+                // Something held or locked: looked for again at the next lock.
+                continue
+            }
             tidiedLock.lock()
             tidied.insert(key)
             tidiedLock.unlock()
@@ -128,17 +132,22 @@ nonisolated enum UndoRecovery {
     }
 
     /// Every staged file a step's apply, undo, redo or recovery left beside
-    /// the files it names.
-    static func tidyStagedFiles(of step: UndoStep, root: URL) {
+    /// the files it names. True when none is left.
+    @discardableResult
+    static func tidyStagedFiles(of step: UndoStep, root: URL) -> Bool {
         var urls: [URL] = []
         for op in step.ops {
             if let path = op.path {
                 urls.append(root.appendingPathComponent(path))
             }
         }
+        var allGone: Bool = true
         for work in ["apply", "undo", "redo"] {
-            UndoSwap.tidyLeftovers(label: "\(step.seq)-\(work)", beside: urls)
+            if !UndoSwap.tidyLeftovers(label: "\(step.seq)-\(work)", beside: urls) {
+                allGone = false
+            }
         }
+        return allGone
     }
 
     /// Where each file of a step stands: before, after or neither.

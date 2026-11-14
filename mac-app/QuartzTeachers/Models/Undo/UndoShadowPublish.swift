@@ -193,11 +193,38 @@ enum UndoShadowPublish {
     /// reached through `/var` or a linked folder is still the same folder
     /// (the core review: a differently spelled root recorded nothing).
     static func relativePath(of url: URL, under root: URL) -> String? {
-        let rootPath: String = root.resolvingSymlinksInPath().standardizedFileURL.path + "/"
-        let path: String = url.resolvingSymlinksInPath().standardizedFileURL.path
+        let rootPath: String = canonicalPath(of: root) + "/"
+        let path: String = canonicalPath(of: url)
         if !path.hasPrefix(rootPath) {
             return nil
         }
         return String(path.dropFirst(rootPath.count))
+    }
+
+    /// A path with every link resolved, for a file that may not exist yet:
+    /// its deepest existing folder is resolved by `realpath`, and the parts
+    /// below it are added back as written. Foundation's
+    /// `resolvingSymlinksInPath` resolves nothing in a path that does not
+    /// exist, so a section whose front page is not there yet, reached
+    /// through a linked folder, fell outside its own working folder and its
+    /// `recompute` op was not recorded (measured in U1's third round: the
+    /// bench Mac's `UndoShadowPublishTests.testAPublishIsRecordedInShadow`
+    /// red, and reproduced standalone with a linked root).
+    static func canonicalPath(of url: URL) -> String {
+        var existing: URL = url.standardizedFileURL
+        var below: [String] = []
+        while !FileManager.default.fileExists(atPath: existing.path) && existing.path != "/" {
+            below.insert(existing.lastPathComponent, at: 0)
+            existing = existing.deletingLastPathComponent()
+        }
+        var resolved: String = existing.path
+        if let real = realpath(existing.path, nil) {
+            resolved = String(cString: real)
+            free(real)
+        }
+        for part in below {
+            resolved = resolved.hasSuffix("/") ? resolved + part : resolved + "/" + part
+        }
+        return resolved
     }
 }

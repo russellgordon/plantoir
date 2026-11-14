@@ -17043,7 +17043,13 @@ after the app updates itself. So now:
   cannot read keeps exactly the blobs whose names its text holds (any run
   of 64 lower-case hex characters) and its own segment, until the newest
   `at` written in that segment is more than 60 days old; then the segment
-  goes like any other (`undoJournal.unknown.deleting`). The first fix kept
+  goes like any other (`undoJournal.unknown.deleting`). A segment holding
+  no readable `at` at all (junk, or a newer version that renamed the key)
+  is judged by the first later segment that has one, since every line in it
+  was written before that segment's (`UndoPruning.segmentBound`, the
+  director's ruling 7 on the third round: before it, such a segment kept
+  itself and every later one for good, because segments go only from the
+  oldest end). The first fix kept
   EVERYTHING while any unreadable line existed, and the second reviews
   found what that costs: the line is never rewritten, so its segment is
   never deleted, so deletion stopped for the life of the list. The
@@ -17057,7 +17063,11 @@ after the app updates itself. So now:
   event a v1 reader does not know is a barrier, so a record a later version
   adds would grey Undo on every older reader. A truly unknown kind stays a
   barrier; a later version that needs a record older readers can skip writes
-  a `note`. U1 writes notes only in its cases and traces.
+  a `note`. U1 writes notes only in its cases and traces. A note's `v` (1)
+  and `seq` are required, or it is an unreadable line like any other; its
+  `at` and `about` are optional, and whatever else it carries, a `phase` or
+  `reason` of any value included, it stays a note (the contract review of
+  the second round probed each).
 - `undoJournal.opKinds.reserved` fixes the outline of every later op kind
   now (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`,
   `external`, `trash`, `storeHeld`), and a step needs a working folder only
@@ -17185,9 +17195,31 @@ and 70 more steps: 71 on the list, none pruned. So now:
   never succeed later: recovery closes the step `interrupted` (reason
   `couldNotPutBack`, naming the files left part way) and clears the list,
   as for a hand edit.
-- A swap refused because a file is in use is left for the next lock. On
-  Windows a file another program holds is the everyday case (W5), and a
-  closed step cannot be retried.
+- A swap refused because a file is in use is tried again, on a bounded
+  schedule (`UndoRefusedSwaps`, the director's ruling 5 on the third round):
+  at once at an Undo or a Redo, where the teacher is waiting for it, and on
+  the ordinary path at a process's first lock, then one minute after a
+  refusal, doubling, never more than an hour apart, until the step is past
+  the limits and pruning closes it. On Windows a file another program holds
+  is the everyday case (W5), and a closed step cannot be retried.
+  **Measured** (the core reviewer's reproduction: a 300-page step stopped
+  after 150 swaps, one of those pages made immutable, then 60 one-page
+  actions): retried at every lock, each action cost 154 to 176 ms until the
+  step was closed; on the schedule, the first cost 148 to 194 ms and every
+  one after it 6 to 19 ms. **Rejected:** once per process (a file held for a
+  minute would wait for the next launch).
+- A step closed `interrupted` leaves nothing of the journal's in a course
+  (the director's ruling 6 on the third round): its staged files are removed
+  when it is closed, and when its folder cannot be reached then, by the
+  first recovery in each process that reaches it
+  (`UndoRecovery.tidyClosedSteps`). The reproduction above used to leave a
+  hidden `.k-0.md.plantoir-undo-1-apply-recover-orig` for good, and it was
+  worse than it looked: that kept original is a copy when the page cannot
+  be linked, and `copyfile` copies the page's immutable flag onto it, so it
+  could not be removed at all. A staged file the swap made, with one link,
+  now has its flags cleared before it is removed (`UndoSwap.removeStaged`);
+  a kept original that is a hard link shares the page's flags (a reference
+  course's lock) and is never touched.
 - A step whose folder cannot be reached, or that this version cannot read,
   stays in flight while it is on the list (ruling 10: Undo is greyed while
   it is the newest, and available again when the folder comes back). Once
@@ -17259,13 +17291,42 @@ a process killed part way leaves each file wholly old or wholly new.
 Undo acts on the newest step that is not undone and Redo on the most
 recently undone; a newer step still in flight refuses both. Any new step
 drops the redo branch. The whole list is CLEARED by one `cleared` line with
-its reason (`undo.clearReasons`), in two cases only: when Undo refuses a
-step because what it changed was changed by hand since (ruling 13, which
-replaced the plan's recommendation that the refused step stay), and when
-recovery closes a step `interrupted`. The `cleared` line's `seq` is the
-highest step number in the journal when it is written, whatever cleared it
-(the contract review found the first version wrote the refused step's
-number for a refusal and the highest for a deploy).
+its reason, and a reader honours that line WHATEVER its reason says, a
+reason it does not know included (the director's ruling 1 on the third
+round): `UndoFold.takeClearing` never reads the reason, and the contract now
+says so, because a Windows reader that checked the reason against
+`undo.clearReasons` would read a later version's clearing as an unreadable
+line, a barrier. This version clears in four cases (`undo.clearReasons`):
+when Undo refuses a step because what it changed was changed by hand since
+(ruling 13, which replaced the plan's recommendation that the refused step
+stay); when Undo refuses it because content it needs is missing from the
+list (below); when recovery closes a step `interrupted`; and once when the
+switch goes live (below). The `cleared` line's `seq` is the highest step
+number in the journal when it is written, whatever cleared it (the contract
+review found the first version wrote the refused step's number for a
+refusal and the highest for a deploy).
+
+**Steps recorded in shadow are never offered** (the director's ruling 1 on
+the third round). A shadow list has gaps by design: most writers are
+journaled only from U3 to U6, and a shadow begin that misses its 50 ms wait
+is dropped (579 and 986 of 1,600 with 8 processes at once). So the flip of
+the switch in U7 writes one `cleared` line, reason `wentLive`, before
+anything is offered (`UndoJournal.clearTheListAsTheSwitchGoesLive`), and the
+list starts empty. **Rejected:** offering them as they stand (the core
+review of the second round: the first Undo after the update could take back
+a publish from three weeks ago and leave the teacher's newest change, which
+nobody recorded, standing, and the content check passes whenever that page
+was not touched since); pruning them one by one (more lines, the same
+result).
+
+**An Undo refused for missing content clears the list too**, once it has
+said so (held question M9 on the second reviews; built as recommended behind
+one constant, `UndoSwitch.undoRefusedForMissingContentClearsTheList`).
+Content that is missing (a blob a disk cleaner removed, or from U5 a 785
+store file swept early) never comes back, so before this the newest step
+was offered and refused on every try until it aged out, and nothing earlier
+could be undone. A Redo refused for missing content drops only its redo, as
+for a hand edit (ruling 20).
 
 **A deploy is not on the list and cuts nothing** (ruling 17), and neither
 does sharing unit plans or stopping sharing them (ruling 18). They replaced
@@ -17276,7 +17337,8 @@ Plantoir then offers to deploy (ruling 19, built in U6 from "Deployed or
 not" below). No line was ever written for a deploy (nothing in the app
 called the clearing), so no journal on any computer holds one.
 
-**A refused Redo drops only the redo** (ruling 20). It is refused once, with
+**A refused Redo drops only the redo** (ruling 20), whether the page was
+changed by hand or content it needs is missing. It is refused once, with
 the page named, and then the undone steps from it upward are `dropped`
 (reason `redoRefused`): Redo greys out, Undo still works for everything
 earlier, and the Redo is never offered and refused again. Choice (b) of
@@ -17335,13 +17397,16 @@ reviewer's suggestion): it would protect a list from one forward jump and
 not from a clock that stays forward, and a real return after the summer
 looks the same.
 
-### Deployed or not: read from the deploy markers (ruling 19)
+### Deployed or not: read from the published-pages record (ruling 19)
 
 Ruling 19 needs to know, when an Undo or a Redo happens, whether a website
-shows what it takes back. **That is read from the deploy markers the
-launchers already write, never from the journal** (the director's ruling 1
-on the second reviews; `undo.rule.deployed`, `undo.deployedCases`,
-`UndoWebsite`). Read in `scripts/deploy.py`, `deploy.sh` and `deploy.ps1` on
+shows what it takes back. **That is read from the published-pages record
+the launchers already write, never from the journal** (the director's
+ruling 1 on the second reviews; `undo.rule.deployed`, `undo.deployedCases`,
+`UndoWebsite`). This section said "the deploy markers" until the third
+round; the contract review pointed out that in `file-formats.json` those
+are `firstDeployMarkers`, the site files, which cannot answer it, so a
+reader built from the words would have gone to the wrong file. Read in `scripts/deploy.py`, `deploy.sh` and `deploy.ps1` on
 2026-11-13: every deploy path writes the section's published-pages record
 (`contracts/file-formats.json` → `publishedPagesRecord`, #379), one fragment
 `courses/<CODE>/.publish_state/section<N>.published-pages/<yyyyMMddTHHmmssZ>-<destination>.json`
@@ -17355,19 +17420,35 @@ those three, so all leave the same trace; the Netlify and Cloudflare site
 markers (`.netlify_sites/`, `.cloudflare_sites/`) only name the site and are
 written when one is made, so they cannot answer it.
 
-The rule compares CONTENT, not times: for each destination, the newest
-fragment by the moment in its own name is what that website shows. An Undo
-or Redo offers to deploy when, for a page whose visibility it changes, some
-destination's newest fragment shows the page as the course has it before
-the move. No fragment at all means never deployed since the section began
-or rolled over: no offer. A fragment that cannot be read, or a move that
-changes what a page says without changing who can see it, is `cannotTell`.
-No journal time is read, so a clock that moved between a step and a deploy
-cannot mislead it.
+The rule compares CONTENT, not times. It reads only the destinations the
+section deploys to NOW (its primary and any additional, by type), because a
+destination left behind keeps its last fragment as the newest for good:
+a course that went to Netlify and then to Cloudflare would otherwise offer
+to deploy on every Undo, and deploying (to Cloudflare) would never refresh
+the Netlify fragment (the contract review of the third round, I1). For each
+of those destinations, the newest fragment by the moment in its own name is
+what that website shows. An Undo or Redo offers to deploy when, for a page
+whose visibility it changes, some destination's newest fragment shows the
+page as the course has it before the move. A destination with a site marker
+and no fragment is `cannotTell`: a section last deployed before the record
+existed (v1.4.1), or rolled over with the "same website" answer, which moves
+every fragment aside and keeps the marker, has a live site and no record of
+it. A fragment that cannot be read, or a move that changes what a page says
+without changing who can see it, is `cannotTell` too, and an offer from any
+destination wins over it. No fragment and no marker anywhere it deploys
+now: no offer (a folder keeps no marker). Places are compared in Unicode
+normalization form C, then code point for code point: the review measured
+Swift's `Set` matching a decomposed and a composed name and Python's `in`
+not, so without one stated form the two apps would answer differently. No
+journal time is read, so a clock that moved between a step and a deploy
+cannot mislead it. A deploy whose fragment was not written (a preview's
+`.build-id` replaced the publish build's first, or the write failed) leaves
+the newest fragment older than the site (`undo.knownLimits.recordNotWritten`).
 
-**What the markers cannot answer, said exactly:** the record holds which
+**What the record cannot answer, said exactly:** the record holds which
 pages a site shows, not what they say. U1's steps (publishing and hiding)
-change only visibility, so for them the answer is complete. For a step that
+change only visibility, so for them the answer is complete, short of the
+known limit above. For a step that
 changes a page's text (U2's body edits, U3's actions that rewrite a page),
 whether the website shows that text cannot be read from any marker: the
 fragment would have to carry a digest of each page's source as the build
@@ -17398,6 +17479,14 @@ Ruling 15 as finally given makes the built-in window's "undo that" the same
 as Edit ▸ Undo; that routing is a later piece, behind the switch, and U1
 changes nothing the window does.
 
+The list is read and written OFF the main actor (the director's ruling 8 on
+the third round): `UndoShadowPublish` works out the pages on the main actor,
+then runs the lock, the read of the journal and the writes on a detached
+task the action waits for. A process's first read of the journal is a whole
+one, 100 to 300 ms and more at a year's steady 2 to 6 MB (the core review of
+the second round), and it was running on the main actor at the first
+publish after a launch.
+
 `UndoWriterScanTests` lists every product file that writes files, with its
 count and why: the door, not a step, or the piece of #899 that will wire
 it. U7 cannot flip the switch while any "waits for" remains. After the
@@ -17419,7 +17508,30 @@ path: `/usr/bin/ditto` in `CourseRestorer` and `ReferenceZipSource`,
 rose and no new writer was found; `testTheScanCountsSplitCallsToolsAndTheTrash`
 counts 7 of the review's samples where the scan before counted 1. The count
 is per file, so a file can swap one write for another and stay green; what
-it catches is a new writer. 76 files write today.
+it catches is a new writer.
+
+After the third round (the director's ruling 9) it counts a SHELL run as a
+process (`/bin/bash`, `/bin/sh`, `/bin/zsh`) and a launcher named in quotes
+(`setup.sh`, `preview.sh`, `deploy.sh`), so whoever starts one is listed with
+what it waits for: `ScriptRunner` runs every launcher through `/bin/bash`
+and was on no list, though `setup.sh` makes a new course and `preview.sh`'s
+preflight rewrites a course's `course_config.json` (both U4's); a deploy and
+sharing unit plans through `deploy.sh` are listed as not steps (rulings 17
+and 18). It counts `rmdir`, a bare `remove`, `mkstemp`, `mkdtemp`, `utimes`,
+the extended-attribute calls and `NSWorkspace`'s `duplicate` too. Making it
+showed a fault in the scan itself: `removeItem(` holds `moveItem(`, so every
+removal had been counted as two writes, and the second round's own sample
+test (`testTheScanCountsSplitCallsToolsAndTheTrash`, which expects 1 for a
+`removeItem`) was red on it; `.moveItem(` is now matched with its dot. With
+both changes 32 files' counts fell, four rose (`BuilderWarmUp`,
+`DeployCommand`, `WorkspaceModel`, `NewCourseCreator`, for the shells and
+launchers they name) and 11 files joined the list;
+`testTheScanCountsShellsLaunchersAndTheCCalls` counts 9 of its samples where
+the scan before counted 2. `DeployCommand`, `ScheduledDeploy` and
+`PlanSharing` no longer say they wait for U6: a deploy, set for later or
+not, and sharing unit plans are not counted (rulings 17 and 18), and
+`DeployCommand.releaseSite`, the rollover's "cut loose", is U4's with the
+rollover. 87 files write today.
 
 ### The U1 harness
 

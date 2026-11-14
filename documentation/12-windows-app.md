@@ -13186,7 +13186,10 @@ what was rejected. **Do not start it until U1's fix reviews have cleared**:
 the format changed after U1's two reviews and again after its two fix
 reviews (Russell's rulings 17 to 20 and the director's rulings on them),
 before any Windows reader existed, so that it would not change again under
-one, and the issue says when that is settled.
+one, and the issue says when that is settled. The third round (2026-11-14)
+changed no byte a v1 line holds: it stated what a reader does with a
+`cleared` line, a `note`'s required keys and a segment with no time, and
+what `rule.deployed` reads.
 
 Windows inherits free: the format (`contracts/file-formats.json` →
 `undoJournal`, which a reader is meant to be built from alone), the rule and
@@ -13199,7 +13202,7 @@ against a reference model of the same rules. It reads the traces with CR LF
 taken as LF, so a checkout with `core.autocrlf=true` is current (measured
 red before the fix by converting the three files to CR LF).
 
-Three things in the format are easy to get wrong and are the reason it was
+Five things in the format are easy to get wrong and are the reason it was
 revised:
 
 - **Every object is open.** Only `kind` is required of an op, and only
@@ -13214,22 +13217,28 @@ revised:
   `note` event: a reader passes over a note whatever else it carries (no
   move, no barrier, nothing kept for it); it exists so a later version can
   add a record an older reader skips.
-- **Two clearings only, and one rule for steps in flight.** A `cleared`
-  line is written for a refused Undo (`changedSince`, ruling 13) and for a
-  step recovery closes `interrupted`; never for a deploy or for sharing unit
-  plans (rulings 17 and 18). A step another process has in flight when a
-  clearing is written leaves the list when its own work ends. A refused
-  REDO writes `dropped` (reason `redoRefused`) for the undone steps from it
-  up, and clears nothing (ruling 20). A dead process's step that cannot be
+- **A `cleared` line clears whatever its reason says.** A reader never
+  checks the reason against `undo.clearReasons`, which lists only the
+  reasons this version writes: a refused Undo (`changedSince`, ruling 13, and
+  `contentMissing`, held question M9), a step recovery closes `interrupted`,
+  and the flip of the switch (`wentLive`, so steps recorded in shadow are
+  never offered); never a deploy or sharing unit plans (rulings 17 and 18).
+  Checking the reason would make a later version's clearing a barrier. A
+  step another process has in flight when a clearing is written leaves the
+  list when its own work ends. A refused REDO, for a hand edit or for
+  missing content, writes `dropped` (reason `redoRefused`) for the undone
+  steps from it up, and clears nothing (ruling 20). A dead process's step that cannot be
   settled is never left in flight for ever: recovery closes it
   `interrupted` when its put-back cannot be planned, and pruning closes it
   `interrupted` (reason `unsettled`, no clearing) once it is past the
   limits.
-- **Whether a step was deployed is read from the deploy markers**, never
-  from the journal (`undo.rule.deployed`, `deployedCases`): the newest
-  fragment per destination of the section's published-pages record, which
-  `deploy.py` and `deploy.ps1` already write. Nothing on the Windows side
-  writes a deploy into the journal, and nothing should.
+- **Whether a step was deployed is read from the published-pages record**,
+  never from the journal (`undo.rule.deployed`, `deployedCases`): the newest
+  fragment of each destination the section deploys to NOW, which `deploy.py`
+  and `deploy.ps1` already write; a site marker with no fragment is
+  `cannotTell`; places are compared in NFC (`String.Normalize()`), then
+  ordinally. Nothing on the Windows side writes a deploy into the journal,
+  and nothing should.
 - **The limits are judged when the list is read**, with the clock rules of
   `undo.rule.limits`, not only when the next step is written.
 - **`folder-id` is shared by both apps** on a synced folder: written lower
@@ -13254,11 +13263,17 @@ It owes, in this order (the contract review's recommendation):
    `interrupted` (a file changed by hand stops recovery putting the whole
    step back: what can be verified is put back and the list is cleared),
    content missing (closed and cleared), a file in use during recovery
-   (left for the next lock: on Windows this is the everyday case, W5), and
-   a step in flight in another process when the clearing is written.
+   (tried again at once by an Undo or a Redo, and otherwise on the schedule
+   in `undo.rule.recovery`: on Windows this is the everyday case, W5, and
+   retrying it at every lock cost the mac 154 to 255 ms on every action),
+   a step in flight in another process when the clearing is written, and a
+   closed step's staged files removed.
 6. The traces.
 7. `plantoir-mcp.exe` told the same folder as the window (W4).
-8. `deployedCases`: a pure function, for U6's offer to deploy.
+8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
+   section's destinations as Windows knows them (primary and additional, by
+   type) and whether each has a site marker, read from the same
+   `firstDeployMarkers` paths the scheduled deploy reads.
 
 Until each is built it is a named gap. What goes red on that side the day
 U1 merges, measured by reading the tests rather than running them: the

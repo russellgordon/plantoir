@@ -298,12 +298,12 @@ nonisolated enum UndoSwap {
         func tidy() {
             for url in staged {
                 if let url {
-                    try? FileManager.default.removeItem(at: url)
+                    _ = UndoSwap.removeStaged(url)
                 }
             }
             for url in originals {
                 if let url {
-                    try? FileManager.default.removeItem(at: url)
+                    _ = UndoSwap.removeStaged(url)
                 }
             }
         }
@@ -463,8 +463,40 @@ nonisolated enum UndoSwap {
         return copied == 0
     }
 
-    /// Removes what a swap for this label left beside these files.
-    static func tidyLeftovers(label: String, beside urls: [URL]) {
+    /// Removes one of the swap's OWN staged files. A kept original copied
+    /// from a file marked immutable carries the mark (copyfile keeps it:
+    /// measured in U1's third round, the copy was `uchg` and could not be
+    /// removed), so a removal that is refused clears the file's flags and
+    /// tries once more. Only ever a staged file, and only one with a single
+    /// link: a kept original that is a hard link shares its flags with the
+    /// teacher's page (a reference course's lock, plan 2.6), and those are
+    /// never touched.
+    static func removeStaged(_ url: URL) -> Bool {
+        if (try? FileManager.default.removeItem(at: url)) != nil {
+            return true
+        }
+        var information: stat = stat()
+        let cleared: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            if lstat(path, &information) != 0 || information.st_nlink != 1 || (information.st_mode & S_IFMT) != S_IFREG {
+                return -1
+            }
+            return chflags(path, 0)
+        }
+        if cleared != 0 {
+            return false
+        }
+        return (try? FileManager.default.removeItem(at: url)) != nil
+    }
+
+    /// Removes what a swap for this label left beside these files. True
+    /// when nothing of it is left (a file another program holds, or one
+    /// made immutable, stays until a later try).
+    @discardableResult
+    static func tidyLeftovers(label: String, beside urls: [URL]) -> Bool {
+        var allGone: Bool = true
         var folders: [URL] = []
         for url in urls {
             let folder: URL = url.deletingLastPathComponent()
@@ -477,9 +509,12 @@ nonisolated enum UndoSwap {
                 continue
             }
             for name in names where UndoSwap.isStaged(name, label: label) {
-                try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
+                if !UndoSwap.removeStaged(folder.appendingPathComponent(name)) {
+                    allGone = false
+                }
             }
         }
+        return allGone
     }
 }
 
