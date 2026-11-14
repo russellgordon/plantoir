@@ -2797,7 +2797,19 @@ and faces, cdnjs for Mermaid), a subset, because verify.sh judges the build
 of those hosts is an **EXPECTED FAILURE**, an `EXPECTED:` line by host and
 engine with the pages that asked it, counted in the checker's DONE line and
 in the Result block, never a pass and never a failure; any other host is a
-failure, as before. A listed host that no page asked for in an engine's
+failure, as before. **Each listed host is pinned to the pages that may ask
+it and the paths it may be asked for** (`thirdPartyHostsToday.pinned`: the
+two Google hosts on every page, `/css2` and `/s/`; cdnjs on Diagrams and
+Handout, `/ajax/libs/mermaid/11.4.0/`), on this Mac and on a deployed site
+alike, so cdnjs asked for another library, or from another page, is a
+stranger (597b review finding 2: matching by host alone let both through;
+proved by the gated sabotage "own host off its pin", red in both engines).
+On a deployed site a pinned page that ran without asking its host is a
+FAILURE too ("an expected failure that moved"; proved with Handout's
+diagram taken out of a copy, both engines), and `verify-deploy.sh`
+compares each host's EXPECTED count with the pinned number
+(`expectedLinesPerEngine`, 3, so 6 a host), failing a total that moved
+without the pin. A listed host that no page asked for in an engine's
 whole run is a FAILURE ("an expected failure that stopped … take it off
 `thirdPartyHostsToday`"), so when #566 moves Mermaid and then the fonts onto
 the site, the list has to shrink with it and the gate tightens without
@@ -2836,6 +2848,23 @@ the provider hosts on every page (the own-host row already refuses that,
 review H1), and dropping the clean-page row on the Embeds page (it is the
 page most likely to carry a policy refusal of the site's own).
 
+**A frame the provider refuses is a failure, not an embed's own console**
+(597b review finding 1). The set-aside above first let a frame the
+provider refuses to be shown in pass both rows: its document answers 200
+in both engines, then Chromium fails the request (`net::ERR_BLOCKED_BY_RESPONSE`)
+and both log "Refused to display '<url>' in a frame", and that line named
+an embed's own address, so it was set aside. Students see a blank box.
+Now a "Refused to display" line, and a failed document of a frame of the
+page itself (not one inside an embed), fail the embeds row and stay in the
+clean-page row. Proved by copying the 597b file in against a copy whose
+YouTube frame points at the video's watch page (YouTube sends
+`X-Frame-Options: SAMEORIGIN` there, the address a teacher copies from the
+address bar): embeds passed in both engines with the old file, and fails in
+both with the new. It is the sabotage "embeds refused" now, run with
+`--site <folder> --host netlify --expect-red "embeds refused"` (the embeds
+row runs on deployed hosts only, so verify.sh's local `--expect-red all`
+prints a NOTE for it).
+
 **The Embeds fixture's geogebra.org frame had gone.** The same run failed
 the embeds row in both engines with "www.geogebra.org answered 410": the
 fixture used `https://www.geogebra.org/material/iframe/id/ju3f2kbg`, and
@@ -2870,6 +2899,46 @@ the row is a regression watch, and it cannot reproduce a fault seen only in
 one signed-in Safari profile. Real Safari through `safaridriver` stays a
 step by hand (it takes the screen); it is not built into this run.
 
+**How the check knows it reads THIS deploy** (597b review finding 5). The
+fixture pages carry no mark of their own; the borrowed page of runnable code
+does: `RUN_MARK` (`plantoir-verify-deploy-run-<UTC time>-<pid>`), written
+fresh for every run. Before the browsers, the rendered section fetches that
+page from each host (through `fetch_headers`, so a new site is waited for)
+and requires this run's mark in it. A host still serving an earlier
+deployment fails there, and its Result line reads `FAILED - it did not
+serve this run's deployment`, whatever the browsers then see. Every page of
+a deploy goes up together (one Netlify deploy, one Cloudflare deployment),
+so the page carrying the mark stands for the fixture pages beside it. On
+Cloudflare the leg's own wait (`wait_for_cloudflare_production`) already
+holds for the same mark; until this check, nothing on Netlify proved it.
+Rejected: a mark on every fixture page (eleven more fetches for what one
+proves).
+
+**A second deploy with nothing changed builds nothing, per host (#892).**
+Asked by Windows' director on #892: a course carrying both a Netlify and a
+Cloudflare record built every Cloudflare deploy again, for ever, because the
+build read the Netlify record whatever the destination was. After the
+rendered section, for each host reached: the destination set to it, one
+deploy to settle (it may build: each site carries its own address, the
+extra build per host the owner accepted on #799), then a second with
+nothing changed, judged from the launcher's own lines: no deploy.sh "🔁"
+build reason and no deploy.py "Rebuilding site for production…"; Netlify's
+"No file uploads needed" (or "Netlify requires 0 file"), Cloudflare's
+"Uploaded 0 files". A log with no upload line is a failure that says it
+could not be judged. A second deploy that printed "Updating Quartz baseUrl
+to …" is named as #892's shape. **On today's `dev` this is RED for
+Cloudflare** on the test course, which carries both records, until
+`origin/issue/799-reuse-the-last-build` merges; it is reported by name and
+not weakened. Cost: two more deploys a host, a minute or two each.
+Rejected: judging the settle deploy (its build is the accepted one).
+
+**The sharing card names its own site (#799).** In every leg that fetches
+a live front page (`check_url`), the page's `og:image` must be an absolute
+address on that site's own host, judged per site (ruled on #799: with two
+web hosts each site carries its own address). Missing or relative is a
+failure; a Cloudflare site whose `og:image` names a Netlify one is named as
+#892's shape, red today for the same course until the #799 branch merges.
+
 **Not on the list, and why.** The folder destination: a deployed folder is
 served by Plantoir itself since #850, and verify.sh crawls one through the
 app's own server; opening it in two browsers here needs the app binary, so
@@ -2884,7 +2953,15 @@ runs for the other only; a SKIPPED engine fails each host, asked twice; a
 row that fails then passes is passed and named as answered on retry; an
 expected failure that stopped is a failure printed under its host; a fixture
 page 404 twice is asked again and counted, and one that never answers is a
-failure that names it; plus the node test of `expected_failures.mjs`. Proved
+failure that names it; plus the node test of `expected_failures.mjs` (pins
+included). Since the review: a Node older than 22, or none, fails each host
+before the checker runs; a checker that could not run (exit 2) fails after
+its re-run; a host whose block never said why is NOT REACHED as "its leg
+never ran"; a re-run that fails again is the host's failure with both runs
+printed; expected failures off their pinned count fail the host; and the
+second deploy's and the sharing card's judgements, six and five cases; and
+a host serving an earlier deployment (no run mark) reads FAILED though
+the browsers passed. 54 passed. Proved
 must-fail on copies of the script: with a plain run asking once, with a
 leg's failures ignored, with the section running over the legs' entries
 instead of the list, and with a skip read as a pass, the matching cases fail

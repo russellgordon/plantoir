@@ -133,6 +133,10 @@ RENDER_RESULTS=()   # one line per host for the Result block: checked, FAILED or
 RENDER_EXPECTED=()  # the expected failures, by host and engine (thirdPartyHostsToday, #566)
 # The checker itself; the self-test puts a stub in its place.
 RENDERED_CHECKER=(node "$SCRIPT_REPO/browser-checks/rendered_features.mjs")
+# The Node the checker needs (22 or later); the self-test puts a stub in its
+# place to prove a missing or old one fails the host.
+RENDERED_NODE=(node)
+SECOND_DEPLOY_RESULTS=()  # one line per host: built and uploaded nothing, or what it did (#892)
 render_label() {  # render_label <host> -> what a person calls it
   case "$1" in
     netlify) echo "Netlify" ;;
@@ -724,14 +728,27 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
       echo "       $base$path answered HTTP ${code:-000}"
     fi
   done
+  # This run's deployment, not an earlier one (597b review finding 5): the
+  # borrowed page of runnable code carries this run's RUN_MARK, on every
+  # host alike, so a site still serving the last deployment fails here.
+  local this_deploy=true
+  fetch_headers page "${base}Runner-Deploy-Check" -o "$WORK/rendered-$host-mark.html" >/dev/null
+  if ! grep -qF -- "$RUN_MARK" "$WORK/rendered-$host-mark.html" 2>/dev/null; then
+    this_deploy=false
+  fi
   NS_CALL_DEADLINE=""
   measure_new_site_retries "$label" "$base" "the rendered check's pages" "page(s)" "one page" "no page"
+  if [ "$this_deploy" = true ]; then
+    ok "$label serves this run's deployment (its page of runnable code carries this run's mark)"
+  else
+    no "$label does not serve this run's deployment: its page of runnable code lacks this run's mark, so the browsers would judge an earlier one"
+  fi
   if [ "$missing" -eq 0 ]; then
     ok "$label serves the rendered check's $count pages (HTTP 200)"
   else
     no "$label: $missing of the rendered check's $count pages did not answer 200"
   fi
-  if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  if ! command -v "${RENDERED_NODE[0]}" >/dev/null 2>&1 || ! "${RENDERED_NODE[@]}" -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
     no "$label: the rendered check needs Node 22 or later on this Mac, and it is not here"
     RENDER_RESULTS+=("$label: FAILED - the rendered check could not run (no Node 22)")
     return
@@ -761,6 +778,16 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
     [ -n "$line" ] && RENDER_EXPECTED+=("$label ${line#EXPECTED: }")
   done < <(grep '^EXPECTED: ' "$log")
   line=$(grep '^DONE: ' "$log" | tail -1 | sed 's/^DONE: //')
+  # The expected failures are compared with the pinned number (597b review
+  # finding 2): one line per listed host in each engine. A count that moved
+  # without the pin moving is a failure, never a quiet change of total.
+  local expected_here pinned
+  expected_here=$(grep -c '^EXPECTED: ' "$log")
+  pinned=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["thirdPartyHostsToday"]["expectedLinesPerEngine"] * 2)' "$SCRIPT_REPO/browser-checks/rendered_rows.json" 2>/dev/null)
+  if [ "$status" -eq 0 ] && [ "$expected_here" != "${pinned:-?}" ]; then
+    no "$label, rendered: $expected_here expected failure(s), where rendered_rows.json -> thirdPartyHostsToday pins ${pinned:-?} (one a listed host in each engine)"
+    status=1
+  fi
   if [ "$status" -eq 0 ]; then
     ok "$label, rendered in Chrome and in Safari's engine: ${line:-no summary}${retried:+ (answered on retry: $retried)}"
   else
@@ -776,7 +803,9 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
   cold=$(grep -E '^(OK|FAIL): cold visit ' "$log" | tail -1 | sed -E 's/^(OK|FAIL): cold visit \[webkit\]: //')
   [ -n "$cold" ] && MEASURED+=("$label, cold visits in Safari's engine (#625): $cold")
   summary=$(grep '^DONE: ' "$log" | tail -1 | sed 's/^DONE: //')
-  if [ "$leg_fails" -gt 0 ]; then
+  if [ "$this_deploy" != true ]; then
+    RENDER_RESULTS+=("$label: FAILED - it did not serve this run's deployment, so what the browsers saw was an earlier one (${summary:-no summary})")
+  elif [ "$leg_fails" -gt 0 ]; then
     RENDER_RESULTS+=("$label: FAILED before the browser check ($leg_fails failure(s) in its publish leg, above); the rendered check then $([ "$status" -eq 0 ] && echo passed || echo "did not pass") (${summary:-no summary})")
   elif [ "$status" -eq 0 ]; then
     RENDER_RESULTS+=("$label: checked - ${summary:-no summary}${retried:+; answered on retry: $retried}")
@@ -808,8 +837,116 @@ print_rendered_result() {
   local line
   echo "  Rendered in Chrome and in Safari's engine, per host (#597):"
   for line in ${RENDER_RESULTS[@]+"${RENDER_RESULTS[@]}"}; do echo "    $line"; done
-  echo "  Expected failures, which #566 removes (browser-checks/rendered_rows.json -> thirdPartyHostsToday): ${#RENDER_EXPECTED[@]}"
+  echo "  Expected failures, which #566 removes (browser-checks/rendered_rows.json -> thirdPartyHostsToday): ${#RENDER_EXPECTED[@]}, pinned at $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["thirdPartyHostsToday"]["expectedLinesPerEngine"] * 2)' "$SCRIPT_REPO/browser-checks/rendered_rows.json" 2>/dev/null || echo '?') a host reached"
   for line in ${RENDER_EXPECTED[@]+"${RENDER_EXPECTED[@]}"}; do echo "    $line"; done
+  if [ "${#SECOND_DEPLOY_RESULTS[@]}" -gt 0 ]; then
+    echo "  A second deploy with nothing changed, per host (#892):"
+    for line in "${SECOND_DEPLOY_RESULTS[@]}"; do echo "    $line"; done
+  fi
+}
+
+# ------------------------- a second deploy with nothing changed (#892)
+# Asked by Windows' director on #892: a course with both a Netlify and a
+# Cloudflare record built every Cloudflare deploy again, for ever, because
+# the build read the Netlify record whatever the destination was, and
+# deploy.py's rebuild for the right address read it again (fixed on
+# origin/issue/799-reuse-the-last-build, not on dev when this was written).
+# So right after the rendered section, per host: the course's destination set
+# to that host, one deploy to settle (it may build: the destination changed,
+# and each site carries its own address, ruled on #799), then a SECOND with
+# nothing changed, which must build nothing and upload nothing. Read from
+# the launcher's own lines: deploy.sh's "🔁 …" build reasons and deploy.py's
+# "Rebuilding site for production…"; Netlify's "No file uploads needed" (or
+# "Netlify requires 0 file"), Cloudflare's "Uploaded 0 files". No such line
+# at all is a failure that says so, never a pass. The #892 shape is named:
+# a second deploy that printed "Updating Quartz baseUrl to …" built for
+# another host's address. Rejected: judging the settle deploy (its build is
+# the extra build per host the owner accepted on #799).
+judge_second_deploy() {  # judge_second_deploy <label> <netlify|cloudflare> <logfile>
+  local label="$1" host="$2" text built uploaded=""
+  text=$(tr -d '\r' <"$3" 2>/dev/null)
+  built=$(printf '%s\n' "$text" | grep -aE '^🔁 |Rebuilding site for production|rebuilding for production' | head -1)
+  case "$host" in
+    netlify)
+      if printf '%s\n' "$text" | grep -aqE 'No file uploads needed|Netlify requires 0 file'; then uploaded=none
+      elif printf '%s\n' "$text" | grep -aqE 'Netlify requires [0-9]+ file'; then uploaded=$(printf '%s\n' "$text" | grep -aoE 'Netlify requires [0-9]+ file' | tail -1); fi ;;
+    cloudflare)
+      if printf '%s\n' "$text" | grep -aqE 'Uploaded 0 files'; then uploaded=none
+      elif printf '%s\n' "$text" | grep -aqE 'Uploaded [0-9]+ files'; then uploaded=$(printf '%s\n' "$text" | grep -aoE 'Uploaded [0-9]+ files' | tail -1); fi ;;
+  esac
+  if printf '%s\n' "$text" | grep -aq 'Updating Quartz baseUrl to'; then
+    no "$label: a second deploy with nothing changed BUILT AGAIN for its own address, so the build had been made for another host's (#892: a course with both records builds for the Netlify address; fixed on origin/issue/799-reuse-the-last-build)"
+    SECOND_DEPLOY_RESULTS+=("$label: BUILT AGAIN - the #892 shape (the build carried another host's address)${uploaded:+; uploaded: $uploaded}")
+  elif [ -n "$built" ]; then
+    no "$label: a second deploy with nothing changed built again ($built)"
+    SECOND_DEPLOY_RESULTS+=("$label: BUILT AGAIN - $built")
+  elif [ -z "$uploaded" ]; then
+    no "$label: a second deploy with nothing changed said nothing about its upload, so whether it uploaded nothing could not be judged"
+    SECOND_DEPLOY_RESULTS+=("$label: NOT JUDGED - no upload line in its log")
+  elif [ "$uploaded" != none ]; then
+    no "$label: a second deploy with nothing changed uploaded something ($uploaded)"
+    SECOND_DEPLOY_RESULTS+=("$label: UPLOADED - $uploaded")
+  else
+    ok "$label: a second deploy with nothing changed built nothing and uploaded nothing"
+    SECOND_DEPLOY_RESULTS+=("$label: built nothing, uploaded nothing")
+  fi
+}
+run_second_deploys() {
+  local host entry found label
+  for host in "${RENDER_HOSTS[@]}"; do
+    label=$(render_label "$host")
+    found=""
+    for entry in ${RENDER_TARGETS[@]+"${RENDER_TARGETS[@]}"}; do
+      case "$entry" in "$host|"*) found="$entry" ;; esac
+    done
+    if [ -z "$found" ]; then
+      skip "$label: no second deploy, since the host was not reached (a failure above)"
+      SECOND_DEPLOY_RESULTS+=("$label: not run - not reached")
+      continue
+    fi
+    case "$host" in
+      netlify)    set_destination "netlify" "" ""
+                  : >"$WORK/again-$host-settle.log"; : >"$WORK/again-$host.log"
+                  measure_deploy "$label, settling before the second deploy" "$WORK/again-$host-settle.log" "$COURSE" "$SECTION" --target netlify
+                  measure_deploy "$label, a second deploy with nothing changed" "$WORK/again-$host.log" "$COURSE" "$SECTION" --target netlify ;;
+      cloudflare) set_destination "cloudflare_pages" "" ""
+                  : >"$WORK/again-$host-settle.log"; : >"$WORK/again-$host.log"
+                  measure_deploy "$label, settling before the second deploy" "$WORK/again-$host-settle.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT"
+                  measure_deploy "$label, a second deploy with nothing changed" "$WORK/again-$host.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" ;;
+      *)          skip "$label: no second-deploy check for this host yet"; continue ;;
+    esac
+    judge_second_deploy "$label" "$host" "$WORK/again-$host.log"
+  done
+}
+
+# ------------------------- the sharing card names this site (#799, #892)
+# Ruled on #799 (2026-11-13): with two web hosts each site carries its own
+# address. So the live front page's og:image, the picture a link shared to
+# a chat or a post shows, must be on THIS site's host, judged per site, in
+# every leg that fetched a front page. A relative address is a failure too
+# (a sharing card cannot find it; the build writes an absolute one for a
+# deployed site), and so is none. A Cloudflare site naming a Netlify one is
+# #892's shape, and is named.
+judge_og_image() {  # judge_og_image <label> <site address> <front page file>
+  local label="$1" site_host og og_host
+  site_host="${2#*://}"; site_host="${site_host%%/*}"
+  og=$(grep -aoE '<meta[^>]*property="og:image"[^>]*>' "$3" 2>/dev/null | head -1 | sed -nE 's/.*content="([^"]*)".*/\1/p')
+  if [ -z "$og" ]; then
+    no "$label's front page carries no og:image, so a shared link shows no picture"
+    return
+  fi
+  case "$og" in
+    http://*|https://*) ;;
+    *) no "$label's og:image is not an absolute address ($og), so a sharing card cannot find it"; return ;;
+  esac
+  og_host="${og#*://}"; og_host="${og_host%%/*}"
+  if [ "$og_host" = "$site_host" ]; then
+    ok "$label's og:image is on its own host ($og_host)"
+  elif [ "${og_host%.netlify.app}" != "$og_host" ] && [ "${site_host%.pages.dev}" != "$site_host" ]; then
+    no "$label's og:image names the Netlify site ($og_host), not its own ($site_host): #892's shape, fixed on origin/issue/799-reuse-the-last-build"
+  else
+    no "$label's og:image is on another host ($og_host), not its own ($site_host)"
+  fi
 }
 
 # ----------------------------------------------------------------- self-test
@@ -1318,12 +1455,17 @@ READ
   # plan says, call by call, and writes down how it was called.
   cat >"$ST_DIR/pages.py" <<'STUB'
 import http.server, os, pathlib, sys
-portfile, mode = sys.argv[1:3]
+portfile, mode, mark = sys.argv[1:4]
 kind, _, limit = mode.partition(":")
 seen = {"n": 0}
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path == "/Runner-Deploy-Check":
+            body = ("<html><body>runnable code, run " + ("an-earlier-run" if kind == "stale" else mark) + "</body></html>").encode()
+            self.send_response(200); self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
         if path == "/Rendered-Check/Quiz" and kind == "404":
             n = seen["n"]; seen["n"] = n + 1
             if limit == "inf" or n < int(limit):
@@ -1353,9 +1495,9 @@ step = n if (plan / f"{n}.out").exists() else max(int(p.stem) for p in plan.glob
 sys.stdout.write((plan / f"{step}.out").read_text())
 sys.exit(int((plan / f"{step}.rc").read_text()))
 STUB
-  ps_start() {  # ps_start <mode>: good or 404:K
+  ps_start() {  # ps_start <mode>: good, stale (an earlier deployment) or 404:K
     rm -f "$ST_DIR/pport"
-    python3 -I "$ST_DIR/pages.py" "$ST_DIR/pport" "$1" &
+    python3 -I "$ST_DIR/pages.py" "$ST_DIR/pport" "$1" "$RUN_MARK" &
     STUB_PID=$!
     for _ in $(seq 1 100); do [ -s "$ST_DIR/pport" ] && break; sleep 0.1; done
     PS_URL="http://127.0.0.1:$(cat "$ST_DIR/pport" 2>/dev/null)/"
@@ -1368,17 +1510,22 @@ STUB
     printf '%s' "$rc" >"$ST_DIR/plan/$n.rc"
   }
   plan_reset() { rm -rf "$ST_DIR/plan"; mkdir -p "$ST_DIR/plan"; }
-  GOOD_LINES=("OK: mermaid [chromium]: 1 diagram(s) drawn" "OK: mermaid [webkit]: 1 diagram(s) drawn"
-    "EXPECTED: own host [chromium]: asked fonts.googleapis.com on 11 of 11 pages (…): an expected failure until #566 removes it"
-    "EXPECTED: own host [webkit]: asked fonts.googleapis.com on 11 of 11 pages (…): an expected failure until #566 removes it"
+  GOOD_LINES=("OK: mermaid [chromium]: 1 diagram(s) drawn" "OK: mermaid [webkit]: 1 diagram(s) drawn")
+  for st_engine in chromium webkit; do
+    for st_host in fonts.googleapis.com fonts.gstatic.com cdnjs.cloudflare.com; do
+      GOOD_LINES+=("EXPECTED: own host [$st_engine]: asked $st_host on some pages (…): an expected failure until #566 removes it")
+    done
+  done
+  GOOD_LINES+=(
     "OK: cold visit [webkit]: first contentful paint after a cold visit or a real press, five samples a route: typed cold: 270 ms"
-    "DONE: 41 OK, 0 FAIL, 0 SKIPPED, 2 EXPECTED in 70 s (stub; ran in chromium and webkit)")
+    "DONE: 41 OK, 0 FAIL, 0 SKIPPED, 6 EXPECTED in 70 s (stub; ran in chromium and webkit)")
   # rs_run: the real rendered section over RS_TARGETS, then its Result lines.
   rs_run() {
     ( MEASURED=(); NS_LEG=0; RENDER_RESULTS=(); RENDER_EXPECTED=()
       RENDER_TARGETS=(${RS_TARGETS[@]+"${RS_TARGETS[@]}"})
       RENDERED_CHECKER=(python3 -I "$ST_DIR/checker.py" "$ST_DIR/plan")
-      RENDER_WHY_cloudflare="no Cloudflare token or account ID in the Keychain"
+      [ -n "${RS_WHY:-}" ] && RENDER_WHY_cloudflare="$RS_WHY"
+      [ -n "${RS_NODE:-}" ] && RENDERED_NODE=("$RS_NODE")
       run_rendered_section
       print_rendered_result
       for line in ${MEASURED[@]+"${MEASURED[@]}"}; do printf 'MEASURED %s\n' "$line"; done ) 2>"$ST_DIR/said.txt"
@@ -1393,11 +1540,11 @@ STUB
   if [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 0 ] \
      && [ "$(printf '%s\n' "$out" | grep -c "✅ .*, rendered in Chrome and in Safari's engine: 41 OK")" -eq 2 ] \
      && printf '%s\n' "$out" | grep -q '^    Netlify: checked - 41 OK' && printf '%s\n' "$out" | grep -q '^    Cloudflare Pages: checked - 41 OK' \
-     && printf '%s\n' "$out" | grep -q 'Expected failures, which #566 removes .*: 4$' \
+     && printf '%s\n' "$out" | grep -q 'Expected failures, which #566 removes .*: 12, pinned at 6 a host reached$' \
      && printf '%s\n' "$out" | grep -q '^MEASURED Netlify, cold visits in Safari' \
      && [ "$(awk -F '\t' '$2 == "chromium,webkit"' "$ST_DIR/plan/args.log" | wc -l | tr -d ' ')" -eq 2 ] \
      && grep -q -- "--host netlify" "$ST_DIR/plan/args.log" && grep -q -- "--host cloudflare" "$ST_DIR/plan/args.log"; then
-    ok "both hosts reached and rendered: each 'checked', both engines required of the checker, the four expected failures counted and the cold visits measured"
+    ok "both hosts reached and rendered: each 'checked', both engines required of the checker, the twelve expected failures counted against the pin and the cold visits measured"
   else
     no "both hosts rendered: $(printf '%s\n' "$out" | grep -E '❌|checked|Expected' | head -4) args: $(head -2 "$ST_DIR/plan/args.log")"
   fi
@@ -1414,7 +1561,9 @@ STUB
 
   plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
   RS_TARGETS=("netlify|$PS_URL|0")
+  RS_WHY="no Cloudflare token or account ID in the Keychain"
   out=$(rs_run)
+  RS_WHY=""
   if printf '%s\n' "$out" | grep -q "❌ Cloudflare Pages: NOT REACHED, so the rendered check did not run on it (no Cloudflare token or account ID in the Keychain)" \
      && printf '%s\n' "$out" | grep -q '^    Cloudflare Pages: NOT REACHED' && [ "$(cat "$ST_DIR/plan/calls")" -eq 1 ]; then
     ok "a host on the list that never gave an address is a failure by name, NOT REACHED, and the checker ran for the other host only"
@@ -1481,6 +1630,126 @@ STUB
     no "a fixture page that never answers: $(printf '%s\n' "$out" | grep -E "pages|Quiz" | head -3)"
   fi
   st_stop
+  ps_start good
+  st_stop
+  ps_start stale
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify does not serve this run's deployment" \
+     && printf '%s\n' "$out" | grep -q "^    Netlify: FAILED - it did not serve this run's deployment" \
+     && ! printf '%s\n' "$out" | grep -q '^    Netlify: checked'; then
+    ok "a host still serving an earlier deployment (no run mark) reads FAILED though the browsers passed, never checked"
+  else
+    no "an earlier deployment: $(printf '%s\n' "$out" | grep -E '❌|Netlify:' | head -3)"
+  fi
+  st_stop
+  ps_start good
+
+  # The review's four (597b implementation review finding 4), and the pin.
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0" "cloudflare|$PS_URL|0")
+  printf '#!/bin/sh\nexit 1\n' >"$ST_DIR/old-node"; chmod +x "$ST_DIR/old-node"
+  RS_NODE="$ST_DIR/old-node"
+  out=$(rs_run)
+  RS_NODE="$ST_DIR/no-such-node"
+  out2=$(rs_run)
+  RS_NODE=""
+  if [ "$(printf '%s\n' "$out" | grep -c "needs Node 22 or later on this Mac, and it is not here")" -eq 2 ] \
+     && [ "$(printf '%s\n' "$out2" | grep -c "needs Node 22 or later")" -eq 2 ] \
+     && printf '%s\n' "$out" | grep -q '^    Netlify: FAILED - the rendered check could not run (no Node 22)' \
+     && [ ! -f "$ST_DIR/plan/calls" ]; then
+    ok "a Node older than 22, or none at all, fails each host before the checker runs"
+  else
+    no "an old or missing Node: $(printf '%s\n' "$out $out2" | grep -E 'Node|calls' | head -3)"
+  fi
+
+  plan_reset; plan_step 1 2 "FAIL: unknown argument --nonsense" "usage: …"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify, rendered: the check could not run (exit 2" \
+     && printf '%s\n' "$out" | grep -q '^    Netlify: FAILED' && [ "$(cat "$ST_DIR/plan/calls")" -eq 2 ]; then
+    ok "a checker that could not run (exit 2) fails the host, after its one re-run"
+  else
+    no "a checker exit 2: $(printf '%s\n' "$out" | grep -E '❌|Netlify:' | head -3)"
+  fi
+
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Cloudflare Pages: NOT REACHED, so the rendered check did not run on it (its leg never ran)" \
+     && printf '%s\n' "$out" | grep -q '^    Cloudflare Pages: NOT REACHED - its leg never ran'; then
+    ok "a host whose deploy block never said why is still NOT REACHED, as its leg never having run"
+  else
+    no "a host with no reason recorded: $(printf '%s\n' "$out" | grep -i 'cloudflare' | head -2)"
+  fi
+
+  plan_reset
+  plan_step 1 1 "FAIL: python [webkit]: Run did not print 42" "DONE: 40 OK, 1 FAIL, 0 SKIPPED in 70 s (stub)"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify, rendered: a row FAILED" \
+     && printf '%s\n' "$out" | grep -q 'first: FAIL: python \[webkit\]' \
+     && printf '%s\n' "$out" | grep -q '^       FAIL: python \[webkit\]' \
+     && ! printf '%s\n' "$out" | grep -q 'answered on retry' && [ "$(cat "$ST_DIR/plan/calls")" -eq 2 ]; then
+    ok "a row that fails again on the re-run is the host's failure, printed from both runs, never answered on retry"
+  else
+    no "a re-run that fails again: $(printf '%s\n' "$out" | grep -E '❌|first:|retry' | head -3)"
+  fi
+
+  plan_reset
+  plan_step 1 0 "OK: mermaid [chromium]: drawn" "EXPECTED: own host [chromium]: asked fonts.googleapis.com on 11 of 11 pages" "DONE: 40 OK, 0 FAIL, 0 SKIPPED, 1 EXPECTED in 70 s (stub)"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify, rendered: 1 expected failure(s), where rendered_rows.json -> thirdPartyHostsToday pins 6" \
+     && printf '%s\n' "$out" | grep -q '^    Netlify: FAILED'; then
+    ok "expected failures that do not number the pinned count fail the host, though the checker passed"
+  else
+    no "expected failures against the pin: $(printf '%s\n' "$out" | grep -E '❌|Netlify:' | head -3)"
+  fi
+  st_stop
+
+  hdr "Self-test — a second deploy with nothing changed (#892), and the sharing card (#799)"
+  sd_case() {  # sd_case <host> <want: pass|fail> <wanted words> <what it shows> <log lines...>
+    local host="$1" want="$2" words="$3" what="$4"; shift 4
+    printf '%s\r\n' "$@" >"$ST_DIR/again.log"
+    local said
+    said=$( (SECOND_DEPLOY_RESULTS=(); judge_second_deploy "case" "$host" "$ST_DIR/again.log"; printf 'RESULT %s\n' "${SECOND_DEPLOY_RESULTS[0]}") )
+    if { [ "$want" = pass ] && printf '%s\n' "$said" | grep -q '✅'; } || { [ "$want" = fail ] && printf '%s\n' "$said" | grep -q '❌'; }; then
+      if printf '%s\n' "$said" | grep -q -- "$words"; then ok "$what"; else no "$what: said $said"; fi
+    else
+      no "$what: said $said"
+    fi
+  }
+  sd_case netlify pass "built nothing, uploaded nothing" "Netlify reusing its build and uploading nothing passes" \
+    " Deploying to Netlify…" " No file uploads needed (all content already present on Netlify)."
+  sd_case cloudflare pass "built nothing, uploaded nothing" "Cloudflare reusing its build with 0 files uploaded passes" \
+    "✨ Success! Uploaded 0 files (212 already uploaded) (0.41 sec)"
+  sd_case cloudflare fail "the #892 shape" "a Cloudflare deploy that rebuilt for its own address is named as #892's shape" \
+    " Updating Quartz baseUrl to 'example.pages.dev' and rebuilding for production…" " Rebuilding site for production…" "✨ Success! Uploaded 0 files (212 already uploaded)"
+  sd_case netlify fail "BUILT AGAIN - 🔁" "a deploy whose launcher built again first fails" \
+    "🔁 Something in this course has changed since its site was last built," " No file uploads needed (all content already present on Netlify)."
+  sd_case cloudflare fail "UPLOADED - Uploaded 3 files" "a deploy that uploaded files fails, naming the count" \
+    "✨ Success! Uploaded 3 files (209 already uploaded)"
+  sd_case netlify fail "NOT JUDGED" "a deploy that said nothing about its upload is not a pass" \
+    " Deploying to Netlify…"
+
+  og_case() {  # og_case <want: pass|fail> <wanted words> <what> <site> <og:image or "">
+    printf '<html><head>%s</head><body></body></html>\n' "${5:+<meta property=\"og:image\" content=\"$5\"/>}" >"$ST_DIR/og.html"
+    local said
+    said=$(judge_og_image "case" "$4" "$ST_DIR/og.html")
+    if { [ "$1" = pass ] && printf '%s' "$said" | grep -q '✅'; } || { [ "$1" = fail ] && printf '%s' "$said" | grep -q '❌'; }; then
+      if printf '%s' "$said" | grep -q -- "$2"; then ok "$3"; else no "$3: said $said"; fi
+    else
+      no "$3: said $said"
+    fi
+  }
+  og_case pass "on its own host" "a site whose og:image is on its own host passes" "https://ada1o-s1.pages.dev" "https://ada1o-s1.pages.dev/static/og-image.png"
+  og_case fail "#892's shape" "a Cloudflare site whose og:image names the Netlify site is named as #892's shape" "https://ada1o-s1.pages.dev" "https://ada1o-s1.netlify.app/static/og-image.png"
+  og_case fail "on another host" "an og:image on any other host fails" "https://ada1o-s1.netlify.app" "https://ada1o-s1.pages.dev/static/og-image.png"
+  og_case fail "not an absolute address" "a relative og:image fails" "https://ada1o-s1.netlify.app" "./static/og-image.png"
+  og_case fail "carries no og:image" "a front page with no og:image fails" "https://ada1o-s1.netlify.app" ""
+
   NS_PLAIN_FIRST=10
 
   hdr "Result"
@@ -1878,6 +2147,7 @@ check_url() {  # check_url <label> <url>
     else
       ok "$1 carries no live-reload client"
     fi
+    judge_og_image "$1" "$2" "$WORK/fetched.html"
   else
     no "$1 answered HTTP $code ($2)"
   fi
@@ -2156,6 +2426,9 @@ fi
 # the rendered check runs once per host, not once per pairing).
 hdr "Rendered in Chrome and in Safari's engine, on every host (#597)"
 run_rendered_section
+
+hdr "A second deploy with nothing changed builds nothing, on every host (#892)"
+run_second_deploys
 
 # ------------------------------------------- sharing unit plans (#709)
 # The course's unit plans shared through deploy.sh --plans, for real, then

@@ -6220,7 +6220,7 @@ echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
 rendered_cleanup
 RENDERED_STARTED=$SECONDS
 if python3 browser-checks/lib/test_rendered_lib.py >/tmp/verify_rendered_lib.log 2>&1; then
-  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row but the deployed-only embeds has one, a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
+  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row has one (the deployed-only embeds row's on its hosts only), a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
 else
   fail "the rendered check's planting or sabotages (browser-checks/lib/test_rendered_lib.py, #597)"
   tail -20 /tmp/verify_rendered_lib.log

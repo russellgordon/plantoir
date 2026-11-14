@@ -456,8 +456,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > host's site in Chrome for Testing and in Safari's engine, both REQUIRED.
    > Fetch the engines once per Mac with `./browser-checks/fetch-browsers.sh`
    > (Node 22). The Result block's "Rendered in Chrome and in Safari's engine,
-   > per host" lines must read **checked** for Netlify and for Cloudflare
-   > Pages: "FAILED" means the rendered check did not pass or the host's leg
+   > per host" lines must read **checked** for BOTH hosts, Netlify and
+   > Cloudflare Pages; one `checked` and one anything else is a failed run: "FAILED" means the rendered check did not pass or the host's leg
    > failed before it (said even when the browsers then passed), and "NOT
    > REACHED" means the host gave no address (no credentials, or a publish
    > that printed none). Both are failures of the run. A row the check had to
@@ -466,7 +466,16 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > other hosts (Google's fonts, cdnjs for Mermaid), counted, never a pass;
    > #566 removes them, and a listed host that no page asks any more is a
    > failure that says to shorten the list in
-   > `browser-checks/rendered_rows.json` → `thirdPartyHostsToday`. The cold
+   > `browser-checks/rendered_rows.json` → `thirdPartyHostsToday`. Each listed
+   > host is pinned to its pages and paths there, and the count is compared
+   > with a pinned number, so a new page or a new path asking one is a
+   > failure too. After the rendered check, each host is deployed once more
+   > to settle and then a SECOND time with nothing changed, which must build
+   > nothing and upload nothing ("A second deploy with nothing changed, per
+   > host", #892), and each leg's live front page must name its own host in
+   > `og:image` (#799). Until `origin/issue/799-reuse-the-last-build` merges,
+   > Cloudflare is red on both for a course carrying both records, and the
+   > line says so by name (#892): that red is real. The cold
    > visits in Safari's engine (#625: typed cold, from the front page, Python
    > to Swift) are in the measured lines on every run. Paste the per-host
    > lines and the expected-failure count into the release's record.
@@ -487,9 +496,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > retry; a file that stays wrong is still the failure. Since #597 it also
    > judges the rendered check per host against a stub checker: a leg that
    > failed before the browsers, a host not reached, a skipped engine, a row
-   > answered on retry, an expected failure that stopped. It reads 37
-   > passed, 0 failed on the mac (about 2 minutes), and 13 passed, 0 failed
-   > on Windows until Windows has #869's, #762's and #597's cases.
+   > answered on retry, an expected failure that stopped, an old Node, a
+   > checker that could not run, a re-run that fails again, expected
+   > failures off their pinned count, and the second deploy's and the
+   > sharing card's judgements (#892, #799), and a host serving an earlier
+   > deployment. It reads 54 passed, 0 failed on
+   > the mac (about 2 minutes), and 13 passed, 0 failed on Windows until
+   > Windows has #869's, #762's, #597's and #892's cases.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,

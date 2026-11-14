@@ -39,3 +39,39 @@ export function stoppedFailing(listed, seen) {
   }
   return stopped
 }
+
+// Each listed host is pinned to the pages that may ask it and the paths it
+// may be asked for (rendered_rows.json -> thirdPartyHostsToday.pinned; 597b
+// review finding 2): a listed host asked from another page, or for another
+// path (cdnjs for a second library, say), is a stranger, on this Mac and on
+// a deployed site alike. `asks` is every { host, path } one page asked.
+export function outsidePins(asks, pins, pageName) {
+  const outside = []
+  for (const one of asks) {
+    const pin = pins[one.host]
+    if (!pin) continue
+    const pageAllowed = pin.pages === "*" || pin.pages.includes(pageName)
+    let pathAllowed = false
+    for (const prefix of pin.paths) {
+      if (one.path.startsWith(prefix)) pathAllowed = true
+    }
+    if (!pageAllowed) outside.push(`asked ${one.host}${one.path} from the ${pageName} page, which thirdPartyHostsToday does not pin to it`)
+    else if (!pathAllowed) outside.push(`asked ${one.host} for ${one.path}, outside the paths thirdPartyHostsToday pins it to (${pin.paths.join(", ")})`)
+  }
+  return outside
+}
+
+// The pinned pages that ran in one engine and did not ask their host: the
+// expected failure moved or shrank, so the pin is shortened with it.
+// `askedBy` maps a page to the hosts it asked; `ran` lists the pages.
+export function pinnedButNotAsked(pins, askedBy, ran) {
+  const missed = []
+  for (const [host, pin] of Object.entries(pins)) {
+    const pages = pin.pages === "*" ? ran : pin.pages
+    for (const page of pages) {
+      if (!ran.includes(page)) continue
+      if (!(askedBy.get(page) ?? []).includes(host)) missed.push({ host, page })
+    }
+  }
+  return missed
+}

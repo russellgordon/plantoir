@@ -59,7 +59,7 @@ import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
+import { outsidePins, pinnedButNotAsked, sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
 import { startSiteServer } from "./lib/site_server.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -350,7 +350,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0 }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [] }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -493,6 +493,17 @@ function watchPage(page, record) {
   page.on("console", (message) => {
     const text = message.text()
     const at = message.location()?.url ?? ""
+    // A frame the provider refuses to be shown in (X-Frame-Options or
+    // frame-ancestors): students see a blank box. Never the embed's own
+    // business: the embeds row fails on it and the clean-page row keeps the
+    // line (597b review finding 1, measured: the frame's navigation answers
+    // 200 in both engines, then this line in both).
+    const refused = /Refused to display '([^']+)' in a frame/.exec(text)
+    if (refused) {
+      record.frameRefusals.push({ url: refused[1], why: text.slice(0, 200) })
+      record.console.push(text)
+      return
+    }
     if ((message.type() === "error" || /Mixed Content|Refused to /i.test(text)) && saidByAnEmbed(text, at)) {
       record.embedLines += 1
       return
@@ -528,6 +539,23 @@ function watchPage(page, record) {
   })
   page.on("requestfailed", (request) => {
     if (record.aborted.has(request.url())) return
+    // A frame's own document that failed after it answered (Chromium:
+    // net::ERR_BLOCKED_BY_RESPONSE for a refused frame) is the embeds row's
+    // failure, never set aside.
+    let frameDocument = false
+    try {
+      // A frame of the page itself, not one inside an embed (an advert frame
+      // a provider opens is the embed's own business).
+      frameDocument = request.isNavigationRequest() && request.frame().parentFrame() === page.mainFrame()
+    } catch {
+      frameDocument = false
+    }
+    if (frameDocument) {
+      const why = request.failure()?.errorText ?? ""
+      record.frameRefusals.push({ url: request.url(), why })
+      if (/BLOCKED|blocked/.test(why)) record.refused.push(`${request.url()} (${why})`)
+      return
+    }
     if (record.embedUrls.has(request.url())) {
       record.embedLines += 1
       return
@@ -1064,7 +1092,14 @@ ROW_CHECKS.embeds = async ({ page, record }) => {
     else if (status < 200 || status > 299) problems.push(`${new URL(src).host} answered ${status}`)
   }
   if (problems.length > 0) return { fail: "a frame's document did not answer 2xx: " + problems.join("; ") }
-  return { ok: `all ${frames.length} frames' documents answered 2xx` }
+  // Answering 200 is not being shown: a provider that refuses to be framed
+  // answers 200 and the engine then blanks the frame (597b review finding 1).
+  if (record.frameRefusals.length > 0) {
+    const named = []
+    for (const one of record.frameRefusals) if (!named.includes(one.url)) named.push(one.url)
+    return { fail: `a frame was refused, so students see a blank box: ${named.slice(0, 3).join(", ")} (${record.frameRefusals[0].why})` }
+  }
+  return { ok: `all ${frames.length} frames' documents answered 2xx, and none was refused` }
 }
 
 ROW_CHECKS.pdf = async ({ page, context }) => {
@@ -1361,8 +1396,9 @@ function judgeClean(record, network) {
   return { ok: `nothing reported to the console, no page error, nothing refused${aside}` }
 }
 
-function judgeOwnHost(record, siteHost) {
+function judgeOwnHost(record, siteHost, pageName) {
   const asked = new Map()
+  const asks = []
   const strangers = []
   for (const one of record.offSite) {
     if (one.fromEmbed) continue
@@ -1375,6 +1411,12 @@ function judgeOwnHost(record, siteHost) {
     if (one.host === siteHost) continue
     const kind = one.kind && one.kind !== "request" ? ` (${one.kind})` : ""
     if (!asked.has(one.host)) asked.set(one.host, one.path + kind)
+    asks.push({ host: one.host, path: one.path })
+  }
+  // A listed host off its pinned pages or paths is a stranger (597b review
+  // finding 2), here and on a deployed site alike.
+  for (const line of outsidePins(asks, ROWS.thirdPartyHostsToday.pinned, pageName)) {
+    if (!strangers.includes(line)) strangers.push(line)
   }
   // On a deployed site the hosts the site still asks today are expected
   // failures, not allowed (lib/expected_failures.mjs; #597's second half).
@@ -1565,7 +1607,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
           outcome = { fail: String(error.message ?? error).split("\n")[0] }
         }
       } else if (row.name === "clean page") outcome = judgeClean(record, network)
-      else if (row.name === "own host") outcome = judgeOwnHost(record, new URL(base).host)
+      else if (row.name === "own host") outcome = judgeOwnHost(record, new URL(base).host, pageName)
       outcomes.push(toOutcome(row.name, outcome))
     }
   } finally {
@@ -1676,8 +1718,18 @@ async function plainRun(engines, network) {
       if (ownHost.length === 0) continue
       const seen = []
       for (const one of ownHost) seen.push(...one.asked)
-      for (const host of stoppedFailing(ROWS.thirdPartyHostsToday.hosts, seen)) {
+      const stopped = stoppedFailing(ROWS.thirdPartyHostsToday.hosts, seen)
+      for (const host of stopped) {
         say("FAIL", "own host, an expected failure that stopped", engineName, `no page asked ${host} any more: take it off rendered_rows.json -> thirdPartyHostsToday, so the list shrinks and the gate tightens (#566)`)
+      }
+      // A pinned page that ran and did not ask its host: the expected
+      // failure moved or shrank, and its pin goes with it.
+      const askedBy = new Map()
+      for (const one of ownHost) askedBy.set(one.page, one.asked)
+      const ran = ownHost.map((one) => one.page)
+      for (const one of pinnedButNotAsked(ROWS.thirdPartyHostsToday.pinned, askedBy, ran)) {
+        if (stopped.includes(one.host)) continue
+        say("FAIL", "own host, an expected failure that moved", engineName, `the ${one.page} page no longer asks ${one.host}: take it off that host's pages in rendered_rows.json -> thirdPartyHostsToday.pinned (#566)`)
       }
     }
   }
@@ -1733,6 +1785,12 @@ async function redRun(engines, network) {
     const runOne = async (sabotage, onlyEngine = null) => {
       const began = Date.now()
       const aimed = ROWS.rows.find((row) => row.name === sabotage.aims)
+      // A row that runs on deployed sites only (embeds) is proven red with
+      // --site <folder> --host netlify, never on this Mac's local host.
+      if (sabotage.hosts && !sabotage.hosts.includes(options.host)) {
+        say("NOTE", `sabotage ${sabotage.name}`, null, `not run with --host ${options.host}: its row runs on ${sabotage.hosts.join(", ")} only (run it with --site <folder> --host netlify --expect-red "${sabotage.name}")`)
+        return
+      }
       // The keys row runs only on its own sabotage, which runs alone (below):
       // with other browsers busy, WebKit's points fell while the lines ran
       // even with the loader's hold in place (measured 2026-11-13, on the
