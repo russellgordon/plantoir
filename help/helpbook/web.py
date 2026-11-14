@@ -58,6 +58,7 @@ def search_index(source: HelpSource, renderer: PageRenderer, included: Set[str])
             {
                 "id": page.id,
                 "title": page.title,
+                "question": page.question,
                 "description": page.description,
                 "keywords": page.keywords,
                 "text": searchable_text(renderer.pages_html[page.id]),

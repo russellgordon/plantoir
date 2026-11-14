@@ -11,7 +11,9 @@ import SwiftUI
 /// answer in one list, and the teacher would have to work out which was which
 /// every time they opened it.
 ///
-/// **Four panes since #495 — Assistant, Preview, Obsidian and Deploying.**
+/// **Five panes since #855 — Assistant, Preview, Obsidian, Deploying and
+/// Other Assistants.** Four panes since #495 — Assistant, Preview, Obsidian
+/// and Deploying.
 /// Three panes since #504 — Assistant, Preview and Deploying. Two panes,
 /// Assistant and Deploying, in a `TabView` since the HIG sweep
 /// (#457 item 4; Russell, 2026-10-08: the Cloudflare Account ID moves here).
@@ -64,6 +66,14 @@ struct PlantoirSettingsView: View {
                     Label("Deploying", systemImage: "paperplane")
                 }
                 .tag(SettingsPane.deploying.rawValue)
+            // The outside assistants Plantoir can set up (#855, ruling 3):
+            // last, because Plantoir works without any of them.
+            OtherAssistantsSettingsView()
+                .frame(minHeight: 420)
+                .tabItem {
+                    Label(AssistantSetUpWording.paneTitle, systemImage: "person.2")
+                }
+                .tag(SettingsPane.otherAssistants.rawValue)
         }
         // Fixed width, the way macOS settings windows are: the panel is a
         // column of sentences, and a resizable one lets the explanations

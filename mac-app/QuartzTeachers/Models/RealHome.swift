@@ -142,6 +142,25 @@ nonisolated enum RealHome {
         )
     }
 
+    /// The login shell the account record names, or `/bin/zsh`, macOS's own
+    /// default, when it names none (#855). Here because the account record
+    /// is where the home folder is too: a set-up's start-up file is chosen
+    /// from this, never from an inherited `$SHELL` (plan review H3).
+    static var accountShell: String {
+        if let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell {
+            let text: String = String(cString: shell)
+            if !text.isEmpty {
+                return text
+            }
+        }
+        return "/bin/zsh"
+    }
+
+    /// The account's short name, for a set-up's `USER` and `LOGNAME` (#855).
+    static var accountName: String {
+        return NSUserName()
+    }
+
     /// The system's answer, asked in exactly one line of the product.
     private static var systemHome: URL {
         return FileManager.default.homeDirectoryForCurrentUser

@@ -4959,10 +4959,10 @@
     },
     "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file. Since 1.9.3 (#736) both its doors start the program DIRECTLY when it is an .exe - by argument vector, with no command interpreter and no Windows Terminal in front, in a console window of its own (Windows Terminal anyway where it is the default terminal) - and through cmd.exe /v:off /s /k when it is an npm .cmd shim, with cmd's metacharacters escaped per parse and every % followed by a quote. Until 1.9.3 the Claude door ran wt.exe -d <folder> cmd /k with a hand-joined line, which left the greeting, and the course's name in it, outside cmd's quotes; and Windows Terminal itself was measured expanding %NAME% and re-joining arguments with its own quoting, which is why it is no longer in front of either door (documentation/12-windows-app.md -> 'What the outside doors hand to Windows, and how'). The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
-    "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: a teacher sees an item for each assistant installed, in the order Claude, Codex, GitHub Copilot, and with none installed sees no sign that any exists.",
+    "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown its door at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: a teacher sees an item for each assistant installed, in the order Claude, Codex, GitHub Copilot. Since #855 (Russell, 2026-11-13: Revise With is always shown) the submenu itself is ALWAYS drawn, ending with setUp.menuItem, so a teacher with no assistant at all sees Revise With holding that one item. Until #855 the submenu was left out when it had nothing in it and a teacher with none saw no sign that any existed; that rule is gone, and Windows' menu changes with it.",
     "menuItemWhy" : "Each agent's menuItem is the item's title INSIDE Revise With ▸ — in the menu bar's Course and Section menus and, since the HIG sweep (#457 item 4, 2026-10-08), in every course and section row's context menu as well, so one command has one name everywhere (HIG: stable command names). Until the sweep the row's context menu showed it at the top level as 'Revise with Claude…' / 'Revise with Codex…' while the menu bar said Revise With ▸ Claude…, and this key held the context menu's words. 'Revise with Claude' is still the command's name in a SENTENCE (shared-rules.json -> workspaceWait's agent names, the support page); only the menu item's title moved. Windows draws its own menu, so it chooses where the item sits, but the item's words are these.",
-    "neverInstalled" : "Plantoir never installs an outside assistant and never offers to. These are developer tools with accounts, sign-ins and their own update paths; an app that puts one onto a teacher's machine has taken on a support surface nobody wants, and the teacher has not agreed to it. The door opens onto something they chose to install themselves.",
-    "neverProbedForSignIn" : "Finding the tool says nothing about whether the teacher is signed in to it, and the door does not try to find out: that would mean running the tool while a context menu is being drawn. A teacher who is signed out meets their assistant's own sign-in step inside the terminal, which is where it belongs.",
+    "installedOnlyWhenAsked" : "Plantoir sets up an outside assistant only when the teacher asks, from Settings > Other Assistants (reached also from Help > Set Up an Assistant… and Revise With > Set Up an Assistant…), and only after a confirmation that says what is downloaded, from whom, where it goes, and where the course content goes (setUp). Nothing is offered unasked: no launch-time offer, no notice, no badge. Plantoir still works without any of them (the never-requires rule). Until #855 this key was neverInstalled ('Plantoir never installs an outside assistant and never offers to'); Russell reversed it on 2026-11-13 because teachers with an account may not know how to set the tool up.",
+    "neverProbedForSignIn" : "Finding the tool says nothing about whether the teacher is signed in to it, and the DOOR does not try to find out: that would mean running the tool while a context menu is being drawn. A teacher who is signed out meets their assistant's own sign-in step inside the terminal. Narrowed by #855: Settings > Other Assistants asks the maker's own signed-in question (setUp.agents' signedInCheck) for a tool Plantoir set up, only after its set-up, after its sign-in window and on Check Again, never while a menu or a tab draws, and keeps the exit code alone, never the output, which names the account.",
     "note" : "The OUTSIDE doors: handing one course to a command-line assistant the teacher already has on their own machine, so it can work on their pages through Plantoir's MCP server. Distinct from the assistant Plantoir carries itself (contracts/assist-cases.json), which runs on the teacher's machine with no account and no CLI. AUTHORED, not generated. This block is the first contract data either door has ever had: it arrived on the mac with issue #205, which added the Codex door, and it describes BOTH doors so that the Claude half states what the two apps already do rather than leaving it written down nowhere.",
     "planAUnit" : {
       "atTheClick" : "The refusal Revise With makes at the click (WorkspaceModel.reviseRefusal on the mac: a session from any outside door already open on the course, or the in-app assistant on it), in its own alert; otherwise the door opens with message as its opening message, which replaces the greeting (so no unit-planning reminder, no reference-courses sentence). A door that did not open shows the door's own could-not-start sentence and writes no trail line.",
@@ -5041,6 +5041,617 @@
     ],
     "serverIsThePlantoirBinary" : "The MCP server is the Plantoir binary itself answering --mcp-stdio, so there is no second executable to find, sign or forget. On Windows it is plantoir-mcp.exe, which is one of the parts of this block that differ by platform — how the session is handed to a terminal is another, and macHandsOverWith is the mac's alone.",
     "serverName" : "plantoir",
+    "setUp" : {
+      "note" : "#855 (Russell's rulings on the issue, 2026-11-13): one button per assistant runs the maker's OWN documented set-up, unchanged, in the background; Plantoir then checks that every program it left is the maker's before it calls the assistant set up. It goes where the maker puts it (the home folder), so the maker's updater, the teacher's own Terminal and the doors' search all agree; no admin rights. Rejected: downloading the programs into Plantoir's own folder (Claude Code's updater installs into ~/.local/share/claude whatever Plantoir does, so a second copy would drift, and pinning versions means a Plantoir release a week); bundling them (Claude Code's licence grants no redistribution, and the three would add about 650 MB); typing the command into a terminal window (needs an Automation prompt, steals focus, and Plantoir learns the result only by polling); a managed setting for school IT (Russell: no, the offer always appears and a locked-down Mac is told so in plain words). AUTHORED.",
+      "whereItIsOffered" : "Settings > Other Assistants (the pane; GitHub Copilot listed first), Help > helpMenuItem, and Revise With > menuItem, last in every Revise With submenu (both subject menus and every live row's context menu), after a divider when anything is above it. The two menu items open the pane and set up nothing themselves. Never on a course kept for reference's row, where Revise With is not drawn (decision s).",
+      "childEnvironment" : {
+        "names" : [
+          "HOME",
+          "USER",
+          "LOGNAME",
+          "TMPDIR",
+          "LANG",
+          "PATH",
+          "SHELL"
+        ],
+        "path" : "/usr/bin:/bin:/usr/sbin:/sbin",
+        "lang" : "en_US.UTF-8",
+        "shellFrom" : "the account record (getpwuid on the mac), never an inherited SHELL",
+        "plusEachAgentsExtraEnvironment" : true,
+        "noTerminal" : "Started in a session of its own (POSIX_SPAWN_SETSID on the mac), so there is no controlling terminal; standard input, output and error on /dev/null; every inherited file closed.",
+        "why" : "Plan review H3, measured. Copilot's set-up reads PREFIX (where it installs), VERSION (which release) and GITHUB_TOKEN (sent as a header); Codex's reads CODEX_INSTALL_DIR, CODEX_HOME, CODEX_RELEASE and more; both choose the start-up file from SHELL. A Plantoir started from a shell carries all of those. With a controlling terminal, Codex's prompt_yes_no and Copilot's profile question read /dev/tty and wait for ever behind a progress line: measured 2026-11-13 with a stand-in of that prompt under a real terminal, a plain spawn with stdin on /dev/null was still waiting after 5 s, and a spawn in a new session went on at once, finding no terminal. Measured again through the mac's own runner (a stand-in set-up run with GITHUB_TOKEN, PREFIX, VERSION, CODEX_INSTALL_DIR and ZDOTDIR set in the parent): the child saw only these names (plus the shell's own PWD, SHLVL and _), and found no terminal even when the parent had one."
+      },
+      "longestRunMinutes" : 30,
+      "stopGraceSeconds" : 5,
+      "quitGraceMilliseconds" : 500,
+      "oneAtATime" : "One set-up at a time, app-wide (implementation review finding 1, measured: two set-ups that overlap each snapshot the start-up files at their own start, so a line Codex added during Claude's run was recorded by both, and Remove of Claude took Codex's line away). While one runs, every other row's Set Up and Try Again are unavailable and the row shows wording.oneAtATime under its own line; the centre refuses a second start too. Remove is unavailable too while one runs, and Set Up and Try Again wait until the launch's settle of cut-short set-ups has run (fix review 6). Within ONE running copy of Plantoir: a second copy running at once (CLAUDE.md Trap 2) is not covered. Rejected: queueing (a set-up the teacher is not watching starting later is an offer they did not make at that moment).",
+      "steps" : [
+        "Ask every host the agent's reachabilityHosts names, and the installer's own host: any answer counts, only a failure to connect does not; one that does not answer is failedNoConnection and nothing runs (review M2).",
+        "Fetch the set-up from installerURL, following redirects only to an address that starts with one of allowedAddresses, scheme, host and path (review L4; by whole address rather than host since the implementation review, because raw.githubusercontent.com serves any GitHub user's files); anything else is failedOther.",
+        "Look at the home folder (which of removes, and the folders above them, exist; the bytes of every start-up file in profileFiles) and WRITE THE RECORD with state installing and that snapshot, before anything runs (review M3). A record that cannot be written runs nothing.",
+        "Run it with interpreter, childEnvironment and no terminal, for at most longestRunMinutes; Stop ends its whole process group (a grace of stopGraceSeconds, then outright); quitting anyway does the same with a grace of quitGraceMilliseconds, before the app goes.",
+        "Look again: the removes paths and folders that appeared, and each start-up file that grew at its end by an appended block (that exact block) or changed otherwise (recorded, never edited).",
+        "Check every program in programs: there, and signed with its identifier and team under a Developer ID certificate, every page hashed. A required one missing, or any not the maker's, fails.",
+        "On success complete the record (installed). On any failure take away exactly what this run added and put the record back as it was."
+      ],
+      "whatTheCheckProves" : "Plan review M1, said plainly so nobody later calls it 'verified before it ran'. The check runs AFTER the maker's set-up has run, and for Claude Code after the maker's own program has run too (its set-up downloads the program, checks a checksum from the same host, then starts it to finish). GitHub's set-up installs without any checksum when its checksum file fails to download. So the signature check is the one check every route gets: it proves the program Plantoir then offers is the maker's, signed and unaltered. It is the same trust the makers' own instructions ask of every user (their set-up, over TLS, from their host).",
+      "profileFiles" : [
+        ".zprofile",
+        ".zshrc",
+        ".bash_profile",
+        ".bash_login",
+        ".bashrc",
+        ".profile"
+      ],
+      "record" : {
+        "where" : "{home}/Library/Application Support/Plantoir/set-up/record.json (under --state-dir's home in a UI test; a throwaway home under the unit suite)",
+        "carries" : "per set-up: key, kind (assistant), state (installing | installed), when, the before-snapshot while installing, created (removes paths that appeared), createdFolders (folders above them that appeared), profileChanges (file, the exact appended block, whether the file was created), changedInPlace (start-up files changed other than by appending). Paths relative to the home folder, so no home folder's name is written.",
+        "removeRule" : "Remove takes away created (a link itself, never what it leads to), then each appended block (the last copy of it, written back through a linked file so a dotfile manager's link is kept; a file the set-up created is deleted once nothing but white space is left), then createdFolders that are empty, deepest first. A recorded path that the agent's removes does not list, or that leads outside the home folder, is refused. A block no longer in its file as written (the teacher edited it) is left alone, and so is a block another entry also records (not this one's alone; that entry's Remove takes it). Never keeps.",
+        "unreadable" : "A record that is there and cannot be read (damaged, or written by a newer Plantoir with a state this one does not know) is NEVER written over: every write refuses (a set-up then runs nothing, couldNotRecord), and the pane moves it aside beside itself as record-unreadable-<seconds>-<id>.json, writes the trail line, and from then on shows each program it found AT THAT MOMENT with no entry as recordUnreadable rather than setUpElsewhere, because it may be one Plantoir set up (the keys are kept beside the record as found-when-set-aside.json; a copy the teacher sets up later shows as setUpElsewhere, fix review 2). Implementation review finding 2: a record with one unknown state used to load as empty, and the next write kept only the new entry.",
+        "writesAreSerialised" : "Every read-change-write of the record is one step under one lock, so two runs finishing together cannot lose an entry. The lock is within ONE running copy of Plantoir: a second copy running at once (CLAUDE.md Trap 2) is not covered.",
+        "atLaunch" : "A record still installing (a quit, a crash or a power cut cut the set-up short) is settled at the next launch: compared with its snapshot; complete and the maker's, it is completed; otherwise what it added is taken away and it is forgotten."
+      },
+      "agents" : [
+        {
+          "key" : "copilot",
+          "displayName" : "GitHub Copilot",
+          "maker" : "GitHub",
+          "installerURL" : "https://gh.io/copilot-install",
+          "interpreter" : "/bin/bash",
+          "allowedAddresses" : [
+            "https://gh.io/copilot-install",
+            "https://raw.githubusercontent.com/github/copilot-cli/"
+          ],
+          "reachabilityHosts" : [
+            "github.com",
+            "release-assets.githubusercontent.com"
+          ],
+          "extraEnvironment" : {},
+          "programs" : [
+            {
+              "path" : ".local/bin/copilot",
+              "identifier" : "copilot",
+              "team" : "VEKTX9H2N7",
+              "required" : true
+            }
+          ],
+          "removes" : [
+            ".local/bin/copilot",
+            "Library/Caches/copilot"
+          ],
+          "keeps" : [
+            ".copilot",
+            "the GitHub Copilot sign-in in the login keychain"
+          ],
+          "signIn" : [
+            "login"
+          ],
+          "signedInCheck" : null,
+          "plansPage" : "https://docs.github.com/en/copilot/get-started/plans",
+          "educationHelpAnchor" : "github-education",
+          "measured" : "2026-11-13: gh.io/copilot-install answers 301 to raw.githubusercontent.com/github/copilot-cli/refs/heads/main/install.sh (198 lines, sha256 00efcc2e…); its archive (copilot-darwin-arm64.tar.gz, 138 MB) holds the one file copilot, extracted straight into ~/.local/bin; the release download redirects to release-assets.githubusercontent.com. With no terminal its profile question is skipped, so it writes no start-up file. GitHub documents no signed-in question, so readySignInFinished rests on the sign-in's exit code."
+        },
+        {
+          "key" : "claude",
+          "displayName" : "Claude Code",
+          "maker" : "Anthropic",
+          "installerURL" : "https://claude.ai/install.sh",
+          "interpreter" : "/bin/bash",
+          "allowedAddresses" : [
+            "https://claude.ai/install.sh",
+            "https://downloads.claude.ai/claude-code-releases/"
+          ],
+          "reachabilityHosts" : [
+            "downloads.claude.ai"
+          ],
+          "extraEnvironment" : {},
+          "programs" : [
+            {
+              "path" : ".local/bin/claude",
+              "identifier" : "com.anthropic.claude-code",
+              "team" : "Q6L2SF6YDW",
+              "required" : true
+            }
+          ],
+          "removes" : [
+            ".local/bin/claude",
+            ".local/share/claude"
+          ],
+          "keeps" : [
+            ".claude",
+            ".claude.json",
+            "the Claude Code sign-in in the login keychain"
+          ],
+          "signIn" : [
+            "auth",
+            "login"
+          ],
+          "signedInCheck" : {
+            "arguments" : [
+              "auth",
+              "status"
+            ],
+            "signedInExitCode" : 0
+          },
+          "plansPage" : "https://code.claude.com/docs/en/setup",
+          "educationHelpAnchor" : null,
+          "measured" : "2026-11-13: claude.ai/install.sh answers 302 to downloads.claude.ai/claude-code-releases/bootstrap.sh (260 lines, sha256 3a68d340…), which downloads the program into ~/.claude/downloads, checks its SHA-256 against a manifest from the same host and runs it with install; the program on this Mac is a link ~/.local/bin/claude to ~/.local/share/claude/versions/<v>, Identifier com.anthropic.claude-code, team Q6L2SF6YDW. The removes are Anthropic's documented removal. The setup page says Claude Code needs a Pro, Max, Ultra, Team, Enterprise or Console account and the free plan does not include it (read 2026-11-13; Help carries that fact with its date, the sheet only links the page)."
+        },
+        {
+          "key" : "codex",
+          "displayName" : "Codex",
+          "maker" : "OpenAI",
+          "installerURL" : "https://chatgpt.com/codex/install.sh",
+          "interpreter" : "/bin/sh",
+          "allowedAddresses" : [
+            "https://chatgpt.com/codex/install.sh",
+            "https://releases.openai.com/codex/"
+          ],
+          "reachabilityHosts" : [
+            "releases.openai.com"
+          ],
+          "extraEnvironment" : {
+            "CODEX_NON_INTERACTIVE" : "1"
+          },
+          "programs" : [
+            {
+              "path" : ".local/bin/codex",
+              "identifier" : "codex",
+              "team" : "2DC432GLL2",
+              "required" : true
+            },
+            {
+              "path" : ".local/bin/codex-code-mode-host",
+              "identifier" : "codex-code-mode-host",
+              "team" : "2DC432GLL2",
+              "required" : false
+            }
+          ],
+          "removes" : [
+            ".local/bin/codex",
+            ".local/bin/codex-code-mode-host",
+            ".codex/packages/standalone"
+          ],
+          "keeps" : [
+            ".codex/auth.json",
+            ".codex/config.toml",
+            "everything else in .codex"
+          ],
+          "signIn" : [
+            "login"
+          ],
+          "signedInCheck" : {
+            "arguments" : [
+              "login",
+              "status"
+            ],
+            "signedInExitCode" : 0
+          },
+          "plansPage" : "https://learn.chatgpt.com/docs/pricing",
+          "educationHelpAnchor" : null,
+          "measured" : "2026-11-13: chatgpt.com/codex/install.sh answers 302 to releases.openai.com/codex/install.sh (1500 lines, sha256 5a8eea5c…). It keeps the package in ~/.codex/packages/standalone and links ~/.local/bin/codex (and codex-code-mode-host on a Mac) into it, and appends a '# >>> Codex installer >>>' block to the start-up file SHELL picks (zsh .zprofile, bash .bash_profile, anything else .profile) unless the block is there already: ruling 4 accepts the line and Remove takes it away from the record. CODEX_NON_INTERACTIVE=1 skips its two questions ('Start Codex now?', 'Uninstall the existing … Codex now?'). codex-code-mode-host is signed Identifier codex-code-mode-host, team 2DC432GLL2 (the Homebrew cask's 0.162.0, same package format). It falls back to GitHub when releases.openai.com fails, so only releases.openai.com is asked first."
+        }
+      ],
+      "menuItem" : "Set Up an Assistant…",
+      "helpMenuItem" : "Set Up an Assistant…",
+      "helpAnchor" : "set-up-assistant",
+      "wording" : {
+        "cancelButton" : "Cancel",
+        "checkAgainButton" : "Check Again",
+        "checking" : "Checking that {maker} made {tool}…",
+        "confirmBody" : "Plantoir downloads {tool} from {maker} and puts it in your home folder, where it keeps itself up to date. Once it is in place, Plantoir checks that {maker} made it. You need an account with {maker} that includes {tool}, and what {tool} reads from your courses goes to {maker} under that account.",
+        "confirmButton" : "Download and Set Up",
+        "confirmEducation" : "Teachers can apply to GitHub for its education benefits, which can include GitHub Copilot. GitHub decides each application, and it can take some time.",
+        "confirmEducationLink" : "How to apply",
+        "confirmPlansLink" : "Which accounts include {tool}",
+        "confirmTitle" : "Set up {tool}?",
+        "downloading" : "Downloading {tool} from {maker}…",
+        "failedNoConnection" : "Plantoir couldn’t reach {maker}. If other websites open, your school’s network may be blocking {maker}.",
+        "failedNotFromMaker" : "Plantoir didn’t set up {tool}: what was downloaded wasn’t made by {maker}, so Plantoir took it away again.",
+        "failedOther" : "Plantoir couldn’t finish setting up {tool}, and took away what it had added. If your school looks after this computer, it may not allow new programs: the people who look after it can tell you.",
+        "failedTookTooLong" : "Plantoir stopped setting up {tool} because it was taking far too long, and took away what it had added. Try again later, or on another network.",
+        "helpMenuItem" : "Set Up an Assistant…",
+        "installedSignedOut" : "{tool} is set up. Sign in to your {maker} account to start using it.",
+        "interrupted" : "Plantoir didn’t finish setting up {tool} last time. Try again to finish it.",
+        "menuItem" : "Set Up an Assistant…",
+        "notSetUp" : "Not set up.",
+        "paneIntro" : "Plantoir works without any of these. If you have an account with one of them, Plantoir can set it up for you here, and Revise With then offers it on your courses.",
+        "paneTitle" : "Other Assistants",
+        "readySignInFinished" : "{tool} is set up and its sign-in finished. Choose Revise With ▸ {menuItem} on a course to start. If {maker} turns you away there, your account may not include {tool} yet.",
+        "readySignedIn" : "{tool} is set up and you’re signed in. Choose Revise With ▸ {menuItem} on a course to start. If {maker} turns you away there, check which accounts include {tool}.",
+        "removeBody" : "Plantoir takes away the copy of {tool} it set up, and only that. Your sign-in and your {tool} settings are kept, so setting it up again later picks up where you left off.",
+        "removeButton" : "Remove…",
+        "removeConfirmButton" : "Remove",
+        "removeIncomplete" : "Plantoir couldn’t take away everything it set up for {tool}. Try again, or ask for help.",
+        "removeTitle" : "Remove {tool}?",
+        "setUpButton" : "Set Up…",
+        "setUpElsewhere" : "Already set up, outside Plantoir. Plantoir uses it as it is and leaves it alone.",
+        "recordUnreadable" : "Already set up. Plantoir couldn’t read its note of what it had set up, so it uses {tool} as it is and leaves it alone.",
+        "oneAtATime" : "Plantoir is setting up {other} now. You can set this one up once that has finished.",
+        "showMeHowButton" : "Show Me How",
+        "signInAgainButton" : "Sign In Again…",
+        "signInButton" : "Sign In…",
+        "signInNotConfirmed" : "Plantoir couldn’t confirm that you’re signed in to {tool}.",
+        "signInWindowDone" : "You can close this window now and go back to Plantoir.",
+        "signInWindowIntro" : "Signing in to {tool}. Your web browser opens: sign in there, and answer anything asked here.",
+        "signingIn" : "A window opened where {tool} signs you in. Your web browser opens too: sign in there, then come back here and choose Check Again.",
+        "stopButton" : "Stop",
+        "stopped" : "Setting up {tool} was stopped. Plantoir took away what it had added.",
+        "tryAgainButton" : "Try Again"
+      },
+      "stateCases" : {
+        "how" : "given: recordSetAside (a record that could not be read was set aside here), found (the door finds the program, anyone's), recorded (null | installing | installed: what the record holds for it), activity (idle | downloading | checking), lastOutcome (null or the outcome of this session's last set-up: finished, noConnection, couldNotFetch, couldNotStart, exited, leftNothing, notFromMaker, stopped, tookTooLong, couldNotRecord), signIn (notAsked | windowOpen | an integer, the sign-in window's exit code), status (notAsked | signedIn | notSignedIn: the maker's signed-in question), hasSignedInCheck (false for GitHub Copilot). expect is the state, whose sentence is the wording key of the same name. Run by both apps against their own rule (AssistantSetUpState.decide on the mac).",
+        "cases" : [
+          {
+            "name" : "nothing there, nothing done",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "notSetUp"
+          },
+          {
+            "name" : "the teacher's own copy",
+            "given" : {
+              "found" : true,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "setUpElsewhere"
+          },
+          {
+            "name" : "the teacher's own copy, even after a failed attempt this session",
+            "given" : {
+              "found" : true,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "exited",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "setUpElsewhere"
+          },
+          {
+            "name" : "downloading",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "downloading",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "downloading"
+          },
+          {
+            "name" : "checking the programs",
+            "given" : {
+              "found" : false,
+              "recorded" : "installing",
+              "activity" : "checking",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "checking"
+          },
+          {
+            "name" : "no connection",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "noConnection",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "failedNoConnection"
+          },
+          {
+            "name" : "not the maker's",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "notFromMaker",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "failedNotFromMaker"
+          },
+          {
+            "name" : "the set-up stopped with a status",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "exited",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "failedOther"
+          },
+          {
+            "name" : "it left nothing",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "leftNothing",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "failedOther"
+          },
+          {
+            "name" : "too long",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "tookTooLong",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "failedTookTooLong"
+          },
+          {
+            "name" : "stopped by the teacher",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : "stopped",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "stopped"
+          },
+          {
+            "name" : "cut short last time and not yet settled",
+            "given" : {
+              "found" : false,
+              "recorded" : "installing",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "interrupted"
+          },
+          {
+            "name" : "set up, not signed in yet",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "installedSignedOut"
+          },
+          {
+            "name" : "set up, already signed in from before (asked after the set-up)",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "signedIn",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "readySignedIn"
+          },
+          {
+            "name" : "sign-in window open",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "windowOpen",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "signingIn"
+          },
+          {
+            "name" : "sign-in ended with a failure",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : 1,
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "signInNotConfirmed"
+          },
+          {
+            "name" : "sign-in finished and the check says signed in",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : 0,
+              "status" : "signedIn",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "readySignedIn"
+          },
+          {
+            "name" : "sign-in finished and the check says not",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : 0,
+              "status" : "notSignedIn",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "signInNotConfirmed"
+          },
+          {
+            "name" : "sign-in finished, not yet checked",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : 0,
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "signingIn"
+          },
+          {
+            "name" : "GitHub Copilot: sign-in finished, no question to ask",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : 0,
+              "status" : "notAsked",
+              "hasSignedInCheck" : false,
+              "recordSetAside" : false
+            },
+            "expect" : "readySignInFinished"
+          },
+          {
+            "name" : "GitHub Copilot: sign-in ended with a failure",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : 1,
+              "status" : "notAsked",
+              "hasSignedInCheck" : false,
+              "recordSetAside" : false
+            },
+            "expect" : "signInNotConfirmed"
+          },
+          {
+            "name" : "recorded but the program is gone",
+            "given" : {
+              "found" : false,
+              "recorded" : "installed",
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "notSetUp"
+          },
+          {
+            "name" : "a set-up under way wins over everything",
+            "given" : {
+              "found" : true,
+              "recorded" : "installed",
+              "activity" : "downloading",
+              "lastOutcome" : "stopped",
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
+            },
+            "expect" : "downloading"
+          },
+          {
+            "name" : "found after an unreadable record was set aside",
+            "given" : {
+              "found" : true,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : true
+            },
+            "expect" : "recordUnreadable"
+          },
+          {
+            "name" : "not found after an unreadable record was set aside",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : true
+            },
+            "expect" : "notSetUp"
+          }
+        ]
+      },
+      "neverCases" : [
+        "Set-up offered without the teacher asking: no launch-time offer, notice, pop-up or badge; the three places in whereItIsOffered only.",
+        "A set-up run without the confirmation's confirmButton.",
+        "A set-up run over a copy the teacher already has (state setUpElsewhere offers nothing).",
+        "Remove offered for an assistant the record does not hold, or taking away anything the record does not list, or anything the agent's removes does not list, or anything in keeps.",
+        "A signed-in question asked while a menu or a tab draws, or anything kept from it but its exit code.",
+        "The set-up's output kept, shown or written to the trail.",
+        "A sentence about cost on Plantoir's own authority, or the word free (ruling 5): the sheet links the maker's plans page and Help carries the dated facts.",
+        "Any MCP or local-assistant tool that sets up or signs in: the assistant tools are unchanged (scripts/test_tool_surface_digest.py)."
+      ],
+      "rejected" : [
+        "A managed setting for school IT to hide the offer (review M5): Russell, 2026-11-13, no; a locked-down Mac is told so in failedOther's plain words.",
+        "Parsing the set-up's output to tell failures apart: it names the home folder and changes every release; the reachability question and the disk are asked instead.",
+        "Checking the signature on every app activation (review M1): up to 2.3 s each time Plantoir comes to the front; it is checked after the set-up, and the door finds the program as it always did.",
+        "Prompting the teacher to add ~/.local/bin to their start-up file for Claude Code or GitHub Copilot: Plantoir adds no line it was not asked to add (review H4); Help says what the teacher's own Terminal finds."
+      ],
+      "wordingHow" : "{tool} is the agent's displayName, {maker} its maker, {menuItem} its item in Revise With (agents[].menuItem). Each state's sentence is the wording key of the same name; a Remove that could not take everything away shows removeIncomplete in its place. signInWindowIntro and signInWindowDone are the sign-in window's own first and last lines. Rule 1 holds for every one: no installer, script, terminal, PATH, shell, binary or signature."
+    },
     "whatADoorIs" : "Plantoir finds the assistant's command-line tool and starts it in a terminal, in the teacher's working folder, with Plantoir's MCP server already connected and an opening message already sent. The teacher types no command and watches a real session in a real terminal window. Nothing is left in the folder Obsidian is watching, and nothing global is touched."
   },
   "previewPorts" : {
@@ -5050,6 +5661,71 @@
       "measured" : "GitHub #235, on one real first preview (the mac, 2026-09-20 capture, ICS4U): the announcement is 6,055 characters in and about 11,000 more follow, so an 8,000-character tail had lost it by the time Quartz said its server started. Read a piece at a time with NOTHING carried over, cutting the line after ':8', ':81' or ':810' gives a valid address on the wrong port (3 of the line's cut points), and reading a raw piece of terminal output whole gives the right port with a garbage path ('http://127.0.0.1:8101/%0D%0A…') because the CRLF line ending is not split.",
       "whenTheLauncherCannotReadIt" : "preview.sh asks for this folder's published port twice; if both answers are empty it says it could not find out where the preview will be and stops before building (exit 1). It never announces the port inside the builder in its place. A build for publishing (--build-only) announces nothing and asks nothing, so it can never be stopped here.",
       "why" : "The port the builder uses inside is the same on every Mac, and the one this Mac opens is not: the first working folder publishes 8081 -> 8081, the next 8091 -> 8081, and so on. A guessed address is right by luck for the first folder only, and can open ANOTHER section's preview as though it were this one."
+    },
+    "anotherProgramsPreviews" : {
+      "appliesOn" : [
+        "mac"
+      ],
+      "appliesOnWhy" : "Windows serves natively and probes an address just before it binds, so no other program can be handed one it holds; only the mac shares one website builder between programs.",
+      "cases" : [
+        {
+          "expect" : 8081,
+          "mine" : [],
+          "name" : "nothing held: the first address",
+          "others" : []
+        },
+        {
+          "expect" : 8082,
+          "mine" : [],
+          "name" : "another program serves 8081: the next address",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : [8081]}
+          ]
+        },
+        {
+          "expect" : 8083,
+          "mine" : [8082],
+          "name" : "another program's address and this program's own are both skipped",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : [8081]}
+          ]
+        },
+        {
+          "expect" : 8082,
+          "mine" : [],
+          "name" : "another COURSE in the folder shares the builder's addresses",
+          "others" : [
+            {"alive" : true, "course" : "OTHER", "ports" : [8081, 8083]}
+          ]
+        },
+        {
+          "expect" : 8081,
+          "mine" : [],
+          "name" : "a program that has ended holds no address",
+          "others" : [
+            {"alive" : false, "course" : "EXC2O", "ports" : [8081]}
+          ]
+        },
+        {
+          "expect" : 8081,
+          "mine" : [],
+          "name" : "a preview lease that names no address (Windows, an older Plantoir) cannot be avoided: the builder's claim refuses that one (twoPreviewsOneAddress)",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : null}
+          ]
+        },
+        {
+          "expect" : "allPortsBusy",
+          "mine" : [8082, 8084],
+          "name" : "every address taken between the two programs: refused, as four of this program's own are",
+          "others" : [
+            {"alive" : true, "course" : "EXC2O", "ports" : [8081, 8083]}
+          ]
+        }
+      ],
+      "fields" : "Each case asks for a preview of EXC2O Section 4 in one working folder. others: preview leases other programs hold there, each naming the addresses its sixth line carries (ports null: a lease with no sixth line); alive false: its program has ended. mine: the addresses this program's own previews in the folder already hold. expect: the container port handed out, or allPortsBusy.",
+      "rule" : "GitHub #835 (third piece). An address another LIVE program's preview lease in the same working folder names (file-formats.json -> workLease.lines, line 6, '@<port>'), on any course, is not handed out, beside the addresses this program's own previews hold.",
+      "why" : "Two copies of Plantoir in one working folder share its one website builder, and each chose an address knowing only its own previews, so both were handed 8081 and the second preview ended the first (3 of 3, #835's measurement). shared-rules.json -> twoPreviewsOneAddress refuses the second in words; this makes that refusal rare. It does not replace it: two programs choosing at the same instant each read the other's lease before either is written."
     },
     "bindsTo" : {
       "address" : "127.0.0.1",

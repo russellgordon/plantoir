@@ -45,6 +45,65 @@ nonisolated enum WorkLeaseFiles {
         /// for an `assist` lease that names none (an older Plantoir, or
         /// Windows until it writes one) or names a door nobody has.
         var assistant: String? = nil
+
+        /// A build, preview or publish lease's sixth line: the sections this
+        /// owner holds the kind for, each with its own moment (#835). Nil
+        /// when the lease names none (Windows, an older Plantoir, course-wide
+        /// work, a line that does not read): then it holds the WHOLE course.
+        var sections: [SectionEntry]? = nil
+
+        // MARK: - Functions
+
+        /// The entry for one section, or nil when the lease names sections
+        /// and this is not one of them.
+        func entry(forSection section: Int) -> SectionEntry? {
+            guard let sections else {
+                return nil
+            }
+            for entry in sections where entry.section == section {
+                return entry
+            }
+            return nil
+        }
+
+        /// Whether this lease holds a section: always, when it names no
+        /// sections (it holds the whole course); otherwise only the ones it
+        /// names. A nil section is a course-wide question, which every lease
+        /// of the course holds.
+        func holds(section: Int?) -> Bool {
+            guard let section, sections != nil else {
+                return true
+            }
+            return entry(forSection: section) != nil
+        }
+
+        /// The moment the take-then-check compares for a question about one
+        /// section: that section's own entry when the lease names it, and
+        /// line 3 otherwise. Line 3 is the moment the FILE was first written,
+        /// never later than any entry in it, so a course-wide question reads
+        /// the lease as early as it can be, which holds more, never less.
+        func moment(forSection section: Int?) -> String? {
+            if let section, let entry = entry(forSection: section) {
+                return entry.moment
+            }
+            return moment
+        }
+    }
+
+    /// One section a lease's sixth line names (#835): the section, the
+    /// moment this owner took it, and, on a preview lease, the container
+    /// port the preview is served on.
+    struct SectionEntry: Equatable, Hashable, Sendable {
+
+        // MARK: - Stored properties
+
+        let section: Int
+
+        /// In line 3's shape, so the tiebreak compares like with like.
+        let moment: String
+
+        /// A preview lease's container port (8081 to 8084), nil otherwise.
+        var port: Int? = nil
     }
 
     /// This process's own claim, which the tiebreak compares against.
@@ -100,6 +159,14 @@ nonisolated enum WorkLeaseFiles {
     static let kindsThatMeanBuilding: [String] = ["build", "publish"]
 
     // MARK: - Stored properties
+
+    /// The word a lease's sixth line begins with (#835). A line that does
+    /// not begin with it names no sections.
+    static let sectionsLineTag: String = "sections"
+
+    /// The kinds whose leases may name sections. `assist`, `import` and
+    /// `copy` are about the whole course or a folder, never a section.
+    static let kindsThatMayNameSections: [String] = ["build", "preview", "publish"]
 
     /// The kinds this side writes.
     static let buildKind: String = "build"
@@ -198,7 +265,8 @@ nonisolated enum WorkLeaseFiles {
         courseCode: String,
         coursesDirectory: URL,
         moment: Date = Date(),
-        assistant: String? = nil
+        assistant: String? = nil,
+        sections: [SectionEntry]? = nil
     ) -> (url: URL, moment: String)? {
         var isDirectory: ObjCBool = false
         let exists: Bool = FileManager.default.fileExists(
@@ -216,6 +284,13 @@ nonisolated enum WorkLeaseFiles {
         // holds the course (#783, `file-formats.json` → `workLease.lines`).
         if kind == assistKind, let assistant, AssistWording.outsideAssistantName(forKey: assistant) != nil {
             body += assistant.lowercased() + "\n"
+        }
+        // The sixth line, on a build, preview or publish lease only: the
+        // sections it holds (#835). Line 4 is always written by `leaseBody`
+        // (empty when the process table does not answer) and line 5 is
+        // written empty here, so the sections are always the sixth line.
+        if let sections, !sections.isEmpty, kindsThatMayNameSections.contains(kind) {
+            body += "\n" + WorkLeaseFiles.sectionsLine(sections) + "\n"
         }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -392,7 +467,8 @@ nonisolated enum WorkLeaseFiles {
                     kind: parsed.kind,
                     pid: parsed.pid,
                     moment: WorkLeaseFiles.momentLine(in: text),
-                    assistant: parsed.kind.lowercased() == assistKind ? WorkLeaseFiles.assistantLine(in: text) : nil
+                    assistant: parsed.kind.lowercased() == assistKind ? WorkLeaseFiles.assistantLine(in: text) : nil,
+                    sections: WorkLeaseFiles.sections(ofALeaseOfKind: parsed.kind, text: text)
                 )
             ))
         }
@@ -416,10 +492,22 @@ nonisolated enum WorkLeaseFiles {
     /// waiting) every blocking holding counts. A holding with no moment it can
     /// compare counts as earlier: when the order cannot be told, the other
     /// process is left alone.
+    ///
+    /// **A section, since #835.** `section` is the section the ask is about,
+    /// or nil for course-wide work (plan sharing, the start of the year),
+    /// which every lease of the course stands in the way of. A lease that
+    /// names sections holds only those; one that names none holds the whole
+    /// course. The claim is compared with the moment of the asked section's
+    /// own entry (`Holding.moment(forSection:)`), because one program can
+    /// hold several sections, each taken at its own moment: comparing one
+    /// moment per file lets a third program's build of the first section
+    /// through when the second is added, or a racing build of the second
+    /// through when it is not (`workLeases.declining.sections`).
     static func blocking(
         among holdings: [Holding],
         asker: Asker,
-        claim: Claim?
+        claim: Claim?,
+        section: Int? = nil
     ) -> Holding? {
         let kinds: [String]
         switch asker {
@@ -434,10 +522,13 @@ nonisolated enum WorkLeaseFiles {
             if !kinds.contains(holding.kind.lowercased()) {
                 continue
             }
+            if !holding.holds(section: section) {
+                continue
+            }
             guard let claim else {
                 return holding
             }
-            if WorkLeaseFiles.wasTakenBefore(holding, claim) {
+            if WorkLeaseFiles.wasTakenBefore(holding, claim, section: section) {
                 return holding
             }
         }
@@ -452,9 +543,17 @@ nonisolated enum WorkLeaseFiles {
     /// reading it as merely served would let a change through — and a
     /// rebuild be answered as if nothing were building — while a build runs.
     /// No claim is compared: an outside change takes no lease of its own.
-    static func whatAnOutsideChangeMeets(among holdings: [Holding]) -> OutsideChangeMeets {
+    ///
+    /// `section` nil (the default) is a course-wide question: an outside
+    /// assistant's page WRITES ask it, because every section's build reads
+    /// the pages they change (#835, the director's ruling). Its
+    /// `rebuild_preview` and `deploy_section` ask about their own section.
+    static func whatAnOutsideChangeMeets(among holdings: [Holding], section: Int? = nil) -> OutsideChangeMeets {
         var served: Holding? = nil
         for holding in holdings {
+            if !holding.holds(section: section) {
+                continue
+            }
             let kind: String = holding.kind.lowercased()
             if WorkLeaseFiles.kindsThatMeanBuilding.contains(kind) {
                 return .building(holding)
@@ -478,8 +577,8 @@ nonisolated enum WorkLeaseFiles {
     /// (millisecond resolution, measured), so two leases taken in the same
     /// millisecond tie, and the tie goes to the lower process id — ordinary,
     /// not rare. Anything not in that shape is treated as earlier.
-    static func wasTakenBefore(_ holding: Holding, _ claim: Claim) -> Bool {
-        guard let theirs = holding.moment else {
+    static func wasTakenBefore(_ holding: Holding, _ claim: Claim, section: Int? = nil) -> Bool {
+        guard let theirs = holding.moment(forSection: section) else {
             return true
         }
         if !WorkLeaseFiles.isAComparableMoment(theirs) || !WorkLeaseFiles.isAComparableMoment(claim.moment) {
@@ -536,6 +635,99 @@ nonisolated enum WorkLeaseFiles {
             assistants[entry.holding.pid] = .some(entry.holding.assistant)
         }
         return assistants
+    }
+
+    /// A lease's sixth line, as the sections it names (#835), or nil when it
+    /// names none: no sixth line, a line that does not begin with
+    /// `sectionsLineTag`, no entries, or ANY entry that does not read. Nil
+    /// means the lease holds the whole course, so every doubt about the
+    /// line resolves toward the wider hold.
+    static func sectionsInLine(of text: String) -> [SectionEntry]? {
+        let unixText: String = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let lines: [Substring] = unixText.split(separator: "\n", omittingEmptySubsequences: false)
+        if lines.count < 6 {
+            return nil
+        }
+        let line: String = String(lines[5]).trimmingCharacters(in: .whitespaces)
+        let words: [Substring] = line.split(separator: " ", omittingEmptySubsequences: true)
+        if words.count < 2 || String(words[0]) != sectionsLineTag {
+            return nil
+        }
+        var entries: [SectionEntry] = []
+        var index: Int = 1
+        while index < words.count {
+            guard let entry = WorkLeaseFiles.sectionEntry(from: String(words[index])) else {
+                return nil
+            }
+            for existing in entries where existing.section == entry.section {
+                return nil
+            }
+            entries.append(entry)
+            index += 1
+        }
+        return entries
+    }
+
+    /// The sections a lease of this kind names, or nil: only a build,
+    /// preview or publish lease may name any (#835).
+    static func sections(ofALeaseOfKind kind: String, text: String) -> [SectionEntry]? {
+        if !kindsThatMayNameSections.contains(kind.lowercased()) {
+            return nil
+        }
+        return WorkLeaseFiles.sectionsInLine(of: text)
+    }
+
+    /// One `<section>=<moment>` or `<section>=<moment>@<port>`, or nil.
+    static func sectionEntry(from word: String) -> SectionEntry? {
+        let halves: [Substring] = word.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+        if halves.count != 2 {
+            return nil
+        }
+        guard let section = Int(String(halves[0])), section > 0 else {
+            return nil
+        }
+        let rest: [Substring] = halves[1].split(separator: "@", omittingEmptySubsequences: false)
+        if rest.count > 2 {
+            return nil
+        }
+        let moment: String = String(rest[0])
+        if !WorkLeaseFiles.isAComparableMoment(moment) {
+            return nil
+        }
+        var port: Int? = nil
+        if rest.count == 2 {
+            guard let number = Int(String(rest[1])), number > 0, number < 65536 else {
+                return nil
+            }
+            port = number
+        }
+        return SectionEntry(section: section, moment: moment, port: port)
+    }
+
+    /// The sixth line for these entries, sections in ascending order, with no
+    /// line feed.
+    static func sectionsLine(_ sections: [SectionEntry]) -> String {
+        var ordered: [SectionEntry] = []
+        for entry in sections {
+            var place: Int = ordered.count
+            var index: Int = 0
+            while index < ordered.count {
+                if entry.section < ordered[index].section {
+                    place = index
+                    break
+                }
+                index += 1
+            }
+            ordered.insert(entry, at: place)
+        }
+        var line: String = sectionsLineTag
+        for entry in ordered {
+            line += " \(entry.section)=\(entry.moment)"
+            if let port = entry.port {
+                line += "@\(port)"
+            }
+        }
+        return line
     }
 
     /// A lease's third line, trimmed, or nil.

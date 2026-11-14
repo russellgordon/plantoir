@@ -24,7 +24,7 @@ class RealGoldenTests(unittest.TestCase):
         for line in text.split("\n"):
             if line.startswith("== "):
                 menus += 1
-            elif line.startswith("  ") and line.strip() != "----":
+            elif line.startswith("  ") and line.strip().split("  ")[0] != "----":
                 items += 1
         self.assertGreater(menus, 3)
         self.assertGreater(items, 50)
