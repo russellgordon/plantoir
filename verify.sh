@@ -598,8 +598,10 @@ fi
 
 # A deploy typed in Terminal holds a build and a publish lease while it works,
 # so the app's Deploy greys for it (GitHub #829): the real deploy.sh to a
-# folder, every case of workLeases.launcherLeases, the six lines, the ways out
-# a trap sees, and kill -9 leaving leases whose owner is gone.
+# folder, every case of workLeases.launcherLeases, its two trail lines, the
+# six lines, the start read in UTC across the hour the clocks go back, no
+# lease when the start cannot be read, the ways out a trap sees, and kill -9
+# leaving leases whose owner is gone.
 if (cd scripts && python3 test_deploy_sh_work_leases.py) >/tmp/verify_deploy_sh_work_leases_test.log 2>&1; then
   pass "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
 else

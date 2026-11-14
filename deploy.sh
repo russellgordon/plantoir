@@ -2351,18 +2351,35 @@ fi
 # assistant and deploy set for later already hold both leases for that
 # deploy. A lease of this run's own beside them would be a stranger's to the
 # app (another pid), so its window would read its own deploy as somebody
-# else's. A leftover run of a deploy set for later whose app has gone names a
-# process that is gone, and takes its own (#829's second case).
-# The rule and its cases are contracts/shared-rules.json -> workLeases
-# .launcherLeases.
+# else's. The variable is read once, here, when this run starts. So a
+# leftover run of a deploy set for later (#439) takes leases only when its
+# app had ALREADY gone by the time this deploy.sh started, for example the
+# deploy leg after the app was ended during the build leg. A deploy.sh that
+# was running when its app was ended saw a live app at its start and holds
+# none for the rest of its run (measured by the #829 implementation review:
+# leases held `[]`). The rule and its cases are contracts/shared-rules.json
+# -> workLeases.launcherLeases.
 #
 # The start is written in WHOLE seconds: a shell cannot read its own start to
 # the microsecond (`ps -o lstart` is to the second; macOS's sysctl tool does
 # not answer kern.proc.pid), and workLeases.liveness compares a start with no
-# point on its whole seconds. A lease left by `kill -9`, which runs no trap,
-# names a process that is gone, so every reader reads it as gone at once.
+# point on its whole seconds. Both `ps` and `date` are asked in UTC: `ps`
+# prints local time with no zone, and in the hour the clocks go back that
+# text names two different seconds, so a local reading could be an hour off
+# and the lease would read as gone. When the start cannot be read, no lease
+# is taken: a lease with an empty start is judged on its name alone
+# (workLeases.liveness), and any other bash handed this id later would then
+# grey Deploy. A lease left by `kill -9`, which runs no trap, names a process
+# that is gone, so every reader reads it as gone at once.
+#
+# Taking the leases and giving them back each leave a line on the trail
+# (activityTrail.mustRecord, the "task started" and "task finished" events'
+# launcher lines, named at the two calls below). A deploy the app started
+# takes no lease, so it writes neither: the app's own "started deploy.sh"
+# line is that deploy's record.
 WORK_LEASES_TAKEN=()
 WORK_LEASE_FOLDERS_MADE=()
+WORK_LEASE_PLACE=""
 
 # this_run_takes_work_leases HELD_BY: 0 (yes) unless HELD_BY is a process id
 # that is running now.
@@ -2381,12 +2398,13 @@ this_run_takes_work_leases() {
 }
 
 # work_lease_start_of PID: when PID started, in whole seconds since 1970, or
-# nothing when the table does not say.
+# nothing when the table does not say. Both calls in UTC (TZ=UTC0), so the
+# hour the clocks go back cannot make the text name the wrong second.
 work_lease_start_of() {
   local started
-  started="$(LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | sed 's/[[:space:]]*$//')"
+  started="$(TZ=UTC0 LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | sed 's/[[:space:]]*$//')"
   [[ -n "$started" ]] || return 0
-  LC_ALL=C date -j -f "%a %b %e %T %Y" "$started" +%s 2>/dev/null || true
+  TZ=UTC0 LC_ALL=C date -j -f "%a %b %e %T %Y" "$started" +%s 2>/dev/null || true
 }
 
 # take_the_work_leases COURSE SECTION: writes both leases atomically (a file
@@ -2398,6 +2416,11 @@ take_the_work_leases() {
   # Only when courses/ is there, as the mac's own writer does.
   [[ -d "$courses" ]] || return 0
   case "$section" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  # No start, no lease: an empty line 4 would be judged on the name alone.
+  started="$(work_lease_start_of "$$")"
+  case "$started" in
     ''|*[!0-9]*) return 0 ;;
   esac
   activity="${courses}/.internal/activity"
@@ -2412,7 +2435,6 @@ take_the_work_leases() {
   name="$(LC_ALL=C ps -o ucomm= -p "$$" 2>/dev/null | sed 's/[[:space:]]*$//')"
   [[ -n "$name" ]] || name="bash"
   moment="$(date -u +%Y-%m-%dT%H:%M:%S).0000000Z"
-  started="$(work_lease_start_of "$$")"
   body="$(printf '%s\n%s\n%s\n%s\n\nsections %s=%s' "$$" "$name" "$moment" "$started" "$section" "$moment")"
   for kind in build publish; do
     made="${activity}/$(printf '%s' "$course" | tr '[:lower:]' '[:upper:]').${kind}.$$.lease"
@@ -2422,6 +2444,11 @@ take_the_work_leases() {
       rm -f "${made}.writing" 2>/dev/null || true
     fi
   done
+  if [[ ${#WORK_LEASES_TAKEN[@]} -gt 0 ]]; then
+    WORK_LEASE_PLACE="${course}/${section}"
+    # contracts/shared-rules.json -> activityTrail.mustRecord."task started".launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection
+    note_on_the_trail "${WORK_LEASE_PLACE} · a deploy running outside Plantoir is holding this section while it works"
+  fi
   trap 'give_back_the_work_leases || true' EXIT
   # bash 3.2 runs no EXIT trap when a foreground command dies of a ^C sent to
   # the whole group (the token block below measured it, #835 review M1), so
@@ -2444,6 +2471,12 @@ give_back_the_work_leases() {
     rmdir "$folder" 2>/dev/null || true
   done
   WORK_LEASE_FOLDERS_MADE=()
+  # Once, only for a run that took them (the place is cleared after).
+  if [[ -n "$WORK_LEASE_PLACE" ]]; then
+    # contracts/shared-rules.json -> activityTrail.mustRecord."task finished".launcherLineWhenItLetsItsSectionGo
+    note_on_the_trail "${WORK_LEASE_PLACE} · the deploy running outside Plantoir has ended, and this section is free again" || true
+    WORK_LEASE_PLACE=""
+  fi
   return 0
 }
 # <<< WORK LEASE BLOCK <<<

@@ -2499,6 +2499,17 @@ build costs a minute, a reused stale one publishes last week's site.
    (`BuildFreshness.ChangedSince`, `test_build_freshness_reuse.py`). #799 has
    no fingerprint of its own: it is this rule on Windows. #800's digest is to
    be computed in that same walk, by each reader, after #799 lands.
+
+   **What a teacher sees while the limit stands:** the deploy reports
+   success and students get the last build's pages. It needs a clock that was
+   AHEAD while the build was made and later went back (set by hand, or
+   corrected by the network after it ran ahead); a synced, restored or
+   `cp -p` file is still caught, because its change time is local and
+   current. **Parity the digest owes beyond the time format** (the #829/#904
+   implementation review): the walk order and the Unicode form of file names
+   must match between BSD `find` and Python, since APFS keeps a name as it
+   was written. Sized by that review at about 8 to 10 agent-hours on the mac
+   and 4 to 5 on Windows.
 6. **Changed means strictly later.** A save at the very instant the build
    started reads as built, as before.
 

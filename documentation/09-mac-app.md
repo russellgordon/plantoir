@@ -922,12 +922,19 @@ in reserve was not built.
   launcher's guard refuses its press in words, and #729's first part widened
   what that guard sees ([03](03-launcher-scripts.md) → "A section being
   deployed cannot be deployed again (#439)"). Since #829 a deploy typed in
-  Terminal, and a leftover run (#439) whose app has gone, take a build and a
-  publish lease from `deploy.sh` itself, naming their section, so the button
-  greys for them like any other program's ([03](03-launcher-scripts.md) → "A
+  Terminal takes a build and a publish lease from `deploy.sh` itself, naming
+  its section, so the button greys for it like any other program's ([03](03-launcher-scripts.md) → "A
   deploy typed in Terminal takes a work lease (#829)"). The app's own children
   take none: `HelperPrograms.environment` hands every launcher
-  `PLANTOIR_LEASES_HELD_BY`, the app's own id. The help sentence does not name
+  `PLANTOIR_LEASES_HELD_BY`, the app's own id.
+- A leftover run of a deploy set for later (#439) whose `deploy.sh` was
+  already running when its app was ended. That `deploy.sh` read a live app
+  in the variable at its start and holds no lease (measured by the #829
+  implementation review: leases held `[]`); only a leg that starts after the
+  app has gone takes its own. The press meets the guard, in words. A
+  follow-up would have the app count a lease whose holder descends from it as
+  its own.
+- The help sentence does not name
   a Terminal deploy among the programs it lists (a question for Russell on
   #829).
 - A holder run by another account (its `Plantoir`, say). W7 shows that a

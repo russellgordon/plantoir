@@ -17,6 +17,11 @@ cases; contracts/file-formats.json -> workLease the shape. This file:
     normal end, a failed one, ^C to the group, SIGTERM and SIGHUP to bash
     alone), and that kill -9, which runs no trap, leaves them naming a
     process that is gone;
+  * checks the two trail lines (activityTrail.mustRecord "task started" and
+    "task finished", their launcher lines): written by a run that took the
+    leases, once each, and never by one the app started;
+  * checks the start is read in UTC, with a fixed clock in the hour the
+    clocks go back, and that a start that cannot be read means no lease;
   * and, for the cases that must never run here (--reset-token and --logout
     clear a saved sign-in; --plans needs the website builder), that the
     lease is taken only under the condition that leaves those out.
@@ -57,6 +62,35 @@ def _the_block() -> str:
     end = "# <<< WORK LEASE BLOCK <<<"
     assert text.count(begin) == 1 and text.count(end) == 1
     return text[text.index(begin):text.index(end)]
+
+
+def _the_trail_lines() -> tuple:
+    """The two launcher lines, as the contract writes them, for course C
+    section 1 (the course and section these tests deploy)."""
+    with open(REPOSITORY_ROOT / "contracts" / "shared-rules.json", encoding="utf-8") as handle:
+        entries = json.load(handle)["activityTrail"]["mustRecord"]
+    held = None
+    let_go = None
+    for entry in entries:
+        if entry["event"] == "task started":
+            held = entry["launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection"]
+        if entry["event"] == "task finished":
+            let_go = entry["launcherLineWhenItLetsItsSectionGo"]
+    assert held and let_go, "the contract names both launcher lines"
+    return (held.replace("{course}", "C").replace("{section}", "1"),
+            let_go.replace("{course}", "C").replace("{section}", "1"))
+
+
+# The second the fall-back hour makes ambiguous: 01:30 EST on Sunday
+# 1 November 2026, which America/Toronto also shows for 01:30 EDT an hour
+# earlier (1793511000).
+FALL_BACK_SECOND = 1793514600
+
+# A stand-in ps for work_lease_start_of: prints FALL_BACK_SECOND as `ps -o
+# lstart` does, in whatever zone it is given (the real ps uses localtime too).
+STAND_IN_PS = """#!/bin/bash
+LC_ALL=C /bin/date -r {second} "+%a %b %e %T %Y"
+""".format(second=FALL_BACK_SECOND)
 
 
 def _a_process_id_nobody_has() -> int:
@@ -122,6 +156,22 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
         with open(self.course / "notes" / "day-1.md", "a", encoding="utf-8") as handle:
             handle.write("edited\n")
         self.activity = self.folder / "courses" / ".internal" / "activity"
+        self.trail = self.tmp / "trail"
+
+    def _trail(self) -> list:
+        written = self.trail / "activity.txt"
+        if not written.exists():
+            return []
+        lines = []
+        for line in written.read_text(encoding="utf-8").splitlines():
+            # Each line opens with the moment it was written, then " · ".
+            lines.append(line.split(" · ", 1)[1])
+        return lines
+
+    def _forget_the_trail(self):
+        written = self.trail / "activity.txt"
+        if written.exists():
+            written.unlink()
 
     def _environment(self, held_by):
         environment = dict(os.environ)
@@ -129,6 +179,10 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
         environment.pop("PWD", None)
         environment["RSYNC_RSH"] = "false"
         environment.pop("PLANTOIR_LEASES_HELD_BY", None)
+        # This test's own trail, so it can read the lines this run wrote
+        # (launcher_test_trail above still keeps every other run's away from
+        # the real trail).
+        environment["PLANTOIR_TRAIL_DIR"] = str(self.trail)
         if held_by is not None:
             environment["PLANTOIR_LEASES_HELD_BY"] = held_by
         return environment
@@ -165,10 +219,12 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
             "gone": str(_a_process_id_nobody_has()),
             "notANumber": "the app",
         }
+        held_line, let_go_line = _the_trail_lines()
         for case in _the_rule()["cases"]:
-            if case["arguments"][0] != "--to-folder":
+            if case["arguments"][0] != "--to-folder" or "start" in case:
                 continue
             with self.subTest(case=case["name"]):
+                self._forget_the_trail()
                 seen = self.folder / "seen"
                 if seen.exists():
                     shutil.rmtree(seen)
@@ -181,6 +237,14 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
                 self.assertEqual(self._kinds_seen(), sorted(case["expect"]))
                 self.assertFalse(self.activity.exists(), "the leases and the folders made for them are gone")
                 self.assertFalse((self.folder / "courses" / ".internal").exists())
+                ours = []
+                for line in self._trail():
+                    if "outside Plantoir" in line:
+                        ours.append(line)
+                if case["expect"]:
+                    self.assertEqual(ours, [held_line, let_go_line], "once each, in order")
+                else:
+                    self.assertEqual(ours, [], "a deploy the app started writes neither line")
 
     def test_the_six_lines_are_the_formats(self):
         result = self._deploy()
@@ -214,6 +278,59 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
         start, listed = result.stdout.decode().strip().split("|")
         stamp = time.mktime(time.strptime(listed.strip(), "%a %b %d %H:%M:%S %Y"))
         self.assertEqual(int(start), int(stamp))
+
+    def test_the_start_is_read_in_utc_in_the_hour_the_clocks_go_back(self):
+        """A fixed clock: a stand-in ps that prints one second of the fall-back
+        hour in the zone it is given. Read in Toronto's local time (the code
+        before the fix) that text names 01:30 EDT, an hour early, and the
+        lease would read as gone for the deploy's whole life."""
+        bin_folder = self.tmp / "bin"
+        bin_folder.mkdir()
+        (bin_folder / "ps").write_text(STAND_IN_PS, encoding="utf-8")
+        (bin_folder / "ps").chmod(0o755)
+        environment = dict(os.environ)
+        environment["PATH"] = f"{bin_folder}:/usr/bin:/bin"
+        environment["TZ"] = "America/Toronto"
+        script = _the_block() + 'work_lease_start_of "$$"\n'
+        result = subprocess.run(["/bin/bash", "-c", "set -euo pipefail\n" + script],
+                                capture_output=True, timeout=30, env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+        self.assertEqual(result.stdout.decode().strip(), str(FALL_BACK_SECOND))
+
+    def test_a_start_that_cannot_be_read_takes_no_lease(self):
+        """workLeases.launcherLeases' case with start unreadable: the block's
+        own take_the_work_leases, with work_lease_start_of answering nothing,
+        writes no lease, makes no folder and leaves no trail line."""
+        case = None
+        for each in _the_rule()["cases"]:
+            if each.get("start") == "unreadable":
+                case = each
+        self.assertIsNotNone(case, "the contract holds the case")
+        self.assertEqual(case["expect"], [])
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        begin = text.index("note_on_the_trail() {")
+        note = text[begin:text.index("\n}\n", begin) + 3]
+        script = "\n".join([
+            "set -euo pipefail",
+            note,
+            _the_block(),
+            "work_lease_start_of() { return 0; }",
+            'take_the_work_leases C 1',
+            # Asked while the deploy would work, before anything is given back.
+            'if [[ -d courses/.internal ]]; then echo HELD; fi',
+            'give_back_the_work_leases',
+            "echo DEPLOYED",
+        ])
+        environment = dict(os.environ)
+        environment["PLANTOIR_TRAIL_DIR"] = str(self.trail)
+        result = subprocess.run(["/bin/bash", "-c", script], cwd=str(self.folder),
+                                capture_output=True, timeout=30, env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+        self.assertIn("DEPLOYED", result.stdout.decode())
+        self.assertNotIn("HELD", result.stdout.decode(), "no lease and no folder while it works")
+        self.assertFalse(self.activity.exists())
+        self.assertFalse((self.folder / "courses" / ".internal").exists())
+        self.assertEqual(self._trail(), [])
 
     def test_an_activity_folder_that_was_there_stays(self):
         self.activity.mkdir(parents=True)
@@ -267,8 +384,10 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
             time.sleep(0.05)
 
     def test_the_ways_out_a_trap_sees_give_them_back(self):
+        held_line, let_go_line = _the_trail_lines()
         for how in ("interrupt the group", "terminate bash", "hang up bash"):
             with self.subTest(how=how):
+                self._forget_the_trail()
                 building = self.folder / "building"
                 if building.exists():
                     building.unlink()
@@ -284,6 +403,11 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
                 process.wait(timeout=60)
                 self._let_the_stand_in_finish()
                 self.assertFalse(self.activity.exists(), how)
+                ours = []
+                for line in self._trail():
+                    if "outside Plantoir" in line:
+                        ours.append(line)
+                self.assertEqual(ours, [held_line, let_go_line], how)
 
     def test_kill_9_leaves_them_naming_a_process_that_is_gone(self):
         process = self._start_and_wait_for_the_build(new_group=True)
@@ -295,6 +419,9 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
         self.assertEqual(names, [f"C.build.{pid}.lease", f"C.publish.{pid}.lease"])
         with self.assertRaises(ProcessLookupError):
             os.kill(pid, 0)
+        held_line, let_go_line = _the_trail_lines()
+        self.assertIn(held_line, self._trail())
+        self.assertNotIn(let_go_line, self._trail(), "kill -9 runs no trap, so no second line")
 
 class TheRunsThatMustNotHoldOne(unittest.TestCase):
     """--reset-token and --logout clear a saved sign-in, and --plans needs the
@@ -318,7 +445,9 @@ class TheRunsThatMustNotHoldOne(unittest.TestCase):
         for case in _the_rule()["cases"]:
             if not case["expect"]:
                 empty.append(case["arguments"][0] if case["heldBy"] == "absent" else case["heldBy"])
-        self.assertEqual(sorted(empty), ["--logout", "--plans", "--reset-token", "running"])
+            if case.get("start") == "unreadable":
+                empty[-1] = "unreadable start"
+        self.assertEqual(sorted(empty), ["--logout", "--plans", "--reset-token", "running", "unreadable start"])
 
     def test_every_later_exit_trap_gives_them_back(self):
         """A later `trap … EXIT` replaces an earlier one, so every EXIT trap

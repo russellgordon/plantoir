@@ -83,8 +83,10 @@ nonisolated enum HelperPrograms {
     /// process this names is running, because every door of the app that
     /// runs deploy.sh (the window, the in-app assistant, `--mcp-stdio`, a
     /// deploy set for later) holds both leases itself, and a lease of the
-    /// child's own would be a stranger's to this app. A leftover run whose
-    /// app has gone names a process that is gone, and takes its own.
+    /// child's own would be a stranger's to this app. deploy.sh reads it once,
+    /// when it starts, so a leftover scheduled run takes its own leases only
+    /// for a deploy.sh that started after this app had gone; one that was
+    /// already running when the app was ended holds none.
     /// `contracts/shared-rules.json` → `workLeases.launcherLeases`.
     static let leasesHeldByVariable: String = "PLANTOIR_LEASES_HELD_BY"
 

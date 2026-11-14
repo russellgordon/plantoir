@@ -2566,8 +2566,7 @@ Since v2.0.0 ([#829](https://github.com/russellgordon/plantoir/issues/829)).
 The app greys Deploy for a course another program holds a build, publish or
 preview lease on (#729, [09](09-mac-app.md) → "Deploy waits for another
 program (#729)"). Until #829 a `deploy.sh` typed in Terminal held
-none, and nor did a leftover run of a deploy set for later whose app had gone
-(#439), so the button stayed pressable and the press was refused only by the
+none, so the button stayed pressable and the press was refused only by the
 guard above, in words. Measured before the change, with the real `deploy.sh`
 deploying to a folder in a scratch working folder and a stand-in build that
 listed `courses/.internal/activity` during the deploy's own build: no activity
@@ -2585,8 +2584,40 @@ changes: `take_the_work_leases` writes `<COURSE>.build.<pid>.lease` and
 `courses/.internal` and its `activity` folder only if they are missing, and
 `give_back_the_work_leases` removes the leases by their own paths and those
 folders if they are left empty, so a launcher test's working folder ends as it
-began. The rule and its seven cases are `shared-rules.json` → `workLeases
+began. The rule and its eight cases are `shared-rules.json` → `workLeases
 .launcherLeases`.
+
+**The start is read in UTC.** `ps -o lstart` prints local time with no zone,
+and `date -j -f` parses it in local time. In the hour the clocks go back that
+text names two seconds an hour apart: measured by the #829 implementation
+review with `TZ=America/Toronto`, a process started at 01:30 EST (1793514600)
+was read as 01:30 EDT (1793511000), so its lease would read as GONE for the
+deploy's whole life. Both calls in `work_lease_start_of` carry `TZ=UTC0`.
+`scripts/test_deploy_sh_work_leases.py` holds it with a fixed clock: a
+stand-in `ps` that prints that one second in whatever zone it is given, the
+function run under `TZ=America/Toronto`; on the file before the fix it reads
+1793511000.
+
+**No start, no lease.** When `work_lease_start_of` prints nothing (`ps` or
+`date` failed), the run takes no lease rather than writing an empty line 4.
+A lease with no start is judged on its name alone (`workLeases.liveness`,
+the case "a bash lease with an EMPTY start"), so any later `bash` handed the
+same id would grey Deploy for its whole life; the review measured exactly that
+(a recycled `bash`, line 4 empty: alive). Taking none errs the way `deploy.sh`
+did before #829: Deploy stays pressable and the guard refuses in words. The
+case "its own start cannot be read" holds it.
+
+**On the trail.** When it takes the leases, `deploy.sh` writes one line
+through `note_on_the_trail`, and one more when it gives them back
+(`activityTrail.mustRecord` → "task started" →
+`launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection`, and "task
+finished" → `launcherLineWhenItLetsItsSectionGo`; course code and section
+only). A forgotten Terminal window sitting at one of `deploy.sh`'s questions
+now greys that section until it is closed, and "Deploy was grey all
+afternoon" needs a line to start from (CLAUDE.md rule 5, the review's I2). A
+deploy the app started takes no lease and so writes neither line, so nothing
+is written twice; `kill -9` writes no second line, and its lease reads as gone
+at once.
 
 **When it takes none.** For `--reset-token` and `--logout` (nothing is
 deployed), for `--plans` (course-wide sharing, left as it was), and when
@@ -2596,8 +2627,21 @@ variable to its own id on every launcher it starts
 `deploy.sh` (the window, the in-app assistant, `--mcp-stdio`, a deploy set for
 later) already holds both leases, and a second pair under the child's id would
 be a stranger's to the app: its window would grey its own other sections in
-another program's words. A leftover run whose app has gone names a dead id,
-so its `deploy.sh` takes its own.
+another program's words.
+
+**A leftover scheduled run is covered only in part.** The variable is read
+once, when `deploy.sh` starts. A leftover run (#439) is one whose app was
+ended while its script carried on, and that usually happens while `deploy.sh`
+is already running, since a scheduled run spends most of its time there. Such
+a `deploy.sh` saw a live app at its start and holds no lease for the rest of
+its run: measured by the #829 implementation review, the holder alive at the
+start and killed during the deploy's build, leases held `[]`. Only a
+`deploy.sh` that STARTS after its app has gone (the deploy leg after the app
+was ended during the build leg) takes its own. The rest err the old way:
+Deploy stays pressable and the guard refuses in words. Closing it for real
+means the app counting a lease whose holder descends from it as its own (the
+process table gives each process's parent), so the child could always take
+its leases; that is a follow-up issue, not this piece.
 
 **Given back on every way out a trap sees.** A later `trap … EXIT` replaces an
 earlier one, so the two EXIT traps set after the leases (the getting-ready
@@ -2627,7 +2671,9 @@ other `bash` would grey Deploy for that process's life); reading the
 microseconds with perl or osascript (not a launcher's tools, and no host
 Python on a teacher's Mac); the child taking leases beside the app's and the
 app telling its own child's from a stranger's (it does not know its children's
-ids at the moment it reads the folder, for the scheduled wrapper's legs);
+ids at the moment it reads the folder, for the scheduled wrapper's legs; the
+review found the process table can answer that through each holder's parent,
+which is the follow-up above);
 leases from `preview.sh --build-only` typed in Terminal too (not #829's case;
 the guard still refuses it in words). Known limits: the moment is to the
 second, so an app lease taken later in the same second reads the Terminal

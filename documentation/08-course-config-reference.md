@@ -221,6 +221,19 @@ folder deploy announces no site address for the link to wear, and corrected
 for the rule's sake). On Windows' #799 branch, `deploy.py` gained its own
 `leg_custom_domain`, which already follows the rule; once #799 merges it is to
 call `custom_domains.for_destination` rather than keep a second copy.
+One baked address moves, and only one (the #904 implementation review, old
+tree against new): a course whose primary is a FOLDER, with the older bare
+string and a Netlify (or Cloudflare) secondary, used to bake the bare string
+into its build's baseUrl, and now bakes what step 2 of
+`resolve_section_domain` finds, the web destination's own site address (for
+Netlify, the `.netlify.app` address from the section's site record). So the
+sitemap, the feed and the sharing card's address follow that host's own
+address. The app's link for the secondary never showed the bare string, so the
+two now agree, and both addresses serve the site. A map entry, and a bare
+string on a web primary, bake the same address as before. An empty
+`deploy_target` is read as Netlify, as an absent one is (the case "an EMPTY
+deploy_target").
+
 REJECTED: leaving the reader inside `build_site.py` for `deploy.py` to import
 (it pulls in the whole build and its `frontmatter` dependency to read one
 key), and moving it into `toolchain_paths.py` (it is not a path).
