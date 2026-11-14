@@ -319,12 +319,25 @@ class KeptDownloadsTests(unittest.TestCase):
                 if case["layout"] == "buildRoot":
                     environ["PLANTOIR_BUILD_ROOT"] = str(builds)
                 elif case["layout"] == "link":
-                    link.symlink_to(builds / "SCH3U", target_is_directory=True)
+                    # Windows lets an ordinary account make a symbolic link only
+                    # with Developer Mode on; without it symlink_to raises
+                    # WinError 1314, as test_dates_follow_the_class.py's
+                    # _link_or_skip records. The machine's setting, not the
+                    # build's behaviour, so the case skips and says why.
+                    try:
+                        link.symlink_to(builds / "SCH3U", target_is_directory=True)
+                    except OSError as error:
+                        if getattr(error, "winerror", None) == 1314:
+                            self.skipTest("this Windows account may not make symbolic links (WinError 1314, "
+                                          "Developer Mode off); the case runs on the mac and in the container")
+                        raise
                 else:
                     link.mkdir()
                 expected = case["expect"].replace("{buildRoot}", str(builds)).replace(
                     "{builds}", str(builds.resolve())).replace("{course}", str(course))
-                self.assertEqual(str(kept_downloads.root_for(course, environ=environ)), expected)
+                # Compared as paths, not as strings: the contract writes "/",
+                # and Windows joins with "\\".
+                self.assertEqual(kept_downloads.root_for(course, environ=environ), Path(expected))
 
     def test_the_folder_is_the_one_the_contract_names(self):
         self.assertEqual(kept_downloads.FOLDER, kept_rules("where", "folder"))

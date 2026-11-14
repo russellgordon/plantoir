@@ -99,7 +99,8 @@ struct FailureExplainer {
     /// The words every first line of a build's stop for a file its pages
     /// use and that could not be downloaded carries, whatever the reason
     /// (#674): `shared-rules.json` → `keptDownloads.stop.markerWords` and
-    /// `markerWordsAlso`. Pinned to the contract by `AppRulesContractTests`.
+    /// `markerWordsAlso`. Pinned to the contract by
+    /// `KeptDownloadsReportTests.testTheStopsMarkerWordsAreTheContracts`.
     static let keptDownloadsStopMarkers: [String] = ["was not built: ", "that its pages use"]
 
     /// `keptDownloads.stop.explained`: the lifted first line, then the place

@@ -1483,6 +1483,21 @@ function rowsWanted() {
 async function runPage(browser, engine, base, pageName, rows, network, fullQuiet = true) {
   const outcomes = []
   const pageRows = rows.filter((row) => row.page === pageName && (!row.engines || row.engines.includes(engine)))
+  // With no PhET copy on this Mac, verify.sh takes the Simulation page out of
+  // the build (rendered_phet_copy) and says so in PLANTOIR_RENDERED_NO_PHET.
+  // The page is then not opened at all: its own rows AND the rows every page
+  // carries are SKIPS by name for it, never a failure for the server's 404
+  // (measured 2026-11-13: both engines log "Failed to load resource" for the
+  // missing page, which the clean-page row would report).
+  const absentCopy = process.env.PLANTOIR_RENDERED_NO_PHET
+  if (absentCopy && pageRows.some((row) => row.needsCopy === "phet")) {
+    const why = `no copy of the simulation on this Mac, so the ${pageName} page is not in the site - ${absentCopy}`
+    for (const row of pageRows) outcomes.push({ row: row.name, state: "SKIPPED", detail: why })
+    for (const row of rows) {
+      if (row.page === "*" && !(row.except ?? []).includes(pageName)) outcomes.push({ row: row.name, state: "SKIPPED", detail: why })
+    }
+    return outcomes
+  }
   const { context, record } = await openContext(browser, engine, new URL(base).origin, pageName)
   try {
     if (pageRows.some((row) => row.name === "print")) await context.addInitScript(PRINT_PROBE)

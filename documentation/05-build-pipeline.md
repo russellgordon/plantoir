@@ -3735,10 +3735,9 @@ and `scripts/test_phet.py` runs every case.
    `phetFences.stop.passFails`). An answer of a shape nobody foresaw that
    slips past the checks, a full disk, a folder that cannot be written: when
    any page students can see shows a simulation, the build stops with
-   `keptDownloads.stop.first.notReady` ("could not be made ready on this
-   computer", ending with the Help menu's Report a Problem item,
-   `help/menu-paths.json` → `helpReportAProblem`, in the form the app's
-   other sentences already give it), naming each
+   `keptDownloads.stop.first.notReady` (which ends with the Help menu's
+   Report a Problem item, `help/menu-paths.json` → `helpReportAProblem`,
+   in the form the app's other sentences already give it), naming each
    simulation and page it can still find. When the visibility rule itself is
    what failed, every Markdown file of the course is read as text for its
    fences; when even that cannot be told, it stops naming nothing (`{what}`
@@ -3770,10 +3769,15 @@ and `scripts/test_phet.py` runs every case.
    `kept_downloads.Fetcher(<its hosts>)` to download;
    `kept_downloads.Store(kept_downloads.root_for(course_dir), "sounds")`,
    `.put(name, version, files, expected=<the pinned SHA-256s>)` and
-   `.get(name, version, expected=...)`; and when a sound is missing and
-   cannot be downloaded, `kept_downloads.stop_lines("sounds", ...)` then
+   `.get(name, version, expected=...)`; `.prune(now)` once its pass is
+   done, as `phet.prepare` does; and when a sound is missing and cannot be
+   downloaded, `kept_downloads.stop_lines("sounds", ...)` then
    `kept_downloads.marker_line(...)`, printed before `sys.exit(1)` as
-   `build_site._stop_for_phet` does. Not the folder, not the apps' sweep
+   `build_site._stop_for_phet` does. One more table gains the kind: each
+   app's words for a kind (`KeptDownloadsReport.kindWords` on the Mac, its
+   counterpart on Windows), because
+   `KeptDownloadsReportTests.testTheWordsAreTheContracts` holds that table's
+   keys to `keptDownloads.kinds`. Not the folder, not the apps' sweep
    exception, not the trail events and not the failure explanation change.
 9. **The apps' sweep keeps it.** `BuildOutputLocation.discardBuildsForMissingCourses`
    removes every entry of a working folder's builds folder that is not a
@@ -3844,7 +3848,7 @@ places.** `scripts/phet.py` does everything that can fail; the contract is
    button names), projectile-motion 4,759,792 (1,367,293); a picture
    124,133. Times: 0.14 s for gas-properties on this Mac's line; a school
    line was not measured.
-6. **The stop** (`phetFences.stop`, seven cases; `keptDownloads.stop`). Not
+6. **The stop** (`phetFences.stop`, eight cases; `keptDownloads.stop`). Not
    kept, and PhET cannot be reached (no answer, a refusal, a timeout, a
    server error, a redirect elsewhere, a cut-off body): the build stops,
    `offline`. Not kept, and what came is not a simulation (a captive portal's

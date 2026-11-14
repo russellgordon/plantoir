@@ -2544,8 +2544,9 @@ def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, fu
 def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config: dict,
                   course_code: str, section_number) -> dict:
     """
-    PhET simulations (#674; scripts/phet.py), ALWAYS: every ```phet and
-    ~~~phet fence on the pages students can see, by the gate's own
+    PhET simulations (#674; scripts/phet.py), ALWAYS: every phet fence
+    (```phet and ~~~phet, with or without spaces before the language, so the
+    pages are found by the word `phet` alone) on the pages students can see, by the gate's own
     visibility rule, read, its simulation found among the copies this
     computer keeps (keptDownloads: the working folder's builds folder,
     .downloaded/phet) or downloaded from PhET now and kept, and handed to the

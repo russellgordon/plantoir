@@ -4952,12 +4952,13 @@ the deployed test sites on every host in a list.
 |---|---|
 | `browser-checks/rendered_features.mjs` | the checker: `--site <folder>` serves a built site itself, `--base <url/> --host <name>` reads a deployed one; `--expect-red <sabotage>\|all` proves the rows see |
 | `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host. Data both platforms run |
-| `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
+| `browser-checks/fixtures/rendered/` | twelve Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor, Simulation) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
+| `browser-checks/lib/plant_phet.py` | `fetch` downloads the Simulation page's PhET simulation once into the dev cache (`PLANTOIR_PHET_CACHE`, else `~/Library/Caches/Plantoir-dev/phet`), refusing a file whose SHA-256 is not the one `rendered_rows.json` pins; `plant` puts it where a build keeps its downloads, so the fixture build asks PhET nothing (#674). Run `fetch` once per Mac: with no copy the Simulation page is left out and its rows are SKIPS by name, and with `PLANTOIR_REQUIRE_ENGINES` set a missing copy is a FAILURE |
 
 **The rows** are `rendered_rows.json` → `rows`, each with the words it passes
 on: mermaid (drawn, and drawn again after the site's own dark-mode button),
@@ -4965,7 +4966,7 @@ katex, tikz, graph, python (Run, then a line typed live where the host
 isolates the page), swift, quiz (the contract's words), tasks, progress,
 geogebra, geogebra drag, geogebra reset, geogebra keys (#807's three: the
 drag, the reset and keys while lines run), embeds (deployed sites only),
-pdf, print, copy (#759), heading anchor (#604, ported from
+phet (#674), pdf, print, copy (#759), heading anchor (#604, ported from
 `heading_anchor.mjs`), and on every page fonts, clean page and own host;
 cold visit (#625) in WebKit only. Presses are Playwright's own, which wait
 for the element to be visible, still and topmost at its centre and then

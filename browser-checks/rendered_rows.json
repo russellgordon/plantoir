@@ -16,7 +16,7 @@
     "Simulation": "Rendered-Check/Simulation"
   },
   "phetFixture": {
-    "why": "#674. The simulation the Simulation page names, which the repository never carries (PhET's licence and Russell's ruling: a class site carries a copy, Plantoir does not). browser-checks/lib/plant_phet.py fetch downloads it once into the dev cache (PLANTOIR_PHET_CACHE, else ~/Library/Caches/Plantoir-dev/phet), refusing any file whose SHA-256 is not the one here, and plant_phet.py plant puts it where a build keeps its downloads (keptDownloads.where), so the fixture build asks PhET nothing. No copy on the Mac: the phet row and its sabotages are SKIPS by name; PLANTOIR_REQUIRE_ENGINES makes that a failure in verify.sh.",
+    "why": "#674. The simulation the Simulation page names, which the repository never carries (PhET's licence and Russell's ruling: a class site carries a copy, Plantoir does not). browser-checks/lib/plant_phet.py fetch downloads it once into the dev cache (PLANTOIR_PHET_CACHE, else ~/Library/Caches/Plantoir-dev/phet), refusing any file whose SHA-256 is not the one here, and plant_phet.py plant puts it where a build keeps its downloads (keptDownloads.where), so the fixture build asks PhET nothing. No copy on the Mac: the Simulation page is left out of the build and is not opened, so the phet row, its sabotages and the every-page rows for that page are SKIPS by name; PLANTOIR_REQUIRE_ENGINES makes that a failure in verify.sh.",
     "sim": "gas-properties",
     "project": "html/gas-properties",
     "version": "1.1.12",

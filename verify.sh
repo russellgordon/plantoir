@@ -5703,6 +5703,15 @@ def tasks(html):
     return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
 def has_file(href):
     return (public / href.lstrip("./")).is_file()
+def phet_credit_reads(html_text):
+    """Every PhET credit line on the page reads PhET's sentence, as the
+    contract has it (phetFences.attribution.sentence), its links' words
+    included; at least one is there (#674)."""
+    import html as html_module, json
+    sentence = json.loads(Path("contracts/shared-rules.json").read_text(encoding="utf-8"))["phetFences"]["attribution"]["sentence"]
+    lines = re.findall(r'<p class="pl-phet-attribution">(.*?)</p>', html_text or "", re.S)
+    read = [" ".join(html_module.unescape(re.sub(r"<[^>]+>", "", line)).split()) for line in lines]
+    return len(read) > 0 and all(one == sentence for one in read)
 def geogebra_specs(html_text):
     import html as html_module, json
     return [json.loads(html_module.unescape(spec)) for spec in
@@ -5768,7 +5777,7 @@ claims = [
      and 'geogebra.org' not in a and 'phet.colorado.edu/sims' not in a),
     ("sim: gas-properties", "a PhET simulation from the site's own copy, with PhET's credit line (#674)",
      lambda a, p: 'class="pl-figure pl-phet"' in a and "static/phet/gas-properties/" in a
-     and "Simulation by PhET Interactive Simulations, University of Colorado Boulder, licensed under" in a
+     and phet_credit_reads(a)
      and has_file("static/phet/gas-properties/index.html") and has_file("static/phet/gas-properties/ABOUT.txt")),
     ("file: Slope Angle Conjecture.ggb", "two GeoGebra sketches: a file found in Media and one from commands (#578)",
      lambda a, p: [spec.get("sketch") for spec in geogebra_specs(a)] == ["Media/Slope-Angle-Conjecture.ggb", None]
@@ -6295,8 +6304,9 @@ rendered_lines() {
 }
 # The Simulation page's PhET simulation (#674), planted where the fixture
 # build keeps its downloads, so the build asks PhET nothing; with no copy
-# on this Mac (PHET_COPY_MISSING, set before 6n) the page is taken out and
-# the phet row and its sabotages are SKIPS by name.
+# on this Mac (PHET_COPY_MISSING, set before 6n) the page is taken out, and
+# the phet row, its sabotages and the every-page rows for that page are
+# SKIPS by name (rendered_features.mjs runPage does not open it).
 rendered_phet_copy() {
   if [[ -n "${PHET_COPY_MISSING:-}" ]]; then
     rm -f "$RENDERED_DIR/courses/EXC2O/Rendered Check/Simulation.md"
