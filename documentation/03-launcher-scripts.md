@@ -3128,10 +3128,26 @@ trail, so the lines #738 found on 2026-11-01 had already stopped with #737;
 the helper keeps a new test from starting again. Two of the 26 run in the
 image (`test_coverage_tab`, `test_published_pages_record`), and `verify.sh`
 mounts the helper beside them, which `test_image_runs_find_their_modules.py`
-checks. Rejected: a source scan for a `HOME` or `PLANTOIR_TRAIL_DIR` in each
-launcher's environment, which cannot tell a scratch `HOME` from the real one;
-and running the 26 launcher tests under a scratch `HOME` as the proof, which
-took 333 s in that measurement (`test_port_blocks.py` alone 208 s).
+checks.
+
+The helper reaches only an environment copied from `os.environ`. Eleven of
+the 26 files build theirs from scratch, as a dict literal naming `PATH` and
+`HOME`, and the variable never reaches those. They are safe because each
+replaces `HOME` with a scratch folder, so a second rule in the same file
+reads every such literal and fails one whose `HOME` is taken from the real
+one (`os.environ`, `os.getenv`, `Path.home`, `expanduser`) unless it names
+`PLANTOIR_TRAIL_DIR` itself. On 2026-11-13 it found one:
+`test_port_blocks.py`'s run of the port-listing functions passed the real
+`HOME` and no variable. Those functions write no trail, so nothing leaked,
+and it now passes the helper's folder. The rule is a reading of the source,
+so a `HOME` built some other way from the real one would pass it. Off
+POSIX the two runs of the real function are skipped, the way
+`test_trail_lock` skips its own: under Git Bash a temporary folder is a
+drive-letter path, which `note_on_the_trail` rightly does not take, so the
+line would fall back to `HOME`. Rejected: running the 26 launcher tests
+under a scratch `HOME` as the proof, which took 333 s in that measurement
+(`test_port_blocks.py` alone 208 s). That run stays the one proof this
+leaves out.
 
 **Windows (#682).** `Write-TrailLine` in `preview.ps1` and `deploy.ps1` (one
 function, byte-identical in both) takes `PLANTOIR_TRAIL_DIR` when it is
