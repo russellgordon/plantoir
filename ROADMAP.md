@@ -155,9 +155,6 @@ ready.
   is still arriving, the sketch's box says so, inside the box, instead of
   standing empty; and the reset icon puts a sketch back to how it opened.
   ([#756](https://github.com/russellgordon/plantoir/issues/756), [#792](https://github.com/russellgordon/plantoir/issues/792))
-- **A cleaner picture when a link to your class site is shared:**
-  near-white, with dark green titles.
-  ([#842](https://github.com/russellgordon/plantoir/issues/842))
 - **Better guidance for an assistant writing your pages and handouts.**
   The notes Claude Code, Codex or GitHub Copilot read before writing a page or a printed
   handout are brought up to date: copyable text that wraps, lettered parts
