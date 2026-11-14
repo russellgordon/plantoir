@@ -357,8 +357,14 @@ struct SectionMenu: Commands {
 
 /// Revise With ▸ Claude… / Codex… / GitHub Copilot… / Local AI Assistant…,
 /// in both subject menus. Each target is DRAWN only when this Mac has it (presence) and
-/// ENABLED by the rule; the submenu itself is left out when there is
-/// nothing to put in it. The reasons an item is greyed (#458) follow it.
+/// ENABLED by the rule. The reasons an item is greyed (#458) follow it.
+///
+/// **Always drawn since #855** (Russell, 2026-11-13: Revise With is always
+/// shown), ending with Set Up an Assistant… after a divider, which
+/// opens Settings ▸ Other Assistants and installs nothing itself. A teacher
+/// with no assistant at all sees the submenu with that one item. Until #855
+/// the submenu was left out when there was nothing to put in it, so a
+/// teacher with none saw no sign that any existed.
 struct ReviseWithMenu: View {
 
     // MARK: - Stored properties
@@ -379,36 +385,38 @@ struct ReviseWithMenu: View {
     // MARK: - Body
 
     var body: some View {
-        if presence.anyReviseTargetExists {
-            Menu("Revise With") {
-                if presence.claudeIsInstalled {
-                    Button(ClaudeCodeLauncher.menuItemTitle) {
-                        run(claude)
-                    }
-                    .disabled(!enabled.contains(claude))
+        Menu("Revise With") {
+            if presence.claudeIsInstalled {
+                Button(ClaudeCodeLauncher.menuItemTitle) {
+                    run(claude)
                 }
-                if presence.codexIsInstalled {
-                    Button(CodexLauncher.menuItemTitle) {
-                        run(codex)
-                    }
-                    .disabled(!enabled.contains(codex))
-                }
-                if presence.copilotIsInstalled {
-                    Button(CopilotLauncher.menuItemTitle) {
-                        run(copilot)
-                    }
-                    .disabled(!enabled.contains(copilot))
-                }
-                if presence.localAssistantCanRun {
-                    Button(ReviseWithMenu.localAssistantTitle) {
-                        run(localAssistant)
-                    }
-                    .disabled(!enabled.contains(localAssistant))
-                }
-                ForEach(notes, id: \.self) { note in
-                    Text(note)
-                }
+                .disabled(!enabled.contains(claude))
             }
+            if presence.codexIsInstalled {
+                Button(CodexLauncher.menuItemTitle) {
+                    run(codex)
+                }
+                .disabled(!enabled.contains(codex))
+            }
+            if presence.copilotIsInstalled {
+                Button(CopilotLauncher.menuItemTitle) {
+                    run(copilot)
+                }
+                .disabled(!enabled.contains(copilot))
+            }
+            if presence.localAssistantCanRun {
+                Button(ReviseWithMenu.localAssistantTitle) {
+                    run(localAssistant)
+                }
+                .disabled(!enabled.contains(localAssistant))
+            }
+            ForEach(notes, id: \.self) { note in
+                Text(note)
+            }
+            if presence.anyReviseTargetExists {
+                Divider()
+            }
+            SetUpAnotherAssistantButton(title: AssistantSetUpWording.menuItem, from: .reviseWith)
         }
     }
 }

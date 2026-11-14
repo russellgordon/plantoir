@@ -4577,7 +4577,7 @@
      "question": "How do I get Claude Code, Codex or GitHub Copilot working with Plantoir?",
      "about": "Setting up Claude Code, Codex or GitHub Copilot's command-line tool from inside Plantoir (#855).",
      "steps": [
-      "Where it is offered: Settings, the Help menu, and Revise With > Set Up Another Assistant...",
+      "Where it is offered: Settings, the Help menu, and Revise With > Set Up an Assistant...",
       "Choose the assistant; Plantoir runs its maker's installer and checks it",
       "Sign in, in the browser",
       "Plantoir confirms it works",
@@ -4752,7 +4752,7 @@
      "id": "revise-with",
      "section": "Optional: working with an assistant",
      "status": "amended",
-     "amendment": "Revise With is always shown (#855); with no assistant it holds only Set Up Another Assistant...; GitHub Copilot... listed after Codex...",
+     "amendment": "Revise With is always shown (#855); with no assistant it holds only Set Up an Assistant...; GitHub Copilot... listed after Codex...",
      "factSheets": [
       "FS-11-the-assistant-section.md"
      ],

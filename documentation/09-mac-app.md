@@ -1268,7 +1268,8 @@ in place of the plain greeting. Every word, number and case is
 is installed, read from `OutsideAssistantPresence` (asked at launch and when
 the app becomes active, never while the table draws — the view's source scan
 holds that it never calls `isAvailable`), and never on a course kept for
-reference: HIDDEN, never greyed, as Revise With ▸ (`hiddenWhenNotInstalled`).
+reference: HIDDEN, never greyed, as Revise With ▸'s door items (`hiddenWhenNotInstalled`;
+the submenu itself has been drawn always since #855, with its set-up item).
 They are enabled while at least one row is handed over: ticked (absent means
 ticked) AND not `fixedInTheSource`. A ticked row another section's later build
 shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
@@ -16924,3 +16925,31 @@ does not match, a canonicalised `..`), the excluded port ranges inside and
 below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
 whether an unelevated shell may listen on the block are to be measured
 there. The `windows` issue for #850 carries the list.
+
+## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
+
+A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
+reached also from Help ▸ Set Up an Assistant… and Revise With ▸ Set Up an
+Assistant… (the same words in both since Russell's evening ruling; one view, `SetUpAnotherAssistantButton`, in the menu bar, every
+live row's context menu and the Help menu, so the item cannot differ between
+them). Each row's sentence and buttons come from `AssistantSetUpState.decide`,
+run against `outsideAgents.setUp.stateCases`. Set Up… opens
+`AssistantSetUpSheet` (on `SheetTitleScanTests.sheets`): what is downloaded,
+from whom, where it goes, that it is checked once in place, and where the
+course content goes; a link to the maker's plans page; for GitHub Copilot,
+Help's `github-education` page. Cancel is the default answer.
+
+`ReviseWithMenu` is always drawn now; the golden (`Tests/Goldens/menu-bar.txt`)
+pins the set-up item and the divider above it (`[if any reviser]`). Quitting
+while a set-up runs asks (`QuitConfirmation.settingUpOne`, `SetUpsUnderWay`);
+Quit Anyway stops it (`AssistantSetUpCentre.stopEverySetUp` in
+`letEverythingGo`) and the next launch settles the record
+(`settleInterruptedSetUps`, behind the not-under-tests guard).
+
+Help links go through `PlantoirHelpPage.open(anchor:)`: the Help book's page
+once #839 wires the book into the app (`CFBundleHelpBookName`), the support
+page until then, with the anchor on the trail either way.
+
+How a set-up runs, what it records, what was measured and what was rejected
+are in `documentation/10-local-ai-assistant.md` → "Setting up an outside
+assistant (#855)".

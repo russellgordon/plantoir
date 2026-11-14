@@ -48,16 +48,19 @@ final class SheetTitleScanTests: XCTestCase {
         // #834: Replace It…, Remove Group and Start the Groups Again, one
         // sentence under the title and the facts as rows.
         ("FactsQuestionSheet", "Helpers/FactsQuestionSheet.swift", true),
+        // #855: the confirmation before an outside assistant is set up, what
+        // will happen said under the title.
+        ("AssistantSetUpSheet", "Settings/OtherAssistantsSettingsView.swift", true),
     ]
 
     // MARK: - Tests
 
-    /// Twenty-one sheets (fifteen, batch B's, #454's, #709's two, #572's
+    /// Twenty-two sheets (#855's set-up confirmation, and before it fifteen, batch B's, #454's, #709's two, #572's
     /// New Group and Rename Group sheet, and #834's facts sheet), each titled through `SheetTitle`, in
     /// the shape it is listed with — and no title in those files at `.title2`
     /// or larger.
     func testEverySheetIsTitledByTheOneShape() throws {
-        XCTAssertEqual(SheetTitleScanTests.sheets.count, 21)
+        XCTAssertEqual(SheetTitleScanTests.sheets.count, 22)
         var problems: [String] = []
         for sheet in SheetTitleScanTests.sheets {
             let source: String = try SheetTitleScanTests.source(of: sheet.file)

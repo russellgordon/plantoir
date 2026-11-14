@@ -106,7 +106,7 @@
         "why": "The first publish of a section stops behind a dialog asking for a Netlify or Cloudflare token, and a teacher who does not notice it reports a publish that 'never finished'. This line is the difference between reading that as a hang and reading it as a question waiting. The answer is a live credential and is never written down - only the name of the thing asked for."
       },
       {
-        "carries": "nothing but the fact - the page is plantoir.app's public support page",
+        "carries": "which page: plantoir.app's public support page (Help > Plantoir Help), or, since #855, the Help page asked for by its anchor ({anchor}, a page id such as set-up-assistant or github-education), opened in the Help book once the app carries one and as the support page until then. Never anything the teacher typed.",
         "event": "opened Plantoir Help",
         "why": "GitHub #457 item 4 (the HIG sweep; Russell, 2026-10-08: Help opens the support page). Help ▸ Plantoir Help used to be the system's item, which said 'Help isn't available for Plantoir'; it now opens https://plantoir.app/support/ in the browser. A teacher who looked for help just before something went wrong is a teacher whose report should say so, and the line is the only trace the app has that they did."
       },
@@ -413,7 +413,7 @@
         "appliesOnWhy": "Permanent for the same reason as the two above: there is no stop to fail where there is nothing to stop."
       },
       {
-        "carries": "what was under way - a publish, or since issue #232 a preview being built, since #351 a copy of a course being saved, and since #863 a course's unit plans being shared, having their password changed or being stopped (each named for what it is, beside any deploys) - in the words the teacher was shown, and which of the two buttons they pressed",
+        "carries": "what was under way - a publish, or since issue #232 a preview being built, since #351 a copy of a course being saved, since #863 a course's unit plans being shared, having their password changed or being stopped, and since #855 an outside assistant being set up (each named for what it is, beside any deploys) - in the words the teacher was shown, and which of the two buttons they pressed",
         "event": "quit asked about work under way",
         "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. Since issue #232 the line also names a preview being BUILT when that is what was under way (a publish, when there is one, is still what is named), so 'it would not quit while my preview was loading' has the same answer on the trail. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out."
       },
@@ -1252,6 +1252,60 @@
         "carries": "the course and the section, and why: the folder was not found, nothing deployed there, no address on this computer was free, or the browser did not open it.",
         "line": "could not open the deployed folder in the web browser — {the folder was not found | nothing deployed there | no address on this computer was free | the browser did not open it}",
         "why": "#850. Each arrives as 'Open in Browser did nothing', and only the trail can say which."
+      },
+      {
+        "event": "outside assistant set-up opened",
+        "carries": "where Set Up an Assistant… was opened from: the Settings pane, the Help menu or Revise With.",
+        "line": "opened Set Up an Assistant… (from {the Settings pane | the Help menu | Revise With})",
+        "why": "#855 (plan review L6). A report of 'it offered me something I did not ask for' is answered by where the teacher opened it. Nothing is offered unasked, so there is no line for an offer."
+      },
+      {
+        "event": "outside assistant set-up record set aside",
+        "carries": "that Plantoir's record of the assistants it set up could not be read (damaged, or written by a newer Plantoir) and was kept aside, with the name it was given (record-unreadable-<seconds>-<id>.json, no path).",
+        "line": "could not read Plantoir’s record of the assistants it set up, so it was kept aside as {name}",
+        "why": "#855 (implementation review finding 2). After it, a program found at that moment shows as recordUnreadable (it may be one Plantoir set up, and it is left alone), and Remove is not offered for it; the trail is how that is explained."
+      },
+      {
+        "event": "outside assistant set-up started",
+        "carries": "which assistant, by the name a teacher reads. Written only on the teacher's Download and Set Up.",
+        "line": "started setting up {tool}",
+        "why": "#855. The start of every set-up story; a set-up that was never confirmed leaves no line, which is the never-unasked rule made visible."
+      },
+      {
+        "event": "outside assistant set up",
+        "carries": "which assistant, that its programs are in place and signed by its maker, and how many seconds the set-up took.",
+        "line": "set up {tool}: in place and made by {maker}, in {seconds} s",
+        "why": "#855. The seconds from a teacher's own network are what the next decision about the time limit needs."
+      },
+      {
+        "event": "outside assistant could not be set up",
+        "carries": "which assistant, why (the outcome's trail words, named in outsideAgents.setUp.stateCases.how and written by SetUpOutcome.trailWords on the mac: no connection to a named host, the set-up could not be fetched, its exit status, a program missing or not signed by its maker, stopped, too long, or the record could not be written) and how many seconds it ran. Never the set-up's output, which names the home folder, and never an account.",
+        "line": "could not set up {tool}: {why}, in {seconds} s",
+        "why": "#855. Every one of these reaches support as 'it said it couldn't set it up'; only the trail says which, and an exit status of 128 or more is a school's security software ending it."
+      },
+      {
+        "event": "outside assistant set-up settled",
+        "carries": "which assistant, and whether the set-up a quit or a crash cut short was found complete and its maker's (and completed), or not (and what it had added was taken away).",
+        "line": "finished a set-up of {tool} that was cut short: {it was in place and made by {maker} | it was not complete, and what it had added was taken away}",
+        "why": "#855 (plan review M3). Without it a program that appears after a quit is a mystery, and so is one that disappears."
+      },
+      {
+        "event": "outside assistant sign-in opened",
+        "carries": "which assistant's sign-in window was opened.",
+        "line": "opened {tool}’s sign-in window",
+        "why": "#855. 'It never asked me to sign in' is answered here."
+      },
+      {
+        "event": "outside assistant sign-in checked",
+        "carries": "which assistant, and exit codes only: the sign-in window's and the maker's signed-in question's (setUp.agents' signedInCheck). Never the account, an email, a plan or a token, and never the question's output.",
+        "line": "checked {tool}’s sign-in: {signed in | the sign-in finished | not confirmed (the check answered {code}) | not confirmed (the sign-in ended with {code})}",
+        "why": "#855 (neverProbedForSignIn, as narrowed). Signed in is not the same as able to use it (plan review M6); the line keeps the two apart."
+      },
+      {
+        "event": "outside assistant removed",
+        "carries": "which assistant, how many items and start-up blocks Plantoir took away, how many blocks it left because the teacher had changed them, and whether anything could not be taken away. Counts only, never a path.",
+        "line": "removed the copy of {tool} Plantoir set up ({items} items, {blocks} start-up blocks[, {n} left because another set-up also added them][, {n} left because the teacher had changed them][, not everything could be taken away])",
+        "why": "#855 (ruling 4). Removing Codex takes away the start-up line its set-up added, which can change what a teacher's own Terminal finds; the trail says it happened."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -14713,13 +14767,21 @@
     ]
   },
   "quittingWhileWorkIsUnderWay": {
-    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, of building a preview, or (since #351) of saving a copy of a course, and never asks when the Mac itself is logging out, restarting or shutting down.",
+    "rule": "Quitting asks the teacher to confirm when THIS app is in the middle of publishing, of building a preview, (since #351) of saving a copy of a course, (since #863) of sharing a course's unit plans, or (since #855) of setting up an outside assistant, and never asks when the Mac itself is logging out, restarting or shutting down.",
     "why": "Quitting used to be free, because it could not reach anything: the path that stops a working folder's website builder looked for programs it had never told itself where to find, so on an ordinary teacher's Mac it did nothing at all and there was nothing to interrupt (issue #220, 2026-09-19). Making it work means a quit can now genuinely land on work in flight, and the one case where that hurts is the one the teacher cannot see happening.",
-    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website. And, since #351 (2026-09-27), a copy of a course being ZIPPED - a backup, or the archive made before a restore or a removal - counted from a third record of the same kind, while the zip runs; named after a publish or a preview build when more than one is under way.",
+    "whatCountsAsUnderWay": "A publish this app started - in any of its windows, or by its own assistant. Counted from the app's own record of active publishes, which lasts exactly as long as the publish does. And, since issue #232 (2026-09-23), a preview being BUILT - from the moment it is asked for until its page first answers, or the run ends - whether a section window started it or the app's own assistant rebuilt it with no window open. Counted from a second record of the same kind, of preview builds. A publish's own build is NOT counted as a preview build: it is part of the publish, which is already counted. When both are under way the question names the publish, whose loss reaches the class website. And, since #351 (2026-09-27), a copy of a course being ZIPPED - a backup, or the archive made before a restore or a removal - counted from a third record of the same kind, while the zip runs; named after a publish or a preview build when more than one is under way. And, since #855 (Russell, 2026-11-13: quitting part way through a set-up asks first), an outside assistant being SET UP (Settings > Other Assistants), counted from the app's own record of set-ups under way and named last, after everything above. A download of the local assistant's model still does not ask.",
     "whatDoesNotCount": "A preview that is merely OPEN. A preview is known by the port it holds, and that is held for as long as the preview is OPEN - it cannot tell a section still building from one that finished twenty minutes ago and is being read. Asking on every open preview would mean asking almost every quit, which teaches a teacher to dismiss the question unread, and the question exists for work that can still be lost. Previews are not abandoned either: quitting stops this app's own previews deliberately, the way the Stop button does, before anything else is asked to rest. The record of a preview BUILD is a different fact from the port, and it is the one that counts: it ends when the page first answers, so a preview being read is never asked about. It is NOT the preview's address either - the launcher prints the address before it starts building, so the address is known for almost the whole build.",
     "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
+      "titles": {
+        "keepWorking": "Keep Working",
+        "quitAnyway": "Quit Anyway"
+      },
+      "firstButtonByQuestion": {
+        "whileAnAssistantIsSetUp": "Finish Setting Up"
+      },
+      "firstButtonByQuestionWhy": "#855, Russell 2026-11-13 evening: the quit question while an outside assistant is being set up has its own first button, Finish Setting Up, which means keepWorking. It is used when set-ups are the only work under way (the question then names them); with a publish, a preview build or a copy also under way the question names those and keeps Keep Working. The meanings and their order never change: only the first title does. Each case may say expectFirstButton.",
       "default": "keepWorking",
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
@@ -15050,6 +15112,15 @@
         }
       ]
     },
+    "whileAnAssistantIsSetUp": {
+      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with its own first button (buttons.firstButtonByQuestion: Finish Setting Up, which is keepWorking) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
+      "words": {
+        "settingUpOne": "setting up {tool}",
+        "settingUpSeveral": "setting up {n} assistants",
+        "message": "Quitting now stops it. The next time Plantoir opens, it finishes the set-up or takes away what it had added."
+      },
+      "how": "{tool} is the assistant's displayName, {n} how many. The question is the usual 'Plantoir is still {underWay}.'; message is used when nothing but set-ups is under way, and otherwise the message of what is named first."
+    },
     "cases": [
       {
         "name": "nothing is happening",
@@ -15073,6 +15144,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
+        "expectFirstButton": "Keep Working",
         "why": "The case this exists for."
       },
       {
@@ -15170,6 +15242,47 @@
         },
         "expectAsk": false,
         "why": "#850 (Russell, 2026-11-13: it runs until Stop or quitting Plantoir). Nothing is built, copied or written while a deployed folder is shown, so nothing can be lost: like an open preview, quitting ends it, and the trail says Plantoir quit. deployedFoldersShown is 0 when a case leaves it out."
+      },
+      {
+        "name": "an outside assistant is being set up",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "assistantsBeingSetUp": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "expectFirstButton": "Finish Setting Up",
+        "why": "#855 (Russell, 2026-11-13). A set-up stopped part way can leave a half-written program in the home folder; the teacher is asked, and Quit Anyway stops it for the next launch to settle. assistantsBeingSetUp is 0 when a case leaves it out."
+      },
+      {
+        "name": "an outside assistant is being set up while the Mac logs out",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "assistantsBeingSetUp": 1,
+          "quitReason": "theMacIsLoggingOutOrShuttingDown"
+        },
+        "expectAsk": false,
+        "why": "The rule that must never bend, for a set-up too: the next launch settles it."
+      },
+      {
+        "name": "an outside assistant is being set up while a section deploys",
+        "given": {
+          "publishesUnderWay": 1,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "assistantsBeingSetUp": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "expectFirstButton": "Keep Working",
+        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website, so it keeps Keep Working; Finish Setting Up is only for a question about set-ups alone (buttons.firstButtonByQuestionWhy)."
       }
     ]
   },
