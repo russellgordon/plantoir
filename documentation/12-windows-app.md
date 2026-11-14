@@ -2007,9 +2007,16 @@ produced, and a hung file still stops the run inside ten minutes. A timeout
 says the file, the limit and how long it ran, and, for a file in
 `KnownSlowFiles` (the table above), that a busy PC is the likely cause; for
 any other file, to suspect a hang first. `AHungFileIsStoppedAtTheLimitAndNamed`
-proves the limit still bites: a file that sleeps 300 s, written into a temp
-folder (never into `scripts/`, which both platforms run), is stopped at a
-2 s limit with exit 124 and that sentence. **Rejected:** a per-file
+proves the limit still bites: a file that sleeps 300 s, written into a
+`RunOwnedTempFolders` folder (never into `scripts/`, which both platforms
+run), is stopped at a 15 s limit with exit 124 and that sentence (15 s, not
+2, so a cold interpreter on a loaded PC still prints before it is stopped).
+**Nothing bounds the class's TOTAL time:** there is no `.runsettings`,
+`--blame-hang-timeout` or session timeout under `windows-app/`, so if every
+file hung (an interpreter that wedges at start, say) the run would take
+119 × 600 s, about 20 hours (about 6 at 180 s). The realistic case, one
+hung file, costs ten minutes and names its file; a hang common to every file
+shows in the first file's message. **Rejected:** a per-file
 allowance table, because it is kept in step by hand with a folder the mac
 adds files to, and the third file stopped that night was in no earlier
 measurement, so the table would have missed exactly the file that needed it

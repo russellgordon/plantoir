@@ -1014,7 +1014,7 @@ changes made there have "no automated gate" at all, which is no longer true:
   `scripts/test_*.py` — DISCOVERED rather than listed, so no count is kept in
   step by hand (fifteen when this was written on 2026-09-07, eighteen later
   the same week) — the same files `verify.sh` runs, inside `dotnet test`, in about
-  eleven minutes now that there are 119 of them (10 min 41 s alone on
+  eleven minutes alone now that there are 119 of them (10 min 41 s alone on
   2026-11-14; eight seconds when there were fifteen, five minutes at 93), and
   each file may run 600 s before it is stopped as hung (#916). They need no Docker, no network and no
   credentials, and until 2026-09-07 Windows ran none of them, so a shared file

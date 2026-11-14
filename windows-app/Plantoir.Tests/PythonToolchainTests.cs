@@ -155,28 +155,30 @@ public class PythonToolchainTests
 
     /// <summary>
     /// #916: raising the limit must not stop a HUNG file being caught. A file
-    /// that sleeps far past a two-second limit, written into a temporary folder
-    /// (never into <c>scripts/</c>, where both platforms would run it), is
-    /// stopped, fails with 124, and its sentence names the file, the limit and
-    /// how long it ran. A known slow file's sentence names a busy PC as the
-    /// likely cause; any other file's does not.
+    /// that sleeps 300 s, far past a 15-second limit, written into a temporary
+    /// folder (never into <c>scripts/</c>, where both platforms would run it),
+    /// is stopped, fails with 124, and its sentence names the file, the limit
+    /// and how long it ran. A known slow file's sentence names a busy PC as the
+    /// likely cause; any other file's does not. Fifteen seconds rather than two
+    /// so a cold interpreter on a loaded PC still prints before it is stopped
+    /// (the #916 review's M1); anything well under 300 s proves the stop.
     /// </summary>
     [Fact]
     public void AHungFileIsStoppedAtTheLimitAndNamed()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "plantoir-hung-python-" + Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(folder);
+        // #882's helper, so a crashed test host's leftover is swept safely by a later run.
+        string folder = RunOwnedTempFolders.Create("plantoir-hung-python-");
         try
         {
             File.WriteAllText(Path.Combine(folder, "test_never_returns.py"), "import time\nprint('started', flush=True)\ntime.sleep(300)\n");
             var clock = Stopwatch.StartNew();
-            var result = RunPython("test_never_returns.py", TimeSpan.FromSeconds(2), folder);
+            var result = RunPython("test_never_returns.py", TimeSpan.FromSeconds(15), folder);
             _output.WriteLine(result.Output);
 
             Assert.Equal(124, result.ExitCode);
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(60), $"The hung file was not stopped promptly: {clock.Elapsed.TotalSeconds:F0} s.");
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(90), $"The hung file was not stopped promptly: {clock.Elapsed.TotalSeconds:F0} s.");
             Assert.Contains("scripts/test_never_returns.py", result.Output);
-            Assert.Contains("limit for one shared Python file is 2 seconds", result.Output);
+            Assert.Contains("limit for one shared Python file is 15 seconds", result.Output);
             Assert.Matches(@"stopped after running \d+ seconds", result.Output);
             Assert.Contains("suspect a HUNG test", result.Output);
             Assert.Contains("started", result.Output);

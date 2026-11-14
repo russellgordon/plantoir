@@ -349,7 +349,7 @@ Split it in two:
   with its version and OpenSSL. (Before, they ran on PATH's interpreter while
   teachers ran 3.11.9, so the gate had never run them on what ships.) With 93
   files the run takes about five minutes, not eight seconds; with 119, on
-  2026-11-14, 10 min 41 s alone, and each file may run 600 s before it is
+  2026-11-14, about eleven minutes alone (10 min 41 s), and each file may run 600 s before it is
   stopped as hung (#916, `documentation/12-windows-app.md` → "A red that is a
   busy PC"). The image's 3.11
   is held only by `RuntimePythonTests.TheSharedScriptsParseAsPython311` (a
