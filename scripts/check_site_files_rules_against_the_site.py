@@ -199,7 +199,11 @@ for (const c of rules.cases) {
   rmSync(root, { recursive: true, force: true })
   for (const name of c.files) {
     mkdirSync(dirname(join(content, name)), { recursive: true })
-    writeFileSync(join(content, name), (c.fileText ?? {})[name] ?? "file " + name)
+    // fileBytes (siteFiles.readAsUtf8): each character U+0000 to U+00FF is
+    // that one byte, so a page that is not UTF-8 can be written.
+    const bytes = (c.fileBytes ?? {})[name]
+    if (bytes !== undefined) writeFileSync(join(content, name), Buffer.from(bytes, "latin1"))
+    else writeFileSync(join(content, name), (c.fileText ?? {})[name] ?? "file " + name)
   }
   for (const [name, markdown] of Object.entries(c.pages)) {
     mkdirSync(dirname(join(content, name)), { recursive: true })

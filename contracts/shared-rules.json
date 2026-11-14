@@ -45276,6 +45276,7 @@
     ],
     "declareRule": "A feature that makes a page load a course file the tree does not name as an address records the file's content path on file.data.plantoirFiles in its transformer (PlantoirGeoGebra does), and the emitter carries it.",
     "exactMatch": "A reference matches a file only letter for letter after resolve's steps: a match by case or by Unicode form is the teacher's own broken link, in the emitter and the check alike (plan review 901-6: on the 27 sites, none of 530 unmatched references matched by case or by NFC/NFD form). Nobody adds normalising to one side only. The mention search that decides TAKING OUT folds both (check.exposure): there a spelling difference must keep a file, never remove it.",
+    "readAsUtf8": "Every carried HTML, SVG and CSS file is read as UTF-8 by both readers, and a byte sequence that is not UTF-8 is read as U+FFFD; a file is never skipped for its encoding (the emitter: readFileSync with 'utf-8'; the check: read_text with errors='replace'). So a page saved in windows-1252, as Word's Web Page export saves it, is read, and every address written in ASCII in it is carried. A UTF-8 byte order mark is read as part of the text and changes no address. A case's `fileBytes` (in `cases`) holds such a file: each character U+0000 to U+00FF is written as that one byte. What it cannot read is in knownLimits (901a round 4, M4).",
     "doneMarker": {
       "file": ".plantoir-emit-done",
       "rule": "The section's quartz/build.ts (patches/build.ts, and build_site.patch_quartz_build_done_marker for a section copied before it) writes it beside public/ once every emitter of the first build has finished. build_site.py removes it before Quartz starts. A preview's watcher mirrors nothing and checks nothing until it appears, because Quartz runs its emitters at once and the root index.html is written while course files are still being copied (plan review 901-1). A build.ts that cannot be given the line skips the preview's check, said once (words.previewNotChecked)."
@@ -45294,7 +45295,7 @@
     "check": {
       "rule": "scripts/site_files.py reads the BUILT site after Quartz has finished, on a deploy's build before it is mirrored to the host and before _mark_build_finished, and on a preview's first build at the done marker, on the site its server serves. It never trusts the emitter: it reads every built page at the places addresses names (the same list as the emitter, read again in Python from the HTML a student is sent, Head included), resolves each from the page's address, and compares with the course's files (site_files.course_files, Assets' own walk).",
       "hole": "A built page names a course file the site lacks: the file is PUT BACK at its address and the teacher is told one line per file (words.putBack; words.putBackFailed when the copy failed). Ruled by Russell 2026-11-13 on #901: put back, the build goes on, the teacher is told, and a trail line is written. Rejected: stopping the build; no second check.",
-      "exposure": "A course file in the site that no built page names is counted (unreferenced). It is TAKEN OUT only when every reading agrees that nothing which stays names it: the check's reader does not name it, and no text file that stays on the site mentions its name. The text that stays is every file the site made (pages, contentIndex.json, sitemap.xml, scripts and stylesheets: .html, .htm, .svg, .json, .xml, .js, .mjs, .css, .txt, .webmanifest by name), every course file the check names (by its content path's ending, so a course .html file served without its ending is read), and, in turn, every mentioned course file that is text itself. The name is looked for in the text as written and as the emitter's reading would decode it (HTML character references, JSON \\u escapes, the tabs and line breaks a browser drops, percent escapes), with case and Unicode form folded. A browser fetches only an address some file it was sent contains, and every way the emitter reads an address decodes to text the search reads, so TAKING OUT CANNOT MAKE A HOLE. Where the readings disagree the file STAYS and is counted in unreferenced, which fails the gates: a file wrongly left on for one build is the cheaper error, and the gate still sees it (901a's Fable sweep, MUST 1: the search did not read carried files, so a picture a carried page named with a backslash was taken out). The same with Quartz's own emitter (marker.assetsEmitter 'quartz'), which read nothing: the rule that took every unreferenced file out unread is retired.",
+      "exposure": "A course file in the site that no built page names is counted (unreferenced). It is TAKEN OUT only when every reading agrees that nothing which stays names it: the check's reader does not name it, and no text file that stays on the site mentions its name. The text that stays is every file the site made (pages, contentIndex.json, sitemap.xml, scripts and stylesheets: .html, .htm, .svg, .json, .xml, .js, .mjs, .css, .txt, .webmanifest by name), every course file the check names (by its content path's ending, so a course .html file served without its ending is read), and, in turn, every mentioned course file that is text itself. The name is looked for in the text as written and as the emitter's reading would decode it (HTML character references, JSON \\u escapes, the tabs and line breaks a browser drops, percent escapes), with case and Unicode form folded. A browser fetches only an address some file it was sent contains, and every way the emitter reads an address decodes to text the search reads, so TAKING OUT CANNOT MAKE A HOLE. Where the readings disagree the file STAYS and is counted in unreferenced, which fails the gates: a file wrongly left on for one build is the cheaper error, and the gate still sees it (901a's Fable sweep, MUST 1: the search did not read carried files, so a picture a carried page named with a backslash was taken out). The same with Quartz's own emitter (marker.assetsEmitter 'quartz'), which read nothing: the rule that took every unreferenced file out unread is retired. What that costs: when Plantoir's emitter is not in play (a section's quartz.config.ts does not hold `Plugin.Assets(),` exactly once, so build_site._wire_site_files_emitter leaves it alone) and Quartz's own Assets copies every course file, a file no page uses is DEPLOYED whenever its name appears anywhere in the site's text: an answer key named in a page's opening text, which Quartz writes into contentIndex.json and the page's <meta name=\"description\">, stays on the site. It is counted in unreferenced, so the gates fail and the trail line is written, but a deploy in the field still goes ahead with it (measured by 901a's round 4 review on a real Quartz 4.5.0 build: both PDFs the opening text named stayed, unreferenced 15, takenOut 4; through Plantoir's emitter both were left off). The move to Quartz 5 (#512) must keep the swap holding, or this becomes every section's path.",
       "gates": "putBack, putBackFailed and unreferenced are each a FAILURE in verify.sh and in the tests, and so is assetsEmitter 'quartz': each means the emitter got something wrong, which the safety net must not hide (Russell, #901).",
       "failure": "When the check itself fails, a plantoir: error: line says so and the build is left unmarked (buildFreshness), so the next deploy builds again (plan review 901-3)."
     },
@@ -45310,15 +45311,15 @@
       "putBackFailed": "A page students can see uses {file}, but it could not be put on the website, so that page will show it as missing.",
       "putBackPreview": "A page students can see uses {file}, so it was put in this preview, and will go on the website when it is next deployed.",
       "putBackFailedPreview": "A page students can see uses {file}, but it could not be put in this preview, so that page shows it as missing.",
-      "emitterNotSwapped": "the website builder's settings for this section have changed shape, so the files no page uses were taken off after the build instead.",
+      "emitterNotSwapped": "the website builder's settings for this section have changed shape, so the files no page uses were taken off after the build instead, except any whose name a page's text mentions, which stay on the website.",
       "sideFileNotWritten": "Could not note which files the pages use, so every file a page students can see uses will be put back after the build.",
       "sideFileMissingPutBackOne": "The file a page students can see uses was put back after the build, so Section {section}'s website is complete.",
       "sideFileMissingPutBackSeveral": "The {count} files that pages students can see use were put back after the build, so Section {section}'s website is complete.",
       "sideFileMissingPutBackPreviewOne": "The file a page students can see uses was put back after the build, so this preview is complete.",
       "sideFileMissingPutBackPreviewSeveral": "The {count} files that pages students can see use were put back after the build, so this preview is complete.",
       "previewNotChecked": "this section's website builder could not be told to say when it has finished, so this preview's files were not checked.",
-      "followLimitStopped": "Section {section}'s website was not built: more than {limit} of the course's own web pages and stylesheets load one another, which is more than the website builder reads, and building it anyway could put files on the website that no page students can see uses. Move a folder of web pages the course does not use out of the course folder, then deploy again.",
-      "followLimitStoppedPreview": "This preview was not built: more than {limit} of the course's own web pages and stylesheets load one another, which is more than the website builder reads. Move a folder of web pages the course does not use out of the course folder, then preview again.",
+      "followLimitStopped": "Section {section}'s website was not built: the pages students can see lead to more than {limit} of the course's own web pages and stylesheets, which is more than the website builder reads, and building it anyway could put files on the website that no page students can see uses. Hiding the pages that show or link to those web pages lets it build. Choose “Report a Problem…” from the Help menu so this can be looked into.",
+      "followLimitStoppedPreview": "This preview was not built: the pages students can see lead to more than {limit} of the course's own web pages and stylesheets, which is more than the website builder reads. Hiding the pages that show or link to those web pages lets it build. Choose “Report a Problem…” from the Help menu so this can be looked into.",
       "size": "GB or MB with one decimal (bytes / 10^9, / 10^6) at or above a megabyte, else KB rounded up, at least 1 KB; a full stop whatever the language"
     },
     "whenSaid": {
@@ -45786,6 +45787,16 @@
         "Unit-1/Day-1",
         "\u0001../Media/a.png\u001f",
         "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "pics//../x.png",
+        "Unit-1/pics/x.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "pics\\\\..\\x.png",
+        "Unit-1/pics/x.png"
       ]
     ],
     "cases": [
@@ -46246,6 +46257,29 @@
           "Media/cat.png",
           "Media/beside.png"
         ]
+      },
+      {
+        "name": "a teacher's page saved in windows-1252 (Word's Web Page export), shown in a frame, is read and keeps its picture (901a round 4, M4)",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: true\n---\n\n<iframe src=\"../Media/word-export.html\"></iframe>\n"
+        },
+        "files": [
+          "Media/word-export.html",
+          "Media/word-pic.png",
+          "Media/café-menu.png"
+        ],
+        "fileBytes": {
+          "Media/word-export.html": "<html><head><title>Résumé</title></head><body><p>Café \u0093menu\u0094</p><img src=\"word-pic.png\"><img src=\"café-menu.png\"></body></html>"
+        },
+        "carried": [
+          "Media/word-export",
+          "Media/word-pic.png"
+        ],
+        "leftOff": [
+          "Media/café-menu.png"
+        ],
+        "why": "readAsUtf8: the page's bytes are not UTF-8, so each byte that is not is read as U+FFFD and the page is still read; its ASCII address is found and carried. The accented name is the known limit (knownLimits): both readers read café-menu.png as caf�-menu.png and leave the file off, where a browser that guesses windows-1252 would load it."
       },
       {
         "name": "a stylesheet a page links keeps its pictures and the stylesheets it imports, in a loop read once (901a fix review I1)",
@@ -47746,7 +47780,7 @@
       "A link with a query, such as [q](Media/x.pdf?v=1): Quartz itself rewrites it to Media/x.pdfv=1, so the link was already broken before #901; the file is now also left off. Nothing to fix here (901a review).",
       "An <iframe srcdoc> holds a page of its own: an address inside it is not read, by either reader. A teacher's srcdoc that shows a course file shows it as missing.",
       "A sharing picture (og:image) Quartz writes as an absolute address on the section's own domain is not resolved, so a course file named that way (socialImage or cover in a page's settings, which no Plantoir course uses today) is not carried.",
-      "A page's own inline <script> is not read for addresses: a teacher's script that fetches a course file by name is not carried. Mention-anywhere keeps such a file from being TAKEN OUT by the check, so a site built by Quartz's own emitter keeps it; Plantoir's emitter leaves it off.",
+      "A page's own inline <script> is not read for addresses: a teacher's script that fetches a course file by name is not carried. When the script writes the file's name out in full, mention-anywhere keeps the file from being TAKEN OUT by the check, so a site built by Quartz's own emitter keeps it; a name the script builds from pieces (\"pics/\" + \"cat\" + \".png\") is not found, and the check takes that file out (measured by 901a's round 4 review). Plantoir's emitter leaves it off either way.",
       "Older deploys on Netlify and Cloudflare can still hold files a newer deploy leaves off; deleting them is piece 901c (Russell, 2026-11-13: both hosts).",
       "A JavaScript file is never read for addresses, carried or not: a file only a script loads is left off. A teacher would meet it as a p5.js sketch exported into Media and shown in a frame: the sketch's page, its sketch.js and the p5 library are carried, but a picture the sketch loads with loadImage('cat.png') is not, and the sketch shows no picture. Naming the file in the sketch's page (an <img hidden src=\"cat.png\">, or a link to it) carries it. A Help line says so.",
       "An address ending .html that names a course's own .html file, in a page's <form action> or anywhere inside a carried HTML file, names nothing: the site serves a course .html file at its name without .html, and only a page's own links, pictures and frames are rewritten to that name (CrawlLinks). The file is left off, and the address was already broken before #901 (901a fix review, M5). A frame's src in a page is rewritten, so a teacher's page shown in a frame is carried.",
@@ -47756,7 +47790,8 @@
       "A link written as the section's own full address (https://<the site>/Media/x.pdf, as a teacher copies it from the browser) is read as another site's address by both readers, so the file is left off; the build knows the site's address, so this can be read (901a's Fable sweep; follow-up).",
       "A url(...) inside a CSS comment is read by both readers, so its file is carried though no browser loads it: wrongly ON, the cheaper direction (901a's Fable sweep).",
       "An SVG shown as a picture (<img src=d.svg>) has the files inside it carried, though a browser loads nothing an SVG picture names: wrongly ON (901a's Fable sweep).",
-      "The two readers parse HTML with different parsers (Quartz's parse5 and Python's html.parser), and Python's changed between 3.11, the image's, and 3.14.10, Windows' runtime. Measured on 2026-11-14 (an <img> inside each element of a carried page; Pythons 3.11.13, 3.12.11, 3.13.7, 3.14.4): Python reads an address that the emitter does not inside <template>, <select> and a repeated attribute on every version, and inside <textarea>, <title>, <xmp>, <noembed>, <plaintext> and an <iframe>'s text on 3.11 and 3.12 (on 3.13, <xmp>, <noembed>, <plaintext> and an <iframe>'s text; on 3.14, none of these six); the check then PUTS BACK a file no browser loads, says so and fails the gates. The emitter reads one Python does not inside <image> outside an SVG (parse5 reads it as <img>) on every version, inside <noframes> on 3.14, and an <img> inside an SVG <title> on 3.13 and 3.14; the check then keeps the file and counts it (check.exposure), which fails the gates. So the same course can give different counts on a Mac and on Windows; a course of Quartz's own pages cannot, because Quartz writes a built page from its tree (follow-up: one HTML reading on both platforms).",
+      "The two readers parse HTML with different parsers (Quartz's parse5 and Python's html.parser), and Python's changed between 3.11, the image's, and 3.14.10, Windows' runtime. Measured on 2026-11-14 (an <img> inside each element of a carried page; Pythons 3.11.13, 3.12.11, 3.13.7, 3.14.4): Python reads an address that the emitter does not inside <template>, <select> and a repeated attribute on every version, and inside <textarea>, <title>, <xmp>, <noembed>, <plaintext> and an <iframe>'s text on 3.11 and 3.12 (on 3.13, <xmp>, <noembed>, <plaintext> and an <iframe>'s text; on 3.14, none of these six); the check then PUTS BACK a file no browser loads, says so and fails the gates. The emitter reads one Python does not inside <image> outside an SVG (parse5 reads it as <img>) on every version, inside <noframes> on 3.14, and an <img> inside an SVG <title> on 3.13 and 3.14; the check then keeps the file and counts it (check.exposure), which fails the gates. So the same course can give different counts on a Mac and on Windows; a course of Quartz's own pages cannot, because Quartz writes a built page from its tree (follow-up: one HTML reading on both platforms). A NUL in an address (pics/cat.png followed by U+0000 in a carried page) is one more such difference: parse5 reads the NUL as U+FFFD, as a browser does, so the emitter leaves the file off, while Python keeps the NUL, the edge step drops it, and the check puts the file back, says so and fails the gates (901a's round 4 review: 72 runs on 3.11, 64 on 3.14).",
+      "A carried page that is not UTF-8 is read as UTF-8 with U+FFFD for each byte that is not (readAsUtf8). An address written in ASCII is carried. An accented name in a windows-1252 page (café-menu.png in Word's Web Page export) reads as caf�-menu.png in both readers and is left off, where a browser that guesses windows-1252 would load it; a UTF-16 page (the reviewer's measured case) reads as no addresses at all in both readers, so every file it loads is left off. Neither puts anything back, so nothing is said (901a's round 4 review, M4; follow-up: read a page's own charset and byte order mark as a browser does).",
       "Two course files with one address (Media/frame.html and Media/frame) leave the choice of the one read to the order each reader walks the folder (glob order in the emitter, sorted order in the check). Not measured (901a's Fable sweep; follow-up)."
     ],
     "rejected": [

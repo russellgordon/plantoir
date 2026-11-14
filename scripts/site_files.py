@@ -438,24 +438,48 @@ def resolved_from_page(page_slug: str, address: str):
         found = value.find(mark)
         if found >= 0 and found < cut:
             cut = found
-    segments = []
-    for segment in value[:cut].split("/"):
-        lowered = segment.lower()
-        if lowered in _DOT_SEGMENTS:
-            segments.append(_DOT_SEGMENTS[lowered])
-        elif lowered in _DOT_DOT_SEGMENTS:
-            segments.append(_DOT_DOT_SEGMENTS[lowered])
-        else:
-            segments.append(segment)
-    try:
-        joined = urljoin(_BASE + page_slug, "/".join(segments))
-        parts = urlsplit(joined)
-    except ValueError:
-        return None
-    if parts.scheme != "https" or parts.netloc != "site.invalid":
-        return None
-    path = _SLASHES.sub("/", unquote(parts.path))
+    written_path = value[:cut]
+    if written_path == "":
+        # Only a query: the page itself, as a browser reads "?x=1".
+        path = str(page_slug)
+    else:
+        path = "/".join(_path_resolved_as_a_browser_does(str(page_slug), written_path))
+    path = _SLASHES.sub("/", unquote(path))
     return path.lstrip("/")
+
+
+def _path_resolved_as_a_browser_does(page_slug: str, written_path: str) -> list:
+    """The path segments a browser asks for when `written_path` (no query,
+    no fragment, backslashes already slashes) is written on the page at
+    `page_slug`, by the WHATWG URL standard's path rules, which the
+    emitter's `new URL` follows: a relative path starts from the page's own
+    folder, and a `..` removes the segment before it even when that segment
+    is EMPTY, so `pics//../x.png` is `pics/x.png` (901a round 4, M3: Python's
+    urljoin read it as `x.png`, a file no browser loads). Never above the
+    site's root. A dot segment last leaves an empty segment, so the path
+    ends in a slash."""
+    if written_path.startswith("/"):
+        result = []
+        written_segments = written_path[1:].split("/")
+    else:
+        result = page_slug.split("/")
+        result.pop()
+        written_segments = written_path.split("/")
+    last = len(written_segments) - 1
+    for position, segment in enumerate(written_segments):
+        lowered = segment.lower()
+        is_last = position == last
+        if lowered in _DOT_DOT_SEGMENTS:
+            if len(result) > 0:
+                result.pop()
+            if is_last:
+                result.append("")
+        elif lowered in _DOT_SEGMENTS:
+            if is_last:
+                result.append("")
+        else:
+            result.append(segment)
+    return result
 
 
 def _built_pages(public_dir: Path):

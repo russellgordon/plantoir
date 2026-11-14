@@ -640,6 +640,30 @@ class FollowingACarriedFile(unittest.TestCase):
         self.assertIn(f"Media/slide{length}.htm", used)
         self.assertNotIn("Media/answer-key.pdf", used)
 
+    def test_a_page_that_is_not_utf8_is_read_and_keeps_its_ascii_addresses(self):
+        """siteFiles.readAsUtf8 (901a round 4, M4), through the contract's
+        case with fileBytes: the page is read, never skipped; its ASCII
+        address is carried and its accented one is left off (knownLimits).
+        The image runs the same case through the emitter's own read."""
+        case = None
+        for candidate in RULES["cases"]:
+            if "fileBytes" in candidate:
+                case = candidate
+        self.assertIsNotNone(case, "a case with fileBytes")
+        for name in case["files"]:
+            target = self.content / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if name in case["fileBytes"]:
+                target.write_bytes(case["fileBytes"][name].encode("latin-1"))
+            else:
+                target.write_text("file " + name, encoding="utf-8")
+        with self.assertRaises(UnicodeDecodeError):
+            (self.content / "Media/word-export.html").read_bytes().decode("utf-8")
+        used = self.follow({"Media/word-export"})
+        self.assertEqual(used, set(case["carried"]))
+        for address in case["leftOff"]:
+            self.assertNotIn(address, used)
+
     def test_the_check_has_no_limit_of_its_own(self):
         """Only the emitter stops at followed.limits (followed.limitsRule):
         the check is never handed a limit, and has no way to raise one."""

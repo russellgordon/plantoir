@@ -16,6 +16,7 @@ final class SiteFilesReportTests: XCTestCase {
     // MARK: - Stored properties
 
     private var marker: [String: Any] = [:]
+    private var siteFiles: [String: Any] = [:]
     private var mustRecord: [[String: Any]] = []
     private var previousStore: ProblemReportStore = ActivityTrail.store
     private var scratchFolderURL: URL = FileManager.default.temporaryDirectory
@@ -36,7 +37,7 @@ final class SiteFilesReportTests: XCTestCase {
         let all: [String: Any] = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
-        let siteFiles: [String: Any] = try XCTUnwrap(all["siteFiles"] as? [String: Any])
+        siteFiles = try XCTUnwrap(all["siteFiles"] as? [String: Any])
         marker = try XCTUnwrap(siteFiles["marker"] as? [String: Any])
         let activityTrail: [String: Any] = try XCTUnwrap(all["activityTrail"] as? [String: Any])
         mustRecord = try XCTUnwrap(activityTrail["mustRecord"] as? [[String: Any]])
@@ -226,5 +227,22 @@ final class SiteFilesReportTests: XCTestCase {
             let line: String = "2026-11-14 09:00:00 · SCH3U/2 · " + sentence
             XCTAssertEqual(LogRedactor.redacting(line), line)
         }
+    }
+
+    /// The failure explanation finds the build's stop at the follow limit by
+    /// words both of the contract's sentences carry, and Quartz's own error
+    /// line above them does not (901a round 4 review, M2), so rewording a
+    /// sentence cannot quietly leave the teacher reading the raw output.
+    func testTheFollowLimitStopsMarkerIsInBothOfTheContractsSentences() throws {
+        let words: [String: Any] = try XCTUnwrap(siteFiles["words"] as? [String: Any])
+        let followed: [String: Any] = try XCTUnwrap(siteFiles["followed"] as? [String: Any])
+        let deploySentence: String = try XCTUnwrap(words["followLimitStopped"] as? String)
+        let previewSentence: String = try XCTUnwrap(words["followLimitStoppedPreview"] as? String)
+        let limitReached: String = try XCTUnwrap(followed["limitReached"] as? String)
+        XCTAssertTrue(deploySentence.contains(FailureExplainer.followLimitStopMarker))
+        XCTAssertTrue(previewSentence.contains(FailureExplainer.followLimitStopMarker))
+        XCTAssertFalse(limitReached.contains(FailureExplainer.followLimitStopMarker))
+        let quartzLineOnly: String = "Failed to emit from plugin `PlantoirAssets`: " + limitReached
+        XCTAssertNil(FailureExplainer.followLimitStopExplanation(in: quartzLineOnly))
     }
 }

@@ -5075,7 +5075,9 @@ function in the image, so the two cannot drift.
   and so is `assetsEmitter: "quartz"` (the swap could not be made, so Quartz's
   own emitter ran and the check sorted the files after the build: plan
   review 901-8; since the Fable sweep it takes out by the same rule as with
-  Plantoir's emitter). In the field they keep a page whole.
+  Plantoir's emitter, so a file whose name a page's text mentions stays and
+  is deployed: "What the round 4 review found", below). In the field they
+  keep a page whole.
 
 **Where it runs, and why there.** On a build for deploying,
 `_check_mirror_and_mark` runs the check on the container's `public/` after
@@ -5376,6 +5378,76 @@ the emitter reads one Python does not in `<image>` outside an SVG, in
 counted). The image runs 3.11 and Windows' runtime 3.14.10, so one course can
 count differently on the two platforms; `knownLimits` says so and a
 follow-up proposes one reading.
+
+### What the round 4 review found, and what changed (901a's fifth round)
+
+The review found nothing wrong and four small things, all fixed here.
+
+**What the fallback costs (I1).** When Plantoir's emitter is not in play (a
+section's `quartz.config.ts` does not hold `Plugin.Assets(),` exactly once,
+so `build_site._wire_site_files_emitter` leaves it alone) Quartz's own
+Assets copies every course file, and the check takes out only what nothing
+on the site mentions (`check.exposure`). So a file a page merely names in
+its text IS deployed. Measured on a real Quartz 4.5.0 build: a page whose
+opening text read "answerkey.pdf and Media/solutions.pdf will be shared
+after the quiz" (Quartz writes that text into `contentIndex.json` and the
+page's description) kept both PDFs on the site through Quartz's Assets,
+`unreferenced` 15 and `takenOut` 4. Through Plantoir's emitter both were
+left off. The fallback's count fails the gates and writes the trail line,
+but a deploy in the field still goes ahead. The previous round's rule took
+all 19 unreferenced files out, those two PDFs among them, but also
+`style.css` and pictures a page loads, so it made holes, and it stays
+retired. The move to Quartz 5 (#512) must keep the swap holding before it
+merges, or this becomes every section's path. `words.emitterNotSwapped`,
+the line the build prints in the fallback, said every unused file was taken
+off; it now says a file a page's text names stays.
+
+**The stop's remedy was wrong (I2).** `words.followLimitStopped` and its
+preview form told the teacher to move a folder of unused web pages out of
+the course. The walk starts only from what published pages use
+(`followed.rule`), so unused pages are never counted and moving them changes
+nothing. Both sentences now say the pages students can see lead to too many
+of the course's own web pages, that hiding the pages that show or link to
+them lets the site build, and to choose Report a Problem. The limit is not
+reachable by any course measured (the 39 ready-made courses hold 9,841 files
+and no HTML, SVG or CSS file among them; the skeletons hold none of 2,389).
+The app now lifts the sentence out of the build's output
+(`FailureExplainer.followLimitStopExplanation`, an `app-rules.json` →
+`failureExplanations` case each for a deploy and a preview), so a teacher
+reads it without Quartz's "Failed to emit from plugin" and the deploy's
+non-zero exit around it (M2).
+
+**One more address both readers must read alike (M3).** `pics//../x.png`
+(and `pics\\..\x.png`, a doubled Windows backslash) is `pics/x.png` to a
+browser and to the emitter's WHATWG `URL`, because `..` removes the segment
+before it even when that segment is empty. Python's `urljoin` read
+`x.png`, so the check put back a file no browser loads and kept the right
+one as unreferenced. `site_files.resolved_from_page` now resolves dot
+segments by the WHATWG path rules itself
+(`_path_resolved_as_a_browser_does`) instead of through `urljoin`. Two
+`resolveCases` pin it (39 in all), and both failed with the previous
+`site_files.py`. Measured against Node 22.6's `URL` over 63,000 generated
+addresses (up to four segments from `a`, empty, `.`, `..`, `%2e`, `%2E%2e`,
+`.%2e`, `x.png`, a space and `%41`, relative and rooted, on three pages): no
+difference except the empty address, which both readers read as no address.
+A NUL in an address remains a parser difference (`knownLimits`).
+
+**A page that is not UTF-8 (M4).** Both readers already read a carried file
+as UTF-8 with U+FFFD for each byte that is not, and never skip it; this is
+now a rule (`siteFiles.readAsUtf8`) and a case (`cases`, a windows-1252 page
+in a frame written with `fileBytes`), run by `test_site_files.py` and, in
+the image, through the emitter's own read. An ASCII address in such a page
+is carried. An accented name in it, and every address in a UTF-16 page, is
+left off by both readers, where a browser could load it; that is a
+`knownLimits` line with a follow-up (read the page's own charset and byte
+order mark as a browser does). Rejected for now: detecting the encoding in
+both readers, because two detectors that disagree would be one more
+difference between them, and a teacher's export in UTF-16 has not been met.
+
+**The inline script line (M1).** `knownLimits` said mention-anywhere keeps a
+file a page's script fetches; that holds only when the script writes the
+name out in full. A name it builds from pieces was taken out in the
+fallback, measured.
 
 ### When the side file could not be written
 

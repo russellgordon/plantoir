@@ -2322,8 +2322,11 @@ SITE_FILES_MARKER = "PLANTOIR-SITE-FILES"
 def _wire_site_files_emitter(config_ts: Path) -> None:
     """Replace `Plugin.Assets(),` with `Plugin.PlantoirAssets(),`. When the
     line is not there exactly once the config is left alone and the build
-    goes on with Quartz's own emitter: the check after the build then takes
-    off what no page uses (assets_emitter_in reports which ran)."""
+    goes on with Quartz's own emitter, which copies every course file: the
+    check after the build then takes off what no page uses and nothing on
+    the site mentions, so a file a page's text names stays on the site and
+    is deployed, counted in unreferenced (siteFiles.check.exposure;
+    assets_emitter_in reports which ran)."""
     text = config_ts.read_text(encoding="utf-8")
     if "Plugin.PlantoirAssets()" in text:
         return
