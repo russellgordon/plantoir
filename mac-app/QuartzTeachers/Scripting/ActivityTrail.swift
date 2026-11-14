@@ -89,6 +89,10 @@ nonisolated enum ActivityTrail {
         /// about another window; now nothing shows, and this line is the
         /// only sign it was made.
         case previewAlreadyStarting = "preview already starting"
+        /// A repair's Preview Again started nothing, because the section's
+        /// page went away or the app was quitting before the old preview had
+        /// stopped, or a later Preview Again took its place (#813).
+        case previewAgainAbandoned = "preview again abandoned"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"

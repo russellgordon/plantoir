@@ -55,6 +55,10 @@ struct SectionDetailView: View {
     /// the record cannot outlive the wait — see `PreviewBuildWait`.
     @State var previewBuildWait: PreviewBuildWait = PreviewBuildWait()
 
+    /// This section page's own id for a repair's Preview Again (#813), so
+    /// leaving the page abandons its press and nobody else's.
+    @State var previewAgainOwner: UUID = UUID()
+
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
 
@@ -986,6 +990,9 @@ struct SectionDetailView: View {
                 }
             }
             .onDisappear {
+                // A repair's Preview Again still waiting for its stop starts
+                // nothing once this page has gone (#813).
+                PreviewAgainPresses.shared.abandon(owner: previewAgainOwner)
                 // FIRST, and unconditionally: the wait, and with it ⌘Q's record
                 // of a preview being built (issue #232). `stopPreview()` below
                 // ends it too; saying so here keeps a window that is going away
@@ -1433,7 +1440,15 @@ struct SectionDetailView: View {
     /// rather than unfortunate, and largely moot anyway: the repair itself puts
     /// content back, which forces a rebuild regardless.
     func rebuildAfterRepair() {
+        // The press is recorded AT ONCE, before anything is awaited (#813):
+        // leaving the section during the stop below abandons it, and so does
+        // quitting, so the start never runs from a view that has gone.
+        let owner: UUID = previewAgainOwner
+        let press: UUID = PreviewAgainPresses.shared.press(owner: owner)
         Task { @MainActor in
+            defer {
+                PreviewAgainPresses.shared.finish(press, owner: owner)
+            }
             // Every other way into a preview is gated — the toolbar button is
             // disabled while the section is busy, and Deploy while a deploy
             // runs. This was the one path with neither, so it could start a
@@ -1517,10 +1532,23 @@ struct SectionDetailView: View {
             // (`stopWaitingForThePreview`, issue #225); what is left holding a
             // port in silence is the outer ten-minute bound — a run that never
             // announced a server at all.
-            if previewLease != nil || previewRunner.isRunning {
-                await stopPreviewAndWait()
-            }
-            startPreview()
+            //
+            // The stop is waited for, then the start runs only if this press
+            // still holds (#813): `PreviewAgainPresses` says why.
+            _ = await PreviewAgainPresses.carryOut(
+                store: PreviewAgainPresses.shared,
+                owner: owner,
+                token: press,
+                courseCode: course.code,
+                sectionNumber: sectionNumber,
+                previewIsRunning: previewLease != nil || previewRunner.isRunning,
+                stop: {
+                    await stopPreviewAndWait()
+                },
+                start: {
+                    startPreview()
+                }
+            )
         }
     }
 

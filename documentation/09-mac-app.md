@@ -1741,7 +1741,9 @@ that build keeps its wait and ⌘Q still knows about it, and its map settles
 the refresh. `CoverageTabTests.testEverySequenceCase`
 runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
 test holds open, no window and no delay. A repair's Preview Again
-(`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
+(`rebuildAfterRepair`) had the same stop-then-start shape and now takes the
+same treatment (#813, "A repair's Preview Again" under "⌘Q while something is
+under way").
 A preview serving when the refresh is pressed starts again at the page last
 viewed (below).
 
@@ -2767,6 +2769,39 @@ inside one `PreviewBuildWait` so a refusal ends only its own wait (the second
 `begin` has already ended the first's claim by then, and the refusal still
 names another window); any delay or retry (the first start is the one the
 teacher asked for).
+
+**A repair's Preview Again (#813).** The button after a repair
+(`rebuildAfterRepair`) awaited `stopPreviewAndWait()` and then called
+`startPreview()` whatever had happened during the stop. A switch of section or
+course, the window closing, or a quit waiting on an update set aside, all
+during the stop, left the start to run on a page that had gone: it took a lease
+and started a serve that nothing would stop, and the section then read as
+previewed in another window. It now takes #793's treatment for Make the Map
+Again. The press is recorded AT ONCE, before the Task, as a token for the
+page (`previewAgainOwner`) in `PreviewAgainPresses`; `onDisappear` abandons
+the page's press first; `AppDelegate.finishTerminating` abandons every press,
+beside `SectionCoverage.abandonEveryRefresh()`; and
+`PreviewAgainPresses.carryOut` starts only if the token survives the stop.
+A second Preview Again replaces the token, so only the later press starts. A
+press that starts nothing writes `preview again abandoned`.
+
+The token lives in a record nothing else writes, which is #813's own note:
+#793's first token sat in the section's Coverage entry and the next reading
+of the record, which the old run's end always brings, wiped it, so nothing
+started. A Preview the teacher presses during the stop is the build: the
+repair's start then meets `aStartIsUnderWay` (#812) and does nothing, and
+that build keeps its record. Quitting during the stop is not asked about,
+since nothing is being built yet, which is how Make the Map Again behaves in
+the same position. The ten cases, with each event arriving inside the stop
+(the old run's end, another page leaving, leaving, quitting, a second press,
+the teacher's own Preview), are
+`quittingWhileWorkIsUnderWay.previewBuildRecord.previewAgainCases`, run by
+`PreviewBuildRecordTests.testEveryPreviewAgainCase` through the real
+`carryOut`; with `stillHolds` answering true (the old unconditional start, the
+must-fail copy) five of the ten fail, the three where the page leaves or the
+app quits among them, each ending with a build recorded that nothing stops.
+REJECTED: the token in the Coverage entry or any record a reading rewrites
+(above); asking at quit during the stop (nothing is building).
 
 **REJECTED, after it was built: ending the record from `.onChange(of:
 isWaitingForServer)`.** The first cut kept the flag as plain `@State` and ended

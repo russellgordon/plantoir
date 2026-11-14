@@ -91,6 +91,11 @@
         "why": "Issue #812: a preview asked for while the same window's own start is still waiting for a stop or building does nothing (quittingWhileWorkIsUnderWay.previewBuildRecord). It used to end the first start's record, so quitting did not ask about a build that was running, and it raised a refusal saying the section was previewed in another window. Nothing shows now, so this line is the only record that the press was made and why nothing new began."
       },
       {
+        "carries": "the course code and the section, and why nothing started: the section's page went away or Plantoir was quitting before the old preview had stopped, or a later Preview Again of the same section took its place",
+        "event": "preview again abandoned",
+        "why": "Issue #813: a repair's Preview Again stops a preview that is up and starts it again, and since #813 the start runs only if the press still holds after the stop (quittingWhileWorkIsUnderWay.previewBuildRecord.previewAgainCases). A press that starts nothing shows nothing either, so this line is the only answer to 'I pressed Preview Again and nothing came up'."
+      },
+      {
         "carries": "the launcher and its arguments, redacted",
         "event": "task started",
         "why": "What was actually asked for, as against what the teacher believes they asked for."
@@ -14934,10 +14939,154 @@
           "why": "Every claim ended, so quitting asks about nothing."
         }
       ],
+      "previewAgainRule": "A repair's Preview Again (the button in the dialog after a repair) is recorded AT ONCE, before anything is awaited, as a token for the section page that pressed it, in a record nothing else writes. A preview that is up is stopped and the stop waited for; then the section's preview starts only if the press still holds. Leaving the page (a switch of section or course, the window closing) abandons its press, quitting abandons every press, and a later Preview Again of the same page replaces it. A press that starts nothing writes a trail line (activityTrail.mustRecord: preview again abandoned). Quitting during the stop is not asked about, since nothing is being built yet (issue #813).",
+      "previewAgainHow": "Section 1 of ICS3U in one working folder, one section page. previewRunning says whether a preview is up at the press: the page holds its lease and its wait is over. The stop ends the page's wait and hands its lease back, then the events in duringTheStop arrive, in order, before the stop returns: oldRunEnds (the old run's own end arrives: the page's wait is ended again and nothing else), anotherWindowLeaves (another page on the section goes away), leave (this page goes away: its press is abandoned and its build, if any, stopped), quit (the quit goes ahead: every press abandoned, and the page's build stopped), pressAgain (a second Preview Again on this page, carried out at once, with nothing left to stop), teacherStartsAPreview (the teacher's own Preview, which starts the section's preview as pressCases' A.start does). expect.stops counts stops of the first press, startsAsked the starts asked for by any Preview Again, records how many sections a quit would ask about at the end, and alreadyStarting the starts that did nothing because a start was under way.",
+      "previewAgainCases": [
+        {
+          "name": "a preview showing, nothing during the stop",
+          "previewRunning": true,
+          "duringTheStop": [],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 1,
+            "records": 1,
+            "alreadyStarting": 0
+          },
+          "why": "The ordinary press: the old preview is stopped and waited for, then the section is previewed again and its build recorded."
+        },
+        {
+          "name": "no preview running: nothing to stop",
+          "previewRunning": false,
+          "duringTheStop": [],
+          "expect": {
+            "stops": 0,
+            "startsAsked": 1,
+            "records": 1,
+            "alreadyStarting": 0
+          },
+          "why": "A repair offered after a build that already ended: the start runs at once."
+        },
+        {
+          "name": "the old run ends during the stop",
+          "previewRunning": true,
+          "duringTheStop": [
+            "oldRunEnds"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 1,
+            "records": 1,
+            "alreadyStarting": 0
+          },
+          "why": "The old run's end always arrives around the stop. It writes the wait and the lease and never the press, so the start still runs (the #813 note: #793's first token was wiped by exactly this kind of event)."
+        },
+        {
+          "name": "another window on the section leaves during the stop",
+          "previewRunning": true,
+          "duringTheStop": [
+            "anotherWindowLeaves"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 1,
+            "records": 1,
+            "alreadyStarting": 0
+          },
+          "why": "Only the pressing page's leaving abandons its press."
+        },
+        {
+          "name": "leaving the section, the course or the window during the stop: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "leave"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 0,
+            "records": 0,
+            "alreadyStarting": 0
+          },
+          "why": "Issue #813. The start used to run on the page that had gone: a lease was taken and a serve started that nothing stopped, and the section read as previewed in another window from then on."
+        },
+        {
+          "name": "quitting during the stop: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "quit"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 0,
+            "records": 0,
+            "alreadyStarting": 0
+          },
+          "why": "A quit that goes ahead, including one waiting on an update set aside, abandons every press. It is not asked about: nothing is being built yet, as for Make the Map Again (coverageTab, 'quitting while the old preview stops: nothing starts')."
+        },
+        {
+          "name": "a second Preview Again during the stop: one start",
+          "previewRunning": true,
+          "duringTheStop": [
+            "pressAgain"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 1,
+            "records": 1,
+            "alreadyStarting": 0
+          },
+          "why": "The later press replaces the token and starts (the preview is already stopped, so it has nothing to stop); the first press then starts nothing."
+        },
+        {
+          "name": "the teacher's own Preview during the stop is the build",
+          "previewRunning": true,
+          "duringTheStop": [
+            "teacherStartsAPreview"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 1,
+            "records": 1,
+            "alreadyStarting": 1
+          },
+          "why": "The teacher's start is under way when the repair's start is asked for, so the repair's start does nothing (pressCases) and the teacher's build keeps its record, so quitting still asks about it."
+        },
+        {
+          "name": "the old run ends, then leaving: nothing starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "oldRunEnds",
+            "leave"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 0,
+            "records": 0,
+            "alreadyStarting": 0
+          },
+          "why": "A run ending does not keep a press alive either."
+        },
+        {
+          "name": "a second press, then leaving",
+          "previewRunning": true,
+          "duringTheStop": [
+            "pressAgain",
+            "leave"
+          ],
+          "expect": {
+            "stops": 1,
+            "startsAsked": 1,
+            "records": 0,
+            "alreadyStarting": 0
+          },
+          "why": "Leaving stops the second press's build, as leaving stops every build of the page, and the first press starts nothing: nothing is left recorded."
+        }
+      ],
       "rejected": [
         "Greying the Preview button while a start waits for its stop: it covers one way in of four (Section > Preview, the assistant and Course Settings still come through startPreview), and a second window on the section would still end the first one's record.",
         "A ticket that lets a refused start end only its own wait inside one window: by the time the lease refuses, the second start's begin has already ended the first start's claim, and the refusal would still name another window.",
-        "Waiting a moment before a second start, or retrying it: the first start is the one the teacher asked for, and a fixed delay only moves the race."
+        "Waiting a moment before a second start, or retrying it: the first start is the one the teacher asked for, and a fixed delay only moves the race.",
+        "Keeping the Preview Again press in the section's Coverage entry or any other record a reading rewrites: #793's first token lived there and was wiped by the reading the old run's end brings, so nothing started (#813's note).",
+        "Asking at quit while a Preview Again waits for its stop: nothing is being built yet, and Make the Map Again in the same position is not asked about either."
       ]
     },
     "whileUnitPlansAreShared": {

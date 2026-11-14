@@ -159,6 +159,122 @@ final class PreviewBuildRecordTests: XCTestCase {
         XCTAssertFalse(assistant.contains("CourseActivity.beginPreviewBuild("), "nor records with a claim nobody keeps")
     }
 
+    /// Every `previewAgainCases` case (#813): a repair's Preview Again with
+    /// each event arriving inside the stop, through the real
+    /// `PreviewAgainPresses.carryOut` and the press steps above.
+    func testEveryPreviewAgainCase() async throws {
+        let block: [String: Any] = try PreviewBuildRecordTests.block()
+        let cases: [[String: Any]] = try XCTUnwrap(block["previewAgainCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "the contract's Preview Again cases were not found")
+        for entry in cases {
+            CourseActivity.reset()
+            PreviewLeases.reset()
+            let name: String = try XCTUnwrap(entry["name"] as? String)
+            let previewRunning: Bool = try XCTUnwrap(entry["previewRunning"] as? Bool, name)
+            let duringTheStop: [String] = try XCTUnwrap(entry["duringTheStop"] as? [String], name)
+            let expect: [String: Any] = try XCTUnwrap(entry["expect"] as? [String: Any], name)
+            let store: PreviewAgainPresses = PreviewAgainPresses()
+            let page: Window = Window()
+            let owner: UUID = UUID()
+            let otherPage: UUID = UUID()
+            _ = store.press(owner: otherPage)
+            var counted: Counted = Counted()
+            var stops: Int = 0
+            var startsAsked: Int = 0
+            if previewRunning {
+                // A preview showing: the lease held and the wait over.
+                PreviewBuildRecordTests.start(page, counted: &counted)
+                page.wait.end()
+            }
+            let token: UUID = store.press(owner: owner)
+            _ = await PreviewAgainPresses.carryOut(
+                store: store,
+                owner: owner,
+                token: token,
+                courseCode: PreviewBuildRecordTests.courseCode,
+                sectionNumber: PreviewBuildRecordTests.section,
+                previewIsRunning: previewRunning,
+                stop: {
+                    stops += 1
+                    PreviewBuildRecordTests.runEnds(page)
+                    for event in duringTheStop {
+                        switch event {
+                        case "oldRunEnds":
+                            page.wait.end()
+                        case "anotherWindowLeaves":
+                            store.abandon(owner: otherPage)
+                        case "leave":
+                            store.abandon(owner: owner)
+                            PreviewBuildRecordTests.runEnds(page)
+                        case "quit":
+                            store.abandonEvery()
+                            PreviewBuildRecordTests.runEnds(page)
+                        case "pressAgain":
+                            let second: UUID = store.press(owner: owner)
+                            _ = await PreviewAgainPresses.carryOut(
+                                store: store,
+                                owner: owner,
+                                token: second,
+                                courseCode: PreviewBuildRecordTests.courseCode,
+                                sectionNumber: PreviewBuildRecordTests.section,
+                                previewIsRunning: false,
+                                stop: {
+                                    XCTFail("\(name): the second press had nothing to stop")
+                                },
+                                start: {
+                                    startsAsked += 1
+                                    PreviewBuildRecordTests.start(page, counted: &counted)
+                                }
+                            )
+                            store.finish(second, owner: owner)
+                        case "teacherStartsAPreview":
+                            PreviewBuildRecordTests.start(page, counted: &counted)
+                        default:
+                            XCTFail("\(name): no event \(event)")
+                        }
+                    }
+                },
+                start: {
+                    startsAsked += 1
+                    PreviewBuildRecordTests.start(page, counted: &counted)
+                }
+            )
+            store.finish(token, owner: owner)
+            XCTAssertEqual(stops, expect["stops"] as? Int, "\(name): stops")
+            XCTAssertEqual(startsAsked, expect["startsAsked"] as? Int, "\(name): startsAsked")
+            XCTAssertEqual(CourseActivity.activePreviewBuilds.count, expect["records"] as? Int, "\(name): records")
+            XCTAssertEqual(counted.alreadyStarting, expect["alreadyStarting"] as? Int, "\(name): alreadyStarting")
+            XCTAssertEqual(counted.refusals, 0, "\(name): nothing is refused")
+            XCTAssertNil(store.underWay[owner], "\(name): the press is over")
+        }
+    }
+
+    /// The view records the press before anything is awaited, carries it
+    /// out through the model, and abandons it when the page goes; the quit
+    /// abandons every press.
+    func testTheRepairPressIsRecordedAndAbandoned() throws {
+        let source: String = try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+        )
+        let body: String = try DeployAsksAboutLaterClassesTests.body(of: "    func rebuildAfterRepair() {", in: source)
+        let pressed: Range<String.Index> = try XCTUnwrap(
+            body.range(of: "PreviewAgainPresses.shared.press(owner: owner)"),
+            "the press is no longer recorded"
+        )
+        let task: Range<String.Index> = try XCTUnwrap(body.range(of: "Task { @MainActor in"))
+        XCTAssertLessThan(pressed.lowerBound, task.lowerBound, "recorded before anything is awaited")
+        XCTAssertTrue(body.contains("PreviewAgainPresses.carryOut("), "carried out through the model")
+        XCTAssertFalse(body.contains("await stopPreviewAndWait()\n            }\n            startPreview()"), "the old unconditional start")
+        let disappear: Range<String.Index> = try XCTUnwrap(source.range(of: ".onDisappear {"))
+        let afterDisappear: Substring = source[disappear.upperBound...].prefix(600)
+        XCTAssertTrue(
+            afterDisappear.contains("PreviewAgainPresses.shared.abandon(owner: previewAgainOwner)"),
+            "leaving the page abandons its press"
+        )
+        let delegate: String = try DeployAsksAboutLaterClassesTests.source("mac-app/QuartzTeachers/App/AppDelegate.swift")
+        XCTAssertTrue(delegate.contains("PreviewAgainPresses.shared.abandonEvery()"), "quitting abandons every press")
+    }
+
     // MARK: - Helpers
 
     /// `startPreview`'s record-keeping steps, in its order.
