@@ -3998,6 +3998,9 @@
       "Plantoir also saves a copy by itself before every Section menu change, Get Ready for the Start of the Year, a unit-word rename, Copy a Page into a course and Replace It…",
       "The Backups group in the sidebar, and All Backups: who made each, its size, what Plantoir keeps",
       "Select a backup's row, then Course > Restore from Backup…; the version you have now moves to Archived",
+      "A restore that cannot finish leaves the course as it was and says why (not enough space, refused before anything is archived; a locked item at the top, or the course folder, named); .git, build and node_modules stay where they are",
+      "A restore a quit or a crash interrupted is put back the next time the folder opens (the alert A restore did not finish); one that stopped part way keeps what it set aside in courses/_backups/<CODE>/<CODE> before a restore …, and the course is not in the sidebar until a backup is restored again",
+      "On a second computer sharing the folder, a course another computer is restoring is missing from the sidebar until that computer finishes, and this is said once",
       "Delete Backup… deletes one for good"
      ],
      "pictures": [
@@ -4023,7 +4026,7 @@
      "id": "backups",
      "section": "Backups",
      "status": "amended",
-     "amendment": "#785: automatic backups keep each Media file once; the size shown is what deleting frees. Nothing a teacher does changes; the fact sheet reads the merged sentences.",
+     "amendment": "#785: automatic backups keep each Media file once; the size shown is what deleting frees. Nothing a teacher does changes; the fact sheet reads the merged sentences. #909: a whole-course restore is staged; three steps added on what a teacher sees when one cannot finish, is interrupted, or is under way on another computer (the page's prose is owed: the 909 help lines).",
      "v4": "Automatic backups and 'select first' added (FS-9 corrections 4, 5); written now, sizes revisited after #785.",
      "factSheets": [
       "FS-9-reference-and-backups.md"
@@ -4050,6 +4053,7 @@
      "steps": [
       "Removing a course or a section moves it to Archived in the sidebar; nothing is deleted",
       "Select its row under Archived; File > Restore from Archive…",
+      "A restore from Archived that a quit or a crash interrupted is put back the next time the folder opens, and the archive is still in Archived",
       "Or right-click > Import for Reference… to put it on the Reference Courses shelf",
       "Course > Delete Archive… deletes it for good"
      ],

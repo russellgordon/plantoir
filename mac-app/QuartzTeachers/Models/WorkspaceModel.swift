@@ -540,6 +540,12 @@ class WorkspaceModel {
     /// The backup a delete confirmation is being shown for, if any.
     var backupDeleteRequest: BackupItem?
 
+    /// The staging folders of another computer's unfinished restores this
+    /// window has already told the teacher about (#909, the implementation
+    /// review's I2), so each is said once per opening and not at every
+    /// reading of the folder.
+    @ObservationIgnored private var restoresElsewhereAlreadyTold: Set<String> = []
+
     /// Why a backup action could not go ahead, shown as an alert.
     var backupProblem: String?
 
@@ -2207,11 +2213,32 @@ class WorkspaceModel {
         // server leaves it for the app, and with the settings moved out
         // first and in last the half-moved course reads as no course to it
         // meanwhile. Told once, in the backup alert's slot.
+        //
+        // Another computer's unfinished restore is never moved by here; while
+        // its course has no settings here it is missing from the sidebar, so
+        // that is said once per opening (the implementation review's I2).
+        // What the settles say is ADDED to a problem already showing rather
+        // than dropped (the review's M-e): the settle has already acted.
         if !AssistMCPServer.isServing {
-            let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: coursesDirectoryURL)
-            if !said.isEmpty && backupProblem == nil {
-                backupProblemTitle = RestoreWholeCourseWording.didNotFinishTitle
-                backupProblem = said.joined(separator: "\n\n")
+            var said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: coursesDirectoryURL)
+            let elsewhere: (said: [String], told: [String]) = WholeCourseRestore.unfinishedOnAnotherComputer(
+                in: coursesDirectoryURL, alreadyTold: restoresElsewhereAlreadyTold
+            )
+            for sentence in elsewhere.said {
+                said.append(sentence)
+            }
+            for staging in elsewhere.told {
+                restoresElsewhereAlreadyTold.insert(staging)
+            }
+            if !said.isEmpty {
+                var shown: String = said.joined(separator: "\n\n")
+                var title: String = RestoreWholeCourseWording.didNotFinishTitle
+                if let showing = backupProblem {
+                    shown = showing + "\n\n" + shown
+                    title = backupProblemTitle
+                }
+                backupProblemTitle = title
+                backupProblem = shown
             }
         }
 
@@ -2783,9 +2810,13 @@ class WorkspaceModel {
         defer { CourseActivity.endRestore(folderPath: workspacePath, courseCode: item.courseCode) }
         // A Claude, Codex or GitHub Copilot session open on the course elsewhere holds a restore too
         // (#458): it replaces the pages that session is changing.
-        if let refusal = wholeCourseRestoreRefusal(courseCode: item.courseCode) {
+        if let refused = wholeCourseRestoreRefusal(courseCode: item.courseCode, ownStaging: nil) {
+            WholeCourseRestore.noteDidNotGoAhead(
+                WholeCourseRestore.DidNotGoAhead.refused(refused.refusal), courseCode: item.courseCode,
+                backupFileName: item.fileURL.lastPathComponent, asked: WholeCourseRestore.AskedWhen.beforeTheArchive
+            )
             backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
-            backupProblem = refusal
+            backupProblem = refused.sentence
             return
         }
         var liveCourseURL: URL? = coursesDirectoryURL.appendingPathComponent(item.courseCode)
@@ -2795,6 +2826,11 @@ class WorkspaceModel {
         if let shortfall = WholeCourseRestore.spaceShortfall(
             courseURL: liveCourseURL, zipURL: item.fileURL, coursesDirectoryURL: coursesDirectoryURL
         ) {
+            WholeCourseRestore.noteDidNotGoAhead(
+                WholeCourseRestore.DidNotGoAhead.notEnoughSpace, courseCode: item.courseCode,
+                backupFileName: item.fileURL.lastPathComponent,
+                detail: "about " + WholeCourseRestore.sizeText(shortfall) + " more needed"
+            )
             backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = CourseRestorer.Problem.notEnoughSpace(item.courseCode, shortfall).localizedDescription
             return
@@ -2817,9 +2853,13 @@ class WorkspaceModel {
             // it would have the course replaced under it — the case the check
             // above exists to refuse. The archive stays: it is a copy of the
             // course as it is, and harmless.
-            if let refusal = wholeCourseRestoreRefusal(courseCode: item.courseCode) {
+            if let refused = wholeCourseRestoreRefusal(courseCode: item.courseCode, ownStaging: nil) {
+                WholeCourseRestore.noteDidNotGoAhead(
+                    WholeCourseRestore.DidNotGoAhead.refused(refused.refusal), courseCode: item.courseCode,
+                    backupFileName: item.fileURL.lastPathComponent, asked: WholeCourseRestore.AskedWhen.afterTheArchive
+                )
                 backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
-                backupProblem = refusal
+                backupProblem = refused.sentence
                 reloadCourses()
                 return
             }
@@ -2831,9 +2871,16 @@ class WorkspaceModel {
                 item,
                 coursesDirectoryURL: coursesDirectoryURL,
                 archiveURL: archiveURL,
-                beforeTheSwap: { () throws in
-                    if let refusal = self.wholeCourseRestoreRefusal(courseCode: item.courseCode) {
-                        throw CourseRestorer.Problem.refused(refusal)
+                beforeTheSwap: { (ownStaging: URL) throws in
+                    // This restore's own record is written by now: it is
+                    // passed so the refusal counts every record but it (the
+                    // implementation review's W1).
+                    if let refused = self.wholeCourseRestoreRefusal(courseCode: item.courseCode, ownStaging: ownStaging) {
+                        WholeCourseRestore.noteDidNotGoAhead(
+                            WholeCourseRestore.DidNotGoAhead.refused(refused.refusal), courseCode: item.courseCode,
+                            backupFileName: item.fileURL.lastPathComponent, asked: WholeCourseRestore.AskedWhen.beforeTheSwap
+                        )
+                        throw CourseRestorer.Problem.refused(refused.sentence)
                     }
                 }
             )
@@ -2869,12 +2916,18 @@ class WorkspaceModel {
     }
 
     /// Why a whole-course restore of this course may not go on now, as the
-    /// sentence the teacher reads, or nil (`WholeCourseRestore.refusal`, in
-    /// its order): this app's own preview, deploy or copy; an outside
-    /// session's hold (#458); a restore of the course that has not settled
-    /// (#909); another program building the course, counted against this
-    /// restore's own lease (`workLeases.declining`, take then check).
-    func wholeCourseRestoreRefusal(courseCode: String) -> String? {
+    /// refusal and the sentence the teacher reads, or nil
+    /// (`WholeCourseRestore.refusal`, in its order): this app's own preview,
+    /// deploy or copy; an outside session's hold (#458); a restore of the
+    /// course that has not settled (#909), counting every record but
+    /// `ownStaging`'s, the asking restore's own (the implementation review's
+    /// W1: it was counted, so every restore from Backups refused itself);
+    /// another program building the course, counted against this restore's
+    /// own lease (`workLeases.declining`, take then check).
+    func wholeCourseRestoreRefusal(
+        courseCode: String,
+        ownStaging: URL?
+    ) -> (refusal: WholeCourseRestore.Refusal, sentence: String)? {
         guard let workspacePath = workspaceURL?.path, let coursesDirectoryURL else {
             return nil
         }
@@ -2882,16 +2935,28 @@ class WorkspaceModel {
         facts.busyHere = CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode)
         facts.revisingAssistant = CourseActivity.revisingAssistant(folderPath: workspacePath, courseCode: courseCode)
         refreshCoursesRevisedElsewhere()
-        facts.unsettledRestore = RestoreSettle.unsettledRecordExists(
-            forCourse: courseCode, coursesDirectoryURL: coursesDirectoryURL
+        let unsettled: RestoreSettle.Unsettled? = RestoreSettle.unsettledRecord(
+            forCourse: courseCode,
+            coursesDirectoryURL: coursesDirectoryURL,
+            otherThan: ownStaging,
+            computer: SharedMediaStore.thisComputer,
+            owner: ProcessLiveness.leaseBody(),
+            ownerIsAlive: { (body: String) -> Bool in
+                return WholeCourseRestore.ownerIsAlive(leaseBody: body)
+            }
         )
+        facts.unsettledRestore = unsettled == RestoreSettle.Unsettled.underWay
+        facts.earlierRestoreLeftOver = unsettled == RestoreSettle.Unsettled.leftOver
         facts.buildingElsewhere = WorkLeaseRegistry.whatBlocksABuild(
             folderPath: workspacePath, courseCode: courseCode, afterTaking: true
         ) != nil
         guard let refusal = WholeCourseRestore.refusal(facts) else {
             return nil
         }
-        return WholeCourseRestore.sentence(for: refusal, courseCode: courseCode, assistant: facts.revisingAssistant)
+        let sentence: String = WholeCourseRestore.sentence(
+            for: refusal, courseCode: courseCode, assistant: facts.revisingAssistant
+        )
+        return (refusal: refusal, sentence: sentence)
     }
 
     /// The line a whole-course restore leaves: the code it shows (read from

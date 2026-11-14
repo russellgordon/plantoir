@@ -181,12 +181,24 @@ nonisolated enum ActivityTrail {
         /// section's, because a line named for a section would mislead a
         /// reader of a whole-course report.
         case courseRestoreStoppedPartWay = "course restore stopped part way"
+        /// A WHOLE-course restore did not go ahead and the course was left
+        /// as it was (#909, the implementation review's I4): refused (which
+        /// refusal, and when it was asked), not enough space, the disk
+        /// filled, the backup unreadable, a small backup refused, a move
+        /// that failed with every file put back, or an item or the folder
+        /// locked. Carries the course, the backup's file name, the reason
+        /// as a fixed phrase, a locked top-level item's name, and where
+        /// newcomers were kept, never a page. Without it "my restore didn't
+        /// work" next week shows nothing at all.
+        case courseRestoreLeftAsItWas = "course restore left as it was"
         /// A reading of the working folder found a restore that did not
         /// finish (#909) and settled it: put back as it was, finished
         /// (it had happened), kept where a teacher can open it, or removed
-        /// (it had moved nothing). Carries the course, the backup's file
-        /// name, what was found and what was done, and any kept path,
-        /// never a page.
+        /// (it had moved nothing); or left it alone because another
+        /// computer wrote it and the course is missing here, written once
+        /// per opening when the teacher is told. Carries the course, the
+        /// backup's file name, what was found and what was done, and any
+        /// kept path, never a page.
         case unfinishedRestoreSettled = "unfinished restore settled"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
@@ -1799,6 +1811,30 @@ nonisolated enum ActivityTrail {
              + "the files set aside are kept in " + keptAt
     }
 
+    /// The words for `courseRestoreLeftAsItWas` (#909, the implementation
+    /// review's I4): which backup, why in a fixed phrase, the locked
+    /// item's name, when a refusal was asked, and where newcomers were
+    /// kept. Never a page.
+    static func courseRestoreLeftAsItWasLine(
+        backup: String,
+        why: String,
+        detail: String?,
+        asked: String?,
+        newcomersKeptAt: String?
+    ) -> String {
+        var line: String = "a whole-course restore from " + backup + " did not go ahead, and the course was left as it was: " + why
+        if let detail {
+            line += " (" + detail + ")"
+        }
+        if let asked {
+            line += ", asked " + asked
+        }
+        if let newcomersKeptAt {
+            line += "; files made in the course meanwhile are kept in " + newcomersKeptAt
+        }
+        return line
+    }
+
     /// The words for `unfinishedRestoreSettled` (#909): which restore, what
     /// was found and what was done.
     static func unfinishedRestoreSettledLine(_ outcome: RestoreSettle.Settled) -> String {
@@ -1825,7 +1861,7 @@ nonisolated enum ActivityTrail {
                 line += " in " + keptAt
             }
         case .leave:
-            line += ": left as it is"
+            line += ": left as it is, because another computer started it; nothing here was moved"
         }
         if let newcomers = outcome.newcomersKeptAt {
             line += "; files made in the course meanwhile are kept in " + newcomers

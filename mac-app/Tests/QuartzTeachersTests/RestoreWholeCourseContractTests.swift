@@ -14,7 +14,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
     @MainActor
     func testEveryFaultCase() throws {
         let cases: [[String: Any]] = try XCTUnwrap(try RestoreWholeCourseContractTests.block()["faultCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 15, "faultCases has shrunk")
+        XCTAssertGreaterThanOrEqual(cases.count, 17, "faultCases has shrunk")
         for testCase in cases {
             try runFaultCase(testCase)
         }
@@ -38,6 +38,9 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         if let readOnly = fault["readOnlyAtTop"] as? String {
             XCTAssertEqual(chmod(fixture.courseURL.appendingPathComponent(readOnly).path, 0o555), 0, name)
         }
+        if fault["readOnlyCourseFolder"] as? Bool == true {
+            XCTAssertEqual(chmod(fixture.courseURL.path, 0o555), 0, name)
+        }
         if let lockedInside = fault["lockedInside"] as? String {
             XCTAssertEqual(lchflags(fixture.courseURL.appendingPathComponent(lockedInside).path, UInt32(UF_IMMUTABLE)), 0, name)
         }
@@ -58,7 +61,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
                 fromZipAt: fixture.zipURL,
                 courseCode: "ICS3U",
                 coursesDirectoryURL: fixture.coursesDirectoryURL,
-                beforeTheSwap: { () throws in
+                beforeTheSwap: { (_: URL) throws in
                     if fault["refusedBeforeTheSwap"] as? Bool == true {
                         throw CourseRestorer.Problem.refused("REFUSED BEFORE THE SWAP")
                     }
@@ -72,7 +75,18 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         if let expectMoves = testCase["expectMoves"] as? [String] {
             XCTAssertEqual(moves, expectMoves, name)
         }
+        if fault["readOnlyCourseFolder"] as? Bool == true {
+            XCTAssertEqual(chmod(fixture.courseURL.path, 0o755), 0, name)
+        }
         let now: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        if let settingsInTheCourse = testCase["settingsInTheCourse"] as? Bool {
+            // The implementation review's I1: a course that is a mix never
+            // has its settings, so nothing builds or deploys it.
+            XCTAssertEqual(
+                RestoreSwap.itemExists(at: fixture.courseURL.appendingPathComponent("course_config.json")),
+                settingsInTheCourse, "\(name): the course's settings"
+            )
+        }
         let expectedCourse: String = try XCTUnwrap(testCase["course"] as? String, name)
         switch expectedCourse {
         case "asItWas":
@@ -111,7 +125,13 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             let lockedName: String = try XCTUnwrap(testCase["lockedName"] as? String, name)
             XCTAssertEqual(
                 said,
-                RestoreWholeCourseWording.leftAsItWasLocked(course: "ICS3U", name: lockedName) + " " + RestoreWholeCourseWording.unlockInTheFinder,
+                RestoreWholeCourseWording.leftAsItWasLocked(course: "ICS3U", name: lockedName) + " " + RestoreWholeCourseWording.unlockIt,
+                name
+            )
+        case "leftAsItWasFolderLocked":
+            XCTAssertEqual(
+                said,
+                RestoreWholeCourseWording.leftAsItWasFolderLocked(course: "ICS3U") + " " + RestoreWholeCourseWording.unlockIt,
                 name
             )
         case "stoppedPartWay":
@@ -119,7 +139,13 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             XCTAssertFalse(said.contains(RestoreWholeCourseWording.notInTheSidebar(course: "ICS3U")), name)
         case "stoppedPartWay+notInTheSidebar":
             XCTAssertTrue(said.hasPrefix("The restore of ICS3U stopped part way"), "\(name): \(said)")
-            XCTAssertTrue(said.contains(RestoreWholeCourseWording.notInTheSidebar(course: "ICS3U")), "\(name): \(said)")
+            XCTAssertTrue(
+                said.contains(
+                    RestoreWholeCourseWording.notInTheSidebar(course: "ICS3U") + " "
+                    + RestoreWholeCourseWording.restoreAgainToPutItRight(course: "ICS3U")
+                ),
+                "\(name): \(said)"
+            )
         case "backups.sharedMedia mediaNotPutBack":
             XCTAssertEqual(said, SharedMediaStore.Problem.mediaNotPutBack(fixture.zipURL.lastPathComponent).localizedDescription, name)
         case "archiveUnreadable":
@@ -129,11 +155,17 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         default:
             XCTFail("\(name): unknown says \(says)")
         }
-        // The one trail line a failed restore writes is the stopped-part-way
-        // line; every other failure writes nothing.
+        // A stop writes the stopped-part-way line; a restore left as it was
+        // writes the left-as-it-was line (the implementation review's I4); a
+        // refusal is noted by the door that refused, which knows which one.
         let stoppedLine: String = "a whole-course restore stopped part way and could not move every file back"
+        let leftLine: String = "a whole-course restore from \(fixture.zipURL.lastPathComponent) did not go ahead, and the course was left as it was: "
         let trail: String? = testCase["trail"] as? String
         XCTAssertEqual(fixture.trailText().contains(stoppedLine), trail == "course restore stopped part way", "\(name): trail")
+        XCTAssertEqual(fixture.trailText().contains(leftLine), trail == "course restore left as it was", "\(name): trail")
+        for line in fixture.trailText().components(separatedBy: "\n") where line.contains("a whole-course restore") {
+            XCTAssertEqual(LogRedactor.redacting(line), line, "\(name): the trail line passes the redactor unchanged")
+        }
     }
 
     // MARK: - Functions: the rule and the pure cases
@@ -174,7 +206,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
     @MainActor
     func testEveryRefusalCase() throws {
         let cases: [[String: Any]] = try XCTUnwrap(try RestoreWholeCourseContractTests.block()["refusalCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6, "refusalCases has shrunk")
+        XCTAssertGreaterThanOrEqual(cases.count, 7, "refusalCases has shrunk")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let facts: [String: Any] = try XCTUnwrap(testCase["facts"] as? [String: Any], name)
@@ -182,6 +214,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             given.busyHere = try XCTUnwrap(facts["busyHere"] as? Bool, name)
             given.revisingAssistant = facts["revisingAssistant"] as? String
             given.unsettledRestore = try XCTUnwrap(facts["unsettledRestore"] as? Bool, name)
+            given.earlierRestoreLeftOver = facts["earlierRestoreLeftOver"] as? Bool ?? false
             given.buildingElsewhere = try XCTUnwrap(facts["buildingElsewhere"] as? Bool, name)
             XCTAssertEqual(WholeCourseRestore.refusal(given)?.rawValue, testCase["refusal"] as? String, name)
         }
@@ -197,6 +230,10 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         XCTAssertEqual(
             WholeCourseRestore.sentence(for: .anotherRestoreUnderWay, courseCode: "ICS3U", assistant: nil),
             RestoreWholeCourseWording.anotherRestoreUnderWay(course: "ICS3U")
+        )
+        XCTAssertEqual(
+            WholeCourseRestore.sentence(for: .anEarlierRestoreDidNotFinish, courseCode: "ICS3U", assistant: nil),
+            RestoreWholeCourseWording.anEarlierRestoreDidNotFinish(course: "ICS3U")
         )
     }
 
@@ -263,7 +300,17 @@ final class RestoreWholeCourseContractTests: XCTestCase {
     /// Every sentence equals the contract's template, filled with the same
     /// values.
     func testEverySentenceIsTheContractsTemplate() throws {
-        let wording: [String: Any] = try XCTUnwrap(try RestoreWholeCourseContractTests.block()["wording"] as? [String: Any])
+        let block: [String: Any] = try RestoreWholeCourseContractTests.block()
+        let wording: [String: Any] = try XCTUnwrap(block["wording"] as? [String: Any])
+        // The per-platform words, as deployTokens.placeholders carries
+        // {deployingSettings} (the implementation review's I6).
+        let placeholders: [String: Any] = try XCTUnwrap(block["placeholders"] as? [String: Any])
+        let unlockWords: [String: String] = try XCTUnwrap(placeholders["unlockInTheFileManager"] as? [String: String])
+        XCTAssertEqual(unlockWords["mac"], RestoreWholeCourseWording.unlockInTheFileManagerOnThisPlatform)
+        XCTAssertNotNil(unlockWords["windows"], "Windows has its own words")
+        XCTAssertEqual(wording["unlockIt"] as? String, RestoreWholeCourseWording.unlockItTemplate)
+        XCTAssertTrue(RestoreWholeCourseWording.unlockItTemplate.contains(RestoreWholeCourseWording.unlockInTheFileManagerPlaceholder))
+        XCTAssertFalse(RestoreWholeCourseWording.unlockIt.contains(RestoreWholeCourseWording.unlockInTheFileManagerPlaceholder))
         let keptAt: String = "courses/_backups/ICS3U/ICS3U before a restore 2026-11-14_031500"
         func filled(_ key: String, reason: String = "", name: String = "", size: String = "") throws -> String {
             let template: String = try XCTUnwrap(wording[key] as? String, key)
@@ -273,10 +320,16 @@ final class RestoreWholeCourseContractTests: XCTestCase {
                 .replacingOccurrences(of: "{NAME}", with: name)
                 .replacingOccurrences(of: "{SIZE}", with: size)
                 .replacingOccurrences(of: "{KEPT}", with: keptAt)
+                .replacingOccurrences(of: "{unlockInTheFileManager}", with: unlockWords["mac"] ?? "")
         }
         XCTAssertEqual(RestoreWholeCourseWording.leftAsItWas(course: "ICS3U", reason: "disk full"), try filled("leftAsItWas", reason: "disk full"))
         XCTAssertEqual(RestoreWholeCourseWording.leftAsItWasLocked(course: "ICS3U", name: "index.md"), try filled("leftAsItWasLocked", name: "index.md"))
-        XCTAssertEqual(RestoreWholeCourseWording.unlockInTheFinder, try filled("unlockInTheFinder"))
+        XCTAssertEqual(RestoreWholeCourseWording.unlockIt, try filled("unlockIt"))
+        XCTAssertEqual(RestoreWholeCourseWording.leftAsItWasFolderLocked(course: "ICS3U"), try filled("leftAsItWasFolderLocked"))
+        XCTAssertEqual(RestoreWholeCourseWording.restoreAgainToPutItRight(course: "ICS3U"), try filled("restoreAgainToPutItRight"))
+        XCTAssertEqual(RestoreWholeCourseWording.didNotFinishFromArchived(course: "ICS3U"), try filled("didNotFinishFromArchived"))
+        XCTAssertEqual(RestoreWholeCourseWording.anEarlierRestoreDidNotFinish(course: "ICS3U"), try filled("anEarlierRestoreDidNotFinish"))
+        XCTAssertEqual(RestoreWholeCourseWording.unfinishedOnAnotherComputer(course: "ICS3U"), try filled("unfinishedOnAnotherComputer"))
         XCTAssertEqual(RestoreWholeCourseWording.leftAsItWasInUse(course: "ICS3U", name: "index.md"), try filled("leftAsItWasInUse", name: "index.md"))
         XCTAssertEqual(RestoreWholeCourseWording.notEnoughSpace(course: "ICS3U", size: "1.2 GB"), try filled("notEnoughSpace", size: "1.2 GB"))
         XCTAssertEqual(RestoreWholeCourseWording.ranOutOfSpace(course: "ICS3U"), try filled("ranOutOfSpace"))
@@ -292,7 +345,8 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         // The joins, as wording.joins says.
         XCTAssertEqual(
             CourseRestorer.Problem.courseRestoreStoppedPartWay("ICS3U", keptAt: keptAt, archived: true, settingsAreBack: false).localizedDescription,
-            try filled("stoppedPartWay") + " " + filled("notInTheSidebar") + " " + OneSectionRestoreWording.stoppedPartWayArchived
+            try filled("stoppedPartWay") + " " + filled("notInTheSidebar") + " " + filled("restoreAgainToPutItRight")
+                + " " + OneSectionRestoreWording.stoppedPartWayArchived
         )
         XCTAssertEqual(
             CourseRestorer.Problem.courseRestoreStoppedPartWay("ICS3U", keptAt: nil, archived: false, settingsAreBack: true).localizedDescription,
@@ -300,7 +354,11 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         )
         XCTAssertEqual(
             CourseRestorer.Problem.courseLeftAsItWasLocked("ICS3U", "index.md").localizedDescription,
-            try filled("leftAsItWasLocked", name: "index.md") + " " + filled("unlockInTheFinder")
+            try filled("leftAsItWasLocked", name: "index.md") + " " + filled("unlockIt")
+        )
+        XCTAssertEqual(
+            CourseRestorer.Problem.courseFolderLocked("ICS3U").localizedDescription,
+            try filled("leftAsItWasFolderLocked") + " " + filled("unlockIt")
         )
         XCTAssertEqual(
             CourseRestorer.Problem.courseLeftAsItWas("ICS3U", "disk full", newcomersKeptAt: keptAt).localizedDescription,
@@ -345,7 +403,7 @@ struct WholeCourseFixture {
 
     // MARK: - Initializer
 
-    init(smallBackupMarker: Bool = false, backupSettingsUnreadable: Bool = false) throws {
+    init(smallBackupMarker: Bool = false, backupSettingsUnreadable: Bool = false, reference: Bool = false) throws {
         let fileManager: FileManager = FileManager.default
         rootURL = fileManager.temporaryDirectory.appendingPathComponent("restore-909-\(UUID().uuidString)")
         coursesDirectoryURL = rootURL.appendingPathComponent("courses")
@@ -355,7 +413,7 @@ struct WholeCourseFixture {
         ActivityTrail.store = ProblemReportStore(folderURL: rootURL.appendingPathComponent("trail"))
 
         let then: URL = rootURL.appendingPathComponent("then")
-        try WholeCourseFixture.writeCourse(at: then.appendingPathComponent("ICS3U"), tag: "BACKUP")
+        try WholeCourseFixture.writeCourse(at: then.appendingPathComponent("ICS3U"), tag: "BACKUP", reference: reference)
         if backupSettingsUnreadable {
             try Data("not settings".utf8).write(to: then.appendingPathComponent("ICS3U/course_config.json"))
         }
@@ -373,14 +431,21 @@ struct WholeCourseFixture {
         zip.waitUntilExit()
         try fileManager.removeItem(at: then)
 
-        try WholeCourseFixture.writeCourse(at: courseURL, tag: "LIVE")
+        try WholeCourseFixture.writeCourse(at: courseURL, tag: "LIVE", reference: reference)
         try WholeCourseFixture.write("ref: refs/heads/main\n", to: courseURL.appendingPathComponent(".git/HEAD"))
     }
 
     // MARK: - Functions
 
-    static func writeCourse(at url: URL, tag: String) throws {
-        let settings: [String: Any] = ["course_code": "ICS3U", "course_name": "\(tag) course", "section_numbers": [1]]
+    /// A course whose every file says `tag`; `reference` makes it one kept
+    /// for reference, as `ReferenceReplacerTests` writes one.
+    static func writeCourse(at url: URL, tag: String, reference: Bool = false) throws {
+        var settings: [String: Any] = ["course_code": "ICS3U", "course_name": "\(tag) course", "section_numbers": [1]]
+        if reference {
+            settings["kept_for_reference"] = true
+            settings["reference_school_year"] = 2025
+            settings["deploy_target"] = "local_folder"
+        }
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         try JSONSerialization.data(withJSONObject: settings).write(to: url.appendingPathComponent("course_config.json"))
         try write("{\"tag\": \"\(tag)\"}", to: url.appendingPathComponent(".obsidian/app.json"))

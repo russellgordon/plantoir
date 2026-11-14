@@ -12904,7 +12904,9 @@ into the kill harness). The order is `contracts/course-management.json` →
    `backup/`; the settings checked; 785b's Media slot (nothing today); the
    Media guard, which refuses a small backup before anything moves; the
    archive flushed (17 to 36 ms, measured by the plan); the refusals a third
-   time.
+   time, handed this restore's own staging folder so the record it has just
+   written is not counted as "another restore under way" (the
+   implementation review's W1, below).
 5. The moves are planned and recorded: every top-level item of the course
    aside into `as-it-was/`, **`course_config.json` first**, every item of
    the backup in, **`course_config.json` last**, the rest in name order. A
@@ -12945,8 +12947,17 @@ skipped, never deleted); an `in` move whose staging end still holds the
 backup's item was never made. A move that cannot be made is blocked:
 `stopped` is recorded, `as-it-was/` (and any newcomers) move to
 `courses/_backups/<CODE>/<CODE> before a restore <stamp>`, and
-`stoppedPartWay` is said, with `notInTheSidebar` when the settings are among
-what is aside (L4). A refusal on a lock or a permission at the top of the
+`stoppedPartWay` is said, with `notInTheSidebar` and
+`restoreAgainToPutItRight` when the settings are among what is aside (L4).
+**The settings go back last, and only over a course whose every other file
+is back** (the implementation review's I1): the course's own
+`course_config.json` is the last move back, and it stays aside whenever an
+earlier move back failed; the backup's `course_config.json` is the first
+move back, and when it will not leave, the way back stops there, so the
+course is the backup's whole rather than a mix under the backup's settings.
+A course that is a mix therefore never has its settings, and the sidebar,
+`build_site.py`, `deploy.sh` and the scheduled deploy all read it as no
+course. A refusal on a lock or a permission at the top of the
 course (EPERM, EACCES) names the item (`leftAsItWasLocked`, Russell's held
 question M13, behind `aLockedItemAtTheTopChangesNothing`). The reason shown
 never carries a staging path (M6): Foundation's move error names both ends,
@@ -12986,15 +12997,22 @@ Fixture: 46 files, 19 moves, 24 steps.
 | restore killed before step 12, 16 or 20, the settle killed before each of its own moves back, a second settle | 39 of 39 as they were, nothing left |
 | two settlers at once, killed before step 12 and 20, 40 trials each | 80 of 80 as they were; one settler acted, the other did nothing; no false stopped-part-way, no spurious kept folder (the prototype: 73 false sentences and 50 spurious folders) |
 | a failure at each forward move | 19 of 19 as they were, nothing staged |
-| forward move k fails and way-back move j<k fails too | 171 cases, 0 files lost, 119 mixes, every set-aside file kept |
+| forward move k fails and way-back move j<k fails too | 171 cases, 0 files lost, 119 mixes, every set-aside file kept; **101 of the 119 with the course's settings back** (the implementation review's count); after its I1, 171 cases, 0 lost, 0 with settings over a mix (see "After the implementation review") |
 | killed before step 8, 12 or 16, then `.obsidian/workspace.json` written into the course, then a settle | 46 of 46 files as they were, the newcomer kept |
 | a newcomer written into `.obsidian` during the swap | left as it was, newcomer kept |
 | Finder-locked page / read-only folder nested inside | restored, nothing staged |
 | the same at the top of the course | left as it was, "Operation not permitted (locked: index.md)", "Permission denied (locked: Concepts)" |
 
 The harness and its outputs are in the run's scratch folder
-(`909/harness/`); exFAT was not re-measured on the branch (the plan's
-prototype: identical results on exFAT, 9 to 17 ms for the swap).
+(`909/harness/`, and `909/round2/harness/` for the round below). exFAT and
+case-sensitive APFS were re-measured on the branch by the implementation
+review: SIGKILL before each of the 24 steps then a settle, 22 of 22 as they
+were and 2 of 2 the backup's on both, and a failure at each of the 19
+forward moves, 19 of 19 byte for byte; on exFAT, top-level items with
+extended attributes (AppleDouble `._` files present) restored cleanly,
+because `contentsOfDirectory` does not list `._` files and a rename carries
+them; a full 42 MB APFS volume refused at the unpack with the course byte
+for byte.
 
 **What it costs.** The only copy is the unpack, which the old code made
 too; the old copy moves aside by renaming. Peak extra space is one unpacked
@@ -13031,16 +13049,114 @@ exFAT; longer from a backup iCloud must download), so a Force Quit is the
 likeliest interruption, and the settle is what makes it safe. Another
 computer sharing the folder through a sync client sees the course without
 its settings, and so without its row, until the first computer settles it,
-and its own reading clears that course's built sites meanwhile (rebuilt on
-the next preview). Sync clients and Obsidian's own behaviour were not
-measured (no app and no synced folder may be touched).
+and is told so once per opening (`unfinishedOnAnotherComputer`, below). Its
+built sites are kept meanwhile: `placeBuiltSitesOutsideTheFolder` is handed
+every folder in `courses/`, settings or not, so a course folder without
+settings keeps its builds (the implementation review's M-f corrected the
+sentence that said they were cleared). A crash between the last move and
+`done` is put back, although every move had been made: for an arrival that
+moves the whole arrived course back into staging and deletes it, and any
+edit made between the crash and the next opening is lost with it; the zip
+is still in Backups or Archived, so the restore can be made again. Rolling
+forward when every move is verifiably made was rejected (the issue's title
+is the ruling) and is recorded here as a limit (the review's M-g). Sync
+clients and Obsidian's own behaviour were not measured (no app and no
+synced folder may be touched).
+
+**After the implementation review** (round two, 2026-11-14). Each finding
+was reproduced first; each fix has a test proven red on 7769cb7a7.
+
+- **W1: every restore from Backups refused itself.** The third refusal
+  asked `RestoreSettle.unsettledRecordExists`, which matched ANY record
+  naming the course, and the restore has written its own record (phase
+  `unpacking`) before it asks, so it always refused with
+  `anotherRestoreUnderWay`, after the archive was made. Reproduced in the
+  harness (`THIRD_CHECK=1` with the old reader: "refused:
+  anotherRestoreUnderWay", nothing moved; with the fix: "ok 19 moves").
+  `beforeTheSwap` is now handed the restore's own staging folder, and
+  `RestoreSettle.unsettledRecord(forCourse:…otherThan:)` counts every record
+  but that one. No contract case could see it, because they inject the
+  refusal, and no engine test ran the door: `WholeCourseRestoreDoorTests`
+  now restores through `WorkspaceModel.restoreBackup` and
+  `WorkspaceModel.restore(_:)` on a temporary working folder, and
+  `ReferenceReplacerTests` covers the reference replacer's path.
+- **I1: the settings over a mix.** As described under the way back above.
+  Measured on the harness (`review_runs.py double`, every kept folder read):
+  171 double faults, 0 files lost, 0 mixes with settings (101 of 119 before).
+  The teacher is told `stoppedPartWay`, `notInTheSidebar` and
+  `restoreAgainToPutItRight`; the trail has `course restore stopped part
+  way`. The way out is to restore a backup again: over a course folder the
+  sidebar does not list nothing is archived first, so `CourseRestorer
+  .restoreBackup` passes `keepingWhatWasReplaced` and the set-aside copy is
+  kept in `courses/_backups/<CODE>/<CODE> before a restore <stamp>` rather
+  than removed. Rejected: archiving the folder anyway (`CourseArchiver`
+  takes a listed course, and a second full zip of a mix adds nothing the
+  kept folder lacks); moving the settings back and marking the course
+  unsafe to deploy (a third state every reader would have to learn).
+- **I2: another computer's restore, silent for 14 days.** The rule stands
+  (never moved by here). `RestoreSettle.unfinishedOnAnotherComputer` lists
+  another computer's records younger than 14 days whose course has no
+  settings here, and `reloadCourses` says `unfinishedOnAnotherComputer` once
+  per opening of the window for each (`restoresElsewhereAlreadyTold`), with
+  an `unfinished restore settled` line whose action is "left as it is". The
+  sentence claims only what this computer can see: a record from another
+  computer and a course without settings. Which computer it was, or whether
+  it is still at work, is not known here. Nothing is said while the course
+  still has its settings (a record from the unpack, nothing moved).
+- **I3: a reference course put back unlocked.** `justBeforeTheSwap` unlocks
+  it; a live failure locked it again, the settle did not. The settle's
+  context has `afterPuttingBack`, which locks it when the settings say it is
+  kept for reference, after a put-back and after a stop.
+- **I4: rule 5.** `course restore left as it was` is written for every
+  restore left as it was: each refusal (and when it was asked: before the
+  archive, after it, or once the backup was opened), not enough space (with
+  about how much more), the disk filling, an unreadable backup, a small
+  backup refused, a move that failed with every file put back, a locked
+  item at the top by name, or the course folder itself. Fixed phrases
+  (`WholeCourseRestore.DidNotGoAhead`), never page text, and they pass
+  `LogRedactor` unchanged.
+- **I6: the unlock sentence per platform.** `wording.unlockIt` is
+  `{unlockInTheFileManager}`, and `placeholders.unlockInTheFileManager`
+  holds each platform's words, as `deployTokens.placeholders` holds
+  `{deployingSettings}`; the mac's are its sentence before, byte for byte.
+- **The MINORs.** The record carries `from` (backups or archived), and a
+  Restore from Archive that did not finish says `didNotFinishFromArchived`
+  (M-a). A course folder that is itself read-only or Locked is named
+  (`leftAsItWasFolderLocked`, measured: `chmod a-w` and `chflags uchg` on the
+  course both refused at `course_config.json`, the first move) (M-b). A stop
+  names the kept folder whenever anything was kept, hidden folders included
+  (M-c). A record this computer wrote that nothing is restoring (its writer
+  gone, or this very process after a stop whose kept folder could not be
+  moved) is refused with `anEarlierRestoreDidNotFinish`, never "being
+  restored somewhere else" (M-d). What the settles say is added after a
+  problem the alert already shows, not dropped (M-e). M-f and M-g are under
+  Known limits above. M-h: the Media guard covers every door today because
+  nothing writes a small backup yet (`writeSmallBackup` has no caller
+  outside tests); the four doors that must call it before 785b turns the
+  writer on are the two section routes, `ReferenceZipSource` and
+  `ReferenceReplacer`. M-i: the whole-course alert's own text in
+  `SidebarView` is still the mac's alone, and follows with the alert's
+  contract.
+
+Re-measured on the final engine (`909/round2/harness/`, the two files copied
+verbatim, Apple M4 Pro, APFS, one core, `nice -n 19`): SIGKILL before each of
+24 steps then a settle, 22 of 22 as they were and 2 of 2 the backup's; a
+failure at each of 19 forward moves, 19 of 19 as they were; 171 double
+faults, 0 lost, 0 with settings over a mix; a kill at step k (3 to 22) then
+a kill in the settle at move back j then a second settle, 190 runs, 0 not as
+they were (the one mid-settle state with settings is k=22, j=1: the
+backup's whole, not a mix); the settle killed at each of its moves back, 39
+of 39; two settlers at once, 60 of 60 as they were with no false sentence
+and no kept folder; a newcomer after a crash, 46 of 46 files in place.
 
 **For Undo (#899, U5).** U5 must land after this. An undo of a whole-course
 restore is a staged restore of the archive made first, a redo one of the
 backup again: `WholeCourseRestore.restore(fromZipAt:…)` takes a zip URL. What
 was replaced is that archive, in `courses/_backups/<CODE>/` until the
 teacher deletes it; nothing else is kept. `keepingWhatWasReplaced` is
-handed the set-aside copy before it is deleted and no door passes one (M8).
+handed the set-aside copy before it is deleted; one door passes one,
+Restore from Backup… over a course folder no archive was made of (I1,
+below), and every other passes none (M8).
 The record carries the archive's name and an empty `journalStep`. U5's
 recovery calls `settleUnfinishedRestores(in:onlyCourse:)` before its own. No
 journal call is made here.

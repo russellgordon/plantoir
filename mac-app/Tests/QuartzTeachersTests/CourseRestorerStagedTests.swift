@@ -19,7 +19,7 @@ final class CourseRestorerStagedTests: XCTestCase {
         XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)) { error in
             XCTAssertEqual(
                 error.localizedDescription,
-                RestoreWholeCourseWording.leftAsItWasLocked(course: "ICS3U", name: "Concepts") + " " + RestoreWholeCourseWording.unlockInTheFinder
+                RestoreWholeCourseWording.leftAsItWasLocked(course: "ICS3U", name: "Concepts") + " " + RestoreWholeCourseWording.unlockIt
             )
         }
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live, "the old restore emptied the course up to Concepts")
@@ -47,10 +47,16 @@ final class CourseRestorerStagedTests: XCTestCase {
         XCTAssertEqual(lchflags(page.path, UInt32(UF_IMMUTABLE)), 0)
         let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
 
-        try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)
+        // As the door runs it, with the course archived first: without an
+        // archive the old copy is kept rather than removed (the
+        // implementation review's I1), and this is about the removal.
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL
+        )
 
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
         XCTAssertEqual(fixture.leftInRestoring(), 0, "the old copy is unlocked on its way out")
+        XCTAssertFalse(fixture.somethingWasKept(), "with an archive made first, the old copy is removed, not kept")
     }
 
     @MainActor

@@ -1703,6 +1703,7 @@
       "kind": "course (a section restore writes no record: backups.restoreOneSection)",
       "course": "the course folder's code",
       "backup": "the backup zip's file name",
+      "from": "where that zip came from: backups (Restore from Backup...) or archived (Restore from Archive...), so what the next reading says after a restore that did not finish names the right place (the #909 implementation review, M-a); an absent key reads as backups",
       "archive": "the file name of the archive made of the course first, or null (an arrival, or Restore from Archive)",
       "phase": "unpacking, swapping, done or stopped",
       "moves": "every planned move in order, each {from, to, out}: paths relative to courses/ with / between parts (Windows normalises them), out true for the course's own item moved aside and false for the backup's moved in. Empty until phase swapping.",
@@ -1711,13 +1712,14 @@
       "writtenAt": "ISO 8601 with fractional seconds, UTC",
       "journalStep": "null; Undo (#899, U5) fills it with its journal step"
     },
-    "absentKeys": "archive and journalStep may be absent rather than null (the mac leaves out a key with no value); a reader treats an absent key as null, and ignores a key it does not know.",
+    "absentKeys": "from, archive and journalStep may be absent rather than null (the mac leaves out a key with no value); a reader treats an absent key as null, and ignores a key it does not know.",
     "flush": "Written to .restore.json.tmp, flushed past the disk's cache (F_FULLFSYNC on the mac, FileStream.Flush(true) on Windows), renamed over restore.json, and the folder flushed, before the step it names: unpacking before the unpack, swapping before the first move, done before anything is removed. A power cut leaves the old record or the new one, never half of one.",
     "example": {
       "version": 1,
       "kind": "course",
       "course": "ICS3U",
       "backup": "ICS3U 2026-11-13_201500.zip",
+      "from": "backups",
       "archive": "ICS3U archived 2026-11-14_081200.zip",
       "phase": "swapping",
       "moves": [

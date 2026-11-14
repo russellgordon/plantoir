@@ -6256,6 +6256,20 @@ with a bounded retry of a sharing violation on each move before it counts as
 a failure; `FileStream.Flush(true)` in place of `F_FULLFSYNC`; and the
 record's `/` paths normalised.
 
+The implementation review's second round (2026-11-14) added five things the
+contract now carries, all as data: the way back keeps `course_config.json`
+aside over a mix (the fault cases' `settingsInTheCourse`); the third refusal
+counts every record but the asking restore's own, which Windows' door must
+be tested end to end to catch (the mac's `WholeCourseRestoreDoorTests`); a
+record's `from` (backups or archived); the refusal `anEarlierRestoreDidNotFinish`;
+and the trail event `course restore left as it was`. One sentence differs by
+platform: `wording.unlockIt` is the placeholder `{unlockInTheFileManager}`,
+filled from `placeholders.unlockInTheFileManager.windows`, a draft for the
+Windows session to check against File Explorer. Explorer can also write
+`desktop.ini` and `Thumbs.db` into a course mid-swap, as the Finder writes
+`.DS_Store`: the way back keeps them as newcomers, and whether
+`keptInPlace` should name them is a contract case to propose.
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived

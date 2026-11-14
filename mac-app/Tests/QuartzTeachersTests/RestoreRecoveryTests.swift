@@ -181,6 +181,113 @@ final class RestoreRecoveryTests: XCTestCase {
             [RestoreWholeCourseWording.didNotFinish(course: "ICS3U")]
         )
     }
+
+    // MARK: - Functions: after the implementation review (#909, round 2)
+
+    /// I3: a reference course a crash left part way through its swap is
+    /// LOCKED again once the settle puts it back, as a live failure locks
+    /// it. MUST FAIL on the settle without `afterPuttingBack`: its pages
+    /// stay unlocked, because `justBeforeTheSwap` unlocked them.
+    @MainActor
+    func testAReferenceCoursePutBackByTheSettleIsLockedAgain() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture(reference: true)
+        defer { fixture.tearDown() }
+        let page: URL = fixture.courseURL.appendingPathComponent("Concepts/Unit 1/Concept 1.md")
+        _ = ReferenceLock.lock(courseDirectory: fixture.courseURL)
+        XCTAssertTrue(ReferenceLock.isLocked(page), "the fixture's reference course starts locked")
+        // What `justBeforeTheSwap` does, then a kill after two moves out.
+        CourseRestorer.unlockForARestore(courseAt: fixture.courseURL)
+        XCTAssertFalse(ReferenceLock.isLocked(page))
+        _ = try StagedRestore.make(fixture, phase: .swapping, movesMade: 2)
+
+        let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+
+        XCTAssertEqual(said, [RestoreWholeCourseWording.didNotFinish(course: "ICS3U")])
+        XCTAssertTrue(RestoreSwap.itemExists(at: fixture.courseURL.appendingPathComponent("course_config.json")))
+        XCTAssertTrue(ReferenceLock.isLocked(page), "a reference course put back is a reference course: locked again")
+    }
+
+    /// M-a: a Restore from Archive that did not finish names Archived, not
+    /// Backups, where its zip still is.
+    @MainActor
+    func testARestoreFromArchivedThatDidNotFinishNamesArchived() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        _ = try StagedRestore.make(fixture, phase: .swapping, movesMade: 2, from: .archived)
+
+        XCTAssertEqual(
+            WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL),
+            [RestoreWholeCourseWording.didNotFinishFromArchived(course: "ICS3U")]
+        )
+    }
+
+    /// I2: another computer's unfinished restore, with the course missing
+    /// its settings here, is said once (per opening: `alreadyTold`), with a
+    /// trail line, and nothing is moved by it.
+    @MainActor
+    func testAnotherComputersUnfinishedRestoreIsSaidOnceAndNothingMoves() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let staged: StagedRestore = try StagedRestore.make(
+            fixture, phase: .swapping, movesMade: 2, computer: "ANOTHER-COMPUTER",
+            writtenAt: Date().addingTimeInterval(-3 * 86_400)
+        )
+        let before: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+
+        let first: (said: [String], told: [String]) = WholeCourseRestore.unfinishedOnAnotherComputer(
+            in: fixture.coursesDirectoryURL, alreadyTold: []
+        )
+        XCTAssertEqual(first.said, [RestoreWholeCourseWording.unfinishedOnAnotherComputer(course: "ICS3U")])
+        XCTAssertEqual(first.told, [staged.stagingURL.lastPathComponent])
+        XCTAssertTrue(fixture.trailText().contains("left as it is, because another computer started it; nothing here was moved"), fixture.trailText())
+        let again: (said: [String], told: [String]) = WholeCourseRestore.unfinishedOnAnotherComputer(
+            in: fixture.coursesDirectoryURL, alreadyTold: Set(first.told)
+        )
+        XCTAssertEqual(again.said, [], "said once")
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), before, "nothing moved")
+        XCTAssertTrue(RestoreSwap.itemExists(at: staged.stagingURL.appendingPathComponent("restore.json")))
+    }
+
+    /// I2: nothing is said while the course still has its settings here
+    /// (the record is from the unpack, nothing moved): it is in the sidebar.
+    @MainActor
+    func testAnotherComputersRecordIsNotSaidWhileTheCourseHasItsSettings() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        _ = try StagedRestore.make(fixture, phase: .unpacking, movesMade: 0, computer: "ANOTHER-COMPUTER")
+
+        XCTAssertEqual(WholeCourseRestore.unfinishedOnAnotherComputer(in: fixture.coursesDirectoryURL, alreadyTold: []).said, [])
+    }
+
+    /// W1 and M-d, through the reader the refusal asks: a restore's OWN
+    /// record is never counted; another process's live record is
+    /// `underWay`; one this computer wrote whose writer is gone is
+    /// `leftOver`, never "being restored somewhere else".
+    @MainActor
+    func testTheRefusalCountsEveryRecordButTheRestoresOwn() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let thisProcess: String = ProcessLiveness.leaseBody()
+        let own: StagedRestore = try StagedRestore.make(fixture, phase: .unpacking, movesMade: 0, owner: thisProcess)
+        func ask(otherThan ownStaging: URL?) -> RestoreSettle.Unsettled? {
+            return RestoreSettle.unsettledRecord(
+                forCourse: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL, otherThan: ownStaging,
+                computer: SharedMediaStore.thisComputer, owner: thisProcess,
+                ownerIsAlive: { (body: String) -> Bool in
+                    return WholeCourseRestore.ownerIsAlive(leaseBody: body)
+                }
+            )
+        }
+        XCTAssertNil(ask(otherThan: own.stagingURL), "a restore asking about itself finds nothing (W1)")
+        XCTAssertEqual(ask(otherThan: nil), RestoreSettle.Unsettled.leftOver, "this process's own record is nothing restoring")
+
+        let gone: StagedRestore = try StagedRestore.make(fixture, phase: .stopped, movesMade: 0)
+        XCTAssertEqual(ask(otherThan: own.stagingURL), RestoreSettle.Unsettled.leftOver, "a record whose writer is gone (M-d)")
+        try FileManager.default.removeItem(at: gone.stagingURL)
+
+        _ = try StagedRestore.make(fixture, phase: .unpacking, movesMade: 0, computer: "ANOTHER-COMPUTER")
+        XCTAssertEqual(ask(otherThan: own.stagingURL), RestoreSettle.Unsettled.underWay, "another computer's record")
+    }
 }
 
 /// The on-disk state a kill leaves part way through a whole-course restore.
@@ -201,7 +308,9 @@ struct StagedRestore {
         phase: RestoreSwap.Phase,
         movesMade: Int,
         computer: String = SharedMediaStore.thisComputer,
-        writtenAt: Date = Date()
+        writtenAt: Date = Date(),
+        from source: RestoreSwap.Source = RestoreSwap.Source.backups,
+        owner: String? = nil
     ) throws -> StagedRestore {
         let fileManager: FileManager = FileManager.default
         let staging: URL = RestoreSwap.restoringFolder(fixture.coursesDirectoryURL).appendingPathComponent(UUID().uuidString)
@@ -220,11 +329,12 @@ struct StagedRestore {
         let record: RestoreSwap.Record = RestoreSwap.Record(
             course: "ICS3U",
             backup: fixture.zipURL.lastPathComponent,
+            from: source,
             archive: nil,
             phase: phase,
             moves: moves,
             computer: computer,
-            owner: try StagedRestore.goneOwner(),
+            owner: try owner ?? StagedRestore.goneOwner(),
             writtenAt: RestoreSettle.momentText(writtenAt)
         )
         try RestoreSwap.writeRecord(record, to: staging.appendingPathComponent(RestoreSwap.recordName), flushes: false)

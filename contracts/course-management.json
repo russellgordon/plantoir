@@ -1678,20 +1678,20 @@
         "check the free space on the course's own disk (spaceCases): nothing archived when there is not enough",
         "archive the course as it is (the copy record holds the course busy and makes quitting ask)",
         "refuse again",
-        "create courses/.internal/restoring/<id>/ and write the record, phase unpacking, flushed",
+        "create courses/.internal/restoring/<id>/ and write the record, phase unpacking, with where the zip came from (from: backups or archived), flushed",
         "unpack the backup into <id>/backup/ (a full disk: ranOutOfSpace; unreadable: the existing sentence)",
         "check the unpacked course: its settings read",
         "put a small backup's Media back (785b's slot; nothing today)",
         "refuse unless its Media was put back (backups.sharedMedia: a small backup is refused here, never restored as if it were whole)",
         "flush the archive made first",
-        "refuse a third time (refusalCases)",
+        "refuse a third time (refusalCases), counting every record of the course but this restore's own, which is written by now (the implementation review's W1: counting its own refused every restore from Backups)",
         "plan the moves: every top-level item of the course not in keptInPlace aside, course_config.json FIRST; every top-level item of the backup not in keptInPlace in, course_config.json LAST; the rest in name order",
         "write the record, phase swapping, with every move, flushed",
         "unlock a course kept for reference; throw away the built sites (kept sketch copies stay)",
-        "make the moves; on any failure, the way back (faultCases)",
+        "make the moves; on any failure, the way back (faultCases), last first: the course's own course_config.json, which moved out first, goes back only when every other move back succeeded, and a way back that cannot move the backup's course_config.json out again stops there, so a course that is a mix never has its settings (the implementation review's I1)",
         "write the record, phase done, flushed: the restore has happened",
         "clear the rename records; lock again if kept for reference",
-        "remove the set-aside copy (clearing Locked and making folders writable on the way, never following a link) and the staging folder",
+        "remove the set-aside copy (clearing Locked and making folders writable on the way, never following a link) and the staging folder; when no archive was made of a course folder that is there (a folder with no settings, left by a stop, is not a course the sidebar lists, so nothing archives it), the set-aside copy is kept in courses/_backups/<CODE>/<CODE> before a restore <stamp> instead of removed",
         "let go of the lease"
       ],
       "sequenceWhy": "Until #909 the course was emptied and then filled from a backup unpacked into the system temporary folder. Anything that stopped it in between (Plantoir quitting or crashing, a power cut, a locked file, a read-only folder) left it half empty, usually with its settings gone, so it vanished from the sidebar, and Restore from Archive then refused because a folder of that name was still there. Measured on the plan's fixture (45 files, 11 top-level items): a kill before each of the 20 operations left 35 to 0 of 45 live files, and a real Finder-locked page stopped it with 26 files left and no settings. Now nothing in the course moves until the backup is unpacked beside it, on its own volume (so every move is a rename), and checked.",
@@ -1711,7 +1711,7 @@
         ".DS_Store"
       ],
       "keptInPlaceWhy": "Russell's held question M12, built as recommended behind one named rule (WholeCourseRestore.leavesWhatBackupsLeaveOut on the mac): every name a backup leaves out (CourseArchiver.excludedFromArchives) stays where it is, because it is in neither the backup nor the archive made first, so a restore that removed it destroyed it for good (measured: the course's .git was gone after a clean restore). The one exception is .merged_output, the built site's link: it is derived, the restore throws the built site away anyway, and a legacy .merged_output FOLDER kept in place would be a stale site the freshness check believes. Deeper copies (section1/build/) go with their parent, as before. A kept name the backup also carries stays in staging and goes with it.",
-      "faultFixture": "A course ICS3U holding course_config.json, .obsidian/app.json, Concepts/Unit 1/Concept 1.md, index.md, section1/All Classes/Unit 1, Day 1.md (each saying LIVE) and .git/HEAD; a backup zip of the same course without .git (each saying BACKUP), made as CourseArchiver makes one. The planned moves are out: course_config.json, .obsidian, Concepts, index.md, section1; in: .obsidian, Concepts, index.md, section1, course_config.json. failForward k makes the k-th forward move fail; failBack j the j-th move back. course is asItWas (every file byte for byte), theBackup (the backup's files, .git as it was) or mix. kept says whether files were moved to a folder under courses/_backups/ICS3U/; staging whether courses/.internal/restoring/ is left empty (removed) or not.",
+      "faultFixture": "A course ICS3U holding course_config.json, .obsidian/app.json, Concepts/Unit 1/Concept 1.md, index.md, section1/All Classes/Unit 1, Day 1.md (each saying LIVE) and .git/HEAD; a backup zip of the same course without .git (each saying BACKUP), made as CourseArchiver makes one. The planned moves are out: course_config.json, .obsidian, Concepts, index.md, section1; in: .obsidian, Concepts, index.md, section1, course_config.json. failForward k makes the k-th forward move fail; failBack j the j-th move back; readOnlyCourseFolder makes the course folder itself read-only (chmod 0555) for the restore. course is asItWas (every file byte for byte), theBackup (the backup's files, .git as it was) or mix. kept says whether files were moved to a folder under courses/_backups/ICS3U/; staging whether courses/.internal/restoring/ is left empty (removed) or not. settingsInTheCourse, where a case gives it, says whether the course holds a course_config.json afterwards: false for every mix (the implementation review's I1).",
       "faultCases": [
         {
           "name": "nothing fails: the backup's course, .git where it was, settings out first and in last",
@@ -1743,7 +1743,7 @@
           "kept": false,
           "staging": "removed",
           "says": "leftAsItWas",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "the last move out fails",
@@ -1754,7 +1754,7 @@
           "kept": false,
           "staging": "removed",
           "says": "leftAsItWas",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "the first move in fails, with every original aside",
@@ -1765,7 +1765,7 @@
           "kept": false,
           "staging": "removed",
           "says": "leftAsItWas",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "the settings' move in fails, last of all",
@@ -1776,31 +1776,57 @@
           "kept": false,
           "staging": "removed",
           "says": "leftAsItWas",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
-          "name": "a move in fails and the first move back fails too",
+          "name": "a move in fails and the first move back fails too: the course's settings stay aside, so the mix is not a course",
           "fault": {
             "failForward": 7,
             "failBack": 1
           },
           "course": "mix",
+          "settingsInTheCourse": false,
           "kept": true,
           "staging": "removed",
-          "says": "stoppedPartWay",
+          "says": "stoppedPartWay+notInTheSidebar",
           "trail": "course restore stopped part way"
         },
         {
-          "name": "a move in fails and the move back of the settings fails: the course is not in the sidebar, and the sentence says so",
+          "name": "a move in fails and a later move back fails: the settings stay aside, the course is not in the sidebar, and the sentence says so",
           "fault": {
             "failForward": 7,
             "failBack": 6
           },
           "course": "mix",
+          "settingsInTheCourse": false,
           "kept": true,
           "staging": "removed",
           "says": "stoppedPartWay+notInTheSidebar",
           "trail": "course restore stopped part way"
+        },
+        {
+          "name": "a move out fails part way and the first move back fails: the settings, which moved out first, are not put back over a mix (the implementation review's I1: 101 of 119 double-fault mixes had them back)",
+          "fault": {
+            "failForward": 3,
+            "failBack": 1
+          },
+          "course": "mix",
+          "settingsInTheCourse": false,
+          "kept": true,
+          "staging": "removed",
+          "says": "stoppedPartWay+notInTheSidebar",
+          "trail": "course restore stopped part way"
+        },
+        {
+          "name": "the course folder itself is read-only: nothing changes, and the folder is named, not the item that moved first (the implementation review's M-b)",
+          "fault": {
+            "readOnlyCourseFolder": true
+          },
+          "course": "asItWas",
+          "kept": false,
+          "staging": "removed",
+          "says": "leftAsItWasFolderLocked",
+          "trail": "course restore left as it was"
         },
         {
           "name": "a file at the top locked in the Finder: nothing changes, and it is named",
@@ -1812,7 +1838,7 @@
           "kept": false,
           "staging": "removed",
           "says": "leftAsItWasLocked",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "a read-only folder at the top: nothing changes, and it is named",
@@ -1824,7 +1850,7 @@
           "kept": false,
           "staging": "removed",
           "says": "leftAsItWasLocked",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "a page locked deep inside is no obstacle, and the old copy is still removed",
@@ -1846,7 +1872,7 @@
           "kept": true,
           "staging": "removed",
           "says": "leftAsItWas+newcomersKept",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "no course folder: an arrival, one move",
@@ -1871,7 +1897,7 @@
           "kept": false,
           "staging": "removed",
           "says": "backups.sharedMedia mediaNotPutBack",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "the backup's settings do not read",
@@ -1882,7 +1908,7 @@
           "kept": false,
           "staging": "removed",
           "says": "archiveUnreadable",
-          "trail": null
+          "trail": "course restore left as it was"
         },
         {
           "name": "refused immediately before the swap",
@@ -1896,7 +1922,7 @@
           "trail": null
         }
       ],
-      "faultMeasured": "On the branch's engine compiled into the plan's kill harness (S/measure/909-plan, re-pointed; fixture 46 files, 19 moves, 24 steps): a failure at each of the 19 forward moves left the course byte for byte as it was with nothing staged, 19 of 19; a failure at forward move k and way-back move j<k, 171 cases, lost no file and left 119 mixes, every set-aside file kept; a Finder-locked page and a read-only folder NESTED inside: restored, nothing left staged (the old copy is unlocked on the way out); the same AT THE TOP: left as it was, the item named; something written into .obsidian during the swap: left as it was, the newcomer kept.",
+      "faultMeasured": "On the branch's engine compiled into the plan's kill harness (S/measure/909-plan, re-pointed; fixture 46 files, 19 moves, 24 steps): a failure at each of the 19 forward moves left the course byte for byte as it was with nothing staged, 19 of 19; a failure at forward move k and way-back move j<k, 171 cases, lost no file and left 119 mixes, every set-aside file kept; a Finder-locked page and a read-only folder NESTED inside: restored, nothing left staged (the old copy is unlocked on the way out); the same AT THE TOP: left as it was, the item named; something written into .obsidian during the swap: left as it was, the newcomer kept. After the implementation review's second round (909/round2/harness/, the final engine, every kept folder read, not only the last one listed): the 171 double faults lost no file and left 0 mixes holding settings, against 101 of 119 before; a read-only or Finder-Locked course folder refused at its first move, course_config.json, and is now named as the folder.",
       "recoveryCases": [
         {
           "name": "no record, an hour old, only an unpack: left (a section restore, which writes no record, may be unpacking into it)",
@@ -2217,17 +2243,29 @@
           "refusal": "courseIsBeingBuiltElsewhere"
         },
         {
+          "name": "this computer wrote a record of the course that nothing is restoring (a stop whose set-aside copy could not be moved): not said as a restore somewhere else (the implementation review's M-d)",
+          "facts": {
+            "busyHere": false,
+            "revisingAssistant": null,
+            "unsettledRestore": false,
+            "earlierRestoreLeftOver": true,
+            "buildingElsewhere": false
+          },
+          "refusal": "anEarlierRestoreDidNotFinish"
+        },
+        {
           "name": "several at once: the first in order is said",
           "facts": {
             "busyHere": true,
             "revisingAssistant": "Codex",
             "unsettledRestore": true,
+            "earlierRestoreLeftOver": true,
             "buildingElsewhere": true
           },
           "refusal": "busy"
         }
       ],
-      "refusalWhy": "Asked three times: before the archive (a refused click leaves nothing in Archived), after it (it runs off the main actor and can take a minute), and immediately before the record goes to swapping (the plan review, M3: the unpack takes seconds on a slow disk and minutes from a backup the cloud must download first). busy is the sentence the restore has always said; claudeIsRevisingTheCourseRestore is assist-wording's sessionIsRevisingTheCourse with then 'restore' (doorCourseHold.holds.structuralWork); courseIsBeingBuiltElsewhere is assist-wording's; anotherRestoreUnderWay is this block's. A refusal before the swap removes the staging folder and leaves the archive.",
+      "refusalWhy": "Asked three times: before the archive (a refused click leaves nothing in Archived), after it (it runs off the main actor and can take a minute), and immediately before the record goes to swapping (the plan review, M3: the unpack takes seconds on a slow disk and minutes from a backup the cloud must download first). busy is the sentence the restore has always said; claudeIsRevisingTheCourseRestore is assist-wording's sessionIsRevisingTheCourse with then 'restore' (doorCourseHold.holds.structuralWork); courseIsBeingBuiltElsewhere is assist-wording's; anotherRestoreUnderWay and anEarlierRestoreDidNotFinish are this block's. A refusal before the swap removes the staging folder and leaves the archive. unsettledRestore is asked of every record of the course in courses/.internal/restoring/ OTHER than the asking restore's own: the third refusal runs after this restore has written its own record (phase unpacking), and counting it refused every whole-course restore from Backups with anotherRestoreUnderWay after the archive was made (the implementation review's W1; no contract case could see it, because the cases inject the refusal; an end-to-end test of each door does). A record counts as unsettledRestore when another process on this computer that is still running wrote it, a live settler holds it, or another computer wrote it; one this computer wrote whose writer is gone, or that this very process wrote, and that no live settler holds, is earlierRestoreLeftOver instead: nothing is restoring it, so 'being restored somewhere else' would be untrue (the review's M-d), and the next opening tries again to keep its files. Each refusal writes the trail line course restore left as it was, naming the refusal and when it was asked.",
       "spaceCases": [
         {
           "name": "room for the archive and the unpacked backup",
@@ -2310,22 +2348,31 @@
       "wording": {
         "leftAsItWas": "{CODE} was left as it was, because the restore could not finish: {REASON}",
         "leftAsItWasLocked": "{CODE} was left as it was, because \"{NAME}\" in it is locked or cannot be changed. Unlock it, then restore again.",
-        "unlockInTheFinder": "In the Finder, select it, choose File ▸ Get Info, and untick Locked, or give yourself Read & Write under Sharing & Permissions.",
+        "unlockIt": "{unlockInTheFileManager}",
+        "leftAsItWasFolderLocked": "{CODE} was left as it was, because its folder, \"{CODE}\", is locked or cannot be changed. Unlock the folder, then restore again.",
         "leftAsItWasInUse": "{CODE} was left as it was, because \"{NAME}\" in it is open in another program. Close it there, then restore again.",
         "notEnoughSpace": "{CODE} was left as it was, because the disk it is on does not have room for the restore. About {SIZE} more free space is needed.",
         "ranOutOfSpace": "{CODE} was left as it was, because the disk it is on ran out of room while the backup was being opened.",
         "stoppedPartWay": "The restore of {CODE} stopped part way, so {CODE} may now hold some files from the backup and some as they were. Nothing was deleted: the files that were set aside are in the folder \"{KEPT}\" inside your working folder.",
         "stoppedPartWayNothingToOpen": "The restore of {CODE} stopped part way, so {CODE} may now hold some files from the backup and some as they were. Nothing was deleted, and none of your pages are left set aside.",
         "notInTheSidebar": "Until its settings are back, {CODE} does not show in the sidebar.",
+        "restoreAgainToPutItRight": "To put it right, restore a backup of {CODE} again: what is in its folder now is kept first, not deleted.",
         "didNotFinishTitle": "A restore did not finish",
         "didNotFinish": "The restore of {CODE} from a backup did not finish, so {CODE} was left as it was. The backup is still in Backups, and you can restore it again.",
+        "didNotFinishFromArchived": "The restore of {CODE} from Archived did not finish, so {CODE} was left as it was. Its archive is still in Archived, and you can restore it again.",
         "newcomersKept": "Files made in {CODE} while the restore was unfinished are in the folder \"{KEPT}\" inside your working folder.",
         "setAsideFilesKept": "A restore that did not finish had set some files aside. Nothing was deleted: they are in the folder \"{KEPT}\" inside your working folder.",
         "anotherRestoreUnderWay": "{CODE} is being restored somewhere else right now, in another copy of Plantoir or on another computer that uses this folder. Wait for that to finish, then restore.",
-        "joins": "Each failure is said in the backup alert titled Could not restore {CODE} (BackupProblemTitle.restoring). leftAsItWasLocked is followed by a space and unlockInTheFinder on the mac; Windows says leftAsItWasInUse for a file another program holds open, and its own way to unlock. leftAsItWas is followed by a space and newcomersKept when newcomers were kept. stoppedPartWay (stoppedPartWayNothingToOpen when the kept folder holds no file whose path has no part starting with a dot) is followed by a space and notInTheSidebar when the course has no course_config.json, then a space and restoreOneSection.wording.stoppedPartWayArchived when the course was archived first. At the next reading, what the settles say is shown once in that alert's place, titled didNotFinishTitle, each sentence after a blank line: didNotFinish (with newcomersKept), stoppedPartWay as above without stoppedPartWayArchived, or setAsideFilesKept. {KEPT} is a path inside the working folder; {SIZE} a size as the Finder writes one; {NAME} a top-level item of the course."
+        "anEarlierRestoreDidNotFinish": "An earlier restore of {CODE} did not finish, and the files it set aside could not be tidied away yet. Quit Plantoir and open it again, then restore.",
+        "unfinishedOnAnotherComputer": "A restore of {CODE} was started on another computer that uses this folder and, as far as this computer can tell, has not finished. Until it does, {CODE} does not show in the sidebar here, and this computer moves none of its files. Opening Plantoir on the computer that started it lets it finish.",
+        "joins": "Each failure is said in the backup alert titled Could not restore {CODE} (BackupProblemTitle.restoring). leftAsItWasLocked and leftAsItWasFolderLocked (the course folder itself refuses changes: Locked, or no write permission, so the folder is named and not the item that moved first) are each followed by a space and unlockIt, whose {unlockInTheFileManager} each app fills with its own words (placeholders); Windows also says leftAsItWasInUse for a file another program holds open. leftAsItWas is followed by a space and newcomersKept when newcomers were kept. stoppedPartWay (stoppedPartWayNothingToOpen when nothing at all was kept: a kept folder holding only hidden items, .obsidian or .internal, is named too, the implementation review's M-c) is followed by a space, notInTheSidebar and a space and restoreAgainToPutItRight when the course has no course_config.json, then a space and restoreOneSection.wording.stoppedPartWayArchived when the course was archived first. At the next reading, what the settles say is shown once in that alert's place, titled didNotFinishTitle, each sentence after a blank line, and ADDED after a problem the alert is already showing rather than dropped (the review's M-e): didNotFinish (didNotFinishFromArchived when the record's from is archived; either with newcomersKept), stoppedPartWay as above without stoppedPartWayArchived, setAsideFilesKept, or unfinishedOnAnotherComputer, once per opening of the window for each restore another computer wrote that this one leaves alone while its course has no course_config.json here (the review's I2). {KEPT} is a path inside the working folder; {SIZE} a size as the Finder writes one; {NAME} a top-level item of the course."
+      },
+      "placeholders": {
+        "rule": "A placeholder unlockIt carries, filled by each app with its own words because the way to unlock an item differs by platform, as deployTokens.placeholders -> {deployingSettings} is. The mac's words are its sentence before this placeholder existed, byte for byte. Windows' are a draft for the Windows session to confirm against File Explorer (the implementation review's I6).",
+        "unlockInTheFileManager": {"mac": "In the Finder, select it, choose File ▸ Get Info, and untick Locked, or give yourself Read & Write under Sharing & Permissions.", "windows": "In File Explorer, right-click it, choose Properties, and untick Read-only, or give yourself Modify on the Security tab."}
       },
       "heldRules": "Russell's held questions, each built as recommended behind ONE named rule on the mac, so a ruling the other way is one line: M11 tellsTheTeacherOnceAfterPuttingRight (true: didNotFinish is said once; false: the trail line only); M12 leavesWhatBackupsLeaveOut (true: keptInPlace; false: today's behaviour, everything moved and deleted); M13 aLockedItemAtTheTopChangesNothing (true: leftAsItWasLocked; false: Finder's Locked cleared on the course's top-level items before the swap).",
-      "undoSeam": "For Undo (#899, U5), which must land after this: an undo of a whole-course restore is a staged restore of the archive made first, and a redo one of the backup again, so the engine takes a zip URL (WholeCourseRestore.restore(fromZipAt:...) on the mac), not a backup row. What was replaced is the archive made first, in courses/_backups/<CODE>/ until the teacher deletes it; nothing else is kept beyond the restore. keepingWhatWasReplaced is handed the set-aside copy before it is deleted, and no door passes one (the plan review, M8: a second full copy of a 500 MB course is what U5's plan avoids). The record carries the archive's file name and an empty journalStep for U5 to fill, and the settle can be run for one course (settleUnfinishedRestores(in:onlyCourse:)), which U5's recovery calls before its own. No journal call is made here."
+      "undoSeam": "For Undo (#899, U5), which must land after this: an undo of a whole-course restore is a staged restore of the archive made first, and a redo one of the backup again, so the engine takes a zip URL (WholeCourseRestore.restore(fromZipAt:...) on the mac), not a backup row. What was replaced is the archive made first, in courses/_backups/<CODE>/ until the teacher deletes it; nothing else is kept beyond the restore. keepingWhatWasReplaced is handed the set-aside copy before it is deleted, and one door passes one: Restore from Backup..., only when no archive was made of a course folder that is there (it keeps the set-aside copy in courses/_backups/<CODE>/ rather than removing it, the implementation review's I1); every other restore passes none (the plan review, M8: a second full copy of a 500 MB course is what U5's plan avoids). The record carries the archive's file name and an empty journalStep for U5 to fill, and the settle can be run for one course (settleUnfinishedRestores(in:onlyCourse:)), which U5's recovery calls before its own. No journal call is made here."
     }
   },
   "courseCode": {

@@ -41,6 +41,15 @@ nonisolated enum RestoreSwap {
         case stopped
     }
 
+    /// Where the zip a restore puts back came from, so what is said after
+    /// one that did not finish names the right place (the implementation
+    /// review's M-a: "The backup is still in Backups" was untrue after a
+    /// Restore from Archive that crashed, whose zip is still in Archived).
+    enum Source: String, Codable, Equatable, Sendable {
+        case backups
+        case archived
+    }
+
     /// One planned move, as paths relative to `courses/`, with `/` between
     /// parts (Windows normalises them).
     struct Move: Codable, Equatable, Sendable {
@@ -66,6 +75,8 @@ nonisolated enum RestoreSwap {
         var kind: String = "course"
         var course: String
         var backup: String
+        /// Where `backup` came from. Nil reads as `backups`.
+        var from: Source? = nil
         var archive: String?
         var phase: Phase
         var moves: [Move]
@@ -156,9 +167,14 @@ nonisolated enum RestoreSwap {
         let refuseUnlessMediaWasPutBack: (URL) throws -> Void
 
         /// Asked immediately before the record goes to `swapping`: the
-        /// refusals asked a third time (the #909 plan review, M3). Throws to
-        /// refuse, with nothing moved.
-        let beforeTheSwap: () throws -> Void
+        /// refusals asked a third time (the #909 plan review, M3). Handed
+        /// this restore's OWN staging folder, so a refusal that asks whether
+        /// another restore of the course is under way counts every record
+        /// but this one: it is written before this is asked (the
+        /// implementation review's W1, which refused every restore from
+        /// Backups with `anotherRestoreUnderWay`). Throws to refuse, with
+        /// nothing moved.
+        let beforeTheSwap: (URL) throws -> Void
 
         /// Run just before the first move: unlock a course kept for
         /// reference, throw away the built site (the review's M9: a crash
@@ -187,13 +203,17 @@ nonisolated enum RestoreSwap {
         /// the file system's words with no staging path in them;
         /// `lockedItem` names the course's top-level item when the move was
         /// refused for a lock or a permission.
+        /// `courseFolderIsLocked` says the course folder ITSELF refused
+        /// (read-only, or Locked in the Finder), so it is the folder that is
+        /// named and not the item that happened to move first (the
+        /// implementation review's M-b: `course_config.json` was named).
         /// `newcomersKeptAt` is where items found in an original's way were
         /// kept, as a path inside the working folder, when there were any.
-        case leftAsItWas(reason: String, lockedItem: String?, newcomersKeptAt: String?)
+        case leftAsItWas(reason: String, lockedItem: String?, courseFolderIsLocked: Bool, newcomersKeptAt: String?)
         /// A move failed and a move back failed too. `keptAt` is where the
         /// set-aside files are, as a path inside the working folder;
-        /// `holdsSomethingToOpen` says whether a teacher would find a page
-        /// there.
+        /// `holdsSomethingToOpen` says whether anything at all was kept there
+        /// (a hidden folder such as `.obsidian` included: the review's M-c).
         case stoppedPartWay(keptAt: String, holdsSomethingToOpen: Bool)
     }
 
@@ -440,6 +460,18 @@ nonisolated enum RestoreSwap {
     ///   then the original goes back; if either move fails it is BLOCKED.
     /// * an `in` move whose staging end still holds the backup's item was
     ///   not made: skipped. One whose course end holds it goes back.
+    ///
+    /// **The settings are the last thing to go back, and only over a course
+    /// whose every other file is back** (the implementation review's I1).
+    /// The course's own `course_config.json` moves out FIRST, so it is the
+    /// last move back; when any earlier move back failed it stays aside,
+    /// with the set-aside copy that is kept, and the course reads as no
+    /// course (`notInTheSidebar`), so nothing builds or deploys a mix.
+    /// Measured on the shipped engine before this: 101 of 119 double-fault
+    /// mixes had their settings back. Likewise the backup's settings move in
+    /// LAST, so they are the first move back; when that move back fails the
+    /// way back stops there, and the course is left wholly the backup's
+    /// rather than a mix under the backup's settings.
     static func wayBack(
         _ moves: [Move],
         coursesDirectoryURL: URL,
@@ -448,6 +480,7 @@ nonisolated enum RestoreSwap {
         hooks: Hooks
     ) -> WayBack {
         let fileManager: FileManager = FileManager.default
+        let settingsInTheCourse: String = relative(courseURL.appendingPathComponent(settingsFileName), to: coursesDirectoryURL)
         var everyFileIsBack: Bool = true
         var newcomers: [String] = []
         for move in moves.reversed() {
@@ -456,6 +489,7 @@ nonisolated enum RestoreSwap {
             if !itemExists(at: to) {
                 continue
             }
+            let isTheSettings: Bool = (move.out ? move.from : move.to) == settingsInTheCourse
             if move.out {
                 if itemExists(at: from) {
                     let insideTheCourse: String = relative(from, to: courseURL)
@@ -470,6 +504,10 @@ nonisolated enum RestoreSwap {
                         everyFileIsBack = false
                         continue
                     }
+                }
+                if isTheSettings && !everyFileIsBack {
+                    // I1: over a mix, the settings stay aside.
+                    continue
                 }
                 do {
                     try hooks.moveBack(to, from)
@@ -489,6 +527,12 @@ nonisolated enum RestoreSwap {
                     try hooks.moveBack(to, from)
                 } catch {
                     everyFileIsBack = false
+                    if isTheSettings {
+                        // The backup's settings would not leave, and every
+                        // other move was made: stop here, so the course is
+                        // the backup's whole rather than a mix under them.
+                        return WayBack(everyFileIsBack: false, newcomers: newcomers)
+                    }
                 }
             }
         }
@@ -523,6 +567,7 @@ nonisolated enum RestoreSwap {
         fromZipAt zipURL: URL,
         courseCode: String,
         backupFileName: String,
+        from source: Source = Source.backups,
         coursesDirectoryURL: URL,
         context: Context,
         hooks: Hooks = Hooks.real
@@ -536,6 +581,7 @@ nonisolated enum RestoreSwap {
         var record: Record = Record(
             course: courseCode,
             backup: backupFileName,
+            from: source,
             archive: context.archiveURL?.lastPathComponent,
             phase: .unpacking,
             moves: [],
@@ -555,7 +601,7 @@ nonisolated enum RestoreSwap {
             if let archiveURL = context.archiveURL {
                 flush(archiveURL)
             }
-            try context.beforeTheSwap()
+            try context.beforeTheSwap(staging)
         } catch {
             removeStaging(staging)
             throw error
@@ -607,9 +653,11 @@ nonisolated enum RestoreSwap {
                 if kept == nil {
                     removeStaging(staging)
                 }
+                let lockedItem: String? = lockedItemName(stopped, courseURL: courseURL, coursesDirectoryURL: coursesDirectoryURL)
                 throw Failure.leftAsItWas(
                     reason: reasonWithoutStagingPaths(stopped.underlying),
-                    lockedItem: lockedItemName(stopped, courseURL: courseURL, coursesDirectoryURL: coursesDirectoryURL),
+                    lockedItem: lockedItem,
+                    courseFolderIsLocked: lockedItem != nil && folderRefusesChanges(courseURL),
                     newcomersKeptAt: kept
                 )
             }
@@ -829,6 +877,22 @@ nonisolated enum RestoreSwap {
         return nil
     }
 
+    /// Whether a folder itself refuses changes to what is in it: Locked in
+    /// the Finder, or without write permission for this account. Measured
+    /// by the implementation review (M-b): `chmod a-w` on the course gave
+    /// `Permission denied`, `chflags uchg` `Operation not permitted`, both
+    /// on the first move out, `course_config.json`.
+    static func folderRefusesChanges(_ folder: URL) -> Bool {
+        var status: stat = stat()
+        if lstat(folder.path, &status) != 0 {
+            return false
+        }
+        if status.st_flags & UInt32(UF_IMMUTABLE) != 0 {
+            return true
+        }
+        return access(folder.path, W_OK) != 0
+    }
+
     // MARK: - Functions: keeping what a stopped restore set aside
 
     /// Moves the set-aside copy (and any newcomers) to where a teacher can
@@ -865,11 +929,14 @@ nonisolated enum RestoreSwap {
         }
         if everythingMoved {
             let said: URL = keptAside ?? aside
-            let holds: Bool = keptAside != nil && holdsAFileFinderShows(said)
+            // Anything kept is named, hidden folders included (the
+            // implementation review's M-c: a stop that kept only `.internal`
+            // with the timetable, or `.obsidian`, said where nothing was).
+            let holds: Bool = keptAside != nil && holdsAnyFile(said)
             removeStaging(staging)
             return (insideTheWorkingFolder(said, coursesDirectoryURL: coursesDirectoryURL), holds)
         }
-        return (insideTheWorkingFolder(staging, coursesDirectoryURL: coursesDirectoryURL), holdsAFileFinderShows(staging))
+        return (insideTheWorkingFolder(staging, coursesDirectoryURL: coursesDirectoryURL), holdsAnyFile(staging))
     }
 
     /// Moves newcomers kept by a way back that otherwise worked to the
@@ -906,6 +973,19 @@ nonisolated enum RestoreSwap {
         coursesDirectoryURL: URL,
         context: Context
     ) -> URL? {
+        return moveToTheBackupsFolder(
+            item, courseCode: courseCode, name: name, coursesDirectoryURL: coursesDirectoryURL, stamp: context.stamp()
+        )
+    }
+
+    /// The same, with the stamp given.
+    static func moveToTheBackupsFolder(
+        _ item: URL,
+        courseCode: String?,
+        name: String,
+        coursesDirectoryURL: URL,
+        stamp: String
+    ) -> URL? {
         let fileManager: FileManager = FileManager.default
         var shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups")
         if let courseCode {
@@ -916,7 +996,7 @@ nonisolated enum RestoreSwap {
         } catch {
             return nil
         }
-        let base: String = name + " " + context.stamp()
+        let base: String = name + " " + stamp
         var destination: URL = shelf.appendingPathComponent(base)
         var attempt: Int = 2
         while itemExists(at: destination) && attempt < 100 {
@@ -936,24 +1016,14 @@ nonisolated enum RestoreSwap {
         return relative(url, to: coursesDirectoryURL.deletingLastPathComponent())
     }
 
-    /// Whether a folder holds a file whose path inside it has no part
-    /// starting with a dot.
-    static func holdsAFileFinderShows(_ folder: URL) -> Bool {
-        let rootPath: String = folder.standardizedFileURL.path + "/"
+    /// Whether a folder holds any file at all, at any depth.
+    static func holdsAnyFile(_ folder: URL) -> Bool {
         guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isDirectoryKey]) else {
             return false
         }
         while let entry = walker.nextObject() as? URL {
             let isFolder: Bool = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            if isFolder {
-                continue
-            }
-            let relativePath: String = String(entry.standardizedFileURL.path.dropFirst(rootPath.count))
-            var isHidden: Bool = false
-            for part in relativePath.split(separator: "/") where part.hasPrefix(".") {
-                isHidden = true
-            }
-            if !isHidden {
+            if !isFolder {
                 return true
             }
         }

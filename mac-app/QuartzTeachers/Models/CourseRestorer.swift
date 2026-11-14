@@ -40,6 +40,9 @@ enum CourseRestorer {
         /// A whole-course restore: a top-level item is locked or read-only,
         /// so nothing changed, and it is named.
         case courseLeftAsItWasLocked(String, String)
+        /// A whole-course restore: the course folder itself is locked or
+        /// read-only, so nothing changed, and the folder is named.
+        case courseFolderLocked(String)
         /// A whole-course restore, before the archive: the course's disk
         /// lacks room for the archive and the unpacked backup.
         case notEnoughSpace(String, Int64)
@@ -89,7 +92,10 @@ enum CourseRestorer {
                 return said
             case .courseLeftAsItWasLocked(let code, let name):
                 return RestoreWholeCourseWording.leftAsItWasLocked(course: code, name: name)
-                    + " " + RestoreWholeCourseWording.unlockInTheFinder
+                    + " " + RestoreWholeCourseWording.unlockIt
+            case .courseFolderLocked(let code):
+                return RestoreWholeCourseWording.leftAsItWasFolderLocked(course: code)
+                    + " " + RestoreWholeCourseWording.unlockIt
             case .notEnoughSpace(let code, let bytes):
                 return RestoreWholeCourseWording.notEnoughSpace(course: code, size: WholeCourseRestore.sizeText(bytes))
             case .courseRanOutOfSpace(let code):
@@ -101,6 +107,7 @@ enum CourseRestorer {
                 }
                 if !settingsAreBack {
                     said += " " + RestoreWholeCourseWording.notInTheSidebar(course: code)
+                        + " " + RestoreWholeCourseWording.restoreAgainToPutItRight(course: code)
                 }
                 if archived {
                     said += " " + OneSectionRestoreWording.stoppedPartWayArchived
@@ -231,7 +238,8 @@ enum CourseRestorer {
             // copy (1.10 s for 512 MB onto exFAT, measured), and a kill in
             // it left part of a course that might already hold its settings.
             try WholeCourseRestore.restore(
-                fromZipAt: item.fileURL, courseCode: item.courseCode, coursesDirectoryURL: coursesDirectoryURL
+                fromZipAt: item.fileURL, courseCode: item.courseCode, from: RestoreSwap.Source.archived,
+                coursesDirectoryURL: coursesDirectoryURL
             )
         }
 
@@ -262,10 +270,25 @@ enum CourseRestorer {
         _ item: BackupItem,
         coursesDirectoryURL: URL,
         archiveURL: URL? = nil,
-        beforeTheSwap: @escaping () throws -> Void = {},
+        beforeTheSwap: @escaping (URL) throws -> Void = { (_: URL) throws in },
         hooks: RestoreSwap.Hooks = RestoreSwap.Hooks.real
     ) throws {
         let destination: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
+        // A course folder no archive was made of (one with no settings, left
+        // by a restore that stopped part way, is not a course the sidebar
+        // lists, so the door archives nothing): what is in it is kept in the
+        // backups folder rather than removed, so restoring again to put it
+        // right deletes nothing (the implementation review's I1).
+        var keepingWhatWasReplaced: ((URL) -> Void)? = nil
+        if archiveURL == nil && RestoreSwap.itemExists(at: destination) {
+            let code: String = item.courseCode
+            keepingWhatWasReplaced = { (aside: URL) in
+                _ = RestoreSwap.moveToTheBackupsFolder(
+                    aside, courseCode: code, name: "\(code) before a restore",
+                    coursesDirectoryURL: coursesDirectoryURL, stamp: ArchiveStamp.text(for: Date())
+                )
+            }
+        }
         if !FileManager.default.fileExists(atPath: destination.path) {
             // The course is not there, so this is an arrival: by its school
             // year (#572 plan review H2). A restore IN PLACE keeps the
@@ -280,7 +303,8 @@ enum CourseRestorer {
             coursesDirectoryURL: coursesDirectoryURL,
             archiveURL: archiveURL,
             beforeTheSwap: beforeTheSwap,
-            hooks: hooks
+            hooks: hooks,
+            keepingWhatWasReplaced: keepingWhatWasReplaced
         )
     }
 

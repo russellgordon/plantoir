@@ -21,8 +21,14 @@ enum WholeCourseRestore {
         /// (`doorCourseHold`), as the busy sentences name it.
         var revisingAssistant: String? = nil
 
-        /// A restore of this course has a record that has not settled.
+        /// A restore of this course has a record that has not settled, other
+        /// than the asking restore's own (the implementation review's W1).
         var unsettledRestore: Bool = false
+
+        /// This computer wrote a record for the course that nothing is
+        /// restoring: a stop whose set-aside copy could not be moved
+        /// (`RestoreSettle.Unsettled.leftOver`, the review's M-d).
+        var earlierRestoreLeftOver: Bool = false
 
         /// Another program holds a build or publish lease on the course,
         /// taken before this restore's own (`workLeases.declining`).
@@ -34,7 +40,50 @@ enum WholeCourseRestore {
         case busy
         case claudeIsRevisingTheCourseRestore
         case anotherRestoreUnderWay
+        case anEarlierRestoreDidNotFinish
         case courseIsBeingBuiltElsewhere
+    }
+
+    /// Why a whole-course restore did not go ahead, as the trail line says
+    /// it (`course restore left as it was`, the implementation review's I4):
+    /// a fixed phrase, never page text.
+    enum DidNotGoAhead: String, Equatable {
+        case busy = "refused: the course is previewing or deploying here"
+        case outsideSession = "refused: an outside assistant's session holds the course"
+        case anotherRestore = "refused: another restore of the course has not finished"
+        case earlierRestore = "refused: an earlier restore of the course on this computer did not finish"
+        case buildingElsewhere = "refused: another program is building the course"
+        case notEnoughSpace = "not enough free space on its disk"
+        case ranOutOfSpace = "the disk filled while the backup was being opened"
+        case unreadable = "the backup could not be read"
+        case mediaNotPutBack = "a small backup whose Media files were not put back"
+        case aMoveFailed = "a file could not be moved, and every file went back"
+        case lockedAtTheTop = "an item at the top of the course is locked or cannot be changed"
+        case courseFolderLocked = "the course folder is locked or cannot be changed"
+        case otherProblem = "it could not finish"
+
+        /// The trail's kind for a refusal.
+        static func refused(_ refusal: Refusal) -> DidNotGoAhead {
+            switch refusal {
+            case .busy:
+                return .busy
+            case .claudeIsRevisingTheCourseRestore:
+                return .outsideSession
+            case .anotherRestoreUnderWay:
+                return .anotherRestore
+            case .anEarlierRestoreDidNotFinish:
+                return .earlierRestore
+            case .courseIsBeingBuiltElsewhere:
+                return .buildingElsewhere
+            }
+        }
+    }
+
+    /// When a refusal was asked, as the trail line says it.
+    enum AskedWhen: String, Equatable {
+        case beforeTheArchive = "before the archive"
+        case afterTheArchive = "after the archive"
+        case beforeTheSwap = "once the backup was opened, before anything moved"
     }
 
     // MARK: - Stored properties
@@ -94,6 +143,9 @@ enum WholeCourseRestore {
         if facts.unsettledRestore {
             return .anotherRestoreUnderWay
         }
+        if facts.earlierRestoreLeftOver {
+            return .anEarlierRestoreDidNotFinish
+        }
         if facts.buildingElsewhere {
             return .courseIsBeingBuiltElsewhere
         }
@@ -109,6 +161,8 @@ enum WholeCourseRestore {
             return AssistWording.sessionIsRevisingTheCourse(course: courseCode, then: "restore", assistant: assistant ?? "")
         case .anotherRestoreUnderWay:
             return RestoreWholeCourseWording.anotherRestoreUnderWay(course: courseCode)
+        case .anEarlierRestoreDidNotFinish:
+            return RestoreWholeCourseWording.anEarlierRestoreDidNotFinish(course: courseCode)
         case .courseIsBeingBuiltElsewhere:
             return AssistWording.courseIsBeingBuiltElsewhere(course: courseCode)
         }
@@ -239,9 +293,10 @@ enum WholeCourseRestore {
     static func restore(
         fromZipAt zipURL: URL,
         courseCode: String,
+        from source: RestoreSwap.Source = RestoreSwap.Source.backups,
         coursesDirectoryURL: URL,
         archiveURL: URL? = nil,
-        beforeTheSwap: @escaping () throws -> Void = {},
+        beforeTheSwap: @escaping (URL) throws -> Void = { (_: URL) throws in },
         hooks: RestoreSwap.Hooks = RestoreSwap.Hooks.real,
         keepingWhatWasReplaced: ((URL) -> Void)? = nil
     ) throws {
@@ -294,6 +349,7 @@ enum WholeCourseRestore {
                 fromZipAt: zipURL,
                 courseCode: courseCode,
                 backupFileName: backupFileName,
+                from: source,
                 coursesDirectoryURL: coursesDirectoryURL,
                 context: context,
                 hooks: hooks
@@ -302,11 +358,85 @@ enum WholeCourseRestore {
             // Locked again whatever happened: a reference course left as it
             // was is still a reference course.
             CourseRestorer.lockAfterARestore(courseAt: courseURL)
+            noteLeftAsItWas(failure, courseCode: courseCode, backupFileName: backupFileName)
             throw problem(for: failure, courseCode: courseCode, courseURL: courseURL, archived: archiveURL != nil)
         } catch {
             CourseRestorer.lockAfterARestore(courseAt: courseURL)
+            noteLeftAsItWas(error, courseCode: courseCode, backupFileName: backupFileName)
             throw error
         }
+    }
+
+    // MARK: - Functions: the trail
+
+    /// The trail line for a restore that did not go ahead (the
+    /// implementation review's I4): which course, which backup, and why, in
+    /// a fixed phrase. A stop part way writes its own line instead.
+    static func noteDidNotGoAhead(
+        _ kind: DidNotGoAhead,
+        courseCode: String,
+        backupFileName: String,
+        detail: String? = nil,
+        asked: AskedWhen? = nil,
+        newcomersKeptAt: String? = nil
+    ) {
+        ActivityTrail.note(
+            .courseRestoreLeftAsItWas,
+            ActivityTrail.courseRestoreLeftAsItWasLine(
+                backup: backupFileName, why: kind.rawValue, detail: detail, asked: asked?.rawValue,
+                newcomersKeptAt: newcomersKeptAt
+            ),
+            course: courseCode,
+            section: 0
+        )
+    }
+
+    /// The line for what the engine reported, when it left the course as
+    /// it was.
+    static func noteLeftAsItWas(_ failure: RestoreSwap.Failure, courseCode: String, backupFileName: String) {
+        switch failure {
+        case .unreadable:
+            noteDidNotGoAhead(.unreadable, courseCode: courseCode, backupFileName: backupFileName)
+        case .noSpace:
+            noteDidNotGoAhead(.ranOutOfSpace, courseCode: courseCode, backupFileName: backupFileName)
+        case .leftAsItWas(_, let lockedItem, let courseFolderIsLocked, let newcomersKeptAt):
+            if courseFolderIsLocked {
+                noteDidNotGoAhead(.courseFolderLocked, courseCode: courseCode, backupFileName: backupFileName)
+            } else if let lockedItem {
+                noteDidNotGoAhead(
+                    .lockedAtTheTop, courseCode: courseCode, backupFileName: backupFileName, detail: lockedItem
+                )
+            } else {
+                noteDidNotGoAhead(
+                    .aMoveFailed, courseCode: courseCode, backupFileName: backupFileName, newcomersKeptAt: newcomersKeptAt
+                )
+            }
+        case .stoppedPartWay:
+            // Its own event, `course restore stopped part way`.
+            return
+        }
+    }
+
+    /// The line for an error that is not the engine's own: a backup whose
+    /// settings do not read, a small backup refused, anything else. A
+    /// refusal is noted by the door that refused, which knows which one.
+    static func noteLeftAsItWas(_ error: Error, courseCode: String, backupFileName: String) {
+        if let problem = error as? CourseRestorer.Problem {
+            switch problem {
+            case .refused:
+                return
+            case .archiveUnreadable:
+                noteDidNotGoAhead(.unreadable, courseCode: courseCode, backupFileName: backupFileName)
+                return
+            default:
+                break
+            }
+        }
+        if let problem = error as? SharedMediaStore.Problem, case .mediaNotPutBack = problem {
+            noteDidNotGoAhead(.mediaNotPutBack, courseCode: courseCode, backupFileName: backupFileName)
+            return
+        }
+        noteDidNotGoAhead(.otherProblem, courseCode: courseCode, backupFileName: backupFileName)
     }
 
     /// The steps after the commit, safe to run twice (a settle that finds
@@ -343,7 +473,10 @@ enum WholeCourseRestore {
             return .archiveUnreadable(reason)
         case .noSpace:
             return .courseRanOutOfSpace(courseCode)
-        case .leftAsItWas(let reason, let lockedItem, let newcomersKeptAt):
+        case .leftAsItWas(let reason, let lockedItem, let courseFolderIsLocked, let newcomersKeptAt):
+            if courseFolderIsLocked {
+                return .courseFolderLocked(courseCode)
+            }
             if let lockedItem {
                 return .courseLeftAsItWasLocked(courseCode, lockedItem)
             }
@@ -388,6 +521,9 @@ enum WholeCourseRestore {
             afterCommit: { (courseCode: String) in
                 afterTheCommit(courseURL: coursesDirectoryURL.appendingPathComponent(courseCode))
             },
+            afterPuttingBack: { (courseCode: String) in
+                CourseRestorer.lockAfterARestore(courseAt: coursesDirectoryURL.appendingPathComponent(courseCode))
+            },
             hooks: RestoreSwap.Hooks.real
         )
         let settled: [RestoreSettle.Settled] = RestoreSettle.settle(
@@ -414,13 +550,40 @@ enum WholeCourseRestore {
         return said
     }
 
+    /// Another computer's restores this computer leaves alone while their
+    /// course is missing here (the implementation review's I2): the
+    /// sentence for each one not in `alreadyTold`, with a trail line, and
+    /// the staging names now told, so the caller says each once per
+    /// opening. Nothing is moved: another computer's record is never acted
+    /// on by moving files (the plan review's M1).
+    static func unfinishedOnAnotherComputer(
+        in coursesDirectoryURL: URL,
+        alreadyTold: Set<String>
+    ) -> (said: [String], told: [String]) {
+        let found: [(staging: String, outcome: RestoreSettle.Settled)] = RestoreSettle.unfinishedOnAnotherComputer(
+            coursesDirectoryURL: coursesDirectoryURL, computer: SharedMediaStore.thisComputer, now: Date()
+        )
+        var said: [String] = []
+        var told: [String] = []
+        for entry in found where !alreadyTold.contains(entry.staging) {
+            ActivityTrail.note(.unfinishedRestoreSettled, ActivityTrail.unfinishedRestoreSettledLine(entry.outcome))
+            said.append(RestoreWholeCourseWording.unfinishedOnAnotherComputer(course: entry.outcome.course ?? ""))
+            told.append(entry.staging)
+        }
+        return (said: said, told: told)
+    }
+
     /// What the teacher is told about one settled folder, or nil.
     static func sentence(for outcome: RestoreSettle.Settled, coursesDirectoryURL: URL) -> String? {
         let course: String = outcome.course ?? ""
         var sentence: String? = nil
         switch outcome.says {
         case .didNotFinish:
-            sentence = RestoreWholeCourseWording.didNotFinish(course: course)
+            if outcome.from == RestoreSwap.Source.archived {
+                sentence = RestoreWholeCourseWording.didNotFinishFromArchived(course: course)
+            } else {
+                sentence = RestoreWholeCourseWording.didNotFinish(course: course)
+            }
         case .stoppedPartWay:
             if let keptAt = outcome.keptAt, outcome.holdsSomethingToOpen {
                 sentence = RestoreWholeCourseWording.stoppedPartWay(course: course, keptAt: keptAt)
@@ -430,6 +593,7 @@ enum WholeCourseRestore {
             let settings: URL = coursesDirectoryURL.appendingPathComponent(course).appendingPathComponent("course_config.json")
             if !RestoreSwap.itemExists(at: settings) {
                 sentence = (sentence ?? "") + " " + RestoreWholeCourseWording.notInTheSidebar(course: course)
+                    + " " + RestoreWholeCourseWording.restoreAgainToPutItRight(course: course)
             }
         case .setAsideFilesKept:
             if let keptAt = outcome.keptAt, outcome.holdsSomethingToOpen {

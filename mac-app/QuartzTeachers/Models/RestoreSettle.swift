@@ -161,6 +161,15 @@ nonisolated enum RestoreSettle {
         /// .afterCommit`), for a settle that finds `done`.
         let afterCommit: (String) -> Void
 
+        /// Run once a settle has moved a course's files back (put back as
+        /// it was, or stopped part way): lock it again when it is kept for
+        /// reference, as a live restore that fails does (the implementation
+        /// review's I3: a crash mid-swap left a reference course put back
+        /// with its pages unlocked, because `justBeforeTheSwap` had unlocked
+        /// them). Asked of the settings as they are, so a course left
+        /// without them is not touched.
+        let afterPuttingBack: (String) -> Void
+
         let hooks: RestoreSwap.Hooks
     }
 
@@ -174,6 +183,10 @@ nonisolated enum RestoreSettle {
 
         /// The backup's file name, from the record.
         let backup: String?
+
+        /// Where that zip came from (`RestoreSwap.Source`), from the record;
+        /// nil for a folder with no record.
+        let from: RestoreSwap.Source?
 
         /// What was found: a phase, or "an unrecorded folder".
         let found: String
@@ -239,24 +252,124 @@ nonisolated enum RestoreSettle {
         return settled
     }
 
+    /// What kind of unsettled record a course has, for the refusals.
+    enum Unsettled: String, Equatable, Sendable {
+        /// Its owner is at work, another settler holds it, or another
+        /// computer wrote it: `anotherRestoreUnderWay`.
+        case underWay
+        /// Written on this computer by a process that is gone, or by this
+        /// very process, and not settled: a stop whose set-aside copy could
+        /// not be moved to the backups folder. Nothing is restoring it, so
+        /// "being restored somewhere else" would be untrue (the
+        /// implementation review's M-d): `anEarlierRestoreDidNotFinish`.
+        case leftOver
+    }
+
     /// Whether a course has a restore that has not settled: a record for it
     /// that the pass left alone (its owner is at work, another settler holds
     /// it, or another computer wrote it). A new restore of that course is
     /// refused (`anotherRestoreUnderWay`).
     static func unsettledRecordExists(forCourse courseCode: String, coursesDirectoryURL: URL) -> Bool {
+        let anyComputer: String = ""
+        return unsettledRecord(
+            forCourse: courseCode, coursesDirectoryURL: coursesDirectoryURL, otherThan: nil,
+            computer: anyComputer, owner: anyComputer,
+            ownerIsAlive: { (_: String) -> Bool in
+                return true
+            }
+        ) != nil
+    }
+
+    /// The unsettled record a course has, other than the one in `ownStaging`
+    /// (a restore asking about itself, which wrote its own record before it
+    /// asks: the implementation review's W1), or nil.
+    static func unsettledRecord(
+        forCourse courseCode: String,
+        coursesDirectoryURL: URL,
+        otherThan ownStaging: URL?,
+        computer: String,
+        owner: String,
+        ownerIsAlive: (String) -> Bool
+    ) -> Unsettled? {
         let fileManager: FileManager = FileManager.default
         let restoring: URL = RestoreSwap.restoringFolder(coursesDirectoryURL)
         guard let names = try? fileManager.contentsOfDirectory(atPath: restoring.path) else {
-            return false
+            return nil
         }
-        for name in names where !name.hasPrefix(".") {
-            let staging: URL = restoring.appendingPathComponent(name)
-            if let found = recordFile(in: staging), let record = RestoreSwap.readRecord(at: found.url),
-               record.course.caseInsensitiveCompare(courseCode) == .orderedSame {
-                return true
+        var found: Unsettled? = nil
+        for name in names.sorted() where !name.hasPrefix(".") {
+            if let ownStaging, name == ownStaging.lastPathComponent {
+                continue
             }
+            let staging: URL = restoring.appendingPathComponent(name)
+            guard let file = recordFile(in: staging), let record = RestoreSwap.readRecord(at: file.url),
+                  record.course.caseInsensitiveCompare(courseCode) == .orderedSame else {
+                continue
+            }
+            var settlerIsAlive: Bool = false
+            if let claimedBy = file.claimedBy {
+                let settler: URL = staging.appendingPathComponent(RestoreSwap.settlerPrefix + String(claimedBy))
+                if let body = try? String(contentsOf: settler, encoding: .utf8), body != owner {
+                    settlerIsAlive = ownerIsAlive(body)
+                }
+            }
+            let writtenHere: Bool = !computer.isEmpty && record.computer == computer
+            let ownerIsGoneOrThisProcess: Bool = record.owner == owner || !ownerIsAlive(record.owner)
+            if writtenHere && ownerIsGoneOrThisProcess && !settlerIsAlive {
+                if found == nil {
+                    found = .leftOver
+                }
+                continue
+            }
+            return .underWay
         }
-        return false
+        return found
+    }
+
+    /// The restores another computer wrote that this one leaves alone (the
+    /// plan review's M1) while the course they name has no settings here,
+    /// so it is missing from the sidebar: each as a `Settled` whose action
+    /// is `leave`, keyed by its staging folder's name. Older than
+    /// `anotherComputersWaitSeconds` they are kept by `settle` instead, so
+    /// they are not listed. The implementation review's I2: without a
+    /// sentence the course vanished for up to two weeks with nothing said.
+    static func unfinishedOnAnotherComputer(
+        coursesDirectoryURL: URL,
+        computer: String,
+        now: Date
+    ) -> [(staging: String, outcome: Settled)] {
+        let fileManager: FileManager = FileManager.default
+        let restoring: URL = RestoreSwap.restoringFolder(coursesDirectoryURL)
+        guard let names = try? fileManager.contentsOfDirectory(atPath: restoring.path) else {
+            return []
+        }
+        var found: [(staging: String, outcome: Settled)] = []
+        for name in names.sorted() where !name.hasPrefix(".") {
+            let staging: URL = restoring.appendingPathComponent(name)
+            guard let file = recordFile(in: staging), let record = RestoreSwap.readRecord(at: file.url),
+                  record.computer != computer else {
+                continue
+            }
+            var ageSeconds: Double = age(ofFolder: staging, now: now)
+            if let written = parsedMoment(record.writtenAt) {
+                ageSeconds = now.timeIntervalSince(written)
+            }
+            if ageSeconds >= RestoreSettleRule.anotherComputersWaitSeconds {
+                continue
+            }
+            let settings: URL = coursesDirectoryURL
+                .appendingPathComponent(record.course)
+                .appendingPathComponent(RestoreSwap.settingsFileName)
+            if RestoreSwap.itemExists(at: settings) {
+                continue
+            }
+            let outcome: Settled = Settled(
+                course: record.course, backup: record.backup, from: source(of: record), found: record.phase.rawValue,
+                action: .leave, says: nil, keptAt: nil, holdsSomethingToOpen: false, newcomersKeptAt: nil
+            )
+            found.append((staging: name, outcome: outcome))
+        }
+        return found
     }
 
     /// The record file in a staging folder, and who has claimed it.
@@ -402,7 +515,7 @@ nonisolated enum RestoreSettle {
         case .remove:
             RestoreSwap.removeStaging(claimed)
             return Settled(
-                course: record?.course, backup: record?.backup, found: foundName, action: .remove,
+                course: record?.course, backup: record?.backup, from: source(of: record), found: foundName, action: .remove,
                 says: nil, keptAt: nil, holdsSomethingToOpen: false, newcomersKeptAt: nil
             )
         case .finish:
@@ -416,7 +529,7 @@ nonisolated enum RestoreSettle {
                 releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
             }
             return Settled(
-                course: record.course, backup: record.backup, found: foundName, action: .finish,
+                course: record.course, backup: record.backup, from: source(of: record), found: foundName, action: .finish,
                 says: nil, keptAt: nil, holdsSomethingToOpen: false, newcomersKeptAt: nil
             )
         case .putBack:
@@ -431,6 +544,7 @@ nonisolated enum RestoreSettle {
                 newcomersURL: claimed.appendingPathComponent(RestoreSwap.newcomersName),
                 hooks: context.hooks
             )
+            context.afterPuttingBack(record.course)
             if back.everyFileIsBack {
                 let newcomersAt: String? = RestoreSwap.keepNewcomers(
                     in: claimed, courseCode: record.course,
@@ -440,7 +554,7 @@ nonisolated enum RestoreSettle {
                     RestoreSwap.removeStaging(claimed)
                 }
                 return Settled(
-                    course: record.course, backup: record.backup, found: foundName, action: .putBack,
+                    course: record.course, backup: record.backup, from: source(of: record), found: foundName, action: .putBack,
                     says: .didNotFinish, keptAt: nil, holdsSomethingToOpen: false, newcomersKeptAt: newcomersAt
                 )
             }
@@ -458,7 +572,7 @@ nonisolated enum RestoreSettle {
                 releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
             }
             return Settled(
-                course: record.course, backup: record.backup, found: foundName, action: .keep,
+                course: record.course, backup: record.backup, from: source(of: record), found: foundName, action: .keep,
                 says: .stoppedPartWay, keptAt: kept.path, holdsSomethingToOpen: kept.holdsSomethingToOpen,
                 newcomersKeptAt: nil
             )
@@ -470,11 +584,12 @@ nonisolated enum RestoreSettle {
                     staging: claimed, courseCode: record.course,
                     coursesDirectoryURL: coursesDirectoryURL, context: swapContext
                 )
+                context.afterPuttingBack(record.course)
                 if RestoreSwap.itemExists(at: claimed) {
                     releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
                 }
                 return Settled(
-                    course: record.course, backup: record.backup, found: foundName, action: .keep,
+                    course: record.course, backup: record.backup, from: source(of: record), found: foundName, action: .keep,
                     says: decided.says, keptAt: kept.path, holdsSomethingToOpen: kept.holdsSomethingToOpen,
                     newcomersKeptAt: nil
                 )
@@ -501,10 +616,10 @@ nonisolated enum RestoreSettle {
                 return nil
             }
             return Settled(
-                course: record?.course, backup: record?.backup, found: foundName, action: .keep,
+                course: record?.course, backup: record?.backup, from: source(of: record), found: foundName, action: .keep,
                 says: decided.says,
                 keptAt: RestoreSwap.insideTheWorkingFolder(kept, coursesDirectoryURL: coursesDirectoryURL),
-                holdsSomethingToOpen: RestoreSwap.holdsAFileFinderShows(kept), newcomersKeptAt: nil
+                holdsSomethingToOpen: RestoreSwap.holdsAnyFile(kept), newcomersKeptAt: nil
             )
         }
     }
@@ -551,6 +666,15 @@ nonisolated enum RestoreSettle {
         }
     }
 
+    /// Where a record's zip came from, `backups` when it does not say;
+    /// nil for a folder with no record.
+    static func source(of record: RestoreSwap.Record?) -> RestoreSwap.Source? {
+        guard let record else {
+            return nil
+        }
+        return record.from ?? RestoreSwap.Source.backups
+    }
+
     /// The restore engine's context for the pieces a settle reuses.
     static func swapContext(for courseCode: String, context: Context) -> RestoreSwap.Context {
         return RestoreSwap.Context(
@@ -568,7 +692,7 @@ nonisolated enum RestoreSettle {
             },
             refuseUnlessMediaWasPutBack: { (_: URL) throws in
             },
-            beforeTheSwap: { () throws in
+            beforeTheSwap: { (_: URL) throws in
             },
             justBeforeTheSwap: { () in
             },
