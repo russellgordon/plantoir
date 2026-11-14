@@ -1252,6 +1252,18 @@
         "carries": "the course and the section, and why: the folder was not found, nothing deployed there, no address on this computer was free, or the browser did not open it.",
         "line": "could not open the deployed folder in the web browser — {the folder was not found | nothing deployed there | no address on this computer was free | the browser did not open it}",
         "why": "#850. Each arrives as 'Open in Browser did nothing', and only the trail can say which."
+      },
+      {
+        "carries": "the action's key (publishPages, hidePages), the course and the section, and a word for why (the list was busy, could not be written, could not be saved to the disk, or what was written differed from what was recorded); and, while the list is switched off, that the change went ahead",
+        "event": "undo could not record a step",
+        "line": "ICS3U/1 · the undo list could not record publishPages: the list was busy. The change went ahead (the list is not in use yet).",
+        "why": "#899, piece U1. The list is written in shadow before it is ever offered, and a shadow failure must never touch the action (plan 4.9), so this line is the only trace of a step the list missed; when the list is live the same failure refuses the change before anything is written, and the line says nothing was changed. Never page text: the journal holds that, the trail does not."
+      },
+      {
+        "carries": "the course and the section, whether it was a change, an undo or a redo that stopped part way, and how many files were put back",
+        "event": "undo rolled back",
+        "line": "ICS3U/1 · the undo list put back 2 files left part way by a change that stopped",
+        "why": "#899, piece U1. Recovery settles a step whose process died part way from the content of what it changed, and putting files back is the one thing it writes; a teacher who finds a publish half-gone after a crash needs this line to know it was put back on purpose. Counts only."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -42298,5 +42310,716 @@
       "A separate, differently named menu item for the folder: Russell ruled one Open in Browser for both (2026-11-13).",
       "URLProtocol (serves only the app's own web views), SwiftNIO (a dependency for about 400 lines), and NetworkListener behind #available (macOS 26 only, two code paths)."
     ]
+  },
+  "undo": {
+    "note": "Undo and Redo: ONE list for the whole app, kept on disk (#899). The FORMAT is file-formats.json -> undoJournal; this is the RULE every process that writes it follows, and the cases both suites run. Piece U1 (the journal core) wrote the rule, the check, stack and recovery cases, and contracts/undo-traces.json; later pieces add classes, reachCases, holdCases, trashCases and menuTitleCases. Everything is behind the switch (`undoJournalIsLive`, off): written in shadow, never offered, so Section > Undo Last Change and the built-in assistant's undo are unchanged until the switch flips (U7). Russell's rulings are the comments on #899; the Windows director's nine facts (W1 to W9) on the same issue bind this rule.",
+    "rule": {
+      "oneLock": "Every change to the list takes ONE exclusive lock shared by every process on the computer (the app, each outside-assistant process, a scheduled run), reads the journal FRESH inside it (never from a copy held across the lock), and holds it only for journal events, never while a change is applied. The mechanism is each platform's own (the mac: flock on undo/.lock; Windows: an exclusive open of undo\\.lock, W3); the contract names the rule.",
+      "readers": "A reader never treats a sharing violation or a busy lock as an unreadable list: it retries for a bounded time (2 seconds) and otherwise shows the last state it read. A good journal is never reset, moved aside or rewritten (W2).",
+      "appendOnly": "Nothing in undo/ is replaced in place. Events are appended, one per line; a blob is written under a temporary name and renamed onto a name that does not exist yet. A reader counts only complete lines that parse; a torn last line is ignored by readers and cut off by the next writer inside the lock (W2).",
+      "writeAhead": "A step is written down BEFORE its change: under the lock, the next number, its content blobs, and a begin line naming every op's expected state, made durable; then the change, outside the lock; then, under the lock, applied. Undo (undoing, undone) and redo (redoing, redone) have the same shape. A process that dies leaves the files as they were before its step or as they were after it, never in between: recoveryCases.",
+      "recovery": "Runs inside the lock before every new step, undo and redo (and, from U7, at every launch). For an unfinished event whose process is gone, judged by the content of what each op changed: none took effect -> failed (or the undo or redo ended, the step back where it stood); all took effect -> completed; some -> what took effect is put back, rolledBack, one trail line; something now neither -> nothing written, the work ended. While switched off (shadow) recovery never writes into a working folder. A step whose working folder cannot be reached is left unsettled.",
+      "stagedThenSwapped": "An undo or redo checks EVERY op first and writes nothing if any is in the way (ruling 4); otherwise writes every new content BESIDE its target (same folder, a dot-file name), and only when all are written swaps them in, one rename each, re-reading each target first; a swap that cannot go in (a file in use, W5) reverses the swaps already made and names the file. Never a half-undone step.",
+      "contentNotTimes": "Whether a file has changed since is judged by the content of EXACTLY what the op changed: a front-matter entry byte for byte (carriage returns, comments and a byte-order mark kept; never Unicode-equivalence), a whole file by SHA-256. Never modification or creation times (ruling 4, W6).",
+      "linear": "Strictly linear (ruling 9): Undo acts only on the newest step that is not undone, then the one before it; Redo only on the most recently undone. A newer step still being made, undone or redone refuses both (anotherChangeIsUnderWay). Any new step, from any process, drops the redo branch.",
+      "clearing": "The whole list is CLEARED, by one `cleared` line carrying its reason, when Undo refuses the newest step because what it changed was changed by hand since (ruling 13: the page is named once, at the refusal), when a deploy happens (ruling 14, which replaced ruling 1: a deploy is never a step), and when unit plans are shared (ruling 16). Everything done or undone at that point leaves the list; nothing before it can be undone or redone; a step being made at that moment is not touched. Setting up an outside assistant is not on the list and clears nothing (ruling 16). What a REFUSED Redo does to the list is not ruled; no case depends on it.",
+      "limits": "The last 50 steps and none older than 30 days (by madeAt), counted across the whole app (rulings 3 and 5), pruned oldest first under the lock. Pruning never breaks a newer step: every step carries its own before. Content no step on the list names is deleted, and old segments from the oldest end while no step on the list has an event in them.",
+      "shadow": "While `undoJournalIsLive` is off, a failure to write the list never blocks, slows noticeably or alters the action: the action goes ahead exactly as before, and one trail line (`undo could not record a step`) says so (plan 4.9). When live, a step whose begin cannot be written is refused before anything changes."
+    },
+    "clearReasons": [
+      "changedSince",
+      "deploy",
+      "shareUnitPlans"
+    ],
+    "checkCases": [
+      {
+        "name": "the line as the step left it",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "body edited since, line untouched (a whole-file check refuses this; the line check must not)",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\nA paragraph written in Obsidian since.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "another key edited since",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1 (revised)\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "the line itself changed since: a comment added",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true # checked\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "the line already back",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "carriage returns kept on the line as left",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false\r",
+          "after": "publish: true\r",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\r\ntitle: Unit 1, Day 1\r\npublish: true\r\ncreated: 2026-09-08T07:00:00.000-0400\r\n---\r\n\r\nToday we start.\r\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "carriage returns taken out since: byte for byte, the line is not the one left",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false\r",
+          "after": "publish: true\r",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a byte-order mark before the fence: the step made the block, which is still as left",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": null,
+          "after": "publish: true",
+          "afterKey": null,
+          "createdTheBlock": true
+        },
+        "current": {
+          "bytesHex": "2d2d2d0a7075626c6973683a20747275650a2d2d2d0aefbbbf2d2d2d0a7469746c653a204461790a2d2d2d0a426f64792e0a"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "a key inserted where there was none, still there",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": null,
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "a key inserted where there was none, removed since by hand",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": null,
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "the key there twice: never a guess",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "the page is gone: a line op never reads a missing file as already back",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a folder where the page was",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "folder": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "the page is no longer UTF-8",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "bytesHex": "2d2d2d0a7075626c6973683a20747275650aff0a2d2d2d0a"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "unreadable front matter: the opening fence never closes",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Day\npublish: true\nBody with no closing fence.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a legacy draft page: the step took the draft line out (one of its two line ops), still out",
+        "op": {
+          "kind": "editLine",
+          "key": "draft",
+          "before": "draft: true",
+          "after": null,
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "the same title in another Unicode form: equal to Swift's ==, not byte for byte",
+        "op": {
+          "kind": "editLine",
+          "key": "title",
+          "before": "title: Cafe",
+          "after": "title: Café",
+          "afterKey": null
+        },
+        "current": {
+          "text": "---\ntitle: Café\n---\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a value that runs on to indented lines, as left",
+        "op": {
+          "kind": "editLine",
+          "key": "tags",
+          "before": "tags:\n  - quiz",
+          "after": "tags:\n  - quiz\n  - review",
+          "afterKey": "title"
+        },
+        "current": {
+          "text": "---\ntitle: Day\ntags:\n  - quiz\n  - review\n---\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "whole file, as the step left it",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n"
+        },
+        "current": {
+          "text": "new\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "whole file, as it was before",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n"
+        },
+        "current": {
+          "text": "old\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "whole file, changed since",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n"
+        },
+        "current": {
+          "text": "new\nand more\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a page the step created, deleted since by hand: already back",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": null,
+          "afterText": "new\n"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "a page the step created, now a folder",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": null,
+          "afterText": "new\n"
+        },
+        "current": {
+          "folder": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a page the step created, not UTF-8 any more",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": null,
+          "afterText": "new\n"
+        },
+        "current": {
+          "bytesHex": "ff0a"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      }
+    ],
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent). current is what is at the op's path now: text (UTF-8), absent, a folder, or raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string). undo and redo are the verdicts: canUndo, alreadyBack, changedSince (undo); canRedo, alreadyRedone, changedSince (redo).",
+    "stackCases": [
+      {
+        "name": "three steps: the newest is the head",
+        "calls": [
+          "step",
+          "step",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "undo once",
+        "calls": [
+          "step",
+          "step",
+          "undo"
+        ],
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "undo twice: linear, the one before it next",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "redo puts back the most recently undone first",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "undo",
+          "redo"
+        ],
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a new step drops the redo branch",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          3
+        ]
+      },
+      {
+        "name": "nothing more to redo",
+        "calls": [
+          "step",
+          "undo",
+          "redo",
+          "redo"
+        ],
+        "expectLast": "nothingToRedo",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "nothing to undo on an empty list",
+        "calls": [
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": null,
+        "onTheList": []
+      },
+      {
+        "name": "ruling 13: undo refused because the line was changed by hand clears the whole list",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "editTheLineByHand",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince"
+      },
+      {
+        "name": "ruling 13: the list starts again with the next change",
+        "calls": [
+          "step",
+          "editTheLineByHand",
+          "undo",
+          "step"
+        ],
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          2
+        ],
+        "cleared": "changedSince"
+      },
+      {
+        "name": "ruling 14: a deploy clears the list, redo branch and all",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "clear:deploy"
+        ],
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "deploy"
+      },
+      {
+        "name": "ruling 16: sharing unit plans clears the list as a deploy does",
+        "calls": [
+          "step",
+          "clear:shareUnitPlans",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": 2,
+        "onTheList": [
+          2
+        ],
+        "cleared": "shareUnitPlans"
+      },
+      {
+        "name": "a clearing on an empty list writes nothing",
+        "calls": [
+          "clear:deploy"
+        ],
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "linesWritten": 0
+      },
+      {
+        "name": "fifty steps kept, counted across the app: the two oldest of 52 leave",
+        "calls": [
+          "steps:52"
+        ],
+        "head": 52,
+        "redo": null,
+        "onTheListCount": 50,
+        "oldestOnTheList": 3
+      },
+      {
+        "name": "thirty days kept: a step made 31 days ago leaves when the next is recorded",
+        "calls": [
+          "step:31daysAgo",
+          "step"
+        ],
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          2
+        ]
+      },
+      {
+        "name": "the oldest pruned, the next touched the same page, and it still undoes: every step carries its own before",
+        "calls": [
+          "steps:51",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 50,
+        "redo": 51,
+        "onTheListCount": 50,
+        "oldestOnTheList": 2
+      }
+    ],
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json (publish: true when it does not read publish: true now, publish: false when it does), so every step changes something; `steps:N` makes N of them; `step:31daysAgo` makes one with the clock 31 days back; `editTheLineByHand` changes the newest step's line by hand; `clear:<reason>` clears the list as that action does. head and redo are step numbers after the last call (null: none); onTheList is every step still on the list, oldest first; cleared is the reason of the clearing the case writes.",
+    "stepCases": [
+      {
+        "name": "two pages, the second changed by hand since: nothing written, the second named",
+        "pages": 2,
+        "handEdit": "line of page 2",
+        "undo": "changedSince",
+        "named": "page 2",
+        "others": 0,
+        "files": "unchanged"
+      },
+      {
+        "name": "three pages, the first and third changed by hand: the first met is named, with one other",
+        "pages": 3,
+        "handEdit": "lines of pages 1 and 3",
+        "undo": "changedSince",
+        "named": "page 3",
+        "others": 1,
+        "files": "unchanged",
+        "why": "An undo checks ops in reverse order, so page 3 is met first."
+      },
+      {
+        "name": "a file in use at the second swap: the first swap reversed, the file named",
+        "pages": 2,
+        "fileInUseAtSwap": 1,
+        "undo": "fileIsInUse",
+        "files": "unchanged",
+        "phase": "done"
+      }
+    ],
+    "recoveryCases": [
+      {
+        "name": "a step dies after its begin is written",
+        "work": "step",
+        "stopAt": "afterBegin",
+        "files": "before",
+        "phase": "failed",
+        "head": null
+      },
+      {
+        "name": "a step dies before its first file is swapped in",
+        "work": "step",
+        "stopAt": "beforeSwap:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null
+      },
+      {
+        "name": "a step dies with one of its two files swapped in: put back",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null
+      },
+      {
+        "name": "in shadow, the same death is recorded and the files are left exactly as the action left them",
+        "work": "step",
+        "mode": "shadow",
+        "stopAt": "beforeSwap:1",
+        "files": "asLeft",
+        "phase": "failed",
+        "head": null
+      },
+      {
+        "name": "a step dies with every file in but before applied: completed",
+        "work": "step",
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "an undo dies after undoing is written",
+        "work": "undo",
+        "stopAt": "afterUndoing",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "an undo dies with one of two files back: put forward again",
+        "work": "undo",
+        "stopAt": "beforeSwap:1",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "an undo dies with every file back but before undone: completed",
+        "work": "undo",
+        "stopAt": "beforeUndone",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "a redo dies after redoing is written",
+        "work": "redo",
+        "stopAt": "afterRedoing",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "a redo dies with one of two files in: put back",
+        "work": "redo",
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "a redo dies with every file in but before redone: completed",
+        "work": "redo",
+        "stopAt": "beforeRedone",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "the process is still running: left in flight, and Undo is refused",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "processAlive": true,
+        "files": "asLeft",
+        "phase": "begun",
+        "undo": "anotherChangeIsUnderWay"
+      }
+    ],
+    "recoveryCasesHow": "A step publishing two pages (two files), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0), then recovery run by another process that sees the first as gone (unless processAlive). files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them, shadow only). phase is where the step stands after recovery; head the step number of the head (null: none).",
+    "traces": "contracts/undo-traces.json, generated by scripts/make_undo_traces.py (seeded, deterministic, with its own scripts/test_make_undo_traces.py) and replayed by both suites through each app's own journal and door. U1's traces are publish and hide only, set at the line; U3 grows them to about 120 through the real action code."
   }
 }
