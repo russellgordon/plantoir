@@ -68,7 +68,7 @@ public class FixWithAssistantContractTests
         Assert.Equal(expect["rowsNotNamed"]!.GetValue<int>(), greeting.RowsNotNamed);
         if (expect["text"] is { } text)
         {
-            // A case whose message carries greetingHandoutsSentence (#859) is
+            // A case whose message carries greetingHandoutsSentence (#895, the mac's #859) is
             // held open by name: until #859 lands here it must be the
             // contract's message with exactly that sentence left out.
             if (NamedGapLedger.Holding(NamedGapLedger.FixWithGreetingCases, name) is { } owed)

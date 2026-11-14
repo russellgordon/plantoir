@@ -2188,7 +2188,7 @@ The mac merged six pieces into `dev` the same evening (#783 GitHub Copilot,
 #865, #871, #872, #878, #839's Help format, then #850 and #846), and a full
 suite on `dev` 39e7b5cf5 read `Failed: 12, Passed: 3467, Skipped: 0, Total:
 3479` (18 min 51 s on this PC, a Lenovo 20QES70500, i5-8365U, 16 GB, Windows
-11 Pro 26200). Merging `dev` again before the gate brought #859's piece A,
+11 Pro 26200). Merging `dev` again before the gate brought #859's piece A (Windows: #895),
 whose handouts sentence turned six Fix with greeting cases red. Step 0's method again: what is
 a few lines and changes nothing a teacher sees was FIXED, everything a later
 piece of v2.0.0 builds was HELD by name against its open `windows` issue.
@@ -2202,7 +2202,7 @@ no lease line changes, so nothing a teacher sees moves; it is the half of #884
 item 7 that cannot go wrong. Proved red on the old code (the two lines taken
 out: `TheOutsideDoorsPassWhatTheContractSays` fails on the env).
 
-**Held, 29 entries, all v2.0.0.** #859 (6): the six `fixWith.greetingCases`
+**Held, 29 entries, all v2.0.0.** #895 (6, the mac's #859 piece A): the six `fixWith.greetingCases`
 whose message carries `greetingHandoutsSentence`, held while each is the
 contract's message with exactly that sentence left out
 (`FixWithGreetingCases`). #884 (13): the `copilot` door; the menu
