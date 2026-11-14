@@ -630,6 +630,27 @@ alt: Pump gas into a box and watch the pressure, temperature and volume change.
   moving or renaming the working folder, or on a new computer, the next
   build needs the internet again.
 
+A simulation that cannot be shown stays a block of text on the page. The
+next Preview names it on the section's Problems tab in Plantoir, as a
+Science simulation row, and the build's output says which page, which
+block and which line:
+
+```
+plantoir: error: Unit 3/Gases.md: phet block 1, line 12: PhET has no simulation called gas-propertys (the closest it has: gas-properties, gases-intro)
+plantoir: error: Unit 3/Gases.md: phet block 1, line 14: screens: needs the screens' numbers, such as 1, 2, not “first”
+plantoir: note: Unit 3/Gases.md: phet block 2: it has no alt: line, so the card describes it only by its title
+```
+
+`phet block 1` is the first phet block on that page, and the line is in
+the teacher's file. An `error:` line is a simulation students cannot open
+until the block is fixed: a missing or misspelled `sim:` name, or a
+`screens:` or `locale:` value that is not understood. Take the name from
+the simulation's address on phet.colorado.edu, never from its title. A
+`note:` line (no `alt:`, a setting a phet block does not have, a language
+the simulation has no version in, a pasted PhET `<iframe>`) is shown on
+the site anyway and is not on the Problems tab. Fix the block and preview
+again.
+
 ## 17. Notes only the teacher sees
 
 Text between `%%` marks is kept in Obsidian and never reaches the site:
