@@ -74,7 +74,7 @@ nonisolated enum LogRedactor {
     /// can hold an address. In another order some lines lose only part of a
     /// secret (#853 rounds 2 and 3, measured): with `labelledSecret` before
     /// the home-folder rules, `password=/Users/First Last/x` keeps `Last`,
-    /// and with `emailAddress` first, `https://name:password@host` keeps
+    /// and with `emailAddress` first, `https://name:password@host.example` keeps
     /// its username. `ruleOrder.cases` holds lines like these, and each
     /// suite checks that they come out right in this order and differently
     /// in the one other order each case names. The labelled rules still run
