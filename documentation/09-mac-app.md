@@ -5421,7 +5421,14 @@ is blank" found nothing, which is the failure rule 5 exists for. Choosing a
 unit, Back, Forward and Reload still write nothing. No line carries a plan's
 title: it is the teacher's own words, and the count is what a report needs.
 So `LogRedactor` needed no new rule: the lines carry a course code, counts
-and an assistant's name.
+and an assistant's name. No trail line names the computer (`couldNotShowLine`
+lost "on this Mac" in #902, as Coverage's did in 5107c8d8b), so both apps
+write the same line. The three sentences on the tab that do name it
+(`cannotShowDescription`, `openInBrowserCouldNotOpen`,
+`openInBrowserNoBrowser`) carry `{machine}`, are recorded in
+`specialNames.platformWording.machine.usedIn`, and are filled with
+`MachineWord.filling` where `PlanningTabView` shows them (Russell's ruling
+on #801, 2026-11-13).
 
 **A greeting can name plans the tab does not offer yet** (review L3,
 accepted): the greeting names every plan with a readable `plan.json`, the

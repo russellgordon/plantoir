@@ -13124,11 +13124,11 @@ Three `unitPlanning.tab.words` sentences named the Mac. They now carry
 `couldNotShowLine` drops "on this Mac" as Coverage's did (5107c8d8b): a
 `usedIn` entry for a `mustRecord` line would be an array index into a list
 that grows every day. `MachineWordContractTests` says the three filled with
-"PC". The mac's `PlanningTabTests.testTheWordsAreTheContracts` is red
-until the mac fills the placeholder, and its `couldNotShowLine` assertion
-in `testTheTabsTrailLinesAreTheContractsAndNameNoPlan` until it drops " on
-this Mac" from `PlanningTrail.couldNotShow` (nothing is filled there; the
-`mac` issue for 790a says what passes each).
+"PC". The mac follows since #902: its constants carry `{machine}`, filled
+with `MachineWord.filling` where `PlanningTabView` shows them, and
+`PlanningTrail.couldNotShow` no longer says " on this Mac" (nothing is
+filled there). `PlanningTabTests.testTheWordsAreTheContracts` and
+`testTheTabsTrailLinesAreTheContractsAndNameNoPlan` pin both.
 
 ### What 790b still owes
 
