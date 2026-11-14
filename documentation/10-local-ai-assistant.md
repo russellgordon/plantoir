@@ -8351,7 +8351,19 @@ report card comments, which are offered only in context by the skill in use.
 They are regular expressions, as the held skills' words are, because
 `scripts/test_held_skills.py` reads every string in `app-rules.json` and a
 plain list of those words would read to it as an offer. The rule is not the
-hold, and stays when the held skills come back. A `where` the suite does not
+hold, and stays when the held skills come back. The expressions carry their own
+cases, `mustMatch` and `mustNotMatch`, run by
+`AppRulesContractTests.testTheGreetingsForbiddenExpressionsCatchTheirCases`.
+After the batch review (2026-11-14) they take mark, marks and marking as whole
+words, so "marked" (publishing's own word) and "Markdown" pass; grade, grades,
+graded and grading, but not a grade level such as Grade 11 in a course's name;
+and a class's result with a straight or a curly apostrophe, or results for the
+class. Measured with `NSRegularExpression` on the cases: the four expressions
+before the review missed five `mustMatch` sentences and caught two
+`mustNotMatch` ones; the six after it miss and catch none, and none of them
+matches any of the 15 whole greetings in `app-rules.json`'s greeting cases.
+`\bcomments?\b` was left as it was: it goes further than the ruling, which
+names report card comments, and no greeting says the word. A `where` the suite does not
 know fails, so a new kind of entry proposed from either side turns the other
 red until it is implemented.
 

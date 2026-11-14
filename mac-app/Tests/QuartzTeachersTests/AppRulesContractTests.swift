@@ -1134,6 +1134,38 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(greetingsChecked, agents.count * variants.count)
     }
 
+    /// `outsideAgents.greetingMustNotSay` (#791, the batch review): each
+    /// `mustMatch` sentence is caught by at least one expression, and no
+    /// `mustNotMatch` sentence by any. Matched without regard to case, as
+    /// the greetings are.
+    func testTheGreetingsForbiddenExpressionsCatchTheirCases() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let mustNotSay: [String: Any] = try XCTUnwrap(section["greetingMustNotSay"] as? [String: Any])
+        let patterns: [String] = try XCTUnwrap(mustNotSay["expressions"] as? [String])
+        var forbidden: [NSRegularExpression] = []
+        for pattern in patterns {
+            forbidden.append(try NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))
+        }
+        let mustMatch: [String] = try XCTUnwrap(mustNotSay["mustMatch"] as? [String])
+        let mustNotMatch: [String] = try XCTUnwrap(mustNotSay["mustNotMatch"] as? [String])
+        XCTAssertFalse(mustMatch.isEmpty)
+        XCTAssertFalse(mustNotMatch.isEmpty)
+
+        for sentence in mustMatch {
+            let caughtBy: [String] = AppRulesContractTests.patternsMatching(sentence, among: forbidden)
+            XCTAssertFalse(caughtBy.isEmpty, "greetingMustNotSay misses a mustMatch sentence: " + sentence)
+        }
+        for sentence in mustNotMatch {
+            let caughtBy: [String] = AppRulesContractTests.patternsMatching(sentence, among: forbidden)
+            XCTAssertTrue(
+                caughtBy.isEmpty,
+                "greetingMustNotSay catches a mustNotMatch sentence: " + sentence
+                    + " (" + caughtBy.joined(separator: ", ") + ")"
+            )
+        }
+    }
+
     /// `greetingReferenceCourses.listCases` (#856): which courses the
     /// sentence names, in what form and order, run through
     /// `referenceCoursesToMention` with each shelf built as `Course`s.
@@ -1582,6 +1614,18 @@ final class AppRulesContractTests: XCTestCase {
             directoryURL: root.appendingPathComponent(folder, isDirectory: true),
             configuration: CourseConfiguration(values: values, lastSavedData: Data())
         )
+    }
+
+    /// The patterns among `expressions` that find `sentence`, in order.
+    private static func patternsMatching(_ sentence: String, among expressions: [NSRegularExpression]) -> [String] {
+        var caughtBy: [String] = []
+        let whole: NSRange = NSRange(sentence.startIndex..., in: sentence)
+        for expression in expressions {
+            if expression.firstMatch(in: sentence, options: [], range: whole) != nil {
+                caughtBy.append(expression.pattern)
+            }
+        }
+        return caughtBy
     }
 
     /// The greeting one Revise door really sends for `variant`:
