@@ -13538,6 +13538,76 @@ storing the base64 of the example pair, which the issue first suggested. It
 is still a stored pair to a scanner that does not read the words, and the
 test that builds it is four lines.
 
+**Four more credential shapes, and a two-word account (#853, #876).**
+Measured on 2026-11-13 by compiling `LogRedactor.swift` from `dev` alone and
+feeding it each shape (invented values only, assembled from `example-user`
+and `example-password`):
+
+| Shape | Before | Rule now |
+|---|---|---|
+| `"Authorization": "Basic …"` (JSON), `'Authorization': 'Basic …'` (Python) | left whole | `basicAuthHeader` reads quotes round the name and the value, and `=` as well as `:` |
+| `curl -u user:pass`, `--user user:pass`, `--user 'user:pass word'` | left whole | `userFlag`, new: a value holding a colon after `-u` or `--user`, a quoted value to its closing quote |
+| `ftp://user:pass@host`, `sftp://…` | the username stayed (`ftp://example-user:[removed: email address]/`) | `urlUserinfo` reads any scheme |
+| a password with a raw `/` or a space | the username and part of the password stayed | `urlUserinfo` takes a `/`, and single spaces unless the password starts with a digit |
+| `Authorization: Basic [removed: token]` redacted again | `… [removed: token] token]` | `basicAuthHeader` and `userFlag` leave a placeholder alone, as #780 made the label rules do |
+| `/Users/First Last/…`, `C:\Users\First Last\…` | `/Users/person Last/…`: the second word of the name stayed | several words are taken when they run on to a separator, a quote, a colon or the end of the line |
+| `/users/name/…`, `c:\users\name\…` | left whole | the home-folder rules ignore case and keep the prefix as written |
+
+The issue also named `HTTPS://` and a lowercase `basic` as case-sensitive.
+Measured, both were already redacted: `urlUserinfo` and `basicAuthHeader`
+have carried `(?i)` since #709. The home-folder rules were the
+case-sensitive ones.
+
+**Who can print these today.** Nothing in the product. `deploy.sh` sends
+its Bearer headers with `curl -fsS -H`, which never echoes a header;
+`scripts/share_plan.py` adds the Basic header through `urllib`, whose errors
+carry the status and not the header; nothing uses `curl -u`, an `ftp://`
+address or a git remote. These rules stand behind a tool's debug output (a
+dump of request headers is the likeliest, which is why the quoted header
+came first) and behind text a teacher typed that a tool echoed. The
+launchers' own trail lines (`note_on_the_trail`, written to
+`PLANTOIR_TRAIL_DIR` when the app hands one over) are fixed sentences
+carrying a course code, a section and fixed phrases, never console text or
+a path, and no script writes `activity.txt`. So the launchers need no
+redactor of their own; that is a reason, not an oversight.
+
+**False redactions, measured** on an invented 99-line trail: the 66 example
+lines of `activityTrail.mustRecord` and 33 invented console lines (Quartz,
+wrangler, docker, npm, colima, made-up paths and addresses). Against the old
+redactor the new one changed only the intended lines and these:
+
+- `http://localhost:8081/@scope/pkg` becomes `http://[removed: token]@scope/pkg`.
+  A password that starts with a digit and holds a slash is still taken, so a
+  port followed by a path with an `@` in it goes too. Kept as the cost.
+- A one-word account followed by words to the end of the line
+  (`Opened /Users/name in Finder`) loses those words, since they cannot be
+  told from the rest of a two-word name. No line in the trail has that
+  shape: a path there always runs on with a `/`. Every string literal in the
+  mac test target that holds a path, an address or a header (223) was run
+  through both redactors as well; the two that changed are test messages and
+  an artificial launcher marker that no test redacts.
+- `docker exec -u 501:20` loses the user and group. No launcher runs it.
+
+REJECTED: letting any password hold spaces. The first draft did, and
+`http://localhost:8081 ready; questions to helpdesk@school.example` lost
+everything from `localhost:` to the address. A port is the commonest thing
+after a colon in this product's output, so a password that starts with a
+digit may not hold a space (the KEPT "Preview at" case in
+`problemReportRedaction.cases`). Also rejected: stopping `basicAuthHeader`
+at a quote rather than at white space. Base64 holds no quote, so no more of
+a credential would be removed, and it would have moved the expectation of
+#709's existing case on both platforms. Also rejected for now: redacting the
+real account name literally, read from the home folder at run time. It
+would close the first gap below, but no shared case could test it, since
+each machine's name differs.
+
+**Still missed, named.** A two-word account followed by words and then
+another path on the same line (`/Users/First Last and /Users/…`): the first
+word goes and the second stays, as before #876, because the words do not
+run on to a separator. A password that starts with a digit and holds a
+space. An apostrophe in an account name (`O'Brien`): the rule stops at the
+quote, as it always has.
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
