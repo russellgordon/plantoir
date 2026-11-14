@@ -3748,7 +3748,8 @@ What replaces the old container concepts:
   PROGRAMS' work leases only, never this program's own publishes, so another
   window of the app — or the in-app assistant's windowless deploy — deploying
   the same section did not refuse; (2) `preview.sh` started by hand checked
-  nothing, and a bare `deploy.sh` writes no lease. The mac's fixes, to match
+  nothing, and a bare `deploy.sh` wrote no lease (it takes them since #829,
+  `workLeases.launcherLeases`). The mac's fixes, to match
   in rule and not in mechanism: a check at the top of the one function every
   window preview goes through, reading the in-process publish record; and a
   check in the launcher, on serving runs only and before anything is changed,

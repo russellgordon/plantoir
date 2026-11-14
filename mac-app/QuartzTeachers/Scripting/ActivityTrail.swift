@@ -99,7 +99,16 @@ nonisolated enum ActivityTrail {
         /// sentence (#812's review). Until then the window waited ten
         /// minutes in silence and every later Preview in it did nothing.
         case previewCouldNotStart = "preview could not start"
+        /// A launcher started, with its arguments (redacted). deploy.sh also
+        /// writes a line of this event itself when a deploy running outside
+        /// Plantoir takes its section's work leases (#829): the contract's
+        /// `launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection`. A
+        /// deploy this app started takes no lease, so it never writes that
+        /// line beside this app's own.
         case taskStarted = "task started"
+        /// A launcher finished: its outcome and how long it took. deploy.sh
+        /// also writes `launcherLineWhenItLetsItsSectionGo` under this event
+        /// when a deploy running outside Plantoir gives its leases back (#829).
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
         /// Help ▸ Plantoir Help opened plantoir.app's support page (#457,

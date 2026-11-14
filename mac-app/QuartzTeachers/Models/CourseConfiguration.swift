@@ -107,6 +107,11 @@ class CourseConfiguration {
     /// #668, the recommended choice (`publishingDestinations.pickerOrder`).
     static let knownDeployTargetTypes: [String] = ["cloudflare_pages", "netlify", "local_folder"]
 
+    /// The destination types that have a site address, so the only ones a
+    /// custom domain can belong to (`customDomain(forSection:destinationType:)`,
+    /// #904). The shared Python's `custom_domains.DESTINATION_TYPES_WITH_AN_ADDRESS`.
+    static let destinationTypesWithAnAddress: [String] = ["netlify", "cloudflare_pages"]
+
     /// Extra places this course ALSO publishes to, beyond `deployTarget` —
     /// for redundancy against one host having a bad day, never a
     /// replacement for the primary choice: `deployTarget` still decides
@@ -1212,7 +1217,17 @@ class CourseConfiguration {
     /// invisible to every other destination type, which is exactly
     /// correct for a course that has never touched additional
     /// destinations at all.
+    ///
+    /// A folder on this computer has no site address, so `local_folder`
+    /// never has a domain, whatever the setting says (#904; the rule and
+    /// its cases are `contracts/file-formats.json` → `customDomainReading`,
+    /// which the shared Python's `custom_domains.for_destination` runs too).
+    /// Before #904 a folder-primary course's bare string was handed to its
+    /// folder leg.
     func customDomain(forSection sectionNumber: Int, destinationType: String) -> String {
+        if !CourseConfiguration.destinationTypesWithAnAddress.contains(destinationType) {
+            return ""
+        }
         let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
         guard let stored = sectionsMap["section\(sectionNumber)"] else {
             return ""

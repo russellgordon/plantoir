@@ -448,6 +448,33 @@ struct SectionDetailView: View {
         return section
     }
 
+    /// What Cannot Preview Yet says when another program's lease declined a
+    /// preview of this section.
+    ///
+    /// A deploy of THIS section (a publish lease that names it) is told
+    /// `AssistWording.sectionIsBeingDeployed`, the sentence this app's own
+    /// deploy of the section is told with (#381): one situation, one
+    /// sentence, whoever is deploying. Before the Fable sweep of #829 a
+    /// deploy typed in Terminal, which since #829 takes leases, was told
+    /// `sectionIsBeingBuiltElsewhere`, which names three programs and none
+    /// of them the one in the way. Then a lease naming the section
+    /// (`sectionIsBeingBuiltElsewhere`, #835), then the course-wide sentence.
+    /// `shared-rules.json` → `previewWhileItsSectionDeploys.leaseCases`.
+    static func previewDeclinedSentence(
+        inTheWay holding: WorkLeaseFiles.Holding,
+        among holdings: [WorkLeaseFiles.Holding],
+        displayCode: String,
+        section: Int
+    ) -> String {
+        if WorkLeaseFiles.aDeployHolds(section: section, among: holdings) {
+            return AssistWording.sectionIsBeingDeployed(course: displayCode, section: String(section))
+        }
+        if let named = SectionDetailView.sectionNamed(by: holding, section: section) {
+            return AssistWording.sectionIsBeingBuiltElsewhere(course: displayCode, section: String(named))
+        }
+        return AssistWording.courseIsBeingBuiltElsewhere(course: displayCode)
+    }
+
     /// The Deploy button's help, and its accessibility hint (#729). The
     /// folder not being ready wins, as it does for every button; then
     /// another program holding the course (the section, when its lease
@@ -2413,12 +2440,14 @@ struct SectionDetailView: View {
             WorkLeaseRegistry.noteDeclined(
                 act: "Preview", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
             )
-            var sentence: String = AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
-            if let named = SectionDetailView.sectionNamed(by: holding, section: sectionNumber) {
-                sentence = AssistWording.sectionIsBeingBuiltElsewhere(
-                    course: course.displayCode, section: String(named)
-                )
-            }
+            // Read again for the sentence only: the decision above is made.
+            let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
+                courseCode: course.code,
+                coursesDirectory: workspaceURL.appendingPathComponent("courses", isDirectory: true)
+            )
+            let sentence: String = SectionDetailView.previewDeclinedSentence(
+                inTheWay: holding, among: holdings, displayCode: course.displayCode, section: sectionNumber
+            )
             showPreviewRefusal(title: "Cannot Preview Yet", sentence: sentence)
             return
         }
