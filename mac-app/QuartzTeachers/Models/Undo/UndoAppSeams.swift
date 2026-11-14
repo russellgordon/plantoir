@@ -38,17 +38,19 @@ nonisolated enum UndoJournalLocation {
     }
 }
 
-/// The two trail lines U1 writes (`activityTrail.mustRecord`). Counts and
+/// The trail lines U1 writes (`activityTrail.mustRecord`). Counts and
 /// codes only: the journal holds page text, the trail never does.
 nonisolated enum UndoTrail {
 
-    // MARK: - Functions
+    // MARK: - Stored properties
 
     /// Set once, the first time the app's list is made (the core review's M7:
     /// it used to be set again on every publish).
     nonisolated(unsafe) private static var installed: Bool = false
 
     private static let guardLock: NSLock = NSLock()
+
+    // MARK: - Functions
 
     static func install() {
         guardLock.lock()

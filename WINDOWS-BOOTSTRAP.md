@@ -70,7 +70,7 @@ pieces into `dev`; a cut still starts with him asking.
    page that explains it. Read the page an issue names rather than all of them.
    Write-ups for work that already shipped on this port are in
    `documentation/13-windows-port-archive.md` — history, not a specification.
-4. **`contracts/README.md`**, then the ten JSON files. The coverage table
+4. **`contracts/README.md`**, then the eleven JSON files. The coverage table
    there says what is shared and what deliberately is not. Three of the ten are
    GENERATED from the mac and must never be hand-edited; the other seven are
    authored and can be corrected from either side — `contracts/README.md` says

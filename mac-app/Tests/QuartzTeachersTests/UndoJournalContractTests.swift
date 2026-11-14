@@ -86,7 +86,7 @@ final class UndoJournalContractTests: XCTestCase {
     /// the same points with SIGKILL.)
     func testRecoveryCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runRecoveryCases(under: scratchURL)
-        XCTAssertEqual(result.cases, 12)
+        XCTAssertEqual(result.cases, 15)
         XCTAssertEqual(result.failures, [])
     }
 

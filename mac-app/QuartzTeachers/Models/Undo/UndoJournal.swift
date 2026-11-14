@@ -286,10 +286,23 @@ nonisolated enum UndoFoldCache {
 
     /// One folder's fold and how far it has been read.
     struct Entry {
+
+        // MARK: - Stored properties
+
         var fold: UndoFold
+
+        /// Each segment's byte offset read up to: always just after a line feed.
         var ends: [Int: Int]
+
+        /// The bytes just before each end, compared before reading on.
         var tails: [Int: Data]
+
+        /// How many complete lines of each segment have been read.
         var lineCounts: [Int: Int]
+
+        /// Each segment's file number, so a file put in its place (by any
+        /// means) is read whole again.
+        var fileNumbers: [Int: UInt64] = [:]
     }
 
     nonisolated(unsafe) private static var entries: [String: Entry] = [:]
@@ -357,6 +370,7 @@ nonisolated enum UndoFoldCache {
             entry.ends[number] = newEnd
             entry.lineCounts[number] = lineIndex
             entry.tails[number] = tail(of: url, endingAt: newEnd)
+            entry.fileNumbers[number] = fileNumber(of: url)
             entry.fold.segmentsSeen.insert(number)
         }
         guardLock.lock()
@@ -383,6 +397,9 @@ nonisolated enum UndoFoldCache {
             if size < end {
                 return false
             }
+            if let remembered = entry.fileNumbers[number], remembered != fileNumber(of: url) {
+                return false
+            }
             if tail(of: url, endingAt: end) != (entry.tails[number] ?? Data()) {
                 return false
             }
@@ -391,6 +408,21 @@ nonisolated enum UndoFoldCache {
             return false
         }
         return true
+    }
+
+    /// The file's number on its volume, or 0 when it cannot be read.
+    static func fileNumber(of url: URL) -> UInt64 {
+        var information: stat = stat()
+        let result: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return stat(path, &information)
+        }
+        if result != 0 {
+            return 0
+        }
+        return UInt64(information.st_ino)
     }
 
     /// The last bytes before a position in a file.

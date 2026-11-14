@@ -209,7 +209,11 @@ nonisolated enum UndoRecovery {
                 outcome = .interrupted(filesInTheWay: inTheWay.count, filesPutBack: putBack)
                 events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "changedByHand", paths: inTheWay))
                 events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
-                UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, putBack, inTheWay.count)
+                if mode == .live {
+                    // In shadow nothing was put back and nothing offered was
+                    // cleared: the journal holds the outcome, the trail does not.
+                    UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, putBack, inTheWay.count)
+                }
             }
         }
         do {

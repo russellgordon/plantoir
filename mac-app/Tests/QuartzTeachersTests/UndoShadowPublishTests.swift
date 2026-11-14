@@ -159,6 +159,10 @@ final class UndoShadowPublishTests: XCTestCase {
 
     /// The built-in assistant's undo neither reads nor writes the list in U1:
     /// "undo that" leaves the journal exactly as the publish left it.
+    ///
+    /// **Flips at U7.** Ruling 15, as given finally, makes the window's "undo
+    /// that" the app's Edit > Undo, so U7 turns this into the opposite test:
+    /// the window's undo undoes the list's head, whoever made it.
     func testTheWindowsUndoDoesNotTouchTheList() async throws {
         let course: (made: AssistFixture.Made, list: URL) = try makeCourse(surface: .local, writableList: true)
         _ = await AssistFixture.run("publish_pages", with: ["pages": ["Unit 1, Day 1"]], on: course.made.runner)
@@ -184,6 +188,10 @@ final class UndoShadowPublishTests: XCTestCase {
         XCTAssertEqual(
             UndoTrail.rolledBackLine(course: "ICS3U", section: 1, phase: .begin, files: 2),
             "ICS3U/1 · the undo list put back 2 files left part way by a change that stopped"
+        )
+        XCTAssertEqual(
+            UndoTrail.interruptedLine(course: "ICS3U", section: 1, phase: .begin, putBack: 2, inTheWay: 1),
+            "ICS3U/1 · the undo list put back 2 files left part way by a change that stopped, found 1 file changed by hand since, and cleared the list"
         )
     }
 }

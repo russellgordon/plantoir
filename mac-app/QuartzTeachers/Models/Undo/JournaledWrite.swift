@@ -477,8 +477,13 @@ nonisolated struct UndoFrontMatter {
 
     /// One top-level key and the lines it spans, `start..<end`.
     struct Entry: Equatable {
+
+        // MARK: - Stored properties
+
         let key: String
+
         let start: Int
+
         let end: Int
     }
 
