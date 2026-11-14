@@ -1032,6 +1032,29 @@ nonisolated enum ActivityTrail {
         /// before, for one delete or many.
         case backupsDeleted = "backups deleted"
 
+        /// A backup Plantoir made on its own was saved small, its Media
+        /// files kept once in the working folder's shared store (#785).
+        /// Carries the course, the backup's FILE NAME, how many Media files
+        /// were already kept, how many were added and their size. Never a
+        /// Media file's name. It dates when the store grew, which is what
+        /// "my disk filled up" is answered by.
+        case backupKeptItsMediaOnce = "backup kept its Media files once"
+
+        /// The shared Media store was swept (#785): how many files no
+        /// backup needs were removed and their size, how many lists that
+        /// kept nothing were removed; or that EVERYTHING was kept, and why
+        /// (a backup or a list could not be read, a backup or restore was
+        /// using the store). Never a Media file's name. It is the only line
+        /// that answers "the pictures of an old backup are gone".
+        case sharedMediaSwept = "shared backup Media swept"
+
+        /// A restore of a small backup could not find some of its Media
+        /// files in the store or in the course (#785): the backup's FILE
+        /// NAME and how many of how many. The paths are shown to the teacher
+        /// and never written here, since a picture's name can carry a
+        /// student's.
+        case backupMediaNotFound = "backup Media not found"
+
         /// A build of a course was declined because ANOTHER program on this
         /// Mac holds a build, publish or preview lease on it (#156) — Preview
         /// or Deploy in the window, the in-app assistant's rebuild or deploy,
