@@ -23,7 +23,19 @@ class ScriptRunner {
     var lastExitCode: Int32?
 
     /// A launch failure message, if the script could not start at all.
+    /// Always a sentence a teacher can read: it reaches the console, the
+    /// preview's "Cannot Preview Yet" alert and the assistant, so it never
+    /// carries the system's own description of an error (#812's review).
     var launchProblem: String?
+
+    /// What lies behind a launch problem, for the trail and never for a
+    /// teacher: which piece the folder is missing, or what the system said
+    /// when a run could not get started. Nil for every other launch
+    /// problem, and cleared at the start of every run. Only a section
+    /// window's preview writes it to the trail today (`preview could not
+    /// start`, redacted on the way in); a deploy, a set-up or the
+    /// assistant's rebuild that meets the same problem keeps it nowhere.
+    var launchProblemDetail: String?
 
     /// When output last arrived — used to sense a stalled prompt.
     var lastOutputAt: Date = Date()
@@ -230,6 +242,34 @@ class ScriptRunner {
     /// build was stopped, and outlive the process with no lease saying so.
     static var refusesNewRuns: Bool = false
 
+    /// What a teacher reads when the system would not open a terminal for a
+    /// run, or would not launch it (#812's review). It used to be followed
+    /// by the system's own description, which named the app's internal
+    /// module and error type ("QuartzTeachers.PseudoTerminalError error 0")
+    /// and gave nothing to act on; that description is kept in
+    /// `launchProblemDetail` instead, which a section window's preview
+    /// writes to the trail. The remedy is the one the launchers
+    /// already give when the website builder will not start
+    /// (`hostBlockClash.saysWhenAStartIsRefused` in `app-rules.json`):
+    /// both failures are the Mac running short of something, which a
+    /// restart puts right.
+    static let couldNotGetStarted: String =
+        "Could not get started. Try again, or restart this Mac if it happens again."
+
+    /// What a teacher reads when the launcher a run needs is not in the
+    /// working folder. It used to name the launcher's file in brackets
+    /// ("(preview.sh)"), which since #812 reached the "Cannot Preview Yet"
+    /// alert and named a piece of the machinery there (rule 1 of the
+    /// repository's CLAUDE.md). The file's name is kept in
+    /// `launchProblemDetail` instead.
+    static let folderIsMissingAPiece: String =
+        "This working folder is missing a piece it needs. Try choosing your working folder again from the File menu."
+
+    /// The shell every launcher runs under. A variable only so a test can
+    /// point it at a program that is not there and meet the launch failure
+    /// for real (`ScriptRunnerLaunchProblemTests`); nothing else sets it.
+    static var shell: URL = URL(fileURLWithPath: "/bin/bash")
+
     /// The launcher's process id while it runs, or nil.
     var processIdentifier: Int32? {
         guard let process else {
@@ -314,6 +354,7 @@ class ScriptRunner {
         if isRunning {
             return
         }
+        launchProblemDetail = nil
         if ScriptRunner.refusesNewRuns {
             launchProblem = "Plantoir is closing, so nothing new was started."
             return
@@ -360,7 +401,8 @@ class ScriptRunner {
 
         let scriptURL: URL = workingDirectory.appendingPathComponent(scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
-            launchProblem = "This working folder is missing a piece it needs (\(scriptName)). Try choosing your working folder again from the File menu."
+            launchProblem = ScriptRunner.folderIsMissingAPiece
+            launchProblemDetail = "the working folder has no " + scriptName
             return
         }
 
@@ -368,12 +410,13 @@ class ScriptRunner {
         do {
             newTerminal = try PseudoTerminal()
         } catch {
-            launchProblem = "Could not get started: \(error.localizedDescription)"
+            launchProblem = ScriptRunner.couldNotGetStarted
+            launchProblemDetail = "the system said: " + error.localizedDescription
             return
         }
 
         let newProcess: Process = Process()
-        newProcess.executableURL = URL(fileURLWithPath: "/bin/bash")
+        newProcess.executableURL = ScriptRunner.shell
         var fullArguments: [String] = [scriptURL.path]
         for argument in arguments {
             fullArguments.append(argument)
@@ -415,7 +458,8 @@ class ScriptRunner {
         do {
             try newProcess.run()
         } catch {
-            launchProblem = "Could not get started: \(error.localizedDescription)"
+            launchProblem = ScriptRunner.couldNotGetStarted
+            launchProblemDetail = "the system said: " + error.localizedDescription
             return
         }
 

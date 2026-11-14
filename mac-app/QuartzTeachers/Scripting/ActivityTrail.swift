@@ -83,6 +83,22 @@ nonisolated enum ActivityTrail {
         /// Preview Again, pressed beside the sentence Course Settings shows
         /// after a Save that an open preview could not see (#265).
         case previewAgainAfterSettingsSaved = "preview again after settings saved"
+        /// A preview was asked for while this window's own start was still
+        /// waiting for a stop or building, and nothing more was done (#812).
+        /// That ask used to end the first start's record and raise a refusal
+        /// about another window; now nothing shows, and this line is the
+        /// only sign it was made.
+        case previewAlreadyStarting = "preview already starting"
+        /// A repair's Preview Again started nothing, because the section's
+        /// page went away or the app was quitting before the old preview had
+        /// stopped, or a later Preview Again took its place (#813).
+        case previewAgainAbandoned = "preview again abandoned"
+        /// A section window's preview never started: the runner recorded why
+        /// and was not running. The wait, the record and the lease are
+        /// handed back at once and the teacher is shown the runner's own
+        /// sentence (#812's review). Until then the window waited ten
+        /// minutes in silence and every later Preview in it did nothing.
+        case previewCouldNotStart = "preview could not start"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"

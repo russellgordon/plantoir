@@ -1424,7 +1424,7 @@ enum ScheduledDeploy {
         }
         let scriptURL: URL = workspaceURL.appendingPathComponent(DeployCommand.scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
-            return "This working folder is missing a piece it needs (\(DeployCommand.scriptName)), so there is nothing to schedule."
+            return "This working folder is missing a piece it needs, so there is nothing to schedule."
         }
 
         // Written now so the job on disk is runnable on its own (an older
