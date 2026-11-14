@@ -50,6 +50,11 @@ import geogebraScript from "./scripts/geogebra.inline"
 import phetStyle from "./styles/phet.scss"
 // @ts-ignore
 import phetScript from "./scripts/phet.inline"
+// Tunes (#679) ride along for the same reason: every style is under
+// .pl-music, and the script does nothing until a student presses Play.
+import musicStyle from "./styles/music.scss"
+// @ts-ignore
+import musicScript from "./scripts/music.inline"
 // The sidebar's page marker (#515) rides along for the same reason: Quartz
 // writes ONE index.css for every page, so a style any component carries
 // reaches the sidebar of every page, folder and tag pages included. It changes
@@ -256,8 +261,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, videosStyle, figuresStyle, geogebraStyle, phetStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, videosStyle, figuresStyle, geogebraStyle, phetStyle, musicStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, geogebraScript, phetScript, quizScript, tasksScript, progressScript, headingAnchorScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, geogebraScript, phetScript, musicScript, quizScript, tasksScript, progressScript, headingAnchorScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

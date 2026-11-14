@@ -97,6 +97,7 @@ _MAKERS = {
     "quizzesReadDifferently": site_health.quizzes_read_differently_finding,
     "geogebraSketchesNotReady": site_health.geogebra_finding,
     "phetSimulationsNotReady": site_health.phet_finding,
+    "musicTunesNotRight": site_health.music_finding,
 }
 
 

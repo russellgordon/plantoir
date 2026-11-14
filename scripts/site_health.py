@@ -381,6 +381,42 @@ def phet_finding(facts: dict, course: str, section, table: dict, most: int = MOS
     )
 
 
+def music_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
+    """
+    ONE finding for every problem with a tune this build found (#679), never
+    one per tune: phet_finding's shape, the reason through
+    musicFences.words.reasons (scripts/music.py reason_sentence). A sound
+    that could not be DOWNLOADED is not here: the build stopped instead
+    (keptDownloads.stop).
+    """
+    import music  # here, not at the top: music imports this module
+    entry = table["musicTunesNotRight"]
+    problems = facts.get("music_problems") or []
+    said = contracts.section(CONTRACT_FILE, "musicFences", "words")
+    named = []
+    for problem in problems[:most]:
+        fill = {"page": problem.get("page", ""), "block": problem.get("block", 1),
+                "reason": music.reason_sentence(problem, said)}
+        if problem.get("line") is not None:
+            fill["line"] = problem["line"]
+            piece = entry["tuneLine"]
+        else:
+            piece = entry["tuneLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(problems) > most:
+        named.append(filled(entry["andMore"], {"count": len(problems) - most}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        "tunes": "; ".join(named),
+    }
+    return finding(
+        "musicTunesNotRight", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def swift_finding(facts: dict, course: str, section, table: dict, windows=None, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every runnable Swift block this build has no program
@@ -675,6 +711,10 @@ def findings(facts: dict, course: str, section) -> list:
                                "value", "sim", "near", "language" where they
                                apply}], each a PhET simulation that cannot be
                                shown (#674)
+    * `music_problems`       — [{"page": place, "block": n, "line": n or None,
+                               "reason": musicFences.words.reasons key,
+                               "value", "near", "said", "more", "name" where
+                               they apply}], each a problem with a tune (#679)
     """
     table = _checks_by_name()
     found = []
@@ -760,6 +800,10 @@ def findings(facts: dict, course: str, section) -> list:
     # (#674). From build_site.py, beside GeoGebra's.
     if facts.get("phet_problems"):
         found.append(shortenable(phet_finding, facts, course, section, table))
+    # After everything above, so the existing examples keep their order
+    # (#679). From build_site.py, beside PhET's.
+    if facts.get("music_problems"):
+        found.append(shortenable(music_finding, facts, course, section, table))
 
     return found
 

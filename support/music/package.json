@@ -1,0 +1,11 @@
+{
+  "name": "plantoir-music",
+  "version": "1.0.0",
+  "private": true,
+  "description": "What Plantoir draws a page's ```abc tunes with at build time, and what plays them in a student's browser (#679): abcjs, and linkedom as the document it draws into under Node. Installed with `npm ci --omit=dev` from the lockfile beside this file, which pins every package under both.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "abcjs": "6.7.2",
+    "linkedom": "0.18.15"
+  }
+}

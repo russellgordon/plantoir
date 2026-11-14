@@ -1,0 +1,97 @@
+// Tunes from a page's ```abc fences (#679). EVERY rule here is under
+// .pl-music (the #454 B2 lesson): a page with no tune is not touched by a
+// single declaration, on screen or on paper. The drawing is fill and stroke
+// currentColor (abcjs's own), so it takes the page's text colour in either
+// colour scheme; Quartz's base rule colours its svg <text> with the page's
+// grey, which is kept (musicFences.darkMode).
+
+.pl-figure.pl-music {
+  text-align: left;
+  color: var(--dark);
+
+  .pl-music-drawing {
+    // abcjs's own container (responsive: resize) keeps the drawing's shape
+    // at the content's width with its padding; nothing here changes it, so
+    // the picture the build drew and the one the loader draws again on a
+    // press are the same size.
+    max-width: 100%;
+  }
+
+  // The note sounding, lit while a tune plays (music.inline.ts).
+  .pl-music-now {
+    fill: var(--secondary);
+    stroke: var(--secondary);
+  }
+
+  .pl-music-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .pl-music-play {
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 0.35rem 1rem;
+    border: 1px solid var(--secondary);
+    border-radius: 6px;
+    background: var(--light);
+    color: var(--secondary);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--highlight);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+  }
+
+  .pl-music-status {
+    font-size: 0.9rem;
+    color: var(--darkgray);
+  }
+
+  .pl-music-credit {
+    margin: 0.35rem 0 0;
+    font-size: 0.75rem;
+    color: var(--gray);
+
+    a {
+      color: inherit;
+    }
+  }
+}
+
+@media print {
+  // The drawing prints, black on white (figures.scss sets the colours for
+  // every .pl-figure); the controls and the credit line do not
+  // (musicFences.print). The drawing is laid out as a plain block on paper,
+  // so a handout's own size rules for figures reach it.
+  .pl-figure.pl-music {
+    .pl-music-controls,
+    .pl-music-credit {
+      display: none !important;
+    }
+
+    .pl-music-drawing {
+      display: block !important;
+      padding-bottom: 0 !important;
+      overflow: visible !important;
+    }
+
+    .pl-music-drawing > svg {
+      position: static !important;
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    .pl-music-now {
+      fill: currentColor;
+      stroke: currentColor;
+    }
+  }
+}

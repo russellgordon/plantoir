@@ -267,6 +267,26 @@ RUN test "$(python3 /tmp/geogebra_engine.py version)" = "$GEOGEBRA_VERSION" \
 # pins -> wrangler carries why.
 RUN npm install -g wrangler@4.156.0 && npm cache clean --force
 
+# Tunes drawn from a page's ```abc fence at BUILD time, and played in the
+# student's browser (#679): abcjs 6.7.2 and linkedom 0.18.15 (the document
+# abcjs draws into under Node), from the LOCKFILE beside support/music's
+# package.json, which pins all 21 packages. 14 MB, 1,285 files. Into its own
+# folder, /opt/vendor/music-engine, as the TikZ engine is; a site carries only
+# abcjs's one prebuilt file (static/abcjs/abcjs-basic-min.js, 511,968 bytes)
+# and only while a page students can see has a tune with Play. The SOUNDS are
+# not here: each is downloaded on the teacher's computer the first time a
+# tune needs it and kept (keptDownloads, kind `sounds`; 239 MB in all, of
+# which a site uses a handful). After wrangler's layer, as late as the other
+# npm layers allow, so a change to it rebuilds nothing above (#566 review
+# M9's order). MIT and ISC; THIRD_PARTY_LICENSES.md; contracts/toolchain.json
+# -> pins abcjs, linkedom carries the why.
+COPY support/music/package.json support/music/package-lock.json /opt/vendor/music-engine/
+RUN cd /opt/vendor/music-engine \
+ && npm ci --omit=dev --no-audit --no-fund \
+ && npm ls abcjs@6.7.2 \
+ && npm ls linkedom@0.18.15 \
+ && npm cache clean --force
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx
@@ -323,6 +343,10 @@ COPY scripts/geogebra.py /opt/scripts/geogebra.py
 # first time it uses it is kept in (keptDownloads).
 COPY scripts/kept_downloads.py /opt/scripts/kept_downloads.py
 COPY scripts/phet.py /opt/scripts/phet.py
+# Tunes (#679): draws them with support/music/plantoir-music.mjs, keeps their
+# sounds beside the simulations (kept_downloads) and stops a build that cannot
+# download one, as phet does.
+COPY scripts/music.py /opt/scripts/music.py
 # Runnable Swift (#493): which blocks the launcher must compile (`plan`, run by
 # preview.sh through docker exec before the build) and what the build gives
 # the site (`prepare`). Imported by build_site.py by bare name.

@@ -281,12 +281,12 @@ class RealContractTests(unittest.TestCase):
     def test_the_list_is_well_formed(self) -> None:
         self.assertEqual(npm_audit.contract_problems(self.npm_audit, self.toolchain["pins"]), [])
 
-    def test_it_names_the_five_trees_and_where_windows_keeps_each(self) -> None:
+    def test_it_names_the_six_trees_and_where_windows_keeps_each(self) -> None:
         names: list[str] = []
         for entry in self.npm_audit["trees"]:
             names.append(entry["tree"])
             self.assertTrue(entry.get("windowsRuntime", "").startswith("runtime\\"), entry["tree"])
-        self.assertEqual(names, ["quartz", "tikz-engine", "wrangler", "pagedjs", "function-plot"])
+        self.assertEqual(names, ["quartz", "tikz-engine", "music-engine", "wrangler", "pagedjs", "function-plot"])
 
     def test_it_fails_on_high_and_critical(self) -> None:
         self.assertEqual(self.npm_audit["failsOn"], ["high", "critical"])
@@ -302,7 +302,10 @@ class RealContractTests(unittest.TestCase):
         # the synthetic tests, and against this list it is BLOCKING.
         audits = {"quartz": load("quartz-trimmed.json"), "wrangler": load("wrangler-clean.json"),
                   "tikz-engine": load("tikz-engine-clean.json"), "pagedjs": load("tikz-engine-clean.json"),
-                  "function-plot": load("tikz-engine-clean.json")}
+                  "function-plot": load("tikz-engine-clean.json"),
+                  # #679: abcjs and linkedom audit clean (npm audit, 2026-11-14:
+                  # found 0 vulnerabilities), so the clean shape stands in.
+                  "music-engine": load("tikz-engine-clean.json")}
         report = npm_audit.compare(audits, self.npm_audit)
         self.assertEqual(report["blocking"], [])
         self.assertEqual(report["failed_trees"], [])

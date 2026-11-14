@@ -2611,7 +2611,7 @@ fi
 # and compared by scripts/npm_audit.py against contracts/toolchain.json ->
 # npmAudit: a high or critical advisory that is not accepted for its tree, or
 # that is accepted at a lower severity than it has now, FAILS. quartz and
-# tikz-engine have lockfiles; wrangler is a global install with none, so one is
+# tikz-engine and music-engine (#679) have lockfiles; wrangler is a global install with none, so one is
 # built next to a copy of the installed tree (no network needed); pagedjs and
 # function-plot are prebuilt files, so a lockfile is built from their pins.
 # Only npm's STDOUT is read - offline npm prints its JSON there, an `npm error`
@@ -2637,7 +2637,7 @@ synthesise() {
 step_failed() {
   printf '{"plantoir":"lockfile-step-failed","message":"%s"}\n' "$(grep -m1 -i 'error' "$1/lock.err" | tr -d '"\\' | cut -c1-200)"
 }
-for tree in quartz:/opt/quartz tikz-engine:/opt/vendor/tikz-engine; do
+for tree in quartz:/opt/quartz tikz-engine:/opt/vendor/tikz-engine music-engine:/opt/vendor/music-engine; do
   echo "=====TREE ${tree%%:*}"
   if [ -f "${tree#*:}/package-lock.json" ]; then (cd "${tree#*:}" && audit_here); else echo '{"plantoir":"no-lockfile"}'; fi
 done

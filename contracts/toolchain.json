@@ -142,6 +142,677 @@
       "why": "#485 E1: draws a page's ```tikz diagrams at BUILD time, so students download no engine (the Obsidian plugin's browser engine is 7.0 MB of script plus 4.8 MB of fonts). Its TeX engine - tex.wasm, core.dump and all 212 TeX files - is byte-identical to the one obsidian-tikzjax 0.5.2 embeds (measured by SHA-256 of each decompressed file, 213 distinct contents on each side, none on one side only), so a fence draws the same picture in Obsidian and on the site; the JavaScript AROUND the engine differs (@prinsss/dvi2html 0.0.1 and svgo 3.3.5 against the plugin's own dvi2html and svgo 2), so 'same picture' also rests on four diagrams compared by viewBox and text runs. Installed with `npm ci --omit=dev` from support/figures/package-lock.json, which pins all 133 packages under it - load-bearing, because node-tikzjax floats jsdom ^23, svgo ^3 and memfs ^4 and svgo shapes every drawing; the lockfile is also part of the figure cache's engine id (figureFences.cache), so a moved package draws every diagram afresh. 39 MB of files, 5,445 of them, 14.4 MB compressed; carried at /opt/vendor/tikz-engine (Windows: runtime\\vendor\\tikz-engine) and NEVER copied into a site - a site carries only the Computer Modern faces its diagrams use (static/tikz). LPPL-1.3c (node-tikzjax, TikZJax); the 212 TeX files carry their own LPPL and GPL terms; the BaKoMa faces their own licence - THIRD_PARTY_LICENSES.md. `sha256` is the npm tarball's, for the record (the lockfile's integrity line is what npm checks); `files` are the engine's own three, which verify.sh checks in the image. REJECTED: TikZJax in the browser (4.94 MB gzipped per student, 1.8 s for four diagrams); installing into Quartz's node_modules; bundling it with esbuild (it reads tex/ beside itself); a fork without jsdom."
     },
     {
+      "pin": "abcjs",
+      "value": "6.7.2",
+      "dockerfileContains": "npm ls abcjs@6.7.2",
+      "sha256": "0cfad45dd6bc87626db9b7dd2b0d992b3a04967b73d6324cf3efd22cc0bf0868",
+      "fileSha256": "3290ef44c918d5e882029d3a47ad3dd63c16c8819da5abe921f3d1e642b4f4f0",
+      "why": "#679: draws a page's ```abc tunes at BUILD time (support/music/plantoir-music.mjs under linkedom) and plays them in the student's browser on a press of Play, from the site's own copy of dist/abcjs-basic-min.js (511,968 bytes, 147,981 gzipped), MIT. The same engine the Obsidian plugin \"ABC Music Notation\" draws with. Installed at /opt/vendor/music-engine from support/music's lockfile with `npm ci --omit=dev` (Windows: runtime\\vendor\\music-engine, owed; no windowsRuntimeContains yet, so the Windows suite is not turned red before that work is done: the draft issue says so). `sha256` is the registry tarball's; `fileSha256` is abcjs-basic-min.js's, which verify.sh checks in the image and in a built site. A site carries it only while a page students can see has a tune with Play (musicFences.siteCarries). abcjs's own default sound address (paulrosen.github.io) is never used: the loader always names the site's own folder. REJECTED: VexFlow (a teacher writes code, not a tune), OpenSheetMusicDisplay (MusicXML only), Verovio (LGPL, 7.4 MB; the route for full scores later), LilyPond (a program and its data in the image, and a second build for Windows) and abc2svg (not updated since 2022), measured in plans/679-plan.md."
+    },
+    {
+      "pin": "linkedom",
+      "value": "0.18.15",
+      "dockerfileContains": "npm ls linkedom@0.18.15",
+      "sha256": "8497b257d8d2960b38639345452c1f91ae191b236d075441941e900a93ca3c3a",
+      "why": "#679: the document abcjs draws into at build time (abcjs needs a DOM; Node has none). Build only: a site never carries it. ISC. 2.8 MB with 19 small dependencies, against jsdom's 4.4 MB and 50 packages; jsdom 27 also needs a Node newer than the image's to load its ES modules (measured 2026-11-14 on Node 22.6.0: ERR_REQUIRE_ESM). linkedom has no getBBox, which is what makes abcjs estimate text widths at build time; the site's loader makes the browser do the same (musicFences.drawing)."
+    },
+    {
+      "pin": "fluidR3Sounds",
+      "value": "cbd6b6f6d1af89ebfb69402860741288f08ff8b7",
+      "version": "cbd6b6f6d1af",
+      "base": "https://raw.githubusercontent.com/paulrosen/midi-js-soundfonts/cbd6b6f6d1af89ebfb69402860741288f08ff8b7/FluidR3_GM",
+      "fileCount": 129,
+      "bytes": 319286148,
+      "files": {
+        "acoustic_grand_piano": {
+          "file": "acoustic_grand_piano-mp3.js",
+          "sha256": "00eebe0214c12ff8f32c47c2f7ac92ef352800e868ab0f883b80854486ac4ca6",
+          "bytes": 2631954
+        },
+        "bright_acoustic_piano": {
+          "file": "bright_acoustic_piano-mp3.js",
+          "sha256": "17fe637f5868899a4c1a777c62ad0c3816c1852cb90f6e477b5a6f945a5722d8",
+          "bytes": 2632311
+        },
+        "electric_grand_piano": {
+          "file": "electric_grand_piano-mp3.js",
+          "sha256": "ef155e91429b0bdf40ac96af79cdcb05e09c03ac0e2c16e71bb1f02b3df4ae75",
+          "bytes": 1995850
+        },
+        "honkytonk_piano": {
+          "file": "honkytonk_piano-mp3.js",
+          "sha256": "51957f9e7a6edfcea43ffc0f23ef763b144a56879ddfe1c7b1d7ea9ee3a51767",
+          "bytes": 2620329
+        },
+        "electric_piano_1": {
+          "file": "electric_piano_1-mp3.js",
+          "sha256": "19041530232e66f8d9b00f43ede2fa50f59a55b1a27a81daf864c54d371426b2",
+          "bytes": 2232690
+        },
+        "electric_piano_2": {
+          "file": "electric_piano_2-mp3.js",
+          "sha256": "c9d99289fdc382bd287f6c4759637821123dfae846a9a7b093ce0d80a9a4227a",
+          "bytes": 2508394
+        },
+        "harpsichord": {
+          "file": "harpsichord-mp3.js",
+          "sha256": "d3f214640a2373e362adc236a2e2adc7868fa7b2602cd51baab96321b4382a09",
+          "bytes": 2332057
+        },
+        "clavinet": {
+          "file": "clavinet-mp3.js",
+          "sha256": "0b0e01046b78ed8bfb535da823f31fa5f4bcc64f3e54bdd78688e1e6e547e916",
+          "bytes": 2423394
+        },
+        "celesta": {
+          "file": "celesta-mp3.js",
+          "sha256": "95481faad30b05357cc8ec0c71b04e58034ccc8c773ab87d3c4436e45ebbb011",
+          "bytes": 1751881
+        },
+        "glockenspiel": {
+          "file": "glockenspiel-mp3.js",
+          "sha256": "871d637db5980e5faa210733872ac50ba6268afb9b71cb9d62a9b9c2c7b95a6e",
+          "bytes": 1946366
+        },
+        "music_box": {
+          "file": "music_box-mp3.js",
+          "sha256": "e2c2bd8329642ca6862f950fd99da9920111385a3cc2cf36840e1f86a1197143",
+          "bytes": 1829435
+        },
+        "vibraphone": {
+          "file": "vibraphone-mp3.js",
+          "sha256": "263bf866f7facd9652d39d4f7f499e8f883bc40adbdee75d8c5caf11403132f5",
+          "bytes": 2020776
+        },
+        "marimba": {
+          "file": "marimba-mp3.js",
+          "sha256": "57249b9905d5298469a52a2e0557738e852b5db6387040a8e1cff19e12549cff",
+          "bytes": 1684709
+        },
+        "xylophone": {
+          "file": "xylophone-mp3.js",
+          "sha256": "9dc8927906e3b3fcda1380f2f29aa0b2212f12d3b825a29390ed2fe1398f8921",
+          "bytes": 1652787
+        },
+        "tubular_bells": {
+          "file": "tubular_bells-mp3.js",
+          "sha256": "a06612711e5d92aec189d75f90220b024417714eea5599ef1e2dabfdff6365a9",
+          "bytes": 2030859
+        },
+        "dulcimer": {
+          "file": "dulcimer-mp3.js",
+          "sha256": "00843a0fac1c435aa319e47a3ed704c0ab93743a4d4f21ad70c64dc935404968",
+          "bytes": 2364806
+        },
+        "drawbar_organ": {
+          "file": "drawbar_organ-mp3.js",
+          "sha256": "00aab0b52e7ad3e8f40a5198c4e4dc844d3f5317d362d90534f433f1157cad64",
+          "bytes": 2553611
+        },
+        "percussive_organ": {
+          "file": "percussive_organ-mp3.js",
+          "sha256": "1da48c68d4de57d39cc46427fe0ad4637aeeaee0918d05c3108e439674d8d628",
+          "bytes": 2686362
+        },
+        "rock_organ": {
+          "file": "rock_organ-mp3.js",
+          "sha256": "da73539d8115952a57cb6c4bd6e1e149353a11bf8c4bcddbf252ee369193da94",
+          "bytes": 2808964
+        },
+        "church_organ": {
+          "file": "church_organ-mp3.js",
+          "sha256": "ab13baf72584d80c4ed989a64559d170e8d62a6bddc3964ccc4de3cd2e206490",
+          "bytes": 2801474
+        },
+        "reed_organ": {
+          "file": "reed_organ-mp3.js",
+          "sha256": "c614da40c1d04687c1b6f2ed132bcd0a17c26f79cade80408e182b07b8602e08",
+          "bytes": 2966120
+        },
+        "accordion": {
+          "file": "accordion-mp3.js",
+          "sha256": "a7fe9c0532f7d8a3fec066d3059fed27c82d942bf70c3079c58d25ad91ae69de",
+          "bytes": 3002635
+        },
+        "harmonica": {
+          "file": "harmonica-mp3.js",
+          "sha256": "40a0686cdb730ea607a2942de71dfc38d96ee57b9d48bea185dfb204e1ec9ee0",
+          "bytes": 2707455
+        },
+        "tango_accordion": {
+          "file": "tango_accordion-mp3.js",
+          "sha256": "382da2bb21b20f3ab477084aa9f603c5bbdf0204fe13d72b90608b8fa3e1a99d",
+          "bytes": 3004169
+        },
+        "acoustic_guitar_nylon": {
+          "file": "acoustic_guitar_nylon-mp3.js",
+          "sha256": "5375fa9e0408d960e12b6e4ec120c42bce824d80b18e982b27ddaece146a4f64",
+          "bytes": 1837439
+        },
+        "acoustic_guitar_steel": {
+          "file": "acoustic_guitar_steel-mp3.js",
+          "sha256": "cb3caa60a5dfe49734c07f8c069df48ab2d0ddca4b38260d8562d8af477db456",
+          "bytes": 1984415
+        },
+        "electric_guitar_jazz": {
+          "file": "electric_guitar_jazz-mp3.js",
+          "sha256": "94807d392bf39488354684713f946c729a65d6e43f6be1263079b4e43791d183",
+          "bytes": 2330622
+        },
+        "electric_guitar_clean": {
+          "file": "electric_guitar_clean-mp3.js",
+          "sha256": "dd7d6049c1a6bc17231fb4bcc5120b00ab95dfbcd145b76c8bd201c061508d20",
+          "bytes": 2109223
+        },
+        "electric_guitar_muted": {
+          "file": "electric_guitar_muted-mp3.js",
+          "sha256": "981fab86094376b90459892f30671f7d02eb78b4dae7a0a8c3c198d1e8563c68",
+          "bytes": 1657999
+        },
+        "overdriven_guitar": {
+          "file": "overdriven_guitar-mp3.js",
+          "sha256": "038f84e0ddfa5ae7a3c677379a4a166cb12646abbf922657f9419158accb7557",
+          "bytes": 2929907
+        },
+        "distortion_guitar": {
+          "file": "distortion_guitar-mp3.js",
+          "sha256": "de186d2b6e88714f343c05dba889a8b5fb3ec08f6ae8baea21e72157bd55d065",
+          "bytes": 2907759
+        },
+        "guitar_harmonics": {
+          "file": "guitar_harmonics-mp3.js",
+          "sha256": "37a10c8a235213529f8bb1a30a4f8c4a2a1741c51377dac13d3aaa23e9d4227c",
+          "bytes": 2596710
+        },
+        "acoustic_bass": {
+          "file": "acoustic_bass-mp3.js",
+          "sha256": "7b6d656613f2b8e2e73526317543a491c630bd5dab4426c54dae55f67dfd1e91",
+          "bytes": 1958275
+        },
+        "electric_bass_finger": {
+          "file": "electric_bass_finger-mp3.js",
+          "sha256": "4b45ce5222c73a849fb6dcdf96e5cd489866a120d7cbf13498ac53a3a81e57e5",
+          "bytes": 1991634
+        },
+        "electric_bass_pick": {
+          "file": "electric_bass_pick-mp3.js",
+          "sha256": "86288c80ea96967d3cd843d8676f9df2b3154448bd1d162b9acff8a64635463d",
+          "bytes": 2087544
+        },
+        "fretless_bass": {
+          "file": "fretless_bass-mp3.js",
+          "sha256": "35bbb95df84379bc1b67799ecd47ebe6c9d17ae316925b713bb584adf7cf642a",
+          "bytes": 2083075
+        },
+        "slap_bass_1": {
+          "file": "slap_bass_1-mp3.js",
+          "sha256": "28d46dfe5fe2d31f6a36fa8c1bc52b9d0d3247c135d7e894181bcfdd8560f57d",
+          "bytes": 1899709
+        },
+        "slap_bass_2": {
+          "file": "slap_bass_2-mp3.js",
+          "sha256": "63a8aa81e5d8eb09cf00d0a3602c44f8d8a039aeb80435285eb843ce64f0ac05",
+          "bytes": 2133921
+        },
+        "synth_bass_1": {
+          "file": "synth_bass_1-mp3.js",
+          "sha256": "bc26d7c27eb9e62f58875a7f7eff0123b03b40ef0eaf526bb93c38142028b7d5",
+          "bytes": 2037954
+        },
+        "synth_bass_2": {
+          "file": "synth_bass_2-mp3.js",
+          "sha256": "315a79d2c3765e2b518ffe2d1ae6fa4af603db739ccc2b5e1663901bb3cac458",
+          "bytes": 2292274
+        },
+        "violin": {
+          "file": "violin-mp3.js",
+          "sha256": "3c169ac4c7781fe145e545e909993371188aa6bad617bc3a5f0692b7678995f8",
+          "bytes": 2870964
+        },
+        "viola": {
+          "file": "viola-mp3.js",
+          "sha256": "0aabb7733ddb5852cb41a5e4881ca2a96781009243ba31d62e3e114c642d9051",
+          "bytes": 2803843
+        },
+        "cello": {
+          "file": "cello-mp3.js",
+          "sha256": "fc72c9351e0dda586802f97a1b890e415640f54dc6cc397bd5dc32b078f6ce4c",
+          "bytes": 3005203
+        },
+        "contrabass": {
+          "file": "contrabass-mp3.js",
+          "sha256": "fde56089e8e292e6d95c458c9fc2b8a9e205753647267c900cd0198a66ab5a77",
+          "bytes": 2149428
+        },
+        "tremolo_strings": {
+          "file": "tremolo_strings-mp3.js",
+          "sha256": "571d11230d47f111fc39795eb0d5b2fec1b655aef555ad1a2e4bbc0ef553412f",
+          "bytes": 2803853
+        },
+        "pizzicato_strings": {
+          "file": "pizzicato_strings-mp3.js",
+          "sha256": "e2e50071902a93fe722d6dbad24c2229b9889c33ae67c1c5d0907978a9dd73bf",
+          "bytes": 1992739
+        },
+        "orchestral_harp": {
+          "file": "orchestral_harp-mp3.js",
+          "sha256": "e6da3bb7c987e2085d923e3a03b2f475c202a2edc9a8fb88ac821e53eca082b3",
+          "bytes": 1920729
+        },
+        "timpani": {
+          "file": "timpani-mp3.js",
+          "sha256": "9f6230ae7fd6e4019c2fc9b7a0ac353103b777e45a2cb50880f5f6f6b3a0cba6",
+          "bytes": 2012089
+        },
+        "string_ensemble_1": {
+          "file": "string_ensemble_1-mp3.js",
+          "sha256": "8571395f4c42a989a63e0aed48ad9d79f0ac1a822ff2afd7cb356191be8fd4a2",
+          "bytes": 2803855
+        },
+        "string_ensemble_2": {
+          "file": "string_ensemble_2-mp3.js",
+          "sha256": "615a44ee0e735417c3e7f1532c7e9958a211952de2214520210234f8cee0982d",
+          "bytes": 2803855
+        },
+        "synth_strings_1": {
+          "file": "synth_strings_1-mp3.js",
+          "sha256": "48b2ac1aefd3d83d24e7b6ce50fa9284cdbdd5dc7ad8472a6db103f791afcda2",
+          "bytes": 2897125
+        },
+        "synth_strings_2": {
+          "file": "synth_strings_2-mp3.js",
+          "sha256": "d735ec7c0edb185370a1d42068e725d8aab4ef33ebc1b1b41f1b35edd398edeb",
+          "bytes": 2978993
+        },
+        "choir_aahs": {
+          "file": "choir_aahs-mp3.js",
+          "sha256": "45586b4abdfc7595af8ae1784dee9bf8b7da73fc4f967cd0333f460297f1eb7a",
+          "bytes": 2803848
+        },
+        "voice_oohs": {
+          "file": "voice_oohs-mp3.js",
+          "sha256": "6bc8434ad4e2e082b1db152d706efbed84d340e92ead8047f175eeacb0848fc3",
+          "bytes": 2775404
+        },
+        "synth_choir": {
+          "file": "synth_choir-mp3.js",
+          "sha256": "2520be81a38891579121968b896b57b679d88d0819083d7dd763b49335a7b56b",
+          "bytes": 3004825
+        },
+        "orchestra_hit": {
+          "file": "orchestra_hit-mp3.js",
+          "sha256": "5dab7f3dcdba76d283da18ff1d776aec2a463748888704e2f604ac4554f4311c",
+          "bytes": 2209675
+        },
+        "trumpet": {
+          "file": "trumpet-mp3.js",
+          "sha256": "7f37e0b8fbbfbf67a1183c746d83c85c11790283e2ea9994bdcdb9055bb0e67c",
+          "bytes": 2937749
+        },
+        "trombone": {
+          "file": "trombone-mp3.js",
+          "sha256": "670c03635d7147847d029f09d9bb2d8c8e902852192713dce3750d16d7265abd",
+          "bytes": 2621806
+        },
+        "tuba": {
+          "file": "tuba-mp3.js",
+          "sha256": "f3bb7363abfd7b9ab7bafd7b61cdcba46bbc0b6c67b11f446ad21dbf3589febb",
+          "bytes": 2135054
+        },
+        "muted_trumpet": {
+          "file": "muted_trumpet-mp3.js",
+          "sha256": "35de0da65b650aba30e609cadf8bb0c81b65e2faf2725f127175294a14694b8d",
+          "bytes": 2753123
+        },
+        "french_horn": {
+          "file": "french_horn-mp3.js",
+          "sha256": "02ab9a746f2f43c9867d67735e52d100996a0d194f06da5e3c4844528869928e",
+          "bytes": 2803849
+        },
+        "brass_section": {
+          "file": "brass_section-mp3.js",
+          "sha256": "616692d454aafa99de7203940bc6b20bc5c478e5045cc972fc819480e4c64d05",
+          "bytes": 2803851
+        },
+        "synth_brass_1": {
+          "file": "synth_brass_1-mp3.js",
+          "sha256": "7bbfd4c60b7cbd225e013435c8bcae3a20f077b2a2b4d2da8ad24c8c91c6f510",
+          "bytes": 3005175
+        },
+        "synth_brass_2": {
+          "file": "synth_brass_2-mp3.js",
+          "sha256": "8e79ee4839f13a1b71ca3b96cc3cb67d6355559ef2806bb6fa9c1d798a666484",
+          "bytes": 3005211
+        },
+        "soprano_sax": {
+          "file": "soprano_sax-mp3.js",
+          "sha256": "7fe1a87b57c7dc16f990adccedaefabe14cf4c2464b3a8352d2a3bb801209ec8",
+          "bytes": 2803849
+        },
+        "alto_sax": {
+          "file": "alto_sax-mp3.js",
+          "sha256": "18ec57c02f27c7e8dc4620f57fa9b94e32babf4ebae7d1f2205e053d3287abce",
+          "bytes": 2602486
+        },
+        "tenor_sax": {
+          "file": "tenor_sax-mp3.js",
+          "sha256": "6e4d21071902042d98b3538138c547d6c71924d2ccb9c33ecbf3d772b82555df",
+          "bytes": 3005207
+        },
+        "baritone_sax": {
+          "file": "baritone_sax-mp3.js",
+          "sha256": "3dc7bd2d176591d7270185cebdfc6592c3a6fa79d26bf31d29579100acce55f6",
+          "bytes": 2401130
+        },
+        "oboe": {
+          "file": "oboe-mp3.js",
+          "sha256": "656bd2e0b6b9f7bb3b864d77bfc75a4efdbf79aff9bdbe860201b4e9c21c3d15",
+          "bytes": 2782850
+        },
+        "english_horn": {
+          "file": "english_horn-mp3.js",
+          "sha256": "4468fb7db39c7831d3a366fdb36026d7a996a51702904d760234b476d9ea4a18",
+          "bytes": 2619270
+        },
+        "bassoon": {
+          "file": "bassoon-mp3.js",
+          "sha256": "763d1dc4111ab8bf8c4b5f481f74f2584f4c8f3f9ccf8e5f4cc53df9af22c22a",
+          "bytes": 2602485
+        },
+        "clarinet": {
+          "file": "clarinet-mp3.js",
+          "sha256": "ef38d445ba297b459c1be464080ef37ddf48d9255ee3e517067ce1d11fab6eac",
+          "bytes": 2950454
+        },
+        "piccolo": {
+          "file": "piccolo-mp3.js",
+          "sha256": "8ac8338440798e4804781f75188078e0e888353309717c9ab8c29369245f741e",
+          "bytes": 2931005
+        },
+        "flute": {
+          "file": "flute-mp3.js",
+          "sha256": "e2e35283876eec60b919beeb8bfa49f46f12dddf5b8c6025e7a45c5d2a24bda5",
+          "bytes": 2969583
+        },
+        "recorder": {
+          "file": "recorder-mp3.js",
+          "sha256": "d72b5db89a759fb97932db006e6ff2320b7815dbdf221bac9200397e164b6d8c",
+          "bytes": 2403162
+        },
+        "pan_flute": {
+          "file": "pan_flute-mp3.js",
+          "sha256": "fc8203fb482e011fcbaca22c4d60e94745cdcaa608bc36fe556bd0946a35e865",
+          "bytes": 2903251
+        },
+        "blown_bottle": {
+          "file": "blown_bottle-mp3.js",
+          "sha256": "2b19c3b686b2c62901018d66dd28258ad41df5b998ed1b6352dcaa6909f4be52",
+          "bytes": 2862834
+        },
+        "shakuhachi": {
+          "file": "shakuhachi-mp3.js",
+          "sha256": "e99cd89497841280e13bf2983791c5123a2c8bb696ddeebf152b35dc7e0e49de",
+          "bytes": 2829668
+        },
+        "whistle": {
+          "file": "whistle-mp3.js",
+          "sha256": "0d99db9b3eb08ae861b0c587a2cf61f5449e71aa9ec0e36f5fea6bb376083487",
+          "bytes": 2369121
+        },
+        "ocarina": {
+          "file": "ocarina-mp3.js",
+          "sha256": "6ab7115b4cbee264583647a61f879766d8ac0819be64fd1544a20f718b92bd32",
+          "bytes": 2730153
+        },
+        "lead_1_square": {
+          "file": "lead_1_square-mp3.js",
+          "sha256": "233a52d98f704399fcee0a41323a26e7e358d50a5a18fa81b59a4150b4fdda62",
+          "bytes": 3005211
+        },
+        "lead_2_sawtooth": {
+          "file": "lead_2_sawtooth-mp3.js",
+          "sha256": "de64fdc423efeac7aba38edaf8f47198b5d80f532993b6ebf184b653ac92b6a2",
+          "bytes": 2999673
+        },
+        "lead_3_calliope": {
+          "file": "lead_3_calliope-mp3.js",
+          "sha256": "ef2b7c6152ae6b84315ccd88df2b039fdb90821742f63151fb75c40304ea41dc",
+          "bytes": 2680933
+        },
+        "lead_4_chiff": {
+          "file": "lead_4_chiff-mp3.js",
+          "sha256": "7dd94a3e8ecff3625c2d42da5ce89d1f60694cba5b34855a107b123c28e7eb62",
+          "bytes": 2282558
+        },
+        "lead_5_charang": {
+          "file": "lead_5_charang-mp3.js",
+          "sha256": "ba35ba199d95a242b962e397701c65d362e5556562482001d38cea7c557eda20",
+          "bytes": 2983724
+        },
+        "lead_6_voice": {
+          "file": "lead_6_voice-mp3.js",
+          "sha256": "2495ee285c2c98c312e7e6f414792932ca3bdd43271c7ad2a6160c23d96516cb",
+          "bytes": 2847270
+        },
+        "lead_7_fifths": {
+          "file": "lead_7_fifths-mp3.js",
+          "sha256": "a17254c35208e7d2bcb84cca40b6375034204d2597fd57eb4db0e9f0335fd5da",
+          "bytes": 3005211
+        },
+        "lead_8_bass_lead": {
+          "file": "lead_8_bass__lead-mp3.js",
+          "sha256": "3384aa40b95dd2eea7323faf8fae7db644903ba93bcb28cfe7337d34cee7b9b9",
+          "bytes": 2979795
+        },
+        "pad_1_new_age": {
+          "file": "pad_1_new_age-mp3.js",
+          "sha256": "317d73384aa92bd342f3b87383e4a48b22d2a52a1b4d32141b764060bd54ad36",
+          "bytes": 2714475
+        },
+        "pad_2_warm": {
+          "file": "pad_2_warm-mp3.js",
+          "sha256": "c688aeeb3d42d1630086cec28125bd3281aa78ff798ac0fa77083d14628ef221",
+          "bytes": 2906336
+        },
+        "pad_3_polysynth": {
+          "file": "pad_3_polysynth-mp3.js",
+          "sha256": "7f543a4315cbcaec852d5d3b3c7fe9e69da8dc57c1aa3df4731ad1202f66ca3f",
+          "bytes": 3003369
+        },
+        "pad_4_choir": {
+          "file": "pad_4_choir-mp3.js",
+          "sha256": "6e687e6da8e5ed84307699c91f391178998e1265aa6a5cadc1a0ea76592399d5",
+          "bytes": 2970209
+        },
+        "pad_5_bowed": {
+          "file": "pad_5_bowed-mp3.js",
+          "sha256": "08e5cb137827e0671ca7b3f528ebecd69766e280b6a40526745f316a38d16580",
+          "bytes": 2645385
+        },
+        "pad_6_metallic": {
+          "file": "pad_6_metallic-mp3.js",
+          "sha256": "f58f0549ee2a7ed5d663afd62dd7457a9a9c9bfe0b77869089c29b3b38dd2c6b",
+          "bytes": 2714176
+        },
+        "pad_7_halo": {
+          "file": "pad_7_halo-mp3.js",
+          "sha256": "1a34e0c3db3da744b7a82f22047b5b3e25f8d791529c05f6167422bed8fa9d34",
+          "bytes": 2998196
+        },
+        "pad_8_sweep": {
+          "file": "pad_8_sweep-mp3.js",
+          "sha256": "159a6d1105042f04ee185dcf4f758ffeb85eb04e4bd7d5c1e2cf223d00789645",
+          "bytes": 2470321
+        },
+        "fx_1_rain": {
+          "file": "fx_1_rain-mp3.js",
+          "sha256": "b257b8b84649a7cff8775e506471bcb8c192c4f72590d695a313860a4dee9a18",
+          "bytes": 2878255
+        },
+        "fx_2_soundtrack": {
+          "file": "fx_2_soundtrack-mp3.js",
+          "sha256": "ac0cda140d6c0fa652559c8ff555d24814ad15eab8d710de037c9452fde18b14",
+          "bytes": 2794913
+        },
+        "fx_3_crystal": {
+          "file": "fx_3_crystal-mp3.js",
+          "sha256": "0650ebf705023ea69f684bf13fa0722841b35554afc8ce5ed0aef139c2eff684",
+          "bytes": 1983322
+        },
+        "fx_4_atmosphere": {
+          "file": "fx_4_atmosphere-mp3.js",
+          "sha256": "8603ebca6b1b7395505a884be07caec2f6ec990d8f1eeead7d89add771cc2023",
+          "bytes": 2718141
+        },
+        "fx_5_brightness": {
+          "file": "fx_5_brightness-mp3.js",
+          "sha256": "85b501c6f3e50bee68145770c3921987c7a2ff7e069679942d85ef74cb7f5a77",
+          "bytes": 2989529
+        },
+        "fx_6_goblins": {
+          "file": "fx_6_goblins-mp3.js",
+          "sha256": "3ed06591f58f3916b990a20746d709296dcce6ff5f60990bf93c91acca9fa848",
+          "bytes": 2734518
+        },
+        "fx_7_echoes": {
+          "file": "fx_7_echoes-mp3.js",
+          "sha256": "6666c4ae2276526becb17dd400171d58b1e4023f0a38bf42910e9a5d331fb7bc",
+          "bytes": 2770641
+        },
+        "fx_8_scifi": {
+          "file": "fx_8_scifi-mp3.js",
+          "sha256": "0cccd7d899b0936dd941791e546ef7d113cbae2e517115aaa0ed19133afa5936",
+          "bytes": 2588660
+        },
+        "sitar": {
+          "file": "sitar-mp3.js",
+          "sha256": "be220a6fd38a8594cf41d035ab01b8a61895cf4b8f2d7b3b8da78242a9f9d634",
+          "bytes": 2906871
+        },
+        "banjo": {
+          "file": "banjo-mp3.js",
+          "sha256": "08f49bde197e518187b17bed57d6b16e4afa1f2102e4e0a368275b57583ec355",
+          "bytes": 1765131
+        },
+        "shamisen": {
+          "file": "shamisen-mp3.js",
+          "sha256": "1f0c039d4d1576d495126d7a4e7e1420cd5e2be499c305409b1802b8c8e42839",
+          "bytes": 2097342
+        },
+        "koto": {
+          "file": "koto-mp3.js",
+          "sha256": "78dcb2449944130b35ed5f1879d8b1512bc220f39c82ba6806023a62fa6365a4",
+          "bytes": 2059794
+        },
+        "kalimba": {
+          "file": "kalimba-mp3.js",
+          "sha256": "9ca415de9866fb55900c2a90df4d06f67d19630dd5cd3e748f86d18abb872a59",
+          "bytes": 1636353
+        },
+        "bagpipe": {
+          "file": "bagpipe-mp3.js",
+          "sha256": "53ccae340a630bbcdb5787fb05b6c62245032b662cc6c37c38414faa12b51c7f",
+          "bytes": 3005205
+        },
+        "fiddle": {
+          "file": "fiddle-mp3.js",
+          "sha256": "607b93af0d073de5a941572c0dd03b4ef7ba4c63010230da6727461ea0851077",
+          "bytes": 2870964
+        },
+        "shanai": {
+          "file": "shanai-mp3.js",
+          "sha256": "9d769ce21250f65efdf0764df9675e49f447d8c359107391d2149c77832bf0de",
+          "bytes": 2733976
+        },
+        "tinkle_bell": {
+          "file": "tinkle_bell-mp3.js",
+          "sha256": "9dbbcb56271831efdb6c2ca65e037ee364c462c70b545d3018708172b0144445",
+          "bytes": 1700181
+        },
+        "agogo": {
+          "file": "agogo-mp3.js",
+          "sha256": "97a2febfc332c481a5ce1010a0ecda703e4d91d0823a5e6700618bd2284f1a33",
+          "bytes": 1697811
+        },
+        "steel_drums": {
+          "file": "steel_drums-mp3.js",
+          "sha256": "74114b14cb375221b22854998e7dd9f18d5b88bfc9bc5e260e77bae3ab9ad203",
+          "bytes": 1762225
+        },
+        "woodblock": {
+          "file": "woodblock-mp3.js",
+          "sha256": "c538148f65143fdebc14c378ee91e1a8282c6439f240b8dd5b0c4a9e388ce76e",
+          "bytes": 1668743
+        },
+        "taiko_drum": {
+          "file": "taiko_drum-mp3.js",
+          "sha256": "2f8ab37521871ec4d29bd4e745fc10806580bfb8101805495b8267593a89de7c",
+          "bytes": 1689156
+        },
+        "melodic_tom": {
+          "file": "melodic_tom-mp3.js",
+          "sha256": "34da43e3d7eb39f8c7e2a7d182a66a1af3c09eb9306623c7e317c20f524ddf23",
+          "bytes": 1702133
+        },
+        "synth_drum": {
+          "file": "synth_drum-mp3.js",
+          "sha256": "d6adbb683801b6d4be062f95e1b8b4767f64317ecfcded5a09c80a9948c33a42",
+          "bytes": 1686120
+        },
+        "reverse_cymbal": {
+          "file": "reverse_cymbal-mp3.js",
+          "sha256": "23d6c27fdb05a14b0b87fef3ea595aa276b908caa649319cc21f41926cf9dbc1",
+          "bytes": 2505580
+        },
+        "guitar_fret_noise": {
+          "file": "guitar_fret_noise-mp3.js",
+          "sha256": "99d5f66d498bb3f2765aa4d590e456d7d1c8a58f0d75d4480a0ad0196876ef74",
+          "bytes": 1671023
+        },
+        "breath_noise": {
+          "file": "breath_noise-mp3.js",
+          "sha256": "b150a1635e4d57aca0c8507f351f1ac71802ebc04ccd67adf111cba0b565aa92",
+          "bytes": 1725690
+        },
+        "seashore": {
+          "file": "seashore-mp3.js",
+          "sha256": "798f92f22911eba65a057303d247c04b7bf6d339dceb5a10f79253cd55d7846b",
+          "bytes": 3001598
+        },
+        "bird_tweet": {
+          "file": "bird_tweet-mp3.js",
+          "sha256": "d3fdf3da4f6825a527cc60fc898c0dc19bfe4c71c9c882739694f1abe8828469",
+          "bytes": 1948672
+        },
+        "telephone_ring": {
+          "file": "telephone_ring-mp3.js",
+          "sha256": "5ff98de65f6e88a44ce64ac9d5c9bb5b54475698ba670084acbf9fbd53008ae1",
+          "bytes": 2562264
+        },
+        "helicopter": {
+          "file": "helicopter-mp3.js",
+          "sha256": "d08cfe83b25a921475463c3e12aca24a86a31c9ad245d70fef2db3e0bd919801",
+          "bytes": 3005208
+        },
+        "applause": {
+          "file": "applause-mp3.js",
+          "sha256": "fec6a799a94c0724aa060993e5c7b52ee2ed761cf8c5e59535c20a808825a6fd",
+          "bytes": 2654114
+        },
+        "gunshot": {
+          "file": "gunshot-mp3.js",
+          "sha256": "86f3d222fcec64567c4088f2360644c2587da36ddd17193e41161f9c64d66ae2",
+          "bytes": 2045873
+        },
+        "percussion": {
+          "file": "percussion-mp3.js",
+          "sha256": "1611fef301af820d1f1864bc8b356d4f3d9298fb9d79734b7121705af26046a6",
+          "bytes": 822698
+        }
+      },
+      "why": "#679: the 128 General MIDI sounds (and the drum kit, carried in the pin but not offered: musicFences.knownLimits) abcjs plays, from the Fluid R3 GM SoundFont as rendered by MIDI.js Soundfonts, abcjs's own author's copy (github.com/paulrosen/midi-js-soundfonts, branch gh-pages, head cbd6b6f6 of 2022-01-17, unchanged since). One file a sound, `<name>-mp3.js`, every note as base64, so one SHA-256 a sound (129) rather than one a note (11,352); keyed by abcjs's name, with `file` the sound set's own spelling (`lead_8_bass__lead`, which abcjs asks for with one underscore). NOT in the image: downloaded on the teacher's computer the first time a tune with Play needs one, refused unless its SHA-256 is this one, kept in the working folder's builds folder (keptDownloads, kind `sounds`) and checked against this hash every time it is used. `version` is the kept entry's version folder. Licence: the sound set's README says CC BY 3.0 for FluidR3_GM; its repository LICENSE says MIT (both recorded in THIRD_PARTY_LICENSES.md; musicFences.credit). Sizes: 319,286,148 bytes as files, 239,159,247 decoded, 0.62 to 2.25 MB a sound decoded (measured 2026-11-14)."
+    },
+    {
       "pin": "pyodide",
       "value": "314.0.7",
       "dockerfileContains": "pyodide-core-314.0.7.tar.bz2",
@@ -419,6 +1090,7 @@
     "trees": [
       {"tree": "quartz", "image": "/opt/quartz", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\quartz", "exposure": "Quartz v4.5.0 and every dependency its lockfile installs, dev dependencies included. Runs in the container on the teacher's Mac: the build, and the preview server while a preview runs. A built site carries Quartz's own client scripts and stylesheets."},
       {"tree": "tikz-engine", "image": "/opt/vendor/tikz-engine", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\vendor\\tikz-engine", "exposure": "node-tikzjax and its locked dependencies (support/figures/package-lock.json, npm ci --omit=dev). Build only: a site carries the SVG it draws, never the engine."},
+      {"tree": "music-engine", "image": "/opt/vendor/music-engine", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\vendor\\music-engine", "exposure": "abcjs and linkedom and their locked dependencies (support/music/package-lock.json, npm ci --omit=dev, #679). abcjs draws at build time and its one prebuilt file, abcjs-basic-min.js, runs in the student's browser on a press of Play; linkedom is build only."},
       {"tree": "wrangler", "image": "/usr/lib/node_modules/wrangler", "lockfile": "synthesised from the installed tree", "pin": "wrangler", "windowsRuntime": "runtime\\wrangler", "exposure": "Cloudflare's deploy command line, a global install that keeps no lockfile: one is built from the installed tree (npm install --package-lock-only next to a copy of it). Runs only during a Cloudflare deploy."},
       {"tree": "pagedjs", "image": "/opt/vendor/pagedjs/paged.min.js", "lockfile": "synthesised from the pin", "pin": "pagedjs", "windowsRuntime": "runtime\\vendor\\pagedjs", "exposure": "A prebuilt file a site carries for printing: it runs in the student's browser. Its lockfile is built from the pin's version, so an advisory against pagedjs itself is caught exactly, and its bundled dependencies only as they resolve today."},
       {"tree": "function-plot", "image": "/opt/vendor/function-plot/function-plot.js", "lockfile": "synthesised from the pin", "pin": "functionPlot", "windowsRuntime": "runtime\\vendor\\function-plot", "exposure": "A prebuilt file a site carries for graphs: it runs in the student's browser. Its lockfile is built from the pin's version, with the same limit as pagedjs."}

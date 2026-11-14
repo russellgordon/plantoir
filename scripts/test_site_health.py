@@ -82,6 +82,8 @@ class SiteHealthTests(unittest.TestCase):
                                     "reason": "fileNotFound", "file": "Slopes.ggb"}]},
             {"phet_problems": [{"page": "Unit 3/Gas Laws", "block": 1, "line": 12,
                                 "reason": "simulationNotFound", "sim": "gas-propertys"}]},
+            {"music_problems": [{"page": "Unit 1/Scales", "block": 1, "line": 4,
+                                 "reason": "unknownSound", "value": "flut", "near": "flute"}]},
         ):
             broken = dict(HEALTHY)
             broken.update(facts)

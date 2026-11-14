@@ -34,6 +34,7 @@ import figures
 import geogebra
 import kept_downloads
 import phet
+import music
 import swift_blocks
 import section_problems
 import site_said
@@ -1856,6 +1857,7 @@ def _wire_transformers_index(index_ts: Path) -> None:
                          ("PlantoirPictureSizes", "./plantoirPictureSizes"),
                          ("PlantoirGeoGebra", "./plantoirGeoGebra"),
                          ("PlantoirPhet", "./plantoirPhet"),
+                         ("PlantoirMusic", "./plantoirMusic"),
                          ("PlantoirVideo", "./plantoirVideo")):
         if f"export {{ {name} }}" in text:
             continue
@@ -1997,6 +1999,32 @@ def _wire_phet_transformer(config_ts: Path) -> None:
         print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirPhet()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_music_transformer(config_ts: Path) -> None:
+    """Put the tunes' transformer (#679) straight AFTER the PhET
+    simulations' and so before the self-check quizzes', for GeoGebra's
+    reason: a tune in a question is a finished figure when the quiz
+    transformer packages the question, and its html stage runs before the
+    quizzes', where it finds a tune inside a choice (and leaves out its
+    Play controls, musicFences.quizzes) by the choice's class, which the
+    quizzes' markdown stage has already given it. Anchored on PlantoirPhet,
+    wired before it in wire_quartz_additions. Idempotent."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirMusic(" in text:
+        return
+    anchor = "Plugin.PlantoirPhet(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the tunes: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the tunes: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirMusic()," + text[at:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2419,7 +2447,8 @@ def wire_quartz_additions(output_dir: Path) -> None:
     straight after the figures' and so before the quizzes'; export, script
     and styles ride as the quizzes' do), the PhET simulations' one (#674:
     its transformer straight after GeoGebra's; export, script and styles
-    ride the same way), the task boxes' one (#519: its transformer after
+    ride the same way), the tunes' one (#679: its transformer straight
+    after PhET's; the same way again), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
@@ -2452,6 +2481,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_geogebra_transformer),
         (output_dir / "quartz.config.ts", _wire_phet_transformer),
+        (output_dir / "quartz.config.ts", _wire_music_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
         (output_dir / "quartz.config.ts", _wire_video_transformer),
@@ -2674,6 +2704,58 @@ def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config
             stop = {"reason": "notReady", "missing": places or []}
         return {"counts": {phet.KIND: 0}, "problems": [], "notes": [], "simulations": 0, "shown": 0,
                 "downloaded": [], "fromBefore": [], "bytes": 0, "seconds": 0.0, "stop": stop}
+
+
+def _prepare_music(content_root: Path, output_dir: Path, course_dir: Path,
+                   course_code: str, section_number) -> dict:
+    """
+    Tunes in ABC notation (#679; scripts/music.py), ALWAYS: every ```abc and
+    ```music-abc fence on the pages students can see, by the gate's own
+    visibility rule, drawn by abcjs, and each sound a tune with Play needs
+    found among the copies this computer keeps (keptDownloads, kind
+    `sounds`) or downloaded now and kept. Answers music.prepare's outcome;
+    when that says `stop`, the caller STOPS the build before Quartz runs
+    (musicFences.stop), as for PhET.
+
+    A fault in this pass ITSELF stops the build too when a page students can
+    see has a tune with Play (musicFences.stop.passFails, reason notReady),
+    for _prepare_phet's reason: a site that says it built with a Play button
+    that plays nothing is the fault the stop exists to prevent.
+    """
+    def list_pages():
+        return music.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name)
+
+    try:
+        pages = list_pages()
+        kept_root = kept_downloads.root_for(course_dir)
+        return music.prepare(pages, output_dir, kept_root, course=course_code, section=section_number)
+    except Exception as error:
+        # The plain reason only, never a path and never Python's name for
+        # the fault (_prepare_phet's rule).
+        if isinstance(error, OSError) and error.strerror:
+            print(f"⚠️ Could not prepare the tunes ({error.strerror}).")
+        else:
+            print("⚠️ Could not prepare the tunes.")
+        shutil.rmtree(output_dir / "quartz" / music.WORKSPACE, ignore_errors=True)
+        shutil.rmtree(output_dir / "quartz" / "static" / music.SITE_FOLDER, ignore_errors=True)
+        places = music.places_after_a_failed_pass(list_pages, content_root)
+        stop = None
+        if places is None or places:
+            stop = {"reason": "notReady", "missing": places or []}
+        return {"counts": {music.ENGINE: 0}, "problems": [], "notes": [], "tunes": 0, "shown": 0,
+                "playable": 0, "sounds": [], "downloaded": [], "fromBefore": [], "bytes": 0,
+                "seconds": 0.0, "stop": stop}
+
+
+def _stop_for_music(outcome: dict, course_code: str, section_number) -> None:
+    """The stop musicFences.stop rules (#679): _stop_for_phet's, for sounds."""
+    print()
+    for line in music.stop_lines(outcome, course_code, section_number):
+        print(line)
+    sys.exit(1)
 
 
 def _stop_for_phet(outcome: dict, course_code: str, section_number) -> None:
@@ -10721,6 +10803,15 @@ def build_section_site(
     downloaded_marker = phet.downloaded_line(phet_here, course_code, section_number)
     if downloaded_marker is not None:
         print(downloaded_marker)
+    # Tunes (#679), ALWAYS, and the second pass that can STOP a build: a
+    # sound a tune with Play needs that is neither kept nor downloadable now
+    # (musicFences.stop). Before any check is said and before Quartz.
+    music_here = _prepare_music(content_root, output_dir, course_dir, course_code, section_number)
+    if music_here.get("stop"):
+        _stop_for_music(music_here, course_code, section_number)
+    downloaded_marker = music.downloaded_line(music_here, course_code, section_number)
+    if downloaded_marker is not None:
+        print(downloaded_marker)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
@@ -10772,6 +10863,8 @@ def build_section_site(
         "geogebra_problems": geogebra.health_finding_facts(geogebra_here),
         # PhET simulations that cannot be shown (#674).
         "phet_problems": phet.health_finding_facts(phet_here),
+        # Problems with tunes (#679).
+        "music_problems": music.health_finding_facts(music_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)

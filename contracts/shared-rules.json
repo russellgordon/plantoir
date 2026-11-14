@@ -8123,6 +8123,60 @@
             "detail": "Students see the block’s lines as you wrote them, instead of the simulation, until it is fixed in your notes: “Motion”, simulation 1, line 4: screens: needs the screens' numbers, such as 1, 2, not “first”; “Motion”, simulation 2: there is no sim: line - add one with the simulation's name from its address on phet.colorado.edu, such as gas-properties."
           }
         ]
+      },
+      {
+        "name": "musicTunesNotRight",
+        "sentence": "A tune on “{page}” in {course} Section {section} needs fixing.",
+        "sentenceForSeveral": "{count} problems with tunes in {course} Section {section} need fixing.",
+        "detail": "Until they are fixed in your notes, students see each tune as described: {tunes}.",
+        "tuneLine": "“{page}”, tune {block}, line {line}: {reason}",
+        "tuneLineNoLine": "“{page}”, tune {block}: {reason}",
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's music fences from 1; {line} is the line in the teacher's own file (the setting's line, abcjs's line mapped back through musicFences.lines, the %% line, else the opening fence's line) and tuneLineNoLine is used when it cannot be found; {reason} is musicFences.words.reasons[reason] filled with the problem's {value}, {near}, {said}, {more} and {name} (unknownSound with close names says unknownSoundNear; abcSaid with more says abcSaidMore). `sentence` when there is ONE problem and `sentenceForSeveral` otherwise. `detail` names at most ten, joined with \"; \", then `andMore`. Every value is filled in ONE pass. ONE finding per section build.",
+        "why": "#679: a tune whose notation abcjs reads with a problem is still drawn as abcjs draws it (as the Obsidian plugin shows it), and one it cannot draw at all stays the plain code block it was; either way the teacher, who previews in the app and never reads the build's console, is told where. Each reason sentence says what students see. A sound that could not be DOWNLOADED is never a finding: the build stops instead (keptDownloads.stop). The notes (musicFences.words.notes) are only `plantoir: note:` lines.",
+        "cases": [
+          {
+            "name": "one misspelt sound",
+            "course": "AMU1O",
+            "section": 1,
+            "tunes": [
+              {
+                "page": "Unit 1/Scales",
+                "block": 1,
+                "line": 4,
+                "reason": "unknownSound",
+                "value": "flut",
+                "near": "flute"
+              }
+            ],
+            "sentence": "A tune on “Unit 1/Scales” in AMU1O Section 1 needs fixing.",
+            "detail": "Until they are fixed in your notes, students see each tune as described: “Unit 1/Scales”, tune 1, line 4: there is no sound called “flut” (the closest: flute)."
+          },
+          {
+            "name": "two, one with no line",
+            "course": "AMU2O",
+            "section": 2,
+            "tunes": [
+              {
+                "page": "Rhythm",
+                "block": 1,
+                "line": 9,
+                "reason": "abcSaid",
+                "said": "Expected ']' to end the chords",
+                "more": 2
+              },
+              {
+                "page": "Rhythm",
+                "block": 2,
+                "line": null,
+                "reason": "emptyTune"
+              }
+            ],
+            "sentence": "2 problems with tunes in AMU2O Section 2 need fixing.",
+            "detail": "Until they are fixed in your notes, students see each tune as described: “Rhythm”, tune 1, line 9: the notation has a problem: Expected ']' to end the chords (and 2 more); “Rhythm”, tune 2: there is no tune in the block, so students see it as text."
+          }
+        ]
       }
     ],
     "linksIntoHiddenPages": {
@@ -31319,6 +31373,13 @@
         "source": "PhET",
         "issue": "#674",
         "fences": "phetFences"
+      },
+      "sounds": {
+        "one": "a sound",
+        "several": "sounds",
+        "source": "GitHub",
+        "issue": "#679",
+        "fences": "musicFences"
       }
     },
     "entries": {
@@ -32265,6 +32326,682 @@
       "A simulation's sounds play after a student touches it; nothing turns them off (it is part of the simulation, and not ruled on).",
       "Obsidian shows the block as a code block (no Obsidian plugin reads ```phet).",
       "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Whether Netlify takes a long header whole (twenty simulations' worth, 421 hashes, a 22,766-character line) is measured with a credentialed test site before this piece merges (documentation/07). A pass says a line of that length is served whole; it does not say where Netlify's limit lies."
+    ]
+  },
+  "musicFences": {
+    "rule": "#679 (v2.0.0): a tune in ABC notation written in a ```abc (or ```music-abc) fence on a page students can see is DRAWN when the site is built, by abcjs (support/music/plantoir-music.mjs, the engine the Obsidian plugin \"ABC Music Notation\" also uses), so students see the notation with no script and it prints; under it a Play button plays the tune in the browser from the site's own copy of abcjs and of the sounds it names, each note lit as it sounds. Russell's rulings on #679 (2026-11-13): a Play button, and every one of the 128 General MIDI sounds of the sound set abcjs uses, a site carrying only the sounds its tunes need, downloaded on the teacher's computer the first time and kept (keptDownloads, kind `sounds`), and a build that cannot download one STOPS (keptDownloads.stop). Python prepares and Quartz places (scripts/music.py; support/quartz/plugins/transformers/plantoirMusic.ts; support/quartz/components/scripts/music.inline.ts).",
+    "fences": {
+      "languages": [
+        "abc",
+        "music-abc"
+      ],
+      "rule": "The info string's first word, exactly: `abc` and `music-abc`, the two names the Obsidian plugin registers (its main.ts, read 2026-11-13). Backticks or tildes, at any quote depth, in a list item, with spaces between the fence and its language (``` abc), all read by markdown_code.fenced_blocks as the site's parser reads them; `ABC` is not a tune. A fence opened after a second container on a list marker's line is left as code, as figures leave theirs. The page is found by the word `abc` anywhere in it (#674's lesson: an opener-shaped scan missed ``` abc).",
+      "cases": [
+        {
+          "name": "backticks",
+          "page": "Intro\n\n```abc\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n```\n",
+          "tunes": [
+            {
+              "block": 1,
+              "line": 3,
+              "lang": "abc"
+            }
+          ]
+        },
+        {
+          "name": "the plugin's second name, with tildes",
+          "page": "~~~music-abc\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n~~~\n",
+          "tunes": [
+            {
+              "block": 1,
+              "line": 1,
+              "lang": "music-abc"
+            }
+          ]
+        },
+        {
+          "name": "a space before the language",
+          "page": "``` abc\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n```\n",
+          "tunes": [
+            {
+              "block": 1,
+              "line": 1,
+              "lang": "abc"
+            }
+          ]
+        },
+        {
+          "name": "capitals are not a tune",
+          "page": "```ABC\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n```\n",
+          "tunes": []
+        },
+        {
+          "name": "in a folded callout",
+          "page": "> [!example]- A scale\n> ```abc\n> X:1\n> K:G\n> G A B c|]\n> ```\n",
+          "tunes": [
+            {
+              "block": 1,
+              "line": 2,
+              "lang": "abc"
+            }
+          ]
+        },
+        {
+          "name": "two on a page",
+          "page": "```abc\nX:1\nK:G\nG2|]\n```\n\nText.\n\n```abc\nX:2\nK:D\nD2|]\n```\n",
+          "tunes": [
+            {
+              "block": 1,
+              "line": 1,
+              "lang": "abc"
+            },
+            {
+              "block": 2,
+              "line": 9,
+              "lang": "abc"
+            }
+          ]
+        }
+      ]
+    },
+    "settings": {
+      "known": [
+        "alt",
+        "play",
+        "sound",
+        "chords"
+      ],
+      "playOff": [
+        "no",
+        "false",
+        "off"
+      ],
+      "rule": "Plantoir's settings are `%` comment lines (one `%`, never two) at the TOP of the fence, before its first line of ABC, so ABC and the Obsidian plugin read them as comments and a page means the same in Obsidian: `% alt:` (what a screen reader reads, in place of the drawing), `% play: no` (no Play button: a theory example), `% sound:` (the whole tune's sound), `% sound V:<voice>:` (one voice's), `% chords:` (the sound chord symbols play in, else the tune's). A known setting written after the tune has begun is an ABC comment and a note says so; any other `%` line is the teacher's own comment and nothing is said. Values are trimmed; `play` is off only for playOff, case-blind.",
+      "cases": [
+        {
+          "name": "nothing set",
+          "body": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "expect": {
+            "alt": null,
+            "play": true,
+            "sound": null,
+            "voiceSounds": {},
+            "chords": null
+          },
+          "notes": []
+        },
+        {
+          "name": "alt and a sound",
+          "body": "% alt: The G major scale, one octave up.\n% sound: flute\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "expect": {
+            "alt": "The G major scale, one octave up.",
+            "play": true,
+            "sound": "flute",
+            "voiceSounds": {},
+            "chords": null
+          },
+          "notes": []
+        },
+        {
+          "name": "play: no, any case",
+          "body": "% play: No\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "expect": {
+            "alt": null,
+            "play": false,
+            "sound": null,
+            "voiceSounds": {},
+            "chords": null
+          },
+          "notes": []
+        },
+        {
+          "name": "a sound for one voice, and chords",
+          "body": "% sound V:2: cello\n% chords: acoustic guitar nylon\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "expect": {
+            "alt": null,
+            "play": true,
+            "sound": null,
+            "voiceSounds": {
+              "2": "cello"
+            },
+            "chords": "acoustic guitar nylon"
+          },
+          "notes": []
+        },
+        {
+          "name": "a setting after the tune has begun is a comment",
+          "body": "X:1\n% sound: flute\nK:G\nG2|]\n",
+          "expect": {
+            "alt": null,
+            "play": true,
+            "sound": null,
+            "voiceSounds": {},
+            "chords": null
+          },
+          "notes": [
+            {
+              "reason": "settingAfterTheTune",
+              "blockLine": 2,
+              "name": "sound"
+            }
+          ]
+        },
+        {
+          "name": "a teacher's own comment is not a setting",
+          "body": "% from the Grade 9 warm-up\n% sound: violin\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "expect": {
+            "alt": null,
+            "play": true,
+            "sound": "violin",
+            "voiceSounds": {},
+            "chords": null
+          },
+          "notes": []
+        },
+        {
+          "name": "two percent signs are never a setting",
+          "body": "%% sound: flute\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "expect": {
+            "alt": null,
+            "play": true,
+            "sound": null,
+            "voiceSounds": {},
+            "chords": null
+          },
+          "notes": []
+        }
+      ]
+    },
+    "sounds": {
+      "rule": "A sound is named by its General MIDI name in plain words (spaces, underscores and dashes alike, any case: `acoustic grand piano`, `Acoustic_Grand_Piano`), by one of `aliases`, or by its General MIDI number, 1 to 128. `names` is abcjs's own list (instrumentIndexToName, abcjs 6.7.2), indexed by the 0-based program abcjs plays. All 128 are offered (Russell's ruling of 2026-11-13, which keeps number 128, \"gunshot\": it is an entry in a standard list, not content Plantoir writes); Plantoir's own Help, guidance and examples never use or feature it. Drums are not offered (knownLimits). A name not on the list is a folder problem (unknownSound) naming the closest names, and the tune plays in piano.",
+      "names": [
+        "acoustic_grand_piano",
+        "bright_acoustic_piano",
+        "electric_grand_piano",
+        "honkytonk_piano",
+        "electric_piano_1",
+        "electric_piano_2",
+        "harpsichord",
+        "clavinet",
+        "celesta",
+        "glockenspiel",
+        "music_box",
+        "vibraphone",
+        "marimba",
+        "xylophone",
+        "tubular_bells",
+        "dulcimer",
+        "drawbar_organ",
+        "percussive_organ",
+        "rock_organ",
+        "church_organ",
+        "reed_organ",
+        "accordion",
+        "harmonica",
+        "tango_accordion",
+        "acoustic_guitar_nylon",
+        "acoustic_guitar_steel",
+        "electric_guitar_jazz",
+        "electric_guitar_clean",
+        "electric_guitar_muted",
+        "overdriven_guitar",
+        "distortion_guitar",
+        "guitar_harmonics",
+        "acoustic_bass",
+        "electric_bass_finger",
+        "electric_bass_pick",
+        "fretless_bass",
+        "slap_bass_1",
+        "slap_bass_2",
+        "synth_bass_1",
+        "synth_bass_2",
+        "violin",
+        "viola",
+        "cello",
+        "contrabass",
+        "tremolo_strings",
+        "pizzicato_strings",
+        "orchestral_harp",
+        "timpani",
+        "string_ensemble_1",
+        "string_ensemble_2",
+        "synth_strings_1",
+        "synth_strings_2",
+        "choir_aahs",
+        "voice_oohs",
+        "synth_choir",
+        "orchestra_hit",
+        "trumpet",
+        "trombone",
+        "tuba",
+        "muted_trumpet",
+        "french_horn",
+        "brass_section",
+        "synth_brass_1",
+        "synth_brass_2",
+        "soprano_sax",
+        "alto_sax",
+        "tenor_sax",
+        "baritone_sax",
+        "oboe",
+        "english_horn",
+        "bassoon",
+        "clarinet",
+        "piccolo",
+        "flute",
+        "recorder",
+        "pan_flute",
+        "blown_bottle",
+        "shakuhachi",
+        "whistle",
+        "ocarina",
+        "lead_1_square",
+        "lead_2_sawtooth",
+        "lead_3_calliope",
+        "lead_4_chiff",
+        "lead_5_charang",
+        "lead_6_voice",
+        "lead_7_fifths",
+        "lead_8_bass_lead",
+        "pad_1_new_age",
+        "pad_2_warm",
+        "pad_3_polysynth",
+        "pad_4_choir",
+        "pad_5_bowed",
+        "pad_6_metallic",
+        "pad_7_halo",
+        "pad_8_sweep",
+        "fx_1_rain",
+        "fx_2_soundtrack",
+        "fx_3_crystal",
+        "fx_4_atmosphere",
+        "fx_5_brightness",
+        "fx_6_goblins",
+        "fx_7_echoes",
+        "fx_8_scifi",
+        "sitar",
+        "banjo",
+        "shamisen",
+        "koto",
+        "kalimba",
+        "bagpipe",
+        "fiddle",
+        "shanai",
+        "tinkle_bell",
+        "agogo",
+        "steel_drums",
+        "woodblock",
+        "taiko_drum",
+        "melodic_tom",
+        "synth_drum",
+        "reverse_cymbal",
+        "guitar_fret_noise",
+        "breath_noise",
+        "seashore",
+        "bird_tweet",
+        "telephone_ring",
+        "helicopter",
+        "applause",
+        "gunshot"
+      ],
+      "aliases": {
+        "piano": "acoustic_grand_piano",
+        "guitar": "acoustic_guitar_nylon",
+        "nylon guitar": "acoustic_guitar_nylon",
+        "steel guitar": "acoustic_guitar_steel",
+        "bass": "acoustic_bass",
+        "organ": "church_organ",
+        "strings": "string_ensemble_1",
+        "choir": "choir_aahs"
+      },
+      "directive": {
+        "program": "%%MIDI program {program}",
+        "chordprog": "%%MIDI chordprog {program}",
+        "bassprog": "%%MIDI bassprog {program}"
+      },
+      "directiveRule": "abcjs takes a sound only from a `%%MIDI` line (measured: `%%MIDI program 73` sets formatting.midi.program; `I:MIDI program 73` sets nothing), and Quartz removes the text between any two `%%` on a page, inside fences too (figureFences.knownLimits). So the teacher writes `% sound:` and the BUILD writes the directive into the tune it draws and hands the site (after Quartz has read the page): `program` after the K: line that ends the header and after each V: line of the body (the voice's own sound, else the tune's); `chordprog` and `bassprog` after the K: line, in `% chords:`'s sound or else the tune's, so chord symbols sound as the teacher named (plan review item 3; abcjs's own default, piano, is a second download and a surprise). With no sound named nothing is added and abcjs plays piano.",
+      "cases": [
+        {
+          "value": "flute",
+          "program": 73
+        },
+        {
+          "value": "Acoustic_Grand_Piano",
+          "program": 0
+        },
+        {
+          "value": "acoustic-guitar-nylon",
+          "program": 24
+        },
+        {
+          "value": "piano",
+          "program": 0
+        },
+        {
+          "value": "nylon guitar",
+          "program": 24
+        },
+        {
+          "value": "1",
+          "program": 0
+        },
+        {
+          "value": "74",
+          "program": 73
+        },
+        {
+          "value": "128",
+          "program": 127
+        },
+        {
+          "value": "0",
+          "program": null
+        },
+        {
+          "value": "129",
+          "program": null
+        },
+        {
+          "value": "flut",
+          "program": null,
+          "near": "flute"
+        },
+        {
+          "value": "",
+          "program": null
+        }
+      ],
+      "emitted": [
+        {
+          "name": "no sound named: the tune unchanged",
+          "body": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "abc": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "problems": []
+        },
+        {
+          "name": "the whole tune, chords following it",
+          "body": "% sound: flute\nX:1\nM:4/4\nK:G\n\"G\"G A B c|]\n",
+          "abc": "% sound: flute\nX:1\nM:4/4\nK:G\n%%MIDI program 73\n%%MIDI chordprog 73\n%%MIDI bassprog 73\n\"G\"G A B c|]\n",
+          "problems": []
+        },
+        {
+          "name": "chords in a sound of their own",
+          "body": "% sound: flute\n% chords: piano\nX:1\nK:G\n\"G\"G2|]\n",
+          "abc": "% sound: flute\n% chords: piano\nX:1\nK:G\n%%MIDI program 73\n%%MIDI chordprog 0\n%%MIDI bassprog 0\n\"G\"G2|]\n",
+          "problems": []
+        },
+        {
+          "name": "a sound per voice",
+          "body": "% sound V:1: violin\n% sound V:2: cello\nX:1\nK:G\nV:1\nG2|]\nV:2\nG,2|]\n",
+          "abc": "% sound V:1: violin\n% sound V:2: cello\nX:1\nK:G\nV:1\n%%MIDI program 40\nG2|]\nV:2\n%%MIDI program 42\nG,2|]\n",
+          "problems": []
+        },
+        {
+          "name": "an unknown sound",
+          "body": "% sound: flut\nX:1\nK:G\nG2|]\n",
+          "abc": "% sound: flut\nX:1\nK:G\nG2|]\n",
+          "problems": [
+            {
+              "reason": "unknownSound",
+              "blockLine": 1,
+              "value": "flut",
+              "near": "flute, pan flute"
+            }
+          ]
+        }
+      ],
+      "needed": {
+        "rule": "Which sounds a tune needs is abcjs's OWN answer for the tune as emitted (setUpAudio's tracks, in the helper), never a reading of the setting lines: chord symbols play on chordprog, so a flute tune with chords and no `% chords:` would need piano too if the build did not write chordprog (plan review M2, measured: `%%MIDI program 73` alone with chord symbols gives [0, 73]). That set decides what is downloaded and what the site carries.",
+        "cases": [
+          {
+            "name": "piano by default",
+            "abc": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+            "programs": [
+              0
+            ]
+          },
+          {
+            "name": "flute with chord symbols, chords following it",
+            "abc": "X:1\nM:4/4\nK:G\n%%MIDI program 73\n%%MIDI chordprog 73\n%%MIDI bassprog 73\n\"G\"G A B c|]\n",
+            "programs": [
+              73
+            ]
+          },
+          {
+            "name": "flute with chord symbols and no chordprog needs piano too",
+            "abc": "X:1\nM:4/4\nK:G\n%%MIDI program 73\n\"G\"G A B c|]\n",
+            "programs": [
+              0,
+              73
+            ]
+          },
+          {
+            "name": "two voices",
+            "abc": "X:1\nK:G\nV:1\n%%MIDI program 40\nG A B c|]\nV:2\n%%MIDI program 42\nG, A, B, C|]\n",
+            "programs": [
+              40,
+              42
+            ]
+          }
+        ]
+      }
+    },
+    "percentPercent": {
+      "rule": "A line inside a music fence that holds `%%` is a folder problem (percentPercentLine), naming its line in the teacher's file, and the tune is drawn as the SITE reads it: Quartz removes everything between two `%%` on a page (Obsidian does not), so a tune copied from the web with `%%MIDI` lines looks right in Obsidian and loses lines on the site. The sentence points at `% sound:` (plan review item 7). Read from the RAW file, so a pair the site removed whole is still reported; the first such line of each tune is named.",
+      "cases": [
+        {
+          "name": "a copied MIDI line",
+          "page": "```abc\nX:1\nT:Copied\nK:G\n%%MIDI program 73\nG A B c|]\n```\n",
+          "lines": [
+            5
+          ]
+        },
+        {
+          "name": "a pair inside one tune",
+          "page": "```abc\nX:1\n%%MIDI program 73\nK:G\n%%MIDI program 74\nG2|]\n```\n",
+          "lines": [
+            3,
+            5
+          ]
+        },
+        {
+          "name": "none",
+          "page": "```abc\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n```\n",
+          "lines": []
+        }
+      ]
+    },
+    "describe": {
+      "rule": "What a screen reader reads in place of the drawing (the figure's caption, hidden on screen): `% alt:` when the tune has one, else a sentence made from its own T:, K: and M: lines (words.site.describe*), the key in words (`F#m` is F sharp minor; a mode by its name), the metre as written (`C` is 4/4, `C|` is 2/2). The Play button carries its own label.",
+      "cases": [
+        {
+          "body": "% alt: The G major scale.\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "alt": "The G major scale."
+        },
+        {
+          "body": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+          "alt": "Music: G major scale, in G major, 4/4 time."
+        },
+        {
+          "body": "X:1\nM:C\nK:F#m\nF2|]\n",
+          "alt": "Music in F sharp minor, 4/4 time."
+        },
+        {
+          "body": "X:1\nT:A tune in Dorian\nK:Ador\nA2|]\n",
+          "alt": "Music: A tune in Dorian, in A Dorian."
+        },
+        {
+          "body": "X:1\nT:Free time\nK:none\nG2|]\n",
+          "alt": "Music: Free time."
+        },
+        {
+          "body": "X:1\nM:6/8\nK:Bb\nB2|]\n",
+          "alt": "Music in B flat major, 6/8 time."
+        }
+      ]
+    },
+    "lines": {
+      "rule": "abcjs names each problem by the line and column of the tune it was handed (`Music Line:3:10: ...`). The build maps that line back through the lines it added (sounds.directiveRule) to the fence's own line, and then to the teacher's file (the fence's opening line plus that line), and names the FIRST problem with the number of others. A tune abcjs reads with a problem is still drawn as abcjs draws it, as the Obsidian plugin shows it.",
+      "cases": [
+        {
+          "name": "a line after an added directive",
+          "body": "% sound: flute\nX:1\nK:G\nG A [B c|]\n",
+          "openingLine": 10,
+          "abcjsLine": 7,
+          "pageLine": 14
+        },
+        {
+          "name": "a line in the header",
+          "body": "X:1\nT:t\nK:G\nG2|]\n",
+          "openingLine": 3,
+          "abcjsLine": 2,
+          "pageLine": 5
+        }
+      ]
+    },
+    "drawing": {
+      "options": {
+        "add_classes": true,
+        "responsive": "resize"
+      },
+      "rule": "The SAME options at build time and when the loader draws the tune again on a press of Play (so the notes it lights are the ones on the page), and getBBox answering no size in both (the build's DOM, linkedom, has none; the loader sets it for the length of its call), so abcjs estimates every text width the same way. `responsive: resize` makes the drawing the content's width at any screen size; `add_classes` gives each note the class the highlight and the rendered check find (abcjs-note).",
+      "measured": "2026-11-14, abcjs 6.7.2 under linkedom 0.18.15 (Node 22.6.0) against headless Chromium 155 and WebKit 2359: four tunes (a scale with words, eight bars with chord symbols, first and second endings, two voices) drew identically in all three once attribute order and the spelling of inline styles are set aside (canonical XML). Without the getBBox rule the browser measures text and the drawing moves on the press. Drawing takes 2 to 17 ms a tune after the helper starts.",
+      "rejected": [
+        "jsdom 27 (the planner's 25 drew too): it needs a newer Node than the image's for require of ES modules, and is 4.4 MB to linkedom's 2.8 MB.",
+        "Drawing in the browser only (the functionplot pattern): every student downloads 512 KB of abcjs to see a still picture, and nothing is checked at build time.",
+        "A drawing cache like .figure-cache: a tune draws in milliseconds, so a cache would add a folder and its failure modes to save less than a second."
+      ]
+    },
+    "download": {
+      "hosts": [
+        "raw.githubusercontent.com"
+      ],
+      "rule": "Each sound is ONE file, `<name>-mp3.js` from the sound set's pinned commit (contracts/toolchain.json -> pins -> fluidR3Sounds: its address, its commit, and every file's SHA-256 and size), fetched through kept_downloads.Fetcher and refused unless its SHA-256 is the pin's (damaged). It is kept as it arrived (keptDownloads.entries, `sounds/<name>/<commit>/`), its hash checked against the pin every time it is used, and decoded into the files abcjs asks for (`<name>-mp3/<note>.mp3`) only as the site is written. One file and one pinned hash a sound (129) rather than one per note (11,352) (plan review item 4).",
+      "decoded": "Measured 2026-11-14: all 129 files (319,286,148 bytes) decode in 0.85 s into 11,352 notes, 239,159,247 bytes; every note of acoustic_grand_piano (88) and flute (88) is byte for byte the sound set's own per-note file at the same commit.",
+      "names": "abcjs asks for `lead_8_bass_lead`, which the sound set spells `lead_8_bass__lead` (two underscores; measured 2026-11-14: the single-underscore address answers 404). The pin's `file` carries the sound set's spelling and the site carries abcjs's, so that sound plays, as it does not from the sound set's own site.",
+      "sizes": "A sound adds 0.62 to 2.25 MB to a site that uses it (decoded notes, median 1.97 MB); piano is 1,971,564 bytes in 88 notes. The kept copy is 0.82 to 3.0 MB (base64)."
+    },
+    "siteCarries": {
+      "rule": "`static/abcjs/` (abcjs-basic-min.js, 511,968 bytes, its LICENSE.md, a README.txt naming the engine, the sounds' credit and licence, and the sounds carried, and `sounds/<name>-mp3/` for each sound a tune with Play needs) ONLY when a page students can see has a tune with Play that was drawn; a site whose tunes all say `% play: no` carries the drawings and nothing else; a site with no tune carries nothing and its pages are byte for byte as before.",
+      "cases": [
+        {
+          "name": "no tune",
+          "pages": [],
+          "carries": false
+        },
+        {
+          "name": "a tune with Play",
+          "pages": [
+            {
+              "body": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+              "hidden": false
+            }
+          ],
+          "carries": true,
+          "sounds": [
+            "acoustic_grand_piano"
+          ]
+        },
+        {
+          "name": "only play: no",
+          "pages": [
+            {
+              "body": "% play: no\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+              "hidden": false
+            }
+          ],
+          "carries": false
+        },
+        {
+          "name": "only on a hidden page",
+          "pages": [
+            {
+              "body": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+              "hidden": true
+            }
+          ],
+          "carries": false
+        },
+        {
+          "name": "a flute tune and a piano tune",
+          "pages": [
+            {
+              "body": "% sound: flute\nX:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+              "hidden": false
+            },
+            {
+              "body": "X:1\nT:G major scale\nM:4/4\nL:1/4\nK:G\nG A B c | d e f g |]\n",
+              "hidden": false
+            }
+          ],
+          "carries": true,
+          "sounds": [
+            "acoustic_grand_piano",
+            "flute"
+          ]
+        }
+      ]
+    },
+    "stop": {
+      "rule": "keptDownloads.stop, kind `sounds`, item the sound in plain words (`flute`, `acoustic guitar nylon`) on each page whose tune with Play needs it. A preview, a deploy and a scheduled deploy stop alike. A fault in the pass itself stops too when a page students can see has a tune with Play (passFails).",
+      "passFails": "As phetFences.stop.passFails: carrying on would make a site with a Play button that plays nothing. Its items name each tune's own `% sound:`, else piano, since without drawing nothing better can be told."
+    },
+    "quizzes": "A tune works in a self-check question's question and its explanation, with Play. In a CHOICE it is drawn without Play: a choice is a click target, so a press on Play would also choose the answer (geogebraFences.quizzes.whyNotInAChoice). The transformer leaves the controls out of any tune inside a .plantoir-quiz-choice; nothing is refused.",
+    "print": "The drawing prints, black on white; the Play controls and the credit line do not.",
+    "darkMode": "The drawing is fill and stroke currentColor (measured), so it takes the page's text colour in either colour scheme; Quartz's own rule colours svg <text> with the page's grey, which is kept.",
+    "credit": {
+      "sentence": "Sounds: Fluid R3 GM, CC BY 3.0.",
+      "licenceName": "CC BY 3.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sourceUrl": "https://github.com/paulrosen/midi-js-soundfonts",
+      "rule": "Under every tune's Play controls, small, a link on the licence's name (plan review item 6: CC BY 3.0 asks for credit reasonable to the medium, and a README in a folder is never seen). The README.txt in static/abcjs/ carries the source and its commit; THIRD_PARTY_LICENSES.md records both licences (the sound set's README says CC BY 3.0; its repository's LICENSE says MIT)."
+    },
+    "engine": {
+      "version": "6.7.2",
+      "licence": "MIT"
+    },
+    "words": {
+      "site": {
+        "play": "Play",
+        "stop": "Stop",
+        "playLabel": "Play {title}",
+        "stopLabel": "Stop {title}",
+        "gettingReady": "Getting the sounds ready…",
+        "couldNotPlay": "This tune could not be played. Reload the page and press Play again.",
+        "untitledTune": "the tune",
+        "describeTitled": "Music: {title}",
+        "describeUntitled": "Music",
+        "describeKey": "in {key}",
+        "describeMeter": "{meter} time"
+      },
+      "reasons": {
+        "percentPercentLine": "a line with %% is read by the site as the start or end of a hidden note, so the site leaves out what lies between two of them; name a sound with % sound: flute (one %) at the top of the tune instead of %%MIDI program",
+        "unknownSound": "there is no sound called “{value}”; name one from the General MIDI list, such as flute or acoustic grand piano",
+        "unknownSoundNear": "there is no sound called “{value}” (the closest: {near})",
+        "abcSaid": "the notation has a problem: {said}",
+        "abcSaidMore": "the notation has a problem: {said} (and {more} more)",
+        "noKey": "there is no K: line, so the tune is drawn in C major; add one after the header, such as K:G",
+        "emptyTune": "there is no tune in the block, so students see it as text",
+        "engineMissing": "this copy of Plantoir cannot draw tunes, so students see the block as text",
+        "drawingStopped": "the tune could not be drawn, so students see the block as text",
+        "tuneNotDrawn": "the tune could not be drawn, so students see the block as text",
+        "settingAfterTheTune": "% {name}: is read as a setting only at the top of the block, before the tune begins; here it is an ABC comment",
+        "moreThanOneTune": "the block holds more than one tune (an X: line each), and only the first is drawn; put each tune in a block of its own"
+      },
+      "notes": [
+        "settingAfterTheTune",
+        "moreThanOneTune"
+      ]
+    },
+    "knownLimits": [
+      "Drums are not offered: abcjs reaches the drum kit only through %%MIDI drum lines, which Quartz removes from a page (plan review item 8).",
+      "One tune a block: a second X: tune in the same block is not drawn (a note says so).",
+      "A per-voice sound follows a V: line on a line of its own; an inline [V:2] in a line of music takes the tune's sound.",
+      "Text widths in a drawing are estimated, in the build and in the student's browser alike (drawing.rule), so a long title or line of words can sit a little off centre.",
+      "Obsidian shows a tune only with the community plugin \"ABC Music Notation\" installed (Plantoir does not add it: it is AGPL-3.0), and that plugin plays its own default sound, not the `% sound:` named, and draws %% lines the site leaves out.",
+      "A tune that is only in a quiz's choice still makes its site carry the player and the sounds.",
+      "The kept sounds belong to one working folder on one computer (keptDownloads.knownLimits): after moving the working folder or changing computers the next build that plays a tune needs the internet.",
+      "The first press of Play on an iPad must come from the student's own tap (Safari's rule for sound); it does, since Play is a button, but it is not measured on a device."
     ]
   },
   "previewStartPage": {
@@ -39840,6 +40577,7 @@
       {"kind": "quizzesReadDifferently", "label": "Self-check question", "scope": "page", "from": "site", "facts": "quiz_disagreements", "identity": ["page", "n"], "page": "page", "item": "quizzes"},
       {"kind": "geogebraSketchesNotReady", "label": "GeoGebra sketch", "scope": "page", "from": "build", "facts": "geogebra_problems", "identity": ["page", "key"], "page": "page", "item": "sketches"},
       {"kind": "phetSimulationsNotReady", "label": "Science simulation", "scope": "page", "from": "build", "facts": "phet_problems", "identity": ["page", "key"], "page": "page", "item": "simulations"},
+      {"kind": "musicTunesNotRight", "label": "Music", "scope": "page", "from": "build", "facts": "music_problems", "identity": ["page", "key"], "page": "page", "item": "tunes"},
       {"kind": "filesTooLargeForCloudflare", "label": "File too large", "scope": "section", "from": "deploy", "identity": ["file"]}
     ],
     "kindsRule": "Every siteHealth.checks name is a kind, plus filesTooLargeForCloudflare (a deploy's refusal, worded by deployRefusals - not a siteHealth check, because no build reports it and nothing about it is a PLANTOIR_HEALTH: line). `facts` names the list a list check reads (siteHealth.findings' facts); its maker is called once per item with that item alone, and `item` is the placeholder of the check's detail that the item fills, so the row's `item` is exactly the piece the folder problem names. A kind with no `facts` is one row, the finding as it stands, with no page. A row's id is the kind and each `identity` field's value joined by |, an absent value as nothing - never a line number, which moves when the teacher types above it. A figure, a GeoGebra sketch, a Swift program and a block of runnable code are identified by their content - the fence's key, the program's key, the code hashed (site_said.facts_from_site) - rather than their place among the page's blocks (plan review, MED 5; implementation review L7: inserting a block above a broken one renumbers it, which would read as one new problem and one gone, and raise the alert for nothing). A self-check question keeps its place (`n`): its content is not in hand where either the folder check or the site's safety net reports it, and a nested one has no number at all, so inserting a question above a broken one still reads as one new and one gone - a named limit (knownLimits). An id met a second time in one record gets #2, #3 after it (two quizzes nested on one page have no number; plan review, LOW 10). `page` is the field the table's Page column shows; `scope` says what it shows for a kind with no page (words.wholeSection, words.wholeCourse).",
