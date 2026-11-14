@@ -17473,6 +17473,23 @@ after the app updates itself. So now:
   or `..` part, leading slash, backslash, drive letter or NUL; one that is
   not makes the op unreadable, so nothing outside the folder is ever
   written by an undo.
+- **Four sentences for a second reader** (the Fable sweep of U1, before
+  Windows writes its reader; no v1 byte changed). A `recompute` whose
+  `maintainer` this version does not know makes its op unreadable
+  (`UndoOp.maintainersThisVersionKnows`), and so does a `holds` other than
+  `section` or `course` for its step (`UndoStep.holdsThisVersionKnows`;
+  absent is readable): either step is a barrier, because an older reader
+  would otherwise undo it with the re-derivation skipped, or under the
+  wrong lease. The sweep measured the code before this: both read as
+  readable. `madeBy`, `class` and `action.key` are open strings no reader
+  rejects. A key a reader does not know on a known op is ignored, so a
+  known kind never gains a key that changes what undoing it does: a new
+  meaning needs a new `kind`. And `madeBy` is split at its ends: who before
+  the first colon, the session or conversation id after the last, so an
+  outside assistant's client name may hold colons. Each has a check case
+  or a stack case (`stepFromAnotherVersion:<variant>`, a begin line written
+  raw as another version would write it). Must-fail: with the old
+  `UndoFormat.swift`, 2 check verdicts and 6 stack checks are red.
 
 **Rejected:** skipping a line it cannot read (the first version; measured
 above); treating an unknown op as "changed since" (it clears the list under
@@ -17494,11 +17511,13 @@ its own locking trap on network and synced volumes); AppKit's
 Every change takes one exclusive lock, reads the journal fresh inside it,
 and holds it only for journal events, never while a change is applied.
 The mac's mechanism is `flock(LOCK_EX)` on `undo/.lock` (`UndoLock`): it
-belongs to the open file, so the app, an `--mcp-stdio` process, a
-scheduled run and two `UndoJournal` objects in one process all exclude
-each other, and the kernel releases it when the holder dies. The contract
-names the rule, not the mechanism; Windows uses an exclusive open of the
-same file (W3).
+belongs to the open file, so the app, an `--mcp-stdio` process and two
+`UndoJournal` objects in one process all exclude each other, and the
+kernel releases it when the holder dies. (A scheduled run never opens the
+list: a deploy set for later records nothing, rulings 17 and 18.) The
+contract names the rule, not the mechanism; Windows uses a wait the system
+queues on the same file, `LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY`,
+never an exclusive open retried on a timer (W3).
 
 It is tried once without blocking; when it is held, a BLOCKING `flock`
 runs on a thread of its own, which the kernel queues, and the caller waits
@@ -17600,10 +17619,12 @@ and 70 more steps: 71 on the list, none pruned. So now:
   the limits and pruning closes it. On Windows a file another program holds
   is the everyday case (W5), and a closed step cannot be retried.
   **Measured** (the core reviewer's reproduction: a 300-page step stopped
-  after 150 swaps, one of those pages made immutable, then 60 one-page
-  actions): retried at every lock, each action cost 154 to 176 ms until the
-  step was closed; on the schedule, the first cost 148 to 194 ms and every
-  one after it 6 to 19 ms. **Rejected:** once per process (a file held for a
+  after 150 swaps, one of those pages made immutable, then one-page
+  actions): retried at every lock, each of the next 50 actions cost 187 to
+  255 ms, against 7 to 11 ms for a free page (the core review of the second
+  round; the one figure the contract and these documents cite). On the
+  schedule, rerun by the implementer on the third round's harness, the
+  first cost 148 to 194 ms and every one after it 6 to 19 ms. **Rejected:** once per process (a file held for a
   minute would wait for the next launch).
 - A step closed `interrupted` leaves nothing of the journal's in a course
   (the director's ruling 6 on the third round): its staged files are removed
@@ -17716,6 +17737,21 @@ nobody recorded, standing, and the content check passes whenever that page
 was not touched since); pruning them one by one (more lines, the same
 result).
 
+**A process still in shadow after the flip is not settled yet**
+(`undo.knownLimits.shadowProcessAfterTheFlip`, found by the Fable sweep of
+U1). An outside-assistant session that outlives an update runs the older
+build, switch off, and goes on writing shadow steps into the same list,
+which a live reader cannot tell from live ones. Measured standalone: after
+`goLive` and one live step, a shadow-mode step became the head the live app
+offered, and Undo took it back past a newer change the shadow process never
+recorded; and a live two-page step killed after its first swap, when the
+first process to take the lock was in shadow, was closed `interrupted`
+with one page published and the other not, both staged files left and no
+trail line. No v1 line changes for it; U7 picks one of two ways out before
+Windows ships anything (`undo.laterPieces.U7`): the shadow list in a folder
+of its own (`undo-shadow/`, the cheaper), or a key on every shadow begin
+that live readers never offer.
+
 **An Undo refused for missing content clears the list too**, once it has
 said so (held question M9 on the second reviews; built as recommended behind
 one constant, `UndoSwitch.undoRefusedForMissingContentClearsTheList`).
@@ -17726,7 +17762,12 @@ could be undone. A Redo refused for missing content drops only its redo, as
 for a hand edit (ruling 20).
 
 **A deploy is not on the list and cuts nothing** (ruling 17), and neither
-does sharing unit plans or stopping sharing them (ruling 18). They replaced
+does sharing unit plans or stopping sharing them (ruling 18). That holds for
+a deploy set for later when it runs. Whether SETTING or CANCELLING one is a
+step is held for Russell (M10): the reserved `external` op names the
+LaunchAgent, and the rollover turns a schedule off. Until he answers it is
+counted as not a step, and the writer scan's `ScheduledDeploy.swift` entry
+says "held for Russell (M10)". They replaced
 rulings 14 and 16, under which a deploy and a share cleared the list. So
 everything done before a deploy can still be undone after it; when an Undo
 or a Redo takes back something a website already shows, it happens and
@@ -17879,7 +17920,11 @@ changes nothing the window does.
 The list is read and written OFF the main actor (the director's ruling 8 on
 the third round): `UndoShadowPublish` works out the pages on the main actor,
 then runs the lock, the read of the journal and the writes on a detached
-task the action waits for. A process's first read of the journal is a whole
+task the action waits for. Today's history records the change BEFORE that
+wait for the step's close (`history.record(change)` above the `await`, the
+Fable sweep of U1), so Undo Last Change knows of a write the moment it is
+made, as it did before U1; for the 5 to 35 ms of the close it otherwise
+did not. A process's first read of the journal is a whole
 one, 100 to 300 ms and more at a year's steady 2 to 6 MB (the core review of
 the second round), and it was running on the main actor at the first
 publish after a launch. A page's place in the working folder is worked out with every link
@@ -17933,7 +17978,8 @@ launchers they name) and 11 files joined the list;
 `testTheScanCountsShellsLaunchersAndTheCCalls` counts 9 of its samples where
 the scan before counted 2. `DeployCommand`, `ScheduledDeploy` and
 `PlanSharing` no longer say they wait for U6: a deploy, set for later or
-not, and sharing unit plans are not counted (rulings 17 and 18), and
+not, and sharing unit plans are not counted (rulings 17 and 18; whether
+setting or cancelling a deploy for later is a step is held as M10), and
 `DeployCommand.releaseSite`, the rollover's "cut loose", is U4's with the
 rollover. 87 files wrote on the branch; with `dev` merged (#785a and #897c), 90: `OneSectionRestore` (an `unzip -p` that only reads), and the shared Media store's `SharedMediaStore` and `SharedMediaFiles` (U5's).
 

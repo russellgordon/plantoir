@@ -13284,7 +13284,9 @@ before any Windows reader existed, so that it would not change again under
 one, and the issue says when that is settled. The third round (2026-11-14)
 changed no byte a v1 line holds: it stated what a reader does with a
 `cleared` line, a `note`'s required keys and a segment with no time, and
-what `rule.deployed` reads.
+what `rule.deployed` reads. The Fable sweep the same day added four
+sentences a reader needs, with cases, and no byte of a v1 line changed
+either: the second bullet below. Steps 1 to 8 may start once U1 merges.
 
 Windows inherits free: the format (`contracts/file-formats.json` →
 `undoJournal`, which a reader is meant to be built from alone), the rule and
@@ -13297,7 +13299,7 @@ against a reference model of the same rules. It reads the traces with CR LF
 taken as LF, so a checkout with `core.autocrlf=true` is current (measured
 red before the fix by converting the three files to CR LF).
 
-Five things in the format are easy to get wrong and are the reason it was
+Six things in the format are easy to get wrong and are the reason it was
 revised:
 
 - **Every object is open.** Only `kind` is required of an op, and only
@@ -13312,6 +13314,19 @@ revised:
   `note` event: a reader passes over a note whatever else it carries (no
   move, no barrier, nothing kept for it); it exists so a later version can
   add a record an older reader skips.
+- **Which values make a step unreadable, and which are open.** A
+  `recompute` whose `maintainer` the reader does not know (only
+  `sectionFrontPage` exists) makes its op unreadable, and a `holds` other
+  than `section` or `course` makes its step unreadable (absent is fine):
+  both are barriers, never undone with the re-derivation skipped or under
+  the wrong lease. `madeBy`, `class` and `action.key` are OPEN strings: a
+  typed reader must not reject a value it does not know (an enum that
+  throws on one is the mistake to avoid). A key it does not know on a known
+  op is ignored and kept, which is why a later version never adds a
+  meaning-bearing key to a known kind. `madeBy` splits at its ends: the
+  word before the FIRST colon, the id after the LAST, the client name
+  between (it may hold colons). `checkCases` and `stackCases`
+  (`stepFromAnotherVersion:<variant>`) pin each.
 - **A `cleared` line clears whatever its reason says.** A reader never
   checks the reason against `undo.clearReasons`, which lists only the
   reasons this version writes: a refused Undo (`changedSince`, ruling 13, and
@@ -13360,10 +13375,13 @@ It owes, in this order (the contract review's recommendation):
    content missing (closed and cleared), a file in use during recovery
    (tried again at once by an Undo or a Redo, and otherwise on the schedule
    in `undo.rule.recovery`: on Windows this is the everyday case, W5, and
-   retrying it at every lock cost the mac 154 to 255 ms on every action),
-   a step in flight in another process when the clearing is written, and a
+   retrying it at every lock cost the mac 187 to 255 ms on every action,
+   the core review of U1's second round), a step in flight in another process when the clearing is written, and a
    closed step's staged files removed.
-6. The traces.
+6. The traces. U1's are written by one small writer
+   (`JournaledWrite.settingEntry`'s rule, setting one front-matter line),
+   and U3 regenerates them through the real action code, so keep the
+   twin of that writer small: U3 replaces it with a wider replayer.
 7. `plantoir-mcp.exe` told the same folder as the window (W4).
 8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
    section's destinations as Windows knows them (primary and additional, by

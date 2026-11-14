@@ -225,7 +225,37 @@ def readable_op(op):
             return False
     if kind == "editLine":
         return isinstance(op.get("key"), str) and (op.get("before") is not None or op.get("after") is not None)
+    if kind == "recompute":
+        # A maintainer a reader does not know is a re-derivation it cannot
+        # run (opKinds.recompute).
+        return op.get("maintainer") in MAINTAINERS_KNOWN
     return True
+
+
+MAINTAINERS_KNOWN = ("sectionFrontPage",)
+HOLDS_KNOWN = ("section", "course")
+
+
+def readable_step(step):
+    """UndoStep's reading, as stepKeys and unknown.unreadableStep say:
+    a `holds` it does not know, or an op it cannot read, makes the step
+    unreadable; `madeBy`, `class` and `action.key` are open strings."""
+    if "holds" in step and step["holds"] not in HOLDS_KNOWN:
+        return False
+    for op in step["ops"]:
+        if not readable_op(op):
+            return False
+    return True
+
+
+def made_by_parts(made_by):
+    """stepKeys.madeBy: who is before the first colon, the id after the last."""
+    first = made_by.find(":")
+    if first < 0:
+        return made_by, None, None
+    last = made_by.rfind(":")
+    client = made_by[first + 1:last] if last > first else None
+    return made_by[:first], client, made_by[last + 1:]
 
 
 class ContractCaseTests(unittest.TestCase):
@@ -255,7 +285,10 @@ class ContractCaseTests(unittest.TestCase):
                     op["beforeSha"] = None if op["beforeText"] is None else traces.sha(op["beforeText"])
                     op["afterSha"] = None if op["afterText"] is None else traces.sha(op["afterText"])
                 text, is_absent_or_text = self.current_text(case["current"])
-                if text is None and not is_absent_or_text:
+                if op["kind"] == "recompute":
+                    # No check (opKinds.recompute): re-derived, never compared.
+                    state = "after"
+                elif text is None and not is_absent_or_text:
                     state = "neither"
                 elif text is None and op["kind"] == "writeFile":
                     state = traces.op_state(op, None)
@@ -373,6 +406,35 @@ class ContractCaseTests(unittest.TestCase):
                         # with one number: the model counts the number and
                         # the barrier; its blob is the Swift replay's to check.
                         model.foreign_line()
+                    elif call.startswith("stepFromAnotherVersion:"):
+                        variant = call[len("stepFromAnotherVersion:"):]
+                        before = model.pages[p1]
+                        after = flipped(p1)
+                        ops = [dict(op) for op in traces.ops_for_change(p1, before, after)]
+                        step = {"seq": model.highest + 1, "madeAt": "now", "madeBy": "menu", "class": "A",
+                                "holds": "section", "action": {"key": "publishPages", "arguments": {"pageCount": "1"}},
+                                "ops": ops}
+                        front = {"kind": "recompute", "path": "courses/TST1O/Section 1/index.md", "section": 1}
+                        if variant == "theFrontPageMaintainer":
+                            ops.append(dict(front, maintainer="sectionFrontPage"))
+                        elif variant == "aMaintainerNobodyKnows":
+                            ops.append(dict(front, maintainer="aMaintainerNobodyKnows"))
+                        elif variant == "aHoldsNobodyKnows":
+                            step["holds"] = "workingFolder"
+                        elif variant == "openStrings":
+                            step["madeBy"] = "outsideAssistant:A client: with colons:session-7"
+                            step["class"] = "Z"
+                            step["action"] = {"key": "aKeyNobodyKnows", "arguments": {}}
+                            self.assertEqual(made_by_parts(step["madeBy"]),
+                                             ("outsideAssistant", "A client: with colons", "session-7"))
+                        elif variant == "aKeyOnAKnownOp":
+                            ops[0]["onlyWhen"] = "aConditionNobodyKnows"
+                        else:
+                            self.fail("unknown variant " + variant)
+                        content_ops = [op for op in ops if op["kind"] != "recompute"]
+                        seq = model.begin(content_ops, readable=readable_step(step))
+                        model.pages[p1] = after
+                        model.finish(seq)
                     elif call == "foreignStep":
                         seq = model.begin([{"kind": "move", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"

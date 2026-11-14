@@ -181,7 +181,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ReferenceStaging.swift": (6, "waitsFor: U4"),
         "Models/ReferenceTreeCopier.swift": (5, "waitsFor: U4"),
         "Models/ReferenceZipSource.swift": (6, "waitsFor: U4"),
-        "Models/ScheduledDeploy.swift": (37, "notAStep: a deploy set for later (rulings 17 and 18): launchd jobs and the scripts they run, outside every course"),
+        "Models/ScheduledDeploy.swift": (37, "notAStep: held for Russell (M10): whether setting or cancelling a deploy for later is a step; the deploy when it runs is not (rulings 17 and 18). launchd jobs and the scripts they run, outside every course"),
         "Models/ScheduledPublishOutcome.swift": (5, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/ScheduledPublishWatcher.swift": (1, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/ScheduledRunFolderRefresh.swift": (4, "notAStep: a deploy set for later refreshing its folder's launchers (rulings 17 and 18), outside every course"),

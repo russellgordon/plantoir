@@ -2108,8 +2108,10 @@ final class AssistToolRunner {
                 sectionNumber: sectionNumber
             ))
         }
-        await UndoShadowPublish.finish(undoTicket, written: change, forSection: sectionNumber, in: course, journal: undoJournal)
+        // Today's history first, so Undo Last Change knows of the write the
+        // moment it is made; the shadow list's close waits on its own task.
         history.record(change)
+        await UndoShadowPublish.finish(undoTicket, written: change, forSection: sectionNumber, in: course, journal: undoJournal)
 
         // The plan's declined pages are already on the card (`describe`);
         // one declined only at the write — edited in Obsidian since the card

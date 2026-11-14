@@ -270,6 +270,12 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
     /// Worked out when read; never written.
     var isReadable: Bool = true
 
+    /// The `holds` values this version knows. A step carrying any other is
+    /// one it cannot read: it would take the wrong lease, or none, to undo
+    /// it (`undoJournal.stepKeys.holds`, the Fable sweep's T2). Absent is
+    /// readable. `madeBy`, `class` and `action.key` are open: never checked.
+    static let holdsThisVersionKnows: Set<String> = ["section", "course"]
+
     enum CodingKeys: String, CodingKey {
         case seq
         case madeAt
@@ -327,6 +333,9 @@ nonisolated struct UndoStep: Codable, Equatable, Sendable {
         section = UndoLenient.int(container, .section, &readable)
         actionClass = UndoLenient.string(container, .actionClass, &readable)
         holds = UndoLenient.string(container, .holds, &readable)
+        if let given = holds, !UndoStep.holdsThisVersionKnows.contains(given) {
+            readable = false
+        }
         if let decoded = try? container.decode([UndoOp].self, forKey: .ops) {
             ops = decoded
         } else {
@@ -488,6 +497,10 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
     /// False when this version cannot read the op. Never written.
     var isReadable: Bool = true
 
+    /// The `recompute` maintainers this version can run. Any other makes the
+    /// op unreadable (`undoJournal.opKinds.recompute`).
+    static let maintainersThisVersionKnows: Set<String> = ["sectionFrontPage"]
+
     enum CodingKeys: String, CodingKey {
         case kind
         case path
@@ -635,7 +648,13 @@ nonisolated struct UndoOp: Codable, Equatable, Sendable {
         case .editLine:
             return op.key != nil && (op.before != nil || op.after != nil)
         case .recompute:
-            return op.maintainer != nil
+            // A maintainer this version does not know is a re-derivation it
+            // cannot run, so the op is one it cannot read and its step is a
+            // barrier (`undoJournal.opKinds.recompute`, the Fable sweep's T1).
+            guard let maintainer = op.maintainer else {
+                return false
+            }
+            return UndoOp.maintainersThisVersionKnows.contains(maintainer)
         }
     }
 

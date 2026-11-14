@@ -561,8 +561,69 @@ nonisolated enum UndoContractReplay {
                 held.change = change.first
             }
 
+            /// One flip of p1 written by another version of Plantoir: a begin
+            /// line written raw, the page changed, then `applied`. The
+            /// variant gives the begin a value this version does not write.
+            func stepFromAnotherVersion(_ variant: String) throws {
+                let change: [UndoFileChange] = flip(in: root, at: pagePath)
+                let made: UndoStepDraft = draft(changes: change, root: root, action: "publishPages")
+                var opObjects: [[String: Any]] = []
+                for op in JournaledWrite.ops(for: made) {
+                    if let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(op)) as? [String: Any] {
+                        opObjects.append(object)
+                    }
+                }
+                let next: Int = try journal().read().highestSeq + 1
+                let moment: String = UndoMoment.text(journal().now())
+                let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: root)
+                var step: [String: Any] = [
+                    "seq": next,
+                    "madeAt": moment,
+                    "action": ["key": "publishPages", "arguments": ["pageCount": "1"]],
+                    "madeBy": "menu",
+                    "workingFolder": ["id": folderID, "pathAtTheTime": root.path],
+                    "course": "TST1O",
+                    "section": 1,
+                    "class": "A",
+                    "holds": "section",
+                ]
+                let frontPage: [String: Any] = ["kind": "recompute", "path": "courses/TST1O/Section 1/index.md", "section": 1]
+                if variant == "theFrontPageMaintainer" {
+                    var op: [String: Any] = frontPage
+                    op["maintainer"] = "sectionFrontPage"
+                    opObjects.append(op)
+                } else if variant == "aMaintainerNobodyKnows" {
+                    var op: [String: Any] = frontPage
+                    op["maintainer"] = "aMaintainerNobodyKnows"
+                    opObjects.append(op)
+                } else if variant == "aHoldsNobodyKnows" {
+                    step["holds"] = "workingFolder"
+                } else if variant == "openStrings" {
+                    step["madeBy"] = "outsideAssistant:A client: with colons:session-7"
+                    step["class"] = "Z"
+                    step["action"] = ["key": "aKeyNobodyKnows", "arguments": [String: String]()]
+                } else if variant == "aKeyOnAKnownOp" {
+                    if !opObjects.isEmpty {
+                        opObjects[0]["onlyWhen"] = "aConditionNobodyKnows"
+                    }
+                } else {
+                    failures.append("stackCases '\(name)': unknown variant \(variant)")
+                }
+                step["ops"] = opObjects
+                let process: Any = try JSONSerialization.jsonObject(with: JSONEncoder().encode(UndoProcess.current()))
+                let begin: [String: Any] = ["v": 1, "seq": next, "event": "begin", "at": moment, "step": step, "process": process]
+                let beginData: Data = try JSONSerialization.data(withJSONObject: begin, options: [.sortedKeys])
+                try appendRaw(String(decoding: beginData, as: UTF8.self), to: journal())
+                if let first = change.first {
+                    try (first.after ?? Data()).write(to: root.appendingPathComponent(first.relativePath))
+                }
+                try appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\",\"at\":\"\(moment)\"}", to: journal())
+            }
+
             for value in testCase["calls"] as? [String] ?? [] {
-                if value == "step" {
+                if value.hasPrefix("stepFromAnotherVersion:") {
+                    try stepFromAnotherVersion(String(value.dropFirst("stepFromAnotherVersion:".count)))
+                } else if value == "step" {
                     oneStep(folderRoot: root, path: pagePath, daysAgo: 0)
                 } else if value == "stepOn:p2" {
                     oneStep(folderRoot: root, path: otherPagePath, daysAgo: 0)
