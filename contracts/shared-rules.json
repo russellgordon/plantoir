@@ -1234,6 +1234,24 @@
           "mac"
         ],
         "appliesOnWhy": "Windows' run has done the same since #477 (2026-10-15) and records it under the two events it already had: 'working folder tools copied' ('got the working folder ready for a scheduled deploy', a failure ending 'the scheduled deploy stood down') and 'scheduled publish waited for the course' for the wait. The mac gives it an event of its own because its run never stands down for the copy (scheduledRunGetsItsFolderReady.platformDifferences), so its line says something Windows' lines do not: that it went ahead with the tools as they were. Nothing is owed by Windows."
+      },
+      {
+        "event": "deployed folder opened in the web browser",
+        "carries": "the course and the section, after the course's own prefix ({course}/{section} · ); where Open in Browser was pressed (the deploy's result, the Section menu, the toolbar, the sidebar); whether it was already being shown; and whether its usual address was taken, so what the site remembered there is not shown. Never the folder's path or the address.",
+        "line": "opened the deployed folder in the web browser ({from}[, already open | , at a different address because its usual one was taken, so what the site remembered there is not shown])",
+        "why": "#850. 'My ticks were gone' is answerable only if the trail says the address moved, and 'it opened the wrong thing' only if it says where the press came from."
+      },
+      {
+        "event": "deployed folder no longer shown",
+        "carries": "the course and the section; why it stopped (Stop was pressed, Plantoir quit, the folder was gone, it stopped on its own); how many requests it answered and how many found nothing. Counts only, never an address: an address is a page name.",
+        "line": "stopped showing the deployed folder in the web browser — {Stop was pressed | Plantoir quit | the folder was gone | it stopped on its own} ({requests} requests, {missing} not found)",
+        "why": "#850. The not-found count is what makes 'a page would not open' reportable without asking which page."
+      },
+      {
+        "event": "deployed folder could not be opened",
+        "carries": "the course and the section, and why: the folder was not found, nothing deployed there, no address on this computer was free, or the browser did not open it.",
+        "line": "could not open the deployed folder in the web browser — {the folder was not found | nothing deployed there | no address on this computer was free | the browser did not open it}",
+        "why": "#850. Each arrives as 'Open in Browser did nothing', and only the trail can say which."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -15139,6 +15157,19 @@
         },
         "expectAsk": true,
         "why": "#351 (mac, 2026-09-27): a backup, or the archive made before a restore or a removal, is zipped off the main thread now, so the window stays live for the minute it can take and a quit mid-zip is possible. It leaves a half-written copy - and, before a restore or a removal, one that never happened. Before #351 the frozen window made the quit impossible."
+      },
+      {
+        "name": "a deployed folder is open in the browser",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "deployedFoldersShown": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": false,
+        "why": "#850 (Russell, 2026-11-13: it runs until Stop or quitting Plantoir). Nothing is built, copied or written while a deployed folder is shown, so nothing can be lost: like an open preview, quitting ends it, and the trail says Plantoir quit. deployedFoldersShown is 0 when a case leaves it out."
       }
     ]
   },
@@ -27213,7 +27244,7 @@
   },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview. On Windows the alternate is a second visible item (a WinUI menu has no modifier alternates), and it is still the same item for this rule.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. OPEN IN BROWSER (#850, Russell 2026-11-13: one Open in Browser for both) is live on a SECTION row when a preview is showing (it opens the preview) or, with none showing, when the section's deployed folder can be opened (deployedFolderReady; it opens the folder, deployedFolderInBrowser.offeredCases); stopShowingDeployedFolder is live while that folder is being shown (deployedFolderShown), whatever else is happening. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview. On Windows the alternate is a second visible item (a WinUI menu has no modifier alternates), and it is still the same item for this rule.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,
@@ -27238,7 +27269,9 @@
       "lastChangeIsHere": false,
       "verbIsRunning": false,
       "canGoBack": false,
-      "canGoForward": false
+      "canGoForward": false,
+      "deployedFolderReady": false,
+      "deployedFolderShown": false
     },
     "situationKeys": {
       "hasFolder": "A Plantoir window is in front with a working folder open. False with no window, or with the assistant, Settings or About in front.",
@@ -27264,7 +27297,9 @@
       "lastChangeIsHere": "The last change the Section menu made in THIS window was made in the selected section, so Undo Last Change would take it back (Russell's decision 4: the assistant's window keeps its own undo list).",
       "verbIsRunning": "One of the assistant's functions is running on the selected section - from this window's menu, another window's, or the in-app assistant's own window (#457 batch B plan review, note 14). They run one at a time.",
       "canGoBack": "The preview can go back a page.",
-      "canGoForward": "The preview can go forward a page."
+      "canGoForward": "The preview can go forward a page.",
+      "deployedFolderReady": "The selected section's deployed folder can be opened in the browser: deployedFolderInBrowser.offeredCases decides 'offered' (#850).",
+      "deployedFolderShown": "The selected section's deployed folder is being shown in the browser by this app (#850)."
     },
     "items": [
       "openWorkingFolder",
@@ -27296,6 +27331,7 @@
       "preview",
       "deploy",
       "openInBrowser",
+      "stopShowingDeployedFolder",
       "scheduleDeploy",
       "cancelScheduledDeploy",
       "getReadyForTheStartOfTheYear",
@@ -27891,6 +27927,127 @@
           "lastChangeIsHere": true
         },
         "enabled": []
+      },
+      {
+        "why": "#850: a live section row with no preview showing, whose course deploys to a folder that holds this section's deployed site. Open in Browser is live and opens the deployed folder; Stop Showing Deployed Folder is not, because nothing is shown yet.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "deployedFolderReady": true
+        },
+        "enabled": [
+          "addNextClass",
+          "addSection",
+          "backUpNow",
+          "classDates",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "hidePages",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "makeRoomForClasses",
+          "newCourse",
+          "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "publishClassForADate",
+          "publishPages",
+          "reDateClasses",
+          "reloadCourses",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder"
+        ]
+      },
+      {
+        "why": "#850: the same section while its deployed folder is being shown. Open in Browser stays live (pressed again it reopens the same address and starts nothing), and Stop Showing Deployed Folder is live.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "deployedFolderReady": true,
+          "deployedFolderShown": true
+        },
+        "enabled": [
+          "addNextClass",
+          "addSection",
+          "backUpNow",
+          "classDates",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "hidePages",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "makeRoomForClasses",
+          "newCourse",
+          "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "publishClassForADate",
+          "publishPages",
+          "reDateClasses",
+          "reloadCourses",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder",
+          "stopShowingDeployedFolder"
+        ]
+      },
+      {
+        "why": "#850: a section whose deployed folder is being shown while its course deploys. The folder is half copied, so it cannot be opened now (offeredCases: greyed while a deploy runs), but Stop is never held back: stopping writes nothing.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "deploying": true,
+          "structuralHold": true,
+          "busy": true,
+          "hasStartOfYearUndo": true,
+          "hasLinksOffer": true,
+          "deployedFolderShown": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeSection",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder",
+          "stopShowingDeployedFolder"
+        ]
       }
     ],
     "rejected": [
@@ -28368,7 +28525,7 @@
         ]
       },
       "handoutsSkill": {
-        "rule": "The skill `plantoir-handouts` (#631) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so a new skill needs no code on either platform: both apps enumerate the folder. It carries the house style for paper made OUTSIDE the site - a LaTeX source compiled with tectonic to `Name.pdf`, with `Name - Answers.pdf` (`- Solutions` for a quiz or test) from the same source behind the \\qa/\\onlyq/\\onlya switch - and tells an assistant to OFFER it first whenever a teacher asks for something to print, in any course, beside `plantoir-printing` for a page that prints. It lays the corners out as the course's print settings do (`print_school_name`, `print_school_name_at`, `print_course_code_at`, `print_blanks`, read the way scripts/print_settings.py reads them, with the handout's title before whatever is placed bottom left), and when `print_school_name` is empty the assistant asks. A quiz or test for marks is usually printed this way; whether it also goes on the website is the teacher's call, and the assistant asks. Sources and answer keys are kept OUT of `courses/`, because every file in a course folder that is not a page is copied to the website (Quartz's Assets emitter). It ships the starters listed here, compiled and looked at when they were written. Since #715 it also carries `patterns/` - tables.tex (a new table in nicematrix, an existing colortbl table with the inset \\rowcolor, tables side by side), finite_differences.tex and finite_differences.py (the scaffold) - which are not starters and so are not listed, and the house rules for tables (a full border always, each value of a column holding any negative value or mixing whole numbers and decimals right-aligned in a box as wide as the column's widest value without its sign, the box centred (the starters' N column; on a page, `---:`), and any other column centred - the first #715 merge centred a mixed column, corrected 2026-11-01 - decimals to the same places in a column and never padded in running text, the x and y columns one width from the widest value in either and the two difference columns one width, every value centred in a row of one pitch so the first and last sit half a pitch from the heading and bottom rules (a strut of equal height and depth in every cell, \\valuepitch, taller for a table with room to write), a horizontal two-row table only where no finite differences are asked and every table used for finite differences vertical, a look at every table at 80 dpi for its top edge and at 600 dpi for notches), the finite-difference scaffold and task cards. Since 2026-11-01 it also says that the answer key keeps the question copy's layout - each table and graph authored once, with the same orientation, alignment, axis ranges, scale and printed size, and only the cells and the plotted answer switched - and that a graph of an abstract relation runs to the edge of the grid with an arrowhead at each end (`<->, >=latex`, a domain that ends at the edge and never past it, where the axis clips the arrowheads off) while a graph that models a context stops at the end points the situation gives it, with none; and that any line carrying a blank students write on is about two lines tall, through an invisible strut in the blank macro (the starters' \\fillin, which writes the answer on the same line in the key), never spaced by hand - a printed page has only a quiz's blank, and the printing skill sends written answers that need the room to a PDF handout. It remembers the folder a course's handouts are kept in, in `courses/<CODE>/.internal/handouts/handouts.json` ({folder, teacherSaid, recorded}): written and read by the assistant only, neither app reads it and both leave it alone; inside `.internal` it travels with a backup, an archive and a restore and never reaches a site. On the site goes only the PDF a page hands out - `Name.pdf`, or a worksheet's merged `Name - with Answers.pdf` when its page gives the answers; a quiz or test may go there, its solutions never. It is NOT in pageAuthoringSkill.routesTo: that table routes the parts of a PAGE, and a handout made as a PDF is not one; `plantoir-printing` and `plantoir-page-authoring` each name it in a sentence instead (mentionedBy). The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Since #754 (ruled 2026-11-09, written into the skill 2026-11-12) a lettered part on a quiz or test hangs under its first word: `starters/Quiz.tex` defines `\\partindent`, `\\qlabel`, `\\qpart` (the part in the flow of the page, `\\leftskip` set to `\\partindent` and the letter pulled back into it) and `\\partbox` (a part in a slot of fixed height, the same height in the solutions, measured to keep the two copies lined up where a slot added only to the question copy let the key drift up), its question 3 a worked example, and the skill says the macros are a starting point to adjust to the teacher's own house style. starterMacros lists, per starter, the macros it must define and the skill must name. Questions are worded in plain English, for students learning it. Since #765 (2026-11-12) it carries lesson materials (section 13, each rule applying only when the lesson has the thing it names: when a lesson uses task cards, one ask per card and core before extension; when it has a summary, only what the lesson built; an exercise on its lesson's topic unless the teacher asks otherwise; whether there are hints is the teacher's choice, and when there are, a hint never gives the answer (how much more it gives is the teacher's), and a hints sheet on paper, when the teacher wants one, is `Name - Hints.pdf` from the same source through `\\showhints` and `\\hint`, the wrapper `hintsStarter`, deliberately NOT in `starters`, whose every entry defines `\\showanswers`) and wording and contexts (section 14), the four-step review (build, a separate reviewer re-solving every answer and checking every hint, the lead's coherence pass against what the teacher asked, any changed question back to the reviewer), the `Adapted from` line (never on an assessment) and equal axis units on a card's graph that compares width or steepness. The course's How I Teach page comes first; otherwise the teacher's request. One teacher's lesson shape (Russell's: the warmup's movie-trailer shape, one big idea per class built by a progression of task cards, visibly random groups at vertical whiteboards with each graph on its own grid and at most four per set (the #715 card rules, moved into the template), the exercise following from that day's cards and summary, hints on every exercise on the page and on paper that point back to a card or summary rather than give a first step, the exercise as the only homework) ships as a TEMPLATE named in `offeredTemplate`, OFFERED, never applied, and only to a teacher who has shown an interest in BOTH halves of what it bridges, constructivist and Thinking Classrooms practice and a school where students often miss class (one without the other is not enough, and a no is not asked again in that conversation) (Russell, 2026-11-12, on #765).",
+        "rule": "The skill `plantoir-handouts` (#631) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so a new skill needs no code on either platform: both apps enumerate the folder. It carries the house style for paper made OUTSIDE the site - a LaTeX source compiled with tectonic to `Name.pdf`, with `Name - Answers.pdf` (`- Solutions` for a quiz or test) from the same source behind the \\qa/\\onlyq/\\onlya switch - and tells an assistant to OFFER it first whenever a teacher asks for something to print, in any course, beside `plantoir-printing` for a page that prints. It lays the corners out as the course's print settings do (`print_school_name`, `print_school_name_at`, `print_course_code_at`, `print_blanks`, read the way scripts/print_settings.py reads them, with the handout's title before whatever is placed bottom left), and when `print_school_name` is empty the assistant asks. A quiz or test for marks is usually printed this way; whether it also goes on the website is the teacher's call, and the assistant asks. Sources and answer keys are kept OUT of `courses/`, because every file in a course folder that is not a page is copied to the website (Quartz's Assets emitter). It ships the starters listed here, compiled and looked at when they were written. Since #715 it also carries `patterns/` - tables.tex (a new table in nicematrix, an existing colortbl table with the inset \\rowcolor, tables side by side), finite_differences.tex and finite_differences.py (the scaffold) - which are not starters (listed in `patterns` since #859), and the house rules for tables (a full border always, each value of a column holding any negative value or mixing whole numbers and decimals right-aligned in a box as wide as the column's widest value without its sign, the box centred (the starters' N column; on a page, `---:`), and any other column centred - the first #715 merge centred a mixed column, corrected 2026-11-01 - decimals to the same places in a column and never padded in running text, the x and y columns one width from the widest value in either and the two difference columns one width, every value centred in a row of one pitch so the first and last sit half a pitch from the heading and bottom rules (a strut of equal height and depth in every cell, \\valuepitch, taller for a table with room to write), a horizontal two-row table only where no finite differences are asked and every table used for finite differences vertical, a look at every table at 80 dpi for its top edge and at 600 dpi for notches), the finite-difference scaffold and task cards. Since 2026-11-01 it also says that the answer key keeps the question copy's layout - each table and graph authored once, with the same orientation, alignment, axis ranges, scale and printed size, and only the cells and the plotted answer switched - and that a graph of an abstract relation runs to the edge of the grid with an arrowhead at each end (`<->, >=latex`, a domain that ends at the edge and never past it, where the axis clips the arrowheads off) while a graph that models a context stops at the end points the situation gives it, with none; and that any line carrying a blank students write on is about two lines tall, through an invisible strut in the blank macro (the starters' \\fillin, which writes the answer on the same line in the key), never spaced by hand - a printed page has only a quiz's blank, and the printing skill sends written answers that need the room to a PDF handout. It remembers the folder a course's handouts are kept in, in `courses/<CODE>/.internal/handouts/handouts.json` ({folder, teacherSaid, recorded}): written and read by the assistant only, neither app reads it and both leave it alone; inside `.internal` it travels with a backup, an archive and a restore and never reaches a site. On the site goes only the PDF a page hands out - `Name.pdf`, or a worksheet's merged `Name - with Answers.pdf` when its page gives the answers; a quiz or test may go there, its solutions never. It is NOT in pageAuthoringSkill.routesTo: that table routes the parts of a PAGE, and a handout made as a PDF is not one; `plantoir-printing` and `plantoir-page-authoring` each name it in a sentence instead (mentionedBy). The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Since #754 (ruled 2026-11-09, written into the skill 2026-11-12) a lettered part on a quiz or test hangs under its first word: `starters/Quiz.tex` defines `\\partindent`, `\\qlabel`, `\\qpart` (the part in the flow of the page, `\\leftskip` set to `\\partindent` and the letter pulled back into it) and `\\partbox` (a part in a slot of fixed height, the same height in the solutions, measured to keep the two copies lined up where a slot added only to the question copy let the key drift up), its question 3 a worked example, and the skill says the macros are a starting point to adjust to the teacher's own house style. starterMacros lists, per starter, the macros it must define and the skill must name. Questions are worded in plain English, for students learning it. Since #765 (2026-11-12) it carries lesson materials (section 13, each rule applying only when the lesson has the thing it names: when a lesson uses task cards, one ask per card and core before extension; when it has a summary, only what the lesson built; an exercise on its lesson's topic unless the teacher asks otherwise; whether there are hints is the teacher's choice, and when there are, a hint never gives the answer (how much more it gives is the teacher's), and a hints sheet on paper, when the teacher wants one, is `Name - Hints.pdf` from the same source through `\\showhints` and `\\hint`, the wrapper `hintsStarter`, deliberately NOT in `starters`, whose every entry defines `\\showanswers`) and wording and contexts (section 14), the four-step review (build, a separate reviewer re-solving every answer and checking every hint, the lead's coherence pass against what the teacher asked, any changed question back to the reviewer), the `Adapted from` line (never on an assessment) and equal axis units on a card's graph that compares width or steepness. The course's How I Teach page comes first; otherwise the teacher's request. One teacher's lesson shape (Russell's: the warmup's movie-trailer shape, one big idea per class built by a progression of task cards, visibly random groups at vertical whiteboards with each graph on its own grid and at most four per set (the #715 card rules, moved into the template), the exercise following from that day's cards and summary, hints on every exercise on the page and on paper that point back to a card or summary rather than give a first step, the exercise as the only homework) ships as a TEMPLATE named in `offeredTemplate`, OFFERED, never applied, and only to a teacher who has shown an interest in BOTH halves of what it bridges, constructivist and Thinking Classrooms practice and a school where students often miss class (one without the other is not enough, and a no is not asked again in that conversation) (Russell, 2026-11-12, on #765). Since #859 (2026-11-13, the owner's bar: teachers get handouts at the quality he produces) the starters are finished sheets to imitate rather than sparse templates (worked examples with substituted values in red via \\sv, side notes via \\sidenote, a \\method heading, a table and a graph inside a box, a context graph that stops at its end points, an N column wherever a column holds a negative, the corners defaulting to an empty school name and the Name and Date blanks, the key's equivalent-forms line); a C cell holding a math minus prints a red `use N` so a centred negative column shows on the rendered page; `patterns` and `checker` (above) ship and are named; the tools are checked before writing, with a route for each on a Mac and on Windows that never runs an installer in the working folder, and a rendering fallback; the hints sheet is the hints ALONE, one block after \\begin{document} ending in its own \\end{document}, with joined `- with Hints` and `- with Answers` files (pdfunite, or tectonic with pdfpages); and two suggestions are offered, never applied: the page's Print button handing out the PDF (a file holding answers only after the teacher is told students will get the answers and says yes; an answer key alone never), and hints first, then the answers, with the swap done in written steps through the existing publish tools and the assistant's own file edits (#753 would make it one step). Ruled in the fix round: a graph only in the key is allowed where it serves the topic (a note, never a failure); a shared exercise page swaps ONCE, after the last section has checked its homework, since the rename changes every section's link at once; and the joined answers file stays outside the course until the swap, because the build drops a `publish: false` page before it writes anything but copies every file in `Media` to the site. And (the Fable sweep, measured with build_site.process_frontmatter) a copy of a published SHARED page keeps its `publishForSection<N>: true` lines, which win over a `publish: false` added beside them, so the answers copy is hidden by setting EVERY per-section line false (or `unpublish_pages`) and confirmed with `plan_unpublish_pages`; the checker's `answers-copy-published` fails a copy that would publish beside its published hints page.",
         "skill": "plantoir-handouts",
         "starters": [
           "starters/Handout.tex",
@@ -28391,7 +28548,10 @@
         },
         "starterMacros": {
           "starters/Handout.tex": [
-            "\\hint"
+            "\\hint",
+            "\\sv",
+            "\\sidenote",
+            "\\method"
           ],
           "starters/Quiz.tex": [
             "\\partindent",
@@ -28399,10 +28559,20 @@
             "\\qpart",
             "\\partbox"
           ]
-        }
+        },
+        "patterns": [
+          "patterns/tables.tex",
+          "patterns/finite_differences.tex",
+          "patterns/finite_differences.py",
+          "patterns/worked_examples.tex",
+          "patterns/graphs.tex"
+        ],
+        "patternsRule": "#859 (2026-11-13): every file under patterns/, each named in the skill in backticks. The .tex patterns compile alone with tectonic, and worked_examples.tex and graphs.tex repeat starters/Handout.tex's preamble line for line between the markers `The starter's preamble` and `End of the starter's preamble`, so a pattern copied into a handout needs nothing added (scripts/test_handout_starters.py compiles them and compares the preambles).",
+        "checker": "tools/check_handout.py",
+        "checkerRule": "#859 (2026-11-13): a stdlib Python checker shipped with the skill, named in it in backticks, that the assistant runs before handing over when Python is there (the skill's section 8). It reads the source, its wrappers, its PDFs and its folder; prints one line per problem, each starting with a rule's name; exits 1 when there is any; changes and deletes nothing; and ends every run with what it cannot check, which the skill sends to the rendered pages. `--self-test` breaks each rule on a small source and must see it fire, and see nothing on the clean one. scripts/test_handout_starters.py runs the self-test, runs the checker on every starter and pattern (placeholders filled in as a teacher would) expecting nothing, and runs it on a broken copy of the starter for each rule expecting that rule. A rule in its NOTE_RULES (since the #859 fix rounds, `key-only-graph`, the owner ruling a graph only in the key allowed where it serves the topic, and `key-columns`, a key whose `tasks` column count differs, which his own templates do where the answers need the room) is printed as a `note:` line and never counted, so it never makes the exit code 1. Windows inherits it through PythonToolchainTests."
       },
       "mustSay": {
-        "rule": "#758 (2026-11-12). The sentences a skill must keep saying, as data both suites read: each key is a skill folder under support/agent_guidance/skills, and each value the phrases its SKILL.md must contain, as written into BOTH homes (.claude/skills and .agents/skills) by AgentGuidance.write. A phrase is matched after the file is read as UTF-8 and, in the phrase and in the file alike, every run of white space (a line break included) is folded to one space, so re-wrapping a paragraph never breaks a pin; a phrase inside a callout or quote also matches when the file is folded with the `>` markers that begin each of its lines dropped as well (a line break, then white space and `>` marks, becomes one space), so a sentence wrapped inside `> ` lines is found too. Either form matching is a match. A phrase is a sentence or part of one, never a whole section, and it pins a RULE, not a heading. Every phrase was absent from the skill it pins before the piece that added it (a phrase already present proves nothing), and every key must name a skill folder that exists, so a misspelled key fails rather than passing on nothing. This is the registry for every skill, not only printing's: it sits under printablePages.agentGuidance because that is where the guidance root (rootFiles, folders, source) lives, and later pieces add their skills' phrases here rather than typing literal checks into each platform's test.",
+        "rule": "#758 (2026-11-12). The sentences a skill must keep saying, as data both suites read: each key is a skill folder under support/agent_guidance/skills (or, for a skill named in held.skills, under held.place, where it is kept and not written), and each value the phrases its SKILL.md must contain, as written into BOTH homes (.claude/skills and .agents/skills) by AgentGuidance.write. A phrase is matched after the file is read as UTF-8 and, in the phrase and in the file alike, every run of white space (a line break included) is folded to one space, so re-wrapping a paragraph never breaks a pin; a phrase inside a callout or quote also matches when the file is folded with the `>` markers that begin each of its lines dropped as well (a line break, then white space and `>` marks, becomes one space), so a sentence wrapped inside `> ` lines is found too. Either form matching is a match. A phrase is a sentence or part of one, never a whole section, and it pins a RULE, not a heading. Every phrase was absent from the skill it pins before the piece that added it (a phrase already present proves nothing), and every key must name a skill folder that exists, so a misspelled key fails rather than passing on nothing. A held skill's pins are checked against its folder in held.place by its own Python tests, and the written-homes walk checks that it is NOT written. This is the registry for every skill, not only printing's: it sits under printablePages.agentGuidance because that is where the guidance root (rootFiles, folders, source) lives, and later pieces add their skills' phrases here rather than typing literal checks into each platform's test.",
         "plantoir-page-authoring": [
           "**Every text block on a page wraps, unless its meaning depends on characters lining up.**",
           "Never a bare `text`: an unwrapped block is always deliberate.",
@@ -28411,7 +28581,9 @@
           "make the exercise as a PDF handout with its hints sheet"
         ],
         "plantoir-printing": [
-          "A text block prints wrapped whether or not it says `wrap`."
+          "A text block prints wrapped whether or not it says `wrap`.",
+          "say plainly that students who press Print will get the answers",
+          "is never what the button offers"
         ],
         "plantoir-handouts": [
           "**A lettered part hangs under its first word.**",
@@ -28428,7 +28600,24 @@
           "then any question that changed goes back to the reviewer",
           "An assessment (a quiz or test) never does.",
           "Contexts you invent never involve firearms or ammunition",
-          "except anything in a teacher-only folder"
+          "except anything in a teacher-only folder",
+          "Go through every line, on the rendered pages of every copy",
+          "The school's name comes only from the course's settings or from the teacher in this conversation",
+          "say plainly that students who press Print will get the answers",
+          "is never what the button offers",
+          "The starters are finished sheets to imitate, not empty templates.",
+          "Equivalent forms are fine",
+          "It never gives the answer away, not even through a pointed first step.",
+          "Check for both FIRST, before planning or writing",
+          "never the working folder or a course",
+          "render into a folder named `.handout-check` inside the handouts folder",
+          "say plainly that the answers page TAKES the plain title",
+          "**The x column counts too**",
+          "A graph only in the key is allowed where it serves the topic",
+          "swap ONCE, after the LAST section has had its homework checked",
+          "stays in the handouts folder, outside the course, for the whole hints period",
+          "and a section's own line wins over `publish:`",
+          "take `Name - with Hints.pdf` out of `Media`"
         ],
         "plantoir-test-authoring": [
           "Please read and decide on all of it before it reaches a student; I draft, you decide.",
@@ -28439,10 +28628,8 @@
           "no file in the kit has a key for a name, ever",
           "use it only after they say yes",
           "If you cannot tell whether they have shown that interest, do not offer it.",
-          "you may mention once, in one sentence, that when the papers are written",
-          "Do not raise it again in this session if they do not take it up.",
-          "If it is not there, say nothing about marking, and do not mark papers from this kit",
-          "If it is there, when the kit is finished and the teacher has looked at it, you may mention once",
+          "Do not offer to mark, and do not mark from this kit, in this session or any other.",
+          "This version of Plantoir does not help with marking or with report card comments; the files in this kit are for your own marking.",
           "it reads keys, not prose: a name typed inside a value is not something it can find",
           "the checker refuses any key the format does not define",
           "and each solutions PDF into that unit's `Answer Keys` folder"
@@ -28535,6 +28722,190 @@
           "cannot see a nickname, initials or a name that is not in the table",
           "after `{they}` the script accepts only can, could, will, would, should, might, must, may, did, had or a past tense",
           "It opens each student's record by that student's section and identifier"
+        ]
+      },
+      "held": {
+        "rule": "#750 (2026-11-13). Skills kept in the repository and NOT written into any working folder in this release, on either platform. Each held skill's folder is in `place` instead of support/agent_guidance/skills, and both apps copy every folder under source/skills and nothing else, so neither app writes it and neither needs a line of code for the hold. Its mustSay pins, its blocks under assessment and its Python tests are kept and run against `place`, so the skill stays whole for the release that brings it back. While held: no folder of its name in either home, neither root file names it, no written skill names it or says one of `words` (outside `mayStillName`), and no greeting, app sentence, app source, Help page or plantoir.app page does either. Bringing one back is the numbered list in `whenTheyReturn.steps`, the same list documentation/09-mac-app.md gives.",
+        "place": "held/agent_guidance/skills",
+        "until": "2.1",
+        "skills": {
+          "plantoir-marking": "Deferred from 2.0.0 on both platforms (the ruling on #750, 2026-11-13). Six rounds of trials and fixes closed every route found by which a student's name could reach an assistant on a Mac, but the last ordinary review still found fixes needed (a contract row overstating what is closed, a stray copy on Windows no test can catch, nine smaller items), and Windows has none of the protection the step that opens the original scans needs. The work is kept on the branch issue/750d-the-teacher-runs-the-steps-that-touch-names for the later release, with the recommendation recorded on #750: a fixed shipped script, not assistant-written code, runs beside the original scans.",
+          "plantoir-report-comments": "It drafts from what plantoir-marking writes and puts the first names in through that skill's runner and make_named_copies.py, so it cannot ship without it."
+        },
+        "words": {
+          "rule": "What scripts/test_held_skills.py looks for: per held skill, regular expressions matched without regard to case, after every run of white space is folded to one space and every phrase in `allowed` is taken out. Read in both root files, every file of every written skill (outside mayStillName), every string in contracts/app-rules.json and contracts/assist-wording.json, both apps' sources, Help (help/*.json and help/pages) and plantoir.app's page sources. `mustTrip` sentences must each be caught and `mustPass` sentences, ordinary uses of marks and marking that stay, must not be. An entry goes when its skill comes back.",
+          "bySkill": {
+            "plantoir-marking": [
+              "plantoir-marking",
+              "\\bmark(?:ing)?\\s+(?:the|a|an|your|their|these|those|each|every|all|students?|student's|students')\\s+(?:[\\w']+\\s+){0,2}?(?:papers?|tests?|quiz(?:zes)?|exams?|assignments?|scans?|work)\\b",
+              "\\bmark(?:ing)?\\s+(?:papers|tests|quizzes|exams|assignments|scans)\\b",
+              "\\bmark\\s+them\\b",
+              "\\bhelp(?:\\s+you)?(?:\\s+with)?(?:\\s+to)?\\s+mark(?:ing)?\\b",
+              "\\bgrad(?:e|ing)\\s+(?:the|their|your|these|those|student|students|students')\\s+(?:[\\w']+\\s+){0,2}?(?:papers?|tests?|quiz(?:zes)?|exams?|work)\\b",
+              "\\bscanned\\s+(?:papers?|tests?|quiz(?:zes)?|exams?|work|pages)\\b",
+              "\\bscans?\\s+of\\s+(?:the|their|your|each|every)\\s+(?:[\\w']+\\s+)?(?:papers?|tests?|quiz(?:zes)?|exams?|work)\\b",
+              "\\bonto\\s+feedback\\s+sheets?\\b",
+              "\\bfeedback\\s+sheets?\\s+(?:for|from)\\s+(?:each|every|your|the|their)\\s+(?:student|paper|class|scan)",
+              "\\bclass(?:'s)?\\s+results\\b"
+            ],
+            "plantoir-report-comments": [
+              "plantoir-report-comments",
+              "\\breport[\\s-]+cards?\\b",
+              "\\breport\\s+comments?\\b",
+              "\\bcomments?\\s+for\\s+(?:the\\s+|their\\s+|your\\s+|each\\s+)?(?:report|reports|term|progress)\\b",
+              "\\bterm\\s+comments?\\b"
+            ]
+          },
+          "allowed": [
+            "This version of Plantoir does not help with marking or with report card comments; the files in this kit are for your own marking.",
+            "If the teacher asks you to mark, or asks about report card comments"
+          ],
+          "mustTrip": [
+            "I can help you mark a test from your scanned papers onto feedback sheets.",
+            "Want me to draft comments for report cards?",
+            "I can help with marking.",
+            "mark the test from scanned papers and write feedback sheets",
+            "Send me the scans of their tests and I will mark them.",
+            "Shall I mark the quiz papers for Section 2?",
+            "I can grade your students' tests.",
+            "Want term comments for the report?",
+            "Let me draft progress report comments.",
+            "I'll build the class results from the marks.",
+            "Upload the scanned papers and I'll do the rest.",
+            "Use the plantoir-marking skill."
+          ],
+          "mustPass": [
+            "Add a marks column to the quiz.",
+            "Open Marking Guide.pdf beside the solutions.",
+            "The marking period ends on Friday.",
+            "Each row of the rubric is worth 4 marks.",
+            "Copy templates/Marking Kit/ into the test's folder.",
+            "A quiz for marks with a marking guide.",
+            "Publishing marks the page for the website.",
+            "A benchmark test of the build.",
+            "## 1. Mark the page printable",
+            "a note at the top on how to mark it yourself",
+            "Send a problem report.",
+            "The Report a Problem dialog.",
+            "This version of Plantoir does not help with marking or with report card comments; the files in this kit are for your own marking."
+          ]
+        },
+        "saysWhenAsked": {
+          "rule": "What plantoir-test-authoring has an assistant say when asked to mark or about report card comments, and what the marking kit's README says (director's wording, 2026-11-13; on the UI review page). It names no skill and suggests none can be added.",
+          "sentence": "This version of Plantoir does not help with marking or with report card comments; the files in this kit are for your own marking."
+        },
+        "mayStillName": {},
+        "helpPages": {
+          "rule": "Help's outline planned a page for each held feature; they are out of help/outline.json while held and return with the skills (whenTheyReturn.steps 5). Kept here verbatim, with `_section` and `_after` saying where each sat.",
+          "pages": [
+            {
+              "anchor": "marking",
+              "title": "Mark a test or assignment",
+              "question": "How do I use an assistant to help mark, keeping names on my computer?",
+              "about": "Marking with an assistant, names kept on this computer (750d).",
+              "steps": [
+                "Scan the papers",
+                "Ask the assistant to mark from the scans",
+                "Review every mark",
+                "Names stay on this computer: how"
+              ],
+              "pictures": [
+                {
+                  "shows": "A marking folder in Finder, names redacted",
+                  "labels": [
+                    "Marks"
+                  ],
+                  "scene": "marking-1"
+                }
+              ],
+              "scenes": 1,
+              "readMinutes": 3,
+              "notes": "No student name, real paper or real mark in any picture; invented example only.",
+              "id": "marking",
+              "section": "Optional: working with an assistant",
+              "status": "amended",
+              "amendment": "Marking is never in an assistant's opening greeting (ruled 2026-11-13); it is offered in context.",
+              "factSheets": [
+                "FS-11-the-assistant-section.md"
+              ],
+              "batch": "W18",
+              "waitsOn": [
+                "#750 (750d)"
+              ],
+              "revisitAfter": [],
+              "opensFrom": [],
+              "assistant": true,
+              "needsPictures": true,
+              "sceneIds": [
+                "marking-1"
+              ],
+              "indexed": true,
+              "_section": "Optional: working with an assistant",
+              "_after": "test-authoring"
+            },
+            {
+              "anchor": "report-comments",
+              "title": "Draft report card comments",
+              "question": "Can an assistant draft comments from my marks?",
+              "about": "Drafting report card comments from marking records.",
+              "steps": [
+                "Finish marking first",
+                "Ask for comments",
+                "Choose and edit one of the drafted options for each student"
+              ],
+              "pictures": [],
+              "scenes": 0,
+              "readMinutes": 2,
+              "notes": "",
+              "id": "report-comments",
+              "section": "Optional: working with an assistant",
+              "status": "kept",
+              "factSheets": [
+                "FS-11-the-assistant-section.md"
+              ],
+              "batch": "W4",
+              "waitsOn": [],
+              "revisitAfter": [],
+              "opensFrom": [],
+              "assistant": true,
+              "needsPictures": false,
+              "sceneIds": [],
+              "indexed": true,
+              "_section": "Optional: working with an assistant",
+              "_after": "marking"
+            }
+          ],
+          "withheldOnTheWeb": [
+            {
+              "pattern": "\\breport card comments?\\b",
+              "why": "an assistant task"
+            }
+          ]
+        },
+        "whenTheyReturn": {
+          "steps": [
+            "1. Move each skill's folder from `place` back to support/agent_guidance/skills.",
+            "2. Put back the two bullets in support/agent_guidance/CLAUDE.md and AGENTS.md, as commit ae1e0db32 removed them.",
+            "3. Put back the `.internal/marking/marking.json` lines in plantoir-handouts and plantoir-page-authoring (three dot-folder exceptions, not two), as ae1e0db32 removed them; assessment.agentGuidance.markingSkill.mentionedBy names both, and the mac test below fails until they are back.",
+            "4. Put back plantoir-test-authoring's offer: SKILL.md sections 7 and 9, and the kit's FORMAT.md, README.md, marks-template.json and scripts/check_kit.py comments, as they read at 1f4b655fe; in mustSay, replace the two `saysWhenAsked` pins with whenTheyReturn.testAuthoringMustSay.",
+            "5. Put Help's two pages back: helpPages.pages into help/outline.json (each after `_after`, in `_section`, without the two underscore keys), the counts (pageCount 104, sceneCount 203, pictureFilesMac 406, readingTimeTotalMinutes 277) and helpPages.withheldOnTheWeb into help/withheld-on-the-web.json; help/tests/test_build_help.py, help/README.md and verify.sh go back to 104 pages and 14 assistant pages; then Help's own process writes the two pages.",
+            "6. Delete this `held` block and assessment.held (or, for one skill, its entries here).",
+            "7. Run PrintablePagesTests (testTheMarkingSkillIsWrittenWithItsScriptsAndBothRootFilesNameIt and testTheReportCommentsSkillIsWrittenAndBothRootFilesNameIt now assert the skills ARE written and named), scripts/test_held_skills.py, the six scripts/test_marking_*.py and help/tests/."
+          ],
+          "testAuthoringMustSay": [
+            "you may mention once, in one sentence, that when the papers are written",
+            "Do not raise it again in this session if they do not take it up.",
+            "If it is not there, say nothing about marking, and do not mark papers from this kit",
+            "If it is there, when the kit is finished and the teacher has looked at it, you may mention once"
+          ]
+        },
+        "alreadyWritten": "A working folder prepared by a development build of 2.0.0 made before the hold already holds .claude/skills/plantoir-marking, .claude/skills/plantoir-report-comments and the same two under .agents/skills, and both root files' sections named them. The next pass rewrites the root sections, so the names go from those; the four skill folders are LEFT where they are, because an app removes nothing under .claude or .agents it is not writing (agentGuidance.rule: each skill's folder is the app's whole, and nothing else under .claude or .agents is touched), and a skill folder carries no mark that says the app wrote it. No released version wrote them, so only development folders hold them, and they are deleted by hand.",
+        "rejected": [
+          "deleting the two skills and their tests: the next release would rebuild them from history, and their tests would stop guarding the parts that do not change",
+          "a list in the app of skills not to copy: code on both platforms for a rule a folder move makes true, and a second list to keep in step with this one",
+          "removing the four already-written folders on the next pass: a folder that happens to be named plantoir-marking may be a teacher's own, there is no marker to tell, and only development folders have them",
+          "moving them under scripts/ or research/: scripts/ is bundled into both apps whole, and research/ holds measurements",
+          "keeping plantoir-test-authoring's conditional offer while held (mayStillName): its words named a skill the teacher could not get and suggested one could be added (hold review M4)"
         ]
       },
       "rootFileCases": {
@@ -40886,9 +41257,14 @@
   },
   "assessment": {
     "rule": "Tests, marking and report comments (#751, #750, #752): skills an outside assistant follows, written into a working folder like every other (printablePages.agentGuidance). Neither app reads or writes any file they make; the only part either app plays is writing the skills, and the greeting sentence that names them (app-rules.json -> outsideAgents, piece G). #751 adds agentGuidance.testAuthoringSkill and kitFormat; #750 and #752 add their own sub-keys here.",
+    "held": {
+      "rule": "#750 (2026-11-13): marking and report comments are HELD from this release (printablePages.agentGuidance.held says what that means and why). The keys below that belong to them are kept, unchanged, for the release that brings them back, and their tests run against the held folders; nothing listed here is written into a working folder while its skill is held. testAuthoringSkill and kitFormat are not held: the test-authoring skill ships, offers no marking, and says held.saysWhenAsked.sentence when asked.",
+      "skills": ["plantoir-marking", "plantoir-report-comments"],
+      "keys": ["agentGuidance.markingSkill", "agentGuidance.reportCommentsSkill", "folders", "identifiers", "scriptPrivacy", "redaction", "namedCopies", "commentNames", "results"]
+    },
     "agentGuidance": {
       "testAuthoringSkill": {
-        "rule": "The skill `plantoir-test-authoring` (#751) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It tells an assistant, for a unit test with versions: the teacher decides (a sentence said in the first reply and printed under the Marking Guide's title); FIXED for every teacher: only what the class was taught, checked question by question, no trick wording, versions genuinely parallel (right answers under different letters, no given number reused), every answer re-solved from scratch by a reviewer who did not write it and a second reviewer filling Coverage.md, never inventing a question, scenario or example involving firearms or ammunition (a teacher's own material and curriculum content that requires the subject are left alone), and nothing of the test, its solutions or its kit in the pages a class website is built from (the one place under courses/ its PDFs may be copied is a unit plan's .internal/planning/<unit>/pdfs/, never built into a site, as plantoir-unit-planning section 6 says); then HOW this teacher writes tests: the course's How I Teach page first, otherwise a few plain questions, and the test shape of the handouts skill's named template (handoutsSkill.offeredTemplate.name) OFFERED only to a teacher who has shown an interest in both things it bridges, never applied unasked. The papers are plantoir-handouts' Quiz.tex starter (usesStyleOf); the guide, kit README, coverage table and checks script are templates the assistant adjusts to the teacher's header, categories, marks scheme and layout, each saying at its top what may change; scripts/check_kit.py is the one file that is not a starting point (it is run from the skill folder, which the app restores). When a kit is finished it may mention marking once, and ONLY when the plantoir-marking skill is in the working folder (without it, it says nothing about marking and does not mark from the kit, since #751 may land before #750); plantoir-unit-planning, when a plan is built, may mention the unit test once (Russell, 2026-11-12: how a teacher finds out, at the moment of need, once, never pressed). The root AGENTS.md and CLAUDE.md sections name it in one bullet each, and their handouts bullet now says 'a quiz for marks' where it said 'a quiz or test for marks'. It is NOT in pageAuthoringSkill.routesTo: a test is not part of a page.",
+        "rule": "The skill `plantoir-test-authoring` (#751) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It tells an assistant, for a unit test with versions: the teacher decides (a sentence said in the first reply and printed under the Marking Guide's title); FIXED for every teacher: only what the class was taught, checked question by question, no trick wording, versions genuinely parallel (right answers under different letters, no given number reused), every answer re-solved from scratch by a reviewer who did not write it and a second reviewer filling Coverage.md, never inventing a question, scenario or example involving firearms or ammunition (a teacher's own material and curriculum content that requires the subject are left alone), and nothing of the test, its solutions or its kit in the pages a class website is built from (the one place under courses/ its PDFs may be copied is a unit plan's .internal/planning/<unit>/pdfs/, never built into a site, as plantoir-unit-planning section 6 says); then HOW this teacher writes tests: the course's How I Teach page first, otherwise a few plain questions, and the test shape of the handouts skill's named template (handoutsSkill.offeredTemplate.name) OFFERED only to a teacher who has shown an interest in both things it bridges, never applied unasked. The papers are plantoir-handouts' Quiz.tex starter (usesStyleOf); the guide, kit README, coverage table and checks script are templates the assistant adjusts to the teacher's header, categories, marks scheme and layout, each saying at its top what may change; scripts/check_kit.py is the one file that is not a starting point (it is run from the skill folder, which the app restores). While marking is held (printablePages.agentGuidance.held, #750) it never offers to mark or marks from the kit, and when asked says printablePages.agentGuidance.held.saysWhenAsked.sentence, which the kit's README also carries; when marking returns, a finished kit may mention it once (held.whenTheyReturn); plantoir-unit-planning, when a plan is built, may mention the unit test once (Russell, 2026-11-12: how a teacher finds out, at the moment of need, once, never pressed). The root AGENTS.md and CLAUDE.md sections name it in one bullet each, and their handouts bullet now says 'a quiz for marks' where it said 'a quiz or test for marks'. It is NOT in pageAuthoringSkill.routesTo: a test is not part of a page.",
         "skill": "plantoir-test-authoring",
         "templates": [
           "templates/Marking Guide.tex",
@@ -41704,6 +42080,223 @@
         "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 2, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
         "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
       }
+    ]
+  },
+  "deployedFolderInBrowser": {
+    "note": "GitHub #850 (Russell, 2026-11-13). A section deployed to a folder on this computer can be opened in the web browser, served by the app itself on this computer, so its links and features work: Quartz writes every page link without .html, and opened straight from the folder 0 of 3,369 page links worked. The plan, as amended by its Opus review, is on the issue (#850); the review won where they differed (live input dropped, the Host check strict). The mac runs every case here in DeployedFolderResolutionTests (the resolver, and the real listener over a socket) and DeployedFolderOfferTests; documentation/09-mac-app.md -> 'A deployed folder opened in the browser (#850)' says why, what was measured and what was rejected.",
+    "rule": "ONE Open in Browser for both (Russell, 2026-11-13): the toolbar's button and Section > Open in Browser open the PREVIEW while one is showing, and the section's DEPLOYED FOLDER otherwise; the help says which (wording.previewHelp, wording.help) or why it is greyed (offeredCases). The deploy's result offers Open in Browser beside Show in Finder (wording.resultButton), and the section row's context menu offers it when the folder can be opened. It runs until Stop or quitting Plantoir, never until a window closes; Stop is a one-line notice in the section's window (wording.notice, wording.stopButton) and Section > Stop Showing Deployed Folder (wording.stopMenuItem). The folder is read at each request: a deploy to it does not stop it, and nothing is built, copied or leased. Bound to 127.0.0.1 only; another account on this computer can reach it while it runs, as it can a preview, which Russell accepted on 2026-11-13 as a known limit. The same address each time (address), so what the site keeps per address - ticked tasks, quiz answers - is still there.",
+    "wording": {
+      "resultButton": "Open in Browser",
+      "menuItem": "Open in Browser",
+      "stopMenuItem": "Stop Showing Deployed Folder",
+      "notice": "Section {section}’s deployed folder is open in your web browser.",
+      "stopButton": "Stop",
+      "stopHint": "Stop showing the deployed folder in your web browser",
+      "help": "Open the deployed folder in your web browser, so its links and features work",
+      "previewHelp": "Open this preview in your web browser",
+      "notDeployedYet": "Nothing has been deployed to this section’s folder yet. Deploy it first.",
+      "folderNotFound": "Plantoir can’t find this section’s deploy folder. If it’s on a drive, connect the drive, or deploy again.",
+      "stoppedFolderGone": "Your deployed folder is no longer where it was, so Plantoir stopped showing it.",
+      "couldNotOpenTitle": "Your Deployed Folder Could Not Be Opened",
+      "couldNotOpen": "Plantoir could not show this folder in your web browser. Try again, or restart your computer if it happens again.",
+      "renderNote": "Opened straight from the folder, its pages won’t work. Click Open in Browser to see them working.",
+      "dismissButton": "Dismiss",
+      "couldNotOpenButton": "OK"
+    },
+    "wordingWhy": "None of these promises how a web host will behave (the plan review's H1): a folder deploy is the one destination whose host is unknown, and #849 measured a plain host answering 404 for every page link. They say what Plantoir shows. renderNote replaces the note that said the pages only display properly once on a web host. No word for what answers the browser (rule 1).",
+    "offeredWhen": "Read on events, never on a clock: when the section shows, when a deploy ends, when a menu opens, when the pointer reaches the button, and when a show starts or stops. The folder is the course's folder destination (its first destination when that is a folder, else the first other one that is; a course has at most one), resolved exactly as folderPublishTarget resolves --to-folder, from the SAVED settings a deploy uses.",
+    "offeredCases": [
+      {"name": "no folder destination", "given": {"hasFolderDestination": false}, "expect": "absent", "why": "Netlify or Cloudflare only: the result panel has no button and Section > Open in Browser is greyed with no reason, as every menu item greys (subjectMenus.rule)."},
+      {"name": "a course kept for reference", "given": {"hasFolderDestination": true, "keptForReference": true, "folderExists": true, "sectionIndexExists": true}, "expect": "absent", "why": "It is never deployed, as Deploy is not offered on one."},
+      {"name": "deployed and there", "given": {"hasFolderDestination": true, "folderExists": true, "sectionIndexExists": true}, "expect": "offered"},
+      {"name": "the folder is there, the section is not", "given": {"hasFolderDestination": true, "folderExists": true, "sectionIndexExists": false}, "expect": {"greyed": "notDeployedYet"}},
+      {"name": "the folder cannot be found", "given": {"hasFolderDestination": true, "folderExists": false, "sectionIndexExists": false}, "expect": {"greyed": "folderNotFound"}, "why": "Moved, renamed, or on a drive that is not connected."},
+      {"name": "a deploy of the section is running", "given": {"hasFolderDestination": true, "folderExists": true, "sectionIndexExists": true, "deployIsRunning": true}, "expect": {"greyed": "deployIsRunning"}, "why": "The folder is half copied. From this app (CourseActivity) or another program (its publish work lease, which is per course, so another section's deploy greys it too while it runs). The reason is CourseActivity's existing sentence, shown once in the Section menu."}
+    ],
+    "offeredDefaults": {"hasFolderDestination": false, "keptForReference": false, "deployIsRunning": false, "folderExists": false, "sectionIndexExists": false},
+    "address": {
+      "rule": "http://127.0.0.1:<port>/, one listener per section's folder. Ports come from a block of their own, firstPort to firstPort + blockSize - 1, below the range the system hands out for outgoing connections (49152-65535, where Windows also reserves moving ranges for Hyper-V) and outside the preview walk (app-rules.json -> previewPorts, 8081-9474), so a preview and a deployed folder never take each other's address. The port remembered for the folder's canonical path is tried first; then the block, starting at firstPort + (FNV-1a 32-bit hash of the canonical path's UTF-8 bytes mod blockSize) and wrapping, so the same folder gets the same address after the remembered one is lost or from a second copy of the app. A walk that had to move on says so on the trail.",
+      "firstPort": 41000,
+      "blockSize": 400,
+      "hash": "FNV-1a, 32 bits: start 2166136261; for each byte, xor it in, then multiply by 16777619 modulo 2^32.",
+      "cases": [
+        {"canonicalPath": "/Users/teacher/Sites/ics3u/section1", "remembered": null, "expectFirst": 41209, "why": "No remembered port: the walk starts where the path's hash says."},
+        {"canonicalPath": "/Users/teacher/Sites/ics3u/section1", "remembered": 41007, "expectFirst": 41007, "why": "The remembered port is tried first."},
+        {"canonicalPath": "/Users/teacher/Sites/ics3u/section1", "remembered": 52000, "expectFirst": 41209, "why": "A remembered port outside the block is not used."},
+        {"canonicalPath": "", "remembered": null, "expectFirst": 41261, "why": "The empty path: the hash is its starting value."}
+      ],
+      "everyCandidate": "Each port of the block appears exactly once (plus the remembered one first, when it is in the block), and none is inside 8081-9474 or 49152-65535."
+    },
+    "limits": {
+      "maximumConnections": 64,
+      "maximumRequestLineBytes": 8192,
+      "maximumHeaderBytes": 16384,
+      "secondsToSendTheHeaders": 10,
+      "secondsIdleBetweenRequests": 30,
+      "secondsToTakeAPiece": 30,
+      "why": "The plan review's M1: a server with no limits held 300 of 300 half-sent requests open after 12 seconds. A request line over the limit is answered 414, headers over theirs 431, and both close; a connection that has not sent its headers in time, or sits idle between requests too long, is closed; when every place is taken, the connection that has been quiet longest is closed to make room, so a newcomer - the teacher's own browser - always gets in; and a piece of an answer left untaken for secondsToTakeAPiece closes its connection. The last two are the implementation review's M2: 64 readers that asked for a 200 MB file and never read held every place, and a normal request was refused at 2 s and at 47 s."
+    },
+    "connectionCases": [
+      {"kind": "requestLineTooLong", "expect": {"status": 414, "closes": true}},
+      {"kind": "headersTooLarge", "expect": {"status": 431, "closes": true}},
+      {"kind": "headersNotSentInTime", "expect": {"closedWithin": 15}},
+      {"kind": "aConnectionPastTheMaximumMakesRoom", "expect": {"newcomerAnswered": true, "oneQuietConnectionClosed": true}, "why": "With maximumConnections open and silent, one more is let in and answered, and the quietest is closed to make room."},
+      {"kind": "readersThatStopReading", "expect": {"aNormalRequestAnswered": true, "aStalledReaderClosedWithin": 40}, "why": "maximumConnections readers ask for a large file and never read: a normal request is still answered, and a stalled reader is closed once a piece has gone untaken for secondsToTakeAPiece (the implementation review's M2)."},
+      {"kind": "twoRequestsOnOneConnection", "expect": {"bothAnswered": true}},
+      {"kind": "theNetworkAddressIsRefused", "expect": {"refused": true}, "why": "Bound to 127.0.0.1 only, as previews since #684: a connection through this computer's own network address is refused."}
+    ],
+    "everyAnswer": {"headers": {"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "same-origin"}, "never": "Access-Control-", "why": "no-cache, not no-store (the plan review's L1): the browser asks again each time, so a redeploy shows on reload, and pages can still use the back and forward cache; an ETag answers a repeat with 304. nosniff, so a wrong type fails here as it would on a strict host. No cross-origin permission is ever given."},
+    "contentTypes": {
+      "html": "text/html; charset=utf-8",
+      "htm": "text/html; charset=utf-8",
+      "css": "text/css; charset=utf-8",
+      "js": "text/javascript; charset=utf-8",
+      "mjs": "text/javascript; charset=utf-8",
+      "json": "application/json",
+      "map": "application/json",
+      "wasm": "application/wasm",
+      "zip": "application/zip",
+      "svg": "image/svg+xml",
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "gif": "image/gif",
+      "webp": "image/webp",
+      "avif": "image/avif",
+      "heic": "image/heic",
+      "ico": "image/x-icon",
+      "bmp": "image/bmp",
+      "tif": "image/tiff",
+      "tiff": "image/tiff",
+      "woff2": "font/woff2",
+      "woff": "font/woff",
+      "ttf": "font/ttf",
+      "otf": "font/otf",
+      "pdf": "application/pdf",
+      "xml": "application/xml",
+      "txt": "text/plain; charset=utf-8",
+      "md": "text/plain; charset=utf-8",
+      "csv": "text/csv; charset=utf-8",
+      "mp4": "video/mp4",
+      "m4v": "video/mp4",
+      "webm": "video/webm",
+      "mov": "video/quicktime",
+      "mp3": "audio/mpeg",
+      "m4a": "audio/mp4",
+      "wav": "audio/wav",
+      "ogg": "audio/ogg",
+      "ggb": "application/octet-stream"
+    },
+    "unknownContentType": "application/octet-stream",
+    "resolution": {
+      "aim": "Every link the build writes resolves, and nothing a strict host refuses is accepted (the plan review's M7). It is not a copy of any one host: preview is Quartz's server, Netlify and Cloudflare are each their own, and a folder's host is unknown (#849). browser-checks/crawl_deployed_folder.py requests every link of every page through the real app; measured 2026-11-13 on a 307-page built site, 7,647 links (314 addresses), 0 not found, against 4,204 not found from python3 -m http.server on the same folder.",
+      "names": "The path is split at its query (and any #), split on /, and each name percent-decoded (a + stays a +) and put in NFC. A name is refused when it is empty (//), . or .., starts with a dot, ends with a dot or a space, holds a control character, /, \\ or :, decodes from %2F, %5C or %00, or is a host's control file (_headers, _redirects) or a name Windows reserves (con, prn, aux, nul, com1-9, lpt1-9, with any extension). EVERY name on the way down is matched against its folder's listing, exactly after NFC, so case counts on every disk. The file's real path must stay inside the folder's real path.",
+      "order": "No slash after the last name: that file; else that name + .html; else a folder of that name with an index.html, redirected 308 to the name with its slash; else not found. A slash after it: that folder's index.html; else that name + .html, redirected 308 to the name without its slash; else not found. Never a listing. Not found answers 404 with the site's own 404.html, or a short page of its own.",
+      "placeholders": "@PORT@ is the listener's port and @OTHERPORT@ one more; @OUTSIDE@ is a folder outside the served one holding secret.html; @BYTES200@ and @BYTES100@ are that many bytes. A `refused` expectation is a status of 400 or 404 and never a byte of a file outside the folder (Windows' HTTP.sys answers some of these itself, before the app). `headers` omitted means a Host of 127.0.0.1:@PORT@ alone.",
+      "cases": [
+        {"name": "the front page", "files": {"index.html": "home"}, "request": {"method": "GET", "target": "/"}, "expect": {"status": 200, "file": "index.html", "contentType": "text/html; charset=utf-8"}, "why": "Every host answers a folder's address with its index page."},
+        {"name": "a page written without .html", "files": {"a/b.html": "b"}, "request": {"method": "GET", "target": "/a/b"}, "expect": {"status": 200, "file": "a/b.html"}, "why": "Quartz writes every page link without .html; a plain server answers 404 here (the measurement: 0 of 3,369 page links)."},
+        {"name": "a folder written without its slash", "files": {"a/b/index.html": "folder"}, "request": {"method": "GET", "target": "/a/b?x=1"}, "expect": {"status": 308, "location": "/a/b/?x=1"}, "why": "The slash is added, with the query kept, so the folder page's relative links resolve."},
+        {"name": "a page and a folder of the same name", "files": {"a/b.html": "page", "a/b/index.html": "folder"}, "request": {"method": "GET", "target": "/a/b"}, "expect": {"status": 200, "file": "a/b.html"}, "why": "The page wins, as Quartz's own server orders it."},
+        {"name": "a folder with its slash", "files": {"a/index.html": "folder"}, "request": {"method": "GET", "target": "/a/"}, "expect": {"status": 200, "file": "a/index.html"}},
+        {"name": "a page asked for with a slash", "files": {"a.html": "page"}, "request": {"method": "GET", "target": "/a/"}, "expect": {"status": 308, "location": "/a"}},
+        {"name": "a page asked for with .html", "files": {"a/b.html": "b"}, "request": {"method": "GET", "target": "/a/b.html"}, "expect": {"status": 200, "file": "a/b.html"}, "why": "Cloudflare redirects this; the page and its base are the same either way, so no redirect is needed."},
+        {"name": "an index page asked for by name", "files": {"a/index.html": "i"}, "request": {"method": "GET", "target": "/a/index.html"}, "expect": {"status": 200, "file": "a/index.html"}},
+        {"name": "a dotted page name", "files": {"Curriculum/A1.1.html": "x"}, "request": {"method": "GET", "target": "/Curriculum/A1.1"}, "expect": {"status": 200, "file": "Curriculum/A1.1.html"}, "why": "594 dotted links in the measured site: adding .html must not stop at a dot."},
+        {"name": "an accented name", "files": {"Café-Notes-2.html": "x"}, "request": {"method": "GET", "target": "/Caf%C3%A9-Notes-2"}, "expect": {"status": 200, "file": "Café-Notes-2.html"}},
+        {"name": "a space", "files": {"Q and A.html": "x"}, "request": {"method": "GET", "target": "/Q%20and%20A"}, "expect": {"status": 200, "file": "Q and A.html"}},
+        {"name": "a plus is a plus", "files": {"a+b.html": "x"}, "request": {"method": "GET", "target": "/a+b"}, "expect": {"status": 200, "file": "a+b.html"}},
+        {"name": "a plus is never a space", "files": {"a b.html": "x"}, "request": {"method": "GET", "target": "/a+b"}, "expect": {"status": 404}},
+        {"name": "a hash in a name", "files": {"Notes-#2.html": "x"}, "request": {"method": "GET", "target": "/Notes-%232"}, "expect": {"status": 200, "file": "Notes-#2.html"}},
+        {"name": "an encoded slash is not a separator", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a%2Fb"}, "expect": {"refused": true}},
+        {"name": "an encoded NUL", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a%00b"}, "expect": {"refused": true}},
+        {"name": "an encoded backslash", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a%5Cb"}, "expect": {"refused": true}},
+        {"name": "case counts, at the last name", "files": {"Page.html": "x"}, "request": {"method": "GET", "target": "/page"}, "expect": {"status": 404}, "why": "Cloudflare is case-sensitive; compared against the folder's listing, so APFS and NTFS answer as a strict host does."},
+        {"name": "case counts, at a folder's name", "files": {"Concepts/index.html": "x"}, "request": {"method": "GET", "target": "/concepts/"}, "expect": {"status": 404}, "why": "The plan review's M4: a last-name-only check served this with 200 on APFS."},
+        {"name": "case counts, at a folder on the way", "files": {"Concepts/index.html": "x"}, "request": {"method": "GET", "target": "/CONCEPTS/index.html"}, "expect": {"status": 404}},
+        {"name": "a decomposed accent finds a composed name", "files": {"Crème.html": "x"}, "request": {"method": "GET", "target": "/Cre%CC%80me"}, "expect": {"status": 200, "file": "Crème.html"}, "why": "Both sides are compared in one Unicode form (NFC)."},
+        {"name": "a composed accent finds a decomposed name", "files": {"Crème.html": "x"}, "request": {"method": "GET", "target": "/Cr%C3%A8me"}, "expect": {"status": 200, "file": "Crème.html"}},
+        {"name": "a dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/../x"}, "expect": {"refused": true}},
+        {"name": "a dot-dot further down", "files": {"a/x.html": "x"}, "request": {"method": "GET", "target": "/a/../../x"}, "expect": {"refused": true}},
+        {"name": "an encoded dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/%2E%2E/x"}, "expect": {"refused": true}},
+        {"name": "a doubly encoded dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/%252e%252e/x"}, "expect": {"refused": true}},
+        {"name": "a raw backslash with a dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/..\\x"}, "expect": {"refused": true}, "why": "A raw backslash is a separator on Windows."},
+        {"name": "a raw backslash", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a\\b"}, "expect": {"refused": true}},
+        {"name": "a drive letter", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/C:/Windows/win.ini"}, "expect": {"refused": true}, "why": "Any name holding a colon is refused on both platforms: a drive on Windows, a stream on NTFS."},
+        {"name": "a double slash at the start", "files": {"server/share/x.html": "x"}, "request": {"method": "GET", "target": "//server/share/x"}, "expect": {"refused": true}, "why": "A Location built from it would start with // and a browser reads that as another host."},
+        {"name": "a double slash before a folder", "files": {"Concepts/index.html": "x"}, "request": {"method": "GET", "target": "//Concepts"}, "expect": {"refused": true, "noLocation": true}},
+        {"name": "a file linked from outside the folder", "files": {"link.html": {"symlinkTo": "@OUTSIDE@/secret.html"}}, "request": {"method": "GET", "target": "/link.html"}, "expect": {"refused": true}, "why": "The real path must stay inside the folder's real path."},
+        {"name": "a folder linked from outside the folder", "files": {"linkdir": {"symlinkTo": "@OUTSIDE@"}}, "request": {"method": "GET", "target": "/linkdir/secret.html"}, "expect": {"refused": true}},
+        {"name": "a dot file", "files": {".DS_Store": "x"}, "request": {"method": "GET", "target": "/.DS_Store"}, "expect": {"status": 404}},
+        {"name": "a dot folder", "files": {".publish_state/a.json": "x"}, "request": {"method": "GET", "target": "/.publish_state/a.json"}, "expect": {"status": 404}},
+        {"name": "a host's headers file", "files": {"_headers": "x"}, "request": {"method": "GET", "target": "/_headers"}, "expect": {"status": 404}},
+        {"name": "a host's headers file with a slash", "files": {"_headers": "x"}, "request": {"method": "GET", "target": "/_headers/"}, "expect": {"status": 404}},
+        {"name": "a host's redirects file", "files": {"_redirects": "x"}, "request": {"method": "GET", "target": "/_redirects"}, "expect": {"status": 404}},
+        {"name": "a stream name", "files": {"a.html": "x"}, "request": {"method": "GET", "target": "/a.html:x"}, "expect": {"refused": true}},
+        {"name": "a reserved name", "files": {"con.html": "x"}, "request": {"method": "GET", "target": "/con"}, "expect": {"refused": true}},
+        {"name": "a trailing dot", "files": {"a.html": "x"}, "request": {"method": "GET", "target": "/a."}, "expect": {"refused": true}},
+        {"name": "a folder with no index page", "files": {"folder/x.html": "x"}, "request": {"method": "GET", "target": "/folder/"}, "expect": {"status": 404, "bodyLacks": "x.html"}, "why": "Never a listing."},
+        {"name": "a missing page, with the site's own 404", "files": {"404.html": "the site's 404"}, "request": {"method": "GET", "target": "/missing"}, "expect": {"status": 404, "file": "404.html", "contentType": "text/html; charset=utf-8"}},
+        {"name": "a missing page, with no 404 of the site's", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/missing"}, "expect": {"status": 404, "contentType": "text/html; charset=utf-8"}},
+        {"name": "POST", "files": {"index.html": "x"}, "request": {"method": "POST", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "content-length": "0"}}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "PUT", "files": {"index.html": "x"}, "request": {"method": "PUT", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "content-length": "0"}}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "OPTIONS asking for the private network", "files": {"index.html": "x"}, "request": {"method": "OPTIONS", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "origin": "https://evil.example", "access-control-request-private-network": "true"}}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}, "noHeaderStartingWith": "Access-Control-"}},
+        {"name": "TRACE", "files": {"index.html": "x"}, "request": {"method": "TRACE", "target": "/"}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "CONNECT", "files": {"index.html": "x"}, "request": {"method": "CONNECT", "target": "127.0.0.1:@PORT@"}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "the one Host accepted", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/"}, "expect": {"status": 200, "file": "index.html"}},
+        {"name": "Host: localhost", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "localhost:@PORT@"}}, "expect": {"status": 400}, "why": "Only the address the app hands out. The plan review's H3."},
+        {"name": "Host: another port", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1:@OTHERPORT@"}}, "expect": {"status": 400}},
+        {"name": "Host: a name that starts with the address", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1.evil.example:@PORT@"}}, "expect": {"status": 400}, "why": "A prefix check answered 200 here: a page rebinding a name to this computer."},
+        {"name": "Host: a name that starts with localhost", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "localhost.evil.example:@PORT@"}}, "expect": {"status": 400}},
+        {"name": "Host: another site", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "evil.example"}}, "expect": {"status": 400}},
+        {"name": "no Host", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {}}, "expect": {"status": 400}},
+        {"name": "an absolute address in the request", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "http://evil.example/"}, "expect": {"status": 400}},
+        {"name": "a query and a fragment", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/x?v=1#frag"}, "expect": {"status": 200, "file": "x.html"}},
+        {"name": "HEAD", "files": {"x.html": "0123456789"}, "request": {"method": "HEAD", "target": "/x"}, "expect": {"status": 200, "file": "x.html", "noBody": true, "headers": {"Content-Length": "10"}}},
+        {"name": "another site asking", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/x", "headers": {"host": "127.0.0.1:@PORT@", "origin": "https://evil.example"}}, "expect": {"status": 200, "noHeaderStartingWith": "Access-Control-"}},
+        {"name": "a GET that says it has a body", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "content-length": "5"}}, "expect": {"status": 400, "closes": true}, "why": "A GET carries no body; this does not read past one, so the connection closes."},
+        {"name": "a GET sent in chunks", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "transfer-encoding": "chunked"}}, "expect": {"status": 400, "closes": true}},
+        {"name": "a camera file named in capitals", "files": {"IMG_0042.JPG": "x"}, "request": {"method": "GET", "target": "/IMG_0042.JPG"}, "expect": {"status": 200, "contentType": "image/jpeg"}},
+        {"name": "a PDF named in capitals", "files": {"A.PDF": "x"}, "request": {"method": "GET", "target": "/A.PDF"}, "expect": {"status": 200, "contentType": "application/pdf"}},
+        {"name": "a video named in capitals", "files": {"A.MOV": "x"}, "request": {"method": "GET", "target": "/A.MOV"}, "expect": {"status": 200, "contentType": "video/quicktime"}},
+        {"name": "a phone picture", "files": {"A.HEIC": "x"}, "request": {"method": "GET", "target": "/A.HEIC"}, "expect": {"status": 200, "contentType": "image/heic"}},
+        {"name": "Python's runtime", "files": {"static/pyodide/pyodide.asm.wasm": "x"}, "request": {"method": "GET", "target": "/static/pyodide/pyodide.asm.wasm"}, "expect": {"status": 200, "contentType": "application/wasm"}, "why": "Pyodide waits 45 seconds and gives up on any other type (documentation/06, I5)."},
+        {"name": "a module script", "files": {"static/pyodide/pyodide.mjs": "x"}, "request": {"method": "GET", "target": "/static/pyodide/pyodide.mjs"}, "expect": {"status": 200, "contentType": "text/javascript; charset=utf-8"}},
+        {"name": "the first bytes of a video", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=0-99"}}, "expect": {"status": 206, "contentType": "video/mp4", "headers": {"Content-Range": "bytes 0-99/200", "Accept-Ranges": "bytes", "Content-Length": "100"}}, "why": "Safari plays a video only from a server that answers byte ranges."},
+        {"name": "the last bytes", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=-50"}}, "expect": {"status": 206, "headers": {"Content-Range": "bytes 150-199/200"}}},
+        {"name": "from a byte to the end", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=100-"}}, "expect": {"status": 206, "headers": {"Content-Range": "bytes 100-199/200"}}},
+        {"name": "a range past the end", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=200-"}}, "expect": {"status": 416, "headers": {"Content-Range": "bytes */200"}}},
+        {"name": "a range longer than the file", "files": {"clip.mp4": "@BYTES100@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=0-999999"}}, "expect": {"status": 206, "headers": {"Content-Range": "bytes 0-99/100"}}},
+        {"name": "several ranges", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=0-10,20-30"}}, "expect": {"status": 200, "headers": {"Content-Length": "200"}}},
+        {"name": "a range it cannot read", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=abc"}}, "expect": {"status": 200, "headers": {"Content-Length": "200"}}},
+        {"name": "a redirect is encoded", "files": {"Café/index.html": "x"}, "request": {"method": "GET", "target": "/Caf%C3%A9"}, "expect": {"status": 308, "location": "/Caf%C3%A9/"}, "why": "Every Location is percent-encoded and single-slashed, built from the decoded names, never the raw path."}
+      ]
+    },
+    "stopCases": [
+      {"when": "Stop is pressed, in the notice or the Section menu", "then": "stopped; the trail says Stop was pressed"},
+      {"when": "Plantoir quits", "then": "stopped, never asked about (quittingWhileWorkIsUnderWay, 'a deployed folder is open in the browser'); the trail says Plantoir quit"},
+      {"when": "a request finds the folder gone", "then": "stopped; the window says wording.stoppedFolderGone until dismissed"},
+      {"when": "the section's window closes", "then": "NOT stopped: the browser tab outlives the window (Russell, 2026-11-13)"},
+      {"when": "a deploy to the same folder", "then": "NOT stopped: the next reload shows the new site"},
+      {"when": "two presses of Open in Browser before the first has started showing", "then": "ONE show: the second joins the first, both hand the browser the same address, and Stop ends it (the implementation review's M1)"},
+      {"when": "Stop is pressed while the show is still starting", "then": "it is stopped as soon as it has started; nothing is left listening"},
+      {"when": "Stop on a section with two shows, one started before its deploy folder was changed", "then": "both are stopped (the implementation review's L5)"},
+      {"when": "the listener ends without being asked", "then": "the show is dropped and the trail says it stopped on its own (the implementation review's L4)"},
+      {"when": "Open in Browser is pressed again while it runs", "then": "the same address opens again and nothing new starts; the trail says already open"}
+    ],
+    "rejected": [
+      "The website builder serving it, through a launcher flag: it sees only its two mounts, a mount cannot be added to a workspace without remaking it (about two minutes, refused while a preview is open, #94), a folder outside the home folder can never be mounted (#221), it takes 109 s to start cold (#225), and Windows has no workspace at all.",
+      "Python on the host: the Mac has none a teacher can rely on (/usr/bin/python3 is Apple's stub without the developer tools), and bundling one is about 50 MB for a file server.",
+      "A .command or .bat file beside the site: a Terminal window, a Gatekeeper prompt, a deprecated Ruby.",
+      "Making the folder browsable as files (#850's ruling).",
+      "One server for every folder under a path prefix: the site uses root-relative addresses (/index.css), so each site must sit at / of its own address.",
+      "Live input (COOP and COEP from a list kept beside the course, the plan's piece C): it would show a feature the folder's real host does not have, and the list describes what this working folder last deployed, not what the folder holds now (the plan review's H2).",
+      "A Host check by prefix: it answered 200 to 127.0.0.1.evil.example (the plan review's H3).",
+      "A port from the system's range, remembered: that range is where outgoing connections take their ports and, on Windows, where Hyper-V reserves moving ranges, so the address would change and the site's saved state be lost without a word (the plan review's M3).",
+      "A one-time key cookie against other accounts on a shared computer: Russell accepted the limit as Preview has it (2026-11-13).",
+      "An assistant tool: adding a tool is a routing change, and this is one button.",
+      "A separate, differently named menu item for the folder: Russell ruled one Open in Browser for both (2026-11-13).",
+      "URLProtocol (serves only the app's own web views), SwiftNIO (a dependency for about 400 lines), and NetworkListener behind #available (macOS 26 only, two code paths)."
     ]
   }
 }

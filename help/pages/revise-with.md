@@ -41,7 +41,7 @@ You install the assistant and sign in to it yourself. [About the assistants (opt
 ## Open the assistant on a course
 
 1. In the sidebar, select the course.
-2. Choose {{menu:courseReviseWithClaude}} from the menu bar. For another assistant, choose {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithCopilot}} instead. Each item shows only when that program is installed on this Mac.
+2. Choose {{menu:courseReviseWithClaude}} from the menu bar. For another assistant, choose {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithCopilot}} instead. Each item shows only when that program is installed on this {{machine}}.
 
 {{picture:revise-with-1}}
 alt: The Course menu with Revise With open and the item for Claude marked.
@@ -106,8 +106,8 @@ If you already have a file of your own by one of those names, Plantoir asks befo
 
 ## If it does not work
 
-- **Revise With lacks the assistant you want.** That program was not found on this Mac. Plantoir does not install it. Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
-- **The items are greyed.** A session is already open on the course, or the course is kept for reference, which no assistant is opened on. They are also greyed while the assistant that runs on this Mac has its window open on the course. A line under them says to close that window first. In the Course menu the items are also greyed while a section's row is selected: use the Section menu.
+- **Revise With lacks the assistant you want.** That program was not found on this {{machine}}. Plantoir does not install it. Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
+- **The items are greyed.** A session is already open on the course, or the course is kept for reference, which no assistant is opened on. They are also greyed while the assistant that runs on this {{machine}} has its window open on the course. A line under them says to close that window first. In the Course menu the items are also greyed while a section's row is selected: use the Section menu.
 - **The item for the Local AI Assistant is greyed in the Course menu.** It always is. See [The local assistant](page:local-assistant).
 - **Plantoir says the course is already being revised.** A session is open on it. Finish that session, then start again.
 - **An alert titled {{control:outsideAssistantClaudeDidNotOpenTitle}} appears.** Plantoir could not start the session. If the assistant was updated or moved recently, quitting Plantoir and opening it again may be enough. The alerts for the other two are titled {{control:outsideAssistantCodexDidNotOpenTitle}} and {{control:outsideAssistantGitHubCopilotDidNotOpenTitle}}.

@@ -49,7 +49,7 @@ The description is for students who cannot see the picture.
 
 - **Every file in Media goes to the website.** Keep a file out of Media if students should not have it.
 - **Media is not in the website's sidebar.** Plantoir looks after the folder itself. Students reach a file through the page that shows it or links to it.
-- **Copy the file in.** Do not point a page at a picture on another website, or at a file somewhere else on your Mac. Copy the picture into Media and show it from there.
+- **Copy the file in.** Do not point a page at a picture on another website, or at a file somewhere else on your {{machine}}. Copy the picture into Media and show it from there.
 - **Do not remove or rename the folder.** If Media goes missing, pictures stop appearing on the website, and the section's {{control:problemsTab}} tab says so. See [The Problems tab](page:problems).
 
 ## Large files

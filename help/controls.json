@@ -165,7 +165,7 @@
   "openInBrowser": {
    "label": "Open in Browser",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+    "wording": "DeployedFolderWording.menuItem"
    },
    "windows": null
   },

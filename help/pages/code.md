@@ -56,7 +56,7 @@ Three more words may follow `run`:
 
 Preview the section and open the page. If a preview is already running, choose {{menu:rebuildPreview}}.
 
-Python needs nothing more. Swift programs are made ready when the website is made, so Swift asks more of your Mac:
+Python needs nothing more. Swift programs are made ready when the website is made, so Swift asks more of your {{machine}}:
 
 - The first time you preview a section whose pages hold Swift blocks, Plantoir downloads what it needs to make Swift programs. The download is about 1.3 GB and takes a few minutes. It needs an internet connection and about 6 GB of free space.
 - This happens once. If you never write a Swift block, nothing is downloaded.

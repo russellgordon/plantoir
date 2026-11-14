@@ -30,7 +30,7 @@ description: Ask Claude, Codex or GitHub Copilot to plan a unit with you, then r
 ---
 An outside assistant can plan a unit with you: Claude, Codex or GitHub Copilot. You agree the plan in conversation, and the assistant builds it only when you say go. The finished plan shows on the course's {{control:courseDetailPlanningTab}} tab. It is never part of a class website.
 
-The {{control:courseDetailPlanningTab}} tab shows only while one of the three assistants is installed on this Mac, and never for a course kept for reference. [About the assistants (optional)](page:assistants) says what an outside assistant is.
+The {{control:courseDetailPlanningTab}} tab shows only while one of the three assistants is installed on this {{machine}}, and never for a course kept for reference. [About the assistants (optional)](page:assistants) says what an outside assistant is.
 
 ## Start a plan
 
@@ -74,7 +74,7 @@ Plantoir holds the course while the assistant's session is open. [Revise a cours
 
 ## If it does not work
 
-- **The course has no {{control:courseDetailPlanningTab}} tab.** None of the three assistants was found on this Mac, or the course is kept for reference.
+- **The course has no {{control:courseDetailPlanningTab}} tab.** None of the three assistants was found on this {{machine}}, or the course is kept for reference.
 - **The tab is titled {{control:planningTabUnitPlansCannotBeShownTitle}}.** Plantoir says:
   {{say:shared-rules#unitPlanning.tab.words.cannotShowDescription}}
 - **{{control:planningTabOpenInBrowserButton}} does not open the page.** When the page has gone from the plan, Plantoir says:

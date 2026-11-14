@@ -29,7 +29,7 @@ You can share a course's unit plans with a colleague. Plantoir puts them on a sm
 
 ## Before you start
 
-- **The Planning tab.** The share bar is at the foot of a course's {{control:courseDetailPlanningTab}} tab. The tab shows only when Claude Code, Codex or GitHub Copilot is installed on this Mac, and never for a course kept for reference. See [Plan a unit](page:plan-a-unit).
+- **The Planning tab.** The share bar is at the foot of a course's {{control:courseDetailPlanningTab}} tab. The tab shows only when Claude Code, Codex or GitHub Copilot is installed on this {{machine}}, and never for a course kept for reference. See [Plan a unit](page:plan-a-unit).
 - **A Cloudflare account.** The share bar says:
 
 {{say:shared-rules#unitPlanning.share.words.sharedThroughCloudflare}}
@@ -57,7 +57,7 @@ alt: The share bar at the foot of the Planning tab before the plans are shared, 
 > [!note]
 > The first time you share protected plans, Plantoir asks for a username and then a password. The sheets are titled {{control:sharePlanUsernameTitle}} and {{control:sharePlanPasswordTitle}}. A username is 1 to 32 letters, digits, dots, dashes or underscores. A password is 8 to 64 characters. Keep a copy of the password somewhere safe, because Plantoir does not show it again. Choose ones made for your colleagues, not the password to your own accounts.
 
-Plantoir keeps the username and password securely on this Mac. There is one pair for each course, and it stays the same from one school year to the next.
+Plantoir keeps the username and password securely on this {{machine}}. There is one pair for each course, and it stays the same from one school year to the next.
 
 ## Read the two tables
 
@@ -86,11 +86,11 @@ There is one such website for each school year. The school year changes on 1 Aug
 
 ## Stop sharing
 
-Press {{control:sharePlanStopSharing}}. Plantoir asks first, and names the school year. The address stops working within a minute, and anyone you gave it to can no longer open the plans. The plans themselves are still on this Mac.
+Press {{control:sharePlanStopSharing}}. Plantoir asks first, and names the school year. The address stops working within a minute, and anyone you gave it to can no longer open the plans. The plans themselves are still on this {{machine}}.
 
 ## If it does not work
 
-- **The course has no Planning tab.** None of Claude Code, Codex and GitHub Copilot is installed on this Mac, or the course is kept for reference.
+- **The course has no Planning tab.** None of Claude Code, Codex and GitHub Copilot is installed on this {{machine}}, or the course is kept for reference.
 - **Answer keys were left out.** The plans have no password. Protect them, or turn on {{control:sharePlanIncludeAnswerKeys}}, then share again.
 - **The plans were not shared because the course is busy.** Plantoir says:
 

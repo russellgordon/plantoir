@@ -32,7 +32,7 @@ The Fix with buttons hand problems from a section's {{control:problemsTab}} tab 
 
 1. In the sidebar, select the section, then click {{control:problemsTab}} at the top of its window.
 2. In the {{control:problemsTabColumnInclude}} column, see that the problems you want fixed are ticked. Only ticked rows are handed over.
-3. Press one of the buttons under the table: {{control:fixWithClaudeButton}}, {{control:fixWithCodexButton}} or {{control:fixWithGitHubCopilotButton}}. Each button shows only while that program is installed on this Mac.
+3. Press one of the buttons under the table: {{control:fixWithClaudeButton}}, {{control:fixWithCodexButton}} or {{control:fixWithGitHubCopilotButton}}. Each button shows only while that program is installed on this {{machine}}.
 
 {{picture:fix-with-1}}
 alt: The Problems tab with rows ticked, and the Fix with buttons under the table.
@@ -62,7 +62,7 @@ Plantoir holds the course, as it does for any session opened from Plantoir. [Rev
 
 ## If it does not work
 
-- **There are no Fix with buttons.** None of the three assistants was found on this Mac, or the course is kept for reference.
+- **There are no Fix with buttons.** None of the three assistants was found on this {{machine}}, or the course is kept for reference.
 - **The buttons cannot be pressed.** They need at least one ticked row for a problem the section still has. A row that says the problem is fixed in the source does not count.
 - **Plantoir says the course is already being revised.** A session is already open on the course. Finish that session, then press the button again.
 - **An alert says the assistant did not open.** Plantoir could not start the session. If the assistant was updated or moved recently, quitting Plantoir and opening it again may be enough.

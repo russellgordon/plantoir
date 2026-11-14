@@ -26,14 +26,14 @@ Publishing and deploying are two different acts. Students see a page only after 
 To publish a page is to mark it as one that students in a section may see. To hide a page is the opposite.
 
 - You publish a page for a section. The same shared page can be published for one section and hidden in another.
-- Publishing changes the page's settings in your course folder, and what Preview shows you. Nothing leaves your Mac.
+- Publishing changes the page's settings in your course folder, and what Preview shows you. Nothing leaves your {{machine}}.
 - Students see no change until the section is next deployed.
 
 [Show or hide pages for a section](page:publish-pages) has the steps.
 
 ## Deploying sends a section's website
 
-To deploy a section is to send its whole website to where students read it: Cloudflare Pages, Netlify, or a folder on this Mac.
+To deploy a section is to send its whole website to where students read it: Cloudflare Pages, Netlify, or a folder on this {{machine}}.
 
 - You deploy a section, never a single page.
 - A deploy carries every page that is published for that section at that moment.
@@ -45,7 +45,7 @@ To deploy a section is to send its whole website to where students read it: Clou
 
 - **Publishing alone shows students nothing.** A page can be published for days before students see it. It reaches them at the section's next deploy.
 - **A deploy sends everything that is published.** If you published a page last week and forgot about it, the next deploy puts it in front of students.
-- **Preview first.** Preview shows the section's website on your Mac, with the pages that are published for that section. Looking it over before you deploy is the safer order.
+- **Preview first.** Preview shows the section's website on your {{machine}}, with the pages that are published for that section. Looking it over before you deploy is the safer order.
 
 ## The usual order
 
@@ -66,7 +66,7 @@ Press {{control:ok}} to close it.
 alt: The Publishing and Deploying box, opened from the Help menu, with its explanation and an OK button.
 
 > [!note]
-> The box says that deploying sends the website out to the web. A section that deploys to a folder on this Mac is sent to that folder instead. It reaches the web when you upload the folder to your web host.
+> The box says that deploying sends the website out to the web. A section that deploys to a folder on this {{machine}} is sent to that folder instead. It reaches the web when you upload the folder to your web host.
 
 ## If students cannot see a page
 

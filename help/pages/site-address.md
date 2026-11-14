@@ -23,7 +23,7 @@ description: What the address of a section's website is made from, the surname q
 ---
 Each section's website has an address of its own, and the address comes from a name given to the website at its first deploy. This page says what the name is made from and which questions Plantoir asks about it.
 
-A section that deploys to a folder on this Mac has no such name, and is asked none of these questions.
+A section that deploys to a folder on this {{machine}} has no such name, and is asked none of these questions.
 
 ## What the name is made from
 

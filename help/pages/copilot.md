@@ -57,7 +57,7 @@ Plantoir gives GitHub Copilot no permissions of any kind. So it asks you, in its
 
 - before each change it makes through Plantoir;
 - before it deploys a section;
-- before each command it runs on this Mac, such as the one that makes a handout's PDF.
+- before each command it runs on this {{machine}}, such as the one that makes a handout's PDF.
 
 {{picture:copilot-2}}
 alt: GitHub Copilot asking in its window whether it may run a command, with its own answers to choose from.
@@ -70,9 +70,13 @@ Another program can have the same name as GitHub Copilot's command-line tool. Pl
 
 A program that is not GitHub's is passed over, and Plantoir shows no message about it. If no program from GitHub is found, there are no GitHub Copilot items anywhere in Plantoir, as when nothing is installed.
 
+{{mac}}
+One case is known on a Mac. Homebrew has two packages that install a program named `copilot` in the same place. The package named `copilot` is another company's tool. GitHub's package is `copilot-cli`.
+{{/mac}}
+
 ## If it does not work
 
-- **There is no GitHub Copilot item.** GitHub's program was not found on this Mac. Check that the program you installed is GitHub's own. One case is known: Homebrew has two packages that install a program named `copilot` in the same place. The package named `copilot` is another company's tool. GitHub's package is `copilot-cli`.
+- **There is no GitHub Copilot item.** GitHub's program was not found on this {{machine}}. Check that the program you installed is GitHub's own.
 - **You have only now installed it.** Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
 - **The window says that GitHub Copilot stopped.** It reads:
   {{say:app-rules#outsideAgents.agents[2].stoppedAtOnce.sentence}}

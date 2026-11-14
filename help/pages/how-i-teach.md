@@ -51,7 +51,7 @@ An assistant that writes the page for you may write 8000 characters at most. A p
 
 - **Claude Code, Codex and GitHub Copilot**, when you open them through Plantoir, are asked to read the page and keep to it. See [Revise a course with Claude or Codex](page:revise-with).
 - Any of them may offer to draft the page for you from the course's own pages. A draft is saved only once you agree.
-- **The assistant that runs on this Mac** does not use the page.
+- **The assistant that runs on this {{machine}}** does not use the page.
 
 ## It is never on a website
 

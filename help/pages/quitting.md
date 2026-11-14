@@ -65,7 +65,7 @@ See [Share a unit plan with a colleague](page:share-plan).
 
 - **A preview that is only open.** Quitting stops Plantoir's previews, as {{control:stopPreview}} does.
 - **Work that belongs to another program.** A scheduled deploy, or a command typed in Terminal, is not Plantoir's to ask about.
-- **When the Mac is logging out, restarting or shutting down.** Plantoir never holds the Mac up with a question.
+- **When the {{machine}} is logging out, restarting or shutting down.** Plantoir never holds the {{machine}} up with a question.
 - **An update.** An update never stops you from quitting. See [Updating Plantoir](page:updates).
 
 {{assistant}}

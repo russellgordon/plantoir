@@ -4,10 +4,10 @@
  "look": "Type \"Helvetica Neue\", Helvetica, Arial, sans-serif for titles (bold) and text; monospace for code only; no display face, no web font. LIGHT: --paper #FCFDFB, --paper-deep #F1F5EF, --card #FFFFFF, --rule #D9E2D6, --ink #1E2721, --ink-soft #566259, --green #1F7A3A, --green-deep #0F4A27; neutral light shadows. DARK: the site's dark values today except the two greens, which are Fern: --green-deep #7FB069, --green #9CC788. Pictures follow the reader's appearance; annotations red #d0312d in both.",
  "voice": "Documentation, not marketing: one task a page, steps in order, what you see after each, what to do when it goes wrong. Written by Fable from an Opus fact sheet; reviewed adversarially for accuracy, clarity, simple language and tone.",
  "anchorRule": "One anchor a page, written <a name=\"<anchor>\"></a> before the title; the file is <anchor>.html; a Help button opens a PAGE, never a place inside one (measured 2026-11-13: every anchor on a page resolves to its first).",
- "pageCount": 104,
- "sceneCount": 195,
- "pictureFilesMac": 390,
- "readingTimeTotalMinutes": 277,
+ "pageCount": 102,
+ "sceneCount": 194,
+ "pictureFilesMac": 388,
+ "readingTimeTotalMinutes": 272,
  "landingPage": {
   "indexed": false,
   "why": "The contents page (index.html) is built from this file and is not indexed (robots: anchors). The director decides which other pages are purely informational and sets their `indexed` to false."
@@ -4961,78 +4961,6 @@
      "sceneIds": [
       "test-authoring-1"
      ],
-     "indexed": true
-    },
-    {
-     "anchor": "marking",
-     "title": "Mark a test or assignment",
-     "question": "How do I use an assistant to help mark, keeping names on my computer?",
-     "about": "Marking with an assistant, names kept on this computer (750d).",
-     "steps": [
-      "Scan the papers",
-      "Ask the assistant to mark from the scans",
-      "Review every mark",
-      "Names stay on this computer: how"
-     ],
-     "pictures": [
-      {
-       "shows": "A marking folder in Finder, names redacted",
-       "labels": [
-        "Marks"
-       ],
-       "scene": "marking-1"
-      }
-     ],
-     "scenes": 1,
-     "readMinutes": 3,
-     "notes": "No student name, real paper or real mark in any picture; invented example only.",
-     "id": "marking",
-     "section": "Optional: working with an assistant",
-     "status": "amended",
-     "amendment": "Marking is never in an assistant's opening greeting (ruled 2026-11-13); it is offered in context.",
-     "factSheets": [
-      "FS-11-the-assistant-section.md"
-     ],
-     "batch": "W18",
-     "waitsOn": [
-      "#750 (750d)"
-     ],
-     "revisitAfter": [],
-     "opensFrom": [],
-     "assistant": true,
-     "needsPictures": true,
-     "sceneIds": [
-      "marking-1"
-     ],
-     "indexed": true
-    },
-    {
-     "anchor": "report-comments",
-     "title": "Draft report card comments",
-     "question": "Can an assistant draft comments from my marks?",
-     "about": "Drafting report card comments from marking records.",
-     "steps": [
-      "Finish marking first",
-      "Ask for comments",
-      "Choose and edit one of the drafted options for each student"
-     ],
-     "pictures": [],
-     "scenes": 0,
-     "readMinutes": 2,
-     "notes": "",
-     "id": "report-comments",
-     "section": "Optional: working with an assistant",
-     "status": "kept",
-     "factSheets": [
-      "FS-11-the-assistant-section.md"
-     ],
-     "batch": "W4",
-     "waitsOn": [],
-     "revisitAfter": [],
-     "opensFrom": [],
-     "assistant": true,
-     "needsPictures": false,
-     "sceneIds": [],
      "indexed": true
     },
     {

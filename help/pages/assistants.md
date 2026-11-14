@@ -47,7 +47,7 @@ Plantoir can open that program in your working folder, on one of your courses, w
 
 Plantoir works with three, and names them as its menus do: Claude, Codex and GitHub Copilot. Each is a program that runs in a terminal window: Claude Code, Codex, and GitHub Copilot's command-line tool.
 
-Plantoir looks for each program on this Mac and finds it where its installer put it. An assistant that is not installed is not shown anywhere in Plantoir. Its items are hidden, not greyed. Each of the three is shown or hidden on its own.
+Plantoir looks for each program on this {{machine}} and finds it where its installer put it. An assistant that is not installed is not shown anywhere in Plantoir. Its items are hidden, not greyed. Each of the three is shown or hidden on its own.
 
 ## Where each appears
 
@@ -74,9 +74,9 @@ You can tell the assistant not to ask again. If you have told your assistant it 
 
 Plantoir saves a backup of a course before the first change an assistant makes through Plantoir in a session. A page file the assistant changes itself is not backed up first. See [Back up a course and restore it](page:backups).
 
-## The assistant that runs on this Mac
+## The assistant that runs on this {{machine}}
 
-Plantoir also has an assistant of its own, which runs on this Mac. Nothing you have written is sent anywhere by it. It is not an outside assistant. See [The local assistant](page:local-assistant).
+Plantoir also has an assistant of its own, which runs on this {{machine}}. Nothing you have written is sent anywhere by it. It is not an outside assistant. See [The local assistant](page:local-assistant).
 
 ## Read next
 

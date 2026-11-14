@@ -1165,23 +1165,41 @@ def serve(port: int) -> int:
     return 1
 
 
-def feed_version_refusal(feed: Path, project_yml: Path) -> str | None:
-    """Why the mac feed must not be deployed with this site, or None (#204).
+# Lives in windows_feed.py, which both feed checks can reach; named here too,
+# because the deploy and the cut-release skill call it by this name (#861).
+shipped_version = windows_feed.shipped_version
 
-    Deploys run from `main`, where the feed's newest version and
-    MARKETING_VERSION agree after a mac cut — and still agree after a
-    Windows-only cut, which leaves both alone. A disagreement means the feed
-    was not rebuilt for the version being released, or was rebuilt for one
-    that has not been.
+
+def feed_version_refusal(feed: Path, project_yml: Path, site: dict | None = None) -> str | None:
+    """Why the mac feed must not be deployed with this site, or None (#204, #861).
+
+    The feed's newest version must be the release site.json says the mac
+    last shipped in: after a mac cut that is the new version line, and after
+    a cut that attaches no DMG it is the mac card's pin. A disagreement means
+    the feed was not rebuilt for the version being released, or was rebuilt
+    for one that has not been. MARKETING_VERSION is no longer compared for
+    equality, because since #861 it names the release being built and runs
+    ahead of the feed between cuts. It is still refused when it is BELOW the
+    feed, which only a number moved backwards can cause. ``site`` defaults to
+    the committed ``website/site.json``: the deploy passes it explicitly, and
+    the default is the seam that lets #861's must-fail tests call this with
+    the arguments the old check took.
     """
     if not feed.is_file():
         return None
+    if site is None:
+        site = windows_feed.committed_site()
     newest = update_feeds.newest_version(feed)
-    marketing = update_feeds.marketing_version(project_yml)
-    if newest != marketing:
-        return (f"Not deploying: updates/macos.xml offers {newest}, but mac-app/project.yml says "
-                f"{marketing}. Rebuild the feed with website/update_feed.py at the cut "
+    shipped = shipped_version(site, "macOS")
+    if newest is None or shipped is None or windows_feed.version_key(newest) != windows_feed.version_key(shipped):
+        return (f"Not deploying: updates/macos.xml offers {newest}, but site.json says the Mac "
+                f"shipped in {shipped}. Rebuild the feed with website/update_feed.py at the cut "
                 f"(RELEASING.md → \"The update feed (macOS)\").")
+    marketing = update_feeds.marketing_version(project_yml)
+    if marketing is None or windows_feed.version_key(marketing) < windows_feed.version_key(newest):
+        return (f"Not deploying: updates/macos.xml offers {newest}, but mac-app/project.yml says "
+                f"{marketing}, which is older. The number in project.yml is only ever raised "
+                f"(RELEASING.md → \"When the number is raised\").")
     return None
 
 
@@ -1326,11 +1344,13 @@ def main() -> int:
         if refusal:
             print(refusal, file=sys.stderr)
             return 1
-        refusal = feed_version_refusal(WEBSITE / "updates" / "macos.xml", REPO / "mac-app" / "project.yml")
+        refusal = feed_version_refusal(WEBSITE / "updates" / "macos.xml", REPO / "mac-app" / "project.yml",
+                                       read_json(WEBSITE / "site.json"))
         if refusal:
             print(refusal, file=sys.stderr)
             return 1
-        refusal = windows_feed.version_refusal(WEBSITE / "updates" / "windows.xml")
+        refusal = windows_feed.version_refusal(WEBSITE / "updates" / "windows.xml",
+                                               shipped_version(read_json(WEBSITE / "site.json"), "Windows"))
         if refusal:
             print(refusal, file=sys.stderr)
             return 1

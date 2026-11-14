@@ -34,7 +34,7 @@ alt: The section's window during a deploy, with a line that says what is happeni
 
 5. Read the result when the window says the deploy is done.
    - For Netlify or Cloudflare Pages, it says that your website is live, and shows the website's address as a link.
-   - For a folder on this Mac, it says so, and has a {{control:showInFinder}} button.
+   - For a folder on this {{machine}}, it says so, and has a {{control:showInFinder}} button.
    - For a course that deploys to more than one place, it shows a link or a {{control:showInFinder}} button for each.
 
 {{picture:deploy-3}}
@@ -69,7 +69,7 @@ To have a section deploy at a later time without you, see [Schedule a deploy for
 ## If it does not work
 
 - **An alert titled {{control:cannotDeployYet}} appears.** Something the deploy needs is missing, and the alert says what. Two examples are a Cloudflare Account ID, and the folder a course deploys into. When the Account ID is missing, the alert also has an {{control:openSettings}} button.
-- **{{control:deployButton}} is greyed.** The section is already being deployed, a copy of the course is being saved, or the working folder is still being made ready. Hold the pointer over the button: when the course is being previewed or deployed somewhere else on this Mac, the button's help says so.
+- **{{control:deployButton}} is greyed.** The section is already being deployed, a copy of the course is being saved, or the working folder is still being made ready. Hold the pointer over the button: when the course is being previewed or deployed somewhere else on this {{machine}}, the button's help says so.
 - **There is no {{control:deployButton}} button.** The course is kept for reference, and {{menu:deploy}} is greyed for it too. A course kept for reference is never deployed.
 - **You pressed {{control:cancel}} on the question about later classes.** Nothing was deployed.
 - **The window says something went wrong.** It gives an explanation. See [A deploy did not work](page:deploy-failed).

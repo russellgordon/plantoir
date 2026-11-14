@@ -14,9 +14,9 @@ adjust it to this teacher's header (see the two MARK blocks below), run --self-t
     python3 -B redact_scans.py --name-papers TABLE --section N --into FOLDER
     python3 -B redact_scans.py --self-test
 
-Russell, 2026-11-12, on #750: "script runs, teacher checks the papers, confirms names are redacted, then
-agent based marking begins. Simple." and "Teacher confirms full redacted papers." So the script does three
-things and claims nothing more:
+The ruling on #750 (2026-11-12): the script runs, the teacher checks the papers and confirms the names are
+redacted, and only then does marking begin; the teacher confirms every redacted paper in full. So the script
+does three things and claims nothing more:
   1. It finds the name blank on each page of the BLANK test from the blank's own text and drawing (the
      label, "Name", "Student Name" or "Nom" in any case, followed by a blank: a line, underscores, dots, a
      table cell or a frame), and boxes that line, margin to margin with room above it, on every scanned

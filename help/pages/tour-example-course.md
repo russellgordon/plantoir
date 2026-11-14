@@ -60,7 +60,7 @@ alt: The page How This Site Is Organised on a section's website, with its diagra
 {{picture:tour-example-course-4}}
 alt: The websites of Section 1 and Section 2 side by side, each with a look of its own.
 
-The first preview on a Mac takes longer than later ones. [The first preview is slow](page:slow-first-build) says why.
+The first preview on a {{machine}} takes longer than later ones. [The first preview is slow](page:slow-first-build) says why.
 
 ## Where to go next
 
@@ -73,5 +73,5 @@ Keep the example to try things on, and remove it when you no longer need it. The
 
 ## If it does not work
 
-- **{{menu:courseOpenInObsidian}} is greyed.** Obsidian is not installed on this Mac, or a section's row is selected. With a section selected, use {{menu:sectionOpenInObsidian}} instead.
+- **{{menu:courseOpenInObsidian}} is greyed.** Obsidian is not installed on this {{machine}}, or a section's row is selected. With a section selected, use {{menu:sectionOpenInObsidian}} instead.
 - **A folder named here is missing from the website's sidebar.** Curriculum and Media are kept out of the website's sidebar on purpose. They are still part of the course.

@@ -19,9 +19,9 @@ keywords:
 - section1
 - Show in Finder
 - no account
-description: Deploy a course's sections into a folder on this Mac, then upload that folder to your school's web space yourself.
+description: Deploy a course's sections into a folder on this {{machine}}, then upload that folder to your school's web space yourself.
 ---
-If your school gives you web space, a course can deploy into a folder on this Mac. You then upload the folder to that web space in whatever way you normally do. Plantoir does not upload it, and you need no account with Cloudflare or Netlify.
+If your school gives you web space, a course can deploy into a folder on this {{machine}}. You then upload the folder to that web space in whatever way you normally do. Plantoir does not upload it, and you need no account with Cloudflare or Netlify.
 
 ## Choose the folder
 
@@ -30,7 +30,7 @@ If your school gives you web space, a course can deploy into a folder on this Ma
 3. Press {{control:deployingPartChooseFolderButton}} and choose the folder. You can make a new folder there. You can also type the folder's full location in the {{control:deployingPartFolderField}} field.
 
 {{picture:folder-deploy-1}}
-alt: The Deploying part of a course's settings set to a folder on this Mac, with the Folder field and the Choose… button.
+alt: The Deploying part of a course's settings set to a folder on this {{machine}}, with the Folder field and the Choose… button.
 
 4. Press {{control:courseSettingsSaveButton}}.
 
@@ -53,7 +53,7 @@ A later deploy copies only the files that have changed. Upload again after each 
 
 ## Things to know
 
-- **The pages do not look right when opened straight from the folder.** The finished deploy says so. They display properly only once they are on a web host, and pages that run code need a web address. To look a section's website over on this Mac, use [Preview a section](page:preview).
+- **The pages do not look right when opened straight from the folder.** The finished deploy says so. They display properly only once they are on a web host, and pages that run code need a web address. To look a section's website over on this {{machine}}, use [Preview a section](page:preview).
 - **A folder has no domain setting.** The address is whatever your school's web space gives it.
 - **A deploy to a folder can be scheduled without a first deploy by hand.** See [Schedule a deploy for later](page:schedule-deploy).
 - **A folder can be a second place.** A course that deploys to Cloudflare Pages or Netlify can also deploy to a folder. See [Choose where a section deploys](page:destinations).

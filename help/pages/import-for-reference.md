@@ -73,5 +73,5 @@ You can also put a ready-made course straight onto the shelf, to read and copy f
 - **An orange sentence says you already have that course kept for reference from that year.** Choose a different school year, or press {{control:referenceCourseReplaceItButton}}. See [Replace a reference course](page:replace-reference-course).
 - **You chose the working folder you have open.** The sheet tells you to use {{menu:courseKeepACopyForReference}} instead. A folder inside the open working folder, or one that holds it, is refused too.
 - **A backup or archive cannot be opened**, or it holds no course, or more than one. The sheet says which.
-- **There is too little room on this Mac**, or a course's settings cannot be read. The sheet says so.
+- **There is too little room on this {{machine}}**, or a course's settings cannot be read. The sheet says so.
 - **The folder is arranged in an older way**, with the shared pages kept beside the class folders. Plantoir recognises it. If it cannot find the shared pages, press {{control:importForReferenceSheetChooseSharedFolderButton}} and point to them.

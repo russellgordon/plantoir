@@ -21,9 +21,9 @@ keywords:
 - custom domain
 - own domain
 - school domain
-description: Choose whether a course deploys to Cloudflare Pages, Netlify or a folder on this Mac. Add a second place, or use a domain of your own.
+description: Choose whether a course deploys to Cloudflare Pages, Netlify or a folder on this {{machine}}. Add a second place, or use a domain of your own.
 ---
-A course's sections can deploy to Cloudflare Pages, to Netlify, or to a folder on this Mac. You choose once for the course, in its settings, and every section of the course deploys there.
+A course's sections can deploy to Cloudflare Pages, to Netlify, or to a folder on this {{machine}}. You choose once for the course, in its settings, and every section of the course deploys there.
 
 ## The three places
 
@@ -31,7 +31,7 @@ A course's sections can deploy to Cloudflare Pages, to Netlify, or to a folder o
   {{say:app-rules#publishingDestinations.sentences.cloudflareCaption}}
   See [Put your site online with Cloudflare Pages](page:cloudflare).
 - **Netlify** also puts each section's website on the web. Its free plan has a monthly allowance that deploys use up. See [Set up Netlify](page:netlify).
-- **A folder on this Mac** receives the website's files, and you upload them to your school's web space yourself. It needs no account. See [Deploy to a folder for your school's web space](page:folder-deploy).
+- **A folder on this {{machine}}** receives the website's files, and you upload them to your school's web space yourself. It needs no account. See [Deploy to a folder for your school's web space](page:folder-deploy).
 
 ## Choose where the course deploys
 
@@ -70,7 +70,7 @@ A section's website can use an address on a domain that you or your school owns.
 After the section's next deploy, the link to the live website uses your domain. Leave the field empty to use the address that Cloudflare or Netlify gives.
 
 - A course that deploys to both Cloudflare Pages and Netlify has two fields, each named for its service. A domain typed for one is never used for the other.
-- A folder on this Mac has no domain. For a course that deploys only to a folder, {{control:sectionSettingsAdvanced}} is empty.
+- A folder on this {{machine}} has no domain. For a course that deploys only to a folder, {{control:sectionSettingsAdvanced}} is empty.
 - Each section has its own field, so two sections can have two addresses.
 
 ## If it does not work

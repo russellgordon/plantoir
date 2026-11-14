@@ -895,6 +895,82 @@ final class AppRulesContractTests: XCTestCase {
 
     // MARK: - The outside doors
 
+    /// `outsideAgents.greetingHandoutsSentence` (#859): the sentence telling
+    /// the teacher the session can make printed handouts is the contract's,
+    /// in its place on every door. The Revise greeting is run through every
+    /// `greetingHandoutsCases` case; the other two doors' cases are checked
+    /// to carry it straight after their hold-until-agreed sentence (their own
+    /// tests compare the code's message with each case's whole text).
+    func testTheHandoutsSentenceIsTheContractsOnEveryDoor() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let sentence: String = try XCTUnwrap(section["greetingHandoutsSentence"] as? String)
+        XCTAssertEqual(sentence, ClaudeCodeLauncher.handoutsGreetingSentence)
+        XCTAssertFalse(sentence.contains("\""), "greetingCarriesNoDoubleQuotes")
+        XCTAssertFalse(sentence.contains(";"), "fixWith.replaceInTheMessage: no semicolon")
+        // The opposite of marking and report comments, which no greeting
+        // advertises (Russell, 2026-11-13).
+        let lowered: String = sentence.lowercased()
+        XCTAssertFalse(lowered.contains("mark"), sentence)
+        XCTAssertFalse(lowered.contains("report"), sentence)
+        XCTAssertFalse(lowered.contains("comment"), sentence)
+
+        // The Revise doors, whole greeting, for every case.
+        let block: [String: Any] = try XCTUnwrap(section["greetingHandoutsCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 3)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let course: String = try XCTUnwrap(testCase["course"] as? String, name)
+            let courseName: String = try XCTUnwrap(testCase["courseName"] as? String, name)
+            let referenceCourses: [String] = try XCTUnwrap(testCase["referenceCourses"] as? [String], name)
+            let text: String = try XCTUnwrap(testCase["text"] as? String, name)
+            var unitPlans: [UnitPlans.Plan]? = nil
+            if testCase["unitPlans"] is [Any] {
+                unitPlans = []
+            }
+            let made: String = ClaudeCodeLauncher.greeting(
+                courseCode: course, courseName: courseName,
+                referenceCourses: referenceCourses, unitPlans: unitPlans
+            )
+            XCTAssertEqual(made, text, name)
+            XCTAssertTrue(made.contains("wait for me to agree. " + sentence), name)
+        }
+
+        // Fix with: every whole-message case carries it after planFirst and
+        // before the closing.
+        let fixWith: [String: Any] = try XCTUnwrap(section["fixWith"] as? [String: Any])
+        let fixGreeting: [String: Any] = try XCTUnwrap(fixWith["fixGreeting"] as? [String: Any])
+        let planFirst: String = try XCTUnwrap(fixGreeting["planFirst"] as? String)
+        let fixCases: [[String: Any]] = try XCTUnwrap(fixWith["greetingCases"] as? [[String: Any]])
+        var fixTextsSeen: Int = 0
+        for testCase in fixCases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            guard let expect = testCase["expect"] as? [String: Any], let text = expect["text"] as? String else {
+                continue
+            }
+            fixTextsSeen += 1
+            XCTAssertTrue(text.contains(planFirst + sentence + " When you are done"), name)
+        }
+        XCTAssertGreaterThanOrEqual(fixTextsSeen, 6)
+
+        // Plan a Unit: the message ends with it, and every case carries it.
+        let planAUnit: [String: Any] = try XCTUnwrap(section["planAUnit"] as? [String: Any])
+        let message: String = try XCTUnwrap(planAUnit["message"] as? String)
+        XCTAssertTrue(message.hasSuffix("Do not build anything until I say go. {handouts}"), message)
+        let messageCases: [[String: Any]] = try XCTUnwrap(planAUnit["messageCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(messageCases.count, 6)
+        for testCase in messageCases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let text: String = try XCTUnwrap(testCase["text"] as? String, name)
+            XCTAssertTrue(text.hasSuffix("Do not build anything until I say go. " + sentence), name)
+            XCTAssertEqual(PlanAUnit.openingMessage(
+                courseCode: try XCTUnwrap(testCase["course"] as? String, name),
+                courseName: try XCTUnwrap(testCase["courseName"] as? String, name)
+            ), text, name)
+        }
+    }
+
     /// `outsideAgents.greetingReferenceCourses` (#856): the sentence naming
     /// the same-code courses kept for reference is the contract's, placed
     /// where the contract says, and absent when there are none. The template
@@ -1003,6 +1079,10 @@ final class AppRulesContractTests: XCTestCase {
         let howITeach: String = try XCTUnwrap(section["greetingHowITeachSentence"] as? String)
         XCTAssertEqual(ClaudeCodeLauncher.howITeachGreetingSentence, howITeach)
         XCTAssertTrue(greeting.contains(howITeach), greeting)
+        // The handouts sentence (#859), in the same one greeting every door
+        // sends.
+        let handouts: String = try XCTUnwrap(section["greetingHandoutsSentence"] as? String)
+        XCTAssertTrue(greeting.contains(handouts), greeting)
 
         for agent in agents {
             let key: String = try XCTUnwrap(agent["key"] as? String)

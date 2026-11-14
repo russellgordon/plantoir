@@ -60,7 +60,7 @@ Students see the page after two more things: the page is published for their sec
 
 ## If it does not work
 
-- **{{control:openInObsidian}} is greyed.** Obsidian is not installed on this Mac. Install it from [obsidian.md](https://obsidian.md), then press the button again.
+- **{{control:openInObsidian}} is greyed.** Obsidian is not installed on this {{machine}}. Install it from [obsidian.md](https://obsidian.md), then press the button again.
 - **An offer of add-ons for Obsidian appears.** It may appear the first time you open a course that has diagrams or graphs. See [See diagrams and graphs in Obsidian too](page:obsidian-addons).
 - **A change is not in the preview.** Choose {{menu:rebuildPreview}}. {{control:reload}} does not show a change made in Obsidian.
 - **The page is not in the preview at all.** It is not published for that section. Publish it, then look again.

@@ -59,7 +59,7 @@ alt: The Deploying part of a course's settings, with Deploy to set to Cloudflare
 ## Deploy the section
 
 1. Select the section and press {{control:deployButton}}.
-2. The first time this Mac deploys to Cloudflare, a sheet titled {{control:connectToCloudflareSheetTitle}} opens. It lists the steps for making a token on Cloudflare's website, and has a link named {{control:connectToCloudflareSheetLink}}. Follow its steps in your browser. Two of them decide whether the token works:
+2. The first time this {{machine}} deploys to Cloudflare, a sheet titled {{control:connectToCloudflareSheetTitle}} opens. It lists the steps for making a token on Cloudflare's website, and has a link named {{control:connectToCloudflareSheetLink}}. Follow its steps in your browser. Two of them decide whether the token works:
    {{say:app-rules#credentialRequests.requests[1].steps[3]}}
    {{say:app-rules#credentialRequests.requests[1].steps[4]}}
 3. Cloudflare shows the token once. Copy it, paste it into the {{control:connectToCloudflareSheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this computer, and Plantoir does not ask for it again.

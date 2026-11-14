@@ -69,6 +69,6 @@ The assistant does this work, not Plantoir. Look in the handouts folder and in t
 
 ## If it does not work
 
-- **Revise With is not in the Course menu, or lacks the assistant you want.** Each item shows only when that program is installed on this Mac. Plantoir does not install any of them.
+- **Revise With is not in the Course menu, or lacks the assistant you want.** Each item shows only when that program is installed on this {{machine}}. Plantoir does not install any of them.
 - **The assistant asks again where the handouts go.** It asks again on another computer, or when the folder has been renamed.
 - **You cannot find the test.** Ask the assistant where the test's folder is. It is in the handouts folder you chose, not in the course.

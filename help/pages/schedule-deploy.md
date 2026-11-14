@@ -26,9 +26,9 @@ keywords:
 - notification
 - clock
 - asleep
-description: Schedule Deploy sets a section to deploy on its own at a date and time, as long as this Mac is on and awake then.
+description: Schedule Deploy sets a section to deploy on its own at a date and time, as long as this {{machine}} is on and awake then.
 ---
-A scheduled deploy sends a section's website at a date and time you choose, without you pressing Deploy. This Mac must be switched on and awake at that time.
+A scheduled deploy sends a section's website at a date and time you choose, without you pressing Deploy. This {{machine}} must be switched on and awake at that time.
 
 ## Before you schedule
 
@@ -39,18 +39,22 @@ A section that deploys to Netlify or Cloudflare Pages must have been deployed th
 1. In the sidebar, select the section.
 2. Choose {{menu:scheduleDeploy}} from the menu bar, or right-click the section in the sidebar and choose the same command. A sheet titled {{control:scheduleADeploy}} opens. The command is greyed when the section already has a deploy scheduled: see the part on changing the time, below.
 3. Set {{control:deployAt}} to the date and time. It starts at 6:30 tomorrow, and it cannot be set in the past.
-4. Read the plan under the time. It names the section, where it deploys to, and when. It also says what this Mac needs at that moment:
-   - The Mac must be switched on and awake, with its lid open if closing the lid puts it to sleep.
-   - A Mac running on its battery goes to sleep sooner.
-   - Plantoir does not wake the Mac. If it is asleep at the time, macOS runs the deploy when the Mac next wakes.
-   - Anything you write before then goes out with the deploy.
+4. Read the plan under the time. It names the section, where it deploys to, and when. It says that anything you write before then goes out with the deploy. It also says what this {{machine}} needs at that moment.
+
+{{mac}}
+On a Mac, the plan says three things:
+
+- The Mac must be switched on and awake, with its lid open if closing the lid puts it to sleep.
+- A Mac running on its battery goes to sleep sooner.
+- Plantoir does not wake the Mac. If it is asleep at the time, macOS runs the deploy when the Mac next wakes.
+{{/mac}}
 
 {{picture:schedule-deploy-1}}
 alt: The Schedule a deploy sheet, with the Deploy at date and time, the plan under it, and the Schedule button.
 
 5. Press {{control:scheduleButton}}. The first time, macOS asks whether Plantoir may send notifications. Allow them, so that Plantoir can tell you how the deploy went.
 
-A clock appears beside the section in the sidebar. Hold the pointer over it to read when the deploy will run. The text also says that this Mac must be on and awake, and that a right-click cancels.
+A clock appears beside the section in the sidebar. Hold the pointer over it to read when the deploy will run. The text also says that this {{machine}} must be on and awake, and that a right-click cancels.
 
 {{picture:schedule-deploy-2}}
 alt: The sidebar with a clock beside one section, and the text that appears when the pointer rests on it.
@@ -74,12 +78,12 @@ alt: The notification macOS shows after a scheduled deploy, which opens the sect
 
 ## How late a deploy may still run
 
-A Mac that was asleep runs the deploy when it next wakes. You choose how long after the set time that is still worth doing.
+A {{machine}} that was asleep runs the deploy when it next wakes. You choose how long after the set time that is still worth doing.
 
 1. Select the course, and open the {{control:deployingPart}} part of its settings.
 2. Under {{control:howLateSetting}}, choose one day, three days, one week or two weeks. One week is the choice to begin with.
 
-If the Mac wakes later than that, Plantoir cancels the deploy, leaves the website as it was, and tells you so.
+If the {{machine}} wakes later than that, Plantoir cancels the deploy, leaves the website as it was, and tells you so.
 
 ## Cancel a scheduled deploy
 

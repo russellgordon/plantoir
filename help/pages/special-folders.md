@@ -77,4 +77,4 @@ Plantoir notices the next time the section is previewed or deployed, and the sec
 
 ## Removing one from the website
 
-Removing a folder in the course's settings takes it off the website and leaves it on this Mac. Some of these folders cannot be removed there at all. [Shared folders and section folders in Course Settings](page:course-folders) lists them.
+Removing a folder in the course's settings takes it off the website and leaves it on this {{machine}}. Some of these folders cannot be removed there at all. [Shared folders and section folders in Course Settings](page:course-folders) lists them.

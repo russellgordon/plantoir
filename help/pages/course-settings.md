@@ -35,7 +35,7 @@ A course's settings are one long form. This page says how to open it, what each 
 alt: A course's settings at the top of the form, with the Course name field, and the Save button at the bottom of the form.
 
 {{assistant}}
-A bar with two tabs shows above the form when Claude Code, Codex or GitHub Copilot is installed on this Mac. The tabs are {{control:courseDetailSettingsTab}} and {{control:courseDetailPlanningTab}}. The settings are on the first.
+A bar with two tabs shows above the form when Claude Code, Codex or GitHub Copilot is installed on this {{machine}}. The tabs are {{control:courseDetailSettingsTab}} and {{control:courseDetailPlanningTab}}. The settings are on the first.
 {{/assistant}}
 
 ## The parts of the form

@@ -19,9 +19,9 @@ keywords:
 - website builder
 - still working
 - after an update
-description: The first preview on a Mac takes a couple of minutes while Plantoir sets up its website builder. Later previews usually take a few seconds.
+description: The first preview on a {{machine}} takes a couple of minutes while Plantoir sets up its website builder. Later previews usually take a few seconds.
 ---
-The first preview on a Mac takes a couple of minutes, because Plantoir sets up its website builder first. Later previews and deploys usually take a few seconds. This page says how to tell that Plantoir is working, and when the wait comes back.
+The first preview on a {{machine}} takes a couple of minutes, because Plantoir sets up its website builder first. Later previews and deploys usually take a few seconds. This page says how to tell that Plantoir is working, and when the wait comes back.
 
 ## How to tell it is working
 
@@ -54,9 +54,9 @@ The link {{control:progressViewWhyMightThisTakeAWhileLink}} is in the window whe
 
 ## When the wait comes
 
-- **The first time on a Mac.** When you first open Plantoir, it starts getting the Mac ready while you choose a folder and make a course. One line at the foot of the sidebar says so:
+- **The first time on a {{machine}}.** When you first open Plantoir, it starts getting the {{machine}} ready while you choose a folder and make a course. One line at the foot of the sidebar says so:
   {{say:app-rules#builderWarmUp.wording.statusLine}}
-  You can carry on working. If you preview before that has finished, the preview waits for it. If the Mac was offline, the work is done at the first preview instead.
+  You can carry on working. If you preview before that has finished, the preview waits for it. If the {{machine}} was offline, the work is done at the first preview instead.
 - **After an update.** The first preview after Plantoir updates can be slow again, once.
 - **A course with Swift programs students can run.** The first time, Plantoir downloads what it needs to make them. The download is large. It takes a few minutes and needs the internet. See [Code students can run](page:code).
 - **A working folder that was only now opened.** A notice says Plantoir is getting the folder ready, and that Preview and Deploy will work in a moment.

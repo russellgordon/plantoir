@@ -77,9 +77,11 @@ class RealRepositoryTests(unittest.TestCase):
 
     def test_the_real_outline_has_its_counts(self) -> None:
         ids, assistant_ids, assistant_sections = outline_ids()
-        self.assertEqual(len(ids), 104)
-        self.assertEqual(len(set(ids)), 104)
-        self.assertEqual(len(assistant_ids), 14)
+        # 102 since #750's hold took out the marking and report-comments pages (they return with the skills:
+        # contracts/shared-rules.json -> printablePages.agentGuidance.held.helpPages).
+        self.assertEqual(len(ids), 102)
+        self.assertEqual(len(set(ids)), 102)
+        self.assertEqual(len(assistant_ids), 12)
         self.assertEqual(len(assistant_sections), 1)
 
     @unittest.skipIf(shutil.which("hiutil") is None, "hiutil is not on this machine")
@@ -87,7 +89,7 @@ class RealRepositoryTests(unittest.TestCase):
         book = Path(self.temporary) / "Plantoir.help"
         code, output = run_build(["--mac", str(book), "--app-version", "2.0.0"])
         self.assertEqual(code, 0, output)
-        self.assertIn("Plantoir.help: 104 pages, ", output)
+        self.assertIn("Plantoir.help: 102 pages, ", output)
         ids, _assistant_ids, _sections = outline_ids()
         anchors = json.loads((book / "Contents" / "Resources" / "anchors.json").read_text(encoding="utf-8"))
         self.assertEqual(anchors, ids)

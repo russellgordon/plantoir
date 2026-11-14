@@ -833,6 +833,10 @@ final class PrintablePagesTests: XCTestCase {
         let agentGuidance: [String: Any] = try XCTUnwrap(assessment["agentGuidance"] as? [String: Any])
         let guidance: [String: Any] = try XCTUnwrap(agentGuidance["markingSkill"] as? [String: Any])
         let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        if try isHeld(skillName) {
+            try assertHeldSkillIsNotWritten(skillName)
+            return
+        }
         let scripts: [String] = try XCTUnwrap(guidance["scripts"] as? [String])
         let templates: [String] = try XCTUnwrap(guidance["templates"] as? [String])
         let references: [String] = try XCTUnwrap(guidance["references"] as? [String])
@@ -892,6 +896,10 @@ final class PrintablePagesTests: XCTestCase {
         let agentGuidance: [String: Any] = try XCTUnwrap(assessment["agentGuidance"] as? [String: Any])
         let guidance: [String: Any] = try XCTUnwrap(agentGuidance["reportCommentsSkill"] as? [String: Any])
         let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        if try isHeld(skillName) {
+            try assertHeldSkillIsNotWritten(skillName)
+            return
+        }
         let references: [String] = try XCTUnwrap(guidance["references"] as? [String])
         let uses: [String] = try XCTUnwrap(guidance["uses"] as? [String])
         let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
@@ -934,18 +942,137 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #750 hold (review M3): the two tests above were the ones that proved
+    /// the marking and report-comments skills are written, named by the root
+    /// files and by every skill in `mentionedBy`. While a skill is in
+    /// `printablePages.agentGuidance.held.skills` each asserts the opposite
+    /// (the skill is in neither home and neither root file names it) and
+    /// stops; when the release that brings it back shortens that list, each
+    /// asserts again that it IS written, so nothing it needs (the root
+    /// bullets, the `.internal/marking` lines `mentionedBy` names) can stay
+    /// missing silently.
+    private func isHeld(_ skillName: String) throws -> Bool {
+        let guidance: [String: Any] = try agentGuidanceContract()
+        guard let held: [String: Any] = guidance["held"] as? [String: Any] else {
+            return false
+        }
+        guard let skills: [String: Any] = held["skills"] as? [String: Any] else {
+            return false
+        }
+        return skills[skillName] != nil
+    }
+
+    private func assertHeldSkillIsNotWritten(_ skillName: String) throws {
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: skillFolder.path), "\(home): \(skillName) is held, and must not be written")
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertFalse(text.contains(skillName), "\(name) must not name the held \(skillName) skill")
+        }
+    }
+
+    /// #750 (2026-11-13): the marking and report-comments skills are HELD
+    /// from this release (`printablePages.agentGuidance.held`). A freshly
+    /// prepared working folder holds neither skill in either home, neither
+    /// root file names them, and no file written into either home names
+    /// them except in a skill `held.mayStillName` lists, which says what to
+    /// do when they are absent. Each held skill is still kept whole in
+    /// `held.place`, so the next release can bring it back by moving it.
+    /// The blocks `assessment.held.keys` names are still in the contract.
+    func testHeldSkillsAreNotWrittenAndNothingWrittenNamesThem() throws {
+        let held: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["held"] as? [String: Any])
+        let heldSkills: [String: Any] = try XCTUnwrap(held["skills"] as? [String: Any])
+        let place: String = try XCTUnwrap(held["place"] as? String)
+        let mayStillName: [String: Any] = try XCTUnwrap(held["mayStillName"] as? [String: Any])
+        XCTAssertFalse(heldSkills.isEmpty)
+        let assessment: [String: Any] = try SharedRulesContractTests.section("assessment")
+        let assessmentHeld: [String: Any] = try XCTUnwrap(assessment["held"] as? [String: Any])
+        let assessmentHeldSkills: [String] = try XCTUnwrap(assessmentHeld["skills"] as? [String])
+        for skillName in assessmentHeldSkills {
+            XCTAssertNotNil(heldSkills[skillName], "assessment.held names \(skillName), which agentGuidance.held does not hold")
+        }
+        for key in try XCTUnwrap(assessmentHeld["keys"] as? [String]) {
+            var node: Any? = assessment
+            for part in key.components(separatedBy: ".") {
+                node = (node as? [String: Any])?[part]
+            }
+            XCTAssertNotNil(node, "assessment.\(key) is held, so it is kept")
+        }
+
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        let fileManager: FileManager = FileManager.default
+        for (skillName, _) in heldSkills {
+            let kept: URL = PrintablePagesTests.repositoryRoot()
+                .appendingPathComponent(place).appendingPathComponent(skillName).appendingPathComponent("SKILL.md")
+            XCTAssertTrue(fileManager.fileExists(atPath: kept.path), "\(skillName) is kept in \(place)")
+            for home in [".claude", ".agents"] {
+                let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+                XCTAssertFalse(fileManager.fileExists(atPath: skillFolder.path), "\(home): \(skillName) is held, and must not be written")
+            }
+            for name in AgentGuidance.rootFiles {
+                let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+                XCTAssertFalse(text.contains(skillName), "\(name) must not name the held \(skillName) skill")
+            }
+        }
+        for home in [".claude", ".agents"] {
+            let skillsFolder: URL = folder.appendingPathComponent("\(home)/skills")
+            let written: [URL] = try fileManager.contentsOfDirectory(
+                at: skillsFolder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+            XCTAssertFalse(written.isEmpty, "\(home): the other skills are written")
+            for skillFolder in written {
+                let writtenSkill: String = skillFolder.lastPathComponent
+                if mayStillName[writtenSkill] != nil {
+                    continue
+                }
+                let enumerator: FileManager.DirectoryEnumerator? = fileManager.enumerator(
+                    at: skillFolder, includingPropertiesForKeys: [.isRegularFileKey])
+                while let file = enumerator?.nextObject() as? URL {
+                    let isFile: Bool = (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+                    if !isFile {
+                        continue
+                    }
+                    guard let text = try? String(contentsOf: file, encoding: .utf8) else {
+                        continue
+                    }
+                    for (skillName, _) in heldSkills {
+                        XCTAssertFalse(text.contains(skillName),
+                                       "\(home)/skills/\(writtenSkill)/\(file.lastPathComponent) names the held \(skillName) skill")
+                    }
+                }
+            }
+        }
+    }
+
     /// #758: every phrase `printablePages.agentGuidance.mustSay` pins is in
     /// its skill as written into both homes, matched with white space folded
     /// as the contract's rule says, and every key names a skill that is
     /// written. Later pieces add their phrases to the contract, not here.
     func testEverySkillSaysWhatTheContractSaysItMust() throws {
         let mustSay: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["mustSay"] as? [String: Any])
+        let held: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["held"] as? [String: Any])
+        let heldSkills: [String: Any] = try XCTUnwrap(held["skills"] as? [String: Any])
         let outcome: AgentGuidance.Outcome = AgentGuidance.write(
             from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
         XCTAssertEqual(outcome.failures, [])
         var pinnedSkills: Int = 0
         for (skillName, value) in mustSay {
             if skillName == "rule" {
+                continue
+            }
+            if heldSkills[skillName] != nil {
+                // Held (#750): its pins are checked against its kept folder by
+                // its own Python tests; here it must not be written at all.
+                for home in [".claude", ".agents"] {
+                    let file: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)/SKILL.md")
+                    XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "\(home): \(skillName) is held")
+                }
                 continue
             }
             let phrases: [String] = try XCTUnwrap(value as? [String], "\(skillName) must be a list of phrases")

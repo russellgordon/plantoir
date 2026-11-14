@@ -25,14 +25,14 @@ keywords:
 - Safari
 - Chrome
 - last viewed
-description: Preview shows a section's website on your Mac, with the pages published for that section, before anything is deployed.
+description: Preview shows a section's website on your {{machine}}, with the pages published for that section, before anything is deployed.
 ---
-A preview shows a section's website on your Mac, as its students would see it. It holds the pages that are published for that section. Nothing is sent anywhere.
+A preview shows a section's website on your {{machine}}, as its students would see it. It holds the pages that are published for that section. Nothing is sent anywhere.
 
 ## Start a preview
 
 1. In the sidebar, select the section.
-2. Press {{control:previewButton}} in the toolbar, or choose {{menu:preview}} ({{key:preview}}). Plantoir says what it is doing while it makes the website. The first preview on a Mac takes longer than later ones: see [The first preview is slow](page:slow-first-build).
+2. Press {{control:previewButton}} in the toolbar, or choose {{menu:preview}} ({{key:preview}}). Plantoir says what it is doing while it makes the website. The first preview on a {{machine}} takes longer than later ones: see [The first preview is slow](page:slow-first-build).
 
 {{picture:preview-2}}
 alt: The section's window while a preview is made, with a line that says what is happening now.
@@ -85,5 +85,5 @@ Plantoir remembers the last page for each section, and keeps it when you quit. O
 - **The preview does not finish.** The section's window says what went wrong.
 - **{{menu:rebuildPreview}} is greyed.** It is live only while a preview is running. Press {{control:previewButton}} instead.
 - **A sheet titled {{control:rebuildPreviewTitle}} appears.** The preview could not be made again at that moment, and the sheet says why.
-- **{{control:openInBrowser}} is greyed.** No preview is running.
+- **{{control:openInBrowser}} is greyed.** No preview is running. A course that deploys to a folder is the exception. With no preview showing, the button opens the deployed website. See [Deploy to a folder for your school's web space](page:folder-deploy).
 - **The preview does not show a change to the course's settings.** A preview uses the settings as they were last saved, and a notice says so. Save them, then preview again.

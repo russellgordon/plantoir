@@ -73,7 +73,7 @@ A date written the first way, year then month then day, is always read correctly
 
 ## A Google Sheet
 
-Reading a Google Sheet sends the sheet's link to Google over the internet. Plantoir's sheet carries a notice that says so. Typing, pasting and choosing a file all stay on this Mac.
+Reading a Google Sheet sends the sheet's link to Google over the internet. Plantoir's sheet carries a notice that says so. Typing, pasting and choosing a file all stay on this {{machine}}.
 
 The Google Sheet must be shared. In Google Sheets, choose Share, and under General access choose **Anyone with the link**. A link to one tab of the sheet reads that tab.
 
@@ -92,7 +92,7 @@ If you choose one for a section with no dates on file, this sheet opens first, w
 - **Some lines cannot be read.** The sheet names them and refuses the whole list. Correct those lines and read the dates again.
 - **No dates were found.** There is nothing to remember.
 - **The dates are written both ways round.** Write them all one way.
-- **The address is not a Google Sheet's.** Copy it from the browser's address bar while the sheet is open. A link made with Google's Publish to the web does not work.
+- **The address is not a Google Sheet's.** Copy it from the browser's address bar while the sheet is open. A link that Google makes for showing a sheet as a web page of its own does not work, and the sheet says so. Use the address of the sheet itself, which ends in `/edit`.
 - **Google sent a sign-in page.** The sheet is not shared. Share it as described above.
 - **The file is refused.** It is not a .csv or .ics file, or it is a calendar file with no events in it.
 - **{{menu:classDates}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section menu.

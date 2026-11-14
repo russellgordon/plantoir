@@ -47,7 +47,7 @@ A course has two kinds of page:
 
 A section is one class you teach the course to. If you teach the same course to two classes, the course has two sections.
 
-Each section gets a website of its own. On Cloudflare Pages or Netlify, each section's site has its own address. In a folder on this Mac, each section's site has its own folder, named `section1`, `section2` and so on. [Your site's address](page:site-address) says how an address is made.
+Each section gets a website of its own. On Cloudflare Pages or Netlify, each section's site has its own address. In a folder on this {{machine}}, each section's site has its own folder, named `section1`, `section2` and so on. [Your site's address](page:site-address) says how an address is made.
 
 ## The sidebar
 
@@ -62,7 +62,7 @@ alt: Plantoir's main window, with the sidebar listing two courses, the sections 
 
 You write your pages in Obsidian. Plantoir opens a course there for you, and Obsidian shows the whole course folder.
 
-Plantoir does the rest. It previews a section, which shows you that section's website on this Mac. It deploys a section, which sends that section's website to where students read it.
+Plantoir does the rest. It previews a section, which shows you that section's website on this {{machine}}. It deploys a section, which sends that section's website to where students read it.
 
 - [Write a class page in Obsidian](page:write-in-obsidian)
 - [Preview a section](page:preview)

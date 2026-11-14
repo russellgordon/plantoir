@@ -59,7 +59,10 @@ When Plantoir opens such a folder, it shows a notice inside the window, above th
 ## Where to keep a working folder
 
 - To avoid the slow moments, keep the working folder inside your home folder, somewhere that is not synced.
-- On a Mac with Desktop & Documents in iCloud, the Desktop is synced.
 - A working folder must be inside your home folder in any case. See [Choose or change the working folder](page:working-folder).
 
-Plantoir recognises a synced folder by how the Mac marks it, never by its name.
+{{mac}}
+On a Mac with Desktop & Documents in iCloud, the Desktop is synced.
+{{/mac}}
+
+Plantoir recognises a synced folder by how the {{machine}} marks it, never by its name.

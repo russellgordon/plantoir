@@ -24,7 +24,7 @@ A problem report is one file that says what Plantoir did on the last few things 
 
 1. Choose {{menu:helpReportAProblem}}. An alert titled {{control:problemReportAlertTitle}} opens.
 2. Read what the report includes and what it leaves out.
-   - It includes the messages Plantoir showed, course codes and section numbers, the names of pages, and what kind of Mac this is.
+   - It includes the messages Plantoir showed, course codes and section numbers, the names of pages, and what kind of {{machine}} this is.
    - It leaves out what you have written on your pages, your sign-in details for Netlify or Cloudflare, and your name.
 
 {{picture:report-1}}

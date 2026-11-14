@@ -16,7 +16,7 @@ from . import BOOK_TITLE, CONTENTS_ANCHOR, LANGUAGE_TAG
 from .frontmatter import read_front_matter
 from .markdown import continues_steps, parse_body, split_inline, step_sequence, walk_blocks
 from .problems import HelpError, Problems
-from .tokens import Registries, read_json
+from .tokens import MACHINE_TOKEN, Registries, fill_machine, read_json
 from .words import WordRules
 
 CONTENTS_FILE = "index.html"
@@ -64,7 +64,8 @@ class Page:
     def description(self) -> str:
         if self.is_stub:
             return self.question
-        return str(self.fields.get("description", ""))
+        # The Mac book and the web copy are the only forms today (tokens.py).
+        return fill_machine(str(self.fields.get("description", "")), "mac")
 
     @property
     def keywords(self) -> List[str]:
@@ -427,7 +428,7 @@ class PageRenderer:
         file: str = self.source.page_file_label(page)
         scene_id: str = block["scene"]
         line: int = block["line"]
-        alt: str = html.escape(block["alt"])
+        alt: str = html.escape(fill_machine(block["alt"], platform))
         if scene_id not in page.scene_ids:
             self.problems.fail(file, line, "{{picture:" + scene_id + "}} is not one of this page's outline sceneIds")
         scene: Optional[Dict[str, Any]] = self.registries.scenes.get(scene_id)

@@ -30,7 +30,7 @@ alt: The top of the New Course or Club sheet, where the New to this? box holds t
 3. When it has finished, press {{control:wizardClose}}. The example is now in the sidebar, and its Section 1 is selected.
 4. Press {{control:previewButton}}. Section 1's website shows in the window.
 
-The first preview on a Mac takes longer than later ones. [The first preview is slow](page:slow-first-build) says why.
+The first preview on a {{machine}} takes longer than later ones. [The first preview is slow](page:slow-first-build) says why.
 
 ## Try things on it
 

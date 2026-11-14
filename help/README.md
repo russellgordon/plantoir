@@ -130,6 +130,16 @@ every page, caption and alt text is written by Fable from a fact sheet
     integrator has committed that page's scenes to `help/scenes.json`. Pages
     whose outline lists scene ids without picture descriptions take `shows`
     and labels from the fact sheet.
+23. **Never type "Mac" (#898).** The same pages are built for Windows, where
+    the reader's computer is a PC. Write `{{machine}}`: "a folder on this
+    `{{machine}}`". It is the one token with no argument, and the one token a
+    `description:` and an `alt:` line take. A bare "Mac" in a description, a
+    heading, a paragraph, a list item, a table cell or an alt line is
+    refused. What is true only on a Mac (the lid, Finder, iCloud, Terminal,
+    the Command key, Apple silicon) goes in a `{{mac}}` … `{{/mac}}` run,
+    where the word is allowed; leave the Windows half to Windows' writers.
+    "macOS" and "MacBook" pass. Keywords are not read, and a label or
+    sentence the app shows is a token, so it is never typed.
 
 ## What is here
 
@@ -239,6 +249,7 @@ horizontal rules and other quote blocks are refused with the file and line.
 | `{{fact:<id>}}` | the value | `facts.json` |
 | `{{key:<id>}}` | the shortcut | a menu id's key in the golden, or `controls.json` → `keys` |
 | `{{count:<name>}}` | a number | counted from `support/` by `helpbook/counts.py` |
+| `{{machine}}` | the reader's computer: "Mac" in the Mac book and the web copy, "PC" inside a `{{windows}}` run | `helpbook/tokens.py` → `MACHINE_WORDS` |
 | `{{picture:<scene>}}` + `alt:` line | a picture or its placeholder | the page's outline `sceneIds` and `scenes.json` |
 | `{{mac}}…{{/mac}}`, `{{windows}}…{{/windows}}` | a run for one platform | may not nest |
 | `{{assistant}}…{{/assistant}}` | lines that name an assistant: kept in the Mac book, left out of the web copy while `assistantOnTheWeb` is false | may not nest |
@@ -360,6 +371,17 @@ header.
    text instead was rejected by review: tokens, code and the introduction
    were ways round it.
 
+8. **The reader's computer** (`check_machine_word`, #898). A page's prose
+   never says "Mac" outside a `{{mac}}` run: it says `{{machine}}`, which the
+   build fills from `helpbook/tokens.py` → `MACHINE_WORDS` by the platform a
+   passage is rendered for. The build has no Windows form yet, so the Mac
+   book and the web copy both say "Mac", and "PC" is filled only inside a
+   `{{windows}}` run; a Windows form passes `windows` as its platform and
+   gets "PC" from the same table. Not read: keywords, the outline's titles
+   and questions, and `scenes.json`. Rejected: rewording every page to "this
+   computer", which loses the word the app itself shows beside it ("A folder
+   on this Mac").
+
 ## The Mac book
 
 `Plantoir.help/Contents/Info.plist` holds exactly the keys of decision 2
@@ -400,7 +422,7 @@ page never lingers and pictures are not rewritten.
 - Index bytes differ between two runs over identical pages, so they are never
   compared across builds.
 - A `robots: anchors` page is listed with no title or description.
-- The real 104 stubs (outline revision 4) build into a 142 KB book.
+- The real 104 stubs (outline revision 4) build into a 142 KB book. (102 since #750's hold took out the marking and report-comments pages, 2026-11-13; not re-measured.)
 - `/usr/bin/python3` is 3.9.6, the Python an Xcode build phase gets. `-I`
   takes the script's own folder off `sys.path`, so `build_help.py` inserts it
   explicitly, and it finds the repository as its own folder's parent, never

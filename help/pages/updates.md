@@ -46,7 +46,7 @@ Press {{control:updateNoticeOk}} and carry on.
 
 ## If an administrator is needed
 
-Installing a new version can need the name and password of an administrator of this Mac. If none is given, a notice says:
+Installing a new version can need the name and password of an administrator of this {{machine}}. If none is given, a notice says:
 
 {{say:shared-rules#appUpdates.wording.needsAdministratorTitle}}
 

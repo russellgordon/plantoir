@@ -43,7 +43,7 @@ You do not have to use these lists to add things. A folder or file you make in O
 2. Type the name and press {{control:folderListAddButton}}.
 3. Press {{control:courseSettingsSaveButton}} at the bottom of the form.
 
-If the folder is not on this Mac yet, Plantoir makes it at once, before you save, and tells you so. Open it in Obsidian to put pages in it.
+If the folder is not on this {{machine}} yet, Plantoir makes it at once, before you save, and tells you so. Open it in Obsidian to put pages in it.
 
 ## Rename a folder
 
@@ -66,7 +66,7 @@ Afterwards Plantoir says how many pages had links that it changed. The folder's 
 2. If Plantoir asks first, read the question and press {{control:folderListRemove}}. It asks about a folder whose work counts for marks. It also asks about a folder that holds curriculum expectations.
 3. Press {{control:courseSettingsSaveButton}}.
 
-Removing takes the folder or file off the website and nothing more. It stays on this Mac with everything in it. It also stays off the website, even if you make it again in Obsidian, until you add it back to the list.
+Removing takes the folder or file off the website and nothing more. It stays on this {{machine}} with everything in it. It also stays off the website, even if you make it again in Obsidian, until you add it back to the list.
 
 ## What cannot be removed
 
@@ -84,5 +84,5 @@ Some rows cannot be removed. An info button on the row says why.
 
 - **The rename sheet refuses the name.** The sheet says why. The name is empty or unchanged, or has a / or a : in it. It begins with a dot, is Media, or is already used by another folder. A name that looks like a section's folder, such as `section1`, is refused too.
 - **A rename did not finish.** Plantoir offers it again. Press {{control:folderRenameSheetRenameButton}} to finish it.
-- **A rename found no folder.** No folder by that name was on this Mac, so only the course's settings changed. Make the folder in Obsidian when you need it.
+- **A rename found no folder.** No folder by that name was on this {{machine}}, so only the course's settings changed. Make the folder in Obsidian when you need it.
 - **A renamed folder still has its old name on the students' website.** Deploy each section.
