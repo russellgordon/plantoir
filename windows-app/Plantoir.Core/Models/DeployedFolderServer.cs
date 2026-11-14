@@ -278,6 +278,11 @@ public sealed class DeployedFolderServer : IDisposable
                     makingRoom = _connections.OrderBy(c => c.LastActivity).ThenBy(c => c.Arrival).First();
                     _connections.Remove(makingRoom);
                 }
+                // No Nagle: an answer is its head and then its body, two sends,
+                // and with Nagle the second waits for the browser's delayed
+                // acknowledgement of the first (measured on this PC: 284
+                // requests took 43.9 s, about 155 ms each, before this line).
+                try { socket.NoDelay = true; } catch (SocketException) { }
                 connection = new Connection(socket, _nextArrival++);
                 _connections.Add(connection);
             }
