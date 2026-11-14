@@ -2045,7 +2045,9 @@ mac 1.7.2's sixteen plan-table sentences (#524), held open against #548 on
 2026-10-16, landed with #548's plan table that day ("The plan as a table",
 below); `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
 keeps the rule exercised on made-up entries meanwhile. Since 2026-11-13 it
-holds the v2.0.0 run's 86 entries ("Step 0 of v2.0.0", below).
+holds the v2.0.0 run's entries: step 0 held 86, and later pieces add and
+close entries, so the count is read from `NamedGapLedger.cs`, not from here
+("Step 0 of v2.0.0" and the sections after it, below).
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
 BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
@@ -2251,6 +2253,66 @@ assembly; restore by writing the bytes (or touch the file) instead.
 **A difference a teacher may meet today** (#885, not measured here): what
 `plantoir-mcp.exe` answers a call that leaves out `section` or `howMany` is
 the MCP SDK's binding of a non-nullable `int`; #885 says to measure it first.
+
+### After the mac's #835 part 3, #855, #839 and #902: held by name again (#868, 2026-11-13)
+
+At about 22:15 EST the mac merged four more pieces into `dev` (fcd0a51c5):
+#835's third part (a build, preview or deploy holds its own SECTION: a work
+lease's sixth line), #855 (Set Up an Assistant…), Help's first 86 pages
+(#839) and #902. A full suite on fcd0a51c5 read BASELINE_TOTALS (this PC, a
+Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200). The same method
+as the two sections above: nothing a teacher sees today differs, and every
+red is held by name against the open `windows` issue that builds it.
+
+**Held, 11 entries, all v2.0.0.** #868 (1): `wording.sectionIsBeingBuiltElsewhere`
+(`AssistWordingKeys`), the sentence for a hold on ONE section, which no
+Windows lease can be until #868 writes and reads the sixth line. It is held
+rather than added as an unused constant, so nothing the built-in assistant
+is shown changes and no member exists that nothing says. #903 (10): the nine
+`outside assistant …` set-up events (`ActivityTrailEvents`) and the quit
+case "an outside assistant is being set up" (`QuitCases`, new).
+
+**One new area, `QuitCases`** (`quittingWhileWorkIsUnderWay.cases`, by
+name), read by `QuitConfirmationTests.EveryQuitCaseIsDecidedAsTheContractSays`.
+A held case must name `assistantsBeingSetUp` (an entry for any other case
+fails, so the area cannot hold an inert entry or a case for another reason),
+must still be decided DIFFERENTLY here (the closed message the day it is
+decided as the contract says), and the entry count must equal the held cases
+met; at least twelve of the thirteen cases are asserted exactly. The two
+other #855 quit cases pass as they are: a set-up while the system ends the
+session expects no question, and a set-up beside a deploy asks for the
+deploy. PROVED_QUIT
+
+**What a six-line lease does to today's reader, measured.** `WorkLease.cs`
+reads lines 1 to 4 by index and never the sixth, so a lease naming sections
+holds the whole course here, which holds more, never less. Measured with
+real lease files in a temp working folder, owned by a live `PING` process,
+through today's `HeldBy`, `InTheWay` (a build before and after taking its
+own lease, a scheduled deploy, an outside deploy), `AnotherProgramIsWorkingIn`
+and `WhatAnOutsideChangeMeets`: a build, publish or preview lease with the
+mac's six lines (with the real start on line 4 or line 4 empty, LF or CRLF,
+one or two sections, a preview's `@<port>`, a sixth line on line 5 by
+mistake, an unreadable entry) gave exactly the answers the same lease gave
+with three lines — held, and declined for every asker that a three-line
+lease declines, whichever section the lease named. A six-line assist lease
+still read as an assist hold. With the owner ended, the six-line lease read
+as gone, as a three-line one does. So a live hold is never read as gone and
+a hold on section 2 is never read as free for section 2. (A mac and a
+Windows program never share leases anyway: liveness asks this machine's
+process table.) Pinned by
+`WorkLeaseContractTests.UntilTheSixthLineIsReadHere_EverySectionCaseIsDeclinedAtLeastAsOftenAsTheContractSays`,
+which runs the 14 `workLeases.declining.sections.cases` through
+`FirstInTheWay` with each lease's sections left unread: every case the
+contract declines must be declined here, and every case it allows is
+declined here too (the course-wide hold). The day #868 narrows a hold to its
+section that second half fails, saying to walk the cases exactly instead.
+
+**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` are not
+discovered by `PythonToolchainTests` (it finds `scripts/test_*.py` only), so
+they neither run nor fail here; wiring them in is #886's first piece.
+#902's Planning tab sentences carry `{machine}` as Windows' Planning tab
+already says them. #835's `returningToASectionMidDeploy.heldElsewhere`
+cases and `helpForASection` have no Windows reader yet (#868 owes them).
 
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
