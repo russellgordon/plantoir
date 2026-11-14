@@ -419,7 +419,7 @@ nonisolated enum OneSectionRestoreWording {
     }
 
     static func foldersChanged(section: Int, course: String) -> String {
-        return "Section \(section) cannot be put back on its own, because a folder its pages use in this backup "
+        return "Section \(section) cannot be put back on its own, because a folder this backup's course had "
              + "has been renamed or removed in \(course) since. Restore Whole Course puts every section back "
              + "together instead."
     }

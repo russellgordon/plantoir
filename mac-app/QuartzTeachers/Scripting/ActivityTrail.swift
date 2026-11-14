@@ -115,8 +115,8 @@ nonisolated enum ActivityTrail {
         /// conversation started ("Restore Section N…"), or, since #897 C,
         /// from Restore from Backup…'s "Restore Section N" for a backup made
         /// for one section (`restoredOneSectionFromTheMenuLine`: the archive
-        /// made first and how many shared pages made since the backup were
-        /// hidden, too). Carries the course, the section and the backup's
+        /// made first, how many shared pages made since the backup were
+        /// hidden, and how many shared pages could not be saved, too). Carries the course, the section and the backup's
         /// FILE NAME — never a page.
         ///
         /// It is the one line that explains a section whose pages are older

@@ -666,7 +666,7 @@
         "notSavedMany": "{COUNT} shared pages could not be saved, so they were left as they are. Their settings for Section {N} may not be what the backup had.",
         "websiteUnchanged": "Section {N} still goes to the website address it has now. A restore does not change where students read it.",
         "notMadeForThisSection": "This backup was not made for Section {N}. Restore Whole Course puts every section back together instead.",
-        "foldersChanged": "Section {N} cannot be put back on its own, because a folder its pages use in this backup has been renamed or removed in {CODE} since. Restore Whole Course puts every section back together instead.",
+        "foldersChanged": "Section {N} cannot be put back on its own, because a folder this backup's course had has been renamed or removed in {CODE} since. Restore Whole Course puts every section back together instead.",
         "namingChanged": "Section {N} cannot be put back on its own, because the class pages of {CODE} are named differently now than they were in this backup. Restore Whole Course puts every section back together instead.",
         "sectionNotInCourse": "{CODE} has no Section {N} now, so there is nowhere to put it back. Restore Whole Course puts every section back together instead.",
         "busy": "Section {N} of {CODE} is being changed right now. Wait for that to finish, then restore.",

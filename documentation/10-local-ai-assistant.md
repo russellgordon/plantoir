@@ -5950,7 +5950,8 @@ then (Russell's ruling on #897, 2026-11-13) the window's restore uses the same
 staged swap as Restore from Backup…: the backup is unpacked beside the
 courses, the live contents move aside, the backup's move in, and a failure
 sends every moved file back. If moving back fails too, the window says the
-restorer's own sentence (`backups.restoreOneSection.wording.stoppedPartWay`:
+restorer's own sentence (`backups.restoreOneSection.wording.stoppedPartWay`, or
+`stoppedPartWayNothingToOpen` when no page is left set aside:
 the section may be a mix, and where the set-aside files are kept) without its
 usual "Nothing was put back:" in front, which would then be untrue, and the
 trail gets `section restore stopped part way`. Nothing the window says on success changed; the

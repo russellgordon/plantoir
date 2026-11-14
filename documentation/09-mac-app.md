@@ -12136,7 +12136,9 @@ whole course is archived, so a refused click leaves nothing in Archived.
   no longer reads. The same holds for a shared or per-section folder renamed
   since (the implementation review): the section's pages would link to the
   old name. The restore asks again of the unpacked backup and refuses with
-  `wording.namingChanged`.
+  `wording.namingChanged` for the word, scheme or class folder and with
+  `wording.foldersChanged` for a folder renamed or removed; a folder ADDED
+  since never refuses.
 
 **Staged, then swapped, with a way back (both one-section routes).** The backup is
 unpacked into `courses/.internal/restoring/<id>/`, on the courses' own volume
@@ -12195,7 +12197,8 @@ in neither the backup nor the archive made first.
 assistant is changing that section, the WHOLE course archived first (so
 "nothing is lost" holds before Undo), the restore, a `section restored` line
 (`ActivityTrail.restoredOneSectionFromTheMenuLine`: the backup's and the
-archive's file names and the count of pages hidden), `page settings left as
+archive's file names, the count of pages hidden and the count of pages that
+could not be saved), `page settings left as
 they were` when pages could not take a key, and the finished line in the
 backup alert's slot.
 

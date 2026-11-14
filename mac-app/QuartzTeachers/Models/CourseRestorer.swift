@@ -611,7 +611,8 @@ enum CourseRestorer {
         guard let backedUpConfiguration = try? CourseConfiguration(
             contentsOf: payload.appendingPathComponent("course_config.json")
         ) else {
-            throw Problem.namingChangedSinceTheBackup(item.courseCode, sectionNumber)
+            // The same words the click uses for the same fact.
+            throw Problem.archiveUnreadable("its course settings could not be read")
         }
         switch OneSectionRestore.Naming(configuration: liveConfiguration)
             .difference(fromBackup: OneSectionRestore.Naming(configuration: backedUpConfiguration)) {
