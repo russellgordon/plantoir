@@ -16734,14 +16734,20 @@ checked before it is saved (#696)"; the words are
   `DeployTokenPanel.cancelChange` does nothing while `isSaving`. Before the
   fix, Cancel closed the sheet while the save ran on, and the token was saved
   and the trail said "changed" though the teacher had cancelled. A Help
-  button at the sheet's foot opens Help's `deploy-tokens` page. When the new
+  button at the sheet's foot opens Help's `deploy-tokens` page (a stub in
+  `help/outline.json` until the Help writer writes it; owed before the
+  cut). When the new
   token cannot reach some of the folder's class websites the sheet stays open
   behind an alert naming them (a course's shared unit plans as "MPM2D unit
-  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default, and
-  what Escape chooses) and Use the New Token, which saves it with
+  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default:
+  Return chooses it, and Escape does nothing, because `.cancel` and
+  `.defaultAction` on one alert button give it Return only, as #832 measured
+  in `QuestionKeysTests`) and Use the New Token, which saves it with
   `--use-anyway`. When no token was saved before the change the first button
   says Don't Save It instead, and the trail says a new token was not saved
-  rather than "kept the old" (review M7). The pasted token is held in memory
+  rather than "kept the old" (review M7). Before the pane's first check has
+  answered nothing is known, and it says Don't Save It, which is true either
+  way (the fix review's M-c). The pasted token is held in memory
   only while that alert is open.
 - **Remove Token** asks first and says a deploy set for later will not run.
 - **The end date travels to the Deploy screen** through

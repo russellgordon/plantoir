@@ -74,6 +74,7 @@ os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts
 
 import contracts  # noqa: E402
 import test_deploy_non_interactive as launcher_harness  # noqa: E402
+from test_deploy_sh_questions import no_request_was_made, the_network_refused  # noqa: E402
 
 # The words that find each pair of lines. They are the launchers' own, and the
 # Swift explainer matches on the same ones (FailureExplainer.tokenRefusedMarker
@@ -234,13 +235,14 @@ class ASavedTokenIsClearedOnlyWhenTheServiceSaysNo(unittest.TestCase):
     def run_with(self, target: str, status: str, body: str = ""):
         with tempfile.TemporaryDirectory() as tmp:
             folder = _a_stubbed_working_folder(tmp)
-            environment = dict(os.environ, FAKE_STATUS=status, FAKE_BODY=body)
+            environment = the_network_refused(folder, dict(os.environ, FAKE_STATUS=status, FAKE_BODY=body))
             result = subprocess.run(
                 ["bash", str(folder / "deploy.sh"), "ICS3U", "1", "--image", "unused:tag",
                  "--target", target, "--non-interactive"],
                 capture_output=True, timeout=180, cwd=str(folder),
                 stdin=subprocess.DEVNULL, env=environment,
             )
+            no_request_was_made(folder)
             return (result.returncode,
                     result.stdout.decode("utf-8", "replace") + result.stderr.decode("utf-8", "replace"))
 

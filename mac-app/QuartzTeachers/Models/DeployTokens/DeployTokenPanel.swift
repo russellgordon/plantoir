@@ -142,7 +142,12 @@ final class DeployTokenPanel {
 
     /// Whether a token was saved when the question opened, so its first
     /// button can say Keep My Old Token only when there is one to keep
-    /// (review M7).
+    /// (review M7). Before the pane's first check has answered, nothing is
+    /// known, and the button says Don't Save It and the trail says the new
+    /// token was not saved: both are true whether or not an old one exists,
+    /// and the token store is unchanged either way (the fix review's M-c).
+    /// Asking the launcher first was rejected: it would add a request, and a
+    /// wait, in front of every question.
     var hadATokenBeforeTheChange: Bool = false
 
     /// The pasted token, held only while that question is open, so Use the

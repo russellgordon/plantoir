@@ -93,9 +93,12 @@ struct DeployTokenRows: View {
             )
             .alert(
                 DeployTokenWording.unreachableQuestionTitle(count: panel.unreachablePlaces.count),
-                // Closed only by its two buttons (Escape is Keep My Old
-                // Token, the cancel role), each of which settles the question
-                // itself, so the setter has nothing to do.
+                // Closed only by its two buttons, each of which settles the
+                // question itself, so the setter has nothing to do. Return is
+                // the first button: `.cancel` with `.defaultAction` on one
+                // button gives it Return and gives Escape to nothing, as
+                // QuestionKeysTests records from #832, and Return is the
+                // answer that changes nothing.
                 isPresented: Binding(
                     get: { panel.isAskingAboutUnreachable },
                     set: { _ in }

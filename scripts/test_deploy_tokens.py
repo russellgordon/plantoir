@@ -53,6 +53,7 @@ os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts
 
 import contracts  # noqa: E402
 import test_deploy_non_interactive as launcher_harness  # noqa: E402
+from test_deploy_sh_questions import no_request_was_made, the_network_refused  # noqa: E402
 
 ON_A_MAC = sys.platform == "darwin"
 GOOD_TOKEN = "good-token"
@@ -201,10 +202,18 @@ class AWorkingFolder:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"id": value}, indent=2), encoding="utf-8")
 
-    def plan_marker(self, course: str, year: int, value: str):
-        """A course's shared unit plans (unit_plan_site.marker_name)."""
+    def plan_marker(self, course: str, year: int, value):
+        """A course's shared unit plans (unit_plan_site.marker_name). With no
+        value, the shape the app writes before the share's question is
+        answered (PlanSharing.writeChoices: the teacher's choices only,
+        pretty-printed with sorted keys, which puts a space before each
+        colon; the fix review's N1)."""
         path = self.folder / "courses" / course / ".cloudflare_sites" / f"plans-{year}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
+        if value is None:
+            choices = json.dumps({"documents": {"Unit 1/plan.md": "shared"}}, indent=2, sort_keys=True)
+            path.write_text(choices.replace('": ', '" : ').replace("/", "\\/"), encoding="utf-8")
+            return
         path.write_text(json.dumps({"name": value, "year": year}, indent=2), encoding="utf-8")
 
     def unreadable_marker(self, service: str, place: str):
@@ -225,12 +234,16 @@ class AWorkingFolder:
         return path.read_text(encoding="utf-8").split()
 
     def run(self, arguments: list, pasted: str = ""):
-        environment = dict(os.environ, FAKE_DIR=str(self.fake), FAKE_GOOD_TOKEN=GOOD_TOKEN)
+        # Under the network guard as well as the curl stub (the fix review's
+        # M-a): a request the stub did not answer fails the run.
+        environment = the_network_refused(
+            self.folder, dict(os.environ, FAKE_DIR=str(self.fake), FAKE_GOOD_TOKEN=GOOD_TOKEN))
         result = subprocess.run(
             ["bash", str(self.folder / "deploy.sh")] + arguments,
             input=pasted.encode("utf-8"), capture_output=True, timeout=180,
             cwd=str(self.folder), env=environment,
         )
+        no_request_was_made(self.folder)
         return (result.returncode, result.stdout.decode("utf-8", "replace"),
                 result.stderr.decode("utf-8", "replace"))
 
@@ -348,7 +361,7 @@ class TheTokenMode(unittest.TestCase):
                 for marker in case.get("legacyMarkers", []):
                     folder.legacy_marker(marker["place"], marker["value"])
                 for marker in case.get("planMarkers", []):
-                    folder.plan_marker(marker["course"], marker["year"], marker["value"])
+                    folder.plan_marker(marker["course"], marker["year"], marker.get("value"))
                 for marker in case.get("unreadableMarkers", []):
                     folder.unreadable_marker(case["service"], marker["place"])
                 if case.get("saved"):
@@ -451,13 +464,21 @@ class TheDeploysOwnPaste(unittest.TestCase):
                 folder.answer(case["answers"])
                 # The marker first: written after the build, it would make the
                 # course look changed since it was built (#768).
+                course, section = case["section"].split("/")
                 if case.get("marker") and case.get("legacyMarker"):
                     folder.legacy_marker(case["section"], case["marker"])
                 elif case.get("marker"):
                     folder.marker(case["service"], case["section"], case["marker"])
-                self._a_built_section(folder, case["section"])
-                course, section = case["section"].split("/")
-                arguments = [course, section, "--image", "unused:tag", "--target", case["service"]]
+                if case.get("planMarker"):
+                    folder.plan_marker(course, case["planMarker"]["year"], case["planMarker"].get("value"))
+                if case.get("plans"):
+                    # A share of unit plans needs the course, not a built section.
+                    (folder.folder / "courses" / course / "course_config.json").write_text(
+                        json.dumps({"course_code": course}), encoding="utf-8")
+                    arguments = [course, "--plans", "--image", "unused:tag", "--target", case["service"]]
+                else:
+                    self._a_built_section(folder, case["section"])
+                    arguments = [course, section, "--image", "unused:tag", "--target", case["service"]]
                 if case.get("account"):
                     arguments += ["--account", case["account"]]
                 code, out, err = folder.run(arguments, pasted=case.get("pasted", GOOD_TOKEN) + "\n")
@@ -527,6 +548,117 @@ class TheDeploysOwnPaste(unittest.TestCase):
             self.assertEqual(folder.requests(), ["cloudflareVerify"])
             self.assertIn("PLANTOIR_TOKEN_ENDS: cloudflare 2027-07-01T00:00:00Z\n", out)
             self.assertEqual(folder.store("cloudflare"), GOOD_TOKEN)
+
+
+
+# The store tool, standing in front of the real one for TheKeychainSave: it
+# writes down its own arguments, refuses unless the throwaway keychain the
+# test made is there (a keychain path that does not exist is not an error to
+# `security`, which then writes to the login keychain instead: measured
+# 2026-11-13), and hands each command it reads on to the real `security -i`
+# with that keychain named at the end of the line.
+STORE_TOOL_IN_FRONT = r"""#!/bin/bash
+printf '%s\n' "$*" >> "$STORE_ARGUMENTS"
+[[ -f "$THROWAWAY_KEYCHAIN" && "$THROWAWAY_KEYCHAIN" == *.keychain-db ]] || exit 99
+while IFS= read -r line; do
+  printf '%s "%s"\n' "$line" "$THROWAWAY_KEYCHAIN"
+done | /usr/bin/security "$@"
+"""
+
+
+@unittest.skipUnless(ON_A_MAC and os.path.exists("/usr/bin/security"), "the Keychain is the mac's")
+class TheKeychainSave(unittest.TestCase):
+    """The fix review's N2 on #696: `--token save` handed the token to
+    `security add-generic-password -w <token>`, where `ps` shows it.
+    MUST-FAIL on c4655ba2d (keychain_save is not there to cut; and its
+    set_token_keychain put the token in the store tool's arguments).
+
+    Everything here goes to a keychain this test makes in a temporary folder
+    and deletes by its path; the login keychain is never named, and every
+    token is invented."""
+
+    TOKENS = ("plain-Token_123.abc", "with space", 'dq"inside', "back\\slash", "end\\",
+              "sq'inside", "dollar$HOME", "semi;colon", "#hash", "tab\tin", '"', 'a\\"b')
+
+    def setUp(self):
+        self.shell = launcher_harness._a_bash_that_can_run_deploy_sh()
+        if self.shell is None:
+            self.skipTest("no bash on this machine that can run deploy.sh's definitions")
+        self.scratch = Path(tempfile.mkdtemp(prefix="plantoir-keychain-save-"))
+        self.keychain = self.scratch / "throwaway.keychain-db"
+        made = subprocess.run(["/usr/bin/security", "create-keychain", "-p", "invented-for-a-test",
+                               str(self.keychain)], capture_output=True, timeout=30)
+        if made.returncode != 0 or not self.keychain.exists():
+            shutil.rmtree(self.scratch, ignore_errors=True)
+            self.skipTest("this Mac would not make a throwaway keychain: "
+                          + made.stderr.decode("utf-8", "replace"))
+        self.tool = self.scratch / "security-in-front"
+        self.tool.write_text(STORE_TOOL_IN_FRONT, encoding="utf-8")
+        self.tool.chmod(0o755)
+        self.arguments = self.scratch / "store-arguments"
+
+    def tearDown(self):
+        subprocess.run(["/usr/bin/security", "delete-keychain", str(self.keychain)],
+                       capture_output=True, timeout=30)
+        shutil.rmtree(self.scratch, ignore_errors=True)
+
+    def _saved(self, service: str, account: str):
+        found = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", service, "-a", account,
+                                "-w", str(self.keychain)], capture_output=True, timeout=30)
+        if found.returncode != 0:
+            return None
+        shown = found.stdout.decode("utf-8", "replace").rstrip("\n")
+        return shown
+
+    def _same(self, shown, token: str) -> bool:
+        # `security -w` shows a value holding a TAB as its bytes in hex.
+        if shown == token:
+            return True
+        try:
+            return bytes.fromhex(shown) == token.encode("utf-8")
+        except (TypeError, ValueError):
+            return False
+
+    def test_each_token_is_saved_byte_for_byte_and_on_no_command_line(self):
+        function = _cut_from_deploy_sh("keychain_save")
+        self.assertEqual(function.count("/usr/bin/security -i"), 1)
+        script = function.replace("/usr/bin/security -i", '"$STORE_TOOL" -i') + \
+            '\nkeychain_save_secret "$1" "$2" "$(cat "$3")"\n'
+        environment = dict(os.environ, STORE_TOOL=str(self.tool), STORE_ARGUMENTS=str(self.arguments),
+                           THROWAWAY_KEYCHAIN=str(self.keychain))
+        for number, token in enumerate(self.TOKENS):
+            with self.subTest(token=token):
+                service = f"plantoir-test-service-{number}"
+                held = self.scratch / f"token-{number}"
+                held.write_text(token, encoding="utf-8")
+                result = subprocess.run(self.shell + ["-c", script, "_", service, "invented-account", str(held)],
+                                        env=environment, capture_output=True, timeout=60)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(self._same(self._saved(service, "invented-account"), token))
+        handed = self.arguments.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(handed, ["-i"] * len(self.TOKENS), "the store tool's arguments are only -i")
+
+    def test_a_secret_with_a_line_break_is_refused_and_nothing_is_saved(self):
+        function = _cut_from_deploy_sh("keychain_save")
+        script = function.replace("/usr/bin/security -i", '"$STORE_TOOL" -i') + \
+            '\nkeychain_save_secret "$1" "$2" "$3"\n'
+        environment = dict(os.environ, STORE_TOOL=str(self.tool), STORE_ARGUMENTS=str(self.arguments),
+                           THROWAWAY_KEYCHAIN=str(self.keychain))
+        result = subprocess.run(self.shell + ["-c", script, "_", "plantoir-test-broken", "invented-account",
+                                              "first\nadd-generic-password -s other -a other -w other"],
+                                env=environment, capture_output=True, timeout=60)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.arguments.exists(), "the store tool was never started")
+        self.assertIsNone(self._saved("other", "other"))
+
+    def test_both_token_stores_save_through_it(self):
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        for name, service in (("set_token_keychain", "KEYCHAIN_SERVICE"), ("set_cf_token_keychain", "CF_KEYCHAIN_SERVICE")):
+            begin = text.index(f"\n{name}() {{\n") + 1
+            body = text[begin:text.index("\n}\n", begin)]
+            with self.subTest(store=name):
+                self.assertIn(f'keychain_save_secret "${service}" "$USER" "$1"', body)
+                self.assertNotIn("-w \"$1\"", body)
 
 
 if __name__ == "__main__":

@@ -777,11 +777,49 @@ KEYCHAIN_SERVICE="containerized-quartz-netlify"
 TOKENS_FILE="courses/.internal/tokens.json"
 KEY_FILE="courses/.internal/.key"
 
+# BEGIN keychain_save
+# A token saved to the Keychain without being written on a command line (the
+# fix review on #696, N2). `security add-generic-password -w <token>` puts the
+# token in the store tool's arguments, which `ps` shows to every program on
+# the Mac while it runs; `security -i` reads its commands from standard input
+# instead, so its arguments are only `security -i`. printf is a shell
+# builtin, so the token is in no process's arguments at any point.
+#
+# Measured 2026-11-13 on macOS 26.6 against a throwaway keychain made for the
+# purpose: with `ps` sampled while the store tool ran, 0 processes carried
+# the token under `security -i` and 1 did under `-w <token>`; and 13 invented
+# tokens, among them a space, a double quote, a backslash, a trailing
+# backslash, a single quote, a dollar sign, a semicolon, a hash and a TAB,
+# came back byte for byte with each backslash and double quote escaped and
+# the whole wrapped in double quotes, as below. A failure inside comes back
+# as the tool's exit status (45 for an item it would not write), so `set -e`
+# stops on it as it did before. One line is one command, so a secret holding
+# a line break is refused here; no token the paste rule lets through holds one.
+# The escaping is done by sed on a pipe rather than by bash's ${…//…/…},
+# whose handling of a backslash in the replacement changed in bash 5.2, and
+# the text reaches sed on its standard input, never in its arguments.
+keychain_command_escaped() {
+  printf '%s' "${1:-}" | LC_ALL=C /usr/bin/sed 's/[\\"]/\\&/g'
+}
+# $1 the service, $2 the account, $3 the secret.
+keychain_save_secret() {
+  local service="${1:-}" account="${2:-}" secret="${3:-}"
+  if [[ "$service$account$secret" == *$'\n'* || "$service$account$secret" == *$'\r'* ]]; then
+    return 1
+  fi
+  service="$(keychain_command_escaped "$service")"
+  account="$(keychain_command_escaped "$account")"
+  secret="$(keychain_command_escaped "$secret")"
+  printf 'add-generic-password -U -s "%s" -a "%s" -w "%s"\n' "$service" "$account" "$secret" \
+    | /usr/bin/security -i >/dev/null
+}
+# END keychain_save
+
 get_token_keychain() {
   /usr/bin/security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
 }
 set_token_keychain() {
-  /usr/bin/security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
+  keychain_save_secret "$KEYCHAIN_SERVICE" "$USER" "$1"
 }
 delete_token_keychain() {
   /usr/bin/security delete-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
@@ -809,7 +847,7 @@ get_cf_token_keychain() {
   /usr/bin/security find-generic-password -s "$CF_KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
 }
 set_cf_token_keychain() {
-  /usr/bin/security add-generic-password -U -s "$CF_KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
+  keychain_save_secret "$CF_KEYCHAIN_SERVICE" "$USER" "$1"
 }
 delete_cf_token_keychain() {
   /usr/bin/security delete-generic-password -s "$CF_KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
@@ -1162,8 +1200,10 @@ token_settings_check() {
 # (deploy.py, where a 404 on the saved site starts "Creating a fresh Netlify
 # site", and remake_pages_project_if_gone). A marker that cannot be read, or
 # names its site in a shape no host gives, is unheard rather than passed over
-# (review I2). "unchecked" is a Cloudflare marker with no Account ID to look
-# it up in; the caller decides what that means.
+# (review I2). "noSite" is a marker that names no site at all
+# (marker_names_no_site, below), which every caller passes over. "unchecked"
+# is a Cloudflare marker with no Account ID to look it up in; the caller
+# decides what that means.
 site_reachability() {
   local target="$1" token="$2" account="$3" marker="$4"
   local key url answer code body pattern
@@ -1179,6 +1219,10 @@ site_reachability() {
   local value
   value="$(grep -E "^  \"${key}\"[ 	]*:[ 	]*\"[^\"]+\"" "$marker" 2>/dev/null | head -n 1 \
     | sed -E 's/^  "[a-z]+"[ 	]*:[ 	]*"([^"]+)".*$/\1/' || true)"
+  if [[ -z "$value" ]] && marker_names_no_site "$marker" "$key"; then
+    echo "noSite"
+    return 0
+  fi
   if [[ -z "$value" || ! "$value" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "unheard"
     return 0
@@ -1198,6 +1242,35 @@ site_reachability() {
       ;;
     *) echo "unheard" ;;
   esac
+}
+
+# Whether a marker names no site at all: it is a JSON object, and its top
+# level carries no $2 (id for Netlify, name for Cloudflare), or carries an
+# empty one. The fix review on #696 (N1) found the shape in use: the app
+# writes a course's unit-plans marker holding only the teacher's choices
+# (PlanSharing.writeChoices) before the share's question is answered, and a
+# share that is cancelled or killed before share_plan.py's clean-up leaves it
+# there. share_plan.py's own rule (forget_a_marker_that_never_shared) is that
+# such a marker names no site, and deploy.py reads a section marker without
+# an id or name as no site and makes one, so there is no website for a token
+# to fail to reach. Before this, such a marker was unheard, and every
+# Cloudflare Change Token… and every paste at a plans share was refused with
+# "check that this computer is online", which no retry could change.
+#
+# Read with plutil, which ships with every macOS this runs on, because a
+# shell cannot tell "not JSON" from "JSON without the key", and the first
+# must stay unheard (review I2). A key that holds anything but a string
+# (null, a number) is not this shape either, and stays unheard.
+marker_names_no_site() {
+  local marker="$1" key="$2" first kind
+  first="$(LC_ALL=C tr -d ' \t\r\n' < "$marker" 2>/dev/null | head -c 1 || true)"
+  [[ "$first" == "{" ]] || return 1
+  /usr/bin/plutil -convert json -o /dev/null -- "$marker" >/dev/null 2>&1 || return 1
+  if ! kind="$(/usr/bin/plutil -type "$key" -- "$marker" 2>/dev/null)"; then
+    return 0
+  fi
+  [[ "$kind" == "string" ]] || return 1
+  [[ -z "$(/usr/bin/plutil -extract "$key" raw -o - -- "$marker" 2>/dev/null || true)" ]]
 }
 
 # The markers of the class websites this folder has deployed to one
@@ -2778,10 +2851,18 @@ fi
 # token: /accounts can answer success with an EMPTY list, because listing
 # accounts is its own permission and a token scoped only to Pages need not
 # carry it. Prints nothing to mean "ask", never "bad token".
+#
+# Through http_answer, so the token reaches curl on its standard input and is
+# in no process's arguments (the fix review on #696, N2: until then `ps`
+# showed this request's header for up to its 20 seconds). Only a 2xx is
+# read, as curl -f's was.
 discover_cf_account() {
   [[ -n "${1:-}" ]] || return 0
-  curl -fsS --max-time 20 -H "Authorization: Bearer $1" \
-    https://api.cloudflare.com/client/v4/accounts 2>/dev/null \
+  local answer code
+  answer="$(http_answer "https://api.cloudflare.com/client/v4/accounts" "$1")"
+  code="${answer##*$'\n'}"
+  [[ "$code" =~ ^2[0-9][0-9]$ ]] || return 0
+  printf '%s' "${answer%$'\n'*}" \
     | python3 -c '
 import json, sys
 try:

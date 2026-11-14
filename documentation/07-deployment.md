@@ -1518,10 +1518,41 @@ standard input. Measured by the reviewer before the fix: `ps -axo command`
 showed `curl … -H Authorization: Bearer <the token> …` for the whole of a
 request's 20-second wait, readable by any program on the Mac.
 `validate_token` and `validate_cf_token`, the deploy's own paste checks, go
-through `http_answer` too. Older calls that still put a token in an argument
-(the store tool's `-w`, `discover_cf_account`) are listed in a follow-up
-issue; `scripts/test_deploy_tokens.py` fails any case whose token reaches
-`curl`'s arguments.
+through `http_answer` too, and since the fix review (N2) so does
+`discover_cf_account`, the account lookup a Cloudflare deploy makes when no
+Account ID was given. Measured with `ps -axo command` sampled while each
+request waited on a local listener that never answers: before, that lookup
+showed `curl -fsS --max-time 20 -H Authorization: Bearer <the token> …`;
+after, no process carried the token, for it or either check.
+`scripts/test_deploy_tokens.py` fails any case whose token reaches `curl`'s
+arguments.
+
+**The token is saved without a command line too (the fix review's N2).**
+`set_token_keychain` and `set_cf_token_keychain` used to run `security
+add-generic-password … -w <token>`, which puts the token in the store tool's
+arguments for as long as it runs. Both now go through `keychain_save_secret`
+(between `# BEGIN keychain_save` markers), which writes the same command on
+`security -i`'s standard input, so the tool's arguments are only `-i`. The
+service, the account and the token each have their backslashes and double
+quotes escaped by `sed` on a pipe (bash's `${…//…/…}` treats a backslash in
+its replacement differently from 5.2 on) and are wrapped in double quotes; a
+line break in any of them is refused, because one line is one command.
+Measured 2026-11-13 on macOS 26.6, only against a keychain made for the
+purpose with `security create-keychain` in a temporary folder and deleted by
+its path: with `ps` sampled while the tool ran, 0 processes carried an
+invented token under `-i` and 1 under `-w <token>`; 13 invented tokens with a
+space, a double quote, a backslash, a trailing backslash, a single quote, a
+dollar sign, a semicolon, a hash and a TAB came back byte for byte (`security
+-w` shows a value holding a TAB in hex); and a refused write comes back as the
+tool's exit status (45 for an item it would not write), so `set -e` stops on
+it as before. One trap found on the way, and the reason the test's stand-in
+checks for the keychain file before every write: `security` given a keychain
+path that does not exist does NOT fail; it writes to the login keychain
+instead. `TheKeychainSave` in `scripts/test_deploy_tokens.py` runs the real
+function through the real `security -i` against such a throwaway keychain.
+The plans share's password (`PLAN_KEYCHAIN_SERVICE`) and the account entry
+still use `-w`; they are not this piece's saves, and the follow-up issue
+names them.
 
 To make that possible the token store's functions (`get_token_keychain` and
 the rest), the check addresses and `token_check_answer` moved from beside the
@@ -1607,7 +1638,23 @@ a rollover: last year's deleted site answered 404, and every Change Token… was
 stopped with a garbled place, "ICS3U section 1.previous-2026-09-08_071500"
 (W1). The service's own 401, 403 or 404 is unreachable; a live marker that
 cannot be read is unheard, so the save stops rather than passing it over
-(I2); anything else is unheard. Any unreachable stops
+(I2); anything else is unheard. The one exception is a marker that names no
+site at all (`marker_names_no_site`, the fix review's N1): a JSON object whose
+top level has no `id` (Netlify) or `name` (Cloudflare), or an empty one, is
+passed over. The app writes exactly that shape for a course's unit plans,
+holding only the teacher's choices, before the share's question is answered
+(`PlanSharing.writeChoices`), and a share cancelled before `share_plan.py`'s
+own clean-up leaves it behind; `share_plan.py` already treats it as naming no
+site, and `deploy.py` treats a section marker without one as no site and
+makes one. The reviewer measured what the first rule did with it: every
+Cloudflare Change Token… answered `sitesNotChecked`, and a plans share's
+paste stopped with "check that this computer is online", which no retry could
+change. It is read with `plutil`, which ships with macOS, because only a
+JSON reader can tell "not JSON" (still unheard) from "JSON without the key";
+a key holding anything but a string (null, a number) stays unheard. No writer
+on either side makes a section or old-place marker without its key (each is
+the service's own answer, saved whole), so the plans marker is the one shape
+known to need it; the rule is the same for every kind. Any unreachable stops
 the save with the list; the app asks "That token cannot reach N of your class
 websites", naming them, with Keep My Old Token (the default) and Use the New
 Token (`--use-anyway`). Any unheard stops it with `sitesNotChecked`. Without
@@ -1673,7 +1720,19 @@ line, never its arguments, and every run fails if it was used
 (`the_network_refused`, `no_request_was_made` in `test_deploy_sh_questions.py`).
 Measured: against `ee9007303`'s `deploy.sh` copied in and restored, 21 of the
 plans file's 30 tests and one of the questions file's fail on that guard;
-against this one, none.
+against this one, none. The fix review (M-a) measured that the `curl` on
+`PATH` caught only `curl` called by name: `/usr/bin/curl`, `command -p curl`
+and Python's `urllib` all went past it. The guard now shuts two more doors:
+the proxy variables (`HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY` and their
+lower-case spellings) point at a listener on 127.0.0.1 that writes a line for
+each connection, with `NO_PROXY` naming only this computer, and a
+`sitecustomize.py` on `PYTHONPATH` refuses and records any Python socket
+connecting anywhere but this computer. `TheNetworkGuardShutsEveryDoor` tries
+six ways in against 192.0.2.1, an address nobody answers on, so a door left
+open times out rather than reaching anybody: on the old guard five of the six
+went unseen, on this one all six are caught. `test_deploy_tokens.py`,
+`test_deploy_token_refusal.py` and `test_deploy_token_handoff.py` run under
+the same guard now.
 
 **Tested.** `scripts/test_deploy_tokens.py` runs every case through the real
 `deploy.sh`: the paste, end-date reading and refusal-line functions cut from
@@ -1701,10 +1760,16 @@ check accepted the token). A network check each time the Deploy screen opens.
 A line saying the account was not checked when Settings has no Account ID
 (every Cloudflare deploy from Plantoir already refuses without one, #668).
 A count of scheduled deploys in Remove's question (the question says it in
-words, true for one or none). Keeping the token off the store tool's own
-command line while saving (`security -i`): unchanged, as for every deploy,
-because it cannot be measured here without writing to the teacher's Keychain;
-it is in the follow-up issue with the other older calls. GitHub Pages: #669.
+words, true for one or none). Limiting a plans share's paste check to the year
+being shared (the fix review's M-b): `deploy.sh` does not know the year when
+`--year` is not given (`share_plan.py` works it out), and teaching the
+launcher the school year would be a second copy of that rule; a year whose
+project was deleted by hand stops the share, and Change Token…'s Use the New
+Token is the way past it. Asking the launcher whether a token is saved before
+the unreachable question, so its first button can say Keep My Old Token even
+when the pane's first check has not answered (M-c): it would add a request
+and a wait in front of every question, and Don't Save It is true either way.
+GitHub Pages: #669.
 
 **Windows.** `deploy.ps1` was not edited: this Mac has no PowerShell, and the
 plan review ruled the Mac piece does not edit it blind. The `windows` issue
