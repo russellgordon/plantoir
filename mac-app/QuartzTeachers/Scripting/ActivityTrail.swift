@@ -1164,6 +1164,15 @@ nonisolated enum ActivityTrail {
         /// folder was not found, nothing was deployed there, no address on
         /// this computer was free, or the browser did not open it.
         case deployedFolderCouldNotBeOpened = "deployed folder could not be opened"
+        /// The app-wide undo list (#899) could not write a step down: the
+        /// action's key, the course and section, and a word for why. While
+        /// the list is switched off the change went ahead regardless, and the
+        /// line says so; never page text.
+        case undoCouldNotRecordAStep = "undo could not record a step"
+        /// The undo list put files back that a change, an undo or a redo
+        /// left part way when it stopped (#899): the course and section, which
+        /// of the three, and how many files. Never page text.
+        case undoRolledBack = "undo rolled back"
         /// Change Password saved a new password for a course's unit plans
         /// and shared nothing (#833): the school year, and whether the new
         /// password now waits for a share or nothing was shared yet. Never
