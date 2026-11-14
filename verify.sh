@@ -881,6 +881,16 @@ else
   fail "GeoGebra sketches: the fences, settings, commands, files, keys, gate or folder problem (scripts/test_geogebra.py, #578)"
   cat /tmp/verify_geogebra_test.log
 fi
+# PhET simulations (#674), and the folder every file a page downloads is kept
+# in (keptDownloads): every phetFences and keptDownloads case, against a PhET
+# of the test's own (never phet.colorado.edu), the stop and where it stands
+# in the build, and the folder problem. Stdlib only.
+if (cd scripts && python3 test_phet.py) >/tmp/verify_phet_test.log 2>&1; then
+  pass "PhET simulations and kept downloads: the fences, settings, names, languages, the address that always starts yotta=false&allowLinks=false, the kept folder and its checks, prune, marker and stop lines, the build stopping before Quartz when a simulation cannot be downloaded, the site's files and the folder problem - $(grep '^Ran ' /tmp/verify_phet_test.log) (scripts/test_phet.py, #674)"
+else
+  fail "PhET simulations or kept downloads (scripts/test_phet.py, #674)"
+  cat /tmp/verify_phet_test.log
+fi
 
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
@@ -1741,6 +1751,17 @@ else
   fail "a geogebraFences key or fence case reads differently through the site's own Markdown reader (scripts/check_geogebra_rules_against_the_site.py, #578)"
   cat /tmp/verify_geogebra_rules_site.log
 fi
+# #674: the key every PhET simulation's card is found by, through the SITE's
+# own Markdown reader in Node, as GeoGebra's above.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_phet_rules_against_the_site.py" /opt/scripts/check_phet_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_phet_rules_against_the_site.py \
+  >/tmp/verify_phet_rules_site.log 2>&1; then
+  pass "every phetFences key and fence case holds through the site's own Markdown reader: the site and the build find each simulation by the same key (scripts/check_phet_rules_against_the_site.py, #674)"
+else
+  fail "a phetFences key or fence case reads differently through the site's own Markdown reader (scripts/check_phet_rules_against_the_site.py, #674)"
+  cat /tmp/verify_phet_rules_site.log
+fi
 
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
 # pictureSizes.js (the file the site's transformer imports) reads every
@@ -2132,6 +2153,9 @@ check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
 # helper, its lockfile and the site's transformer, script and styles.
 check_baked scripts/figures.py            /opt/scripts/figures.py
 check_baked scripts/geogebra.py           /opt/scripts/geogebra.py
+# PhET simulations (#674): the pass, and the folder every download is kept in.
+check_baked scripts/phet.py               /opt/scripts/phet.py
+check_baked scripts/kept_downloads.py     /opt/scripts/kept_downloads.py
 # Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
 # recipe, which the build hashes for its toolchain id, and the page's thread.
 check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
@@ -4174,6 +4198,33 @@ def blocks(flag):
     "---\ntitle: Wrap Plain Twin\n---\nThe same blocks without the word (plantoir-text-wrap-twin-653).\n\n" + blocks(""),
     encoding="utf-8")
 WRAPPLANTS
+# ---- #674: the PhET simulation the skill's example and the rendered check name ----
+# The repository carries no PhET file (PhET's licence; Russell's ruling of
+# 2026-11-13), so the copy comes from the dev cache (fetched once, pinned by
+# SHA-256: browser-checks/lib/plant_phet.py) and is planted where the build
+# keeps what its pages download (keptDownloads.where): the builds below ask
+# PhET nothing. No copy and no network to fetch one: the skill's PhET example
+# is left out and 6n's claim for it, and the rendered check's phet row, are
+# SKIPS by name; PLANTOIR_REQUIRE_ENGINES makes it a failure.
+PHET_COPY_MISSING=""
+if ! python3 browser-checks/lib/plant_phet.py check >/dev/null 2>&1; then
+  python3 browser-checks/lib/plant_phet.py fetch >/tmp/verify_phet_fetch.log 2>&1 || true
+fi
+if ! python3 browser-checks/lib/plant_phet.py check >/dev/null 2>&1; then
+  PHET_COPY_MISSING="$(tail -1 /tmp/verify_phet_fetch.log 2>/dev/null || echo 'no copy in the dev cache')"
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "PhET's simulation for the skill's example and the rendered check (#674): no copy on this Mac and none could be fetched ($PHET_COPY_MISSING), and PLANTOIR_REQUIRE_ENGINES asks for every row"
+  else
+    skip "PhET's simulation for the skill's example and the rendered check (#674): no copy on this Mac and none could be fetched ($PHET_COPY_MISSING); run python3 browser-checks/lib/plant_phet.py fetch"
+  fi
+elif python3 browser-checks/lib/plant_phet.py plant "${HOME%/}/Library/Application Support/Plantoir/builds/$(/bin/pwd -P | shasum -a 256 | cut -c1-8)" >/tmp/verify_phet_plant.log 2>&1; then
+  pass "PhET's simulation planted where the build keeps its downloads, from the dev cache, its SHA-256 the pinned one: the builds below ask PhET nothing (browser-checks/lib/plant_phet.py, #674)"
+else
+  PHET_COPY_MISSING="it could not be planted"
+  fail "PhET's simulation could not be planted where the build keeps its downloads (#674)"
+  cat /tmp/verify_phet_plant.log
+fi
+export PHET_COPY_MISSING
 # ---- #596: every example in the page-authoring skill, planted for the same build ----
 # The skill's examples are read from the skill ITSELF, so an example edited
 # there is the example built here: every ```markdown / ````markdown fence and
@@ -4186,7 +4237,7 @@ WRAPPLANTS
 # listed in /tmp/verify_authoring_planted.txt, which restore_hit_fixture reads.
 # 6n reads each back.
 python3 - "$HIT_COURSE" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md /tmp/verify_authoring_planted.txt <<'AUTHORPLANTS'
-import re, struct, sys, zlib
+import os, re, struct, sys, zlib
 from pathlib import Path
 course, skill_path, record = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
 lines = skill_path.read_text(encoding="utf-8").split("\n")
@@ -4215,6 +4266,10 @@ def plant(relative, data):
     planted.append(relative)
 for number, text in enumerate(examples, start=1):
     name = f"Authoring Example {number:02d}"
+    if os.environ.get("PHET_COPY_MISSING") and "```phet" in text:
+        # No copy of the simulation on this Mac (#674): a build of this
+        # example would have to download it, and stops without the internet.
+        continue
     if text.startswith("---\n"):
         page = re.sub(r"^title: (.*)$", lambda m: f"title: {name} - {m.group(1)}", text, count=1, flags=re.M)
         if page == text:
@@ -5709,7 +5764,7 @@ fi
 # not, a spaced `$ x $` is typeset, a [words](Page Name.md) link is not a
 # link, and an unknown callout kind is still a callout with its own title.
 if python3 - "$SITE_PUBLIC" support/agent_guidance/skills/plantoir-page-authoring/SKILL.md <<'AUTHORPY'
-import re, sys
+import os, re, sys
 from pathlib import Path
 public, skill_path = Path(sys.argv[1]), Path(sys.argv[2])
 lines = skill_path.read_text(encoding="utf-8").split("\n")
@@ -5738,6 +5793,15 @@ def tasks(html):
     return len(re.findall(r'<input type="checkbox"[^>]*class="plantoir-task"', html))
 def has_file(href):
     return (public / href.lstrip("./")).is_file()
+def phet_credit_reads(html_text):
+    """Every PhET credit line on the page reads PhET's sentence, as the
+    contract has it (phetFences.attribution.sentence), its links' words
+    included; at least one is there (#674)."""
+    import html as html_module, json
+    sentence = json.loads(Path("contracts/shared-rules.json").read_text(encoding="utf-8"))["phetFences"]["attribution"]["sentence"]
+    lines = re.findall(r'<p class="pl-phet-attribution">(.*?)</p>', html_text or "", re.S)
+    read = [" ".join(html_module.unescape(re.sub(r"<[^>]+>", "", line)).split()) for line in lines]
+    return len(read) > 0 and all(one == sentence for one in read)
 def geogebra_specs(html_text):
     import html as html_module, json
     return [json.loads(html_module.unescape(spec)) for spec in
@@ -5798,9 +5862,13 @@ claims = [
      lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
      and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
      and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
-    ("![](https://www.youtube.com/watch?v=", "YouTube, Vimeo and PhET players, and no GeoGebra iframe (#578)",
+    ("![](https://www.youtube.com/watch?v=", "YouTube and Vimeo players, and no GeoGebra or PhET iframe (#578, #674)",
      lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
-     and 'geogebra.org' not in a and '<iframe src="https://phet.colorado.edu/' in a),
+     and 'geogebra.org' not in a and 'phet.colorado.edu/sims' not in a),
+    ("sim: gas-properties", "a PhET simulation from the site's own copy, with PhET's credit line (#674)",
+     lambda a, p: 'class="pl-figure pl-phet"' in a and "static/phet/gas-properties/" in a
+     and phet_credit_reads(a)
+     and has_file("static/phet/gas-properties/index.html") and has_file("static/phet/gas-properties/ABOUT.txt")),
     ("file: Slope Angle Conjecture.ggb", "two GeoGebra sketches: a file found in Media and one from commands (#578)",
      lambda a, p: [spec.get("sketch") for spec in geogebra_specs(a)] == ["Media/Slope-Angle-Conjecture.ggb", None]
      and [line["text"] for line in geogebra_specs(a)[1].get("commands", [])] == ["f(x) = 2x + 1", "A = Point(f)"]
@@ -5827,6 +5895,10 @@ for number, text in enumerate(examples, start=1):
     if marker in used:
         problems.append(f"two examples match the claim {marker!r}")
     used.add(marker)
+    if os.environ.get("PHET_COPY_MISSING") and "```phet" in text:
+        # Left out of the build: no copy of the simulation on this Mac (#674).
+        print(f"   example {number} ({what}) not built: no copy of PhET's simulation on this Mac")
+        continue
     body = article(slug)
     full = (public / f"{slug}.html").read_text(encoding="utf-8", errors="replace") if body is not None else ""
     if body is None and marker != "title: Unit 3 Test Review":
@@ -6350,6 +6422,21 @@ rendered_lines() {
     "$verb" "rendered check: ${line#"${kind}: "}"
   done < <(grep "^${kind}: " "$log")
 }
+# The Simulation page's PhET simulation (#674), planted where the fixture
+# build keeps its downloads, so the build asks PhET nothing; with no copy
+# on this Mac (PHET_COPY_MISSING, set before 6n) the page is taken out, and
+# the phet row, its sabotages and the every-page rows for that page are
+# SKIPS by name (rendered_features.mjs runPage does not open it).
+rendered_phet_copy() {
+  if [[ -n "${PHET_COPY_MISSING:-}" ]]; then
+    rm -f "$RENDERED_DIR/courses/EXC2O/Rendered Check/Simulation.md"
+    export PLANTOIR_RENDERED_NO_PHET="$PHET_COPY_MISSING"
+    return 0
+  fi
+  unset PLANTOIR_RENDERED_NO_PHET
+  mkdir -p "$RENDERED_BUILDS"
+  python3 browser-checks/lib/plant_phet.py plant "$RENDERED_BUILDS"
+}
 echo ""
 echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
 rendered_cleanup
@@ -6380,6 +6467,7 @@ elif ! run_check node browser-checks/lib/test_site_server.mjs >/tmp/verify_rende
   fail "the rendered check's server does not serve a site as the hosts do (browser-checks/lib/test_site_server.mjs, #597)"
   grep '^FAIL' /tmp/verify_rendered_server.log
 elif ! python3 browser-checks/lib/plant_rendered.py plant "$RENDERED_DIR/courses/EXC2O" >/tmp/verify_rendered_build.log 2>&1 \
+     || ! rendered_phet_copy >>/tmp/verify_rendered_build.log 2>&1 \
      || ! (cd "$RENDERED_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) >>/tmp/verify_rendered_build.log 2>&1 \
      || [[ ! -f "$RENDERED_BUILDS/EXC2O/section1/public/Rendered-Check/Diagrams.html" ]]; then
   # A build that failed is a failure, never a skip: the rows never ran.

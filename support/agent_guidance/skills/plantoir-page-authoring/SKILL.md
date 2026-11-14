@@ -1,6 +1,6 @@
 ---
 name: plantoir-page-authoring
-description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos, GeoGebra sketches students drag, PhET applets, hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
+description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos, GeoGebra sketches students drag, PhET simulations (a phet block), hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
 ---
 
 # Writing pages for a Plantoir class website
@@ -539,18 +539,15 @@ and do not print:
 ![](https://www.youtube.com/watch?v=WUvTyaaNkzM)
 
 <iframe src="https://player.vimeo.com/video/22439234" width="640" height="360" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
-
-<iframe src="https://phet.colorado.edu/sims/html/projectile-motion/latest/projectile-motion_all.html" width="800" height="600" allowfullscreen></iframe>
 ```
 
 - **YouTube**: the picture form `![](address)` with the video's ordinary
   address (`youtube.com/watch?v=...` or `youtu.be/...`) becomes the player.
-- **Vimeo and PhET**: paste the `<iframe ...></iframe>` the site's own
-  Share or Embed button gives, **on one line, with an empty line before
-  and after**. For Vimeo the address is `player.vimeo.com/video/<number>`,
-  for PhET the simulation's `..._all.html` address.
-- **GeoGebra is never an `<iframe>`**: write a ` ```geogebra ` block
-  (below).
+- **Vimeo**: paste the `<iframe ...></iframe>` the site's own Share or
+  Embed button gives, **on one line, with an empty line before and
+  after**. The address is `player.vimeo.com/video/<number>`.
+- **GeoGebra and PhET are never an `<iframe>`**: write a ` ```geogebra `
+  or a ` ```phet ` block (below).
 - A video file of the teacher's own goes in `Media` and is shown with
   `![[clip.mp4]]`.
 - For a graph students read rather than an applet they play with, prefer
@@ -594,6 +591,65 @@ A = Point(f)
   `.ggb` in Obsidian, and what a problem looks like: the GeoGebra section
   of `plantoir-math-graphs`. A sketch inside a self-check question:
   `plantoir-quizzes`.
+
+**PhET simulations** are a ` ```phet ` block. The class website carries
+its own copy of the simulation: it opens when a student taps it, in the
+course's language, and a student's browser asks PhET nothing.
+
+````markdown
+```phet
+sim: gas-properties
+alt: Pump gas into a box and watch the pressure, temperature and volume change.
+```
+````
+
+- `sim:` is the simulation's name, the last part of its address on
+  phet.colorado.edu (`phet.colorado.edu/en/simulations/gas-properties` is
+  `gas-properties`), or that address pasted whole. Never the title shown
+  on the page ("Gas Properties").
+- **`alt:` always** - what the simulation lets a student do. It is the
+  card's description and what a screen reader says.
+- `locale: fr` (or `fr-CA`) only when the page's language is not the
+  course's: the course's language is used otherwise, and English when the
+  simulation has no version in that language.
+- `screens: 1, 2` shows only those screens, numbered as PhET numbers them.
+  Nothing else can be set: no height, and none of PhET's other settings.
+- **The first build that meets a simulation needs the internet**: it
+  downloads the simulation once onto the teacher's computer, and every
+  later build uses that copy. A build with no internet and a simulation
+  not downloaded yet stops and says which page and which simulation, so
+  preview once after adding one, before a deploy set for later.
+- Every card carries PhET's credit line; never write or remove one.
+- A page with PhET's own `<iframe>` (from phet.colorado.edu) still works,
+  but it reports to PhET and Google from every student's browser: replace
+  it with a ` ```phet ` block named by the simulation in its address.
+- A simulation prints as its picture.
+- In a self-check question, put a simulation in the question or the
+  explanation, never inside a choice (the `plantoir-quizzes` skill).
+- The downloaded copies stay with the working folder on this computer: after
+  moving or renaming the working folder, or on a new computer, the next
+  build needs the internet again.
+
+A simulation that cannot be shown stays a block of text on the page. The
+next Preview names it on the section's Problems tab in Plantoir, as a
+Science simulation row, and the build's output says which page, which
+block and which line:
+
+```
+plantoir: error: Unit 3/Gases.md: phet block 1, line 12: PhET has no simulation called gas-propertys (the closest it has: gas-properties, gases-intro)
+plantoir: error: Unit 3/Gases.md: phet block 1, line 14: screens: needs the screens' numbers, such as 1, 2, not “first”
+plantoir: note: Unit 3/Gases.md: phet block 2: it has no alt: line, so the card describes it only by its title
+```
+
+`phet block 1` is the first phet block on that page, and the line is in
+the teacher's file. An `error:` line is a simulation students cannot open
+until the block is fixed: a missing or misspelled `sim:` name, or a
+`screens:` or `locale:` value that is not understood. Take the name from
+the simulation's address on phet.colorado.edu, never from its title. A
+`note:` line (no `alt:`, a setting a phet block does not have, a language
+the simulation has no version in, a pasted PhET `<iframe>`) is shown on
+the site anyway and is not on the Problems tab. Fix the block and preview
+again.
 
 ## 17. Notes only the teacher sees
 

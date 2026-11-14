@@ -477,6 +477,45 @@ def graph_invisible(site: Path) -> str:
     return "the graph's curves stroked with nothing"
 
 
+def phet_tracking(site: Path) -> str:
+    # The card's data-phet holds the frame's address as JSON in an
+    # attribute (&quot; for its quotes); the fixed settings are taken out of
+    # it, leaving PhET's defaults.
+    path = page_file(site, "Simulation")
+    text = path.read_text(encoding="utf-8")
+    # However the page writes the & inside the attribute (raw, &amp; or &#x26;).
+    changed, count = re.subn(r"\?yotta=false(?:&amp;|&#x26;|&#38;|&)allowLinks=false(?:&amp;|&#x26;|&#38;|&)", "?", text)
+    if count == 0:
+        raise SystemExit("sabotage: the Simulation page's card has no yotta=false&allowLinks=false")
+    path.write_text(changed, encoding="utf-8")
+    return f"yotta=false&allowLinks=false taken out of {count} card(s)"
+
+
+def phet_isolation(site: Path) -> str:
+    headers = site / "_headers"
+    text = headers.read_text(encoding="utf-8")
+    changed = re.sub(r"(?m)^/static/phet/\*\n(?:[ \t]+[^\n]*\n)+", "", text)
+    if changed == text:
+        raise SystemExit("sabotage: the site's _headers has no /static/phet/* rule")
+    headers.write_text(changed, encoding="utf-8")
+    return "the /static/phet/* rule taken out of _headers"
+
+
+def phet_cropped(site: Path) -> str:
+    add_style(site, "Simulation", ".pl-phet .pl-phet-stage { aspect-ratio: auto !important; height: 120px !important; overflow: hidden !important; }")
+    return "the simulation's box held at 120 px high"
+
+
+def phet_credit(site: Path) -> str:
+    path = page_file(site, "Simulation")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'<p class="pl-phet-attribution">.*?</p>', "", text, flags=re.DOTALL)
+    if count == 0:
+        raise SystemExit("sabotage: the Simulation page has no credit line")
+    path.write_text(changed, encoding="utf-8")
+    return f"{count} credit line(s) taken out"
+
+
 def cold_visit(site: Path) -> str:
     if not (site / "index.css").is_file():
         raise SystemExit("sabotage: the site has no index.css")
@@ -524,6 +563,10 @@ DOERS = {
     "tikz empty": tikz_empty,
     "handout answers open": handout_answers_open,
     "graph invisible": graph_invisible,
+    "phet tracking": phet_tracking,
+    "phet isolation": phet_isolation,
+    "phet cropped": phet_cropped,
+    "phet credit": phet_credit,
     "cold visit": cold_visit,
     "embeds refused": embeds_refused,
     "own host off its pin": own_host_off_its_pin,

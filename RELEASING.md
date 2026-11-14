@@ -514,6 +514,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    the summary's last lines count every SKIP; a SKIP is never a pass. The variable covers the engines only, not the network, so run the cut's `verify.sh` with the network and read the summary's SKIP lines. Fetch
    Safari's engine once per Mac with `./browser-checks/fetch-browsers.sh`
    (Node 22, npm and the network once; 296 MB, outside the repository).
+   Fetch PhET's simulation for the rendered check once per Mac too, with
+   `python3 browser-checks/lib/plant_phet.py fetch` (#674): with the variable
+   set, a Mac with no copy and no network FAILS the run, which is the one
+   network row the variable does cover.
    `documentation/06-quartz-customizations.md` → R.
 
    **On Windows, the same audit over the runtime** (#685): run

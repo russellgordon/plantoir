@@ -95,6 +95,16 @@ Beyond the actions, the app owns delivery and resources:
   of its two implementations (`BuildOutputLocation.swift`), the three
   launchers are the other, for a teacher at the command line and for a
   publish scheduled with launchd.
+  The builds folder also holds `.downloaded/`, what the folder's pages
+  downloaded the first time they used it (a PhET simulation, #674), which
+  every course shares; when the app reads a folder's courses it sweeps away
+  the builds of courses that are gone (`discardBuildsForMissingCourses`) and
+  keeps that folder, as it keeps `working-folder.txt`
+  (`BuildOutputLocation.keptDownloadsFolderName`,
+  `buildOutputLocation.keptDownloadsSurviveTheSweep`). Its trail lines come
+  from the build's `PLANTOIR_DOWNLOADED:` line (`KeptDownloadsReport`), and
+  a build that stopped without one is worded by `FailureExplainer`
+  (documentation/05, "Files downloaded when a page first uses them").
 
 ## A blank window: when a child claims a size the window cannot give
 

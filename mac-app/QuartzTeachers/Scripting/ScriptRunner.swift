@@ -925,6 +925,9 @@ class ScriptRunner {
         // How getting Swift ready ended, when this preview built the Swift
         // image or could not (#635).
         SwiftGotReadyReport.noteOnTheTrail(from: text)
+        // What this build downloaded for its pages the first time they used
+        // it, or why it stopped without it (#674).
+        KeptDownloadsReport.noteOnTheTrail(from: text)
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)

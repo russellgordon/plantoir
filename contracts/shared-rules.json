@@ -1173,6 +1173,25 @@
         "why": "#570. Recording only the success hides exactly the case worth seeing (the assistant model download's reasoning): every Swift block on the site then says it is not ready, and the trail is what tells a helper whether that was the network, the disk or the download."
       },
       {
+        "event": "files for the site downloaded",
+        "carries": "what kind of file and how many (keptDownloads.kinds: a science simulation, 2 science simulations), how many megabytes and seconds the download took, and the course and section whose build needed them. Never a page's name.",
+        "marker": "PLANTOIR_DOWNLOADED: with downloaded (keptDownloads.marker), printed by scripts/phet.py through build_site.py",
+        "line": "{course}/{section} · downloaded {what} for the site ({megabytes} MB in {seconds} s), kept on this computer for later builds",
+        "why": "#674. The first build that meets a simulation is the one that takes longer and needs the internet, and 'my first preview took longer' or 'my disk filled up' is asked about later; the line dates when the computer gained the copies. One event for every kind (keptDownloads), so #679's sounds write the same line in their own words."
+      },
+      {
+        "event": "files for the site could not be downloaded",
+        "carries": "what kind and how many, why (offline: no internet connection, or the download stopped; damaged: what arrived was not what was asked for, and was thrown away; notReady: something on this computer went wrong while making it ready), and the course and section, whose build therefore STOPPED",
+        "marker": "PLANTOIR_DOWNLOADED: with failed and its reason (keptDownloads.marker)",
+        "line": "{course}/{section} · could not download {what} for the site, so it was not built: {why}",
+        "whyWords": {
+          "offline": "no internet connection, or the download stopped",
+          "damaged": "what arrived was not what was asked for, and was thrown away",
+          "notReady": "something on this computer went wrong while making it ready"
+        },
+        "why": "#674. The one case that stops a build because of the network (keptDownloads.stop), which otherwise reads as 'Preview is broken' or as a scheduled deploy that did not happen."
+      },
+      {
         "event": "problems changed",
         "carries": "the course and section, whether a preview or a deploy found it, how many problems were new and how many gone, and the KINDS of each (sectionProblems.kinds' names) - never a page, which is the teacher's own name; and, as a second line of the same event, which answer the teacher gave the alert (Show, the repair, or Not Now)",
         "line": "{course}/{section} · the {occasion} found {new} new and {gone} fewer problems (new: {kinds}; gone: {kinds})",
@@ -7288,7 +7307,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady", "phetSimulationsNotReady"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -7835,6 +7854,59 @@
             ],
             "sentence": "2 GeoGebra sketches in MPM2D Section 2 can’t be shown.",
             "detail": "Students see the sketch’s lines as you wrote them, instead of a sketch they can move, until it is fixed in your notes: “Lines”, sketch 1, line 4: app: can be classic, graphing, geometry or 3d, not “cas”; “Lines”, sketch 2: there is nothing to show - add a file: line, a material_id: line, or GeoGebra commands."
+          }
+        ]
+      },
+      {
+        "name": "phetSimulationsNotReady",
+        "sentence": "A science simulation on “{page}” in {course} Section {section} can’t be shown.",
+        "sentenceForSeveral": "{count} science simulations in {course} Section {section} can’t be shown.",
+        "detail": "Students see the block’s lines as you wrote them, instead of the simulation, until it is fixed in your notes: {simulations}.",
+        "simulationLine": "“{page}”, simulation {block}, line {line}: {reason}",
+        "simulationLineNoLine": "“{page}”, simulation {block}: {reason}",
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {block} counts the page's phet fences from 1; {line} is the line in the teacher's own file - the setting's line when the problem is a setting, the opening fence's line otherwise - and simulationLineNoLine is used when it cannot be found; {reason} is phetFences.words.reasons[reason] filled with the simulation's {name}, {value}, {sim}, {near} and {language} (simulationNotFound with close names says simulationNotFoundNear). `sentence` when ONE simulation cannot be shown and `sentenceForSeveral` otherwise. `detail` names at most ten, joined with \"; \", then `andMore`. Every value is filled in ONE pass. ONE finding per section build.",
+        "why": "#674: a simulation that cannot be shown stays the plain code block it was, and the teacher, who previews in the app and never reads the build's console, has to be told where. A simulation that could not be DOWNLOADED is never a finding: the build stops instead (keptDownloads.stop, Russell's ruling of 2026-11-13). A misspelt name is one: the internet was there, the next build will not fix it, and only the teacher knows which simulation was meant (not repairable). A block with no description (alt:) is only a `plantoir: note:` line.",
+        "cases": [
+          {
+            "name": "one simulation PhET does not have",
+            "course": "SCH3U",
+            "section": 1,
+            "simulations": [
+              {
+                "page": "Unit 3/Gas Laws",
+                "block": 1,
+                "line": 12,
+                "reason": "simulationNotFound",
+                "sim": "gas-propertys",
+                "near": "gas-properties"
+              }
+            ],
+            "sentence": "A science simulation on “Unit 3/Gas Laws” in SCH3U Section 1 can’t be shown.",
+            "detail": "Students see the block’s lines as you wrote them, instead of the simulation, until it is fixed in your notes: “Unit 3/Gas Laws”, simulation 1, line 12: PhET has no simulation called gas-propertys (the closest it has: gas-properties)."
+          },
+          {
+            "name": "two, one with no line",
+            "course": "SPH3U",
+            "section": 2,
+            "simulations": [
+              {
+                "page": "Motion",
+                "block": 1,
+                "line": 4,
+                "reason": "screensNotUnderstood",
+                "value": "first"
+              },
+              {
+                "page": "Motion",
+                "block": 2,
+                "line": null,
+                "reason": "simulationNotNamed"
+              }
+            ],
+            "sentence": "2 science simulations in SPH3U Section 2 can’t be shown.",
+            "detail": "Students see the block’s lines as you wrote them, instead of the simulation, until it is fixed in your notes: “Motion”, simulation 1, line 4: screens: needs the screens' numbers, such as 1, 2, not “first”; “Motion”, simulation 2: there is no sim: line - add one with the simulation's name from its address on phet.colorado.edu, such as gas-properties."
           }
         ]
       }
@@ -12326,6 +12398,41 @@
           "courseFolderKeptCopies": ["b"],
           "buildsFolder": {"builtSite": false, "keptCopies": [], "is": "a link to a folder outside"},
           "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "theFolderOutsideIsUntouched": true}
+        }
+      ]
+    },
+    "keptDownloadsSurviveTheSweep": {
+      "rule": "#674. The app's sweep of a working folder's builds folder for courses it no longer has (BuildOutputLocation.discardBuildsForMissingCourses on the Mac; its twin in BuildOutputLocation.cs) keeps `folder`, the files the courses' pages had downloaded (keptDownloads.where), as it keeps working-folder.txt: it is not a course, and its copies serve every course. The sweeps that remove a WHOLE builds folder (a working folder that is gone, a second spelling's copy) take it with them, which is right: nothing of that working folder is left to use it.",
+      "folder": ".downloaded",
+      "why": "Without the exception every simulation a working folder had downloaded would go the next time the app read the folder's courses, and the next build would need the internet again, or stop.",
+      "cases": [
+        {
+          "name": "a course that is gone goes, the downloads stay",
+          "entries": [
+            "SCH3U",
+            "SPH3U",
+            ".downloaded",
+            "working-folder.txt"
+          ],
+          "coursesPresent": [
+            "SCH3U"
+          ],
+          "kept": [
+            ".downloaded",
+            "SCH3U",
+            "working-folder.txt"
+          ]
+        },
+        {
+          "name": "no course left at all",
+          "entries": [
+            "SCH3U",
+            ".downloaded"
+          ],
+          "coursesPresent": [],
+          "kept": [
+            ".downloaded"
+          ]
         }
       ]
     },
@@ -30958,6 +31065,992 @@
       "The open sketch's box keeps the sketch's own shape and hides what spills out of it (geogebra.scss: height auto, overflow hidden - documentation/06 Q3), so the keyboard GeoGebra may open INSIDE its applet on a touchscreen, for a fence with `algebra: true`, could be cut off at the box's bottom edge. Unmeasured: no touchscreen was tried (an iPad and Edge on a touch laptop are to be checked later); on a desktop browser no keyboard opens."
     ]
   },
+  "keptDownloads": {
+    "rule": "#674 (v2.0.0), for every kind of file a class site carries that is too large or not Plantoir's to put in the website builder, downloaded on the teacher's computer the first time a page students can see uses one, and KEPT (Russell's rulings of 2026-11-13 on #674, and on #679 for the sounds a tune names). One rule for every kind (scripts/kept_downloads.py), so #679's sounds use the same folder, the same record, the same checks and the same stop, adding only a kind of its own here. A build that needs a file it has not kept and cannot download STOPS before the site is made (stop), and says so in a sentence the apps lift (app-rules.json -> failureExplanations): a site that says it built and is missing what a page promises is the fault this prevents.",
+    "where": {
+      "folder": ".downloaded",
+      "mac": "{home}/Library/Application Support/Plantoir/builds/{folder id}/.downloaded",
+      "windows": "%LOCALAPPDATA%\\Plantoir\\builds\\{folder id}\\.downloaded",
+      "rule": "In the WORKING FOLDER's builds folder (buildOutputLocation.macLocation.buildsRoot, windowsLocation.buildsRoot), beside the courses' built sites: one copy serves every course and section of the working folder. Found from the build's own layout (kept_downloads.root_for): PLANTOIR_BUILD_ROOT when it is set (Windows), else the folder that the course's .merged_output link points into (the Mac), else, for a course whose .merged_output is still a real folder inside the course, inside that .merged_output, so nothing is ever written among the teacher's notes. The Mac's website builder reads it at the same absolute path through the builds folder's own mount (CLAUDE.md, How the toolchain ships): nothing new is mounted, and the folder is under the home folder, which is all the Colima VM can see.",
+      "cases": [
+        {
+          "name": "Windows: the builds folder is named",
+          "layout": "buildRoot",
+          "expect": "{buildRoot}/.downloaded"
+        },
+        {
+          "name": "the Mac: .merged_output links into the builds folder",
+          "layout": "link",
+          "expect": "{builds}/.downloaded"
+        },
+        {
+          "name": "an old course whose .merged_output is a real folder",
+          "layout": "realFolder",
+          "expect": "{course}/.merged_output/.downloaded"
+        }
+      ],
+      "rejected": [
+        "Per course, as GeoGebra's .geogebra-cache is: each course would download the same simulation again, and the clears that keep .geogebra-cache name one folder in five launchers and two apps (buildOutputLocation.keptCopiesSurviveTheClear); a folder beside the courses is cleared by none of them.",
+        "A folder for the whole computer under Application Support: the Mac's website builder sees only its two mounts, and a mount cannot be added to a website builder that already exists without making it again (CLAUDE.md, How the toolchain ships).",
+        "Inside the teacher's course or working folder: it would be synced to their cloud drive, backed up, shown in Obsidian, and carried by a copy of the folder.",
+        "In the website builder (the image): 127 simulations at 2.6 to 4.8 MB each, and for #679 239 MB of sounds, of which a site uses a handful; and PhET's files are not Plantoir's to ship (ruling)."
+      ]
+    },
+    "kinds": {
+      "phet": {
+        "one": "a science simulation",
+        "several": "science simulations",
+        "source": "PhET",
+        "issue": "#674",
+        "fences": "phetFences"
+      }
+    },
+    "entries": {
+      "rule": "`<kind>/<name>/<version>/` holding the files and `record`, which names each file's SHA-256 and size, where it came from, when (downloadedAt) and what the kind keeps about it (`about`). Written into a hidden folder beside it (`.<version>.<process>.<thread>.tmp`) and RENAMED into place, so two sections built at once never read half of one; when the name is already there the second build throws its own copy away and uses the first's. A name or version is lower-case letters, digits, dots, dashes and underscores, at most 80 characters, so no download can name a path outside the folder.",
+      "record": "kept.json",
+      "checked": "Every file's SHA-256 and size are checked against the record EVERY time an entry is used, and against a pin when the kind has one. An entry that fails is thrown away and counts as not downloaded: the next build that is online downloads it again, and one that is not stops.",
+      "pinned": "A kind whose hashes are known before downloading passes them (#679: contracts/toolchain.json -> pins), and a download that does not match is refused before anything is kept. PhET publishes no checksum (measured 2026-11-13: no header, no file), so a simulation is pinned by the version PhET's metadata names and by the SHA-256 of what was checked and kept; from then on every build uses that copy, byte for byte.",
+      "neverRefreshed": "A kept entry is never downloaded again on its own: a class site must not change under a teacher mid-unit, and a build must not need the internet once it has what its pages use. A newer version reaches a site only after the kept one is pruned or the folder is removed (knownLimits)."
+    },
+    "prune": {
+      "days": 90,
+      "rule": "Every build that uses an entry touches its record; an entry whose record is untouched for `days` (figures.PRUNE_DAYS, the rule diagrams and GeoGebra's copies follow) goes, and so does a hidden half-written folder older than a day. A course left unbuilt over the summer can therefore need the internet for its first build in September (knownLimits).",
+      "cases": [
+        {
+          "name": "used yesterday",
+          "daysSinceUsed": 1,
+          "kept": true
+        },
+        {
+          "name": "unused for 89 days",
+          "daysSinceUsed": 89,
+          "kept": true
+        },
+        {
+          "name": "unused for 91 days",
+          "daysSinceUsed": 91,
+          "kept": false
+        }
+      ]
+    },
+    "asking": {
+      "rule": "https only, to the kind's own hosts; a redirect anywhere else is refused (a school's sign-in page is not followed). `accept` is sent, never text/html, and no compression is asked for. A body larger than largestFileMegabytes, or shorter than its Content-Length, is refused; a body cut off mid-answer raises and is refused. Each failure is sorted into the reason a teacher is told: notFound for an answer in notFoundStatuses (the address names nothing), offline for everything else (no answer, a timeout, a refusal, a server error, a redirect elsewhere, a cut-off body). Whether what arrived is what was asked for (damaged) is the kind's own check (phetFences.download.checks).",
+      "accept": "*/*",
+      "acceptWhy": "Measured 2026-11-13 against phet.colorado.edu's simulation files, one request each: with Accept: text/html, curl and a browser's user agent were sent the file with a Cloudflare Web Analytics script added before </body> (static.cloudflareinsights.com/beacon.min.js), and Python's urllib, which sends no Accept, was sent it too; with Accept: */* none of six requests was. phetFences.download.removedOnTheWay takes it out if it comes anyway.",
+      "requestSeconds": 30,
+      "largestFileMegabytes": 20,
+      "notFoundStatuses": [
+        404,
+        410
+      ]
+    },
+    "marker": {
+      "prefix": "PLANTOIR_DOWNLOADED:",
+      "rule": "ONE line per kind per build, printed only when the build downloaded something or stopped: {kind, course, section, downloaded (how many), bytes, seconds} or {kind, course, section, failed (how many distinct names, 0 when none can be named), reason (offline, damaged or notReady)}. It names no page and no file of the teacher's. Both apps read it from the console of a run they start and from a scheduled publish's record, as PLANTOIR_SWIFT:, and write the trail line (activityTrail.mustRecord: 'files for the site downloaded', 'files for the site could not be downloaded'); the console a teacher reads leaves it out, by the one rule for every PLANTOIR_ line.",
+      "cases": [
+        {
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "downloaded": {
+            "count": 2,
+            "bytes": 7930217,
+            "seconds": 1.4
+          },
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"downloaded\":2,\"bytes\":7930217,\"seconds\":1.4}"
+        },
+        {
+          "kind": "phet",
+          "course": "SCH3U",
+          "section": 2,
+          "failed": {
+            "count": 1,
+            "reason": "offline"
+          },
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SCH3U\",\"section\":2,\"failed\":1,\"reason\":\"offline\"}"
+        }
+      ],
+      "trailCases": [
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"downloaded\":2,\"bytes\":7930217,\"seconds\":1.4}",
+          "event": "files for the site downloaded",
+          "sentence": "downloaded 2 science simulations for the site (7.9 MB in 1.4 s), kept on this computer for later builds"
+        },
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"downloaded\":1,\"bytes\":3170537,\"seconds\":0.4}",
+          "event": "files for the site downloaded",
+          "sentence": "downloaded a science simulation for the site (3.2 MB in 0.4 s), kept on this computer for later builds"
+        },
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SCH3U\",\"section\":2,\"failed\":1,\"reason\":\"offline\"}",
+          "event": "files for the site could not be downloaded",
+          "sentence": "could not download a science simulation for the site, so it was not built: no internet connection, or the download stopped"
+        },
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SCH3U\",\"section\":2,\"failed\":3,\"reason\":\"damaged\"}",
+          "event": "files for the site could not be downloaded",
+          "sentence": "could not download 3 science simulations for the site, so it was not built: what arrived was not what was asked for, and was thrown away"
+        },
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}",
+          "event": "files for the site could not be downloaded",
+          "sentence": "could not download a science simulation for the site, so it was not built: something on this computer went wrong while making it ready"
+        },
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"newer\",\"course\":\"SCH3U\",\"section\":2,\"downloaded\":4,\"bytes\":8000000,\"seconds\":2.0}",
+          "event": "files for the site downloaded",
+          "sentence": "downloaded 4 files for the site (8.0 MB in 2.0 s), kept on this computer for later builds"
+        }
+      ],
+      "trailWords": {
+        "downloaded": "downloaded {what} for the site ({megabytes} MB in {seconds} s), kept on this computer for later builds",
+        "failed": "could not download {what} for the site, so it was not built: {why}",
+        "why": {
+          "offline": "no internet connection, or the download stopped",
+          "damaged": "what arrived was not what was asked for, and was thrown away",
+          "notReady": "something on this computer went wrong while making it ready"
+        },
+        "unknownKind": {
+          "one": "a file",
+          "several": "files"
+        },
+        "megabytes": "bytes / 10^6 with one decimal, written with a full stop whatever the computer's language, as SwiftGotReadyReport writes gigabytes; seconds as the marker gives them, with one decimal",
+        "why2": "A kind this app does not know yet (a newer website builder's) is worded as files, never dropped: the line is the one worth having."
+      }
+    },
+    "stop": {
+      "rule": "A build whose pages students can see use something of a kind that is not kept, and that cannot be downloaded now (asking: offline; or the kind's checks fail: damaged), STOPS before Quartz runs, exit 1, with nothing written to the site: `first` for the reason, after the cross, filled with {course}, {section}, {what} (kinds' one or several, counting each name once however many pages use it) and {source}; then one line per place it is used, `item`, indented three spaces, at most listedAtMost, then andMore. Then the marker. The previous site is left as it was. A preview stops, a deploy stops, and a scheduled deploy stops (scheduledPublishStopped's 'the pages could not be built' line is what the trail already says). A kind's other faults (a misspelt name) are folder problems and never stop. A fault in the kind's pass itself, not in a download, stops too when a page students can see uses the kind (notReady; phetFences.stop.passFails); {what} is then the kind's several, with no number, when nothing can be named.",
+      "first": {
+        "offline": "{course} Section {section} was not built: this computer could not reach {source} to download {what} that its pages use for the first time. Connect to the internet, then build again.",
+        "damaged": "{course} Section {section} was not built: {what} that its pages use for the first time did not arrive from {source} as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this.",
+        "notReady": "{course} Section {section} was not built: {what} that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu."
+      },
+      "item": "“{item}” on “{page}”",
+      "andMore": "and {count} more",
+      "listedAtMost": 10,
+      "explained": "{first} Not downloaded yet: {items}.",
+      "explainedRule": "What the apps' failure explanation makes of the lines (app-rules.json -> failureExplanations): the first line lifted (FailureExplainer.liftedSentence: everything before its first ASCII letter or digit taken off; it begins with the course code), then `explained` with {items} the item lines, each trimmed, joined with \"; \". The marker word every first line carries, whatever the reason, is `markerWords`.",
+      "markerWords": "was not built: ",
+      "markerWordsAlso": "that its pages use",
+      "cases": [
+        {
+          "name": "one simulation, offline",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "offline",
+          "missing": [
+            {
+              "item": "gas-properties",
+              "page": "Unit 3/Gas Laws"
+            }
+          ],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: this computer could not reach PhET to download a science simulation that its pages use for the first time. Connect to the internet, then build again.",
+            "   “gas-properties” on “Unit 3/Gas Laws”"
+          ]
+        },
+        {
+          "name": "three on three pages, offline (one simulation twice)",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "offline",
+          "missing": [
+            {
+              "item": "gas-properties",
+              "page": "Unit 3/Gas Laws"
+            },
+            {
+              "item": "projectile-motion",
+              "page": "Unit 1/Motion"
+            },
+            {
+              "item": "gas-properties",
+              "page": "Unit 3/Review"
+            }
+          ],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: this computer could not reach PhET to download 2 science simulations that its pages use for the first time. Connect to the internet, then build again.",
+            "   “gas-properties” on “Unit 3/Gas Laws”",
+            "   “projectile-motion” on “Unit 1/Motion”",
+            "   “gas-properties” on “Unit 3/Review”"
+          ]
+        },
+        {
+          "name": "eleven, offline: ten named and one more",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "offline",
+          "missing": [
+            {
+              "item": "sim-1",
+              "page": "Unit 1/Lesson"
+            },
+            {
+              "item": "sim-2",
+              "page": "Unit 2/Lesson"
+            },
+            {
+              "item": "sim-3",
+              "page": "Unit 3/Lesson"
+            },
+            {
+              "item": "sim-4",
+              "page": "Unit 4/Lesson"
+            },
+            {
+              "item": "sim-5",
+              "page": "Unit 5/Lesson"
+            },
+            {
+              "item": "sim-6",
+              "page": "Unit 6/Lesson"
+            },
+            {
+              "item": "sim-7",
+              "page": "Unit 7/Lesson"
+            },
+            {
+              "item": "sim-8",
+              "page": "Unit 8/Lesson"
+            },
+            {
+              "item": "sim-9",
+              "page": "Unit 9/Lesson"
+            },
+            {
+              "item": "sim-10",
+              "page": "Unit 10/Lesson"
+            },
+            {
+              "item": "sim-11",
+              "page": "Unit 11/Lesson"
+            }
+          ],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: this computer could not reach PhET to download 11 science simulations that its pages use for the first time. Connect to the internet, then build again.",
+            "   “sim-1” on “Unit 1/Lesson”",
+            "   “sim-2” on “Unit 2/Lesson”",
+            "   “sim-3” on “Unit 3/Lesson”",
+            "   “sim-4” on “Unit 4/Lesson”",
+            "   “sim-5” on “Unit 5/Lesson”",
+            "   “sim-6” on “Unit 6/Lesson”",
+            "   “sim-7” on “Unit 7/Lesson”",
+            "   “sim-8” on “Unit 8/Lesson”",
+            "   “sim-9” on “Unit 9/Lesson”",
+            "   “sim-10” on “Unit 10/Lesson”",
+            "   and 1 more"
+          ]
+        },
+        {
+          "name": "one that arrived as something else",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "damaged",
+          "missing": [
+            {
+              "item": "gas-properties",
+              "page": "Unit 3/Gas Laws"
+            }
+          ],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: a science simulation that its pages use for the first time did not arrive from PhET as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this.",
+            "   “gas-properties” on “Unit 3/Gas Laws”"
+          ]
+        },
+        {
+          "name": "the pass itself failed, and it can say where",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "notReady",
+          "missing": [
+            {
+              "item": "gas-properties",
+              "page": "Unit 3/Gas Laws"
+            }
+          ],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.",
+            "   “gas-properties” on “Unit 3/Gas Laws”"
+          ]
+        },
+        {
+          "name": "the pass itself failed, and it cannot say where",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "notReady",
+          "missing": [],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: science simulations that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu."
+          ]
+        }
+      ],
+      "why": "Russell's ruling on #674, 2026-11-13: a build with no internet and a simulation not yet downloaded stops, naming the page and the simulation; no stand-in card. A damaged download stops too, because the alternative is the same site with the simulation missing; a captive portal's sign-in page answered in place of the file is the likeliest cause, and the sentence says so in plain words."
+    },
+    "forTheMusicPiece": "#679 adds a kind `sounds` here (its one, several and source), downloads each sound through kept_downloads.Fetcher and keeps it with kept_downloads.Store(root_for(course_dir), \"sounds\").put(name, version, files, expected=<its pinned SHA-256s from toolchain.json>), reads it back with .get(name, version, expected=...), calls .prune(now) once its pass is done, as phet.prepare does, and when a sound is missing and cannot be downloaded answers the same stop (kept_downloads.stop_lines(\"sounds\", ...), then kept_downloads.marker_line). One more table gains the kind: each app's words for a kind (KeptDownloadsReport.kindWords on the Mac, its counterpart on Windows), since a test holds that table's keys to keptDownloads.kinds. Nothing else changes: not the folder, not the sweep exception, not the trail events, not the failure explanation.",
+    "knownLimits": [
+      "A kept entry is never refreshed: a newer PhET version reaches a site only once the kept one is unused for 90 days, or its folder under .downloaded is removed by hand.",
+      "A course left unbuilt for 90 days (a summer) loses its kept copies, so its next build needs the internet, and may get a newer version.",
+      "A scheduled deploy that meets a simulation for the first time with no internet stops at its hour with nobody there: preview once after adding a simulation, before scheduling.",
+      "The kept copies belong to one working folder on one computer: the builds folder is named by a hash of the working folder's path. A working folder moved or renamed, copied to a new computer, or opened on the other platform starts with nothing kept, so its next build that shows a simulation needs the internet, or stops (implementation review, 2026-11-13). Help says to preview once with the internet after moving a working folder or changing computers.",
+      "The stop's first line after a fault in the pass itself (notReady) is followed by the same `Not downloaded yet:` in the apps' sentence (stop.explained), though the copy may be kept and only the site's own files could not be written."
+    ]
+  },
+  "phetFences": {
+    "rule": "#674 (v2.0.0). A ```phet fence (or ~~~phet) on a page students can see becomes a card with the simulation's picture, its title, the teacher's description and a button; a tap opens the simulation in place, from the class site's OWN copy, and a student's browser asks PhET nothing. Python prepares and Quartz places, as for geogebraFences: scripts/phet.py reads every fence on the pages students can see (by the gate's own visibility rule), finds the simulation among the copies kept on this computer or downloads it from PhET now (keptDownloads; ruling: downloaded only when a page uses it, and kept), writes it into the site at static/phet/<sim>/ and hands the site's transformer (support/quartz/plugins/transformers/plantoirPhet.ts) a manifest in quartz/plantoir-phet/; the loader (support/quartz/components/scripts/phet.inline.ts) makes the frame only when a student taps. A fence that cannot be shown stays the code block it was and is a folder problem (siteHealth -> phetSimulationsNotReady); a simulation that is not kept and cannot be downloaded STOPS the build (stop). Measured 2026-11-13: documentation/05-build-pipeline.md -> PhET simulations: what the build does; documentation/06-quartz-customizations.md -> S.",
+    "fences": {
+      "rule": "The info string's FIRST WORD, exactly `phet`; backticks or tildes; at any quote depth, in a list item, %% comments removed: markdown_code.fenced_blocks, as geogebraFences.fences. Found with ONE page scan for the word `phet` alone (a scan's must_contain is a plain substring test, and CommonMark lets spaces stand between the fence and its language: ``` phet is a simulation to the site, so a scan for ```phet missed it and the page deployed without its simulation, measured 2026-11-13 by the fix review); simulations_on_page then reads each page exactly. Every case here whose `found` is not empty is also a page that scan keeps (test_phet.FenceTests).",
+      "cases": [
+        {
+          "name": "a phet fence",
+          "page": "Intro.\n\n```phet\nsim: gas-properties\n```\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 3
+            }
+          ]
+        },
+        {
+          "name": "tildes",
+          "page": "~~~phet\nsim: ph-scale\n~~~\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 1
+            }
+          ]
+        },
+        {
+          "name": "in a callout",
+          "page": "> [!note]\n> ```phet\n> sim: ph-scale\n> ```\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 2
+            }
+          ]
+        },
+        {
+          "name": "after other code",
+          "page": "```python\nprint(1)\n```\n\n```phet\nsim: ph-scale\n```\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 5
+            }
+          ]
+        },
+        {
+          "name": "a space before the language",
+          "page": "Intro.\n\n``` phet\nsim: gas-properties\n```\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 3
+            }
+          ]
+        },
+        {
+          "name": "tildes with spaces before the language",
+          "page": "~~~   phet\nsim: ph-scale\n~~~\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 1
+            }
+          ]
+        },
+        {
+          "name": "a word that only starts with phet",
+          "page": "```phetio\nsim: ph-scale\n```\n",
+          "found": []
+        }
+      ]
+    },
+    "keys": {
+      "rule": "A simulation's card is looked up in the manifest by geogebraFences.keys' rule, REUSED: SHA-256 of the tidied fence body (figures.key_of in the build, figureRules.keyOf on the site's mdast code value in plantoirPhet.ts), the body read after the quote markers of its depth are taken off. Each case is the same fence in another place, so every key is the same. Run by scripts/test_phet.py and, through the site's own Markdown reader in Node, by scripts/check_phet_rules_against_the_site.py (verify.sh), with every fences case's count and line.",
+      "cases": [
+        {
+          "name": "at the top of the page",
+          "page": "```phet\nsim: gas-properties\nalt: A box of gas.\n```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "in a callout",
+          "page": "> [!note] Try it\n> ```phet\n> sim: gas-properties\n> alt: A box of gas.\n> ```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "in a list item",
+          "page": "1. Open this:\n\n   ```phet\n   sim: gas-properties\n   alt: A box of gas.\n   ```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "with tildes",
+          "page": "~~~phet\nsim: gas-properties\nalt: A box of gas.\n~~~\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "with Windows line endings",
+          "page": "```phet\r\nsim: gas-properties\r\nalt: A box of gas.\r\n```\r\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "in a quiz's explanation",
+          "page": "> [!quiz] What happens to the pressure?\n> - [x] It goes up\n> - [ ] It goes down\n>\n> > [!explain]\n> > ```phet\n> > sim: gas-properties\n> > alt: A box of gas.\n> > ```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        }
+      ]
+    },
+    "settings": {
+      "rule": "Every line is a `key: value` setting, a key one of `known`, in small letters; a block may open and close with `---`; blank lines and // lines are skipped. A value may be wrapped in one pair of quotes, which are taken off. `sim` is needed (simulationNotNamed); `alt` is the card's description and the frame's title (missingAlt is a note, as GeoGebra's); `locale` is a language (`fr`, `fr-CA`, `fr_CA`, any case, written as PhET writes it: fr, fr_CA); `screens` is distinct whole numbers from 1, separated by commas. A line that is not a known setting is left out with a note (unknownSetting). NOTHING ELSE reaches the simulation's address (address): no height (the frame takes the simulation's own shape at the page's width), no other of PhET's settings (ruling, 2026-11-13).",
+      "known": [
+        "sim",
+        "alt",
+        "locale",
+        "screens"
+      ],
+      "cases": [
+        {
+          "name": "a name, a description, a language and two screens",
+          "body": "sim: gas-properties\nalt: Pump gas into a box and watch the pressure change.\nlocale: fr\nscreens: 1, 2",
+          "settings": {
+            "sim": "gas-properties",
+            "alt": "Pump gas into a box and watch the pressure change.",
+            "locale": "fr",
+            "screens": [
+              1,
+              2
+            ]
+          },
+          "problems": [],
+          "notes": []
+        },
+        {
+          "name": "the address pasted whole",
+          "body": "sim: https://phet.colorado.edu/en/simulations/projectile-motion",
+          "settings": {
+            "sim": "projectile-motion"
+          },
+          "problems": [],
+          "notes": []
+        },
+        {
+          "name": "a --- block",
+          "body": "---\nsim: ph-scale\n---",
+          "settings": {
+            "sim": "ph-scale"
+          },
+          "problems": [],
+          "notes": []
+        },
+        {
+          "name": "a setting that is not one",
+          "body": "sim: ph-scale\nheight: 400",
+          "settings": {
+            "sim": "ph-scale"
+          },
+          "problems": [],
+          "notes": [
+            {
+              "reason": "unknownSetting",
+              "blockLine": 2,
+              "name": "height"
+            }
+          ]
+        },
+        {
+          "name": "no sim line",
+          "body": "alt: Something to try.",
+          "settings": {
+            "alt": "Something to try."
+          },
+          "problems": [
+            {
+              "reason": "simulationNotNamed",
+              "blockLine": null
+            }
+          ],
+          "notes": []
+        },
+        {
+          "name": "screens that are not numbers",
+          "body": "sim: ph-scale\nscreens: first",
+          "settings": {
+            "sim": "ph-scale"
+          },
+          "problems": [
+            {
+              "reason": "screensNotUnderstood",
+              "blockLine": 2,
+              "value": "first"
+            }
+          ],
+          "notes": []
+        },
+        {
+          "name": "a screen named twice",
+          "body": "sim: ph-scale\nscreens: 1, 1",
+          "settings": {
+            "sim": "ph-scale"
+          },
+          "problems": [
+            {
+              "reason": "screensNotUnderstood",
+              "blockLine": 2,
+              "value": "1, 1"
+            }
+          ],
+          "notes": []
+        },
+        {
+          "name": "quotes taken off",
+          "body": "sim: \"gas-properties\"\nalt: 'A box of gas.'",
+          "settings": {
+            "sim": "gas-properties",
+            "alt": "A box of gas."
+          },
+          "problems": [],
+          "notes": []
+        },
+        {
+          "name": "a language with its region",
+          "body": "sim: gas-properties\nlocale: fr-CA",
+          "settings": {
+            "sim": "gas-properties",
+            "locale": "fr_CA"
+          },
+          "problems": [],
+          "notes": []
+        },
+        {
+          "name": "a title in place of the name",
+          "body": "sim: Gas Properties",
+          "settings": {},
+          "problems": [
+            {
+              "reason": "simulationNotUnderstood",
+              "blockLine": 1,
+              "value": "Gas Properties"
+            }
+          ],
+          "notes": []
+        },
+        {
+          "name": "a language that is not one",
+          "body": "sim: ph-scale\nlocale: French please",
+          "settings": {
+            "sim": "ph-scale"
+          },
+          "problems": [
+            {
+              "reason": "localeNotUnderstood",
+              "blockLine": 2,
+              "value": "French please"
+            }
+          ],
+          "notes": []
+        }
+      ]
+    },
+    "simNames": {
+      "rule": "`sim:` takes the simulation's name as in its address (letters, digits and dashes, any case, read in small letters), or an address on one of `hosts` that holds the name: /<language>/simulations/<name>, /<language>/simulation/<name>, /simulations/<name>, /sims/html/<name>/..., with or without anything after it. Anything else is simulationNotUnderstood.",
+      "hosts": [
+        "phet.colorado.edu"
+      ],
+      "cases": [
+        {
+          "value": "gas-properties",
+          "sim": "gas-properties"
+        },
+        {
+          "value": "Gas-Properties",
+          "sim": "gas-properties"
+        },
+        {
+          "value": "https://phet.colorado.edu/en/simulations/gas-properties",
+          "sim": "gas-properties"
+        },
+        {
+          "value": "https://phet.colorado.edu/en/simulation/gas-properties",
+          "sim": "gas-properties"
+        },
+        {
+          "value": "phet.colorado.edu/fr/simulations/projectile-motion?x=1",
+          "sim": "projectile-motion"
+        },
+        {
+          "value": "https://phet.colorado.edu/zh_CN/simulations/ph-scale",
+          "sim": "ph-scale"
+        },
+        {
+          "value": "https://phet.colorado.edu/sims/html/gas-properties/latest/gas-properties_all.html",
+          "sim": "gas-properties"
+        },
+        {
+          "value": "https://phet.colorado.edu/sims/html/gas-properties/latest/gas-properties_en.html",
+          "sim": "gas-properties"
+        },
+        {
+          "value": "https://example.com/en/simulations/gas-properties",
+          "sim": null
+        },
+        {
+          "value": "Gas Properties",
+          "sim": null
+        },
+        {
+          "value": "",
+          "sim": null
+        }
+      ]
+    },
+    "locale": {
+      "rule": "The language a simulation shows in: the fence's `locale`, else the course's (course_config.json -> locale, default en-US), written as PhET writes it; then, of the simulation's own languages (from its metadata, kept with the copy), that exact language and region, else the language alone, else English, with a note (notInThisLanguage) when English was not what was asked. ONE all-languages file per simulation (the director's direction, 2026-11-13): changing a page's or a course's language never downloads anything. Measured 2026-11-13: 127 HTML simulations, 121 with French; an unknown locale in the address falls back to English in the simulation itself.",
+      "cases": [
+        {
+          "name": "the fence's language",
+          "fence": "fr",
+          "course": "en-US",
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "locale": "fr",
+          "fellBack": false
+        },
+        {
+          "name": "the course's language",
+          "fence": null,
+          "course": "fr-CA",
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "locale": "fr",
+          "fellBack": false
+        },
+        {
+          "name": "the course's language and region, when the simulation has it",
+          "fence": null,
+          "course": "fr-CA",
+          "languages": [
+            "en",
+            "fr",
+            "fr_CA"
+          ],
+          "locale": "fr_CA",
+          "fellBack": false
+        },
+        {
+          "name": "a region the simulation does not have",
+          "fence": "fr_CA",
+          "course": "en-US",
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "locale": "fr",
+          "fellBack": false
+        },
+        {
+          "name": "an English course",
+          "fence": null,
+          "course": "en-US",
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "locale": "en",
+          "fellBack": false
+        },
+        {
+          "name": "a language the simulation does not have",
+          "fence": "fr",
+          "course": "en-US",
+          "languages": [
+            "en"
+          ],
+          "locale": "en",
+          "fellBack": true
+        },
+        {
+          "name": "no course language",
+          "fence": null,
+          "course": "",
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "locale": "en",
+          "fellBack": false
+        }
+      ]
+    },
+    "address": {
+      "rule": "Every simulation's frame is `<site>/static/phet/<sim>/?` then this query: `fixed`, in that order, ALWAYS first, then locale=<the language>, then screens=<the fence's screens, joined with commas> when the fence names any. Nothing a page writes can change or drop the fixed part. A case that drops either fixed setting fails both suites.",
+      "fixed": [
+        "yotta=false",
+        "allowLinks=false"
+      ],
+      "why": "Measured 2026-11-13, headless Chromium 1243 and WebKit 2359, every request off the test host recorded and refused: with PhET's defaults a simulation asks four other addresses as it opens (www.googletagmanager.com/gtm.js, phet.colorado.edu/yotta/immediate.gif and /yotta/sanity.gif, and http://phet.colorado.edu/services/check-html-updates); with yotta=false it asks none, in both engines. allowLinks=false turns off the simulation's links to PhET's site. The ruling: a student's browser fetches nothing from the vendor (#578's standing rule).",
+      "cases": [
+        {
+          "locale": "fr",
+          "screens": [
+            1,
+            2
+          ],
+          "query": "yotta=false&allowLinks=false&locale=fr&screens=1,2"
+        },
+        {
+          "locale": "en",
+          "screens": null,
+          "query": "yotta=false&allowLinks=false&locale=en"
+        },
+        {
+          "locale": "fr_CA",
+          "screens": [
+            3
+          ],
+          "query": "yotta=false&allowLinks=false&locale=fr_CA&screens=3"
+        }
+      ]
+    },
+    "download": {
+      "rule": "For a simulation that is not kept: PhET's metadata for that one simulation (`metadata`), which names its project and its current version (`projects[0].version.string`) and its title in each language; then the simulation's all-languages file at THAT version (`simulation`, a pinned address that stays downloadable, measured: an old version answered 200 while a newer was current), then its picture (`screenshot`; none is not an error). What came is cleaned (removedOnTheWay), checked (checks) and kept (keptDownloads.entries). PhET's own answer for a name it does not have (an `error` and no projects, measured for a misspelt name) is notFound: a folder problem (simulationNotFound), with up to three close names from the whole list (`allNames`, asked only then). Any other answer that names no simulation of that name ({}, null, no projects, a project with no such simulation) is damaged, so it stops the build rather than reading as a misspelling. Every request is keptDownloads.asking's.",
+      "base": "https://phet.colorado.edu",
+      "hosts": [
+        "phet.colorado.edu"
+      ],
+      "metadata": "/services/metadata/1.3/simulations?format=json&type=html&summary&simulation={sim}",
+      "allNames": "/services/metadata/1.3/simulations?format=json&type=html&summary",
+      "simulation": "/sims/{project}/{version}/{sim}_all.html",
+      "screenshot": "/sims/{project}/{version}/{sim}-600.png",
+      "checks": {
+        "rule": "What was downloaded is a PhET simulation only when it starts as a web page, is at most largestMegabytes, holds every one of mustContain, and loads no script from another site. mustContain: PhET's licence line as the file states it; the production marker; PhET's own brand, which a PhET-iO build does not carry (the brief's 'never the licensed PhET-iO build'; the words phet-io appear 11 to 65 times in ordinary builds, measured, and are not a test). Fails: damaged, nothing kept, the build stops (stop).",
+        "largestMegabytes": 20,
+        "largestPictureMegabytes": 4,
+        "mustContain": [
+          "Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)",
+          "<meta name=\"phet-sim-level\" content=\"production\"",
+          "window.phet.chipper.brand = 'phet';"
+        ]
+      },
+      "removedOnTheWay": {
+        "rule": "Taken out of the file before it is checked or kept: what PhET's servers add on the way and the published file does not hold.",
+        "patterns": [
+          "<script\\b[^>]*\\bsrc=\"https://static\\.cloudflareinsights\\.com/[^\"]*\"[^>]*>\\s*</script>\\n?"
+        ],
+        "measured": "2026-11-13: gas-properties 1.1.12 was answered with a Cloudflare Web Analytics script before </body> on some requests (keptDownloads.asking.acceptWhy): 3,046,765 bytes, SHA-256 ce3ad048...8f44, against 3,046,404 bytes, SHA-256 11440b2a...fc34f24, without it. With the script taken out the two are byte for byte the same. Carried as it came, the script would make every student's browser ask static.cloudflareinsights.com, and the site's own policy would list it."
+      },
+      "measured": "2026-11-13 on this Mac's line: the metadata for one simulation 8,316 bytes in 0.09 to 0.14 s; gas-properties 1.1.12 _all.html 3,046,404 bytes in 0.14 s (986,328 gzipped); projectile-motion 1.0.36 4,759,792 bytes (1,367,293 gzipped); a picture 124,133 bytes. A school line will be slower; none was measured."
+    },
+    "siteCarries": {
+      "rule": "For each simulation a page students can see SHOWS: static/phet/<sim>/index.html (the kept file, byte for byte; an index.html so every host answers /static/phet/<sim>/ with no redirect), screenshot.png when PhET had one, and ABOUT.txt (the title and version, attribution.sentence, the licence and terms addresses, where and when it was downloaded). Nothing else, and nothing for a simulation no page shows: the folder is emptied of those, and removed when none is shown. A site with no simulation carries no static/phet.",
+      "linkedBy": "For #901 (a site carries only what published pages link to): a carried simulation is linked by the card on each page that shows it, a <figure class=\"pl-figure pl-phet\"> whose data-phet JSON names `folder` (static/phet/<sim>/) and whose <img> names the picture; quartz/plantoir-phet/manifest.json lists every page and simulation the build placed. #901 must keep static/phet/<sim>/ (all three files) while any built page holds such a figure for <sim>, and must never treat the folder as an unlinked attachment.",
+      "folder": "static/phet",
+      "files": [
+        "index.html",
+        "screenshot.png",
+        "ABOUT.txt"
+      ]
+    },
+    "stop": {
+      "rule": "What a build does when a simulation a page shows is not kept, by what PhET answered (keptDownloads.stop). A kept simulation needs no answer at all: the build asks PhET nothing (requests 0).",
+      "cases": [
+        {
+          "name": "not kept, and PhET answers",
+          "kept": false,
+          "phet": "answers",
+          "expect": {
+            "stop": null,
+            "shown": 1,
+            "problems": [],
+            "kept": true
+          }
+        },
+        {
+          "name": "kept, and no internet",
+          "kept": true,
+          "phet": "down",
+          "expect": {
+            "stop": null,
+            "shown": 1,
+            "problems": [],
+            "requests": 0
+          }
+        },
+        {
+          "name": "not kept, and no internet",
+          "kept": false,
+          "phet": "down",
+          "expect": {
+            "stop": "offline",
+            "shown": 0,
+            "problems": [],
+            "kept": false
+          }
+        },
+        {
+          "name": "not kept, and the answer was cut off",
+          "kept": false,
+          "phet": "cutOff",
+          "expect": {
+            "stop": "offline",
+            "shown": 0,
+            "problems": [],
+            "kept": false
+          }
+        },
+        {
+          "name": "not kept, and a page from somewhere else came in its place",
+          "kept": false,
+          "phet": "wrongFile",
+          "expect": {
+            "stop": "damaged",
+            "shown": 0,
+            "problems": [],
+            "kept": false
+          }
+        },
+        {
+          "name": "a name PhET does not have",
+          "kept": false,
+          "phet": "notFound",
+          "expect": {
+            "stop": null,
+            "shown": 0,
+            "problems": [
+              "simulationNotFound"
+            ],
+            "kept": false
+          }
+        },
+        {
+          "name": "the analytics script PhET's servers add is taken out",
+          "kept": false,
+          "phet": "withAnalytics",
+          "expect": {
+            "stop": null,
+            "shown": 1,
+            "problems": [],
+            "kept": true,
+            "keptHasNo": "cloudflareinsights"
+          }
+        },
+        {
+          "name": "PhET answers in a shape nobody foresaw",
+          "kept": false,
+          "phet": "oddAnswer",
+          "expect": {
+            "stop": "damaged",
+            "shown": 0,
+            "problems": [],
+            "kept": false
+          }
+        }
+      ],
+      "passFails": {
+        "rule": "A fault in the pass ITSELF, not in a download (an answer of a shape nobody foresaw that slips past the checks, a full disk, a folder that cannot be written): when any page students can see shows a simulation, the build STOPS with reason notReady (keptDownloads.stop.first.notReady), naming each simulation and page it can still find; with none, the build carries on, as nothing is missing. When the visibility rule itself fails, every Markdown file of the course is read as text for its fences. When even that cannot be told, the build stops naming nothing. Never only a console line: a site that says it built and shows a code block where the page promises a simulation is the fault the ruling's stop exists to prevent (implementation review, 2026-11-13). The console line before the stop gives the plain reason only (a full disk's words), never a path.",
+        "cases": [
+          {
+            "name": "the pass fails on a page that shows a simulation",
+            "fails": "prepare",
+            "pages": {
+              "Unit 3/Gas Laws.md": "Gases.\n\n```phet\nsim: gas-properties\nalt: Pump gas into a box.\n```\n"
+            },
+            "expect": {
+              "stop": "notReady",
+              "lines": [
+                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.",
+                "   “gas-properties” on “Unit 3/Gas Laws”",
+                "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}"
+              ]
+            }
+          },
+          {
+            "name": "the pass fails and no page shows a simulation",
+            "fails": "prepare",
+            "pages": {
+              "Unit 1/Welcome.md": "Welcome to the course.\n"
+            },
+            "expect": {
+              "stop": null
+            }
+          },
+          {
+            "name": "the visibility rule itself fails, and the fences are read from the files",
+            "fails": "pages",
+            "pages": {
+              "Unit 3/Gas Laws.md": "~~~phet\nsim: gas-properties\n~~~\n"
+            },
+            "expect": {
+              "stop": "notReady",
+              "lines": [
+                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.",
+                "   “gas-properties” on “Unit 3/Gas Laws”",
+                "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "quizzes": {
+      "rule": "As geogebraFences.quizzes, for the same reason: a simulation works in a self-check question's QUESTION (before the choices) and in its EXPLANATION, and is REFUSED in a CHOICE (quizCallouts.words.problems.simulationInAChoice, in quizCallouts.recognise.order straight after sketchInAChoice), found by quizzes.py (a ```phet or ~~~phet fence opened inside an item of the quiz's boxed list, a callout in the item included) and by the site (quizRules.QuizModel.simulationInAChoice: a plantoirPhet node, or a phet code block the build could not show, inside an item of the first boxed list), whether or not the simulation itself can be shown, so the two agree. The cases are quizCallouts.recognise's aSimulationInAChoice, aSimulationInACalloutInAChoice and aSimulationInTheQuestion. A quiz page's search text reads a card as its description alone (withoutAnswers).",
+      "whyNotInAChoice": "A choice is a click target: its label wraps the box, so a tap on the simulation's button, or inside the simulation, would toggle the answer; and the shuffle moves the choices, which would reload a simulation a student had open."
+    },
+    "attribution": {
+      "rule": "PhET's licence (https://phet.colorado.edu/en/licensing, read 2026-11-13): the simulations are CC BY-NC 4.0, free for any non-commercial use by students and educators, classroom use included, and a copy shared must carry `sentence` \"as close as possible to the point of use\", human-readable, unmodified (translations allowed). Under every card on screen: `sentence`, its licence name linked to licenceUrl (rel=license) and its address linked; on paper the same sentence as plain text. ABOUT.txt carries it with the copy. The PhET logo stays visible: the frame is never cropped (documentation/06 S).",
+      "sentence": "Simulation by PhET Interactive Simulations, University of Colorado Boulder, licensed under CC BY-NC 4.0 (https://phet.colorado.edu).",
+      "licenceName": "CC BY-NC 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-nc/4.0/",
+      "siteUrl": "https://phet.colorado.edu",
+      "termsUrl": "https://phet.colorado.edu/en/licensing"
+    },
+    "pastedFrames": {
+      "rule": "A page that pastes PhET's own frame (an iframe from phet.colorado.edu, which the page-authoring guidance used to teach) keeps working unchanged - it is the teacher's own HTML - and the build says on a `plantoir: note:` line that it reports to PhET and Google from every student's browser, and that a phet block shows the site's own copy instead (pastedPhetFrame). REJECTED: rewriting the frame (the teacher's HTML), or adding yotta=false to it (it would still load from PhET).",
+      "pattern": "<iframe\\b[^>]*\\bsrc\\s*=\\s*[\"']?\\s*https?://phet\\.colorado\\.edu/"
+    },
+    "isolation": "static/phet is one of codeRunnerBlocks.isolation.engineFolders: a page isolated for live input (COOP and COEP) opens a same-origin frame only when the frame's document carries COEP too. Measured 2026-11-13 in both engines: with no header on the simulation's file the frame never opened (WebKit: Refused to display ... because of Cross-Origin-Embedder-Policy); with it, it opened in 601 to 644 ms and asked nothing off the site. The card itself is a picture and a button, so it never stops a page from being isolated (notLive).",
+    "words": {
+      "note": "English, as data: the site's words appear on a page students read; the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {size} is site.size filled; {megabytes} the simulation's size as a browser downloads it (gzipped), one decimal; {title} the simulation's title in the page's language; {name} a setting's name; {value} what it was given; {sim} a simulation's name; {near} up to three close names, joined with commas; {language} a language as PhET writes it; {count} a number. The loader's own bound is 60 s, after which couldNotLoad is said.",
+      "site": {
+        "open": "Open the simulation ({size})",
+        "size": "about {megabytes} MB",
+        "loading": "Opening the simulation…",
+        "loadingFirstTime": "The first time, this can take up to a minute.",
+        "couldNotLoad": "This simulation couldn't be opened. Check the connection, then try again.",
+        "untitled": "A PhET simulation: {title}.",
+        "printNote": "On the class website, this simulation can be opened and used."
+      },
+      "reasons": {
+        "simulationNotNamed": "there is no sim: line - add one with the simulation's name from its address on phet.colorado.edu, such as gas-properties",
+        "simulationNotUnderstood": "“{value}” isn't a PhET simulation's name or its address - the name is the last part of the simulation's address on phet.colorado.edu, such as gas-properties",
+        "simulationNotFound": "PhET has no simulation called {sim} - the name is the last part of the simulation's address on phet.colorado.edu",
+        "simulationNotFoundNear": "PhET has no simulation called {sim} (the closest it has: {near})",
+        "screensNotUnderstood": "screens: needs the screens' numbers, such as 1, 2, not “{value}”",
+        "localeNotUnderstood": "locale: needs a language, such as fr or fr-CA, not “{value}”",
+        "missingAlt": "it has no alt: line, so the card describes it only by its title",
+        "unknownSetting": "{name} isn't a setting of a phet block, so it was left out",
+        "notInThisLanguage": "{sim} has no version in {language} yet, so it shows in English",
+        "pastedPhetFrame": "this page shows a PhET simulation in a frame from phet.colorado.edu, which reports to PhET and Google from every student's browser - a phet block shows the class website's own copy instead"
+      }
+    },
+    "knownLimits": [
+      "The attribution is in English on every page, French courses included (PhET allows a translation; none is written yet).",
+      "A simulation's sounds play after a student touches it; nothing turns them off (it is part of the simulation, and not ruled on).",
+      "Obsidian shows the block as a code block (no Obsidian plugin reads ```phet).",
+      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Whether Netlify takes a long header whole (twenty simulations' worth, 421 hashes, a 22,766-character line) is measured with a credentialed test site before this piece merges (documentation/07). A pass says a line of that length is served whole; it does not say where Netlify's limit lies."
+    ]
+  },
   "previewStartPage": {
     "note": "GitHub #504 (v1.7.1, mac first; Russell's comment of 2026-10-11 is binding). A teacher who stops a preview to change something and starts it again lands on the front page and has to click back to where they were. An app-wide setting now chooses where a press of Preview opens - the site's front page (the default, what Preview always did) or the page last viewed in that section's preview - and holding Option (Alt on Windows) while pressing does the OPPOSITE. The button and the menu item are TITLED by what a press will do, the setting's choice or, while the modifier is held, the other (decision 504-2). documentation/09-mac-app.md -> 'Opening the preview at the page last viewed (#504)' says what was measured and rejected.",
     "rule": "THE PRESS DECIDES, THE APP OPENS. Where the site opens is opensAt = setting XOR modifierHeld, read at the moment of the press - from the keyboard for the toolbar button, from which of the two items was chosen for the menu. Only the TEACHER's press of Preview (the toolbar button, Section > Preview and its alternate) can ask for the page last viewed; every other way a preview starts - the assistant, Rebuild Preview, Course Settings' Preview Again, Start of the Year, a repair - opens the front page as before. The launcher is never told a page: the preview starts exactly as it always did, and once the site's root answers 200 the app asks the remembered page's address on the same server and opens it if it answers 200; a 404 or 410 means it is gone and the front page opens; anything else - a timeout, an error, another status - is asked again, `attempts` times in all, and then the front page opens. A request made while the server rebuilds WAITS for the build rather than failing (measured, Quartz v4.5.0 handlers.js), which is why silence is retried and not read as 'gone'. Falling back is SILENT on screen - no dialog, no band - and says why on the trail (activityTrail -> 'preview started at the page last viewed'). A Show on Front Page answer to the question about today's class (#397) that wrote the page opens the FRONT page whatever was asked: the teacher has just asked to change it. WHAT IS REMEMBERED is the PATH below the site's root (no query, no fragment, percent-encoded as it arrived; '' for the front page), per working folder, course and section, across quits - and ONLY from the teacher's own navigations in the app's preview pane: a click, Back, Forward. The app's own loads - the first page of a fresh build, Reload, Rebuild Preview, a restart by the assistant - never change it, or the first rebuild would erase the page being read. An address on another site, another port, or no address at all is ignored and leaves what was remembered alone. A page opened in the teacher's web browser is not observable and is not remembered.",
@@ -31684,7 +32777,8 @@
       },
       "engineFolders": [
         "static/pyodide",
-        "static/swift"
+        "static/swift",
+        "static/phet"
       ],
       "engineRule": "The engine's own folder carries COEP too, every file in it: Chrome checks the worker script, and Safari also every module the worker imports (#583 gotcha 2, measured: COEP on the two worker files alone failed in Safari, and none on the engine failed in Chrome). It costs nothing on a page that is not isolated (measured in both browsers). Written only for an engine the site carries; static/swift-wasm/ is fetched by the worker from the same site and needs nothing.",
       "notLive": "Read from the BUILT page (public/<page>.html), outside scripts' and styles' text and comments, tag and attribute names in any case: any iframe, frame, embed or object, from any site (reason `frame`); a cross-origin `src` on video, or on a source without srcset (`frame`); a cross-origin img src or srcset, source srcset, video poster, input type=image src or SVG image href (`picture`); a cross-origin audio or track src, script src, link href whose rel holds stylesheet, preload or modulepreload, or url(...) in a style attribute or a <style> (`other`). Several: frame, then picture, then other is named. CROSS-ORIGIN means an absolute http(s) URL, or a protocol-relative //host one, whose host is not exactly one of allowedHosts; relative, data: and blob: URLs are the site's own. Preconnect, dns-prefetch, alternate and icon links fetch nothing that COEP blocks and are not read.",
@@ -31852,6 +32946,7 @@
       ],
       "spa": "Quartz's router (spa.inline.ts, patched with the marker PLANTOIR-ISOLATION-NAV) loads a page WHOLE when the fetched page's Cross-Origin-Embedder-Policy (require-corp or not) disagrees with this document's crossOriginIsolated. A document's isolation is fixed when it is made, so morphing a runner page in from a plain page would leave it not isolated, and morphing a plain page in from a runner page would carry COEP to it and block its frames. Back and forward take the same path (location.assign to the address already shown replaces it and adds no history entry - review). Where no host sends the headers (a folder publish) it never fires. Cost: one load, from cache, only when crossing.",
       "cases": [
+        {"name": "a block that reads input beside a PhET simulation's card (#674)", "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"input()\"><pre><code>input()</code></pre></div><figure class=\"pl-figure pl-phet\" data-phet-key=\"k1\" data-phet=\"{&quot;sim&quot;:&quot;gas-properties&quot;}\"><div class=\"pl-phet-card\"><img class=\"pl-phet-picture\" src=\"../static/phet/gas-properties/screenshot.png\" alt=\"\"/><button type=\"button\" class=\"pl-phet-open\">Open the simulation (about 1 MB)</button></div><p class=\"pl-phet-attribution\">Simulation by PhET Interactive Simulations, University of Colorado Boulder, licensed under <a href=\"https://creativecommons.org/licenses/by-nc/4.0/\" rel=\"license\">CC BY-NC 4.0</a> (<a href=\"https://phet.colorado.edu\">https://phet.colorado.edu</a>).</p></figure>", "verdict": "live", "readsInput": true, "why": "The card is a picture of the site's own and a button; its frame is made only by a tap, from static/phet/ on the same site, which carries COEP too (engineFolders), so the page is still isolated and the simulation still opens (phetFences.isolation)."},
         {
           "name": "a page with no runnable block",
           "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><p>Loops</p>",
@@ -33652,6 +34747,7 @@
         "twoAnswers",
         "choicesAndAnswer",
         "sketchInAChoice",
+        "simulationInAChoice",
         "oneChoice",
         "noCorrectChoice",
         "noAnswerLine",
@@ -34240,6 +35336,43 @@
           "quizzes": [
             {
               "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSimulationInAChoice",
+          "markdown": "> [!quiz] Which simulation shows a gas?\n> - [x] This one\n>   ```phet\n>   sim: gas-properties\n>   alt: A box of gas, in a choice.\n>   ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "simulationInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSimulationInACalloutInAChoice",
+          "markdown": "> [!quiz] Which simulation shows a gas?\n> - [x] This one\n>   > [!note] The simulation\n>   > ~~~phet\n>   > sim: gas-properties\n>   > alt: A box of gas, in a note in a choice.\n>   > ~~~\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "simulationInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSimulationInTheQuestion",
+          "markdown": "> [!quiz] Pump in more gas. What happens to the pressure?\n> ```phet\n> sim: gas-properties\n> alt: A box of gas, in a question.\n> ```\n> - [x] It goes up\n> - [ ] It goes down\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
               "line": 1
             }
           ],
@@ -34985,6 +36118,7 @@
         "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
         "sketchInAChoice": "a GeoGebra sketch sits inside one of its choices, where dragging the sketch would pick that choice - put the sketch in the question, above the choices, or in its explanation",
+        "simulationInAChoice": "a PhET simulation sits inside one of its choices, where a tap on the simulation would pick that choice - put the simulation in the question, above the choices, or in its explanation",
         "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
       "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"
@@ -38215,7 +39349,8 @@
       "PLANTOIR_REPAIRED:",
       "PLANTOIR_LINKS_CHECKLIST:",
       "PLANTOIR_SWIFT:",
-      "PLANTOIR_CLOUDFLARE_REMADE:"
+      "PLANTOIR_CLOUDFLARE_REMADE:",
+      "PLANTOIR_DOWNLOADED:"
     ],
     "boundedNote": "PLANTOIR_CLOUDFLARE_REMADE: is space-separated rather than JSON (deploy.py) and names one project and one address. The others carry counts, one page or one reason. scripts/test_machine_line_length.py holds each under the cap at its worst plausible size, so a list added to one of them later is caught there.",
     "why": "The mac's kernel pseudo terminal never splits a line, but Windows' pseudo console has a width: a line longer than the console that wraps on the bottom row while Quartz's spinner redraws comes back as two lines (CR LF, a cursor move, then the rest), and its reader gets a cut-off JSON head and records nothing (#662, measured 2026-10-23 on a Lenovo 20QES70500, i5-8365U, Windows 11 Pro 26200: a 611-character finding split at 400 columns). #662 widened the app's console to 8,192 columns, the widest Windows PowerShell 5.1 can afford (documentation/12 -> How wide the console is, and why), but nothing bounded the lines: PLANTOIR_DATED: names every re-dated page, about 40 characters each, so roughly 200 pages pass 8,192; PLANTOIR_MAPS: every map; a ten-block health finding is about 2,300. 4,000 is half the narrowest of the limits a line meets on the way, because 'characters' are counted three ways: Python counts code points, the app's carry guard (ScriptRunner, 8,000) counts UTF-16 units, and the console counts cells, and a CJK character or an emoji is two of either; so 2 x maxCharacters must fit both 8,000 and ConPtyProcess.LauncherColumns, which the Windows suite pins. A cap protects any future reader with a width, not only Windows'.",
@@ -38482,6 +39617,7 @@
       {"kind": "runnableCodeShownAsPlainCode", "label": "Runnable code", "scope": "page", "from": "site", "facts": "site_disagreements", "identity": ["page", "language", "key"], "page": "page", "item": "blocks"},
       {"kind": "quizzesReadDifferently", "label": "Self-check question", "scope": "page", "from": "site", "facts": "quiz_disagreements", "identity": ["page", "n"], "page": "page", "item": "quizzes"},
       {"kind": "geogebraSketchesNotReady", "label": "GeoGebra sketch", "scope": "page", "from": "build", "facts": "geogebra_problems", "identity": ["page", "key"], "page": "page", "item": "sketches"},
+      {"kind": "phetSimulationsNotReady", "label": "Science simulation", "scope": "page", "from": "build", "facts": "phet_problems", "identity": ["page", "key"], "page": "page", "item": "simulations"},
       {"kind": "filesTooLargeForCloudflare", "label": "File too large", "scope": "section", "from": "deploy", "identity": ["file"]}
     ],
     "kindsRule": "Every siteHealth.checks name is a kind, plus filesTooLargeForCloudflare (a deploy's refusal, worded by deployRefusals - not a siteHealth check, because no build reports it and nothing about it is a PLANTOIR_HEALTH: line). `facts` names the list a list check reads (siteHealth.findings' facts); its maker is called once per item with that item alone, and `item` is the placeholder of the check's detail that the item fills, so the row's `item` is exactly the piece the folder problem names. A kind with no `facts` is one row, the finding as it stands, with no page. A row's id is the kind and each `identity` field's value joined by |, an absent value as nothing - never a line number, which moves when the teacher types above it. A figure, a GeoGebra sketch, a Swift program and a block of runnable code are identified by their content - the fence's key, the program's key, the code hashed (site_said.facts_from_site) - rather than their place among the page's blocks (plan review, MED 5; implementation review L7: inserting a block above a broken one renumbers it, which would read as one new problem and one gone, and raise the alert for nothing). A self-check question keeps its place (`n`): its content is not in hand where either the folder check or the site's safety net reports it, and a nested one has no number at all, so inserting a question above a broken one still reads as one new and one gone - a named limit (knownLimits). An id met a second time in one record gets #2, #3 after it (two quizzes nested on one page have no number; plan review, LOW 10). `page` is the field the table's Page column shows; `scope` says what it shows for a kind with no page (words.wholeSection, words.wholeCourse).",
@@ -38515,7 +39651,7 @@
     },
     "rowState": {
       "rule": "A row is `current`, or `fixedInTheSource` when ALL of these hold (#717 ruling 11): (1) the row's kind is in clearsAcrossSections; (2) the row's reason is not in notAboutThePage for its kind; (3) of the course's OTHER sections, take the records whose pagesShown holds the row's page, and of those the LATEST alone - never any clean one (implementation review L1: Section 2 clean at 10:00 proves nothing once Section 3 has broken it again at 11:00); (4) that record is later than this one; (5) that record has NO row of the same kind on that page - not merely no row with this id, because the id of a renumbered fence is not the id of the fence it was (plan review, MED 5); (6) for a kind whose `from` is site, that record's siteSaidComplete is true. A fixedInTheSource row stays in the table, says words.fixedInTheSource instead of its item, and keeps the section's marker on: that section's deployed site still carries the broken page until its OWN next build.",
-      "clearsAcrossSections": ["pageSettingsUnreadable", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady"],
+      "clearsAcrossSections": ["pageSettingsUnreadable", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady", "phetSimulationsNotReady"],
       "clearsAcrossSectionsWhy": "The kinds that depend on the page alone. NOT linksIntoHiddenPages, which depends on what THIS section hides; not the whole-section or whole-course kinds; not a deploy's refusal.",
       "notAboutThePage": {
         "figuresCouldNotBeDrawn": ["tookTooLong", "engineMissing", "graphEngineMissing", "drawingEnded"],

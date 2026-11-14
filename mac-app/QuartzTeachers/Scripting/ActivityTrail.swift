@@ -1617,6 +1617,19 @@ nonisolated enum ActivityTrail {
         /// ready, and this says whether that was the network, the disk or
         /// the download.
         case swiftCouldNotBeGotReady = "Swift could not be got ready"
+
+        // ---- Files a page downloads the first time it uses them (#674) ----
+
+        /// A build downloaded what its pages use for the first time and kept
+        /// it on this computer for later builds: how many of what kind (a
+        /// science simulation), how many megabytes and seconds, read from the
+        /// build's `PLANTOIR_DOWNLOADED:` line by `KeptDownloadsReport`. It
+        /// dates when the computer gained them and why one build was slower.
+        case filesForTheSiteDownloaded = "files for the site downloaded"
+        /// A build STOPPED because something its pages use was not on this
+        /// computer and could not be downloaded (`keptDownloads.stop`): how
+        /// many of what kind, and why, as offline, damaged or notReady.
+        case filesForTheSiteCouldNotBeDownloaded = "files for the site could not be downloaded"
     }
 
     // MARK: - Stored properties

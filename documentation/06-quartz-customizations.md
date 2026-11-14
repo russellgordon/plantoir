@@ -4955,13 +4955,14 @@ browsers, on the deployed sites (#597)").
 |---|---|
 | `browser-checks/rendered_features.mjs` | the checker: `--site <folder>` serves a built site itself, `--base <url/> --host <name>` reads a deployed one; `--expect-red <sabotage>\|all` proves the rows see |
 | `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host, `refusedByDesign`. Data both platforms run |
-| `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
+| `browser-checks/fixtures/rendered/` | twelve Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor, Simulation) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
 | `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, sent to browsers only) from the site's own script refused; `test_refused_by_design.mjs` beside it |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
+| `browser-checks/lib/plant_phet.py` | `fetch` downloads the Simulation page's PhET simulation once into the dev cache (`PLANTOIR_PHET_CACHE`, else `~/Library/Caches/Plantoir-dev/phet`), refusing a file whose SHA-256 is not the one `rendered_rows.json` pins; `plant` puts it where a build keeps its downloads, so the fixture build asks PhET nothing (#674). Run `fetch` once per Mac: with no copy the Simulation page is left out and its rows are SKIPS by name, and with `PLANTOIR_REQUIRE_ENGINES` set a missing copy is a FAILURE |
 
 **The rows** are `rendered_rows.json` → `rows`, each with the words it passes
 on: mermaid (drawn, and drawn again after the site's own dark-mode button),
@@ -4969,7 +4970,7 @@ katex, tikz, graph, python (Run, then a line typed live where the host
 isolates the page), swift, quiz (the contract's words), tasks, progress,
 geogebra, geogebra drag, geogebra reset, geogebra keys (#807's three: the
 drag, the reset and keys while lines run), embeds (deployed sites only),
-pdf, print, copy (#759), heading anchor (#604, ported from
+phet (#674), pdf, print, copy (#759), heading anchor (#604, ported from
 `heading_anchor.mjs`), and on every page fonts, clean page and own host;
 cold visit (#625) in WebKit only. Presses are Playwright's own, which wait
 for the element to be visible, still and topmost at its centre and then
@@ -5127,9 +5128,13 @@ clone), applies one sabotage, serves the copy and runs that page's rows in
 both engines; it passes only when the aimed row FAILS with its own reason's
 words and every other row on the page passes, except those the sabotage's
 `alsoRed` names (a missing file is also a console error, so the clean-page
-row is named there, with its reason). All forty sabotages run on every gate
-(the keys one in Chromium only, below), three at a time, each in a browser
-of its own.
+row is named there, with its reason). Every sabotage in `rendered_rows.json`
+runs on every gate (the keys one in Chromium only, below) except one, three at
+a time, each in a browser of its own: forty-six sabotages since #597's second
+half and #674 (counted with `len(sabotages)` on the merged tree, 2026-11-14:
+forty on `dev`, 597b's two and PhET's four), of which `embeds refused` runs on
+deployed sites only, so verify.sh's `--expect-red all` runs forty-five and
+says the forty-sixth in a NOTE line.
 
 Two things made that reliable, both measured 2026-11-13:
 
@@ -5324,6 +5329,138 @@ detaching it would make the one case nothing can answer worse, and ending
 Chrome's main process already ends its helpers (all of them gone within 3 s,
 measured). Ending leftovers by name (`pkill -f Chrome`): it would end a
 browser some other checkout or person started.
+
+## S. PhET simulations (#674, v2.0.0)
+
+A ` ```phet ` fence becomes a card students tap to open a PhET simulation
+from the class site's own copy. The build's half (downloading, keeping, the
+stop) is documentation/05 → "PhET simulations: what the build does" and
+"Files downloaded when a page first uses them"; the contract is
+`contracts/shared-rules.json` → `phetFences`.
+
+### S1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/plantoirPhet.ts`: the transformer, wired straight
+  after GeoGebra's (`_wire_phet_transformer`, anchored on
+  `Plugin.PlantoirGeoGebra()`, idempotent), so the order is Figures,
+  GeoGebra, PhET, Quizzes on a new site and an old one alike
+  (`test_quartz_additions_wiring.py`).
+- `components/scripts/phet.inline.ts` and `components/styles/phet.scss`,
+  carried by `PlantoirMetaLine` as GeoGebra's are. Every style is under
+  `.pl-phet`; the script does nothing until a tap.
+- `cli/plantoirIsolation.mjs`: `ENGINE_FOLDERS` gains `static/phet`.
+
+### S2. Two stages, as GeoGebra's
+
+The markdown stage turns a fence the manifest knows into `<figure
+class="pl-figure pl-phet">` holding only a hidden figcaption (the
+description), an mdast node so the quiz reader sees a figure; a quiz reads
+it by that description alone, never its button or credit line
+(`plantoirQuizzes.ts`, as for a sketch). The html stage puts in the card:
+a box of the simulation's own shape holding its picture, the title in the
+page's language, the description, the button `words.site.open` with the
+gzipped size ("about 1 MB" for gas-properties), the print note and PhET's
+credit line. A fence the manifest does not know stays the code block it
+was. The manifest is keyed by `figures.key_of` in the build and
+`figureRules.keyOf` on the site's mdast code value, GeoGebra's rule reused;
+`phetFences.keys` holds the same fence at the top of a page, in a callout,
+in a list item, with tildes, with Windows line endings and in a quiz's
+explanation, run by `test_phet.py` and, through the site's own Markdown
+reader in Node, by `scripts/check_phet_rules_against_the_site.py`
+(verify.sh, beside GeoGebra's check). The plan named that check and the
+first implementation left it out; the implementation review found the gap
+(a callout fence the two read differently would build as "ready" and show
+as code, with no folder problem), and it was put back.
+
+**In a self-check question** (`phetFences.quizzes`), as for a sketch: a
+simulation works in the question and in the explanation, and one inside a
+choice makes the quiz `simulationInAChoice` (a folder problem and a
+not-ready quiz), found by `quizzes.py` and by the site's `modelOf`
+(`holdsSimulation`: a `plantoirPhet` node, or a ` ```phet ` code block the
+build could not show) alike. A choice is a click target, so a tap on the
+simulation would pick it, and the shuffle moves the choices, which would
+reload a simulation a student had open. The cases are
+`quizCallouts.recognise`'s `aSimulationInAChoice`,
+`aSimulationInACalloutInAChoice` and `aSimulationInTheQuestion`, which
+verify.sh 6k plants with the others. Must-fail: `quizzes.py` from before the
+check gives the two refusals as working questions.
+
+### S3. A tap
+
+The loader makes ONE frame in the picture's box, at `<root>/static/phet/
+<sim>/?yotta=false&allowLinks=false&locale=…&screens=…`, the box's shape
+being the picture's own (PhET's 600 px pictures are the whole simulation
+window, 600 by 394 for gas-properties) or else PhET's layout bounds,
+1024 by 618. A simulation scales itself to fit its box, so its logo stays
+in view (the licence's brand rule), and the frame takes the picture's place
+without moving anything below it (#756's lesson). The box says the
+simulation is opening, once, in a polite live region. The simulation shows
+when the frame's document has loaded AND is the simulation (its `phet`
+object is there); an error page, a school network's sign-in page or a
+minute with neither says `couldNotLoad` below it and the button works
+again. Quartz's page change replaces the body and the frame with it,
+which frees the simulation's memory; a frame that loads after its page has
+gone marks nothing. Nothing is fetched before a tap but the picture.
+
+### S4. Paper, dark theme
+
+A frame prints blank or cropped, so the print styles hide it and print the
+picture, opened or not, with the print note and the credit line as plain
+text. The card follows the theme; the simulation keeps its own colours
+(`colorProfile` is not a teacher's setting).
+
+### S5. Measured (2026-11-13, this Mac, headless Chromium 1243 and WebKit 2359, muted)
+
+On a site made with the real `phet.py` (from a copy planted as a build
+keeps it), the real transformer and the real loader, served by
+`browser-checks/lib/site_server.mjs` under the publish's own `_headers`
+(isolation, then Netlify's policy): the rendered check's `phet` row passed
+in both engines. A real press opened gas-properties 1.1.12 in 0.4 s
+(WebKit) and 0.6 s (Chromium) on a page isolated for live input; inside the
+frame the simulation read `yotta` and `allowLinks` false, `fr` and one
+screen; the frame was 758 by 497 inside its box; the own-host row saw
+nothing asked of any other host. Its four sabotages each turned it red for
+its own reason in both engines: the address without `yotta=false`
+(own-host red too: the simulation asked other hosts), the `/static/phet/*`
+header taken out (never opened; "This simulation couldn't be opened"), the
+box held at 120 px ("cropped: 758 x 118"), the credit line taken out. The
+full fixture build is verify.sh 6h-r's (Deferred to the gate on the day it
+was written).
+
+### S6. Rejected
+
+- Loading the simulation from phet.colorado.edu in the frame (what a pasted
+  frame does): four requests to PhET and Google from every student's
+  browser, and no simulation on a network that blocks PhET.
+- A frame on the page before a tap: a 3 MB file for every visitor of the
+  page, most of whom never open it.
+- `sandbox` on the frame: the simulation is the site's own file on the site's
+  own host, and with `allowLinks=false` nothing in it leaves the site.
+- Printing the frame: blank or cropped in both engines.
+- A height setting: the box takes the simulation's own shape.
+
+### S7. Known limits
+
+- The credit line is in English on every page, French courses included.
+- A simulation's sounds play after a student touches it (part of the
+  simulation; not ruled on). The rendered check holds every frame's audio
+  suspended.
+- Each simulation adds about 21 hashes (about 1 KB) to the policy a Netlify
+  publish sends with every file of the site (documentation/07). Whether
+  Netlify serves a long one whole is measured before this piece merges.
+- On a deployed site the rendered check meets the Simulation page like any
+  other fixture page (`rendered_rows.json` → `pages`), and verify-deploy.sh's
+  build downloads the simulation from PhET as a teacher's first build does:
+  nothing plants the dev cache's copy there. Measured 2026-11-14 on a stand-in
+  for Netlify's edge (the simulation's own copy and a page holding its frame,
+  served by `site_server.mjs` under the publish's `_headers`, an inline script
+  added to every document a browser was sent), headless Chromium 155 and
+  WebKit 2359: the simulation started under the policy (French, one screen,
+  `yotta` false, on an isolated page), and the only refusal was the added
+  script, once in the page and once in the frame. Before the checker counted
+  a site's own frame's document, that second line failed the clean-page row
+  ("2 refusal lines ... account for 1"); `refusedByDesign` is unchanged. Whether
+  real Netlify adds its badge to a frame's document is not measured yet.
 
 ## E. Summary: what is *not* customized
 

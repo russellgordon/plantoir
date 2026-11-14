@@ -2958,7 +2958,7 @@
      ],
      "scenes": 2,
      "readMinutes": 2,
-     "notes": "",
+     "notes": "Facts the page must carry (#674): the four keys sim, alt, locale, screens and their defaults; the first build that uses a simulation needs the internet and later ones do not; one copy serves every course in the working folder; a build with no internet and a simulation not downloaded yet stops and names the page and the simulation (keptDownloads.stop); a fault while making the simulations ready also stops (notReady), and points at the Help menu's Report a Problem item (helpReportAProblem); preview once after adding a simulation, before scheduling a deploy; a course left unbuilt about 90 days (a summer) needs the internet again; a working folder moved or renamed, copied to a new computer, or opened on the other platform starts with nothing kept, so preview once with the internet after moving it; a simulation in a self-check question works in the question and the explanation, not in a choice (Problems tab, Self-check question); a misspelt name is a Problems tab row of the kind Science simulation; the credit line and the licence in plain words (free for teaching, not for anything sold or carrying ads); nothing is sent to PhET from students' browsers; a pasted PhET frame still works but contacts PhET and Google.",
      "id": "phet",
      "section": "What a page can show",
      "status": "new",

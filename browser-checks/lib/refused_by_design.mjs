@@ -95,7 +95,9 @@ export function policyAllows(header, text) {
 
 // Sorts the refused inline scripts of one page.
 //   documents  every document the page was sent (its first load, a row's
-//              reload, the next page a row went to), each
+//              reload, the next page a row went to, and a frame's document
+//              from the site's own host, such as a PhET simulation's copy,
+//              #674, listed first so the page's own is last), each
 //              { policy, received, served }: its Content-Security-Policy
 //              header, its HTML as the browser received it, and its HTML as
 //              the host serves it to a client that is not a browser

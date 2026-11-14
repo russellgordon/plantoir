@@ -567,6 +567,21 @@ no inline script is added and no new hash is needed. Cloudflare Pages sets no
 policy. Not yet measured on the live hosts; `verify-deploy.sh` is where that
 is done before the release.
 
+**A PhET simulation's inline scripts are hashed too (#674).** A simulation
+is a single web page full of inline scripts, carried at
+`static/phet/<sim>/index.html`; `_collect_inline_script_policy` reads every
+built `.html`, so their hashes join the policy with no change to it. The
+cost, measured 2026-11-13: gas-properties adds 22 hashes, projectile-motion
+20, none shared, so each simulation adds about 1 KB to a header Netlify
+sends with EVERY file of the site; a site with gas-properties alone wrote a
+policy line of 1,247 characters. Netlify's limit on one `_headers` value was
+not found documented. It is measured before this piece merges, with a test site
+carrying twenty simulations' worth of hashes fetched back whole; if Netlify
+refuses or cuts it, the fallback is to move each simulation's inline scripts
+into files beside it at build. No host is added: a simulation loads no
+script from another site (`phetFences.download.checks`), and the analytics
+script PhET's servers sometimes add is taken out before it is kept.
+
 (Until #494 the host list ended `https://cdn.jsdelivr.net`, because Quartz
 linked KaTeX's copy-tex script from there on every page. Since every site
 serves KaTeX itself (06 → C2-26), that script is `'self'` and the host falls
@@ -854,8 +869,10 @@ that test rather than shipping a silent regression.
 A page whose runnable code can ask for input, and that shows nothing from
 another website the headers would break, is sent
 `Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`; `static/pyodide/*` and
-`static/swift/*` get COEP (06 → I11 says why each, and what was measured).
+`Cross-Origin-Embedder-Policy: require-corp`; `static/pyodide/*`,
+`static/swift/*` and, since #674, `static/phet/*` (a PhET simulation's own
+file, which a frame on an isolated page opens only when it carries COEP
+too) get COEP (06 → I11 and S say why each, and what was measured).
 `deploy.py` writes them as ONE marked block in `public/_headers`
 (`isolation_headers.publish_headers`), replaced on every publish:
 
@@ -3490,6 +3507,43 @@ must-fail on copies of the script: with a plain run asking once, with a
 leg's failures ignored, with the section running over the legs' entries
 instead of the list, and with a skip read as a pass, the matching cases fail
 (the counts are in the closing note).
+
+**The Simulation page on a deployed site (#674).** The fixture pages are
+`rendered_rows.json` → `pages`, so since #674 there are twelve, the
+Simulation page among them, and the `phet` row runs on every host the
+section renders (it names no `hosts`). verify-deploy.sh plants no PhET copy:
+the section's build downloads the simulation from PhET the way a teacher's
+first build does, so a run with PhET unreachable stops at that build
+(`phetFences.stop`) rather than skipping the row. The self-test reads the
+page count from the file (`rendered_pages | wc -l`) instead of typing it;
+typed as 11 it failed two cases the day the twelfth page arrived.
+
+Netlify's policy hashes the simulation's own inline scripts with the rest
+(above, "A PhET simulation's inline scripts are hashed too"). Measured
+2026-11-14 on a stand-in for Netlify's edge (the policy and isolation
+headers as the publish writes them, an inline script added to every
+document a browser was sent), Chromium 155 and WebKit 2359: the simulation
+started, French, one screen, on an isolated page, and nothing was refused
+but the added script, once in the page and once in the simulation's frame.
+The clean-page row used to read only the page's own documents, so that
+second line was one more than the page's documents could account for, and
+the row failed the Simulation page. It now reads every document of the
+site's own host that a frame of the page was sent as well (listed before
+the page's, so the page's last document still judges the scripts it holds),
+and each such document may carry one badge, as a page may. Nothing was
+added to `refusedByDesign`. A frame document whose own script the policy
+does not list still fails, naming it (`test_refused_by_design.mjs`). Whether
+real Netlify adds its badge to a frame's document is not measured; with no
+badge there, the frame's document counts 0 and nothing changes.
+
+What the next credentialed run must show for it, in each engine on both
+hosts: `OK: phet` (opened on a real press from the site's own copy, on an
+isolated page, the credit line under it); the Simulation page among the
+own-host row's EXPECTED pages ("on 12 of 12 pages"); on Netlify the
+Simulation page in the clean-page EXPECTED line with a count of 1, or 2 if
+Netlify badges the frame's document (then say so here); on Cloudflare the
+clean-page row OK on it. So Netlify's line becomes `41 OK, 0 FAIL, 0
+SKIPPED, 8 EXPECTED` where it read 39 OK: one `phet` result an engine.
 
 ## The scheduled task never refuses over FOLDER PROBLEMS
 

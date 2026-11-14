@@ -239,6 +239,8 @@ def verdict(model: dict) -> dict:
         return problem("choicesAndAnswer")
     if has_choices and model.get("sketchInAChoice"):
         return problem("sketchInAChoice")
+    if has_choices and model.get("simulationInAChoice"):
+        return problem("simulationInAChoice")
     if has_choices:
         if len(model["choices"]) == 1:
             return problem("oneChoice")
@@ -411,6 +413,18 @@ def _fence_language(body: str) -> str:
 # A ```geogebra fence's language (geogebra.LANGUAGE; not imported, so this
 # file stays free of the sketches' own module).
 SKETCH_LANGUAGE = "geogebra"
+# A ```phet fence's language (phet.LANGUAGE, #674): a simulation in a choice
+# is refused as a sketch is (phetFences.quizzes).
+SIMULATION_LANGUAGE = "phet"
+
+
+def _note_a_figure_in_a_choice(state: dict, language: str) -> None:
+    """A GeoGebra sketch or a PhET simulation opened inside a choice:
+    refused if this list turns out to be the quiz's choices."""
+    if language == SKETCH_LANGUAGE:
+        state["listHasSketch"] = True
+    elif language == SIMULATION_LANGUAGE:
+        state["listHasSimulation"] = True
 
 
 def _code_spans(text: str) -> list:
@@ -451,6 +465,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
         "boxedLists": 0, "choices": [], "listKind": None, "listContent": 0,
         "listHasBox": False, "listItems": [], "stem": [], "blanks": _blanks_in(title),
         "listHasSketch": False, "sketchInAChoice": False,
+        "listHasSimulation": False, "simulationInAChoice": False,
     }
     answers = []
     answer_lines_at = []
@@ -462,10 +477,12 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             if state["boxedLists"] == 1:
                 state["choices"] = list(state["listItems"])
                 state["sketchInAChoice"] = state["listHasSketch"]
+                state["simulationInAChoice"] = state["listHasSimulation"]
         state["listKind"] = None
         state["listHasBox"] = False
         state["listItems"] = []
         state["listHasSketch"] = False
+        state["listHasSimulation"] = False
 
     def close_stem():
         if state["stem"]:
@@ -592,8 +609,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             opened = _fence_opens(text)
             if opened is not None:
                 fence = (opened, 0)
-                if _fence_language(text) == SKETCH_LANGUAGE:
-                    state["listHasSketch"] = True
+                _note_a_figure_in_a_choice(state, _fence_language(text))
             previous_blank = False
             previous_paragraph = opened is None
             index += 1
@@ -604,10 +620,11 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             close_stem()
             if not in_item:
                 close_list()
-            elif _fence_language(body) == SKETCH_LANGUAGE:
-                # A GeoGebra sketch inside a choice (#578 stage 5): refused
-                # if this list turns out to be the quiz's choices.
-                state["listHasSketch"] = True
+            else:
+                # A GeoGebra sketch (#578 stage 5) or a PhET simulation
+                # (#674) inside a choice: refused if this list turns out to
+                # be the quiz's choices.
+                _note_a_figure_in_a_choice(state, _fence_language(body))
             fence = (opened, 0)
             previous_blank = False
             previous_paragraph = False
@@ -626,8 +643,8 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
                     quoted_fence = None
             else:
                 quoted_fence = _fence_opens(body)
-                if quoted_fence is not None and _fence_language(body) == SKETCH_LANGUAGE:
-                    state["listHasSketch"] = True
+                if quoted_fence is not None:
+                    _note_a_figure_in_a_choice(state, _fence_language(body))
         else:
             quoted_fence = None
         if in_item or lazy_in_item:
@@ -657,6 +674,7 @@ def _read_quiz(entries: list, title: str, metadata) -> dict:
             "blanks": state["blanks"],
             "htmlChoices": state.get("htmlChoices", False),
             "sketchInAChoice": state["sketchInAChoice"],
+            "simulationInAChoice": state["simulationInAChoice"],
         },
         "answerLinesAt": answer_lines_at,
         "nestedQuizzes": nested_quizzes,
