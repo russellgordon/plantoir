@@ -4218,12 +4218,13 @@ places.** `scripts/phet.py` does everything that can fail; the contract is
     on a site with gas-properties: 22 hashes and a policy line of 1,247
     characters, sent with every file of the site. Each simulation adds about
     21 hashes (none shared between gas-properties and projectile-motion,
-    measured by the planner). Whether Netlify takes a long header whole is
-    measured before this piece merges with a credentialed test site
-    (documentation/07): twenty simulations' worth, 421 hashes, a
-    22,766-character line; the
-    fallback, if it does not, is to move each simulation's inline scripts
-    into files beside it.
+    measured by the planner). Netlify takes a long header whole, measured
+    on 2026-11-14 with a credentialed test site (documentation/07): a site
+    of 20 stand-in simulations carrying 421 script hashes wrote one policy
+    line of 22,766 characters, and Netlify took the deploy and sent that
+    line whole, once, with each of three answers checked. The fallback,
+    kept for a site past where Netlify's limit lies (not measured), is to
+    move each simulation's inline scripts into files beside it.
 13. **Image.** `scripts/` and `support/` change, so every working folder
     makes its builder again once; no layer and no download are added to the
     image.

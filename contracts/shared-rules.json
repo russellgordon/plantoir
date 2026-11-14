@@ -32264,7 +32264,7 @@
       "The attribution is in English on every page, French courses included (PhET allows a translation; none is written yet).",
       "A simulation's sounds play after a student touches it; nothing turns them off (it is part of the simulation, and not ruled on).",
       "Obsidian shows the block as a code block (no Obsidian plugin reads ```phet).",
-      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Whether Netlify takes a long header whole (twenty simulations' worth, 421 hashes, a 22,766-character line) is measured with a credentialed test site before this piece merges (documentation/07). A pass says a line of that length is served whole; it does not say where Netlify's limit lies."
+      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Measured 2026-11-14 on a credentialed test site: a site of 20 stand-in simulations carrying 421 script hashes wrote one policy line of 22,766 characters, Netlify took the deploy and sent that line whole, once, with each of three answers checked (documentation/07). That says a line of that length is served whole; it does not say where Netlify's limit lies."
     ]
   },
   "previewStartPage": {
