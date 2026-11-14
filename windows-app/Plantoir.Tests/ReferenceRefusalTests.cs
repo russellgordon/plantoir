@@ -81,7 +81,7 @@ public class ReferenceRefusalTests : IDisposable
     {
         var runner = new MultiDestinationDeployRunner();
         var refused = await Assert.ThrowsAsync<ReferenceCourse.Refused>(() => runner.RunAsync(Kept, 1,
-            Kept.Configuration.AllDeployDestinations, "", _folder, needsBuild: true));
+            Kept.Configuration.AllDeployDestinations, "", _folder, buildReason: BuildFreshness.ReasonPages));
         Assert.Equal(Refusal, refused.Message);
         Assert.False(runner.IsRunning);
     }
@@ -265,7 +265,12 @@ public class ReferenceRefusalTests : IDisposable
     {
         string program = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "Program.cs"));
         Assert.Contains("AddCallToolFilter", program);
-        Assert.Contains("ReferenceWriteGate.Refusal(", program);
+        // Since #885 the filter asks MissingArguments.InFrontOfTheTool, which
+        // runs this gate (and OutsideChangeGate) before its own refusal;
+        // MissingSectionTests pins that order by behaviour and by source.
+        Assert.Contains("MissingArguments.InFrontOfTheTool(", program);
+        string front = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "MissingArguments.cs"));
+        Assert.Contains("ReferenceWriteGate.Refusal(", front);
     }
 
     /// <summary>A stand-in tool type with one write tool nobody listed.</summary>
@@ -368,17 +373,39 @@ public class ReferenceRefusalTests : IDisposable
 
     /// <summary>
     /// <c>scheduledDeployCancellation</c>: "a course kept for reference is met
-    /// when the working folder is read" — its alarm is turned off by the read.
+    /// when the working folder is read" — its alarm is turned off by the read,
+    /// and the trail says so once (<c>activityTrail.mustRecord</c> →
+    /// <c>scheduled deploy turned off</c>, carrying the course, the section and
+    /// why). A second read finds nothing to turn off and writes nothing more.
     /// </summary>
     [Fact]
     public void ReadingTheFolderTurnsOffAReferenceCoursesDeploy()
     {
-        string task = _scheduler.AddNew(_folder, "ICS3U-2025", 1);
-        string live = _scheduler.AddNew(_folder, "ICS3U", 1);
-        ReferenceCourseUpkeep.BringUpToDate(_folder, Workspace.DiscoverCourses(_folder));
-        Assert.Contains(task, _scheduler.Deleted);
-        Assert.DoesNotContain(live, _scheduler.Deleted);
-        Assert.True(ReferenceLock.IsLocked(Path.Combine(Kept.DirectoryPath, "section1", "index.md")));
+        string trail = Path.Combine(_folder + "-trail", "activity.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(trail)!);
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            string task = _scheduler.AddNew(_folder, "ICS3U-2025", 1);
+            string live = _scheduler.AddNew(_folder, "ICS3U", 1);
+            ReferenceCourseUpkeep.BringUpToDate(_folder, Workspace.DiscoverCourses(_folder));
+            Assert.Contains(task, _scheduler.Deleted);
+            Assert.DoesNotContain(live, _scheduler.Deleted);
+            Assert.True(ReferenceLock.IsLocked(Path.Combine(Kept.DirectoryPath, "section1", "index.md")));
+
+            Assert.Equal("scheduled deploy turned off", ActivityTrail.KeyFor(ActivityTrail.Event.ScheduledDeployTurnedOff));
+            string turnedOff = $"ICS3U-2025/1 · turned off: {ReferenceCourseUpkeep.TurnedOffBecause}";
+            Assert.Single(File.ReadAllLines(trail), line => line.EndsWith(turnedOff, StringComparison.Ordinal));
+            Assert.DoesNotContain(File.ReadAllLines(trail), line => line.Contains("ICS3U/1 ·", StringComparison.Ordinal));
+
+            ReferenceCourseUpkeep.BringUpToDate(_folder, Workspace.DiscoverCourses(_folder));
+            Assert.Single(File.ReadAllLines(trail), line => line.Contains("turned off:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+            try { Directory.Delete(Path.GetDirectoryName(trail)!, recursive: true); } catch { }
+        }
     }
 
     /// <summary>The refusal output, read back as the teacher's sentence (<c>app-rules.json → failureExplanations</c> cases 0-2).</summary>

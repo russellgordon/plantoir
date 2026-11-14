@@ -17,6 +17,12 @@ public class ClaudeCodeLauncherTests
         Assert.Contains("Start by listing its sections so we both know what's there.", text);
         Assert.Contains("Before changing anything, use the matching plan tool first and show me what it says, in plain words, and wait for me to agree.", text);
         Assert.DoesNotContain("\"", text);
+        // The whole greeting, the handouts sentence included (#895): the
+        // contract's first greetingHandoutsCases text, which names this course.
+        var first = ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["greetingHandoutsCases"]!["cases"]![0]!;
+        Assert.Equal("ICS3U", first["course"]!.ToString());
+        Assert.Equal("Grade 11 Computer Science", first["courseName"]!.ToString());
+        Assert.Equal(first["text"]!.ToString(), text);
     }
 
     [Fact]

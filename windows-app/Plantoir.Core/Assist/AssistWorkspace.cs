@@ -1698,36 +1698,53 @@ public sealed partial class AssistWorkspace
                 : AssistWording.DeployHasClassesDatedLaterAndNoWindow(course.Code, section.ToString(), titles));
         }
 
-        progress?.Report($"Building Section {section} of {course.Code}…");
         using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy", asker);
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
-                                        _folder, progress, cancellation);
-        if (build.NeededAnAnswer)
-            // The build leg's question is the deploy's, not a destination's:
-            // no destination was reached (the #132 lesson - keep the legs apart).
-            return new AssistResult(false,
-                AppendingFindings(course, section, build, 
-                    AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString())), null);
-        // Refused because the section was still being deployed (#467 / mac
-        // #439): a refused preview.ps1 --build-only exits 1 like a broken
-        // build, so it is asked for FIRST and said as itself. Only the
-        // refusal is the mac's answerWhenTheBuildDidNotFinish here: an
-        // ordinary build failure keeps its own message, which carries the
-        // launcher's output - couldNotBuildBeforeDeploying points at a window
-        // this process does not have (#467 plan review, L2).
-        if (!build.Succeeded && FailureExplainer.SectionDeployRefusalOf(build.Message) is { } buildRefusal)
-            return new AssistResult(false,
-                AppendingFindings(course, section, build,
-                    MultiDestinationDeployRunner.RefusalAnswer(course.Code, section.ToString(), buildRefusal).Message),
-                null);
-        if (!build.Succeeded)
-            return new AssistResult(false,
-                // What the build said about the folders belongs HERE most of
-                // all: a build that failed because the front page is missing
-                // is the case where the finding is the cause.
-                AppendingFindings(course, section, build, 
-                    $"The build failed, so nothing was deployed. {build.Message}"),
-                null);
+
+        // Built first only when something asks for it (#799, Russell's ruling
+        // on #768: every way of deploying reuses the last build when nothing
+        // has changed), as the Deploy button asks, and as the mac's
+        // AssistSiteWork.deploy asks BuildFreshness.whyRebuild. deploy.ps1
+        // asks again for itself (and reads the toolchain stamp, which this
+        // does not), so a reuse here is never the last word.
+        string? buildReason = BuildFreshness.WhyRebuild(course, section, BuildOutputLocation.BuildsRootFor(_folder));
+        LaunchOutcome? build = null;
+        if (buildReason is not null)
+        {
+            progress?.Report($"Building Section {section} of {course.Code}…");
+            var ran = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
+                                          _folder, progress, cancellation);
+            if (ran.NeededAnAnswer)
+                // The build leg's question is the deploy's, not a destination's:
+                // no destination was reached (the #132 lesson - keep the legs apart).
+                return new AssistResult(false,
+                    AppendingFindings(course, section, ran, 
+                        AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString())), null);
+            // Refused because the section was still being deployed (#467 / mac
+            // #439): a refused preview.ps1 --build-only exits 1 like a broken
+            // build, so it is asked for FIRST and said as itself. Only the
+            // refusal is the mac's answerWhenTheBuildDidNotFinish here: an
+            // ordinary build failure keeps its own message, which carries the
+            // launcher's output - couldNotBuildBeforeDeploying points at a window
+            // this process does not have (#467 plan review, L2).
+            if (!ran.Succeeded && FailureExplainer.SectionDeployRefusalOf(ran.Message) is { } buildRefusal)
+                return new AssistResult(false,
+                    AppendingFindings(course, section, ran,
+                        MultiDestinationDeployRunner.RefusalAnswer(course.Code, section.ToString(), buildRefusal).Message),
+                    null);
+            if (!ran.Succeeded)
+                return new AssistResult(false,
+                    // What the build said about the folders belongs HERE most of
+                    // all: a build that failed because the front page is missing
+                    // is the case where the finding is the cause.
+                    AppendingFindings(course, section, ran,
+                        $"The build failed, so nothing was deployed. {ran.Message}"),
+                    null);
+            // The build went through: one line, with why (activityTrail.mustRecord
+            // -> "site built again before deploying"). deploy.ps1 then finds the
+            // build current and writes no second one.
+            ActivityTrail.NoteBuiltBeforeDeploying(course.Code, section, buildReason);
+            build = ran;
+        }
 
         // Every destination's own deploy — one FAILING does not stop the
         // others, the whole point of a course having more than one.
@@ -4603,8 +4620,10 @@ public sealed partial class AssistWorkspace
     /// something the teacher has not answered — so it never promises a sheet
     /// that will not come. Otherwise the finding's own words.
     /// </summary>
-    private static string AppendingFindings(Course course, int section, LaunchOutcome build, string message)
+    private static string AppendingFindings(Course course, int section, LaunchOutcome? ran, string message)
     {
+        // No build (a deploy that reused the last one, #799): nothing found.
+        if (ran is not { } build) return message;
         var findings = build.Findings;
         if (findings is null || findings.Count == 0) return message;
         bool offered = build.LinksChecklist is { } marker

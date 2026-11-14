@@ -75,13 +75,17 @@ namespace Plantoir.Tests;
 /// work a LATER BATCH of that catch-up owns, on the milestone that work shipped
 /// in on the mac (v1.5.0 … v1.7.1). Every one of those must be gone by the
 /// 1.7.1 cut, and that is not left to memory:
-/// <c>NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild</c>
-/// reads <c>&lt;Version&gt;</c> from <c>Plantoir.csproj</c> and fails for any
-/// entry whose milestone is not LATER than the version being built. Setting the
-/// version to 1.7.1 therefore turns every v1.5.0–v1.7.1 entry still here red,
-/// while an entry owed by a genuinely later release (a v2.0.0, say) rightly
-/// survives the cut. This replaced the single "Windows: parity with mac v1.4.0"
-/// milestone, whose burn-down list the ledger was until v1.4.0 shipped.</para>
+/// <c>NamedGapLedgerTests</c> read <c>&lt;Version&gt;</c> from
+/// <c>Plantoir.csproj</c> and failed for any entry whose milestone was not
+/// LATER than the version being built, so setting the version to 1.7.1 turned
+/// every v1.5.0–v1.7.1 entry still here red. Since #862 (2026-11-13)
+/// <c>&lt;Version&gt;</c> names the release in progress, so
+/// <c>NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease</c>
+/// compares with the last release Windows SHIPPED (<c>site.json</c> and
+/// <c>updates/windows.xml</c>), and <c>publish.ps1 -Sign</c> runs it against
+/// <c>&lt;Version&gt;</c> and refuses the cut. This replaced the single
+/// "Windows: parity with mac v1.4.0" milestone, whose burn-down list the
+/// ledger was until v1.4.0 shipped.</para>
 /// </remarks>
 internal static class NamedGapLedger
 {
@@ -187,7 +191,7 @@ internal static class NamedGapLedger
     /// <summary><c>shared-rules.json</c> → <c>activityTrail.mustRecord</c>, by event: an event this app records, whose <c>line</c> it writes in older words (<c>DoorCourseHoldTests.TheTrailLineIsTheContracts</c>); a held line must still differ.</summary>
     internal const string TrailLineSaidDifferently = "shared-rules.json → activityTrail.mustRecord line (said in older words here)";
 
-    /// <summary><c>app-rules.json</c> → <c>outsideAgents.fixWith.greetingCases</c>, by case <c>name</c>: a message that carries <c>greetingHandoutsSentence</c> (#895, the mac's #859), held while it is the contract's message with exactly that sentence left out (<c>FixWithAssistantContractTests.GreetingCases</c>, <c>HeldGreetingCasesAreStillTheContracts</c>).</summary>
+    /// <summary><c>app-rules.json</c> → <c>outsideAgents.fixWith.greetingCases</c>, by case <c>name</c>: a message carrying a sentence the mac added to Fix with…'s text that this app does not say yet, held while it is the contract's message with exactly that sentence left out (<c>FixWithAssistantContractTests.GreetingCases</c>, <c>HeldGreetingCasesAreStillTheContracts</c>). Empty since #895 brought <c>greetingHandoutsSentence</c> here (its six cases were the first held); kept, with its hook, for the next such sentence.</summary>
     internal const string FixWithGreetingCases = "app-rules.json → outsideAgents.fixWith.greetingCases";
 
     /// <summary>
@@ -214,7 +218,8 @@ internal static class NamedGapLedger
 
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
     // parses each entry's milestone as a version and requires it to be LATER
-    // than Plantoir.csproj's <Version>; anything that is not a version fails
+    // than the last Windows release (and, at a signed cut, than
+    // Plantoir.csproj's <Version>, #862); anything that is not a version fails
     // there. (Until 2026-10-15 every entry named one milestone, "Windows:
     // parity with mac v1.4.0", and the ledger was its burn-down list.)
     private const string V150 = "v1.5.0";
@@ -231,9 +236,10 @@ internal static class NamedGapLedger
     /// <param name="Key">The event name or sentence key, spelled as the contract spells it.</param>
     /// <param name="Issue">The open GitHub issue that owns the work.</param>
     /// <param name="Milestone">The milestone that issue carries, spelled as its
-    /// GitHub title ("v1.6.0"). It must be LATER than the version being built,
-    /// which <c>NamedGapLedgerTests</c> checks against <c>Plantoir.csproj</c>,
-    /// so an entry still here when its release is cut fails the suite
+    /// GitHub title ("v1.6.0"). It must be LATER than the last release Windows
+    /// shipped, which <c>NamedGapLedgerTests</c> checks in every run, and later
+    /// than <c>Plantoir.csproj</c>'s <c>&lt;Version&gt;</c> at a signed cut,
+    /// where <c>publish.ps1 -Sign</c> refuses an entry still here
     /// (<c>contracts/README.md</c> → "Named gaps").</param>
     /// <param name="Reason">Why it is not built here yet, in a sentence.</param>
     internal sealed record Entry(string Area, string Key, int Issue, string Milestone, string Reason);
@@ -264,7 +270,6 @@ internal static class NamedGapLedger
     // brought, each owned by the open `windows` issue that builds it later in
     // the same run. Each piece deletes its own entries as it lands, and the
     // ledger fails, naming the entry, the moment a held thing exists here.
-    private const string Reason799 = "a deploy that builds the site again only when something changed is #799's piece of v2.0.0, not built here yet";
     private const string Reason801 = "the course's Planning tab, its unit plans and Plan a Unit are #801's piece of v2.0.0, not built here yet";
     private const string Reason811 = "a section's Coverage tab is #811's piece of v2.0.0, not built here yet";
     private const string Reason820 = "Open in Browser on a unit plan is #820's piece of v2.0.0, not built here yet";
@@ -279,13 +284,15 @@ internal static class NamedGapLedger
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
     private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
     private const string Reason884Naming = "naming the assistant at work through {assistant} needs plantoir-mcp to write the door's key as the assist lease's fifth line (#884 item 7, with WorkLease); until then every Windows hold names none, and the contract's anyAssistant for that names GitHub Copilot, which a Windows teacher cannot open yet, so the older 'Claude or Codex' words stay the true ones";
-    private const string Reason885 = "what plantoir-mcp answers a call that names no section (or no howMany) is #885's piece of v2.0.0 (the mac's #865): measured first, then these sentences where it mis-answers; not built here yet";
-    private const string Reason895 = "every outside door's greeting saying it can make printed handouts (greetingHandoutsSentence, the mac's #859 piece A) is #895's piece of v2.0.0, not built here yet";
     private const string Reason889 ="Open in Browser for a section deployed to a folder is #889's piece of v2.0.0 (the mac's #850), not built here yet";
 
     // #868's held-by-name piece (2026-11-13): the mac's #835 part 3 and #855 merged into dev.
     private const string Reason868Sections = "a build, preview or deploy holding only its own section (a work lease's sixth line, the mac's #835 part 3) is #868's piece of v2.0.0; until it lands every Windows lease holds the whole course and a lease's sixth line is read as course-wide, so no hold here is ever on one section and the course-wide sentence is the true one";
     private const string Reason903 = "setting up Claude Code, Codex or GitHub Copilot from Settings (the mac's #855) is #903's piece of v2.0.0; Windows has no set-up yet, so none can be under way, recorded or quit through";
+
+    // #911's held-by-name piece (2026-11-14): the mac's #897 C and #785a merged into dev.
+    private const string Reason911 = "a one-section restore staged so that a failure part way moves everything back, and says when moving back failed too (the mac's #897 C), is #911's piece of v2.0.0; until it lands Windows' section restore is not staged, so it has no 'stopped part way' outcome to record, and its trail lines are unchanged";
+    private const string Reason912 = "small backups that keep each Media file once in courses/_backups/.shared-media (the mac's #785a) are #912's piece of v2.0.0; until it lands Windows writes no small backup, sweeps nothing and lists no _shared-media name (BackupItem.From refuses every one), so none of these three can happen here";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -312,7 +319,8 @@ internal static class NamedGapLedger
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- step 0 of v2.0.0: activityTrail.mustRecord (22; "course
-        // restored from a backup" is built in step 0 itself, ruling F3).
+        // restored from a backup" is built in step 0 itself, ruling F3;
+        // #799's "site built again before deploying" went when #799 landed).
         Owed(ActivityTrailEvents, 823, V200, Reason823,
              "course created for reference", "course could not be created for reference", "zip could not be read for reference"),
         Owed(ActivityTrailEvents, 826, V200, Reason826,
@@ -320,7 +328,6 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 827, V200, Reason827,
              "reference group made", "reference group renamed", "reference group removed", "reference course moved to a group",
              "reference groups not changed", "reference groups started again"),
-        Owed(ActivityTrailEvents, 799, V200, Reason799, "site built again before deploying"),
         Owed(ActivityTrailEvents, 801, V200, Reason801, "looked at a course's unit plans", "asked an assistant to plan a unit"),
         Owed(ActivityTrailEvents, 820, V200, Reason820, "opened a unit plan in the browser"),
         // 790a (2026-11-13): Plan a Unit's third button arrived with the mac's #783.
@@ -407,14 +414,6 @@ internal static class NamedGapLedger
              "deployed folder opened in the web browser", "deployed folder no longer shown", "deployed folder could not be opened"),
         Owed(SubjectMenuItems, 889, V200, Reason889, "stopShowingDeployedFolder"),
         Owed(SubjectMenuSituationKeys, 889, V200, Reason889, "deployedFolderReady", "deployedFolderShown"),
-        Owed(AssistWordingKeys, 885, V200, Reason885,
-             "noSectionNamed", "noSectionNamedAndNoSections", "addClassesNeedsAUnit", "addClassesNeedsACount"),
-        Owed(FixWithGreetingCases, 895, V200, Reason895,
-             "one problem on a page every section shares",             "a section's own page is not called shared, a problem with no page names none, and a deploy says so",
-             "Cloudflare's refusal alone is cleared by a deploy, not a preview",
-             "a refusal beside a figure needs a preview and a deploy, said in one sentence",
-             "a semicolon a row brings is written as a comma, and a very long course name is cut",
-             "a row's own braces are handed over as written, and a double quote becomes an apostrophe"),
 
         // ---- #868's held-by-name piece (2026-11-13): what the mac's #835
         // part 3 (holds narrow to the section) and #855 (Set Up an
@@ -425,6 +424,15 @@ internal static class NamedGapLedger
              "outside assistant set up", "outside assistant could not be set up", "outside assistant set-up settled",
              "outside assistant sign-in opened", "outside assistant sign-in checked", "outside assistant removed"),
         Owed(QuitCases, 903, V200, Reason903, "an outside assistant is being set up"),
+
+        // ---- #911's held-by-name piece (2026-11-14): what the mac's #897 C
+        // (Restore from Backup… puts back one section, staged) and #785a (the
+        // shared Media store for small backups) brought. Their case lists
+        // (backups.restoreOneSection, backups.sharedMedia, file-formats.json →
+        // sharedMediaStore) have no reader here yet, so they are unrun, not red.
+        Owed(ActivityTrailEvents, 911, V200, Reason911, "section restore stopped part way"),
+        Owed(ActivityTrailEvents, 912, V200, Reason912,
+             "backup kept its Media files once", "shared backup Media swept", "backup Media not found"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
