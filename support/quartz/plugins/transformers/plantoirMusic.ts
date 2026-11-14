@@ -204,6 +204,11 @@ export const PlantoirMusic: QuartzTransformerPlugin = () => ({
                 options: known.options,
                 engine: `${root}/${known.engine}`,
                 sounds: `${root}/${known.soundsFolder}`,
+                // The sound folders this tune's notes are asked from
+                // (`<sounds><name>-mp3/<note>.mp3`, by abcjs at the press):
+                // named here so a reader of the page alone (#901: a site
+                // carries only what its pages name) can tell which it needs.
+                soundNames: entry.sounds,
                 play: words.play,
                 stop: words.stop,
                 playLabel: filled(words.playLabel, { title }),
