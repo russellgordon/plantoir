@@ -302,6 +302,14 @@ public static partial class AssistWording
     // variable (AssistWorkspace.DoorCourseVariable). The in-app window's own
     // server holds the course too, and its cause gets the window's own words
     // (WindowHoldWording, beside WindowServers), never these.
+    //
+    // Since the mac's #783 the contract says these nine with an {assistant}
+    // slot (doorCourseHold.naming). Both doors here pass their key as
+    // PLANTOIR_DOOR_ASSISTANT since #884's first part, but plantoir-mcp does
+    // not record it yet, so every hold here would name none, and the
+    // contract's anyAssistant for that names GitHub Copilot, which Windows
+    // cannot open yet. They stay in these words, held by name in
+    // NamedGapLedger, until #884 item 7 (the lease's fifth line) lands.
 
     /// <summary>Under a greyed Revise item while an outside session holds the course.</summary>
     public const string AvailableOnceYouFinishRevisingWithClaude = "Available once you finish revising with Claude or Codex";

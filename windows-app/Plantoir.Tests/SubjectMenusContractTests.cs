@@ -41,7 +41,10 @@ public class SubjectMenusContractTests
             .Where(name => name != "equalityContract")
             .OrderBy(name => name)
             .ToList();
-        Assert.Equal(keys.OrderBy(k => k), properties);
+        // A situation this app cannot be in yet (a deployed folder shown in
+        // the browser, #889) is held open by name; the rest as before.
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.SubjectMenuSituationKeys, keys, properties);
+        Assert.Equal(keys.Where(k => !deferred.Contains(k)).OrderBy(k => k), properties);
 
         var fresh = new SubjectMenuRules.Situation();
         Assert.Equal(SubjectMenuRules.Enabled(Situation(new JsonObject())), SubjectMenuRules.Enabled(fresh));
@@ -60,8 +63,10 @@ public class SubjectMenusContractTests
         // enabled here: it is taken out of what each case expects, and
         // everything else is compared as before.
         var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItems).Select(entry => entry.Key).ToHashSet();
+        int notRun = 0;
         foreach (var c in cases)
         {
+            if (!CanBeIn(c["situation"]!.AsObject())) { notRun++; continue; }
             var expected = c["enabled"]!.AsArray().Select(n => n!.ToString()).Where(n => !held.Contains(n)).OrderBy(n => n, StringComparer.Ordinal).ToList();
             var actual = SubjectMenuRules.Enabled(Situation(c["situation"]!.AsObject()))
                 .Select(SubjectMenuRules.ContractName).OrderBy(n => n, StringComparer.Ordinal).ToList();
@@ -69,11 +74,30 @@ public class SubjectMenusContractTests
                 failures.Add($"{c["why"]}\n  missing: {string.Join(", ", expected.Except(actual))}\n  extra: {string.Join(", ", actual.Except(expected))}");
         }
         Assert.True(failures.Count == 0, string.Join("\n", failures));
+        Assert.True(cases.Count - notRun >= 21, $"only {cases.Count - notRun} cases run ({notRun} name a situation held open)");
+    }
+
+    /// <summary>
+    /// False for a case whose situation names a key <see cref="NamedGapLedger.SubjectMenuSituationKeys"/>
+    /// holds open: this app has no such situation yet (the key is no property
+    /// of <see cref="SubjectMenuRules.Situation"/>, which the fact above makes
+    /// sure of), so the case cannot be put to it. It comes back the day the
+    /// entry goes.
+    /// </summary>
+    internal static bool CanBeIn(JsonObject overrides)
+    {
+        var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuSituationKeys).Select(entry => entry.Key).ToHashSet();
+        return !overrides.Any(pair => held.Contains(pair.Key));
     }
 
     /// <summary>The contract's defaults, overlaid with one case's situation, as a <see cref="SubjectMenuRules.Situation"/>.</summary>
     internal static SubjectMenuRules.Situation Situation(JsonObject overrides)
     {
+        Assert.True(CanBeIn(overrides), "a case naming a situation held open in NamedGapLedger cannot be put to this app");
+        // A door this app does not have yet (GitHub Copilot, #884) greys
+        // nothing here: its items are held open too.
+        var heldDoors = NamedGapLedger.OutsideDoorsHeld(
+            ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["agents"]!.AsArray().Select(a => a!["key"]!.ToString()));
         var merged = new Dictionary<string, JsonNode?>();
         foreach (var (key, value) in Rule["situationDefaults"]!.AsObject()) merged[key] = value;
         foreach (var (key, value) in overrides) merged[key] = value;
@@ -84,6 +108,7 @@ public class SubjectMenusContractTests
         string rowName = merged["row"]!.ToString();
         var row = Enum.GetValues<SubjectMenuRules.Row>().Single(r => SubjectMenuRules.ContractName(r) == rowName);
         var blocked = merged["reviseBlocked"]!.AsArray()
+            .Where(n => !heldDoors.Contains(n!.ToString()))
             .Select(n => Enum.GetValues<SubjectMenuRules.ReviseTarget>().Single(t => SubjectMenuRules.ContractName(t) == n!.ToString()))
             .ToHashSet();
         return new SubjectMenuRules.Situation

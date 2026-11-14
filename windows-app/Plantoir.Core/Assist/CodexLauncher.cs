@@ -112,7 +112,8 @@ public static class CodexLauncher
     }
 
     /// <summary>
-    /// The argv the contract states, in order: five dotted overrides and the
+    /// The argv the contract states, in order: six dotted overrides (the sixth,
+    /// <c>PLANTOIR_DOOR_ASSISTANT</c>, since #884) and the
     /// greeting as the first message. No sandbox, approval or cd flag — Codex
     /// asks the teacher itself before a change, and a flag would quietly widen
     /// what they set for themselves.
@@ -136,8 +137,12 @@ public static class CodexLauncher
         "-c", "mcp_servers.plantoir.startup_timeout_sec=60",
         "-c", "mcp_servers.plantoir.tool_timeout_sec=1800",
         "-c", "mcp_servers.plantoir.env." + AssistWorkspace.DoorCourseVariable + "=" + TomlBasicString(courseCode),
+        "-c", "mcp_servers.plantoir.env." + AssistWorkspace.DoorAssistantVariable + "=" + TomlBasicString(DoorKey),
         greeting.Replace("\"", "'"),
     };
+
+    /// <summary>This door's agent key, <c>outsideAgents.agents[codex].key</c>, written as <see cref="AssistWorkspace.DoorAssistantVariable"/> (#884).</summary>
+    internal const string DoorKey = "codex";
 
     /// <summary>
     /// A TOML basic string: backslash, double quote and control characters

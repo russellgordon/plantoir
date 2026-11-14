@@ -271,6 +271,9 @@ public static class ClaudeCodeLauncher
     /// (<see cref="AssistWorkspace.DoorCourseVariable"/>, fix round ruling 3),
     /// which the server holds an <c>assist</c> lease on without locking to it.
     /// </summary>
+    /// <summary>This door's agent key, <c>outsideAgents.agents[claude].key</c>, written as <see cref="AssistWorkspace.DoorAssistantVariable"/> (#884).</summary>
+    internal const string DoorKey = "claude";
+
     internal static string ConfigText(string workspacePath, string server, string courseCode)
     {
         var config = new
@@ -281,7 +284,11 @@ public static class ClaudeCodeLauncher
                 {
                     command = server,
                     args = ServerArguments(workspacePath),
-                    env = new Dictionary<string, string> { [AssistWorkspace.DoorCourseVariable] = courseCode },
+                    env = new Dictionary<string, string>
+                    {
+                        [AssistWorkspace.DoorCourseVariable] = courseCode,
+                        [AssistWorkspace.DoorAssistantVariable] = DoorKey,
+                    },
                 },
             },
         };
