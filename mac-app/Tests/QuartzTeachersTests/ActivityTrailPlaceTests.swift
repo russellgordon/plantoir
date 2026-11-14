@@ -65,4 +65,36 @@ final class ActivityTrailPlaceTests: XCTestCase {
         XCTAssertTrue(sentence.contains("the course is being"), sentence)
         XCTAssertTrue(written.hasSuffix(" · ICS3U · " + sentence), written)
     }
+
+    /// The built-in assistant's two records build their place through
+    /// `place` too (the batch review): a section gives "ICS3U/2 · ", and 0
+    /// gives the course alone. The assistant is always scoped to a located
+    /// section today, so 0 is reached only here.
+    func testTheAssistantsRecordsGoThroughPlace() {
+        let moment: Date = Date(timeIntervalSince1970: 1_786_000_000)
+        let utc: TimeZone = TimeZone(identifier: "UTC") ?? TimeZone.current
+        let asked: String = AssistTurnRecord.askedLines(
+            prompt: "What will students see?", courseCode: "ICS3U", sectionNumber: 2, at: moment, timeZone: utc
+        )
+        XCTAssertTrue(asked.contains(" · ICS3U/2 · asked the local AI assistant\n"), asked)
+        let askedNoSection: String = AssistTurnRecord.askedLines(
+            prompt: "What will students see?", courseCode: "ICS3U", sectionNumber: 0, at: moment, timeZone: utc
+        )
+        XCTAssertFalse(askedNoSection.contains("ICS3U/0"), askedNoSection)
+        XCTAssertTrue(askedNoSection.contains(" · ICS3U · asked the local AI assistant\n"), askedNoSection)
+
+        let turn: AssistTurnRecord = AssistTurnRecord(
+            at: moment, courseCode: "ICS3U", sectionNumber: 0,
+            toolName: "publish_pages", argumentNames: ["course"],
+            seconds: 1.0, completionTokens: nil, stoppedAtGate: false
+        )
+        XCTAssertFalse(turn.lines.contains("ICS3U/0"), turn.lines)
+        XCTAssertTrue(turn.lines.contains(" · ICS3U · chose publish_pages(course)"), turn.lines)
+        let turnWithSection: AssistTurnRecord = AssistTurnRecord(
+            at: moment, courseCode: "ICS3U", sectionNumber: 2,
+            toolName: nil, argumentNames: [],
+            seconds: 1.0, completionTokens: nil, stoppedAtGate: false
+        )
+        XCTAssertTrue(turnWithSection.lines.contains(" · ICS3U/2 · answered in words"), turnWithSection.lines)
+    }
 }
