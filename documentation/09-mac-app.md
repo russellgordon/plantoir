@@ -11843,75 +11843,132 @@ piece 785b moves the automatic backups onto it. The code is
 - **What both zips leave out comes from one place.** `CourseArchiver.
   archiveRules(forFolderAt:)` builds the `zip -x` patterns AND the names the
   Media walk leaves out from `excludedFromArchives`; the whole zip's `archive`
-  reads the same function. Symbolic links in Media are followed and a link
-  that leads nowhere is left out, as `zip -r` does (measured).
+  reads the same function. Only a folder LISTED as exactly `Media` is left
+  out: a course whose folder is spelled `media` keeps it in the zip, as the
+  whole zip's case-sensitive `zip -x` does (review I2).
+- **The walk is `zip -r`'s walk** (`SharedMediaStore.walkMedia`, through
+  `SharedMediaFiles`, measured case by case against the whole zip's restore).
+  A link to a file is that file's bytes under the link's name. A link to a
+  folder, inside the course or outside it, is that folder's contents under
+  the link's name, and the folder itself is walked again under its own name.
+  A link that leads nowhere is left out. A loop is followed until the system
+  refuses a path with more than 32 links, which is where `zip -r` stops too:
+  a link back to its own parent gave 100 entries in both. Paths are resolved
+  from the course's parent folder (`openat`, `fstatat`), as zip resolves them
+  from its working folder, so a link above the working folder does not stop
+  the walk one level early. More than 200,000 entries refuses the small
+  backup. Until the implementation review (W1) the walk skipped any folder it
+  had already been through, so a link that sorted before its sibling folder
+  made the real folder vanish from the restore while the restore reported
+  nothing missing.
+- **Names are bytes** (review W2). Every name is carried as the listing's own
+  UTF-8 bytes and every file call takes a Swift `String` straight to POSIX
+  (`SharedMediaFiles`), because `URL.appendingPathComponent(...).path` and
+  `withUnsafeFileSystemRepresentation` decompose a name: a precomposed
+  `café.png` (`caf\xc3\xa9`) came back as `cafe\xcc\x81`. Finder and Obsidian
+  on APFS do not tell them apart; the website builder, reading the course
+  from Linux, does. The tests compare trees by name BYTES, since Swift's
+  `String` equality treats the two forms as one and hid the fault.
 - **Writing, in this order.** Shared lock; every Media file read and hashed,
   every time; a pending list; each file not kept copied into the store under
   `.incoming-<uuid>`, checked against its checksum after writing, flushed,
   renamed (a kept file is re-checked and replaced if damaged; a mismatch fails
   the backup and says whether the copy or the picture changed); the pages
   zipped under `.writing-<uuid>.zip`, the list added, the zip tested with
-  `unzip -t` and its list read back, then renamed with `RENAME_EXCL`; the list
-  copied to `lists/`; the pending list removed. A crash at any step leaves
-  store files nothing names, never a zip whose files are missing.
-- **Restoring.** `beginRestore` takes the shared lock and finds every listed
-  file before anything changes: in the store, checked by checksum, and when
-  the store's copy is missing or damaged, in the course's CURRENT Media by
-  checksum (plan review, amendment 4). The result carries `missing` (paths,
-  for the teacher's screen) and `canBeRestored` (false when the list names
-  files and none can be found: the backup was carried away from its store).
-  `fill` copies each file in under a temporary name, checks it again, gives it
-  its listed date and permissions, and names any that fail; nothing is
-  skipped silently. 785b calls it on the unpacked course in staging, before
-  the swap, and asks the teacher first when anything is missing.
-- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's
+  `unzip -t` and its list read back; the list copied to `lists/` BEFORE the
+  zip takes its name, so an older copy of the same name can never stand for
+  it (review M5; the copy is removed again if the name turns out taken); the
+  zip renamed with `RENAME_EXCL`; the pending list rewritten with `finishedAt`
+  and kept for a day. A crash at any step leaves store files nothing names,
+  never a zip whose files are missing.
+- **Restoring.** A small zip unpacks into its pages plus
+  `.plantoir-backup.json` at the staging root. That file is the MARKER:
+  `SharedMediaStore.refuseUnlessItsMediaWasPutBack(unpackedAt:backupFileName:)`
+  throws `mediaNotPutBack` while it is there, and `fill` removes it once the
+  Media is back (review I3). `beginRestore` takes the shared lock and finds
+  every listed file before anything changes: in the store, checked by
+  checksum, and when the store's copy is missing or damaged, in the course's
+  CURRENT Media by checksum (plan review, amendment 4). The result carries
+  `missing` (paths, for the teacher's screen) and `canBeRestored` (false when
+  the list names files and none can be found). `fill` makes every folder,
+  copies each file in under a temporary name with the list's exact name
+  bytes, checks it again, gives it its listed date and permissions, and names
+  any that fail; nothing is skipped silently.
+- **For 785b: every door that unpacks a backup must call the marker guard**
+  before it swaps anything in, or route through `beginRestore` and `fill`
+  first. On the mac today those doors are `CourseRestorer.unpack`, reached
+  from `restoreBackup` (Restore from Backup…, `WorkspaceModel`),
+  `restoreSection` (the assistant window's Restore Section N…,
+  `AssistSectionRestore`), #897 C's `restoreSectionFromTheMenu`, and
+  `extract` (a course or section restored into an empty place, and Restore
+  from Archive); `ReferenceZipSource`'s `ditto` unpack (importing a backup
+  zip as a reference course); and `ReferenceReplacer`'s check that a backup
+  holds every file (`zipinfo` listing, plan review amendment 2), which must
+  ask `pathsNotHeld(by:)` for Media. Windows' `CourseRestorer` and its import
+  are the same doors there. A test should walk every caller of `unpack`.
+- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 31
   cases): anything unreadable stops it; needed is every checksum named by a
-  small backup that is there (or its iCloud `.icloud` placeholder, through its
-  list copy), a list whose zip has not arrived and is under a day old, an Undo
-  list under 31 days old, and a pending list under a day old or whose process
-  still runs on this computer; and nothing is deleted until a sweep a day
-  after this computer FIRST found it unneeded still finds it so. Every age is
-  a moment a list or this computer wrote down, never a file's date. It takes
-  the lock exclusively without waiting, and deletes nothing while a backup or
-  a restore holds it. The lock is `flock` on the lock file, so a working
-  folder reached through a symbolic link or in another case is one lock
-  (tested).
+  small backup that is there (or its pre-macOS 14 `.icloud` placeholder,
+  through its list copy), a list whose zip has not arrived and is under a day
+  old, an Undo list under 31 days old, a pending list of a backup being
+  written (a day, or while its process runs on this computer), and a FINISHED
+  backup's pending list for a day after it finished. Nothing is deleted until
+  a sweep a day after this computer first found it unneeded still finds it
+  so, or FOURTEEN days once any sign of another computer has been seen in the
+  store (a list, pending list or small backup naming another host, or another
+  computer's sweep record; remembered in this computer's record). Every age is
+  a moment a list or this computer wrote down; a moment more than a day ahead
+  of this computer's clock is counted from when this computer first saw that
+  list (review M1). What a crash leaves that names nothing (a `.writing-*.zip`,
+  the store's `.incoming-*` folders, `.writing-*` temporaries) is removed once
+  its own date is more than a day old (review I1). It takes the lock
+  exclusively without waiting, and deletes nothing while a backup or a
+  restore holds it on this computer. The lock is `flock` on the lock file, so
+  a working folder reached through a symbolic link or in another case is one
+  lock (tested).
+- **Two computers on one synced folder** (review W3). A picture computer B
+  lists again in a new backup copies nothing into the store, so the only sign
+  of B's reliance is B's pending list. It is the first file B writes and is
+  now kept a day after B's backup finishes, so a sync service usually carries
+  it to A first; and once A has seen any sign of B, A waits fourteen days, not
+  one, before deleting. Fourteen days covers a computer shut over a two-week
+  holiday with a backup it had not synced; the cost is that space comes back
+  two weeks after a delete on a shared folder. Measured before the fix: with
+  an hour of sync lag, A deleted the picture and B's restore could not find
+  it; after it, A keeps it and B's restore finds it. **No wait closes this race
+  against a sync delay of any length:** if nothing of B's reaches A before A's
+  wait ends, the picture is deleted, and B's restore then names it as missing,
+  in words, before anything changes, and refuses when it was the only one
+  (measured in the harness).
 - **Undo's seam (#899).** Before a step deletes or moves a small backup,
   Undo calls `keepForUndo(stepID:checksums:writtenAt:)` with the backup's
   `list(ofBackupNamed:zipURL:).checksums`; when the step leaves the Undo list
   it calls `releaseForUndo(stepID:)`. Every computer's sweep honours the list
   for 31 days by its own `writtenAt`. A reference replace that must not trust
   a zip's listing alone asks `pathsNotHeld(by:)`, which re-hashes each file.
-- **Measured** (Apple M4 Pro, APFS, a scratch folder, 2026-11-13). The AVI1O
-  example course as installed with its three pictures moved into Media (0.27
-  MB of pages, 0.62 MB of Media): whole zip 0.79 MB, small zip 0.17 MB plus
-  0.62 MB in the store once; seven backups took 2.05 MB in all against about
-  5.5 MB as whole zips. The same course with 120 incompressible 4.4 MB stand-in
-  pictures (528.6 MB of Media): whole zip 8.29 s and 528.9 MB; the first small
-  backup 0.88 s, a 0.18 MB zip and 528.6 MB into the store; each later one
-  about 0.77 s and 0.18 MB, adding nothing after a text edit, one 0.2 MB file
-  after one picture changed, nothing after one was renamed; seven backups
-  530.2 MB against about 3.7 GB. On APFS the store's copies are clones: the
-  scratch folder freed about 1.04 GB when deleted, the course's Media plus the
-  whole zip, so the store took no blocks of its own while the pictures were
-  unchanged. A small backup restores byte for byte what the whole zip
-  restores, on APFS and on an exFAT disk image (names in both Unicode forms,
-  hidden files, permissions, empty folders, links), and with each picture's own
-  date, which the whole zip does not keep: it brought a September date back an
-  hour out (DOS time, across daylight saving).
+- **Measured** after the review's fixes (Apple M4 Pro, macOS 26, 2026-11-13,
+  scratch folders and hidden disk images). MEASURE_LINES
 - **Rejected.** A guard on a store file's modification date (a copy keeps the
-  source's, plan review amendment 1); an `added/` record of when a file entered
-  the store (it protects a new file and not an old one another computer has
-  just listed again); trusting an unchanged size and date instead of hashing
-  (0.02 s against 0.25 s for 526 MB, and a picture edited by a tool that keeps
-  its date would restore as the old one); Git, hard links, compressing the
-  store, a store per course; a `.plantoirbackup` extension; reporting missing
-  pictures after the swap instead of before it.
-- **Known limits.** A `.writing-<uuid>.zip` left by a crash between zipping
-  and renaming stays in `_backups/<CODE>/` (hidden, never listed, about the
-  size of the pages) until removed by hand. Two computers writing to one
-  synced store at once are covered by the day's wait and by each list's own
-  moment, not by the lock, which is local to each computer. Not measured on a
+  source's, plan review amendment 1). An `added/` record of when a file
+  ENTERED the store, reconsidered after the review's W3 and still rejected: a
+  file another computer lists again entered the store long ago, so its added
+  moment says nothing about that computer's reliance, while the kept pending
+  list names every file a backup relies on, old and new; the earlier stated
+  reason implied the day's wait protected that old file, and it did not.
+  Trusting an unchanged size and date instead of hashing (0.02 s against 0.25
+  s for 526 MB, and a picture edited by a tool that keeps its date would
+  restore as the old one). Git, hard links, compressing the store, a store
+  per course; a `.plantoirbackup` extension; reporting missing pictures after
+  the swap instead of before it.
+- **Known limits.** The two-computer race above. A clock set days forward
+  deletes for real while it is forward and can end an Undo list's 31 days
+  early (review M2). Since macOS 14 iCloud Drive keeps an evicted file under
+  its own name with no data on this disk, not as `.X.icloud`; reading such a
+  zip's list downloads it under the sweep's lock or fails, and a failure keeps
+  everything (review M3, not measured). On exFAT the whole zip also brings back
+  a file's extended attributes as an AppleDouble `._` file, which a small
+  backup does not; attributes are not a teacher's content. A server that tells
+  the two Unicode forms apart was not available to measure. Not measured on a
   real iCloud Drive folder, nor with tens of thousands of Media files.
 
 **Where the space is shown.** The sidebar's Backups header carries the total

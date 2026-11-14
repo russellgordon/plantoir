@@ -70,22 +70,31 @@ final class SharedMediaStoreTests: XCTestCase {
             "the restored course carries no file the teacher did not make"
         )
 
-        let small: [String: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(payload)
-        let whole: [String: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(wholeOut.appendingPathComponent("ICS3U"))
+        // Keyed by the names' BYTES: Swift's String equality treats the two
+        // Unicode forms of a name as one, and so could not see a precomposed
+        // name come back decomposed (#785 implementation review, W2).
+        let small: [[UInt8]: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(payload)
+        let whole: [[UInt8]: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(wholeOut.appendingPathComponent("ICS3U"))
         XCTAssertEqual(SharedMediaTestFiles.differences(small, whole), [])
-        XCTAssertNotNil(small["Media/empty folder"], "an empty folder comes back")
-        XCTAssertNil(small["Media/build/left out.png"], "what the whole zip leaves out, the small one leaves out")
-        XCTAssertNil(small["Media/sub/.DS_Store"])
-        XCTAssertNotNil(small["Media/.hidden"], "hidden files come back")
-        XCTAssertGreaterThan(small.count, 15, "the comparison saw the awkward course")
+        XCTAssertEqual(small.count, whole.count)
+        XCTAssertNotNil(small[Array("Media/empty folder".utf8)], "an empty folder comes back")
+        XCTAssertNil(small[Array("Media/build/left out.png".utf8)], "what the whole zip leaves out, the small one leaves out")
+        XCTAssertNil(small[Array("Media/sub/.DS_Store".utf8)])
+        XCTAssertNotNil(small[Array("Media/.hidden".utf8)], "hidden files come back")
+        XCTAssertNotNil(small[Array("Media/real folder/inner.png".utf8)], "a folder a link sorted before comes back (W1)")
+        XCTAssertNotNil(small[Array("Media/a link to the real folder/inner.png".utf8)], "and the link's copy too, as the whole zip has it")
+        XCTAssertNotNil(small[Array("Media/link to outside/far.png".utf8)], "a link to a folder outside the course")
+        XCTAssertNotNil(small[Array("Media/caf\u{00E9}/cr\u{00E8}me.png".utf8)], "a precomposed name keeps its bytes (W2)")
+        XCTAssertNil(small[Array("Media/cafe\u{0301}/cre\u{0300}me.png".utf8)], "and is not decomposed")
+        XCTAssertGreaterThan(small.count, 100, "the comparison saw the awkward course, its loop included")
 
-        let original: [String: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(course)
-        for (path, node) in small where node.kind == "file" && path.hasPrefix("Media/") {
+        let original: [[UInt8]: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(course)
+        for (path, node) in small where node.kind == "file" && path.starts(with: Array("Media/".utf8)) {
             if let restoredDate = node.modified, let originalNode = original[path], originalNode.kind == "file",
                let originalDate = originalNode.modified {
                 XCTAssertEqual(
                     restoredDate.timeIntervalSince1970, originalDate.timeIntervalSince1970, accuracy: 0.002,
-                    "\(path) comes back with its own date"
+                    "\(SharedMediaTestFiles.shown(path)) comes back with its own date"
                 )
             }
         }
@@ -142,7 +151,7 @@ final class SharedMediaStoreTests: XCTestCase {
     /// then swept again and again over four days: every published backup
     /// stays whole, and one that never published leaves nothing behind.
     func testACrashAtEveryPointLeavesEveryPublishedBackupWhole() throws {
-        let points: [SharedMediaStore.WritePoint] = [.pendingWritten, .mediaStored, .zipPublished, .listCopied]
+        let points: [SharedMediaStore.WritePoint] = [.pendingWritten, .mediaStored, .zipWritten, .listCopied, .zipPublished]
         for point in points {
             let courses: URL = topURL.appendingPathComponent("crash-\(point)/courses")
             let course: URL = try SharedMediaTestFiles.makeAwkwardCourse(in: courses)
@@ -172,7 +181,7 @@ final class SharedMediaStoreTests: XCTestCase {
             )
             let zipURL: URL = courses.appendingPathComponent("_backups/ICS3U/\(name)")
             let published: Bool = FileManager.default.fileExists(atPath: zipURL.path)
-            XCTAssertEqual(published, point == .zipPublished || point == .listCopied, "\(point)")
+            XCTAssertEqual(published, point == .zipPublished, "\(point)")
             let start: Date = clock.now
             for hours in [0.0, 25.0, 50.0, 75.0, 100.0] {
                 clock.now = start.addingTimeInterval(hours * 3600)
@@ -187,6 +196,7 @@ final class SharedMediaStoreTests: XCTestCase {
                 XCTAssertEqual(sweeper.pathsNotHeld(by: list), [], "\(point): the published backup keeps every file")
             } else {
                 XCTAssertEqual(SharedMediaTestFiles.storeEntryCount(sweeper), 0, "\(point): nothing is left behind")
+                XCTAssertEqual(SharedMediaTestFiles.leftoverCount(sweeper, course: "ICS3U"), 0, "\(point): no unpublished zip or list folder")
             }
         }
     }
@@ -269,12 +279,15 @@ final class SharedMediaStoreTests: XCTestCase {
         try Data(count: Int(target.size)).write(to: store.fileURL(forChecksum: target.sha256))
 
         let noCourse: SharedMediaRestore = store.beginRestore(of: first.list, currentCourseFolderURL: nil)
-        XCTAssertEqual(noCourse.missing, ["Media/sub/c.jpg"], "named, by its path")
+        XCTAssertTrue(noCourse.missing.contains("Media/sub/c.jpg"), "named, by its path")
+        for path in noCourse.missing {
+            XCTAssertTrue(path.hasSuffix("/sub/c.jpg"), "only the damaged file, wherever a link also leads to it: \(path)")
+        }
         XCTAssertTrue(noCourse.canBeRestored)
         let payload: URL = topURL.appendingPathComponent("staging/ICS3U")
         let filled: SharedMediaRestore.Filled = try noCourse.fill(intoCourseAt: payload, backupFileName: "x")
         noCourse.end()
-        XCTAssertEqual(filled.missing, ["Media/sub/c.jpg"], "named again, never skipped")
+        XCTAssertEqual(filled.missing, noCourse.missing, "named again, never skipped")
         XCTAssertFalse(FileManager.default.fileExists(atPath: payload.appendingPathComponent("Media/sub/c.jpg").path))
 
         let withCourse: SharedMediaRestore = store.beginRestore(of: first.list, currentCourseFolderURL: course)
@@ -375,7 +388,10 @@ final class SharedMediaStoreTests: XCTestCase {
         here.sweep()
         clock.now = start.addingTimeInterval(8 * 86_400 + 60)
         here.sweep()
-        XCTAssertEqual(here.pathsNotHeld(by: written.list).count, 1, "released, it goes a day after it is found unneeded")
+        XCTAssertEqual(here.pathsNotHeld(by: written.list), [], "another computer has written here, so a day is not enough")
+        clock.now = start.addingTimeInterval(21 * 86_400 + 120)
+        here.sweep()
+        XCTAssertEqual(here.pathsNotHeld(by: written.list).count, 1, "released, it goes fourteen days after it is found unneeded")
     }
 
     // MARK: - The lock
@@ -472,6 +488,171 @@ final class SharedMediaStoreTests: XCTestCase {
                 + "\"size\":1,\"modified\":\"2026-11-13T18:38:00.000Z\",\"mode\":420}]}"
             XCTAssertThrowsError(try SharedMediaList.decoded(from: Data(text.utf8)), path)
         }
+    }
+
+    // MARK: - Two computers on one synced folder (#785 implementation review, W3)
+
+    /// Computer A deletes the only backup naming a picture and finds it
+    /// unneeded; a day later computer B makes a backup that lists the same
+    /// picture again (copying nothing). An hour on, only B's pending list
+    /// has synced to A. A's sweep must keep the picture, and B's restore
+    /// find it. Before the fix A deleted it within the hour.
+    func testAPictureAnotherComputerHasJustListedAgainIsKept() throws {
+        let courses: URL = topURL.appendingPathComponent("courses")
+        let course: URL = courses.appendingPathComponent("ICS3U")
+        try SharedMediaTestFiles.write(Data("{}".utf8), to: course.appendingPathComponent("course_config.json"))
+        try SharedMediaTestFiles.write(SharedMediaTestFiles.randomData(3000), to: course.appendingPathComponent("Media/picture.png"))
+        let clock: SharedMediaTestClock = SharedMediaTestClock()
+        let start: Date = clock.now
+        let a: SharedMediaStore = SharedMediaStore(
+            coursesDirectoryURL: courses, clock: { clock.now }, computer: "MAC-A",
+            processIsRunning: { (_: Int32, _: String?) -> Bool in false }
+        )
+        let b: SharedMediaStore = SharedMediaStore(
+            coursesDirectoryURL: courses, clock: { clock.now }, computer: "MAC-B",
+            processIsRunning: { (_: Int32, _: String?) -> Bool in false }
+        )
+        let rules: SharedMediaStore.ArchiveRules = CourseArchiver.archiveRules(forFolderAt: course)
+        let first: SharedMediaStore.Written = try a.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-13_090000_menu-section1_shared-media.zip", rules: rules
+        )
+        try FileManager.default.removeItem(at: first.zipURL)
+        clock.now = start.addingTimeInterval(1.1 * 86_400)
+        a.sweep()
+        clock.now = start.addingTimeInterval(2.1 * 86_400)
+        let again: SharedMediaStore.Written = try b.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-15_110000_menu-section1_shared-media.zip", rules: rules
+        )
+        XCTAssertEqual(again.filesAdded, 0)
+        let aside: URL = topURL.appendingPathComponent("not yet synced")
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        let copy: URL = a.listsURL.appendingPathComponent("backup-\(again.list.backupName).json")
+        try FileManager.default.moveItem(at: again.zipURL, to: aside.appendingPathComponent("zip"))
+        try FileManager.default.moveItem(at: copy, to: aside.appendingPathComponent("copy"))
+        clock.now = start.addingTimeInterval(2.15 * 86_400)
+        XCTAssertEqual(a.sweep().filesDeleted, 0, "the picture B relies on is kept")
+        try FileManager.default.moveItem(at: aside.appendingPathComponent("zip"), to: again.zipURL)
+        try FileManager.default.moveItem(at: aside.appendingPathComponent("copy"), to: copy)
+        let restore: SharedMediaRestore = b.beginRestore(of: again.list, currentCourseFolderURL: nil)
+        XCTAssertEqual(restore.missing, [], "and B's restore finds it")
+        restore.end()
+    }
+
+    // MARK: - A crash's leftovers (#785 implementation review, I1)
+
+    /// A backup stopped once its zip is whole under its temporary name and
+    /// its list folder is still there, as a crash leaves them: a sweep the
+    /// same day keeps both (a writer that young might still be live), a
+    /// sweep two days later removes both, and the next backup is whole.
+    func testWhatACrashMidZipLeavesIsRemovedAfterADay() throws {
+        let courses: URL = topURL.appendingPathComponent("courses")
+        let course: URL = try SharedMediaTestFiles.makeAwkwardCourse(in: courses)
+        let clock: SharedMediaTestClock = SharedMediaTestClock()
+        clock.now = Date()
+        let start: Date = clock.now
+        let crashing: SharedMediaStore = SharedMediaStore(
+            coursesDirectoryURL: courses, clock: { clock.now },
+            processIsRunning: { (_: Int32, _: String?) -> Bool in false },
+            hooks: SharedMediaStore.Hooks(
+                reached: { (point: SharedMediaStore.WritePoint) throws in
+                    if point == .zipWritten {
+                        throw SharedMediaTestFiles.Stopped()
+                    }
+                },
+                copiedIntoTheStore: { (_: URL) in },
+                tidiesUpAfterAFailure: false
+            )
+        )
+        let rules: SharedMediaStore.ArchiveRules = CourseArchiver.archiveRules(forFolderAt: course)
+        XCTAssertThrowsError(try crashing.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-13_183800_menu-section1_shared-media.zip", rules: rules
+        ))
+        try Data("{}".utf8).write(to: crashing.listsURL.appendingPathComponent(".writing-left-by-a-crash"))
+        let left: Int = SharedMediaTestFiles.leftoverCount(crashing, course: "ICS3U")
+        XCTAssertGreaterThanOrEqual(left, 3, "an unpublished zip, a list folder and a temporary list")
+        let store: SharedMediaStore = SharedMediaStore(
+            coursesDirectoryURL: courses, clock: { clock.now },
+            processIsRunning: { (_: Int32, _: String?) -> Bool in false }
+        )
+        store.sweep()
+        XCTAssertEqual(SharedMediaTestFiles.leftoverCount(store, course: "ICS3U"), left, "kept the same day")
+        clock.now = start.addingTimeInterval(2 * 86_400)
+        XCTAssertEqual(store.sweep().leftoversRemoved, left)
+        XCTAssertEqual(SharedMediaTestFiles.leftoverCount(store, course: "ICS3U"), 0)
+        let healthy: SharedMediaStore.Written = try store.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-15_183800_menu-section1_shared-media.zip", rules: rules
+        )
+        XCTAssertEqual(store.pathsNotHeld(by: healthy.list), [])
+    }
+
+    // MARK: - The restore door's marker (#785 implementation review, I3)
+
+    func testADoorThatDoesNotPutTheMediaBackIsRefused() throws {
+        let courses: URL = topURL.appendingPathComponent("courses")
+        let course: URL = try SharedMediaTestFiles.makeAwkwardCourse(in: courses)
+        let store: SharedMediaStore = SharedMediaStore(coursesDirectoryURL: courses)
+        let written: SharedMediaStore.Written = try store.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-13_183800_menu-section1_shared-media.zip",
+            rules: CourseArchiver.archiveRules(forFolderAt: course)
+        )
+        let staging: URL = topURL.appendingPathComponent("staging")
+        XCTAssertTrue(SharedMediaTestFiles.unpack(written.zipURL, into: staging), "unpacked as CourseRestorer.unpack does")
+        XCTAssertThrowsError(try SharedMediaStore.refuseUnlessItsMediaWasPutBack(
+            unpackedAt: staging, backupFileName: written.list.backupName
+        )) { (error: Error) in
+            XCTAssertEqual(error as? SharedMediaStore.Problem, .mediaNotPutBack(written.list.backupName))
+        }
+        let list: SharedMediaList = try XCTUnwrap(try SharedMediaStore.list(inUnpackedBackupAt: staging))
+        let restore: SharedMediaRestore = store.beginRestore(of: list, currentCourseFolderURL: nil)
+        _ = try restore.fill(intoCourseAt: staging.appendingPathComponent("ICS3U"), backupFileName: list.backupName)
+        restore.end()
+        XCTAssertNoThrow(try SharedMediaStore.refuseUnlessItsMediaWasPutBack(
+            unpackedAt: staging, backupFileName: list.backupName
+        ), "once the Media is back, the door goes ahead")
+
+        let wholeURL: URL = try wholeZip(of: course, in: courses)
+        let wholeStaging: URL = topURL.appendingPathComponent("whole staging")
+        XCTAssertTrue(SharedMediaTestFiles.unpack(wholeURL, into: wholeStaging))
+        XCTAssertNoThrow(try SharedMediaStore.refuseUnlessItsMediaWasPutBack(
+            unpackedAt: wholeStaging, backupFileName: wholeURL.lastPathComponent
+        ), "a whole zip carries no marker")
+    }
+
+    /// A whole zip of the course, by the same `zip` call `CourseArchiver`
+    /// makes, for a test that is not async.
+    private func wholeZip(of course: URL, in courses: URL) throws -> URL {
+        let zipURL: URL = topURL.appendingPathComponent("whole.zip")
+        var arguments: [String] = ["-r", "-q", "-X", zipURL.path, course.lastPathComponent, "-x"]
+        arguments.append(contentsOf: CourseArchiver.archiveRules(forFolderAt: course).zipExclusions)
+        let result: SharedMediaStore.ProgramResult = SharedMediaStore.run("/usr/bin/zip", arguments, in: courses)
+        XCTAssertEqual(result.status, 0)
+        return zipURL
+    }
+
+    // MARK: - Which folder is Media (#785 implementation review, I2)
+
+    /// Only a folder listed as exactly `Media` is left out. A course whose
+    /// folder is spelled `media` keeps it in the zip, as the whole zip's
+    /// case-sensitive `zip -x` does, and its list names nothing.
+    func testAFolderSpelledOtherwiseStaysInTheZip() throws {
+        let courses: URL = topURL.appendingPathComponent("courses")
+        let course: URL = courses.appendingPathComponent("ICS3U")
+        try SharedMediaTestFiles.write(Data("{}".utf8), to: course.appendingPathComponent("course_config.json"))
+        try SharedMediaTestFiles.write(SharedMediaTestFiles.randomData(500), to: course.appendingPathComponent("media/u/p.png"))
+        let store: SharedMediaStore = SharedMediaStore(coursesDirectoryURL: courses)
+        let written: SharedMediaStore.Written = try store.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-13_183800_menu-section1_shared-media.zip",
+            rules: CourseArchiver.archiveRules(forFolderAt: course)
+        )
+        XCTAssertEqual(written.list.media.count, 0)
+        XCTAssertEqual(written.filesAdded, 0)
+        XCTAssertTrue(SharedMediaTestFiles.zipEntries(written.zipURL).contains("ICS3U/media/u/p.png"))
     }
 
     // MARK: - The trail
@@ -596,6 +777,24 @@ enum SharedMediaTestFiles {
         try FileManager.default.createDirectory(at: media.appendingPathComponent("empty folder"), withIntermediateDirectories: true)
         try write(randomData(100), to: media.appendingPathComponent("closed/inner/deep.png"))
         chmod(media.appendingPathComponent("closed").path, 0o700)
+        // #785 implementation review, W1: a link to a sibling folder that
+        // sorts first, a link to a folder outside the course, and a loop
+        // (zip follows it until the system refuses more links in a path).
+        try write(randomData(400), to: media.appendingPathComponent("real folder/inner.png"))
+        symlink("real folder", media.appendingPathComponent("a link to the real folder").path)
+        let outside: URL = courses.deletingLastPathComponent().appendingPathComponent("outside")
+        try write(randomData(300), to: outside.appendingPathComponent("far.png"))
+        symlink(outside.path, media.appendingPathComponent("link to outside").path)
+        try write(randomData(50), to: media.appendingPathComponent("loop/f.png"))
+        symlink("..", media.appendingPathComponent("loop/back up").path)
+        // W2: a precomposed folder and file, made by POSIX calls so their
+        // bytes stay precomposed.
+        let composedFolder: String = media.path + "/caf\u{00E9}"
+        mkdir(composedFolder, 0o755)
+        let composedFile: Int32 = open(composedFolder + "/cr\u{00E8}me.png", O_WRONLY | O_CREAT, 0o644)
+        let creme: [UInt8] = Array("creme".utf8)
+        _ = Darwin.write(composedFile, creme, creme.count)
+        close(composedFile)
         symlink("a.png", media.appendingPathComponent("link to a.png").path)
         symlink("/nonexistent/nowhere.png", media.appendingPathComponent("broken link.png").path)
         try FileManager.default.setAttributes(
@@ -617,48 +816,85 @@ enum SharedMediaTestFiles {
         return String(data: result.output, encoding: .utf8) ?? ""
     }
 
-    static func tree(_ top: URL) -> [String: Node] {
-        var found: [String: Node] = [:]
-        let fileManager: FileManager = FileManager.default
-        guard let walker = fileManager.enumerator(atPath: top.path) else {
+    /// Every entry under `top`, keyed by its name BYTES, read with the
+    /// folder's own listing.
+    static func tree(_ top: URL) -> [[UInt8]: Node] {
+        var found: [[UInt8]: Node] = [:]
+        guard let folder = SharedMediaFiles.Folder(path: top.path) else {
             return found
         }
-        while let relative = walker.nextObject() as? String {
-            let url: URL = top.appendingPathComponent(relative)
-            let attributes: [FileAttributeKey: Any] = (try? fileManager.attributesOfItem(atPath: url.path)) ?? [:]
-            let type: FileAttributeType? = attributes[.type] as? FileAttributeType
-            let mode: Int = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
-            if type == .typeDirectory {
-                found[relative] = Node(kind: "folder", mode: mode, bytes: nil, modified: nil)
-            } else if type == .typeSymbolicLink {
-                found[relative] = Node(kind: "link", mode: mode, bytes: nil, modified: nil)
-            } else {
-                found[relative] = Node(
-                    kind: "file", mode: mode, bytes: try? Data(contentsOf: url),
-                    modified: attributes[.modificationDate] as? Date
-                )
+        var waiting: [String] = [""]
+        while let relative = waiting.popLast() {
+            let listing: String = relative.isEmpty ? "." : relative
+            guard let names = SharedMediaFiles.names(in: folder, at: listing) else {
+                continue
+            }
+            for name in names {
+                let path: String = relative.isEmpty ? name : relative + "/" + name
+                var status: stat = stat()
+                if fstatat(folder.descriptor, path, &status, AT_SYMLINK_NOFOLLOW) != 0 {
+                    continue
+                }
+                let kind: mode_t = status.st_mode & S_IFMT
+                let mode: Int = Int(status.st_mode & 0o7777)
+                if kind == S_IFDIR {
+                    found[Array(path.utf8)] = Node(kind: "folder", mode: mode, bytes: nil, modified: nil)
+                    waiting.append(path)
+                } else if kind == S_IFLNK {
+                    found[Array(path.utf8)] = Node(kind: "link", mode: mode, bytes: nil, modified: nil)
+                } else {
+                    var data: Data = Data()
+                    let opened: Int32 = openat(folder.descriptor, path, O_RDONLY)
+                    if opened >= 0 {
+                        data = FileHandle(fileDescriptor: opened, closeOnDealloc: true).readDataToEndOfFile()
+                    }
+                    let facts: SharedMediaFiles.Facts? = SharedMediaFiles.facts(in: folder, at: path)
+                    found[Array(path.utf8)] = Node(kind: "file", mode: mode, bytes: data, modified: facts?.modified)
+                }
             }
         }
         return found
     }
 
-    /// Names, kinds, bytes and permissions that differ. Dates are compared
-    /// apart, against the original files.
-    static func differences(_ small: [String: Node], _ whole: [String: Node]) -> [String] {
+    /// A name's bytes as text a failure message can show, every byte
+    /// outside plain ASCII written as `\xNN`.
+    static func shown(_ bytes: [UInt8]) -> String {
+        var text: String = ""
+        for byte in bytes {
+            if byte >= 32 && byte < 127 {
+                text.append(Character(UnicodeScalar(byte)))
+            } else {
+                text += String(format: "\\x%02x", byte)
+            }
+        }
+        return text
+    }
+
+    /// Names (by their bytes), kinds, bytes and permissions that differ.
+    /// Dates are compared apart, against the original files.
+    static func differences(_ small: [[UInt8]: Node], _ whole: [[UInt8]: Node]) -> [String] {
         var found: [String] = []
-        var names: Set<String> = []
+        var names: Set<[UInt8]> = []
         for (name, _) in small {
             names.insert(name)
         }
         for (name, _) in whole {
             names.insert(name)
         }
-        for name in names.sorted() {
-            guard let mine = small[name] else {
+        var ordered: [[UInt8]] = []
+        for name in names {
+            ordered.append(name)
+        }
+        ordered.sort { (first: [UInt8], second: [UInt8]) -> Bool in
+            return first.lexicographicallyPrecedes(second)
+        }
+        for key in ordered {
+            let name: String = shown(key)
+            guard let mine = small[key] else {
                 found.append("only in the whole restore: \(name)")
                 continue
             }
-            guard let theirs = whole[name] else {
+            guard let theirs = whole[key] else {
                 found.append("only in the small restore: \(name)")
                 continue
             }
@@ -673,6 +909,24 @@ enum SharedMediaTestFiles {
             }
         }
         return found
+    }
+
+    /// What a crash leaves that names nothing: unpublished zips in the
+    /// course's backups folder, list folders and temporaries in the store.
+    static func leftoverCount(_ store: SharedMediaStore, course: String) -> Int {
+        var count: Int = 0
+        let fileManager: FileManager = FileManager.default
+        let folders: [URL] = [
+            store.backupsURL.appendingPathComponent(course), store.storeURL, store.listsURL, store.pendingURL,
+        ]
+        for folder in folders {
+            for name in (try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? [] {
+                if name.hasPrefix(".writing-") || name.hasPrefix(".incoming-") {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 
     static func everySmallBackupIsWhole(_ store: SharedMediaStore, course: String) throws -> Bool {

@@ -61,9 +61,14 @@ final class SharedMediaContractTests: XCTestCase {
         XCTAssertEqual(honoured["listWithoutItsZipHours"] as? Int, Int(SharedMediaSweepRule.pendingHonouredFor / 3600))
         XCTAssertEqual(honoured["undoListDays"] as? Int, Int(SharedMediaSweepRule.undoHonouredFor / 86_400))
         XCTAssertEqual(honoured["unneededBeforeDeletedHours"] as? Int, Int(SharedMediaSweepRule.unneededFor / 3600))
+        XCTAssertEqual(
+            honoured["unneededBeforeDeletedWhenSharedDays"] as? Int, Int(SharedMediaSweepRule.unneededForWhenShared / 86_400)
+        )
+        XCTAssertEqual(honoured["futureAllowedHours"] as? Int, Int(SharedMediaSweepRule.futureAllowed / 3600))
+        XCTAssertEqual(honoured["leftoverHours"] as? Int, Int(SharedMediaSweepRule.leftoverAge / 3600))
 
         let cases: [[String: Any]] = try XCTUnwrap(shared["sweepCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 22)
+        XCTAssertGreaterThanOrEqual(cases.count, 31)
         let now: Date = Date(timeIntervalSince1970: 1_800_000_000)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -89,6 +94,16 @@ final class SharedMediaContractTests: XCTestCase {
             XCTAssertEqual(recorded, expectedRecorded, "\(name): recorded as unneeded")
             if let removed = testCase["expectListsRemoved"] as? [String] {
                 XCTAssertEqual(decision.listFilesToRemove, removed.sorted(), "\(name): lists removed")
+            }
+            if let firstSeen = testCase["expectFirstSeenRecorded"] as? [String] {
+                var recordedSeen: Set<String> = []
+                for (fileName, _) in decision.listsFirstSeen {
+                    recordedSeen.insert(fileName)
+                }
+                XCTAssertEqual(recordedSeen, Set(firstSeen), "\(name): first seen")
+            }
+            if let leftovers = testCase["expectLeftoversRemoved"] as? [String] {
+                XCTAssertEqual(decision.leftoversToRemove, leftovers.sorted(), "\(name): leftovers removed")
             }
         }
     }
@@ -250,9 +265,11 @@ final class SharedMediaContractTests: XCTestCase {
         var index: Int = 0
         for backup in (testCase["backups"] as? [[String: Any]]) ?? [] {
             let unreadable: Bool = (backup["unreadable"] as? Bool) ?? false
-            backups.append(SharedMediaSweepRule.BackupSeen(
+            var seen: SharedMediaSweepRule.BackupSeen = SharedMediaSweepRule.BackupSeen(
                 name: "backup\(index)", checksums: unreadable ? nil : checksums(backup["lists"])
-            ))
+            )
+            seen.host = backup["computer"] as? String == "another" ? "ANOTHER" : "THIS"
+            backups.append(seen)
             index += 1
         }
         var withoutZips: [SharedMediaSweepRule.ListWithoutItsZip] = []
@@ -266,9 +283,13 @@ final class SharedMediaContractTests: XCTestCase {
             index += 1
         }
         var holds: [SharedMediaSweepRule.HoldSeen] = []
+        var firstSeen: [String: Date] = [:]
         index = 0
         for list in (testCase["undoLists"] as? [[String: Any]]) ?? [] {
             let days: Double = try XCTUnwrap(list["daysAgo"] as? NSNumber).doubleValue
+            if let seenDays = list["firstSeenDaysAgo"] as? NSNumber {
+                firstSeen["undo\(index)"] = now.addingTimeInterval(-seenDays.doubleValue * 86_400)
+            }
             let host: String = list["computer"] as? String == "this" ? "THIS" : "ANOTHER"
             holds.append(SharedMediaSweepRule.HoldSeen(
                 fileName: "undo\(index)",
@@ -284,12 +305,16 @@ final class SharedMediaContractTests: XCTestCase {
         for list in (testCase["pendingLists"] as? [[String: Any]]) ?? [] {
             let hours: Double = try XCTUnwrap(list["hoursAgo"] as? NSNumber).doubleValue
             let host: String = list["computer"] as? String == "this" ? "THIS" : "ANOTHER"
+            var hold: SharedMediaHold = SharedMediaHold(
+                kind: .pending, id: "pending\(index)", writtenAt: now.addingTimeInterval(-hours * 3600),
+                host: host, pid: 4321, checksums: checksums(list["lists"])
+            )
+            if let finished = list["finishedHoursAgo"] as? NSNumber {
+                hold.finishedAt = now.addingTimeInterval(-finished.doubleValue * 3600)
+            }
             holds.append(SharedMediaSweepRule.HoldSeen(
                 fileName: "pending\(index)",
-                hold: SharedMediaHold(
-                    kind: .pending, id: "pending\(index)", writtenAt: now.addingTimeInterval(-hours * 3600),
-                    host: host, pid: 4321, checksums: checksums(list["lists"])
-                ),
+                hold: hold,
                 writerIsRunningHere: try XCTUnwrap(list["running"] as? Bool)
             ))
             index += 1
@@ -304,7 +329,14 @@ final class SharedMediaContractTests: XCTestCase {
             let hoursAgo: Double = try XCTUnwrap(hours as? NSNumber).doubleValue
             since[entryPath(token)] = now.addingTimeInterval(-hoursAgo * 3600)
         }
-        return SharedMediaSweepRule.Inputs(
+        var leftovers: [SharedMediaSweepRule.Leftover] = []
+        for leftover in (testCase["leftovers"] as? [[String: Any]]) ?? [] {
+            let hours: Double = try XCTUnwrap(leftover["hoursAgo"] as? NSNumber).doubleValue
+            leftovers.append(SharedMediaSweepRule.Leftover(
+                path: try XCTUnwrap(leftover["path"] as? String), modified: now.addingTimeInterval(-hours * 3600)
+            ))
+        }
+        var inputs: SharedMediaSweepRule.Inputs = SharedMediaSweepRule.Inputs(
             storeEntries: entries,
             backups: backups,
             listsWithoutTheirZips: withoutZips,
@@ -314,6 +346,11 @@ final class SharedMediaContractTests: XCTestCase {
             now: now,
             thisComputer: "THIS"
         )
+        inputs.sharedWithAnotherComputer = (testCase["sharedWithAnotherComputer"] as? Bool) ?? false
+        inputs.anotherComputersSweepRecordIsThere = (testCase["anotherComputersSweepRecord"] as? Bool) ?? false
+        inputs.listsFirstSeen = firstSeen
+        inputs.leftovers = leftovers
+        return inputs
     }
 }
 

@@ -85,15 +85,22 @@ nonisolated struct SharedMediaList: Equatable, Sendable {
     let media: [MediaFile]
     let folders: [MediaFolder]
 
-    // MARK: - Computed properties
-
     /// The format number this version writes and is the only one it reads.
     static let formatNumber: Int = 1
 
     /// The list's name inside the zip, at the zip's root and beside the
     /// course folder rather than inside it, so a course unpacked from the
-    /// zip carries no file the teacher did not make.
+    /// zip carries no file the teacher did not make. It is also the MARKER
+    /// a restore must check (`SharedMediaStore.refuseUnlessItsMediaWasPutBack`).
     static let nameInsideTheZip: String = ".plantoir-backup.json"
+
+    /// The folder a small backup leaves out, at the top of the course,
+    /// spelled exactly so: a folder whose listing spells it otherwise
+    /// (`media`) is not left out, and the zip keeps it, as the whole zip's
+    /// case-sensitive `zip -x` does.
+    static let mediaFolderName: String = "Media"
+
+    // MARK: - Computed properties
 
     /// Every checksum the list names, once each.
     var checksums: Set<String> {
@@ -225,9 +232,6 @@ nonisolated struct SharedMediaList: Equatable, Sendable {
         )
     }
 
-    /// The folder a small backup leaves out, at the top of the course.
-    static let mediaFolderName: String = "Media"
-
     /// `Media/…` with no part that is empty, `.` or `..`, and no backslash
     /// (a Windows separator read on the mac would be one strange name, and
     /// on Windows a way out of the folder).
@@ -298,6 +302,14 @@ nonisolated struct SharedMediaHold: Equatable, Sendable {
 
     let checksums: Set<String>
 
+    /// When the backup that wrote this pending list FINISHED, by its own
+    /// clock, or nil while it is still being written. A finished backup's
+    /// pending list is kept for a day after this moment (#785 implementation
+    /// review, W3): it is the first file the backup writes, so a sync service
+    /// usually carries it to another computer before the zip, and it names
+    /// every picture the backup relies on, old ones included.
+    var finishedAt: Date? = nil
+
     // MARK: - Functions
 
     func encoded() throws -> Data {
@@ -316,6 +328,9 @@ nonisolated struct SharedMediaHold: Equatable, Sendable {
         ]
         if kind == .pending {
             object["pid"] = Int(pid)
+            if let finishedAt {
+                object["finishedAt"] = SharedMediaDates.text(for: finishedAt)
+            }
         }
         return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
@@ -354,13 +369,24 @@ nonisolated struct SharedMediaHold: Equatable, Sendable {
             checksums.insert(checksum)
         }
         var pid: Int32 = 0
+        var finishedAt: Date? = nil
         if kind == .pending {
             guard let number = object["pid"] as? Int else {
                 throw SharedMediaList.Problem.missingField("pid")
             }
             pid = Int32(truncatingIfNeeded: number)
+            if let finishedText = object["finishedAt"] as? String {
+                guard let moment = SharedMediaDates.date(from: finishedText) else {
+                    throw SharedMediaList.Problem.missingField("finishedAt")
+                }
+                finishedAt = moment
+            }
         }
-        return SharedMediaHold(kind: kind, id: id, writtenAt: writtenAt, host: host, pid: pid, checksums: checksums)
+        var hold: SharedMediaHold = SharedMediaHold(
+            kind: kind, id: id, writtenAt: writtenAt, host: host, pid: pid, checksums: checksums
+        )
+        hold.finishedAt = finishedAt
+        return hold
     }
 }
 

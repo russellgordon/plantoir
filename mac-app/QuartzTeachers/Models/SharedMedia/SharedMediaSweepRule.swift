@@ -12,27 +12,33 @@ import Foundation
 /// **The rule, in the order it is applied:**
 ///
 /// 1. **Anything unreadable stops the whole sweep.** A small backup whose
-///    list cannot be read (a zip still in the cloud with no copy of its list
-///    beside it, a damaged zip, a list in a format this version does not
-///    know) might name any file in the store, so nothing is deleted and the
-///    reason is written on the trail.
+///    list cannot be read, or a list of a kind or format this version does
+///    not know, might name any file in the store, so nothing is deleted and
+///    the reason is written on the trail.
 /// 2. **What is still needed** is every checksum named by: a small backup
 ///    that is there; a backup's list whose zip is NOT there yet but that was
-///    written less than a day ago (another computer's backup whose list has
-///    synced before its zip); a step on the Undo list written less than 31
-///    days ago (#899, by any computer); and a backup being written, for a
-///    day, or for as long as its process is still running on this computer.
-///    Every age is measured from the moment the list itself WROTE DOWN,
-///    never from a file's dates.
+///    written less than a day ago; a step on the Undo list written less than
+///    31 days ago (#899, by any computer); a backup being written, for a day
+///    or while its process still runs on this computer; and a FINISHED
+///    backup's pending list, for a day after it finished. Every age is a
+///    moment a list wrote down, never a file's date. A moment more than a
+///    day ahead of this computer's clock is counted from when this computer
+///    first saw the list instead, so a wrong clock cannot pin files for
+///    years.
 /// 3. **Nothing is deleted the first time it is found unneeded.** This
 ///    computer writes down when it first found each file unneeded, and
-///    deletes it only when a sweep a day or more after that still finds it
-///    unneeded. That one rule covers what file dates cannot: a picture
-///    copied into the store today keeps the date it was taken in 2024, and
-///    a file another computer has just started to rely on looks exactly
-///    like one nobody needs until that computer's list arrives.
+///    deletes it only when a sweep a day or more later still finds it so;
+///    FOURTEEN days once a second computer has written to the store, since
+///    a file another computer has just started to rely on looks unneeded
+///    here until that computer's lists arrive (#785 implementation review,
+///    W3). No wait closes that race against a sync delay of any length: a
+///    restore that then misses a picture names it, and never skips it.
 /// 4. A file whose name is neither a checksum nor an unfinished copy (a sync
 ///    service's "abc… 2") is never touched.
+/// 5. What a crash leaves that names nothing (an unpublished
+///    `.writing-….zip`, an `.incoming-…` folder, a temporary list) goes once
+///    its own date is more than a day old: it is no backup and no list, so
+///    its date is the only thing to go by, and nothing writes for a day.
 nonisolated enum SharedMediaSweepRule {
 
     // MARK: - Types
@@ -59,6 +65,9 @@ nonisolated enum SharedMediaSweepRule {
 
         let name: String
         let checksums: Set<String>?
+
+        /// The computer its list says wrote it.
+        var host: String? = nil
     }
 
     /// A copy in `lists/` of a backup's list whose zip is not in the
@@ -70,6 +79,7 @@ nonisolated enum SharedMediaSweepRule {
         let fileName: String
         let writtenAt: Date
         let checksums: Set<String>
+        var host: String? = nil
     }
 
     /// A pending or Undo list, and for a pending one whether the process
@@ -81,6 +91,17 @@ nonisolated enum SharedMediaSweepRule {
         let fileName: String
         let hold: SharedMediaHold
         let writerIsRunningHere: Bool
+    }
+
+    /// Something a crash left that names nothing: an unpublished zip, an
+    /// unfinished list folder, a temporary list. By its path from the
+    /// working folder's `courses` folder, with its own modification date.
+    struct Leftover: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        let path: String
+        let modified: Date
     }
 
     struct Inputs: Equatable, Sendable {
@@ -101,6 +122,19 @@ nonisolated enum SharedMediaSweepRule {
 
         let now: Date
         let thisComputer: String
+
+        /// This computer's record that another computer has written to the
+        /// store, kept once found.
+        var sharedWithAnotherComputer: Bool = false
+
+        /// Another computer's sweep record is in the store.
+        var anotherComputersSweepRecordIsThere: Bool = false
+
+        /// When this computer first saw each list whose moment is more than
+        /// a day ahead of its clock, by file name.
+        var listsFirstSeen: [String: Date] = [:]
+
+        var leftovers: [Leftover] = []
     }
 
     /// Why a sweep kept everything.
@@ -127,12 +161,16 @@ nonisolated enum SharedMediaSweepRule {
 
         /// The record to write back for this computer.
         let unneededSince: [String: Date]
+
+        var sharedWithAnotherComputer: Bool = false
+        var listsFirstSeen: [String: Date] = [:]
+        var leftoversToRemove: [String] = []
     }
 
     // MARK: - Stored properties
 
-    /// How long a pending list, and a backup's list whose zip is not here,
-    /// are honoured by their written moment: a day.
+    /// How long a pending list, a finished backup's pending list, and a
+    /// backup's list whose zip is not here, are honoured: a day.
     static let pendingHonouredFor: TimeInterval = 24 * 60 * 60
 
     /// How long a step on the Undo list keeps its pictures (#899 plan 4.5):
@@ -141,8 +179,21 @@ nonisolated enum SharedMediaSweepRule {
     static let undoHonouredFor: TimeInterval = 31 * 24 * 60 * 60
 
     /// How long a file must have been found unneeded, by this computer,
-    /// before it is deleted.
+    /// before it is deleted, when only this computer writes to the store.
     static let unneededFor: TimeInterval = 24 * 60 * 60
+
+    /// The same once another computer has written to the store: fourteen
+    /// days, long enough to cover a computer shut for a two-week holiday
+    /// with a backup it had not yet synced. The cost is only that space
+    /// comes back two weeks after a backup is deleted on a shared folder.
+    static let unneededForWhenShared: TimeInterval = 14 * 24 * 60 * 60
+
+    /// How far ahead of this computer's clock a written moment may be
+    /// before it is counted from when this computer first saw it.
+    static let futureAllowed: TimeInterval = 24 * 60 * 60
+
+    /// How old a crash's leftover must be, by its own date, before it goes.
+    static let leftoverAge: TimeInterval = 24 * 60 * 60
 
     // MARK: - Functions
 
@@ -156,6 +207,8 @@ nonisolated enum SharedMediaSweepRule {
             return keepingEverything(.aListCouldNotBeRead(first), inputs)
         }
 
+        var shared: Bool = inputs.sharedWithAnotherComputer || inputs.anotherComputersSweepRecordIsThere
+        var firstSeen: [String: Date] = [:]
         var needed: Set<String> = []
         var listFilesToRemove: [String] = []
 
@@ -163,22 +216,33 @@ nonisolated enum SharedMediaSweepRule {
             if let checksums = backup.checksums {
                 needed.formUnion(checksums)
             }
+            if let host = backup.host, host != inputs.thisComputer {
+                shared = true
+            }
         }
         for list in inputs.listsWithoutTheirZips {
-            if isYounger(than: pendingHonouredFor, writtenAt: list.writtenAt, now: inputs.now) {
+            if let host = list.host, host != inputs.thisComputer {
+                shared = true
+            }
+            let written: Date = moment(list.writtenAt, of: list.fileName, inputs, &firstSeen)
+            if isYounger(than: pendingHonouredFor, writtenAt: written, now: inputs.now) {
                 needed.formUnion(list.checksums)
             } else {
                 listFilesToRemove.append(list.fileName)
             }
         }
         for seen in inputs.holds {
-            if holdIsHonoured(seen, inputs) {
+            if seen.hold.host != inputs.thisComputer {
+                shared = true
+            }
+            if holdIsHonoured(seen, inputs, &firstSeen) {
                 needed.formUnion(seen.hold.checksums)
             } else {
                 listFilesToRemove.append(seen.fileName)
             }
         }
 
+        let wait: TimeInterval = shared ? unneededForWhenShared : unneededFor
         var entriesToDelete: [String] = []
         var unneededSince: [String: Date] = [:]
         for entry in inputs.storeEntries {
@@ -199,33 +263,68 @@ nonisolated enum SharedMediaSweepRule {
                 unneededSince[entry.relativePath] = inputs.now
                 continue
             }
-            if inputs.now.timeIntervalSince(firstFound) >= unneededFor {
+            if inputs.now.timeIntervalSince(firstFound) >= wait {
                 entriesToDelete.append(entry.relativePath)
             } else {
                 unneededSince[entry.relativePath] = firstFound
             }
         }
 
+        var leftoversToRemove: [String] = []
+        for leftover in inputs.leftovers {
+            if inputs.now.timeIntervalSince(leftover.modified) > leftoverAge {
+                leftoversToRemove.append(leftover.path)
+            }
+        }
+
         entriesToDelete.sort()
         listFilesToRemove.sort()
+        leftoversToRemove.sort()
         return Decision(
             keptEverything: nil,
             entriesToDelete: entriesToDelete,
             listFilesToRemove: listFilesToRemove,
-            unneededSince: unneededSince
+            unneededSince: unneededSince,
+            sharedWithAnotherComputer: shared,
+            listsFirstSeen: firstSeen,
+            leftoversToRemove: leftoversToRemove
         )
     }
 
-    /// A pending list is honoured for a day by its own written moment, and
-    /// after that while the process that wrote it still runs on this
-    /// computer (a process id means nothing on another computer). An Undo
-    /// list is honoured for 31 days, whoever wrote it.
-    static func holdIsHonoured(_ seen: HoldSeen, _ inputs: Inputs) -> Bool {
+    /// The moment a list's age is counted from: its own written moment, or,
+    /// when that is more than a day ahead of this computer's clock, the
+    /// moment this computer first saw it (recorded in `firstSeen`).
+    static func moment(
+        _ written: Date,
+        of fileName: String,
+        _ inputs: Inputs,
+        _ firstSeen: inout [String: Date]
+    ) -> Date {
+        if written.timeIntervalSince(inputs.now) <= futureAllowed {
+            return written
+        }
+        let seen: Date = inputs.listsFirstSeen[fileName] ?? inputs.now
+        firstSeen[fileName] = seen
+        return seen
+    }
+
+    /// A pending list being written is honoured for a day by its own
+    /// written moment, and after that while the process that wrote it still
+    /// runs on this computer (a process id means nothing on another
+    /// computer). A FINISHED backup's pending list is honoured for a day
+    /// after it finished, whatever runs. An Undo list is honoured for 31
+    /// days, whoever wrote it.
+    static func holdIsHonoured(_ seen: HoldSeen, _ inputs: Inputs, _ firstSeen: inout [String: Date]) -> Bool {
+        let written: Date = moment(seen.hold.writtenAt, of: seen.fileName, inputs, &firstSeen)
         switch seen.hold.kind {
         case .undo:
-            return isYounger(than: undoHonouredFor, writtenAt: seen.hold.writtenAt, now: inputs.now)
+            return isYounger(than: undoHonouredFor, writtenAt: written, now: inputs.now)
         case .pending:
-            if isYounger(than: pendingHonouredFor, writtenAt: seen.hold.writtenAt, now: inputs.now) {
+            if let finished = seen.hold.finishedAt {
+                let finishedMoment: Date = moment(finished, of: seen.fileName, inputs, &firstSeen)
+                return isYounger(than: pendingHonouredFor, writtenAt: finishedMoment, now: inputs.now)
+            }
+            if isYounger(than: pendingHonouredFor, writtenAt: written, now: inputs.now) {
                 return true
             }
             return seen.hold.host == inputs.thisComputer && seen.writerIsRunningHere
@@ -233,8 +332,7 @@ nonisolated enum SharedMediaSweepRule {
     }
 
     /// True when less than `limit` has passed since `writtenAt`, and for a
-    /// moment in the future, which is another computer's clock running
-    /// ahead: kept, which only ever keeps a file longer.
+    /// moment in the future.
     static func isYounger(than limit: TimeInterval, writtenAt: Date, now: Date) -> Bool {
         return now.timeIntervalSince(writtenAt) < limit
     }
@@ -246,7 +344,10 @@ nonisolated enum SharedMediaSweepRule {
             keptEverything: why,
             entriesToDelete: [],
             listFilesToRemove: [],
-            unneededSince: inputs.unneededSince
+            unneededSince: inputs.unneededSince,
+            sharedWithAnotherComputer: inputs.sharedWithAnotherComputer,
+            listsFirstSeen: inputs.listsFirstSeen,
+            leftoversToRemove: []
         )
     }
 }

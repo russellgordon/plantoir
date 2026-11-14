@@ -31,8 +31,12 @@ extension ActivityTrail {
         let size: String = ByteCountFormatter.string(fromByteCount: result.bytesFreed, countStyle: .file)
         let files: String = result.filesDeleted == 1 ? "1 file" : "\(result.filesDeleted) files"
         let lists: String = result.listsRemoved == 1 ? "1 list" : "\(result.listsRemoved) lists"
-        return "removed \(files) no backup needs from the backups' shared Media (\(size)), "
+        var line: String = "removed \(files) no backup needs from the backups' shared Media (\(size)), "
             + "and \(lists) that kept nothing any more"
+        if result.leftoversRemoved > 0 {
+            line += "; removed \(result.leftoversRemoved) left by a backup that stopped part way"
+        }
+        return line
     }
 
     nonisolated static func sharedMediaKeptWords(_ why: SharedMediaSweepRule.KeptEverything) -> String {

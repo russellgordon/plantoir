@@ -23,9 +23,9 @@ import Foundation
 ///   files/<aa>/<sha256>         the bytes, named by their checksum
 ///   lists/backup-<zip>.json     a copy of each small backup's list
 ///   lists/undo-<step>.json      a step on the Undo list that needs files
-///   pending/<id>.json           a backup being written
-///   sweep-<computer>.json       when this computer first found each file
-///                               unneeded
+///   pending/<id>.json           a backup being written, kept a day after
+///                               it finishes
+///   sweep-<computer>.json       this computer's own sweep record
 /// ```
 ///
 /// The format is shared with Windows: `contracts/file-formats.json` →
@@ -43,17 +43,19 @@ nonisolated struct SharedMediaStore: Sendable {
     // MARK: - Types
 
     /// What went wrong, in words a teacher can be shown. Every one of them
-    /// means nothing was published: no zip under its final name, no list.
+    /// means nothing was published: no zip under its final name.
     enum Problem: LocalizedError, Equatable {
         case notASmallBackupName(String)
         case nameAlreadyTaken(String)
         case mediaUnreadable(String)
         case mediaChangedWhileBeingSaved(String)
         case storeCopyDidNotMatch(String)
+        case mediaHasTooManyEntries(Int)
         case zipFailed(String)
         case notASmallBackup(String)
         case listUnreadable(String)
         case badUndoStepID(String)
+        case mediaNotPutBack(String)
 
         var errorDescription: String? {
             switch self {
@@ -67,6 +69,8 @@ nonisolated struct SharedMediaStore: Sendable {
                 return "\(path) changed while the backup was being saved, so no backup was saved. Try again."
             case .storeCopyDidNotMatch(let path):
                 return "The copy of \(path) did not match the original after it was saved, so no backup was saved."
+            case .mediaHasTooManyEntries(let count):
+                return "The course's Media folder holds more than \(count) files and folders, counting the ones its links lead to, so no small backup was saved."
             case .zipFailed(let reason):
                 return "Could not write the backup: \(reason)"
             case .notASmallBackup(let name):
@@ -75,6 +79,8 @@ nonisolated struct SharedMediaStore: Sendable {
                 return "The list of Media files in \(name) could not be read."
             case .badUndoStepID(let id):
                 return "\(id) cannot name a step on the Undo list."
+            case .mediaNotPutBack(let name):
+                return "\(name) keeps its pictures with the other backups, and they were not put back, so nothing was changed."
             }
         }
     }
@@ -87,11 +93,15 @@ nonisolated struct SharedMediaStore: Sendable {
         case pendingWritten
         /// Every Media file the list names is in the store.
         case mediaStored
-        /// The zip is under its final name.
-        case zipPublished
-        /// The copy of the list is in `lists/`; only the pending list is
-        /// left to remove.
+        /// The zip is whole under its temporary name, and the folder its
+        /// list was added from is still there.
+        case zipWritten
+        /// The copy of the list is in `lists/`; the zip is not yet under its
+        /// name.
         case listCopied
+        /// The zip is under its final name; the pending list is not yet
+        /// marked finished.
+        case zipPublished
     }
 
     /// Where a test can step into a backup. `real` everywhere else.
@@ -158,6 +168,47 @@ nonisolated struct SharedMediaStore: Sendable {
         let bytesFreed: Int64
         let listsRemoved: Int
         let filesFoundUnneededForTheFirstTime: Int
+        var leftoversRemoved: Int = 0
+    }
+
+    /// One file found in Media.
+    struct WalkedFile: Sendable {
+
+        // MARK: - Stored properties
+
+        /// From the course folder: `Media/…`, in the listing's own bytes.
+        let path: String
+
+        /// From the course's PARENT folder: `<course>/Media/…`.
+        let sourcePath: String
+
+        let size: Int64
+        let modified: Date
+        let mode: Int
+    }
+
+    /// Everything in a course's Media folder, and the open folder its
+    /// `sourcePath`s are resolved from.
+    struct WalkedMedia: Sendable {
+
+        // MARK: - Stored properties
+
+        let parent: SharedMediaFiles.Folder
+        let files: [WalkedFile]
+        let folders: [SharedMediaList.MediaFolder]
+    }
+
+    private enum SweepGatherProblem: Error {
+        case couldNotRead(String)
+    }
+
+    struct ProgramResult: Sendable {
+
+        // MARK: - Stored properties
+
+        let status: Int32
+        let output: Data
+        let errors: String
     }
 
     // MARK: - Stored properties
@@ -178,8 +229,6 @@ nonisolated struct SharedMediaStore: Sendable {
 
     let hooks: Hooks
 
-    // MARK: - Computed properties
-
     /// What every small backup's name ends with, before `.zip`. It is also
     /// what keeps an OLDER Plantoir from listing one: every released parser
     /// (v1.0.0 to v1.9.x on the mac, `BackupItem.From` on Windows) refuses a
@@ -189,6 +238,15 @@ nonisolated struct SharedMediaStore: Sendable {
     static let smallBackupEnding: String = "_shared-media"
 
     static let storeFolderName: String = ".shared-media"
+
+    /// The most files and folders a small backup's walk of Media takes,
+    /// links followed. Two links that each lead back to their own parent
+    /// would otherwise double the walk at every level until the system's
+    /// limit of 32 links in a path; a whole zip of such a course never ends
+    /// either.
+    static let mostMediaEntries: Int = 200_000
+
+    // MARK: - Computed properties
 
     var backupsURL: URL {
         return coursesDirectoryURL.appendingPathComponent("_backups")
@@ -255,8 +313,11 @@ nonisolated struct SharedMediaStore: Sendable {
         return name.hasSuffix(smallBackupEnding + ".zip") && !name.hasPrefix(".")
     }
 
-    /// The zip a sync service's placeholder stands for: iCloud Drive keeps
-    /// an evicted `X.zip` as `.X.zip.icloud`. Nil for any other name.
+    /// The zip a sync service's placeholder stands for: iCloud Drive before
+    /// macOS 14 kept an evicted `X.zip` as `.X.zip.icloud`. Nil for any
+    /// other name. (Since macOS 14 an evicted file keeps its own name and
+    /// has no data on this disk; reading its list either downloads it or
+    /// fails, and a failure keeps everything.)
     static func smallBackupNameBehindPlaceholder(_ name: String) -> String? {
         let ending: String = ".icloud"
         if !name.hasPrefix(".") || !name.hasSuffix(ending) {
@@ -298,9 +359,15 @@ nonisolated struct SharedMediaStore: Sendable {
     ///    to its name. A copy that does not match fails the backup. A kept
     ///    file is checked too, and a damaged one is replaced.
     /// 5. The pages are zipped under a temporary name, the list is added,
-    ///    the zip is tested, and it is moved to `zipName`, refusing a name
-    ///    that is already there.
-    /// 6. A copy of the list goes in `lists/`, then the pending list goes.
+    ///    and the zip is tested.
+    /// 6. A copy of the list goes in `lists/` (before the zip has its name,
+    ///    so an old copy of the same name can never stand for this zip), then
+    ///    the zip is moved to `zipName`, refusing a name that is already
+    ///    there.
+    /// 7. The pending list is marked finished and KEPT for a day: it is the
+    ///    first thing a sync service carries to another computer, and it
+    ///    names every picture this backup relies on (#785 implementation
+    ///    review, W3).
     func writeSmallBackup(
         courseFolderURL: URL,
         courseCode: String,
@@ -330,19 +397,19 @@ nonisolated struct SharedMediaStore: Sendable {
             inCourseAt: courseFolderURL, namesLeftOut: rules.namesLeftOut
         )
         var listedFiles: [SharedMediaList.MediaFile] = []
-        var sourceForChecksum: [String: URL] = [:]
+        var sourceForChecksum: [String: String] = [:]
         var folders: [SharedMediaList.MediaFolder] = []
         if let walked {
             folders = walked.folders
             for file in walked.files {
-                guard let checksum = SharedMediaStore.checksum(ofFileAt: file.url) else {
+                guard let checksum = SharedMediaFiles.checksum(in: walked.parent, at: file.sourcePath) else {
                     throw Problem.mediaUnreadable(file.path)
                 }
                 listedFiles.append(SharedMediaList.MediaFile(
                     path: file.path, sha256: checksum, size: file.size, modified: file.modified, mode: file.mode
                 ))
                 if sourceForChecksum[checksum] == nil {
-                    sourceForChecksum[checksum] = file.url
+                    sourceForChecksum[checksum] = file.sourcePath
                 }
             }
         }
@@ -358,7 +425,7 @@ nonisolated struct SharedMediaStore: Sendable {
         // 3.
         let pendingID: String = UUID().uuidString
         let pendingFileURL: URL = pendingURL.appendingPathComponent("\(pendingID).json")
-        let pending: SharedMediaHold = SharedMediaHold(
+        var pending: SharedMediaHold = SharedMediaHold(
             kind: .pending,
             id: pendingID,
             writtenAt: list.writtenAt,
@@ -367,7 +434,9 @@ nonisolated struct SharedMediaStore: Sendable {
             checksums: list.checksums
         )
         try SharedMediaStore.writeWhole(try pending.encoded(), to: pendingFileURL)
+        let listCopyURL: URL = listsURL.appendingPathComponent("backup-\(zipName).json")
         var zipIsPublished: Bool = false
+        var listIsCopied: Bool = false
         var temporaryZipURL: URL?
         do {
             try hooks.reached(.pendingWritten)
@@ -382,10 +451,12 @@ nonisolated struct SharedMediaStore: Sendable {
             }
             checksumsInOrder.sort()
             for checksum in checksumsInOrder {
-                guard let source = sourceForChecksum[checksum] else {
+                guard let source = sourceForChecksum[checksum], let walked else {
                     continue
                 }
-                let wasAdded: Int64? = try keep(source, as: checksum, pathForWords: pathOf(checksum, in: listedFiles))
+                let wasAdded: Int64? = try keep(
+                    source, from: walked.parent, as: checksum, pathForWords: pathOf(checksum, in: listedFiles)
+                )
                 if let bytes = wasAdded {
                     added += 1
                     bytesAdded += bytes
@@ -406,15 +477,19 @@ nonisolated struct SharedMediaStore: Sendable {
                 leavingOutMedia: walked != nil,
                 list: listData
             )
+
+            // 6.
+            try SharedMediaStore.writeWhole(listData, to: listCopyURL)
+            listIsCopied = true
+            try hooks.reached(.listCopied)
             try SharedMediaStore.moveRefusingAnExistingName(from: temporary, to: finalZipURL)
             zipIsPublished = true
             temporaryZipURL = nil
             try hooks.reached(.zipPublished)
 
-            // 6.
-            try SharedMediaStore.writeWhole(listData, to: listsURL.appendingPathComponent("backup-\(zipName).json"))
-            try hooks.reached(.listCopied)
-            try? fileManager.removeItem(at: pendingFileURL)
+            // 7.
+            pending.finishedAt = clock()
+            try? SharedMediaStore.writeWhole(try pending.encoded(), to: pendingFileURL)
 
             ActivityTrail.note(
                 .backupKeptItsMediaOnce,
@@ -432,10 +507,12 @@ nonisolated struct SharedMediaStore: Sendable {
                 if let temporaryZipURL {
                     try? fileManager.removeItem(at: temporaryZipURL)
                 }
-                // A published zip keeps its pending list until a sweep has
-                // its copy from inside the zip; one that never published
-                // needs nothing, and its files are swept in a day.
                 if !zipIsPublished {
+                    // The copy would stand for another zip of the same name
+                    // that got there first.
+                    if listIsCopied {
+                        try? fileManager.removeItem(at: listCopyURL)
+                    }
                     try? fileManager.removeItem(at: pendingFileURL)
                 }
             }
@@ -454,10 +531,15 @@ nonisolated struct SharedMediaStore: Sendable {
         return checksum
     }
 
-    /// Makes sure the store holds `checksum`, copying `source` in when it
+    /// Makes sure the store holds `checksum`, copying `sourcePath` in when it
     /// does not or when what it holds does not match. Returns the bytes added,
     /// or nil when a good copy was already kept.
-    private func keep(_ source: URL, as checksum: String, pathForWords: String) throws -> Int64? {
+    private func keep(
+        _ sourcePath: String,
+        from parent: SharedMediaFiles.Folder,
+        as checksum: String,
+        pathForWords: String
+    ) throws -> Int64? {
         let fileManager: FileManager = FileManager.default
         let destination: URL = fileURL(forChecksum: checksum)
         if fileManager.fileExists(atPath: destination.path) {
@@ -465,28 +547,34 @@ nonisolated struct SharedMediaStore: Sendable {
                 return nil
             }
         }
-        let folder: URL = destination.deletingLastPathComponent()
-        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-        let temporary: URL = folder.appendingPathComponent(".incoming-\(UUID().uuidString)")
+        let groupURL: URL = destination.deletingLastPathComponent()
+        try fileManager.createDirectory(at: groupURL, withIntermediateDirectories: true)
+        guard let group = SharedMediaFiles.Folder(path: groupURL.path) else {
+            throw Problem.zipFailed("the store's folder \(groupURL.lastPathComponent) could not be opened")
+        }
+        let temporaryName: String = ".incoming-\(UUID().uuidString)"
+        let temporary: URL = groupURL.appendingPathComponent(temporaryName)
         do {
-            try SharedMediaStore.copyBytes(from: source, to: temporary)
+            if !SharedMediaFiles.copy(from: parent, at: sourcePath, to: group, at: temporaryName) {
+                throw Problem.mediaUnreadable(pathForWords)
+            }
             hooks.copiedIntoTheStore(temporary)
-            let copied: String? = SharedMediaStore.checksum(ofFileAt: temporary)
+            let copied: String? = SharedMediaFiles.checksum(in: group, at: temporaryName)
             if copied != checksum {
                 // Either the copy is damaged or the picture changed after it
                 // was read. Read the original again to say which.
-                if SharedMediaStore.checksum(ofFileAt: source) != checksum {
+                if SharedMediaFiles.checksum(in: parent, at: sourcePath) != checksum {
                     throw Problem.mediaChangedWhileBeingSaved(pathForWords)
                 }
                 throw Problem.storeCopyDidNotMatch(pathForWords)
             }
-            SharedMediaStore.flushToDisk(temporary)
-            if rename(temporary.path, destination.path) != 0 {
+            SharedMediaFiles.flush(in: group, at: temporaryName)
+            if !SharedMediaFiles.rename(in: group, from: temporaryName, to: checksum) {
                 throw Problem.zipFailed(String(cString: strerror(errno)))
             }
         } catch {
             if hooks.tidiesUpAfterAFailure {
-                try? fileManager.removeItem(at: temporary)
+                SharedMediaFiles.remove(in: group, at: temporaryName)
             }
             throw error
         }
@@ -516,7 +604,7 @@ nonisolated struct SharedMediaStore: Sendable {
             arguments.append("-x")
             arguments.append(contentsOf: exclusions)
         }
-        let pages: SharedMediaStore.ProgramResult = SharedMediaStore.run(
+        let pages: ProgramResult = SharedMediaStore.run(
             "/usr/bin/zip", arguments, in: courseFolderURL.deletingLastPathComponent()
         )
         if pages.status != 0 {
@@ -528,29 +616,34 @@ nonisolated struct SharedMediaStore: Sendable {
         let fileManager: FileManager = FileManager.default
         let listFolder: URL = storeURL.appendingPathComponent(".incoming-\(UUID().uuidString)")
         try fileManager.createDirectory(at: listFolder, withIntermediateDirectories: true)
-        defer {
-            try? fileManager.removeItem(at: listFolder)
+        do {
+            try list.write(to: listFolder.appendingPathComponent(SharedMediaList.nameInsideTheZip))
+            let adding: ProgramResult = SharedMediaStore.run(
+                "/usr/bin/zip", ["-q", "-X", temporaryZipURL.path, SharedMediaList.nameInsideTheZip], in: listFolder
+            )
+            if adding.status != 0 {
+                throw Problem.zipFailed(adding.errors)
+            }
+            // Tested before it is given its name: a backup that says it was
+            // made and cannot be opened is the worst fault there is here.
+            let test: ProgramResult = SharedMediaStore.run(
+                "/usr/bin/unzip", ["-tqq", temporaryZipURL.path], in: listFolder
+            )
+            if test.status != 0 {
+                throw Problem.zipFailed(test.errors)
+            }
+            let readBack: Data? = try? SharedMediaStore.listData(insideZipAt: temporaryZipURL)
+            if readBack != list {
+                throw Problem.zipFailed("the list inside the zip did not read back")
+            }
+            try hooks.reached(.zipWritten)
+        } catch {
+            if hooks.tidiesUpAfterAFailure {
+                try? fileManager.removeItem(at: listFolder)
+            }
+            throw error
         }
-        try list.write(to: listFolder.appendingPathComponent(SharedMediaList.nameInsideTheZip))
-        let adding: SharedMediaStore.ProgramResult = SharedMediaStore.run(
-            "/usr/bin/zip", ["-q", "-X", temporaryZipURL.path, SharedMediaList.nameInsideTheZip], in: listFolder
-        )
-        if adding.status != 0 {
-            throw Problem.zipFailed(adding.errors)
-        }
-
-        // Tested before it is given its name: a backup that says it was made
-        // and cannot be opened is the worst fault there is here.
-        let test: SharedMediaStore.ProgramResult = SharedMediaStore.run(
-            "/usr/bin/unzip", ["-tqq", temporaryZipURL.path], in: listFolder
-        )
-        if test.status != 0 {
-            throw Problem.zipFailed(test.errors)
-        }
-        let readBack: Data? = try? SharedMediaStore.listData(insideZipAt: temporaryZipURL)
-        if readBack != list {
-            throw Problem.zipFailed("the list inside the zip did not read back")
-        }
+        try? fileManager.removeItem(at: listFolder)
     }
 
     // MARK: - Functions: reading a small backup's list
@@ -579,6 +672,23 @@ nonisolated struct SharedMediaStore: Sendable {
             return try SharedMediaList.decoded(from: data)
         } catch {
             throw Problem.listUnreadable(SharedMediaList.nameInsideTheZip)
+        }
+    }
+
+    /// **The guard every restore door must call** after unpacking a backup
+    /// into `stagingURL` and before swapping anything into the course
+    /// (#785 implementation review, I3). A small backup unpacks into its
+    /// pages plus `.plantoir-backup.json` at the staging root; swapped in as
+    /// it is, it would take the course's whole Media folder away and report
+    /// success. The marker stays until `SharedMediaRestore.fill` has put the
+    /// Media back, so a door that never called it is refused here, in
+    /// words, with nothing changed. A whole zip carries no marker and
+    /// passes.
+    static func refuseUnlessItsMediaWasPutBack(unpackedAt stagingURL: URL, backupFileName: String) throws {
+        let marker: URL = stagingURL.appendingPathComponent(SharedMediaList.nameInsideTheZip)
+        var status: stat = stat()
+        if lstat(marker.path, &status) == 0 {
+            throw Problem.mediaNotPutBack(backupFileName)
         }
     }
 
@@ -622,24 +732,26 @@ nonisolated struct SharedMediaStore: Sendable {
     /// restore swaps it out; nil when the course is not there.
     func beginRestore(of list: SharedMediaList, currentCourseFolderURL: URL?) -> SharedMediaRestore {
         let lock: SharedMediaLock = SharedMediaLock.shared(at: lockURL, creatingFolder: false)
-        var sources: [String: URL] = [:]
+        var sources: [String: SharedMediaRestore.Source] = [:]
         var missing: [String] = []
         var takenFromTheCourse: Set<String> = []
-        var currentByChecksum: [String: URL]? = nil
+        var current: (folder: SharedMediaFiles.Folder, byChecksum: [String: String])? = nil
+        var currentWasRead: Bool = false
         for file in list.media {
             if sources[file.sha256] != nil {
                 continue
             }
             let kept: URL = fileURL(forChecksum: file.sha256)
             if SharedMediaStore.checksum(ofFileAt: kept) == file.sha256 {
-                sources[file.sha256] = kept
+                sources[file.sha256] = SharedMediaRestore.Source(folderPath: kept.deletingLastPathComponent().path, folder: nil, relativePath: file.sha256)
                 continue
             }
-            if currentByChecksum == nil {
-                currentByChecksum = SharedMediaStore.checksumsOfMedia(inCourseAt: currentCourseFolderURL)
+            if !currentWasRead {
+                currentWasRead = true
+                current = SharedMediaStore.checksumsOfMedia(inCourseAt: currentCourseFolderURL)
             }
-            if let fromTheCourse = currentByChecksum?[file.sha256] {
-                sources[file.sha256] = fromTheCourse
+            if let current, let fromTheCourse = current.byChecksum[file.sha256] {
+                sources[file.sha256] = SharedMediaRestore.Source(folderPath: nil, folder: current.folder, relativePath: fromTheCourse)
                 takenFromTheCourse.insert(file.sha256)
             }
         }
@@ -657,20 +769,21 @@ nonisolated struct SharedMediaStore: Sendable {
         )
     }
 
-    /// Every file of a course's Media folder by checksum, for a restore
-    /// that cannot find one in the store.
-    static func checksumsOfMedia(inCourseAt courseFolderURL: URL?) -> [String: URL] {
-        var found: [String: URL] = [:]
+    /// Every file of a course's Media folder by checksum, as a path from the
+    /// course's parent folder, for a restore that cannot find one in the
+    /// store.
+    static func checksumsOfMedia(inCourseAt courseFolderURL: URL?) -> (folder: SharedMediaFiles.Folder, byChecksum: [String: String])? {
         guard let courseFolderURL,
               let walked = try? walkMedia(inCourseAt: courseFolderURL, namesLeftOut: []) else {
-            return found
+            return nil
         }
+        var found: [String: String] = [:]
         for file in walked.files {
-            if let checksum = checksum(ofFileAt: file.url), found[checksum] == nil {
-                found[checksum] = file.url
+            if let checksum = SharedMediaFiles.checksum(in: walked.parent, at: file.sourcePath), found[checksum] == nil {
+                found[checksum] = file.sourcePath
             }
         }
-        return found
+        return (walked.parent, found)
     }
 
     /// Whether the store holds every file of a list, each checked against
@@ -798,7 +911,7 @@ nonisolated struct SharedMediaStore: Sendable {
         for (relativePath, _) in decision.unneededSince where inputs.unneededSince[relativePath] == nil {
             firstTime += 1
         }
-        if let data = try? SharedMediaStore.encodeSweepRecord(decision.unneededSince, computer: computer) {
+        if let data = try? SharedMediaStore.encodeSweepRecord(decision, computer: computer) {
             try? SharedMediaStore.writeWhole(data, to: sweepRecordURL)
         }
         var removed: Int = 0
@@ -809,11 +922,18 @@ nonisolated struct SharedMediaStore: Sendable {
                 removed += 1
             }
         }
-        let result: SweepResult = SweepResult(
+        var leftoversRemoved: Int = 0
+        for path in decision.leftoversToRemove {
+            if (try? fileManager.removeItem(at: coursesDirectoryURL.appendingPathComponent(path))) != nil {
+                leftoversRemoved += 1
+            }
+        }
+        var result: SweepResult = SweepResult(
             keptEverything: nil, filesDeleted: deleted, bytesFreed: bytesFreed, listsRemoved: removed,
             filesFoundUnneededForTheFirstTime: firstTime
         )
-        if deleted > 0 || removed > 0 {
+        result.leftoversRemoved = leftoversRemoved
+        if deleted > 0 || removed > 0 || leftoversRemoved > 0 {
             ActivityTrail.note(.sharedMediaSwept, ActivityTrail.sharedMediaSweptLine(result))
         }
         return result
@@ -828,14 +948,26 @@ nonisolated struct SharedMediaStore: Sendable {
         return result
     }
 
-    private enum SweepGatherProblem: Error {
-        case couldNotRead(String)
+    /// A crash's leftover in `folderURL`, by its path from `courses/`, when
+    /// its name is one only this store writes for a moment.
+    private func leftover(named name: String, in folderURL: URL, under prefix: String) -> SharedMediaSweepRule.Leftover? {
+        if !name.hasPrefix(".writing-") && !name.hasPrefix(".incoming-") {
+            return nil
+        }
+        let url: URL = folderURL.appendingPathComponent(name)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modified = attributes[.modificationDate] as? Date else {
+            return nil
+        }
+        return SharedMediaSweepRule.Leftover(path: prefix + "/" + name, modified: modified)
     }
 
     /// Everything the rule needs, read from disk under the exclusive lock.
     private func gatherSweepInputs() throws -> SharedMediaSweepRule.Inputs {
         let fileManager: FileManager = FileManager.default
         let now: Date = clock()
+        let storePrefix: String = "_backups/" + SharedMediaStore.storeFolderName
+        var leftovers: [SharedMediaSweepRule.Leftover] = []
 
         // files/<aa>/<entry>
         var entries: [SharedMediaSweepRule.StoreEntry] = []
@@ -866,6 +998,18 @@ nonisolated struct SharedMediaStore: Sendable {
             }
         }
 
+        // The store's own root: unfinished list folders, temporary records,
+        // and other computers' sweep records.
+        var anotherSweepRecord: Bool = false
+        for name in (try? fileManager.contentsOfDirectory(atPath: storeURL.path)) ?? [] {
+            if let found = leftover(named: name, in: storeURL, under: storePrefix) {
+                leftovers.append(found)
+            }
+            if name.hasPrefix("sweep-") && name.hasSuffix(".json") && name != sweepRecordURL.lastPathComponent {
+                anotherSweepRecord = true
+            }
+        }
+
         // Every small backup zip in _backups/<any folder>/, placeholders too.
         guard let courseFolders = try? fileManager.contentsOfDirectory(atPath: backupsURL.path) else {
             throw SweepGatherProblem.couldNotRead("_backups")
@@ -885,6 +1029,11 @@ nonisolated struct SharedMediaStore: Sendable {
                 throw SweepGatherProblem.couldNotRead("_backups/\(folder)")
             }
             for name in names {
+                if name.hasPrefix(".writing-") && name.hasSuffix(".zip"),
+                   let found = leftover(named: name, in: folderURL, under: "_backups/\(folder)") {
+                    leftovers.append(found)
+                    continue
+                }
                 var zipName: String? = nil
                 var zipURL: URL? = nil
                 if SharedMediaStore.isSmallBackupName(name) {
@@ -898,7 +1047,11 @@ nonisolated struct SharedMediaStore: Sendable {
                 }
                 zipsPresent.insert(zipName)
                 let list: SharedMediaList? = try? self.list(ofBackupNamed: zipName, zipURL: zipURL)
-                backups.append(SharedMediaSweepRule.BackupSeen(name: zipName, checksums: list?.checksums))
+                var seen: SharedMediaSweepRule.BackupSeen = SharedMediaSweepRule.BackupSeen(
+                    name: zipName, checksums: list?.checksums
+                )
+                seen.host = list?.host
+                backups.append(seen)
             }
         }
 
@@ -911,6 +1064,10 @@ nonisolated struct SharedMediaStore: Sendable {
                 throw SweepGatherProblem.couldNotRead("lists")
             }
             for name in names.sorted() {
+                if let found = leftover(named: name, in: listsURL, under: storePrefix + "/lists") {
+                    leftovers.append(found)
+                    continue
+                }
                 if name.hasPrefix(".") || !name.hasSuffix(".json") {
                     continue
                 }
@@ -925,9 +1082,11 @@ nonisolated struct SharedMediaStore: Sendable {
                         unreadable.append("lists/\(name)")
                         continue
                     }
-                    withoutZips.append(SharedMediaSweepRule.ListWithoutItsZip(
+                    var without: SharedMediaSweepRule.ListWithoutItsZip = SharedMediaSweepRule.ListWithoutItsZip(
                         fileName: "lists/\(name)", writtenAt: list.writtenAt, checksums: list.checksums
-                    ))
+                    )
+                    without.host = list.host
+                    withoutZips.append(without)
                 } else if name.hasPrefix("undo-") {
                     guard let data = try? Data(contentsOf: url),
                           let hold = try? SharedMediaHold.decoded(from: data),
@@ -952,6 +1111,10 @@ nonisolated struct SharedMediaStore: Sendable {
                 throw SweepGatherProblem.couldNotRead("pending")
             }
             for name in names.sorted() {
+                if let found = leftover(named: name, in: pendingURL, under: storePrefix + "/pending") {
+                    leftovers.append(found)
+                    continue
+                }
                 if name.hasPrefix(".") || !name.hasSuffix(".json") {
                     continue
                 }
@@ -972,46 +1135,78 @@ nonisolated struct SharedMediaStore: Sendable {
             }
         }
 
-        return SharedMediaSweepRule.Inputs(
+        let record: SweepRecord = readSweepRecord()
+        var inputs: SharedMediaSweepRule.Inputs = SharedMediaSweepRule.Inputs(
             storeEntries: entries,
             backups: backups,
             listsWithoutTheirZips: withoutZips,
             holds: holds,
             unreadableListFiles: unreadable,
-            unneededSince: readSweepRecord(),
+            unneededSince: record.unneededSince,
             now: now,
             thisComputer: computer
         )
+        inputs.sharedWithAnotherComputer = record.shared
+        inputs.anotherComputersSweepRecordIsThere = anotherSweepRecord
+        inputs.listsFirstSeen = record.listsFirstSeen
+        inputs.leftovers = leftovers
+        return inputs
     }
 
-    /// This computer's record of when it first found each file unneeded. A
-    /// record that cannot be read is an empty one: every file starts its day
-    /// again, which only ever keeps files longer.
-    private func readSweepRecord() -> [String: Date] {
-        var record: [String: Date] = [:]
+    /// This computer's sweep record.
+    private struct SweepRecord {
+
+        // MARK: - Stored properties
+
+        var unneededSince: [String: Date] = [:]
+        var shared: Bool = false
+        var listsFirstSeen: [String: Date] = [:]
+    }
+
+    /// This computer's record. A record that cannot be read is an empty
+    /// one: every file starts its wait again, which only ever keeps files
+    /// longer. (It would also forget that another computer has written here,
+    /// until the next sweep finds that computer's lists or record again.)
+    private func readSweepRecord() -> SweepRecord {
+        var record: SweepRecord = SweepRecord()
         guard let data = try? Data(contentsOf: sweepRecordURL),
               let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              object["format"] as? Int == SharedMediaList.formatNumber,
-              let since = object["unneededSince"] as? [String: String] else {
+              object["format"] as? Int == SharedMediaList.formatNumber else {
             return record
         }
-        for (path, text) in since {
-            if let moment = SharedMediaDates.date(from: text) {
-                record[path] = moment
+        if let since = object["unneededSince"] as? [String: String] {
+            for (path, text) in since {
+                if let moment = SharedMediaDates.date(from: text) {
+                    record.unneededSince[path] = moment
+                }
             }
         }
+        if let seen = object["listsFirstSeen"] as? [String: String] {
+            for (name, text) in seen {
+                if let moment = SharedMediaDates.date(from: text) {
+                    record.listsFirstSeen[name] = moment
+                }
+            }
+        }
+        record.shared = (object["sharedWithAnotherComputer"] as? Bool) ?? false
         return record
     }
 
-    static func encodeSweepRecord(_ record: [String: Date], computer: String) throws -> Data {
+    static func encodeSweepRecord(_ decision: SharedMediaSweepRule.Decision, computer: String) throws -> Data {
         var since: [String: String] = [:]
-        for (path, moment) in record {
+        for (path, moment) in decision.unneededSince {
             since[path] = SharedMediaDates.text(for: moment)
+        }
+        var seen: [String: String] = [:]
+        for (name, moment) in decision.listsFirstSeen {
+            seen[name] = SharedMediaDates.text(for: moment)
         }
         let object: [String: Any] = [
             "format": SharedMediaList.formatNumber,
             "computer": computer,
             "unneededSince": since,
+            "sharedWithAnotherComputer": decision.sharedWithAnotherComputer,
+            "listsFirstSeen": seen,
         ]
         return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
@@ -1025,181 +1220,120 @@ nonisolated struct SharedMediaStore: Sendable {
         try fileManager.createDirectory(at: pendingURL, withIntermediateDirectories: true)
     }
 
-    /// One file found in Media.
-    struct WalkedFile: Sendable {
-
-        // MARK: - Stored properties
-
-        let path: String
-        let url: URL
-        let size: Int64
-        let modified: Date
-        let mode: Int
-    }
-
-    struct WalkedMedia: Sendable {
-
-        // MARK: - Stored properties
-
-        let files: [WalkedFile]
-        let folders: [SharedMediaList.MediaFolder]
-    }
-
     /// Everything in the course's top-level `Media` folder as a whole zip
-    /// would hold it: hidden files included, a name in `namesLeftOut`
-    /// anywhere in the path left out, symbolic links followed (to a file or
-    /// a folder, once each) and a link that leads nowhere left out, as
-    /// `zip -r` does without `-y` (measured). Nil when there is no Media
-    /// FOLDER, and then a small backup leaves nothing out.
+    /// would hold it, walked as `zip -r` walks it (measured, each case
+    /// compared byte for byte with the whole zip's restore):
+    ///
+    /// - hidden files are included; a name in `namesLeftOut` anywhere in the
+    ///   path is left out;
+    /// - a link to a file is the file's bytes under the link's name;
+    /// - a link to a folder, inside the course or outside it, is that
+    ///   folder's contents under the link's name, AND the folder itself is
+    ///   walked again under its own name (until #785's review the walk
+    ///   skipped any folder it had already been through, so a link that
+    ///   sorted first made the real folder vanish from the restore);
+    /// - a link that leads nowhere is left out, and so is a path through so
+    ///   many links that the system refuses it (32 on macOS), which is where
+    ///   `zip -r` stops a loop;
+    /// - names are carried as the listing's own bytes.
+    ///
+    /// Nil when there is no folder listed as exactly `Media` (a folder
+    /// listed as `media` is kept in the zip, as the whole zip's
+    /// case-sensitive `zip -x` keeps it), and then a small backup leaves
+    /// nothing out.
     static func walkMedia(inCourseAt courseFolderURL: URL, namesLeftOut: Set<String>) throws -> WalkedMedia? {
-        let fileManager: FileManager = FileManager.default
-        let mediaURL: URL = courseFolderURL.appendingPathComponent(SharedMediaList.mediaFolderName)
-        var isFolder: ObjCBool = false
-        if !fileManager.fileExists(atPath: mediaURL.path, isDirectory: &isFolder) || !isFolder.boolValue {
+        let courseName: String = courseFolderURL.lastPathComponent
+        guard let parent = SharedMediaFiles.Folder(path: courseFolderURL.deletingLastPathComponent().path),
+              let topNames = SharedMediaFiles.names(in: parent, at: courseName) else {
+            return nil
+        }
+        var listedExactly: Bool = false
+        for name in topNames where Array(name.utf8) == Array(SharedMediaList.mediaFolderName.utf8) {
+            listedExactly = true
+        }
+        let mediaSource: String = courseName + "/" + SharedMediaList.mediaFolderName
+        guard listedExactly,
+              let facts = SharedMediaFiles.facts(in: parent, at: mediaSource),
+              facts.isFolder else {
             return nil
         }
         var files: [WalkedFile] = []
-        var folders: [SharedMediaList.MediaFolder] = []
-        var visited: Set<String> = []
+        var folders: [SharedMediaList.MediaFolder] = [
+            SharedMediaList.MediaFolder(path: SharedMediaList.mediaFolderName, mode: facts.mode)
+        ]
         try walk(
-            folderURL: mediaURL,
+            parent: parent,
+            sourcePath: mediaSource,
             relativePath: SharedMediaList.mediaFolderName,
             namesLeftOut: namesLeftOut,
             files: &files,
-            folders: &folders,
-            visited: &visited
+            folders: &folders
         )
-        return WalkedMedia(files: files, folders: folders)
+        return WalkedMedia(parent: parent, files: files, folders: folders)
     }
 
     private static func walk(
-        folderURL: URL,
+        parent: SharedMediaFiles.Folder,
+        sourcePath: String,
         relativePath: String,
         namesLeftOut: Set<String>,
         files: inout [WalkedFile],
-        folders: inout [SharedMediaList.MediaFolder],
-        visited: inout Set<String>
+        folders: inout [SharedMediaList.MediaFolder]
     ) throws {
-        let fileManager: FileManager = FileManager.default
-        let resolvedFolder: URL = folderURL.resolvingSymlinksInPath()
-        if visited.contains(resolvedFolder.path) {
-            return
-        }
-        visited.insert(resolvedFolder.path)
-        let folderAttributes: [FileAttributeKey: Any]? = try? fileManager.attributesOfItem(atPath: resolvedFolder.path)
-        let folderMode: Int = (folderAttributes?[.posixPermissions] as? NSNumber)?.intValue ?? 0o755
-        folders.append(SharedMediaList.MediaFolder(path: relativePath, mode: folderMode))
-
-        guard let names = try? fileManager.contentsOfDirectory(atPath: folderURL.path) else {
+        guard let names = SharedMediaFiles.names(in: parent, at: sourcePath) else {
             throw Problem.mediaUnreadable(relativePath)
         }
-        for name in names.sorted() {
+        for name in names {
             if namesLeftOut.contains(name) {
                 continue
             }
-            let childURL: URL = folderURL.appendingPathComponent(name)
+            let childSource: String = sourcePath + "/" + name
             let childPath: String = relativePath + "/" + name
-            var childIsFolder: ObjCBool = false
-            if !fileManager.fileExists(atPath: childURL.path, isDirectory: &childIsFolder) {
-                // A link that leads nowhere: zip -r leaves it out too.
+            guard let facts = SharedMediaFiles.facts(in: parent, at: childSource) else {
+                // A link that leads nowhere, or one link too many: zip -r
+                // leaves it out too.
                 continue
             }
-            if childIsFolder.boolValue {
+            if files.count + folders.count >= mostMediaEntries {
+                throw Problem.mediaHasTooManyEntries(mostMediaEntries)
+            }
+            if facts.isFolder {
+                folders.append(SharedMediaList.MediaFolder(path: childPath, mode: facts.mode))
                 try walk(
-                    folderURL: childURL,
+                    parent: parent,
+                    sourcePath: childSource,
                     relativePath: childPath,
                     namesLeftOut: namesLeftOut,
                     files: &files,
-                    folders: &folders,
-                    visited: &visited
+                    folders: &folders
                 )
                 continue
             }
-            let resolved: URL = childURL.resolvingSymlinksInPath()
-            guard let attributes = try? fileManager.attributesOfItem(atPath: resolved.path) else {
-                throw Problem.mediaUnreadable(childPath)
-            }
-            if attributes[.type] as? FileAttributeType != FileAttributeType.typeRegular {
+            if !facts.isRegularFile {
                 continue
             }
             files.append(WalkedFile(
                 path: childPath,
-                url: resolved,
-                size: (attributes[.size] as? NSNumber)?.int64Value ?? 0,
-                modified: (attributes[.modificationDate] as? Date) ?? Date(timeIntervalSince1970: 0),
-                mode: (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0o644
+                sourcePath: childSource,
+                size: facts.size,
+                modified: facts.modified,
+                mode: facts.mode
             ))
         }
     }
 
-    /// The SHA-256 of a file, read a megabyte at a time; nil when it cannot
-    /// be read.
+    /// The SHA-256 of a file in the store, read a megabyte at a time; nil
+    /// when it cannot be read. (The store's names are hexadecimal, so a URL
+    /// is safe here; a course's own files go through `SharedMediaFiles`.)
     static func checksum(ofFileAt url: URL) -> String? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else {
+        let opened: Int32 = open(url.path, O_RDONLY | O_CLOEXEC)
+        if opened < 0 {
             return nil
         }
         defer {
-            try? handle.close()
+            close(opened)
         }
-        var hasher: SHA256 = SHA256()
-        while true {
-            // `read(upToCount:)` answers nil, or empty data, at the end of
-            // the file, and throws when the file cannot be read.
-            let chunk: Data?
-            do {
-                chunk = try handle.read(upToCount: 1 << 20)
-            } catch {
-                return nil
-            }
-            guard let chunk, !chunk.isEmpty else {
-                break
-            }
-            hasher.update(data: chunk)
-        }
-        var text: String = ""
-        for byte in hasher.finalize() {
-            text += String(format: "%02x", byte)
-        }
-        return text
-    }
-
-    /// Copies a file's bytes, cloning them where the volume can (APFS: no
-    /// new blocks until either copy changes) and copying them where it
-    /// cannot. Extended attributes are taken off afterwards, so a restored
-    /// file carries what a whole zip's would (`zip -X` keeps none).
-    static func copyBytes(from source: URL, to destination: URL) throws {
-        let flags: copyfile_flags_t = copyfile_flags_t(COPYFILE_CLONE)
-        if copyfile(source.path, destination.path, nil, flags) != 0 {
-            let reason: String = String(cString: strerror(errno))
-            throw Problem.zipFailed("could not copy \(source.lastPathComponent): \(reason)")
-        }
-        removeExtendedAttributes(from: destination)
-        chmod(destination.path, 0o644)
-    }
-
-    static func removeExtendedAttributes(from url: URL) {
-        let size: Int = listxattr(url.path, nil, 0, XATTR_NOFOLLOW)
-        if size <= 0 {
-            return
-        }
-        var buffer: [CChar] = [CChar](repeating: 0, count: size)
-        let read: Int = listxattr(url.path, &buffer, size, XATTR_NOFOLLOW)
-        if read <= 0 {
-            return
-        }
-        var names: [String] = []
-        var current: [UInt8] = []
-        for index in 0..<read {
-            if buffer[index] == 0 {
-                names.append(String(decoding: current, as: UTF8.self))
-                current = []
-            } else {
-                current.append(UInt8(bitPattern: buffer[index]))
-            }
-        }
-        for name in names {
-            removexattr(url.path, name, XATTR_NOFOLLOW)
-        }
+        return SharedMediaFiles.checksum(ofOpenFile: opened)
     }
 
     static func flushToDisk(_ url: URL) {
@@ -1260,15 +1394,6 @@ nonisolated struct SharedMediaStore: Sendable {
         return escaped
     }
 
-    struct ProgramResult: Sendable {
-
-        // MARK: - Stored properties
-
-        let status: Int32
-        let output: Data
-        let errors: String
-    }
-
     /// Runs a program to the end, its output and errors collected through
     /// files so a long list cannot fill a pipe and stop it.
     static func run(_ executable: String, _ arguments: [String], in folder: URL) -> ProgramResult {
@@ -1317,6 +1442,18 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
 
     // MARK: - Types
 
+    /// Where one file's bytes come from: a store folder by path (its names
+    /// are hexadecimal), or the course's current Media through its open
+    /// parent folder.
+    struct Source: @unchecked Sendable {
+
+        // MARK: - Stored properties
+
+        let folderPath: String?
+        let folder: SharedMediaFiles.Folder?
+        let relativePath: String
+    }
+
     struct Filled: Equatable, Sendable {
 
         // MARK: - Stored properties
@@ -1339,7 +1476,7 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
     /// found before anything was changed.
     let missing: [String]
 
-    private let sources: [String: URL]
+    private let sources: [String: Source]
     private let takenFromTheCourse: Set<String>
     private var lock: SharedMediaLock?
 
@@ -1360,7 +1497,7 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
 
     init(
         list: SharedMediaList,
-        sources: [String: URL],
+        sources: [String: Source],
         takenFromTheCourse: Set<String>,
         missing: [String],
         lock: SharedMediaLock
@@ -1382,51 +1519,62 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
     /// the course folder in staging, before it is swapped in): every
     /// folder, then every file, each copied under a temporary name, checked
     /// against its checksum and moved to its name, with its date and
-    /// permissions put back. A file whose copy does not match, or whose
-    /// source has gone since `beginRestore`, is counted missing, never
-    /// skipped silently.
+    /// permissions put back, every name in the list's own bytes. A file
+    /// whose copy does not match, or whose source has gone since
+    /// `beginRestore`, is counted missing, never skipped silently. Then the
+    /// marker beside the payload goes, which is what
+    /// `refuseUnlessItsMediaWasPutBack` checks.
     func fill(intoCourseAt payloadURL: URL, backupFileName: String) throws -> Filled {
         let fileManager: FileManager = FileManager.default
+        try fileManager.createDirectory(at: payloadURL, withIntermediateDirectories: true)
+        guard let payload = SharedMediaFiles.Folder(path: payloadURL.path) else {
+            throw SharedMediaStore.Problem.zipFailed("the restore's folder could not be opened")
+        }
         var folders: [SharedMediaList.MediaFolder] = list.folders
         folders.sort { (first: SharedMediaList.MediaFolder, second: SharedMediaList.MediaFolder) -> Bool in
-            return first.path.count < second.path.count
+            return first.path.utf8.count < second.path.utf8.count
         }
         for folder in folders {
-            try fileManager.createDirectory(
-                at: payloadURL.appendingPathComponent(folder.path), withIntermediateDirectories: true
-            )
+            if !SharedMediaFiles.makeFolders(in: payload, at: folder.path) {
+                throw SharedMediaStore.Problem.zipFailed("could not make \(folder.path)")
+            }
         }
         var putBack: Int = 0
         var fromTheCourse: Int = 0
         var missingNow: [String] = []
         for file in list.media {
-            let destination: URL = payloadURL.appendingPathComponent(file.path)
             guard let source = sources[file.sha256] else {
                 missingNow.append(file.path)
                 continue
             }
-            let folder: URL = destination.deletingLastPathComponent()
-            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-            let temporary: URL = folder.appendingPathComponent(".incoming-\(UUID().uuidString)")
-            do {
-                try SharedMediaStore.copyBytes(from: source, to: temporary)
-            } catch {
+            let parentPath: String = SharedMediaRestore.folderPart(of: file.path)
+            if !SharedMediaFiles.makeFolders(in: payload, at: parentPath) {
                 missingNow.append(file.path)
                 continue
             }
-            if SharedMediaStore.checksum(ofFileAt: temporary) != file.sha256 {
-                try? fileManager.removeItem(at: temporary)
+            let temporary: String = parentPath + "/.incoming-\(UUID().uuidString)"
+            var sourceFolder: SharedMediaFiles.Folder? = source.folder
+            if sourceFolder == nil, let folderPath = source.folderPath {
+                sourceFolder = SharedMediaFiles.Folder(path: folderPath)
+            }
+            guard let from = sourceFolder,
+                  SharedMediaFiles.copy(from: from, at: source.relativePath, to: payload, at: temporary) else {
                 missingNow.append(file.path)
                 continue
             }
-            if fileManager.fileExists(atPath: destination.path) {
-                try? fileManager.removeItem(at: destination)
+            if SharedMediaFiles.checksum(in: payload, at: temporary) != file.sha256 {
+                SharedMediaFiles.remove(in: payload, at: temporary)
+                missingNow.append(file.path)
+                continue
             }
-            try fileManager.moveItem(at: temporary, to: destination)
-            try? fileManager.setAttributes(
-                [.posixPermissions: NSNumber(value: file.mode), .modificationDate: file.modified],
-                ofItemAtPath: destination.path
-            )
+            SharedMediaFiles.remove(in: payload, at: file.path)
+            if !SharedMediaFiles.rename(in: payload, from: temporary, to: file.path) {
+                SharedMediaFiles.remove(in: payload, at: temporary)
+                missingNow.append(file.path)
+                continue
+            }
+            SharedMediaFiles.setMode(in: payload, at: file.path, file.mode)
+            SharedMediaFiles.setModified(in: payload, at: file.path, file.modified)
             putBack += 1
             if takenFromTheCourse.contains(file.sha256) {
                 fromTheCourse += 1
@@ -1435,11 +1583,11 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
         // Folder permissions last, so a folder without write permission
         // could still be filled.
         for folder in folders.reversed() {
-            try? fileManager.setAttributes(
-                [.posixPermissions: NSNumber(value: folder.mode)],
-                ofItemAtPath: payloadURL.appendingPathComponent(folder.path).path
-            )
+            SharedMediaFiles.setMode(in: payload, at: folder.path, folder.mode)
         }
+        try? fileManager.removeItem(
+            at: payloadURL.deletingLastPathComponent().appendingPathComponent(SharedMediaList.nameInsideTheZip)
+        )
         if !missingNow.isEmpty {
             ActivityTrail.note(
                 .backupMediaNotFound,
@@ -1450,6 +1598,14 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
             )
         }
         return Filled(filesPutBack: putBack, filesTakenFromTheCourse: fromTheCourse, missing: missingNow)
+    }
+
+    /// Everything before a path's last `/`, its bytes untouched.
+    static func folderPart(of path: String) -> String {
+        guard let slash = path.lastIndex(of: "/") else {
+            return ""
+        }
+        return String(path[..<slash])
     }
 
     /// Lets go of the lock. Called when the restore is over, whatever
@@ -1464,7 +1620,8 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
 /// or a restore, which may run side by side; exclusive and never waited for,
 /// for a sweep. `flock` is held by the open file, not the path, so a working
 /// folder reached by two spellings (a symbolic link, another case) is one
-/// lock.
+/// lock. It is local to this computer: between two computers sharing a
+/// synced folder the guards are the lists' own moments and the sweep's wait.
 nonisolated final class SharedMediaLock: @unchecked Sendable {
 
     // MARK: - Stored properties
