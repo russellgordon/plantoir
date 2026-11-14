@@ -26,6 +26,8 @@ import { join } from "path"
 import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } from "./types"
 import { concatenateResources } from "../util/resources"
 import { FilePath, FullSlug, joinSegments, pathToRoot, slugifyFilePath } from "../util/path"
+// The PDF's content path, one function with the emitter that carries it (#901).
+import { printPdfPath } from "../plugins/emitters/siteFilesRules"
 import style from "./styles/print.scss"
 import { codeBoxRules, countedLabel, cssPlainString, cssString, fontFaceRules, footerLeft, pageBoxRules } from "./scripts/printRules"
 // @ts-ignore
@@ -161,10 +163,7 @@ export default ((inner: QuartzComponent) => {
 
   const PlantoirMetaLine: QuartzComponent = (props: QuartzComponentProps) => {
     const frontmatter = (props.fileData.frontmatter ?? {}) as Record<string, unknown>
-    const pdf =
-      typeof frontmatter.printPdf === "string" && frontmatter.printPdf.trim() !== ""
-        ? frontmatter.printPdf.trim()
-        : null
+    const pdf = printPdfPath(frontmatter)
     const printable = frontmatter.printable === true
     if (pdf === null && !printable) {
       return <Inner {...props} />
@@ -178,7 +177,7 @@ export default ((inner: QuartzComponent) => {
 
     let button
     if (pdf !== null) {
-      const href = joinSegments(root, slugifyFilePath(("Media/" + pdf) as FilePath))
+      const href = joinSegments(root, slugifyFilePath(pdf as FilePath))
       button = (
         <a class="plantoir-print plantoir-print-pdf" href={href} target="_blank" rel="noopener">
           <PrinterGlyph />

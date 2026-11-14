@@ -2146,5 +2146,21 @@
       "newPasswordWaiting": "true from a Change Password that saved a new password until a share proves the address (unitPlanning.share.changePasswordCases); absent otherwise. Never the password."
     },
     "olderMarkers": "A marker written before #833 has none of keysSince833 and reads as no remembered choices, nothing counted, and no password waiting. A marker holding only `documents` has no address and reads as not shared, to the bar and to deploy.sh's sticky protection alike."
+  },
+  "siteFilesRecord": {
+    "note": "GitHub #901. What the last build of a section carried of the course's files, so the next build knows whether it is the first to leave files off and whether the count changed (shared-rules.json -> siteFiles.whenSaid). Counts only: never a file's or a page's name.",
+    "path": "<the section's built output>/.site-files.json, beside .visible-pages.json and public/ and never inside public/ - <CODE>/.merged_output/section<N>/ on macOS, PLANTOIR_BUILD_ROOT/<CODE>/section<N>/ on Windows. Hidden, so the freshness checks skip it.",
+    "writtenBy": "scripts/site_files.py (write_record), after the check, on every build whose site has a front page; written through a temporary file and renamed",
+    "keys": {
+      "buildId": "the build that wrote it, for diagnosis only",
+      "carried": "how many course files the site carries",
+      "leftOff": "how many it leaves off because no page students can see uses them",
+      "leftOffBytes": "their size on disk",
+      "putBack": "how many the check put back (a published page needed them)",
+      "putBackFailed": "how many it could not put back",
+      "takenOut": "how many it took out (no page named them and the site never mentioned them)",
+      "unreferenced": "how many no built page named, taken out or not"
+    },
+    "readers": "only scripts/site_files.py (read_record). A file that is missing or cannot be read is a first build."
   }
 }

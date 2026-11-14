@@ -1202,6 +1202,15 @@
         "why": "#674. The one case that stops a build because of the network (keptDownloads.stop), which otherwise reads as 'Preview is broken' or as a scheduled deploy that did not happen."
       },
       {
+        "event": "site leaves off files no published page uses",
+        "carries": "the course and section, how many of the course's files the built site leaves off because no page students can see uses them, and the two safety counts: how many a page needed that were put back, and how many no page named that were taken out after the build. Counts only: never a file's or a page's name, which are the teacher's.",
+        "marker": "PLANTOIR_SITE_FILES: (siteFiles.marker), printed by scripts/site_files.py through build_site.py",
+        "line": "{course}/{section} · the website leaves off {leftOff} files no published page uses ({putBack} put back, {takenOut} taken out)",
+        "lineWhenSortedAfterTheBuild": "{course}/{section} · the website leaves off {leftOff} files no published page uses, sorted after the build because the website builder's settings had changed shape ({putBack} put back, {takenOut} taken out)",
+        "writtenWhen": "siteFiles.marker.writtenWhen: the first build that leaves files off, a build whose count changed, a build that put a file back or took one out, and a build that used Quartz's own emitter. Nothing on a build that changed nothing.",
+        "why": "#901. 'My picture is missing from the website' is asked about the week after the change, and the line dates when each section began leaving files off and how many. A put-back count above zero is exactly what a developer needs: the emitter missed a way a page names a file. Read from the marker by the apps (KeptDownloadsReport's two places: a run's console and a scheduled deploy's record), never written by deploy.py (buildFreshness.reuseTheLastBuild.knownLimits: a build deploy.py makes inside the builder writes no trail line on a Mac)."
+      },
+      {
         "event": "problems changed",
         "carries": "the course and section, whether a preview or a deploy found it, how many problems were new and how many gone, and the KINDS of each (sectionProblems.kinds' names) - never a page, which is the teacher's own name; and, as a second line of the same event, which answer the teacher gave the alert (Show, the repair, or Not Now)",
         "line": "{course}/{section} · the {occasion} found {new} new and {gone} fewer problems (new: {kinds}; gone: {kinds})",
@@ -44952,6 +44961,947 @@
       "A per-video width (![Title|400](address)): the size is ruled, and the width part is dropped from the title instead.",
       "Vimeo's title=0, byline=0 and portrait=0: the video's owner sets them in Vimeo's embed settings, which is Vimeo's default.",
       "Google Drive, Loom and Stream: each has its own sharing pitfalls, and #692 proposed Vimeo now and the rest later."
+    ]
+  },
+  "siteFiles": {
+    "note": "GitHub #901 (piece 901a), Russell's ruling 2026-11-13: 'We should only copy files into the built site that are linked from published pages.' A built site carries a course file (anything in content/ that is not a page) only when a page students can see uses it. documentation/05-build-pipeline.md -> 'A site carries only the files its published pages use (#901)' has what was measured and rejected.",
+    "rule": "The site's emitter, support/quartz/plugins/emitters/plantoirAssets.ts (rules in siteFilesRules.ts), replaces Quartz's own Assets emitter in every section's quartz.config.ts (build_site._wire_site_files_emitter, ALWAYS section, idempotent, marker PLANTOIR-SITE-FILES). It walks content/ exactly as Assets did (glob '**', Quartz's ignore patterns, no dotted names, symlinks followed) and copies a file to the address Assets would have used (slugifyFilePath) only when a published page uses it, by any way in whatNamesAFile. Preview and deploy run the same emitter in the same build, so a preview shows exactly the files a deploy sends (ticked means included).",
+    "why": "Until #901 every picture, PDF and video in Media, and every non-page file in the shared and per-section folders, went to every section's website whether a published page used it or not: an answer key beside a hidden page, last year's test, a draft. Measured 2026-11-14 on the 26 built sites on the owner's Mac with scripts/site_files.py's reader: 4,321 course files carried, 1,389 (32%) named by no built page. The hints-then-answers pattern (#859) is safe only when the answers' PDF is off the site while the answers page is hidden.",
+    "whatNamesAFile": [
+      {
+        "way": "![[pic.png]], ![](Media/pic.png), ![[clip.mp4]], ![[note.m4a]], ![[sheet.pdf]]",
+        "renderedAs": "<img src>, <video src>, <audio src>, <iframe src> (Quartz's PDF frame), rewritten by CrawlLinks",
+        "foundBy": "the page's tree, every property"
+      },
+      {
+        "way": "[[notes.docx]], [text](Media/a.pdf), ![[file.xyz]]",
+        "renderedAs": "<a href>",
+        "foundBy": "the page's tree"
+      },
+      {
+        "way": "raw HTML in a page: <source src>, <track src>, poster, srcset, <object data>, <embed src>, SVG <image href>, style=\"...url(...)\", a <style> element's url(...)",
+        "renderedAs": "elements, as written: ObsidianFlavoredMarkdown reads raw HTML into the tree first (rehype-raw)",
+        "foundBy": "the page's tree: EVERY string a property holds is tried as an address from the page, plus srcset items and CSS url()"
+      },
+      {
+        "way": "printPdf: in a page's settings (#454), including the hints-then-answers twins (#859)",
+        "renderedAs": "the Print button's <a href>, drawn by PlantoirMetaLine.tsx at render time, outside the tree",
+        "foundBy": "siteFilesRules.printPdfPath, the one function the component and the emitter both use"
+      },
+      {
+        "way": "a ```geogebra fence naming a .ggb file (#578)",
+        "renderedAs": "data-geogebra JSON's sketch, loaded from the JSON's own root (geogebra.inline.ts), never from the page",
+        "foundBy": "the transformer declares the file (file.data.plantoirFiles, declareRule); the tree's JSON is read from its root as well"
+      },
+      {
+        "way": "footer_html in the course's settings",
+        "renderedAs": "the Footer component on every page",
+        "foundBy": "the build's side file (sideFile.footerAddresses), resolved from every published page as the page's own addresses are"
+      },
+      {
+        "way": "favicon.ico at the site's root",
+        "renderedAs": "written into content/ by build_site.install_favicon",
+        "foundBy": "alwaysCarried"
+      },
+      {
+        "way": "Diagrams and graphs (#485), Functionplot, Mermaid, KaTeX and its fonts (#494), printing's fonts, PhET simulations kept with the site (#674, keptDownloads), runnable code's engines and Swift programs (#455, #493), GeoGebra's engine and thumbnails (#566, #578), the sharing card (og:image), My Progress's manifest (#545), the quizzes' words (#563)",
+        "renderedAs": "files in quartz/static/ or written by Plantoir's own emitters",
+        "foundBy": "nothing: they are not course files, and the Static emitter and Plantoir's emitters still write them"
+      },
+      {
+        "way": "privately loaded video players (#692)",
+        "renderedAs": "an <iframe> to youtube-nocookie.com or player.vimeo.com",
+        "foundBy": "nothing to carry: another site's address"
+      },
+      {
+        "way": "Netlify's _headers and _redirects, Cloudflare's files",
+        "renderedAs": "written into public/ by deploy.py after the build",
+        "foundBy": "nothing: not course files, and written after the check"
+      },
+      {
+        "way": "a unit plan site (#709)",
+        "renderedAs": "its own site, staged by unit_plan_site.stage from an allowlist",
+        "foundBy": "nothing: not built by Quartz"
+      },
+      {
+        "way": "a page a published page embeds (![[Other page]])",
+        "renderedAs": "the embedded page's tree, inside the embedding page, at render time",
+        "foundBy": "the embedded page's own tree when it is published; nothing when it is hidden, which Quartz renders as nothing (renderPage.tsx looks it up among published pages)"
+      },
+      {
+        "way": "a name inside code, a %% comment %%, or prose",
+        "renderedAs": "text, or nothing",
+        "foundBy": "nothing: not a link"
+      },
+      {
+        "way": "a file named only by another file (a teacher's HTML that loads its own script)",
+        "renderedAs": "a request from that file",
+        "foundBy": "nothing: only what a published page names is carried (plan review 901-9: 0 such files on the 27 sites measured)"
+      }
+    ],
+    "alwaysCarried": [
+      "favicon.ico"
+    ],
+    "declareRule": "A feature that makes a page load a course file the tree does not name as an address records the file's content path on file.data.plantoirFiles in its transformer (PlantoirGeoGebra does), and the emitter carries it.",
+    "exactMatch": "A reference matches a file only letter for letter after decoding: a match by case or by Unicode form is the teacher's own broken link, in the emitter and the check alike (plan review 901-6: on the 27 sites, none of 530 unmatched references matched by case or by NFC/NFD form). Nobody adds normalising to one side only.",
+    "doneMarker": {
+      "file": ".plantoir-emit-done",
+      "rule": "The section's quartz/build.ts (patches/build.ts, and build_site.patch_quartz_build_done_marker for a section copied before it) writes it beside public/ once every emitter of the first build has finished. build_site.py removes it before Quartz starts. A preview's watcher mirrors nothing and checks nothing until it appears, because Quartz runs its emitters at once and the root index.html is written while course files are still being copied (plan review 901-1). A build.ts that cannot be given the line skips the preview's check, said once (words.previewNotChecked)."
+    },
+    "sideFile": {
+      "file": "quartz/plantoir_site_files.json",
+      "keys": {
+        "alwaysCarried": "alwaysCarried",
+        "footerAddresses": "every address the footer's HTML holds, read by site_files.addresses_in_html"
+      },
+      "rule": "Written by build_site.py on every build (ALWAYS section). Read, not imported, by the emitter: missing or broken, only favicon.ico is always carried and the footer's files are left to the check, which puts them back."
+    },
+    "check": {
+      "rule": "scripts/site_files.py reads the BUILT site after Quartz has finished, on a deploy's build before it is mirrored to the host and before _mark_build_finished, and on a preview's first build at the done marker, on the site its server serves. It never trusts the emitter: it reads every built page's attributes (the same ways as whatNamesAFile, written again in Python), resolves each from the page's address, and compares with the course's files (site_files.course_files, Assets' own walk).",
+      "hole": "A built page names a course file the site lacks: the file is PUT BACK at its address and the teacher is told one line per file (words.putBack; words.putBackFailed when the copy failed). Ruled by Russell 2026-11-13 on #901: put back, the build goes on, the teacher is told, and a trail line is written. Rejected: stopping the build; no second check.",
+      "exposure": "A course file in the site that no built page names is counted (unreferenced). Of those, one whose name the site's text never mentions (any .html, .json, .xml, .js, .css, .txt) is taken out: a page cannot fetch a file whose name it does not contain, so taking it out cannot make a hole. With Quartz's own emitter (marker.assetsEmitter 'quartz'), every unreferenced file is taken out, which is what Plantoir's emitter would have left off.",
+      "gates": "putBack, putBackFailed and unreferenced are each a FAILURE in verify.sh and in the tests, and so is assetsEmitter 'quartz': each means the emitter got something wrong, which the safety net must not hide (Russell, #901).",
+      "failure": "When the check itself fails, a plantoir: error: line says so and the build is left unmarked (buildFreshness), so the next deploy builds again (plan review 901-3)."
+    },
+    "words": {
+      "firstTimeDeploy": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. {count} {files} ({size}) that no page students can see uses are left off Section {section}'s website. Publish a page that uses a file to put it back.",
+      "firstTimePreview": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. {count} {files} ({size}) that no page students can see uses are left out of this preview, and will be left off Section {section}'s website when it is next deployed. Publish a page that uses a file to put it back.",
+      "changed": "{count} {files} in this course ({size}) are left off Section {section}'s website because no page students can see uses them.",
+      "putBack": "A page students can see uses {file}, so it was put on the website.",
+      "putBackFailed": "A page students can see uses {file}, but it could not be put on the website, so that page will show it as missing.",
+      "emitterNotSwapped": "the website builder's settings for this section have changed shape, so the files no page uses were taken off after the build instead.",
+      "previewNotChecked": "this section's website builder could not be told to say when it has finished, so this preview's files were not checked.",
+      "oneFile": "file",
+      "severalFiles": "files",
+      "size": "GB or MB with one decimal (bytes / 10^9, / 10^6) at or above a megabyte, else KB rounded up, at least 1 KB; a full stop whatever the language"
+    },
+    "whenSaid": {
+      "rule": "The first build of a section that leaves anything off says firstTimeDeploy, or firstTimePreview on a preview, once: 'first' means no .site-files.json beside the built site (file-formats.json -> siteFilesRecord). A later build says changed only when its count differs from the last build's. Nothing when it is the same. A put-back file is said on every build it happens.",
+      "constant": "site_files.lines_to_say. Russell has not ruled on this (the plan's question 2): built as the plan recommended, with every sentence named here so it is one place to change."
+    },
+    "marker": {
+      "prefix": "PLANTOIR_SITE_FILES:",
+      "rule": "ONE line per build, after the check: {course, section, mode ('preview' or 'deploy'), carried, leftOff, leftOffBytes, putBack, putBackFailed, takenOut, unreferenced, firstTime, changed, assetsEmitter ('plantoir' or 'quartz')}. Counts only: never a file's or a page's name. Both apps read it from the console of a run they start and from a scheduled deploy's record, as PLANTOIR_DOWNLOADED:, and write the trail line (activityTrail.mustRecord: 'site leaves off files no published page uses'). The console a teacher reads leaves it out, by the one rule for every PLANTOIR_ line.",
+      "writtenWhen": "firstTime, or changed, or putBack, putBackFailed or takenOut above zero, or assetsEmitter 'quartz'"
+    },
+    "slugCases": [
+      [
+        "Media/pic.png",
+        "Media/pic.png"
+      ],
+      [
+        "Media/my pic.png",
+        "Media/my-pic.png"
+      ],
+      [
+        "Media/a&b.png",
+        "Media/a-and-b.png"
+      ],
+      [
+        "Media/50%.png",
+        "Media/50-percent.png"
+      ],
+      [
+        "Media/what?.png",
+        "Media/what.png"
+      ],
+      [
+        "Media/no#1.png",
+        "Media/no1.png"
+      ],
+      [
+        "Media/sim.html",
+        "Media/sim"
+      ],
+      [
+        "Media/README",
+        "Media/README"
+      ],
+      [
+        "Unit 1/_index.md",
+        "Unit-1/index"
+      ],
+      [
+        "Media/café.png",
+        "Media/café.png"
+      ],
+      [
+        "Media/x.tar.gz",
+        "Media/x.tar.gz"
+      ],
+      [
+        "Media/a b.png",
+        "Media/a-b.png"
+      ],
+      [
+        "Media/file.PNG",
+        "Media/file.PNG"
+      ],
+      [
+        "Unit 1/Day 1.md",
+        "Unit-1/Day-1"
+      ],
+      [
+        "Media/salt & pepper 50% off.png",
+        "Media/salt--and--pepper-50-percent-off.png"
+      ],
+      [
+        "Media/notes.tex~",
+        "Media/notes.tex~"
+      ],
+      [
+        "Media/Café menu.pdf",
+        "Media/Café-menu.pdf"
+      ]
+    ],
+    "resolveCases": [
+      [
+        "Unit-1/Day-1",
+        "../Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "index",
+        "Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/index",
+        "a.png",
+        "Unit-1/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "/Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "https://example.org/a.png",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "#top",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "//cdn.example.org/a.png",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/caf%C3%A9.png?x=1#y",
+        "Media/café.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "mailto:someone@example.org",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "../../../Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "data:image/png;base64,AAAA",
+        null
+      ],
+      [
+        "Unit-1/Week-2/Day-3",
+        "../../Media/s.ggb",
+        "Media/s.ggb"
+      ],
+      [
+        "Unit-1/Day-1",
+        "",
+        null
+      ]
+    ],
+    "cases": [
+      {
+        "name": "a picture a published page shows is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: true\n---\n\n![[pic.png]]\n"
+        },
+        "files": [
+          "Media/pic.png"
+        ],
+        "carried": [
+          "Media/pic.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a picture only a hidden page shows is left off",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: false\n---\n\n![[pic.png]]\n"
+        },
+        "files": [
+          "Media/pic.png"
+        ],
+        "carried": [],
+        "leftOff": [
+          "Media/pic.png"
+        ]
+      },
+      {
+        "name": "a picture a hidden and a published page show is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[pic.png]]\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: false\n---\n\n![[pic.png]]\n"
+        },
+        "files": [
+          "Media/pic.png"
+        ],
+        "carried": [
+          "Media/pic.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a published page that embeds a hidden page does not carry the hidden page's picture",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[Answers]]\n",
+          "Unit 1/Answers.md": "---\ntitle: Page\npublish: false\n---\n\n![[key.png]]\n"
+        },
+        "files": [
+          "Media/key.png"
+        ],
+        "carried": [],
+        "leftOff": [
+          "Media/key.png"
+        ]
+      },
+      {
+        "name": "the Print button's PDF on a published page is carried, its hidden answers twin's is not",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Worksheet.md": "---\ntitle: Page\npublish: true\nprintPdf: Worksheet.pdf\n---\n\nTry these.\n",
+          "Unit 1/Worksheet with Answers.md": "---\ntitle: Page\npublish: false\nprintPdf: Worksheet with Answers.pdf\n---\n\nAnswers.\n"
+        },
+        "files": [
+          "Media/Worksheet.pdf",
+          "Media/Worksheet with Answers.pdf"
+        ],
+        "carried": [
+          "Media/Worksheet.pdf"
+        ],
+        "leftOff": [
+          "Media/Worksheet-with-Answers.pdf"
+        ]
+      },
+      {
+        "name": "a Markdown link to a PDF is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n[The sheet](Media/sheet.pdf)\n"
+        },
+        "files": [
+          "Media/sheet.pdf"
+        ],
+        "carried": [
+          "Media/sheet.pdf"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a PDF shown in a frame is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[sheet.pdf]]\n"
+        },
+        "files": [
+          "Media/sheet.pdf"
+        ],
+        "carried": [
+          "Media/sheet.pdf"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a video and a sound embedded the Obsidian way are carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[clip.mp4]]\n\n![[note.m4a]]\n"
+        },
+        "files": [
+          "Media/clip.mp4",
+          "Media/note.m4a"
+        ],
+        "carried": [
+          "Media/clip.mp4",
+          "Media/note.m4a"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "raw HTML: a video's source, poster and captions are carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: true\n---\n\n<video controls poster=\"../Media/poster.jpg\"><source src=\"../Media/clip.mp4\" type=\"video/mp4\"><track kind=\"captions\" src=\"../Media/clip.vtt\"></video>\n"
+        },
+        "files": [
+          "Media/clip.mp4",
+          "Media/poster.jpg",
+          "Media/clip.vtt"
+        ],
+        "carried": [
+          "Media/clip.mp4",
+          "Media/clip.vtt",
+          "Media/poster.jpg"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "raw HTML: every picture a srcset names is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n<img src=\"Media/small.png\" srcset=\"Media/small.png 1x, Media/big.png 2x\" alt=\"A graph\">\n"
+        },
+        "files": [
+          "Media/small.png",
+          "Media/big.png"
+        ],
+        "carried": [
+          "Media/big.png",
+          "Media/small.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "raw HTML: an object's data, an embed's src and an SVG image's href are carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n<object data=\"Media/model.pdf\"></object>\n\n<embed src=\"Media/chart.pdf\">\n\n<svg width=\"10\" height=\"10\"><image href=\"Media/shape.png\" width=\"10\" height=\"10\"></image></svg>\n"
+        },
+        "files": [
+          "Media/model.pdf",
+          "Media/chart.pdf",
+          "Media/shape.png"
+        ],
+        "carried": [
+          "Media/chart.pdf",
+          "Media/model.pdf",
+          "Media/shape.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "raw HTML: a picture in a style's url() is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n<div style=\"background-image: url('Media/bg.png')\">Hello</div>\n"
+        },
+        "files": [
+          "Media/bg.png"
+        ],
+        "carried": [
+          "Media/bg.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "two pictures with one name: only the one a page names is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[Unit 1/pic.png]]\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: true\n---\n\nHello.\n"
+        },
+        "files": [
+          "Unit 1/pic.png",
+          "Unit 2/pic.png"
+        ],
+        "carried": [
+          "Unit-1/pic.png"
+        ],
+        "leftOff": [
+          "Unit-2/pic.png"
+        ]
+      },
+      {
+        "name": "a file in a course folder rather than Media is carried when a page links it, left off when none does",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n[Notes](Handouts/notes.docx)\n",
+          "Handouts/About.md": "---\ntitle: Page\npublish: true\n---\n\nHandouts.\n"
+        },
+        "files": [
+          "Handouts/notes.docx",
+          "Handouts/old test.docx"
+        ],
+        "carried": [
+          "Handouts/notes.docx"
+        ],
+        "leftOff": [
+          "Handouts/old-test.docx"
+        ]
+      },
+      {
+        "name": "a file a page names only inside code is left off",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nType `Media/code.png` into the box.\n\n```\nMedia/code.png\n```\n"
+        },
+        "files": [
+          "Media/code.png"
+        ],
+        "carried": [],
+        "leftOff": [
+          "Media/code.png"
+        ]
+      },
+      {
+        "name": "a file nobody names is left off",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n"
+        },
+        "files": [
+          "Media/orphan.png"
+        ],
+        "carried": [],
+        "leftOff": [
+          "Media/orphan.png"
+        ]
+      },
+      {
+        "name": "a name with a space and an ampersand is carried at Quartz's address for it",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[Media/salt & pepper.png]]\n"
+        },
+        "files": [
+          "Media/salt & pepper.png"
+        ],
+        "carried": [
+          "Media/salt--and--pepper.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a file with no extension that a page links is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n[Read me](Media/README)\n"
+        },
+        "files": [
+          "Media/README"
+        ],
+        "carried": [
+          "Media/README"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a link that matches a file only by case is the teacher's own broken link",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![](Media/Pic.png)\n"
+        },
+        "files": [
+          "Media/pic.png"
+        ],
+        "carried": [],
+        "leftOff": [
+          "Media/pic.png"
+        ]
+      },
+      {
+        "name": "a file named only by another file is left off",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n<iframe src=\"Media/sim.html\"></iframe>\n"
+        },
+        "files": [
+          "Media/sim.html",
+          "Media/sim.js"
+        ],
+        "carried": [
+          "Media/sim"
+        ],
+        "leftOff": [
+          "Media/sim.js"
+        ]
+      },
+      {
+        "name": "a GeoGebra sketch's file declared by its transformer is carried; a hidden page's is not",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: true\n---\n\nA sketch.\n",
+          "Unit 1/Draft.md": "---\ntitle: Page\npublish: false\n---\n\nA draft.\n"
+        },
+        "declared": {
+          "Unit 1/Day 1.md": [
+            "Media/parabola.ggb"
+          ],
+          "Unit 1/Draft.md": [
+            "Media/draft.ggb"
+          ]
+        },
+        "files": [
+          "Media/parabola.ggb",
+          "Media/draft.ggb"
+        ],
+        "carried": [
+          "Media/parabola.ggb"
+        ],
+        "leftOff": [
+          "Media/draft.ggb"
+        ]
+      },
+      {
+        "name": "the footer's logo is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n",
+          "Unit 1/Day 1.md": "---\ntitle: Page\npublish: true\n---\n\nHello.\n"
+        },
+        "footer": "<img src=\"Media/logo.png\" alt=\"School logo\">",
+        "files": [
+          "Media/logo.png"
+        ],
+        "carried": [
+          "Media/logo.png"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "the site's root favicon is always carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\nWelcome.\n"
+        },
+        "files": [
+          "favicon.ico"
+        ],
+        "carried": [
+          "favicon.ico"
+        ],
+        "leftOff": []
+      },
+      {
+        "name": "a folder the sidebar hides is not unpublished: its linked file is carried",
+        "pages": {
+          "index.md": "---\ntitle: Page\npublish: true\n---\n\n![[Private Notes/diagram.png]]\n",
+          "Private Notes/Plans.md": "---\ntitle: Page\npublish: true\n---\n\nPlans.\n"
+        },
+        "files": [
+          "Private Notes/diagram.png",
+          "Private Notes/unused.png"
+        ],
+        "carried": [
+          "Private-Notes/diagram.png"
+        ],
+        "leftOff": [
+          "Private-Notes/unused.png"
+        ]
+      }
+    ],
+    "checkCases": [
+      {
+        "name": "a clean site: what pages use is there, the rest is not",
+        "public": {
+          "index.html": "<html><body><img src=\"./Media/a.png\"></body></html>",
+          "Media/a.png": "a"
+        },
+        "content": [
+          "Media/a.png",
+          "Media/b.png",
+          "index.md"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/a.png"
+        ],
+        "absent": [
+          "Media/b.png"
+        ]
+      },
+      {
+        "name": "a hole: a page names a course file the site lacks, so it is put back",
+        "public": {
+          "index.html": "<html><body><img src=\"./Media/a.png\"></body></html>"
+        },
+        "content": [
+          "Media/a.png"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 0,
+          "putBack": 1,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/a.png"
+        ],
+        "absent": []
+      },
+      {
+        "name": "an exposure no page names and the site never mentions is taken out",
+        "public": {
+          "index.html": "<html><body>Hello</body></html>",
+          "Media/answers.pdf": "%PDF"
+        },
+        "content": [
+          "Media/answers.pdf"
+        ],
+        "expect": {
+          "carried": 0,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 1,
+          "unreferenced": 1
+        },
+        "present": [],
+        "absent": [
+          "Media/answers.pdf"
+        ]
+      },
+      {
+        "name": "an exposure the site's text mentions is counted but kept",
+        "public": {
+          "index.html": "<html><body>Hello</body></html>",
+          "static/contentIndex.json": "{\"index\": {\"content\": \"see answers.pdf\"}}",
+          "Media/answers.pdf": "%PDF"
+        },
+        "content": [
+          "Media/answers.pdf"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 0,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 1
+        },
+        "present": [
+          "Media/answers.pdf"
+        ],
+        "absent": []
+      },
+      {
+        "name": "with Quartz's own emitter every unreferenced file is taken out, mentioned or not",
+        "emitter": "quartz",
+        "public": {
+          "index.html": "<html><body>Hello</body></html>",
+          "static/contentIndex.json": "{\"index\": {\"content\": \"see answers.pdf\"}}",
+          "Media/answers.pdf": "%PDF"
+        },
+        "content": [
+          "Media/answers.pdf"
+        ],
+        "expect": {
+          "carried": 0,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 1,
+          "unreferenced": 1
+        },
+        "present": [],
+        "absent": [
+          "Media/answers.pdf"
+        ]
+      },
+      {
+        "name": "a hole in a srcset is put back",
+        "public": {
+          "index.html": "<html><body><img src=\"Media/small.png\" srcset=\"Media/small.png 1x, Media/big.png 2x\"></body></html>",
+          "Media/small.png": "s"
+        },
+        "content": [
+          "Media/small.png",
+          "Media/big.png"
+        ],
+        "expect": {
+          "carried": 2,
+          "leftOff": 0,
+          "putBack": 1,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/big.png"
+        ],
+        "absent": []
+      },
+      {
+        "name": "an address a browser encodes is read decoded",
+        "public": {
+          "Unit-1/Day-1.html": "<html><body><img src=\"../Media/caf%C3%A9.png\"></body></html>",
+          "index.html": "<html></html>"
+        },
+        "content": [
+          "Media/café.png"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 0,
+          "putBack": 1,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/café.png"
+        ],
+        "absent": []
+      },
+      {
+        "name": "a GeoGebra sketch on a page two folders down is read from its root, and a missing one is put back",
+        "public": {
+          "index.html": "<html></html>",
+          "Unit-1/Week-2/Day-3.html": "<html><body><figure class=\"pl-geogebra\" data-geogebra=\"{&quot;sketch&quot;:&quot;Media/parabola.ggb&quot;,&quot;root&quot;:&quot;../..&quot;}\"></figure></body></html>"
+        },
+        "content": [
+          "Media/parabola.ggb"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 0,
+          "putBack": 1,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/parabola.ggb"
+        ],
+        "absent": []
+      },
+      {
+        "name": "a reference to a file that exists nowhere is the teacher's own broken link",
+        "public": {
+          "index.html": "<html><body><img src=\"./Media/gone.png\"></body></html>"
+        },
+        "content": [],
+        "expect": {
+          "carried": 0,
+          "leftOff": 0,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [],
+        "absent": [
+          "Media/gone.png"
+        ]
+      },
+      {
+        "name": "a reference that matches a file only by case is not a hole",
+        "public": {
+          "index.html": "<html><body><img src=\"./Media/Pic.png\"></body></html>"
+        },
+        "content": [
+          "Media/pic.png"
+        ],
+        "expect": {
+          "carried": 0,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [],
+        "absent": [
+          "Media/pic.png"
+        ]
+      },
+      {
+        "name": "the root favicon is always carried and never counted",
+        "public": {
+          "index.html": "<html></html>",
+          "favicon.ico": "i"
+        },
+        "content": [
+          "favicon.ico"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 0,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "favicon.ico"
+        ],
+        "absent": []
+      },
+      {
+        "name": "a page's style element and style attribute name files",
+        "public": {
+          "index.html": "<html><head><style>.a { background: url(\"Media/bg.png\") }</style></head><body><div style=\"background:url(Media/tile.png)\"></div></body></html>",
+          "Media/bg.png": "b"
+        },
+        "content": [
+          "Media/bg.png",
+          "Media/tile.png"
+        ],
+        "expect": {
+          "carried": 2,
+          "leftOff": 0,
+          "putBack": 1,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/tile.png"
+        ],
+        "absent": []
+      },
+      {
+        "name": "a teacher's HTML file is carried at its address without .html, and is not read as a page",
+        "public": {
+          "index.html": "<html><body><iframe src=\"./Media/sim\"></iframe></body></html>",
+          "Media/sim": "<script src=\"sim.js\"></script>"
+        },
+        "content": [
+          "Media/sim.html",
+          "Media/sim.js"
+        ],
+        "expect": {
+          "carried": 1,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/sim"
+        ],
+        "absent": [
+          "Media/sim.js"
+        ]
+      },
+      {
+        "name": "a folder that starts with a dot and an ignored folder are not the course's files",
+        "public": {
+          "index.html": "<html></html>"
+        },
+        "content": [
+          ".obsidian/app.json",
+          "private/notes.png",
+          "Media/.hidden.png"
+        ],
+        "expect": {
+          "carried": 0,
+          "leftOff": 0,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [],
+        "absent": []
+      }
+    ],
+    "knownLimits": [
+      "A deploy typed in Terminal writes no trail line for this event, as PLANTOIR_DOWNLOADED: writes none: only the apps read the marker (from a run they start and from a scheduled deploy's record).",
+      "A page's own inline <script> is not read for addresses: a teacher's script that fetches a course file by name is not carried. Mention-anywhere keeps such a file from being TAKEN OUT by the check, so a site built by Quartz's own emitter keeps it; Plantoir's emitter leaves it off.",
+      "Older deploys on Netlify and Cloudflare can still hold files a newer deploy leaves off; deleting them is piece 901c (Russell, 2026-11-13: both hosts)."
+    ],
+    "rejected": [
+      "Choosing the files in Python before Quartz, so only used files go into content/: Python would have to resolve wikilinks as Quartz does (shortest path over allSlugs, ambiguous names), every mismatch is a hole, and taking files out of content/ changes allSlugs, so an ambiguous name could resolve to another file.",
+      "Building everything and deleting from public/ in Python: right for a deploy, wrong for a preview, whose server serves public/ while the build is still being made, so preview and deploy would differ.",
+      "ignorePatterns listing every unused file: the same resolution problem, and hundreds of patterns.",
+      "Walking only the page's Markdown tree: drops the Print button's PDFs and the GeoGebra sketches (measured by the planner: 80 and 2 files that real pages need).",
+      "Refusing the build when the check finds a hole: Russell's ruling.",
+      "Keeping the old behaviour behind a setting: the exposure is today's default, and a switch keeps it for anyone who does not find it.",
+      "Quartz 5's own publishAssets: 'referenced' option: deferred to the move to Quartz 5 (#512), which also lowercases every slug. The cases above name content paths and Quartz's addresses, not this emitter, so the same cases can judge that option when the move comes."
     ]
   }
 }
