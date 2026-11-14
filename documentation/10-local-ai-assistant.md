@@ -4368,6 +4368,28 @@ Undo Last Change takes back the last change made from the menu there
 REJECTED: a runner per action (no undo), and sharing the assistant window's
 runner (a larger refactor, and no window for a teacher who has none).
 
+
+### What only the built-in assistant could do, and where it is on the menus (#897)
+
+On 2026-11-13 Russell first ruled the built-in assistant removed, then
+reversed it: it stays in both apps, its surface frozen (no tool, description,
+schema, prompt byte or fixed phrasing moves, so nothing needs re-measuring),
+and the menus gain what only it could do. The audit behind that (36 rows, in
+the director's scratchpad as `plans/897-questions-first.md`) found 18 things
+the menus already did in full, 8 in part, and 3 gaps. Where each gap went:
+
+| Gap | Where it is now |
+|---|---|
+| Starting a new unit ("Start a new unit for the next class") | Section ▸ Add Class…, in a new unit (#897, [09 → "Add Class…"](09-mac-app.md#add-class-the-next-class-a-new-unit-or-a-copy-897)) |
+| Duplicating a class as the next one | Section ▸ Add Class…, as a copy of a class: at the END, by file, hidden; the window's own duplicate still lands after its source |
+| The rollover's website question | Section ▸ Roll Over to a New Year… (planned, #897 piece B) |
+
+Four were accepted as they are, unasked: one list of every page with its
+state, what a given page links to, a text list of what students see now, and
+adding several class days at once. Every menu route runs the tool's own code
+on `.menu`, and any behaviour that differs from the window's is read on
+`.menu` only, so the window behaves exactly as it did.
+
 **Why the menu's answers are a sheet, not alerts.** The plan put the answer of
 Rebuild Preview, Undo Last Change and Add Next Class in an alert. The section
 window already carries three `.alert` modifiers, and its own code records that
@@ -4380,6 +4402,7 @@ layout pass while AppKit's sheet animation spins a nested runloop — one call
 stack, not a race. This piece did not reproduce it again; it simply does not
 add a fourth alert. So every answer is the Section menu's one sheet
 (`SectionVerbSheetModel`, kind `.result`): Undo Last Change and Add Next Class
+(since #897 Add Class…'s first way, which answers in its own sheet)
 show it at once, working, while the copy is saved; and an answer that arrives
 while something else is on the window — the links checklist the change's own
 preview offered, a health alert — waits (`pendingVerbResult`) and is shown when
@@ -4445,7 +4468,9 @@ change are guards, green on the old code too. Not covered: duplicating a
 class when it moves others (`duplicateClassRequested`) also writes with no
 entry, and no menu item reaches it. The other menu paths were read: Make
 Room's `apply` throws only before its first write, Add Next Class writes one
-page.
+page. (Since #897 a menu copy of a class, Add Class…'s third way, is written
+only after it reads hidden, so it never writes without an entry; the
+assistant's own duplicate is unchanged.)
 
 **On Windows since #550 (2026-10-16).** The same endings, and the same five
 paths, each pinned. The undo ending comes from the depth the menu's server

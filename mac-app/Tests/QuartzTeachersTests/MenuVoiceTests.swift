@@ -43,6 +43,8 @@ final class MenuVoiceTests: XCTestCase {
         ("whatPublishingMeans", "publishingAndDeployingExplained"),
         ("pagesAChangeCouldNotFinish", "pagesAChangeCouldNotFinishFromTheMenu"),
         ("pagesAChangeCouldNotFinishNamingSeveral", "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"),
+        // #897: Section ▸ Duplicate as Next Class…'s copy that cannot be made hidden.
+        ("theCopyCouldNotBeMadeHidden", "theCopyCouldNotBeMadeHiddenFromTheMenu"),
     ]
 
     // MARK: - Set up and tear down

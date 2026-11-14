@@ -267,6 +267,20 @@
    },
    "windows": null
   },
+  "addClassAddButton": {
+   "label": "Add",
+   "mac": {
+    "wording": "AssistWording.menuAddButton"
+   },
+   "windows": null
+  },
+  "addClassDuplicateButton": {
+   "label": "Duplicate",
+   "mac": {
+    "wording": "AssistWording.menuDuplicateButton"
+   },
+   "windows": null
+  },
   "undoLastChangeTitle": {
    "label": "Undo last change",
    "mac": {

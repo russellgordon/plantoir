@@ -6796,7 +6796,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
 | Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
 | Undo Last Change | nothing: it runs and says what it put back | `undo_last_change` |
-| Add Next Class | nothing: the page arrives hidden and Undo Last Change takes it away (Russell's decision 11) | `add_next_class` |
+| Add Class… (since #897; it replaced Add Next Class) | a sheet asking how: the next class in this unit, in a new unit, or as a copy of a class; the first two are added at once, a copy shows its plan first (the section after this one) | `add_next_class` (with `unit: "next"` for a new unit); a copy `plan_add_next_class`, then `add_next_class`, with its source's path |
 | Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |
 | Make Room for Classes… | the class a new one goes in front of, how many (1–10), then the plan | `plan_make_room_for_classes`, then `make_room_for_classes` |
 | Class Dates… | the class dates sheet (`SectionScheduleSheet`) | — |
@@ -6805,7 +6805,14 @@ Help ▸ Publishing and Deploying… says what the two words mean, in an alert o
 its own, with or without a window (`publishingAndDeployingExplained` — said
 to the teacher; the assistant's `whatPublishingMeans` says "the teacher").
 The section row's context menu carries Publish Pages…, Hide Pages…, Publish
-Class for a Date… and Add Next Class, and selects the row first.
+Class for a Date… and Add Class…, and selects the row first. Add Class… took
+Add Next Class's place there in #897 (Russell ruled it on 2026-11-13, after
+the piece first went to the gate with the menu bar only); it sends the same
+request as the menu bar's item, so `performVerb` opens the same sheet. The
+three ways are not items of their own on that menu (rejected by the same
+ruling, `subjectMenus.addClassSheet.rejected`). No test or contract case
+covers the row's menu, so the line is checked by reading
+`SidebarView.sectionRowMenu`.
 
 **One entry point, the tool's own.** Each item builds its `AssistToolCall` in
 code (`SectionVerbs`) and runs it through `AssistToolRunner.run(call:)` — the
@@ -6837,7 +6844,7 @@ change made from the menu in THIS window (Russell's decision 4); the
 assistant's window keeps its own list. Opening another folder in the window
 makes a new runner, and the old folder's undo list goes with it.
 
-**Class dates first.** Add Next Class, Re-date Classes… and Make Room for
+**Class dates first.** Add Class…, Re-date Classes… and Make Room for
 Classes… need them. With none on file the SECTION WINDOW shows its own class
 dates sheet with the reason line, and the item runs once they are written —
 never `SectionSchedulePrompt.shared`, whose offer only the assistant's window
@@ -6867,7 +6874,139 @@ refactor, and a teacher with no assistant has no window for it); ⌘Z on Undo
 Last Change (it belongs to text editing in Edit, and a key that took back a
 page change from inside a text field would be a surprise nobody could undo);
 hiding the items on a course kept for reference (greyed, as every item is);
-a plan sheet for Add Next Class (it is undoable and the page arrives hidden).
+a plan sheet for Add Next Class (it is undoable and the page arrives hidden;
+since #897 the same holds for Add Class…'s first two ways).
+
+### Add Class…: the next class, a new unit, or a copy (#897)
+
+Two things only the built-in assistant's window could do had no menu item:
+starting a new unit, and duplicating a class as the next one (the audit of
+#897; the record is in [documentation/10](10-local-ai-assistant.md#what-only-the-built-in-assistant-could-do-and-where-it-is-on-the-menus-897)).
+Russell ruled, on the night of 2026-11-13, that they are not items of their
+own: **Section ▸ Add Class…** replaces Add Next Class and its sheet asks how
+the class is added. The ways are data, in this order
+(`SubjectMenuRules.AddClassWay`; `shared-rules.json` →
+`subjectMenus.addClassSheet`):
+
+| Way | What it sends | Greyed in the sheet when |
+|---|---|---|
+| The next class in this unit (a club: "the next meeting") | `add_next_class` with course and section, exactly what Add Next Class sent | never: it keeps Add Next Class's rule |
+| In a new unit | `add_next_class` with `unit: "next"`, the argument the window's "Start a new unit for the next class" phrasing already sends | the course is numbered (a club has no units), or a unit-word rename stopped part way |
+| As a copy of a class in this section | `plan_add_next_class`, then `add_next_class`, with `duplicateFileFromTheMenu`: the source's path in the course, `.md` included | the section's class folders hold no page, or a unit-word rename stopped part way |
+
+A way that cannot be used is drawn greyed, never left out, and a line under
+the ways says why, once per reason, in words a teacher can act on
+(`subjectMenus.addClassSheet.greyedBecause`: `menuAddClassGreyedNoUnits`,
+`menuAddClassGreyedNothingToCopy`, `menuAddClassGreyedRenameUnfinished`); the
+first way that can be used is chosen. The lines use the course's own word
+("in a new module"), except in a numbered course (a club), whose word is the
+pages' whole name ("Week") and never a unit: there the greyed way reads "In a
+new unit", beside the line saying the course has none (the fix review's
+finding 1: "In a new week" was untrue). The rename's line names only the ways
+the rename holds back, so finishing it is never promised to bring back a way
+greyed for another reason; which line, for every one of the eight
+combinations of the three facts, is `addClassSheet.labels`, `reasonLines` and
+its eight cases, all checked in a standalone `swiftc` run against five course
+words (Unit, Module, ICT, and numbered Week and Lesson) and both nouns (40
+renderings, 0 untrue; the previous wording, 22). The first two add at once (the button says Add), as Add
+Next Class did; the copy lists this section's class pages, numbered or not
+(`SectionVerbSheetModel.sourceRows`, from `ClassPages.list`), seven rows before
+the list scrolls inside itself (`mostSourceRowsShown`, so the tallest sheet
+stays inside the 620 pt a 13-inch screen allows, with the ways and their reason
+above it; seven is an estimate until the test host lays the sheet out at seven
+and at twelve rows and prints both, `testTheTallestAddClassSheetStaysOnTheScreen`),
+then shows the plan, then Duplicate. A class chosen and then hidden
+by the search is let go. The item itself is live wherever Add Next Class was,
+since its first way always can be chosen; it carries no key equivalent,
+because Add Next Class had none. The facts the ways are decided from
+(`SubjectMenuRules.AddClassFacts`) are read when the sheet OPENS
+(`SectionVerbs.addClassFacts`), not when the menu is drawn, and are not keys
+of the menu's situation. REJECTED: reading them with the window's " — Edited"
+marker and greying the item on them (the implementation review's finding 9:
+it changed nothing anyone sees, since the item is never greyed for them, and
+it walked the class folders on the main thread on every window activation). The trail line
+is `ran from a menu` with "Section ▸ Add Class…" and the way in its counts.
+
+**The copy, read on `.menu` only.** `duplicateFileFromTheMenu`
+(`AssistToolRunner.menuDuplicateFileArgument`) is read when the runner's
+surface is `.menu` and ignored on every other surface, so the built-in
+assistant's window and an outside assistant keep `duplicate`, by title, and
+its behaviour: the copy lands on the source's next day and later classes move
+(`class-planning.json` → `duplication`, unchanged). No schema shows the key,
+so nothing the local model is shown moves (`DuplicateAsNextClassTests.
+testTheMenusArgumentIsOnNoToolSurface`, and `AssistContractTests.
+testTheCommittedCasesMatchTheToolSurface` for every byte). The menu's copy
+(`class-planning.json` → `duplicatingAsTheNextClass`):
+
+- **becomes the NEXT class** (Russell's ruling): `NextClassPlanner.plan`, the
+  page Add Next Class would make, so nothing else is renamed or re-dated;
+- **is named by FILE.** `AssistSectionGraph.page(titled:)` answers the first
+  page in path order and strips any folder in front of the name, so a title
+  lookup copied a course-level "Concepts/Unit 2, Day 3" in place of the class
+  and said "Duplicated": a fault that reported success. The source must be one
+  of this section's class pages, or it is refused before anything is written;
+- **is built and read back before anything is written.** Per-section keys come
+  out first, then the date and `publish: false`, then
+  `AssistPageVisibility.answer` must say hidden; the file is written with
+  `.withoutOverwriting`. The assistant's path writes a blank page and fills it
+  after, which leaves a hidden blank page with no undo entry when the read-back
+  fails (the plan review's amendment 6); the menu's does not;
+- **is one undo entry** with no "before", so Undo Last Change deletes it.
+
+**A course reached through a link**: the class folders are listed with links
+in their ancestors resolved, so a path compared in two spellings never matched
+and every copy was refused (the implementation review's finding 8, measured).
+The test (`DuplicateAsNextClassTests.testACourseReachedThroughALinkCanBeCopied`)
+makes the COURSE folder the link. Measured 2026-11-13 on macOS 26.6 with
+Xcode 27: listing a working folder reached through a link already gives its
+courses their resolved spelling (`/var/…/link/courses/ICS3U` comes back as
+`/private/var/…/root/courses/ICS3U`), so a linked working folder puts both
+sides in one spelling and the old comparison passed too; the test's first
+fixture, which linked the working folder, asserted the course kept the link's
+spelling, failed on the second Mac, and by the listing measured here would
+fail on this one too. A course folder that is itself
+a link keeps its name in the listing while its pages are listed at the
+target, and there the old comparison found no page (measured standalone, the
+old and new comparisons side by side). Both the sheet
+(`SectionVerbs.coursePath`) and the runner compare the page's FOLDER in its
+`FolderIdentity.canonicalPath` spelling, as the rest of the app compares
+folders, and its file name as it is, so a page that is itself a link is still
+the page in that folder (the fix review's finding 3;
+`testAClassPageThatIsALinkCanBeCopied`).
+
+**An unfinished unit-word rename** greys the second and third ways, decided by
+the rename's OWN judgement (`UnitWordRenamer.interruptedRenameTarget`) as the
+sheet opens, which reads a record left by a rename that finished, or by a word
+edited by hand, as stale; the runner judges again at the press, refusing on
+`.menu` only with `menuUnitWordRenameUnfinished`, which speaks of the names
+the course gives its classes rather than of a unit, so it is true in a
+numbered course too (the Fable sweep's finding 5). Both judge WITHOUT clearing
+(`clearingAStaleRecord: false`): a rename running in another window writes its
+record and then, for one frontmatter write, has moved no page, which reads as
+stale, and clearing there would leave it running without its record (the fix
+review's finding 5, measured on 11 shapes of a half-done rename, every one of
+which keeps its record). The rename sheet that owns the record still clears a
+stale one when it opens, as it always has. REJECTED: greying on the record FILE
+alone, which held both ways greyed for good behind a stale record, since a
+greyed way never reaches the runner that would clear it (the implementation
+review's finding 1). A rename to "Module" that
+stopped part way leaves "Module 3" pages the planner cannot read, so a new unit
+would have been "Unit 3, Day 1" beside "Module 3, Day 2". The first way keeps
+Add Next Class's rule, which never waited for a rename: a known limit, left as
+it was.
+
+**A write that fails part way** (the disk full, say) removes the file it
+created, which no other program can own, since `.withoutOverwriting` refused
+any page already there; only `fileWriteFileExists` is answered "already
+there" (the implementation review's finding 11).
+
+REJECTED: one menu item per way (ruled earlier the same evening, then
+replaced); keeping Add Next Class beside Add Class…; the ways on the row's
+context menu; sending a folder-qualified name through `duplicate` (the title
+lookup strips the folder); changing `duplicate` itself (the assistant's
+behaviour is frozen); offering other sections' or course-level pages (ruled
+out); numbered sources only (the plan review's amendment 8: numbering was
+needed only for the insertion the ruling rejected).
 
 ### The plan as a table (#524)
 

@@ -26,7 +26,7 @@ Add Next Class makes the page for a section's next class. The page is named with
 ## Steps
 
 1. In the sidebar, select the section.
-2. Choose {{menu:addNextClass}} from the menu bar. There is nothing to fill in. A sheet titled {{control:addNextClassTitle}} opens. It says Plantoir is saving a copy of the course first, and then that it is working.
+2. Choose {{menu:addClass}} from the menu bar. There is nothing to fill in. A sheet titled {{control:addNextClassTitle}} opens. It says Plantoir is saving a copy of the course first, and then that it is working.
 
 {{picture:add-next-class-1}}
 alt: The Section menu open, with Add Next Class marked.
@@ -69,6 +69,6 @@ The copy of the course that Plantoir saved first is in its list of backups. See 
 
 ## If it does not work
 
-- **{{menu:addNextClass}} is greyed.** The course may be kept for reference. Or the section is busy. It is being deployed, a copy of the course is being saved, or another command from the Section menu is still running in this window.
+- **{{menu:addClass}} is greyed.** The course may be kept for reference. Or the section is busy. It is being deployed, a copy of the course is being saved, or another command from the Section menu is still running in this window.
 - **The answer says nothing needed adding.** A page with that name is already there. Plantoir never writes over a page that exists.
 - **The new page is not in the preview.** It is unpublished. Publish it first.

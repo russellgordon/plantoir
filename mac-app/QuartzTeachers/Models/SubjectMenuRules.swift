@@ -103,7 +103,12 @@ nonisolated enum SubjectMenuRules {
         case publishClassForADate
         case rebuildPreview
         case undoLastChange
-        case addNextClass
+        /// Add Class… (#897): one item, whose sheet asks HOW the class is
+        /// added (`AddClassWay`): the next class in this unit (what Add Next
+        /// Class did, the item it replaces), in a new unit, or as a copy of a
+        /// class. The last two were only the built-in assistant's window's
+        /// before (Russell, 2026-11-13 night: only Add Class… remains).
+        case addClass
         case reDateClasses
         case makeRoomForClasses
         case classDates
@@ -111,6 +116,20 @@ nonisolated enum SubjectMenuRules {
         case back
         case forward
         case reloadPage
+    }
+
+    /// The ways Add Class…'s sheet offers, in the order it lists them
+    /// (`shared-rules.json` → `subjectMenus.addClassSheet.ways`). A way is a
+    /// case here and a name in the contract, so a third way joins as data:
+    /// a case, its line in `addClassWays`, its wording and its call.
+    enum AddClassWay: String, CaseIterable, Sendable {
+        /// The next class in the unit under way: what Section ▸ Add Next
+        /// Class did until #897 replaced it, call for call.
+        case nextInThisUnit
+        /// The first class of the next unit, Unit 5, Day 1.
+        case inANewUnit
+        /// A copy of one of this section's classes, as the next class.
+        case asACopyOfAClass
     }
 
     /// Everything the rule needs to know, gathered from the window's
@@ -177,6 +196,65 @@ nonisolated enum SubjectMenuRules {
         var deployedFolderReady: Bool = false
         /// This app is showing the selected section's deployed folder.
         var deployedFolderShown: Bool = false
+    }
+
+    /// What Add Class…'s sheet decides its ways from (#897), read when the
+    /// sheet OPENS (`SectionVerbs.addClassFacts`), never per drawing of the
+    /// menu: the item itself is live wherever Add Next Class was, because its
+    /// first way always is. In the contract as
+    /// `subjectMenus.addClassSheet.factDefaults`.
+    struct AddClassFacts: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        /// The course names its class pages with one number ("Week 3", a
+        /// club, #267): it has no units.
+        var classPagesAreNumbered: Bool = false
+        /// A rename of the course's unit word stopped part way, as the
+        /// rename itself judges it (`UnitWordRenamer.interruptedRenameTarget`,
+        /// which reads a stale record as stale). Pages under the new word do not
+        /// read under the old one, so the highest unit would be read too low.
+        var unitWordRenameUnfinished: Bool = false
+        /// The section has at least one page in its class folders.
+        var hasAClassPage: Bool = false
+    }
+
+    /// Why a way is greyed in Add Class…'s sheet, said under the ways in a
+    /// sentence a teacher can act on (`AssistWording.menuAddClassGreyed…`).
+    enum AddClassGreyedBecause: String, CaseIterable, Sendable {
+        case theCourseHasNoUnits
+        case thereIsNoClassToCopy
+        case aRenameIsUnfinished
+    }
+
+    /// Which line a way is drawn with (`subjectMenus.addClassSheet.labels`).
+    /// A numbered course (a club) has no "unit under way", and its word is
+    /// the whole page name ("Week"), never a unit, so its new-unit line says
+    /// "unit" plainly, beside the reason that it has none (the fix review's
+    /// finding 1).
+    enum AddClassLabel: String, CaseIterable, Sendable {
+        /// "As the next class in the <word> under way".
+        case nextInTheUnitUnderWay
+        /// "As the next meeting": a numbered course.
+        case nextInANumberedCourse
+        /// "In a new <word>, as its first class".
+        case inANewUnitInTheCoursesWord
+        /// "In a new unit, as its first meeting": a numbered course, where
+        /// the way is greyed and the word "Week" would make a false line.
+        case inANewUnitPlainly
+        case asACopy
+    }
+
+    /// One line under the ways (`subjectMenus.addClassSheet.reasonLines`).
+    /// The rename's line names ONLY the ways the rename holds back, so it
+    /// never promises a way that stays greyed for another reason after the
+    /// rename is finished (the fix review's finding 1).
+    enum AddClassReasonLine: String, CaseIterable, Sendable {
+        case theCourseHasNoUnits
+        case thereIsNoClassToCopy
+        case aRenameHoldsBackANewUnitAndACopy
+        case aRenameHoldsBackANewUnit
+        case aRenameHoldsBackACopy
     }
 
     // MARK: - Functions
@@ -338,7 +416,10 @@ nonisolated enum SubjectMenuRules {
                 enabled.insert(.publishPages)
                 enabled.insert(.hidePages)
                 enabled.insert(.publishClassForADate)
-                enabled.insert(.addNextClass)
+                // #897: live wherever Add Next Class was, since its sheet's
+                // first way is exactly Add Next Class. Which other ways the
+                // sheet offers is `addClassWays`, decided when it opens.
+                enabled.insert(.addClass)
                 enabled.insert(.reDateClasses)
                 enabled.insert(.makeRoomForClasses)
                 enabled.insert(.classDates)
@@ -374,6 +455,92 @@ nonisolated enum SubjectMenuRules {
             }
         }
         return enabled
+    }
+
+    /// The ways Add Class…'s sheet can use, in the sheet's
+    /// order (#897). The next class in this unit always, exactly as Add Next
+    /// Class was. Not in a new unit in a numbered course: it has no units,
+    /// and the tool would refuse in the conversation's words. Not as a copy
+    /// with no class page to copy. Neither of those two while a unit-word
+    /// rename is unfinished: the planner reads only the pages named the old
+    /// way. (The next class in this unit keeps Add Next Class's rule, which
+    /// did not wait for one; that is a known limit, not changed here.)
+    static func addClassWays(_ facts: AddClassFacts) -> [AddClassWay] {
+        var ways: [AddClassWay] = []
+        for way in AddClassWay.allCases where whyGreyed(way, facts) == nil {
+            ways.append(way)
+        }
+        return ways
+    }
+
+    /// The line `way` is drawn with.
+    static func label(of way: AddClassWay, _ facts: AddClassFacts) -> AddClassLabel {
+        switch way {
+        case .nextInThisUnit:
+            return facts.classPagesAreNumbered ? .nextInANumberedCourse : .nextInTheUnitUnderWay
+        case .inANewUnit:
+            return facts.classPagesAreNumbered ? .inANewUnitPlainly : .inANewUnitInTheCoursesWord
+        case .asACopyOfAClass:
+            return .asACopy
+        }
+    }
+
+    /// The lines under the ways, in the ways' order: one per reason, and
+    /// the rename's one line naming exactly the ways it holds back.
+    static func reasonLines(_ facts: AddClassFacts) -> [AddClassReasonLine] {
+        var lines: [AddClassReasonLine] = []
+        var renameHoldsANewUnit: Bool = false
+        var renameHoldsACopy: Bool = false
+        for way in AddClassWay.allCases {
+            guard let reason = whyGreyed(way, facts) else {
+                continue
+            }
+            switch reason {
+            case .theCourseHasNoUnits:
+                lines.append(.theCourseHasNoUnits)
+            case .thereIsNoClassToCopy:
+                lines.append(.thereIsNoClassToCopy)
+            case .aRenameIsUnfinished:
+                if way == .inANewUnit {
+                    renameHoldsANewUnit = true
+                } else if way == .asACopyOfAClass {
+                    renameHoldsACopy = true
+                }
+            }
+        }
+        if renameHoldsANewUnit && renameHoldsACopy {
+            lines.append(.aRenameHoldsBackANewUnitAndACopy)
+        } else if renameHoldsANewUnit {
+            lines.append(.aRenameHoldsBackANewUnit)
+        } else if renameHoldsACopy {
+            lines.append(.aRenameHoldsBackACopy)
+        }
+        return lines
+    }
+
+    /// Why `way` cannot be chosen, or nil when it can. One reason per way,
+    /// the first that applies: a club has no units before anything else.
+    static func whyGreyed(_ way: AddClassWay, _ facts: AddClassFacts) -> AddClassGreyedBecause? {
+        switch way {
+        case .nextInThisUnit:
+            return nil
+        case .inANewUnit:
+            if facts.classPagesAreNumbered {
+                return .theCourseHasNoUnits
+            }
+            if facts.unitWordRenameUnfinished {
+                return .aRenameIsUnfinished
+            }
+            return nil
+        case .asACopyOfAClass:
+            if !facts.hasAClassPage {
+                return .thereIsNoClassToCopy
+            }
+            if facts.unitWordRenameUnfinished {
+                return .aRenameIsUnfinished
+            }
+            return nil
+        }
     }
 
     /// The menu item the Delete key asks for on the selected sidebar row,

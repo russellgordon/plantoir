@@ -759,8 +759,60 @@ enum AssistContract {
             "menuWorking": AssistWording.menuWorking,
             "menuRebuildPreviewTitle": AssistWording.menuRebuildPreviewTitle,
             "menuUndoLastChangeTitle": AssistWording.menuUndoLastChangeTitle,
+            // No longer the title of any Mac sheet since #897 replaced Add Next
+            // Class with Add Class…. KEPT on purpose: Windows reads it
+            // (AssistWording.Menu.cs) until it makes the same change, so it
+            // leaves the contract in that piece, not before.
             "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
             "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
+            // #897: Section ▸ Add Class…, in a new unit or as a copy of a class.
+            "menuAddClassTitle": AssistWording.menuAddClassTitle(course: course, section: section),
+            "menuAddClassTitleForAMeeting": AssistWording.menuAddClassTitle(
+                course: course, section: section, noun: .meeting
+            ),
+            "menuHowToAddAClass": AssistWording.menuHowToAddAClass(),
+            "menuHowToAddAClassForAMeeting": AssistWording.menuHowToAddAClass(noun: .meeting),
+            "menuAddClassNextInThisUnit": AssistWording.menuAddClassNextInThisUnit(),
+            "menuAddClassNextInThisUnitForAMeeting": AssistWording.menuAddClassNextInThisUnit(noun: .meeting),
+            "menuAddClassNextInANumberedCourse": AssistWording.menuAddClassNextInThisUnit(numbered: true),
+            "menuAddClassNextInANumberedCourseForAMeeting": AssistWording.menuAddClassNextInThisUnit(
+                noun: .meeting, numbered: true
+            ),
+            "menuAddClassInANewUnit": AssistWording.menuAddClassInANewUnit(),
+            "menuAddClassInANewUnitForAMeeting": AssistWording.menuAddClassInANewUnit(noun: .meeting),
+            "menuAddClassInANewUnitInAModuleCourse": AssistWording.menuAddClassInANewUnit(unit: "module"),
+            "menuAddClassNextInThisUnitInAModuleCourse": AssistWording.menuAddClassNextInThisUnit(unit: "module"),
+            "menuAddClassGreyedNoUnits": AssistWording.menuAddClassGreyedNoUnits(),
+            "menuAddClassGreyedNoUnitsForAMeeting": AssistWording.menuAddClassGreyedNoUnits(noun: .meeting),
+            "menuAddClassGreyedNothingToCopy": AssistWording.menuAddClassGreyedNothingToCopy(),
+            "menuAddClassGreyedNothingToCopyForAMeeting": AssistWording.menuAddClassGreyedNothingToCopy(noun: .meeting),
+            "menuAddClassGreyedRenameUnfinished": AssistWording.menuAddClassGreyedRenameUnfinished(),
+            "menuAddClassGreyedRenameUnfinishedForAMeeting": AssistWording.menuAddClassGreyedRenameUnfinished(
+                noun: .meeting
+            ),
+            "menuAddClassGreyedRenameHoldsANewUnit": AssistWording.menuAddClassGreyedRenameUnfinished(copy: false),
+            "menuAddClassGreyedRenameHoldsACopyInANumberedCourse": AssistWording.menuAddClassGreyedRenameUnfinished(
+                newUnit: false, numbered: true
+            ),
+            "menuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting":
+                AssistWording.menuAddClassGreyedRenameUnfinished(noun: .meeting, newUnit: false, numbered: true),
+            "menuNeedsClassDatesFirst": AssistWording.menuNeedsClassDatesFirst(),
+            "menuNeedsClassDatesFirstForAMeeting": AssistWording.menuNeedsClassDatesFirst(noun: .meeting),
+            "menuAddClassAsACopy": AssistWording.menuAddClassAsACopy(),
+            "menuAddClassAsACopyForAMeeting": AssistWording.menuAddClassAsACopy(noun: .meeting),
+            "menuAddButton": AssistWording.menuAddButton,
+            "menuPickClassToDuplicate": AssistWording.menuPickClassToDuplicate(),
+            "menuPickClassToDuplicateForAMeeting": AssistWording.menuPickClassToDuplicate(noun: .meeting),
+            "menuDuplicateButton": AssistWording.menuDuplicateButton,
+            "duplicatedFromTheMenu": AssistWording.duplicatedFromTheMenu(
+                page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
+            ),
+            "theCopyCouldNotBeMadeHiddenFromTheMenu": AssistWording.theCopyCouldNotBeMadeHiddenFromTheMenu(
+                page: pagePlaceholder
+            ),
+            "menuTheNextPageIsAlreadyThere": AssistWording.menuTheNextPageIsAlreadyThere(page: copyPlaceholder),
+            "menuUnitWordRenameUnfinished": AssistWording.menuUnitWordRenameUnfinished(),
+            "menuUnitWordRenameUnfinishedForAMeeting": AssistWording.menuUnitWordRenameUnfinished(noun: .meeting),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),

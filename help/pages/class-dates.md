@@ -81,7 +81,7 @@ The Google Sheet must be shared. In Google Sheets, choose Share, and under Gener
 
 Three commands need the class dates:
 
-- {{menu:addNextClass}}
+- {{menu:addClass}}
 - {{menu:reDateClasses}}
 - {{menu:makeRoomForClasses}}
 

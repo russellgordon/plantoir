@@ -65,4 +65,4 @@ Students see none of this until the section is next deployed.
   Give the dates, and Make Room for Classes carries on. See [Give Plantoir your class dates](page:class-dates).
 - **{{menu:makeRoomForClasses}} is greyed.** The course is kept for reference, or the section is busy with a deploy, a backup or another command from the Section menu.
 - **You wanted to move dates, not add a class.** Use {{menu:reDateClasses}}. See [Move classes when the schedule changes](page:redate).
-- **You wanted a class at the end.** Use {{menu:addNextClass}}. See [Add the next class](page:add-next-class).
+- **You wanted a class at the end.** Use {{menu:addClass}}. See [Add the next class](page:add-next-class).

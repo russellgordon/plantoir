@@ -54,7 +54,7 @@ Write the page as ordinary notes, under its settings.
 1. In Plantoir, select the section and press {{control:previewButton}}. The section's website opens in Plantoir's window.
 2. If a preview was already running, choose {{menu:rebuildPreview}}. A preview shows the pages as they were when it was made. A change made since is not in it.
 
-The preview shows only the pages that are published for the section. A class page made with {{menu:addNextClass}} starts unpublished. Publish it when it is written, and it appears in the preview. [Preview a section](page:preview) has more.
+The preview shows only the pages that are published for the section. A class page made with {{menu:addClass}} starts unpublished. Publish it when it is written, and it appears in the preview. [Preview a section](page:preview) has more.
 
 Students see the page after two more things: the page is published for their section, and the section is deployed. [Publishing and deploying](page:publish-and-deploy) explains both.
 

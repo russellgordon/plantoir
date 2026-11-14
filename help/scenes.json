@@ -247,9 +247,9 @@
   },
   "add-next-class-1": {
    "page": "add-next-class",
-   "shows": "The Section menu open on Add Next Class",
+   "shows": "The Section menu open on Add Class\u2026",
    "labels": [
-    "Add Next Class"
+    "Add Class\u2026"
    ],
    "expectText": [],
    "awaiting_capture": true,

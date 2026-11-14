@@ -53,4 +53,4 @@ Seven of the example's shared folders hold a page named `_DUPLICATE ME`: Concept
 
 `_DUPLICATE ME` is not published for either section, so your copy starts hidden as well. Publish it for each section when it is ready: see [Show or hide pages for a section](page:publish-pages).
 
-There is no `_DUPLICATE ME` page in All Classes. A new class page is made in Plantoir, with {{menu:addNextClass}}. See [Add the next class](page:add-next-class).
+There is no `_DUPLICATE ME` page in All Classes. A new class page is made in Plantoir, with {{menu:addClass}}. See [Add the next class](page:add-next-class).

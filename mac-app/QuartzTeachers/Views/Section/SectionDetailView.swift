@@ -283,7 +283,7 @@ struct SectionDetailView: View {
     @State var afterTheVerbSheet: (() -> Void)?
 
     /// The answer of a function with no sheet of its own (Undo Last Change,
-    /// a refused Rebuild Preview, Add Next Class) that arrived while
+    /// a refused Rebuild Preview) that arrived while
     /// something else was on the window — shown when that has gone, never
     /// dropped (#457 batch B's review, note 4).
     @State var pendingVerbResult: SectionVerbSheetModel?
@@ -1889,7 +1889,8 @@ struct SectionDetailView: View {
         case .stopShowingDeployedFolder:
             stopShowingTheDeployedFolder()
         case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+             .addClass,
+             .reDateClasses, .makeRoomForClasses, .classDates:
             performVerb(item)
         default:
             break
