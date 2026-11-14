@@ -396,11 +396,15 @@ final class ProblemReportTests: XCTestCase {
     ///
     /// Bounded by GROWTH rather than by a number of seconds, so a slower
     /// machine passes as well as a fast one: ten times the characters may
-    /// take at most `growthLimit` times as long, in the same run. Linear
-    /// work grows about ten times; the quadratic rules grew about a hundred.
-    /// Fifty sits between the two with room for a busy machine: on one
-    /// running another redactor's timings beside it, a linear rule's best
-    /// measured growth reached thirty-nine (2026-11-14, Apple M4 Pro).
+    /// take at most `growthLimit` times as long, in the same run. Three
+    /// numbers set the bound (Apple M4 Pro, 2026-11-14, a Debug build as
+    /// XCTest makes it, on one core with other work running beside it):
+    /// the largest growth measured for the eight shapes was 12.5, over 40
+    /// runs of all eight; the limit is 50; and a quadratic rule, the email
+    /// rule as it stood on `dev`, grew 103. So fifty catches a purely
+    /// quadratic rule with a factor of two to spare and leaves four times
+    /// the largest linear growth seen. How far the growth spreads on a
+    /// machine under heavy load is not measured yet.
     func testNoRuleTakesLongerThanLinearTime() {
         let growthLimit: Double = 50
         let shorter: Int = 10_000

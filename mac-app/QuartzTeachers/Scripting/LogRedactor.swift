@@ -71,13 +71,15 @@ nonisolated enum LogRedactor {
     /// part of the contract (`problemReportRedaction.ruleOrder`). A rule
     /// that reads one narrow shape runs before a rule that takes whatever
     /// follows a label, and the email rule runs after every rule whose value
-    /// can hold an address. Each of these was a leak in the other order
-    /// (#853 round 2, measured with every pair of rules): `labelledSecret`
-    /// first took only the word `Bearer` from `token: Bearer abc…` and left
-    /// the token, and `emailAddress` first left the password of
-    /// `curl -u name@school…:password`. The labelled rules still run before
-    /// the length rule, which runs last, so that a value with a label round
-    /// it is removed WITH its label kept.
+    /// can hold an address. In another order some lines lose only part of a
+    /// secret (#853 rounds 2 and 3, measured): with `labelledSecret` before
+    /// the home-folder rules, `password=/Users/First Last/x` keeps `Last`,
+    /// and with `emailAddress` first, `https://name:password@host` keeps
+    /// its username. `ruleOrder.cases` holds lines like these, and each
+    /// suite checks that they come out right in this order and differently
+    /// in the one other order each case names. The labelled rules still run
+    /// before the length rule, which runs last, so that a value with a
+    /// label round it is removed WITH its label kept.
     ///
     /// Every rule is linear in the length of the line (#853 round 2): a
     /// trail line of 100,000 characters took more than 90 seconds in the
@@ -116,10 +118,14 @@ nonisolated enum LogRedactor {
         // An apostrophe followed by a letter is part of the name, so
         // `O'Brien` goes whole; any other quote ends it, so
         // `HOME='/Users/First Last'` keeps its closing quote. A word that
-        // holds another rule's label (`token`, `password`, `Bearer`,
-        // `Account` and the rest) is never taken as a further word of the
-        // name: `/Users/name token: abc` keeps its label for
-        // `labelledSecret`, where taking it would have left `abc` behind.
+        // would start another rule's match is never taken as a further
+        // word of the name: a label word followed by `=` or `:` (`token:`,
+        // `password=` and the rest), or `Bearer`, `Authorization` or
+        // `Account` not followed by a letter. So `/Users/name token: abc`
+        // keeps its label for `labelledSecret`, where taking it would have
+        // left `abc` behind, and a surname that only holds a label word
+        // (`Secretan`, `Tokenfield`, `Accountly`) is taken with the name
+        // (#853 round 3; before, it was left on the line).
         // A carriage return ends the name as the end of a line does,
         // because .NET's `$` does not match before one.
         //
@@ -127,12 +133,12 @@ nonisolated enum LogRedactor {
         // prints a Windows path in a dict or an exception (`C:\\Users\\…`).
         RedactionRule(
             name: "macHomeFolder",
-            pattern: #"(?im)(/Users/)(?:(?:[^/\s"':]|'(?=\p{L}))+(?: (?!-|[^/\s"':]*(?:token|secret|password|api[_\-]?key|bearer|authorization|account))(?:[^/\s"':]|'(?=\p{L}))+)*(?=[/"'\r]|:(?:\s|$)|$)|(?:[^/\s"':]|'(?=\p{L}))+)"#,
+            pattern: #"(?im)(/Users/)(?:(?:[^/\s"':]|'(?=\p{L}))+(?: (?!-|[^/\s"':]*(?:token|secret|password|api[_\-]?key)\s*[=:]|[^/\s"':]*(?:bearer|authorization|account)(?![a-z]))(?:[^/\s"':]|'(?=\p{L}))+)*(?=[/"'\r]|:(?:\s|$)|$)|(?:[^/\s"':]|'(?=\p{L}))+)"#,
             replacement: "$1" + removedPersonPath
         ),
         RedactionRule(
             name: "windowsHomeFolder",
-            pattern: #"(?im)([A-Z]:\\{1,2}Users\\{1,2})(?:(?:[^\\\s"':]|'(?=\p{L}))+(?: (?!-|[^\\\s"':]*(?:token|secret|password|api[_\-]?key|bearer|authorization|account))(?:[^\\\s"':]|'(?=\p{L}))+)*(?=[\\/"'\r]|:(?:\s|$)|$)|(?:[^\\\s"':]|'(?=\p{L}))+)"#,
+            pattern: #"(?im)([A-Z]:\\{1,2}Users\\{1,2})(?:(?:[^\\\s"':]|'(?=\p{L}))+(?: (?!-|[^\\\s"':]*(?:token|secret|password|api[_\-]?key)\s*[=:]|[^\\\s"':]*(?:bearer|authorization|account)(?![a-z]))(?:[^\\\s"':]|'(?=\p{L}))+)*(?=[\\/"'\r]|:(?:\s|$)|$)|(?:[^\\\s"':]|'(?=\p{L}))+)"#,
             replacement: "$1" + removedPersonPath
         ),
         // A Basic Authorization header (#709): the base64 of a unit plan's
@@ -149,24 +155,37 @@ nonisolated enum LogRedactor {
         //
         // None of the three label rules (this one, `bearerHeader` and
         // `labelledSecret`) takes another rule's label as its value: a
-        // value that is `Bearer` or `Basic` and a word, an `Authorization`
-        // header, a `token:` label with a space and a value after it, or
-        // an account flag or label with its identifier (#853 round 2). The
-        // rule that owns that label takes what follows it instead, in
-        // either order. Before, `token: Bearer abc…` wrote out the token.
+        // value that is `Bearer` and a word, an `Authorization` header, a
+        // `token:` label with a space and a value after it, or an account
+        // flag or label with its identifier, or with the placeholder that
+        // took the identifier (#853 rounds 2 and 3). The rule that owns
+        // that label takes what follows it instead, in either order, and
+        // redacting again changes nothing. Before, `token: Bearer abc…`
+        // wrote out the token, and `password: --account <id>` became
+        // `password: [removed: token] [removed: account id]` on a second
+        // pass.
+        //
+        // `Basic` is different, because `basicAuthHeader` owns it only
+        // after `Authorization`. So `labelledSecret` takes `Basic` and the
+        // word after it together (`password: Basic abc…`, #853 round 3;
+        // before, nobody took it). It reads `Basic` atomically, `(?>…)`, so
+        // a second pass over `password: Basic [removed: token]` cannot give
+        // up the `Basic` and take it as the value. The two header rules
+        // still refuse `Basic` and a word, which leaves the contrived
+        // `Bearer Basic abc…` to nobody (documentation 09 names it).
         RedactionRule(
             name: "basicAuthHeader",
-            pattern: #"(?i)(\bAuthorization["']?\s*[:=]\s*["']?\s*Basic\s+)(?!\[removed: )(?!Bearer\s+\S|Basic\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*[A-Za-z0-9]{16}|account\s*id\s*[:=]?\s*[A-Za-z0-9]{16})\S+"#,
+            pattern: #"(?i)(\bAuthorization["']?\s*[:=]\s*["']?\s*Basic\s+)(?!\[removed: )(?!Bearer\s+\S|Basic\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*(?:[A-Za-z0-9]{16}|\[removed: account id\])|account\s*id\s*[:=]?\s*(?:[A-Za-z0-9]{16}|\[removed: account id\]))\S+"#,
             replacement: "$1" + removedToken
         ),
         RedactionRule(
             name: "bearerHeader",
-            pattern: #"(?i)\bBearer\s+(?!\[removed: )(?!Bearer\s+\S|Basic\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*[A-Za-z0-9]{16}|account\s*id\s*[:=]?\s*[A-Za-z0-9]{16})\S+"#,
+            pattern: #"(?i)\bBearer\s+(?!\[removed: )(?!Bearer\s+\S|Basic\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*(?:[A-Za-z0-9]{16}|\[removed: account id\])|account\s*id\s*[:=]?\s*(?:[A-Za-z0-9]{16}|\[removed: account id\]))\S+"#,
             replacement: "Bearer " + removedToken
         ),
         RedactionRule(
             name: "labelledSecret",
-            pattern: #"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)(?!\[removed: )(?!Bearer\s+\S|Basic\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*[A-Za-z0-9]{16}|account\s*id\s*[:=]?\s*[A-Za-z0-9]{16})\S+"#,
+            pattern: #"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)(?!\[removed: )(?!Bearer\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*(?:[A-Za-z0-9]{16}|\[removed: account id\])|account\s*id\s*[:=]?\s*(?:[A-Za-z0-9]{16}|\[removed: account id\]))(?>(?:Basic\s+)?)(?!\[removed: )\S+"#,
             replacement: "$1" + removedToken
         ),
         RedactionRule(
@@ -235,8 +254,16 @@ nonisolated enum LogRedactor {
 
     /// The text as it may be written to a report.
     static func redacting(_ text: String) -> String {
+        return redacting(text, applyingInOrder: patternRules)
+    }
+
+    /// The text with these pattern rules applied in this order, then the
+    /// 40-character run. The app always passes `patternRules`; a test
+    /// passes the same rules in another order, to show that a
+    /// `problemReportRedaction.ruleOrder` case depends on the order.
+    static func redacting(_ text: String, applyingInOrder rules: [RedactionRule]) -> String {
         var result: String = text
-        for rule in patternRules {
+        for rule in rules {
             result = applying(rule, to: result)
         }
         result = removingLongSecrets(from: result)

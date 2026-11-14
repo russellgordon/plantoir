@@ -571,6 +571,62 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertEqual(actual, expected)
     }
 
+    /// The order is pinned by what it does as well as by name (#853 round
+    /// 3). Each `ruleOrder.cases` line comes out as its `expect` in the
+    /// pinned order, and comes out differently when the one rule its
+    /// `wrongOrder` names is moved to run just before another. So a list of
+    /// rules in another order fails here on what it writes, not only on
+    /// the names `testTheRedactionRulesRunInTheContractsOrder` compares.
+    func testEachRuleOrderCaseDependsOnTheOrder() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportRedaction")
+        let ruleOrder: [String: Any] = try XCTUnwrap(section["ruleOrder"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(ruleOrder["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 2)
+        for testCase in cases {
+            let template: String = try XCTUnwrap(testCase["input"] as? String)
+            let input: String = try SharedRulesContractTests.assembledRedactionInput(for: testCase)
+            let expect: String = try XCTUnwrap(testCase["expect"] as? String)
+            XCTAssertNotNil(testCase["why"] as? String, template)
+            XCTAssertEqual(LogRedactor.redacting(input), expect, "pinned order, input \(template.debugDescription)")
+
+            let wrongOrder: [String: String] = try XCTUnwrap(testCase["wrongOrder"] as? [String: String], template)
+            let moved: String = try XCTUnwrap(wrongOrder["move"], template)
+            let before: String = try XCTUnwrap(wrongOrder["before"], template)
+            let reordered: [RedactionRule] = try SharedRulesContractTests.patternRules(moving: moved, toRunBefore: before)
+            XCTAssertNotEqual(
+                LogRedactor.redacting(input, applyingInOrder: reordered), expect,
+                "with \(moved) before \(before), input \(template.debugDescription) should come out differently"
+            )
+        }
+    }
+
+    /// The app's pattern rules with the one named `moving` taken out and
+    /// put back just before the one named `toRunBefore`.
+    static func patternRules(moving moved: String, toRunBefore before: String) throws -> [RedactionRule] {
+        var movedRule: RedactionRule? = nil
+        var others: [RedactionRule] = []
+        for rule in LogRedactor.patternRules {
+            if rule.name == moved {
+                movedRule = rule
+            } else {
+                others.append(rule)
+            }
+        }
+        let ruleToMove: RedactionRule = try XCTUnwrap(movedRule, "no rule named \(moved)")
+        var reordered: [RedactionRule] = []
+        var placed: Bool = false
+        for rule in others {
+            if rule.name == before {
+                reordered.append(ruleToMove)
+                placed = true
+            }
+            reordered.append(rule)
+        }
+        XCTAssertTrue(placed, "no rule named \(before)")
+        XCTAssertEqual(reordered.count, LogRedactor.patternRules.count)
+        return reordered
+    }
+
     /// The phrases left behind are named in the contract rather than
     /// described, so that a report reads identically on both platforms and
     /// neither side has to copy a string out of prose.
