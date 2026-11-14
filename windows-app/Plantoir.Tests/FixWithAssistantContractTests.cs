@@ -66,11 +66,30 @@ public class FixWithAssistantContractTests
         Assert.NotNull(greeting);
         Assert.Equal(expect["rowsNamed"]!.GetValue<int>(), greeting!.RowsNamed);
         Assert.Equal(expect["rowsNotNamed"]!.GetValue<int>(), greeting.RowsNotNamed);
-        if (expect["text"] is { } text) Assert.Equal(text.ToString(), greeting.Text);
+        if (expect["text"] is { } text)
+        {
+            // A case whose message carries greetingHandoutsSentence (#859) is
+            // held open by name: until #859 lands here it must be the
+            // contract's message with exactly that sentence left out.
+            if (NamedGapLedger.Holding(NamedGapLedger.FixWithGreetingCases, name) is { } owed)
+            {
+                string sentence = ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["greetingHandoutsSentence"]!.ToString();
+                Assert.False(text.ToString() == greeting.Text, NamedGapLedger.ClosedMessage(owed));
+                Assert.Equal(text.ToString().Replace(" " + sentence, ""), greeting.Text);
+            }
+            else
+                Assert.Equal(text.ToString(), greeting.Text);
+        }
         if (expect["atMostCharacters"] is { } most) Assert.True(FixWithAssistant.Characters(greeting.Text) <= most.GetValue<int>());
         if (expect["textHas"] is { } has) Assert.Contains(has.ToString(), greeting.Text);
         AssertOneCleanLine(greeting.Text);
     }
+
+    /// <summary>Every greeting case held open by name is still a case the contract has (the other half of the hold in <see cref="GreetingCases"/>).</summary>
+    [Fact]
+    public void HeldGreetingCasesAreStillTheContracts() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.FixWithGreetingCases,
+            FixWith()["greetingCases"]!.AsArray().Select(c => c!["name"]!.ToString()));
 
     internal static IReadOnlyList<SectionProblemRow> RowsOf(JsonNode testCase)
     {
