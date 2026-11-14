@@ -247,11 +247,12 @@ final class OneSectionRestoreTests: XCTestCase {
         XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
             2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: counter.hooks
         )) { (error: Error) in
-            guard case CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, let keptAt, true) = error else {
-                XCTFail("Expected sectionRestoreStoppedPartWay, got \(error)")
+            guard case CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, let keptAtOrNil, true) = error,
+                  let keptAt = keptAtOrNil else {
+                XCTFail("Expected sectionRestoreStoppedPartWay naming a folder, got \(error)")
                 return
             }
-            XCTAssertTrue(keptAt.hasPrefix("courses/_backups/ICS3U/Section 2 as it was before a restore, "), keptAt)
+            XCTAssertTrue(keptAt.hasPrefix("courses/_backups/ICS3U/Section 2 before a restore "), keptAt)
             XCTAssertTrue(error.localizedDescription.contains(keptAt), "the sentence says where")
             XCTAssertTrue(error.localizedDescription.contains("Archived"), "the menu's route archived first")
         }
@@ -352,21 +353,142 @@ final class OneSectionRestoreTests: XCTestCase {
 
     // MARK: - Refusals
 
-    /// A shared folder renamed since the backup: refused, nothing moves.
+    /// A shared folder RENAMED since the backup (Concepts to Ideas): refused
+    /// with the folder sentence, and nothing moves.
     @MainActor
     func testARestoreIsRefusedWhenASharedFolderWasRenamed() async throws {
         let fixture: OneSectionFixture = try OneSectionFixture()
         defer { fixture.tearDown() }
+        try fixture.writeConfig(unitWord: nil, sharedFolders: ["Concepts", "Media"])
         let item: BackupItem = try await fixture.backUp()
-        try fixture.writeConfig(unitWord: nil, sharedFolders: ["Ideas"])
+        try fixture.writeConfig(unitWord: nil, sharedFolders: ["Ideas", "Media"])
+        let before: [String: Data] = try OneSectionFixture.snapshot(of: fixture.courseURL)
         XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
             2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
         )) { (error: Error) in
-            guard case CourseRestorer.Problem.namingChangedSinceTheBackup("ICS3U", 2) = error else {
-                XCTFail("Expected namingChangedSinceTheBackup, got \(error)")
+            guard case CourseRestorer.Problem.foldersChangedSinceTheBackup("ICS3U", 2) = error else {
+                XCTFail("Expected foldersChangedSinceTheBackup, got \(error)")
                 return
             }
         }
+        XCTAssertEqual(try OneSectionFixture.snapshot(of: fixture.courseURL), before)
+    }
+
+    /// Folders ADDED since the backup, as every preview build adds them (the
+    /// fix review, WRONG 1), never stand in the way.
+    @MainActor
+    func testFoldersAddedSinceTheBackupDoNotStandInTheWay() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        try fixture.writeConfig(unitWord: nil, sharedFolders: ["Concepts", "Media"])
+        let item: BackupItem = try await fixture.backUp()
+        try fixture.writeConfig(
+            unitWord: nil, sharedFolders: ["Concepts", "Media", "Quizzes"], perSectionFolders: ["All Classes", "Labs"]
+        )
+        try "ruined".write(to: fixture.page(in: 2), atomically: true, encoding: .utf8)
+
+        _ = try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertEqual(try String(contentsOf: fixture.page(in: 2), encoding: .utf8), OneSectionFixture.sectionPage(2))
+    }
+
+    // MARK: - The assistant window's route on a double failure
+
+    /// The window's restore, when a move fails AND a move back fails: the
+    /// files are kept where Finder shows them, the sentence names no
+    /// archive (the window makes none), the trail says so, and the
+    /// conversation does not put "Nothing was put back:" before it.
+    @MainActor
+    func testTheWindowsStoppedRestoreKeepsTheFilesAndSaysSoTruly() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let item: BackupItem = try await fixture.backUp()
+        try "tonight's work".write(to: fixture.page(in: 2), atomically: true, encoding: .utf8)
+
+        let counter: OneSectionFixture.MoveCounter = OneSectionFixture.MoveCounter(failFrom: 2, failUntil: Int.max)
+        var caught: Error?
+        do {
+            try CourseRestorer.restoreSection(
+                2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: counter.hooks
+            )
+        } catch {
+            caught = error
+        }
+        let error: Error = try XCTUnwrap(caught)
+        guard case CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, let keptAtOrNil, false) = error,
+              let keptAt = keptAtOrNil else {
+            XCTFail("Expected sectionRestoreStoppedPartWay with archived false, got \(error)")
+            return
+        }
+        XCTAssertTrue(keptAt.hasPrefix("courses/_backups/ICS3U/Section 2 before a restore "), keptAt)
+        XCTAssertFalse(error.localizedDescription.contains("Archived"), "the window archived nothing")
+        XCTAssertTrue(fixture.holds(text: "tonight's work", under: "_backups/ICS3U"))
+        XCTAssertTrue(fixture.trailText().contains(keptAt), "the trail names where the files are")
+
+        let said: String = AssistSession.restoreProblemText(for: error)
+        XCTAssertEqual(said, error.localizedDescription)
+        XCTAssertFalse(said.hasPrefix("Nothing was put back"))
+        XCTAssertTrue(AssistSession.restoreProblemText(for: CourseRestorer.Problem.courseMissing("ICS3U"))
+            .hasPrefix("Nothing was put back: "), "every other failure keeps the window's own words")
+    }
+
+    /// When the files cannot be moved into the backups folder, they stay in
+    /// `courses/.internal/restoring/` and that path is what is said.
+    @MainActor
+    func testAStoppedRestoreFallsBackToTheStagingFolderWhenTheBackupsFolderRefuses() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let item: BackupItem = try await fixture.backUp()
+        try "tonight's work".write(to: fixture.page(in: 2), atomically: true, encoding: .utf8)
+        let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: shelf.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shelf.path) }
+
+        let counter: OneSectionFixture.MoveCounter = OneSectionFixture.MoveCounter(failFrom: 2, failUntil: Int.max)
+        XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: counter.hooks
+        )) { (error: Error) in
+            guard case CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, let keptAtOrNil, true) = error,
+                  let keptAt = keptAtOrNil else {
+                XCTFail("Expected sectionRestoreStoppedPartWay naming a folder, got \(error)")
+                return
+            }
+            XCTAssertTrue(keptAt.hasPrefix("courses/.internal/restoring/"), keptAt)
+        }
+        XCTAssertTrue(fixture.holds(text: "tonight's work", under: ".internal/restoring"),
+                      "the staging folder is kept, because it holds the only copy")
+    }
+
+    // MARK: - The website record
+
+    /// Compared as parsed JSON: the same site written with other spacing is
+    /// no difference; no live marker says nothing; another site is said.
+    @MainActor
+    func testTheWebsiteRecordIsComparedAsParsedJSON() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let marker: URL = fixture.outside(".netlify_sites/section2.json")
+        try fixture.write("{\n  \"site_id\": \"abc\"\n}", to: marker)
+        let item: BackupItem = try await fixture.backUp()
+
+        try fixture.write("{\"site_id\":\"abc\"}", to: marker)
+        let sameSite: OneSectionRestore.Outcome = try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertFalse(sameSite.websiteRecordDiffers, "the same site, written differently")
+
+        try FileManager.default.removeItem(at: marker)
+        let noLiveMarker: OneSectionRestore.Outcome = try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertFalse(noLiveMarker.websiteRecordDiffers, "no address now, so nothing is said about one")
+
+        try fixture.write("{\"site_id\":\"xyz\"}", to: marker)
+        let otherSite: OneSectionRestore.Outcome = try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertTrue(otherSite.websiteRecordDiffers)
     }
 
     /// The course's word for a unit changed since the backup: refused, and
@@ -562,12 +684,12 @@ final class OneSectionFixture {
         return "---\ntitle: Section \(number)\npublish: true\n---\nSection \(number)'s landing page."
     }
 
-    func writeConfig(unitWord: String?, sharedFolders: [String]? = nil) throws {
+    func writeConfig(unitWord: String?, sharedFolders: [String]? = nil, perSectionFolders: [String] = ["All Classes"]) throws {
         var values: [String: Any] = [
             "course_code": "ICS3U",
             "course_name": "One Section Restore Test Course",
             "section_numbers": [1, 2],
-            "per_section_folders": ["All Classes"],
+            "per_section_folders": perSectionFolders,
         ]
         if let unitWord {
             values["unit_word"] = unitWord

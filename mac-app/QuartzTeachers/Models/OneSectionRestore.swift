@@ -63,11 +63,14 @@ enum OneSectionRestore {
         /// The per-section folder the class pages live in.
         let classFolder: String
 
-        /// The folders every section shares, in the course's order. A rename
-        /// (`SpecialFolderRenamer`) moves the folder AND rewrites the links
-        /// into it in every page, so a section's pages from before it link to
-        /// a name the course no longer has (the #897 C implementation
-        /// review, INCOMPLETE 1).
+        /// The folders every section shares. A rename (`SpecialFolderRenamer`)
+        /// moves the folder AND rewrites the links into it in every page, so
+        /// a section's pages from before it link to a name the course no
+        /// longer has (the #897 C implementation review, INCOMPLETE 1). Only
+        /// a folder the BACKUP lists that is gone now counts: every build adds
+        /// a new folder to this list (`build_site.preflight_update_course_config`),
+        /// so an added one must never withdraw the offer (the fix review,
+        /// WRONG 1). See `difference(fromBackup:)`.
         let sharedFolders: [String]
 
         /// The folders each section has, in the course's order, for the same
@@ -96,6 +99,38 @@ enum OneSectionRestore {
             self.sharedFolders = configuration.sharedFolders
             self.perSectionFolders = configuration.perSectionFolders
         }
+
+        // MARK: - Functions
+
+        /// What stands between a backup made under `backup` and a course
+        /// named as `self` now, or nil when one section can be put back.
+        ///
+        /// The word, the scheme and the class folder must be the same: they
+        /// decide which pages count as classes. A folder in either list must
+        /// still be there: a folder renamed or removed since leaves the
+        /// section's pages linking to a name the course no longer has. A
+        /// folder ADDED since, or the lists in another order, changes
+        /// nothing a section from the backup relies on.
+        func difference(fromBackup backup: Naming) -> NamingDifference? {
+            if word != backup.word || scheme != backup.scheme || classFolder != backup.classFolder {
+                return .classPages
+            }
+            for folder in backup.sharedFolders where !sharedFolders.contains(folder) {
+                return .folders
+            }
+            for folder in backup.perSectionFolders where !perSectionFolders.contains(folder) {
+                return .folders
+            }
+            return nil
+        }
+    }
+
+    /// Why a backup's naming does not fit the course now.
+    enum NamingDifference: Equatable {
+        /// The word for a unit, the class page scheme or the class folder.
+        case classPages
+        /// A folder the backup lists has been renamed or removed since.
+        case folders
     }
 
     /// What a backup zip holds that the offer needs, read from its listing
@@ -163,6 +198,10 @@ enum OneSectionRestore {
     /// folders`, measured with Quartz's own ignore patterns). A page in one
     /// is never given a key by the restore: a template made since the backup
     /// and hidden here would hide every page later made from it.
+    ///
+    /// A copy, because the app reads no contract at run time;
+    /// `OneSectionRestoreContractTests.testTheFoldersNeverPublishedAreTheContractsList`
+    /// holds the two together.
     static let foldersNeverPublished: [String] = ["private", "templates", ".obsidian"]
 
     // MARK: - Functions
@@ -371,6 +410,20 @@ nonisolated enum OneSectionRestoreWording {
         return text
     }
 
+    /// Said when asked to put one section back from a backup that was not
+    /// made for it (a teacher's own, or another section's). The alert never
+    /// offers that, so only a caller that skips the alert meets it.
+    static func notMadeForThisSection(section: Int) -> String {
+        return "This backup was not made for Section \(section). Restore Whole Course puts every section back "
+             + "together instead."
+    }
+
+    static func foldersChanged(section: Int, course: String) -> String {
+        return "Section \(section) cannot be put back on its own, because a folder its pages use in this backup "
+             + "has been renamed or removed in \(course) since. Restore Whole Course puts every section back "
+             + "together instead."
+    }
+
     static func namingChanged(section: Int, course: String) -> String {
         return "Section \(section) cannot be put back on its own, because the class pages of \(course) are named "
              + "differently now than they were in this backup. Restore Whole Course puts every section back "
@@ -393,11 +446,22 @@ nonisolated enum OneSectionRestoreWording {
 
     /// Said when the swap failed AND putting things back failed too, from
     /// either route. `keptAt` is where the set-aside files are, as a path
-    /// inside the working folder.
+    /// inside the working folder, quoted because the folder's name has
+    /// spaces in it.
     static func stoppedPartWay(section: Int, keptAt: String) -> String {
         return "The restore of Section \(section) stopped part way, so Section \(section) may now hold some files "
              + "from the backup and some as they were. Nothing was deleted: the files that were set aside are in "
-             + "the folder \(keptAt), inside your working folder."
+             + "the folder \"\(keptAt)\" inside your working folder."
+    }
+
+    /// The same, when what is still set aside holds nothing a teacher would
+    /// see in Finder (every page went back, and what is left is Plantoir's
+    /// own hidden records): sending them to that folder would send them to
+    /// what looks like an empty folder (the fix review, MINOR 2).
+    static func stoppedPartWayNothingToOpen(section: Int) -> String {
+        return "The restore of Section \(section) stopped part way, so Section \(section) may now hold some files "
+             + "from the backup and some as they were. Nothing was deleted, and none of your pages are left "
+             + "set aside."
     }
 
     /// Added after `stoppedPartWay` on the menu's route, which archives the

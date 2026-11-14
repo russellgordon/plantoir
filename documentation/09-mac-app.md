@@ -11952,10 +11952,19 @@ every sentence are `contracts/course-management.json` →
 `.assistant`, read from the name) names a section; that section is in the
 course now; the course is not kept for reference; no unit-word or folder
 rename has a record still on disk; the zip holds `section<N>/`; and the
-course's naming is the backup's (`OneSectionRestore.Naming`: the unit word,
-the class page scheme, the class folder, and the shared and per-section
-folder lists, because `SpecialFolderRenamer` rewrites the links into a
-renamed folder in every page). The zip's part is read by
+course's naming fits the backup's (`OneSectionRestore.Naming.difference`):
+the unit word, the class page scheme and the class folder are the same, and
+every folder the BACKUP lists among the shared and per-section folders is
+still listed, because `SpecialFolderRenamer` rewrites the links into a
+renamed folder in every page. A folder ADDED since never counts, and that
+was measured, not assumed: `build_site.preflight_update_course_config` adds
+every new top-level folder to those lists on every preview build (a new
+`Quizzes` folder and one build gave `['Concepts', 'Media', 'Quizzes']`; a new
+`Labs` at the top of a section gave `['All Classes', 'Labs']`), so comparing
+the lists exactly, as the first fix did, withdrew the offer after any new
+folder (the fix review, WRONG 1). A folder renamed or removed is refused
+with `wording.foldersChanged`, a changed word, scheme or class folder with
+`wording.namingChanged`; both are asked of the settings as SAVED on disk. The zip's part is read by
 `OneSectionRestore.readFacts`, `zipinfo -1` for the listing and `unzip -p`
 for `course_config.json` alone, once per backup (an unreadable zip is kept
 as holding nothing), when `backupRestoreRequest` is set, never while the
@@ -12018,14 +12027,20 @@ course moves until the backup is unpacked and checked. Then
 aside, moves the backup's in, and on any failure moves every moved file back,
 last first: the teacher is told the section was left as it was. If a move
 back fails too, nothing is deleted: the set-aside files move to
-`courses/_backups/<CODE>/Section N as it was before a restore, <stamp>`, a
+`courses/_backups/<CODE>/Section N before a restore <stamp>` (no comma, since
+the sentence that names it is punctuated after it), a
 folder Finder shows (`courses/.internal` is a dot folder Finder hides), on
 the same volume, where nothing reads a folder (the backup and archive lists
 read zip names only). The trail gets `section restore stopped part way`
 with that path, and the teacher reads `wording.stoppedPartWay`: the section
 may hold a mix, and where the files are; on the menu's route also that the
-course as it was is in Archived. If that last move fails as well, the files
-stay in `courses/.internal/restoring/` and that path is what is said.
+course as it was is in Archived. When the kept folder holds no file Finder
+shows (every page went back and only hidden records are left; the fix review
+measured that in 5 plus 46 of 91 double failures on its fixture), the
+sentence is `wording.stoppedPartWayNothingToOpen` instead, so nobody is sent
+to what looks like an empty folder; the trail names the folder either way.
+If that last move fails as well, the files stay in `courses/.internal/
+restoring/` and that path is what is said.
 
 Measured on 2026-11-13. A standalone copy of the swap, the function's text
 sliced out and compiled with `swiftc -default-isolation MainActor`: a failure

@@ -2929,9 +2929,13 @@ class WorkspaceModel {
             backupFactsByPath[item.fileURL.path] = facts
         }
         let backupHasTheSection: Bool = facts.sectionsInside.contains(sectionNumber)
+        // Asked of the settings as SAVED, as the restorer asks them: a build
+        // may have added a folder to the file since the window last read it.
+        let savedCourse: Course = (try? course.asSavedNow()) ?? course
         var namingSameAsNow: Bool = false
         if let backedUpNaming = facts.naming {
-            namingSameAsNow = backedUpNaming == OneSectionRestore.Naming(configuration: course.configuration)
+            namingSameAsNow = OneSectionRestore.Naming(configuration: savedCourse.configuration)
+                .difference(fromBackup: backedUpNaming) == nil
         }
         return OneSectionRestore.offeredSection(
             maker: item.maker,
@@ -3045,6 +3049,18 @@ class WorkspaceModel {
     /// opened), or nil when it may. Each reason is the one
     /// `OneSectionRestore.offeredSection` would have withheld the offer for.
     func oneSectionRestoreRefusal(_ sectionNumber: Int, from item: BackupItem) -> String? {
+        var madeFor: Int?
+        switch item.maker {
+        case .teacher:
+            madeFor = nil
+        case .assistant(let number):
+            madeFor = number
+        case .menu(let number):
+            madeFor = number
+        }
+        if madeFor != sectionNumber {
+            return OneSectionRestoreWording.notMadeForThisSection(section: sectionNumber)
+        }
         var matchingCourse: Course?
         for course in courses where course.code == item.courseCode {
             matchingCourse = course
@@ -3070,7 +3086,19 @@ class WorkspaceModel {
             if !facts.sectionsInside.contains(sectionNumber) {
                 return CourseRestorer.Problem.sectionMissingFromBackup(item.courseCode, sectionNumber).localizedDescription
             }
-            return OneSectionRestoreWording.namingChanged(section: sectionNumber, course: item.courseCode)
+            guard let backedUpNaming = facts.naming else {
+                return CourseRestorer.Problem.archiveUnreadable("its course settings could not be read").localizedDescription
+            }
+            let savedCourse: Course = (try? course.asSavedNow()) ?? course
+            switch OneSectionRestore.Naming(configuration: savedCourse.configuration).difference(fromBackup: backedUpNaming) {
+            case .folders:
+                return OneSectionRestoreWording.foldersChanged(section: sectionNumber, course: item.courseCode)
+            case .classPages:
+                return OneSectionRestoreWording.namingChanged(section: sectionNumber, course: item.courseCode)
+            case nil:
+                // Unreachable: every other reason is asked above.
+                return OneSectionRestoreWording.notMadeForThisSection(section: sectionNumber)
+            }
         }
         return nil
     }

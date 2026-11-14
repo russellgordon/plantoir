@@ -42,7 +42,7 @@ final class OneSectionRestoreContractTests: XCTestCase {
     func testEveryNamingCase() throws {
         let block: [String: Any] = try OneSectionRestoreContractTests.block()
         let cases: [[String: Any]] = try XCTUnwrap(block["namingCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8, "namingCases has shrunk")
+        XCTAssertGreaterThanOrEqual(cases.count, 12, "namingCases has shrunk")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let live: [String: Any] = try XCTUnwrap(testCase["live"] as? [String: Any], name)
@@ -53,7 +53,14 @@ final class OneSectionRestoreContractTests: XCTestCase {
             let backupNaming: OneSectionRestore.Naming = OneSectionRestore.Naming(
                 configuration: CourseConfiguration(values: backup, lastSavedData: Data())
             )
-            XCTAssertEqual(liveNaming == backupNaming, try XCTUnwrap(testCase["same"] as? Bool, name), name)
+            let difference: OneSectionRestore.NamingDifference? = liveNaming.difference(fromBackup: backupNaming)
+            XCTAssertEqual(difference == nil, try XCTUnwrap(testCase["same"] as? Bool, name), name)
+            var expected: OneSectionRestore.NamingDifference?
+            if let named = testCase["difference"] as? String {
+                expected = named == "folders" ? .folders : .classPages
+                XCTAssertTrue(named == "folders" || named == "classPages", "\(name): \(named)")
+            }
+            XCTAssertEqual(difference, expected, name)
         }
     }
 
@@ -107,6 +114,13 @@ final class OneSectionRestoreContractTests: XCTestCase {
         XCTAssertEqual(OneSectionRestoreWording.leftAsItWas(section: 2, reason: "disk full"), try filled("leftAsItWas", reason: "disk full"))
         XCTAssertEqual(OneSectionRestoreWording.stoppedPartWay(section: 2, keptAt: keptAt), try filled("stoppedPartWay"))
         XCTAssertEqual(OneSectionRestoreWording.stoppedPartWayArchived, try filled("stoppedPartWayArchived"))
+        XCTAssertEqual(OneSectionRestoreWording.stoppedPartWayNothingToOpen(section: 2), try filled("stoppedPartWayNothingToOpen"))
+        XCTAssertEqual(OneSectionRestoreWording.foldersChanged(section: 2, course: "ICS3U"), try filled("foldersChanged"))
+        XCTAssertEqual(OneSectionRestoreWording.notMadeForThisSection(section: 2), try filled("notMadeForThisSection"))
+        XCTAssertEqual(
+            CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, keptAt: nil, archived: true).localizedDescription,
+            try filled("stoppedPartWayNothingToOpen") + " " + filled("stoppedPartWayArchived")
+        )
         XCTAssertEqual(OneSectionRestoreWording.renameUnfinished(section: 2, course: "ICS3U"), try filled("renameUnfinished"))
         // The two routes' joins, as doneJoin says.
         XCTAssertEqual(
@@ -136,6 +150,23 @@ final class OneSectionRestoreContractTests: XCTestCase {
         let expectedMany: String = try filled("done") + "\n\n" + filled("hiddenSinceMany", count: 4) + "\n\n"
             + filled("notPutBackMany", count: 3) + "\n\n" + filled("notSavedMany", count: 2)
         XCTAssertEqual(OneSectionRestoreWording.done(section: 2, when: when, outcome: many), expectedMany)
+    }
+
+    /// The folders the restore never gives a key are the contract's list of
+    /// folders Quartz never publishes, which the build reads too.
+    @MainActor
+    func testTheFoldersNeverPublishedAreTheContractsList() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let fences: [String: Any] = try XCTUnwrap(all["geogebraFences"] as? [String: Any])
+        let files: [String: Any] = try XCTUnwrap(fences["files"] as? [String: Any])
+        let notPublished: [String: Any] = try XCTUnwrap(files["notPublished"] as? [String: Any])
+        XCTAssertEqual(OneSectionRestore.foldersNeverPublished, try XCTUnwrap(notPublished["folders"] as? [String]))
     }
 
     private static func block() throws -> [String: Any] {

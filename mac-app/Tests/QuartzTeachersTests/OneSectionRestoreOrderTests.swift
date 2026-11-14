@@ -156,6 +156,53 @@ final class OneSectionRestoreOrderTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: page, encoding: .utf8), "Changed since.")
     }
 
+    /// The course's word for a unit changed on disk since the backup (no
+    /// reload in between, as after a build): refused with the naming
+    /// sentence BEFORE anything is archived.
+    func testANamingChangeIsRefusedBeforeTheArchive() async throws {
+        let (root, workspace, course, page) = try makeWorkspace()
+        let item: BackupItem = try await menuBackup(of: course, root: root)
+        let configData: Data = try Data(contentsOf: course.configFileURL)
+        var values: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: configData) as? [String: Any])
+        values["unit_word"] = "Module"
+        try JSONSerialization.data(withJSONObject: values).write(to: course.configFileURL)
+        try "Changed since.".write(to: page, atomically: true, encoding: .utf8)
+
+        await workspace.restoreOneSection(1, from: item)
+
+        XCTAssertEqual(workspace.backupProblem, OneSectionRestoreWording.namingChanged(section: 1, course: "ICS3U"))
+        XCTAssertEqual(archiveCount(root), 0)
+        XCTAssertEqual(try String(contentsOf: page, encoding: .utf8), "Changed since.")
+    }
+
+    /// A backup that has no folder for the section (made before the section
+    /// existed) is refused BEFORE anything is archived.
+    func testASectionMissingFromTheBackupIsRefusedBeforeTheArchive() async throws {
+        let (root, workspace, course, _) = try makeWorkspace()
+        let url: URL = try await CourseArchiver.backUpCourse(
+            course, coursesDirectoryURL: root.appendingPathComponent("courses"), madeBy: .menu(sectionNumber: 2)
+        )
+        let item: BackupItem = try XCTUnwrap(BackupItem.from(fileURL: url, courseCode: "ICS3U"))
+        // Section 2 is added after the backup.
+        try FileManager.default.createDirectory(
+            at: course.sectionDirectoryURL(forSection: 2), withIntermediateDirectories: true
+        )
+        let configData: Data = try Data(contentsOf: course.configFileURL)
+        var values: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: configData) as? [String: Any])
+        values["section_numbers"] = [1, 2]
+        values["num_sections"] = 2
+        try JSONSerialization.data(withJSONObject: values).write(to: course.configFileURL)
+        workspace.reloadCourses()
+
+        await workspace.restoreOneSection(2, from: item)
+
+        XCTAssertEqual(
+            workspace.backupProblem,
+            CourseRestorer.Problem.sectionMissingFromBackup("ICS3U", 2).localizedDescription
+        )
+        XCTAssertEqual(archiveCount(root), 0)
+    }
+
     /// A publish that begins DURING the archive is refused after it, and the
     /// section is not touched (the archive stays: it is a copy, harmless).
     func testAPublishThatBeganDuringTheArchiveIsRefusedAfterIt() async throws {

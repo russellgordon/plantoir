@@ -20,16 +20,20 @@ enum CourseRestorer {
         /// Restore Section N from the alert (#897 C): the course names its
         /// class pages differently now than the backup did.
         case namingChangedSinceTheBackup(String, Int)
+        /// Restore Section N from the alert: a folder the backup lists has
+        /// been renamed or removed since.
+        case foldersChangedSinceTheBackup(String, Int)
         /// Restore Section N from the alert: the course has no such section now.
         case sectionNotInCourse(String, Int)
         /// The staged swap failed and every file went back where it was.
         case sectionLeftAsItWas(Int, String)
         /// The staged swap failed and putting things back failed as well:
         /// the section may hold a mix of old and new. `keptAt` is where the
-        /// set-aside files were moved, as a path inside the working folder;
+        /// set-aside files were moved, as a path inside the working folder,
+        /// or nil when nothing a teacher would see is left there;
         /// `archived` says whether the whole course was archived first (the
         /// menu's route) or not (the assistant window's).
-        case sectionRestoreStoppedPartWay(Int, keptAt: String, archived: Bool)
+        case sectionRestoreStoppedPartWay(Int, keptAt: String?, archived: Bool)
 
         var errorDescription: String? {
             switch self {
@@ -45,12 +49,17 @@ enum CourseRestorer {
                 return "The archive could not be opened: \(reason)"
             case .namingChangedSinceTheBackup(let code, let number):
                 return OneSectionRestoreWording.namingChanged(section: number, course: code)
+            case .foldersChangedSinceTheBackup(let code, let number):
+                return OneSectionRestoreWording.foldersChanged(section: number, course: code)
             case .sectionNotInCourse(let code, let number):
                 return OneSectionRestoreWording.sectionNotInCourse(section: number, course: code)
             case .sectionLeftAsItWas(let number, let reason):
                 return OneSectionRestoreWording.leftAsItWas(section: number, reason: reason)
             case .sectionRestoreStoppedPartWay(let number, let keptAt, let archived):
-                let said: String = OneSectionRestoreWording.stoppedPartWay(section: number, keptAt: keptAt)
+                var said: String = OneSectionRestoreWording.stoppedPartWayNothingToOpen(section: number)
+                if let keptAt {
+                    said = OneSectionRestoreWording.stoppedPartWay(section: number, keptAt: keptAt)
+                }
                 if archived {
                     return said + " " + OneSectionRestoreWording.stoppedPartWayArchived
                 }
@@ -321,11 +330,11 @@ enum CourseRestorer {
         } catch is WayBackDidNotFinish {
             // The window makes no archive first, so it may not say one is in
             // Archived.
-            let keptAt: String = keepTheSetAsideFiles(
+            let kept: SetAsideFiles = keepTheSetAsideFiles(
                 aside, sectionNumber: sectionNumber, courseCode: item.courseCode,
                 coursesDirectoryURL: coursesDirectoryURL
             )
-            throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: keptAt, archived: false)
+            throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: kept.pathToSay, archived: false)
         } catch {
             removeStaging(aside)
             throw error
@@ -384,8 +393,7 @@ enum CourseRestorer {
 
     /// Moves the files a stopped restore set aside to where a teacher can
     /// open them in Finder: a folder beside the course's backups,
-    /// `courses/_backups/<CODE>/Section N as it was before a restore,
-    /// <stamp>`. The backups folder is the one place in a working folder
+    /// `courses/_backups/<CODE>/Section N before a restore <stamp>`. The backups folder is the one place in a working folder
     /// that already holds copies of the course, it is on the same volume
     /// (so this is a rename), and nothing reads a FOLDER there: the backup
     /// and archive lists read `.zip` names only. When the move fails, the
@@ -399,11 +407,12 @@ enum CourseRestorer {
         sectionNumber: Int,
         courseCode: String,
         coursesDirectoryURL: URL
-    ) -> String {
+    ) -> SetAsideFiles {
         let fileManager: FileManager = FileManager.default
         let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().standardizedFileURL.path + "/"
         let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups").appendingPathComponent(courseCode)
-        let name: String = "Section \(sectionNumber) as it was before a restore, " + ArchiveStamp.text(for: Date())
+        // No comma: the sentence that names it puts punctuation after it.
+        let name: String = "Section \(sectionNumber) before a restore " + ArchiveStamp.text(for: Date())
         var keptURL: URL = aside
         do {
             try fileManager.createDirectory(at: shelf, withIntermediateDirectories: true)
@@ -423,7 +432,63 @@ enum CourseRestorer {
             course: courseCode,
             section: sectionNumber
         )
-        return keptAt
+        return SetAsideFiles(
+            path: keptAt,
+            holdsSomethingToOpen: holdsAFileFinderShows(keptURL),
+            isStillInStaging: keptURL.standardizedFileURL.path == aside.standardizedFileURL.path
+        )
+    }
+
+    /// Where a stopped restore kept what it set aside, and whether a teacher
+    /// would find anything there.
+    struct SetAsideFiles {
+
+        // MARK: - Stored properties
+
+        /// A path inside the working folder.
+        let path: String
+
+        /// Whether the folder holds a file Finder shows (no part of its path
+        /// starting with a dot). When it does not, every page went back and
+        /// what is left is Plantoir's own hidden records.
+        let holdsSomethingToOpen: Bool
+
+        /// Whether the move into the backups folder failed, so the files are
+        /// still in `courses/.internal/restoring/`.
+        let isStillInStaging: Bool
+
+        // MARK: - Computed properties
+
+        /// The path the teacher is told, or nil when there is nothing there
+        /// to open (the fix review, MINOR 2). The trail records the path
+        /// either way.
+        var pathToSay: String? {
+            return holdsSomethingToOpen ? path : nil
+        }
+    }
+
+    /// Whether a folder holds a file whose path inside it has no part
+    /// starting with a dot.
+    private static func holdsAFileFinderShows(_ folder: URL) -> Bool {
+        let rootPath: String = folder.standardizedFileURL.path + "/"
+        guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return false
+        }
+        while let entry = walker.nextObject() as? URL {
+            let isFolder: Bool = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if isFolder {
+                continue
+            }
+            let relative: String = String(entry.standardizedFileURL.path.dropFirst(rootPath.count))
+            var isHidden: Bool = false
+            for part in relative.split(separator: "/") where part.hasPrefix(".") {
+                isHidden = true
+            }
+            if !isHidden {
+                return true
+            }
+        }
+        return false
     }
 
     /// Points a test can stop a restore at, to prove what is left behind.
@@ -548,9 +613,14 @@ enum CourseRestorer {
         ) else {
             throw Problem.namingChangedSinceTheBackup(item.courseCode, sectionNumber)
         }
-        if OneSectionRestore.Naming(configuration: backedUpConfiguration)
-            != OneSectionRestore.Naming(configuration: liveConfiguration) {
+        switch OneSectionRestore.Naming(configuration: liveConfiguration)
+            .difference(fromBackup: OneSectionRestore.Naming(configuration: backedUpConfiguration)) {
+        case .classPages:
             throw Problem.namingChangedSinceTheBackup(item.courseCode, sectionNumber)
+        case .folders:
+            throw Problem.foldersChangedSinceTheBackup(item.courseCode, sectionNumber)
+        case nil:
+            break
         }
         let websiteRecordDiffers: Bool = websiteRecordDiffers(
             sectionNumber, inCourseAt: courseURL, from: payload
@@ -572,12 +642,12 @@ enum CourseRestorer {
         } catch is WayBackDidNotFinish {
             // What the section held is in `aside`, and is kept where a
             // teacher can open it.
-            let keptAt: String = keepTheSetAsideFiles(
+            let kept: SetAsideFiles = keepTheSetAsideFiles(
                 aside, sectionNumber: sectionNumber, courseCode: item.courseCode,
                 coursesDirectoryURL: coursesDirectoryURL
             )
-            keepStaging = keptAt.contains(".internal/restoring")
-            throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: keptAt, archived: true)
+            keepStaging = kept.isStillInStaging
+            throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: kept.pathToSay, archived: true)
         }
 
         let keys: (pagesNotPutBack: Int, pagesNotSaved: Int, pagesMadeSinceHidden: Int) = restorePerSectionKeys(

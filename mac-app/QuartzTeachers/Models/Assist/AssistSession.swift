@@ -624,6 +624,18 @@ final class AssistSession {
     /// again. What it does do is write down the outcome either way: a restore
     /// that quietly failed would leave a teacher believing their section had
     /// gone back when it had not.
+    /// What the conversation says when "Restore Section N…" fails.
+    ///
+    /// "Nothing was put back:" and the reason, except for a restore that
+    /// stopped part way after moving files (#897 C): something WAS put back
+    /// there, so the restorer's own sentence says what is, alone.
+    static func restoreProblemText(for error: Error) -> String {
+        if case CourseRestorer.Problem.sectionRestoreStoppedPartWay = error {
+            return error.localizedDescription
+        }
+        return "Nothing was put back: \(error.localizedDescription)"
+    }
+
     func restoreSection() {
         let saidSoFar: Int = agent?.entries.count ?? 0
         let backupURL: URL? = toolRunner?.conversationBackupURL
@@ -635,19 +647,9 @@ final class AssistSession {
                 sectionNumber: sectionNumber,
                 coursesDirectoryURL: coursesDirectoryURL
             )
-        } catch CourseRestorer.Problem.sectionRestoreStoppedPartWay(let number, let keptAt, let archived) {
-            // Something WAS put back here, so "Nothing was put back" would be
-            // untrue (#897 C): the restorer's own sentence says what is.
-            let stopped: CourseRestorer.Problem = .sectionRestoreStoppedPartWay(number, keptAt: keptAt, archived: archived)
-            restoreNotes.append(RestoreNote(
-                text: stopped.localizedDescription,
-                isProblem: true,
-                saidSoFar: saidSoFar
-            ))
-            return
         } catch {
             restoreNotes.append(RestoreNote(
-                text: "Nothing was put back: \(error.localizedDescription)",
+                text: AssistSession.restoreProblemText(for: error),
                 isProblem: true,
                 saidSoFar: saidSoFar
             ))
