@@ -284,7 +284,7 @@ enum CourseRestorer {
         // renaming (#897 C).
         let staging: URL = stagingFolderBesideTheCourses(coursesDirectoryURL)
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
-        defer { try? fileManager.removeItem(at: staging) }
+        defer { removeStaging(staging) }
 
         // Unpack and check BEFORE touching the course, so an unreadable zip
         // can never leave an emptied section folder behind.
@@ -324,10 +324,10 @@ enum CourseRestorer {
             // Archived.
             throw Problem.sectionRestoreStoppedPartWayWithNoArchive(number)
         } catch {
-            try? fileManager.removeItem(at: aside)
+            removeStaging(aside)
             throw error
         }
-        try? fileManager.removeItem(at: aside)
+        removeStaging(aside)
         let notPutBack: Int = restorePerSectionKeys(
             sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: false
         ).pagesNotPutBack
@@ -351,6 +351,24 @@ enum CourseRestorer {
             .appendingPathComponent(".internal")
             .appendingPathComponent("restoring")
             .appendingPathComponent(UUID().uuidString)
+    }
+
+    /// Removes a restore's staging folder, and `courses/.internal/restoring`
+    /// and `courses/.internal` after it when each is left empty, so a
+    /// restore that worked leaves the courses folder as it found it.
+    private static func removeStaging(_ staging: URL) {
+        let fileManager: FileManager = FileManager.default
+        try? fileManager.removeItem(at: staging)
+        // `restoring`, then `.internal`, each only when it is empty.
+        var parent: URL = staging.deletingLastPathComponent()
+        for _ in 0..<2 {
+            let left: [String] = (try? fileManager.contentsOfDirectory(atPath: parent.path)) ?? []
+            if !left.isEmpty {
+                return
+            }
+            try? fileManager.removeItem(at: parent)
+            parent = parent.deletingLastPathComponent()
+        }
     }
 
     /// Points a test can stop a restore at, to prove what is left behind.
@@ -450,7 +468,7 @@ enum CourseRestorer {
         var keepStaging: Bool = false
         defer {
             if !keepStaging {
-                try? fileManager.removeItem(at: staging)
+                removeStaging(staging)
             }
         }
 
