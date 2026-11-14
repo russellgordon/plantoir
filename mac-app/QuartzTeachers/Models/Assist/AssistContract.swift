@@ -1114,8 +1114,13 @@ enum AssistContract {
         let committedCases: Data? = try? Data(contentsOf: casesURL)
         if let data = committedCases,
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            // A generated key the app no longer writes leaves the file (#866).
-            cases = ContractText.withoutGeneratedKeys(existing)
+            // The generated keys are taken out before the generator's go in,
+            // and a name there the app does not generate stops the run (#866).
+            do {
+                cases = try ContractText.withoutGeneratedKeys(existing, generating: generatedCaseKeys)
+            } catch {
+                return "Could not write the contract: \(error.localizedDescription)"
+            }
         }
         for (key, value) in generatedCases() {
             cases[key] = value

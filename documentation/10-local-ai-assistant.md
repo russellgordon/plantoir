@@ -8362,6 +8362,17 @@ class. Measured with `NSRegularExpression` on the cases: the four expressions
 before the review missed five `mustMatch` sentences and caught two
 `mustNotMatch` ones; the six after it miss and catch none, and none of them
 matches any of the 15 whole greetings in `app-rules.json`'s greeting cases.
+After the Fable sweep (2026-11-14) the first leaves marking a page alone
+("marks a page", "Mark the pages", the project's word for publishing one),
+and the fourth takes results for, of or from a class or classes in the
+greeting's own voice (my, our, this) as well as the, a, your, each and every.
+Four cases were added, two each way; with `NSRegularExpression` the
+expressions before the sweep missed both new `mustMatch` sentences and caught
+both new `mustNotMatch` ones, and the expressions after it miss and catch
+none. Neither change catches any of the 1,040 other strings under
+`outsideAgents`. Still passing, by choice: "marked the tests" (marked as a
+whole word is left to publishing), "markbook" and "gradebook" (no greeting
+says them), and "Comment out code" is still caught.
 `\bcomments?\b` was left as it was: it goes further than the ruling, which
 names report card comments, and no greeting says the word. A `where` the suite does not
 know fails, so a new kind of entry proposed from either side turns the other

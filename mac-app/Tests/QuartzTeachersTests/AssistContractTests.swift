@@ -176,10 +176,11 @@ final class AssistContractTests: XCTestCase {
 
     /// A GENERATED key is always written in the generator's own text, so a
     /// hand edit that changed only its spacing or escaping does not survive,
-    /// while the same edit in an AUTHORED key does; and a generated key the
-    /// committed `generated.keys` names but the generator no longer writes
-    /// leaves the file (#866, the batch review).
-    func testAGeneratedKeyIsWrittenInTheGeneratorsTextAndAStaleOneLeaves() throws {
+    /// while the same edit in an AUTHORED key does; and every key the
+    /// committed `generated.keys` names is taken out before the generator's
+    /// values go in, unless the generator does not write it, which is refused
+    /// (#866, the batch review and the Fable sweep).
+    func testAGeneratedKeyIsWrittenInTheGeneratorsTextAndAStaleOneIsRefused() throws {
         let committedText: String = """
         {
           "authored":   {
@@ -205,9 +206,15 @@ final class AssistContractTests: XCTestCase {
             try JSONSerialization.jsonObject(with: committed) as? [String: Any]
         )
 
+        // A name in generated.keys the generator does not write is refused,
+        // by name, rather than taken out.
+        XCTAssertThrowsError(try ContractText.withoutGeneratedKeys(existing, generating: ["readout"])) { error in
+            XCTAssertEqual((error as? ContractText.Refusal)?.key, "stale")
+        }
+
         // What the writers do: take out every key generated.keys names, then
         // put back the ones the generator still writes.
-        var rules: [String: Any] = ContractText.withoutGeneratedKeys(existing)
+        var rules: [String: Any] = try ContractText.withoutGeneratedKeys(existing, generating: ["readout", "stale"])
         XCTAssertNil(rules["stale"])
         XCTAssertNil(rules["readout"])
         XCTAssertNotNil(rules["authored"])
@@ -250,7 +257,7 @@ final class AssistContractTests: XCTestCase {
 
         // A file with no generated.keys is left as it is.
         let plain: [String: Any] = ["a": 1]
-        XCTAssertEqual(ContractText.withoutGeneratedKeys(plain)["a"] as? Int, 1)
+        XCTAssertEqual(try ContractText.withoutGeneratedKeys(plain, generating: [])["a"] as? Int, 1)
     }
 
     /// The hand-written half is still there.

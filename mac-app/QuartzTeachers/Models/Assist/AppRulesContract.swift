@@ -122,8 +122,13 @@ enum AppRulesContract {
         let committed: Data? = try? Data(contentsOf: url)
         if let data = committed,
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            // A generated key the app no longer writes leaves the file (#866).
-            rules = ContractText.withoutGeneratedKeys(existing)
+            // The generated keys are taken out before the generator's go in,
+            // and a name there the app does not generate stops the run (#866).
+            do {
+                rules = try ContractText.withoutGeneratedKeys(existing, generating: generatedKeys)
+            } catch {
+                return "Could not write the app rules: \(error.localizedDescription)"
+            }
         }
         for (key, value) in generated() {
             rules[key] = value

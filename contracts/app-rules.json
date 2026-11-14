@@ -4143,10 +4143,10 @@
     "greetingIsTheSameForEveryAgent" : true,
     "greetingMustNotSay" : {
       "expressions" : [
-        "\\bmark(?:s|ing)?\\b",
+        "\\bmark(?:s|ing)?\\b(?!\\s+(?:(?:a|the|this|that|each|every|one|your)\\s+)?pages?\\b)",
         "\\bgrad(?:e|es|ed|ing)\\b(?!\\s*\\d)",
         "\\bclass(?:['’]s)?\\s+results?\\b",
-        "\\bresults?\\s+for\\s+(?:the|a|your|each|every)\\s+(?:whole\\s+)?class\\b",
+        "\\bresults?\\s+(?:for|of|from)\\s+(?:the|a|my|our|this|your|each|every)\\s+(?:whole\\s+)?class(?:es)?\\b",
         "\\breport[\\s-]+cards?\\b",
         "\\bcomments?\\b"
       ],
@@ -4157,15 +4157,19 @@
         "I can grade it for you.",
         "I can look at the class’s results.",
         "I can sum up the class's result.",
-        "I can look at results for the class."
+        "I can look at results for the class.",
+        "I can look at results for my class.",
+        "I can look at the results of our classes."
       ],
       "mustNotMatch" : [
         "Pages marked for publishing stay as they are.",
         "Write pages in Markdown.",
         "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir.",
-        "A benchmark test of the build."
+        "A benchmark test of the build.",
+        "Publishing only marks a page for inclusion.",
+        "Mark the pages you want published."
       ],
-      "why" : "Russell, 2026-11-13, in the full ruling on #750 (restated on #791): the greeting an assistant gives when it opens from Plantoir never mentions marking, results for a whole class, or the comments written on a report; those are offered only in context, by the skill in use. Each expression is matched without regard to case in every greeting greetingMustSayHow builds, on every door, so the first catches mark, marks and marking as whole words and leaves marked and Markdown alone, the second catches grade, grades, graded and grading but not a grade level such as Grade 11 in a course's name, and the third takes a class's result with either apostrophe. mustMatch sentences must each be caught by some expression and mustNotMatch sentences by none; they are chosen so that scripts/test_held_skills.py, which reads them too, finds no offer in them. Written as regular expressions, as printablePages.agentGuidance.held.words is, and for the same reason: scripts/test_held_skills.py reads every string in this file, and a rule naming what must not be offered is not an offer. This rule is not the hold: it stays when the held skills come back."
+      "why" : "Russell, 2026-11-13, in the full ruling on #750 (restated on #791): the greeting an assistant gives when it opens from Plantoir never mentions marking, results for a whole class, or the comments written on a report; those are offered only in context, by the skill in use. Each expression is matched without regard to case in every greeting greetingMustSayHow builds, on every door, so the first catches mark, marks and marking as whole words and leaves marked, Markdown and marking a page alone (the project's word for publishing one, the Fable sweep of #791), the second catches grade, grades, graded and grading but not a grade level such as Grade 11 in a course's name, the third takes a class's result with either apostrophe, and the fourth takes results for, of or from a class or classes in the greeting's own voice (my, our, this) as well as the, a, your, each and every. mustMatch sentences must each be caught by some expression and mustNotMatch sentences by none; they are chosen so that scripts/test_held_skills.py, which reads them too, finds no offer in them. Written as regular expressions, as printablePages.agentGuidance.held.words is, and for the same reason: scripts/test_held_skills.py reads every string in this file, and a rule naming what must not be offered is not an offer. This rule is not the hold: it stays when the held skills come back."
     },
     "greetingMustSay" : [
       {

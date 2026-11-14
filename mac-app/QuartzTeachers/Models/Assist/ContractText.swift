@@ -25,10 +25,21 @@ import Foundation
 /// GENERATED key, one the caller names in `generatedKeys`, is always written
 /// in the generator's own text, so a hand edit that changed only its spacing
 /// or escaping is rewritten rather than kept; "generated, never hand-edited"
-/// then holds for the form as well as the meaning. And a generated key Swift
-/// no longer writes is removed from the file rather than left to look
-/// authored: `withoutGeneratedKeys` takes out every key the committed file's
-/// own `generated.keys` names before the generator's values go in.
+/// then holds for the form as well as the meaning. `withoutGeneratedKeys`
+/// takes out every key the committed file's own `generated.keys` names
+/// before the generator's values go in. A name there that the app does not
+/// generate stops the run with a `Refusal` naming it (the Fable sweep of
+/// #866): the writer cannot tell a retired readout from an authored key
+/// named there by mistake, and deleting an authored key is the one thing it
+/// must never do, so a person decides. A retired readout therefore cannot
+/// stay behind looking authored: the run refuses until it is deleted.
+///
+/// A committed file whose only fault is its whitespace (CRLF line ends, a
+/// blank line between members, a space or tab at the end of a line) is read
+/// as if it had none: none of the three can be inside a JSON string, so
+/// taking them out changes no value, and the authored keys keep their
+/// committed order. Before the sweep each of those
+/// sent the whole file to the sorted fallback without a word.
 ///
 /// Anything it cannot read in that shape, or a result that does not mean
 /// exactly what the generator meant, falls back to the plain sorted
@@ -36,6 +47,24 @@ import Foundation
 nonisolated enum ContractText {
 
     // MARK: - Types
+
+    /// Why a committed file cannot be written over.
+    struct Refusal: LocalizedError {
+
+        // MARK: - Stored properties
+
+        /// The key the committed `generated.keys` names and the app does not
+        /// generate.
+        let key: String
+
+        // MARK: - Computed properties
+
+        var errorDescription: String? {
+            return "generated.keys names \(key), which the app does not generate, so nothing was written. "
+                 + "If \(key) is hand-written, take its name out of generated.keys; if it is a readout "
+                 + "the app no longer writes, delete \(key) and its name by hand."
+        }
+    }
 
     /// One top-level member of a pretty-printed JSON object: its key, and
     /// its text from the key's opening quote to the end of its value, with
@@ -71,9 +100,9 @@ nonisolated enum ContractText {
     ) throws -> Data {
         let fresh: Data = try sortedEncoding(value)
         guard let existing,
-              let oldText = String(data: existing, encoding: .utf8),
+              let committedText = String(data: existing, encoding: .utf8),
               let newText = String(data: fresh, encoding: .utf8),
-              let oldMembers = members(of: oldText),
+              let oldMembers = members(of: withoutStrayWhitespace(committedText)),
               let newMembers = members(of: newText) else {
             return fresh
         }
@@ -138,20 +167,45 @@ nonisolated enum ContractText {
     }
 
     /// `rules` (a committed file, read) without the keys its own
-    /// `generated.keys` names, so that a generated key the generator no longer
-    /// writes leaves the file instead of staying behind looking authored. The
-    /// generator then puts back every key it still writes. A file with no
-    /// `generated.keys` is returned as it is.
-    static func withoutGeneratedKeys(_ rules: [String: Any]) -> [String: Any] {
+    /// `generated.keys` names; the generator then puts back every key it
+    /// writes. A file with no `generated.keys` is returned as it is.
+    ///
+    /// A name there that is not in `generating`, the keys the app writes
+    /// today, throws a `Refusal` naming it, and nothing is taken out: an
+    /// authored key named there by mistake is never deleted.
+    static func withoutGeneratedKeys(_ rules: [String: Any], generating: [String]) throws -> [String: Any] {
         guard let generated = rules["generated"] as? [String: Any],
               let keys = generated["keys"] as? [String] else {
             return rules
+        }
+        for key in keys {
+            if !generating.contains(key) {
+                throw Refusal(key: key)
+            }
         }
         var kept: [String: Any] = rules
         for key in keys {
             kept.removeValue(forKey: key)
         }
         return kept
+    }
+
+    /// `text` with CRLF line ends made LF and every space or tab at the end of
+    /// a line taken off. Neither can be inside a JSON string, so the result
+    /// means what `text` means. Blank lines stay: the generator's own text
+    /// has one inside every empty array, and `members(of:)` drops the ones
+    /// between members.
+    static func withoutStrayWhitespace(_ text: String) -> String {
+        let unixText: String = text.replacingOccurrences(of: "\r\n", with: "\n")
+        var lines: [String] = []
+        for line in unixText.components(separatedBy: "\n") {
+            var trimmed: String = line
+            while trimmed.hasSuffix(" ") || trimmed.hasSuffix("\t") {
+                trimmed.removeLast()
+            }
+            lines.append(trimmed)
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// The top-level members of a pretty-printed JSON object, or nil when the
@@ -179,10 +233,12 @@ nonisolated enum ContractText {
                 }
                 currentKey = key
                 currentLines = [line]
-            } else {
-                if currentKey == nil {
+            } else if currentKey == nil {
+                // A blank line before the first member is not part of one.
+                if !line.isEmpty {
                     return nil
                 }
+            } else {
                 currentLines.append(line)
             }
         }
@@ -238,10 +294,15 @@ nonisolated enum ContractText {
         return try sortedEncoding(["value": committedValue]) == sortedEncoding(["value": wanted])
     }
 
-    /// One member's lines joined, without the comma that separates it from
-    /// the next.
+    /// One member's lines joined, without the blank lines after it and the
+    /// comma that separates it from the next. A value never ends with a blank
+    /// line, so those are always between members.
     private static func withoutTrailingComma(_ lines: [String]) -> String {
-        var text: String = lines.joined(separator: "\n")
+        var kept: [String] = lines
+        while let last = kept.last, last.isEmpty {
+            kept.removeLast()
+        }
+        var text: String = kept.joined(separator: "\n")
         if text.hasSuffix(",") {
             text.removeLast()
         }
