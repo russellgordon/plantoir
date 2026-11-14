@@ -70,6 +70,26 @@ public sealed class LocalSiteGuard
             [".txt"] = "text/plain", [".json"] = "application/json",
         };
 
+    /// <summary>
+    /// The plans' header (defence in depth beside scripts off): their own
+    /// pages, stylesheets, fonts and pictures, from the host alone. Sent on
+    /// HTML only: on a PDF's own response <c>object-src 'none'</c> could stop
+    /// Chromium's viewer drawing it (790 plan review L3).
+    /// </summary>
+    /// <remarks>
+    /// Each kind named, and NO <c>default-src</c>: measured with
+    /// <c>Plantoir.GuardProbe</c> (WebView2 1.0.3179.45, this PC), a page sent
+    /// with <c>default-src 'self'</c> raised no navigation at all for a link to
+    /// the web clicked through the DevTools protocol (3 runs of 3), so the
+    /// click did nothing; the same page with these directives raised
+    /// <c>NavigationStarting</c> as a click. Whether a real mouse is stopped
+    /// the same way was not measured; the header is not worth the doubt.
+    /// </remarks>
+    public const string PlansContentSecurityPolicy =
+        "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; "
+        + "manifest-src 'none'; connect-src 'none'; img-src 'self' data:; font-src 'self' data:; "
+        + "style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self'";
+
     private readonly ILocalFiles _files;
 
     public LocalSiteGuard(string root, string host, IReadOnlyDictionary<string, string> contentTypes, ILocalFiles? files = null)
