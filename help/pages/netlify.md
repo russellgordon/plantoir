@@ -51,7 +51,7 @@ Deploying is what uses the allowance. Publishing or hiding a page uses none, bec
 
 1. Select the section and press {{control:deployButton}}.
 2. A sheet titled {{control:connectToNetlifySheetTitle}} opens. It lists the steps for making an access token on Netlify's website, and has a link named {{control:connectToNetlifySheetLink}}. Follow its steps in your browser. One of them matters months later:
-   {{say:app-rules#credentialRequests.requests[0].steps[3]}}
+   {{say:app-rules#credentialRequests.requests[0].steps[3] ~ Change the expiry — it}}
 3. Netlify shows the token once. Copy it, paste it into the {{control:connectToNetlifySheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this computer, and Plantoir does not ask for it again.
 4. If a sheet titled {{control:teacherSurnameSheetTitle}} opens, type your surname in the {{control:teacherSurnameSheetSurnameField}} field, using letters only. Plantoir asks once, and uses the surname in the names of your class websites.
 

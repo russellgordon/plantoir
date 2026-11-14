@@ -79,7 +79,7 @@ One case is known on a Mac. Homebrew has two packages that install a program nam
 - **There is no GitHub Copilot item.** GitHub's program was not found on this {{machine}}. Check that the program you installed is GitHub's own.
 - **You have only now installed it.** Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
 - **The window says that GitHub Copilot stopped.** It reads:
-  {{say:app-rules#outsideAgents.agents[2].stoppedAtOnce.sentence}}
+  {{say:app-rules#outsideAgents.agents[2].stoppedAtOnce.sentence ~ GitHub Copilot stopped as soon}}
   To open it on its own, start GitHub Copilot yourself, outside Plantoir.
 - **An alert titled {{control:outsideAssistantGitHubCopilotDidNotOpenTitle}} appears.** Plantoir could not start the session. If GitHub Copilot was updated or moved recently, quitting Plantoir and opening it again may be enough.
 - **The session opens, but GitHub Copilot cannot use Plantoir.** There are three known causes. A school account's administrator may not have turned on GitHub Copilot's command-line tool. A school's policy may stop it from working with other programs. Or you once turned Plantoir off inside GitHub Copilot, and it has stayed off. For the first two, ask the person who manages your school's GitHub account. For the third, turn Plantoir on again inside GitHub Copilot.
