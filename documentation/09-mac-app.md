@@ -6678,7 +6678,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
 | Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
 | Undo Last Change | nothing: it runs and says what it put back | `undo_last_change` |
-| Add Next Class | nothing: the page arrives hidden and Undo Last Change takes it away (Russell's decision 11) | `add_next_class` |
+| Add Class… (since #897; it replaced Add Next Class) | a sheet asking how: the next class in this unit, in a new unit, or as a copy of a class; the first two are added at once, a copy shows its plan first (the section after this one) | `add_next_class` (with `unit: "next"` for a new unit); a copy `plan_add_next_class`, then `add_next_class`, with its source's path |
 | Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |
 | Make Room for Classes… | the class a new one goes in front of, how many (1–10), then the plan | `plan_make_room_for_classes`, then `make_room_for_classes` |
 | Class Dates… | the class dates sheet (`SectionScheduleSheet`) | — |
@@ -6686,8 +6686,10 @@ all. They are Section menu items now, in two groups after Open in Browser:
 Help ▸ Publishing and Deploying… says what the two words mean, in an alert of
 its own, with or without a window (`publishingAndDeployingExplained` — said
 to the teacher; the assistant's `whatPublishingMeans` says "the teacher").
-The section row's context menu carries Publish Pages…, Hide Pages…, Publish
-Class for a Date… and Add Next Class, and selects the row first.
+The section row's context menu carries Publish Pages…, Hide Pages… and
+Publish Class for a Date…, and selects the row first. It carried Add Next
+Class too, until #897 replaced that item with Add Class…, which Russell
+ruled is in the menu bar only.
 
 **One entry point, the tool's own.** Each item builds its `AssistToolCall` in
 code (`SectionVerbs`) and runs it through `AssistToolRunner.run(call:)` — the
@@ -6719,7 +6721,7 @@ change made from the menu in THIS window (Russell's decision 4); the
 assistant's window keeps its own list. Opening another folder in the window
 makes a new runner, and the old folder's undo list goes with it.
 
-**Class dates first.** Add Next Class, Re-date Classes… and Make Room for
+**Class dates first.** Add Class…, Re-date Classes… and Make Room for
 Classes… need them. With none on file the SECTION WINDOW shows its own class
 dates sheet with the reason line, and the item runs once they are written —
 never `SectionSchedulePrompt.shared`, whose offer only the assistant's window
@@ -6749,7 +6751,78 @@ refactor, and a teacher with no assistant has no window for it); ⌘Z on Undo
 Last Change (it belongs to text editing in Edit, and a key that took back a
 page change from inside a text field would be a surprise nobody could undo);
 hiding the items on a course kept for reference (greyed, as every item is);
-a plan sheet for Add Next Class (it is undoable and the page arrives hidden).
+a plan sheet for Add Next Class (it is undoable and the page arrives hidden;
+since #897 the same holds for Add Class…'s first two ways).
+
+### Add Class…: the next class, a new unit, or a copy (#897)
+
+Two things only the built-in assistant's window could do had no menu item:
+starting a new unit, and duplicating a class as the next one (the audit of
+#897; the record is in [documentation/10](10-local-ai-assistant.md#what-only-the-built-in-assistant-could-do-and-where-it-is-on-the-menus-897)).
+Russell ruled, on the night of 2026-11-13, that they are not items of their
+own: **Section ▸ Add Class…** replaces Add Next Class and its sheet asks how
+the class is added. The ways are data, in this order
+(`SubjectMenuRules.AddClassWay`; `shared-rules.json` →
+`subjectMenus.addClassSheet`):
+
+| Way | What it sends | Greyed in the sheet when |
+|---|---|---|
+| The next class in this unit (a club: "the next meeting") | `add_next_class` with course and section, exactly what Add Next Class sent | never: it keeps Add Next Class's rule |
+| In a new unit | `add_next_class` with `unit: "next"`, the argument the window's "Start a new unit for the next class" phrasing already sends | the course is numbered (a club has no units), or a unit-word rename stopped part way |
+| As a copy of a class in this section | `plan_add_next_class`, then `add_next_class`, with `duplicateFileFromTheMenu`: the source's path in the course, `.md` included | the section's class folders hold no page, or a unit-word rename stopped part way |
+
+A way that cannot be used is drawn greyed, never left out; the first that can
+be is chosen. The first two add at once (the button says Add), as Add Next
+Class did; the copy lists this section's class pages, numbered or not
+(`SectionVerbSheetModel.sourceRows`, from `ClassPages.list`), then shows the
+plan, then Duplicate. The item itself is live wherever Add Next Class was;
+it carries no key equivalent, because Add Next Class had none. The trail line
+is `ran from a menu` with "Section ▸ Add Class…" and the way in its counts.
+
+**The copy, read on `.menu` only.** `duplicateFileFromTheMenu`
+(`AssistToolRunner.menuDuplicateFileArgument`) is read when the runner's
+surface is `.menu` and ignored on every other surface, so the built-in
+assistant's window and an outside assistant keep `duplicate`, by title, and
+its behaviour: the copy lands on the source's next day and later classes move
+(`class-planning.json` → `duplication`, unchanged). No schema shows the key,
+so nothing the local model is shown moves (`DuplicateAsNextClassTests.
+testTheMenusArgumentIsOnNoToolSurface`, and `AssistContractTests.
+testTheCommittedCasesMatchTheToolSurface` for every byte). The menu's copy
+(`class-planning.json` → `duplicatingAsTheNextClass`):
+
+- **becomes the NEXT class** (Russell's ruling): `NextClassPlanner.plan`, the
+  page Add Next Class would make, so nothing else is renamed or re-dated;
+- **is named by FILE.** `AssistSectionGraph.page(titled:)` answers the first
+  page in path order and strips any folder in front of the name, so a title
+  lookup copied a course-level "Concepts/Unit 2, Day 3" in place of the class
+  and said "Duplicated": a fault that reported success. The source must be one
+  of this section's class pages, or it is refused before anything is written;
+- **is built and read back before anything is written.** Per-section keys come
+  out first, then the date and `publish: false`, then
+  `AssistPageVisibility.answer` must say hidden; the file is written with
+  `.withoutOverwriting`. The assistant's path writes a blank page and fills it
+  after, which leaves a hidden blank page with no undo entry when the read-back
+  fails (the plan review's amendment 6); the menu's does not;
+- **is one undo entry** with no "before", so Undo Last Change deletes it.
+
+**An unfinished unit-word rename** greys the second and third ways on the
+cheap fact (the record a rename leaves is on disk), and the runner checks it in
+full at the click (`UnitWordRenamer.interruptedRenameTarget`), refusing on
+`.menu` only with `menuUnitWordRenameUnfinished`. A rename to "Module" that
+stopped part way leaves "Module 3" pages the planner cannot read, so a new unit
+would have been "Unit 3, Day 1" beside "Module 3, Day 2". The first way keeps
+Add Next Class's rule, which never waited for a rename: a known limit, left as
+it was. The facts are read with the " — Edited" marker (on showing, on coming
+forward, after each function), never per drawing of the menu
+(`SectionVerbs.classFacts`).
+
+REJECTED: one menu item per way (ruled earlier the same evening, then
+replaced); keeping Add Next Class beside Add Class…; the ways on the row's
+context menu; sending a folder-qualified name through `duplicate` (the title
+lookup strips the folder); changing `duplicate` itself (the assistant's
+behaviour is frozen); offering other sections' or course-level pages (ruled
+out); numbered sources only (the plan review's amendment 8: numbering was
+needed only for the insertion the ruling rejected).
 
 ### The plan as a table (#524)
 
