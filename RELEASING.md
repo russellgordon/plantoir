@@ -247,7 +247,11 @@ as the deploy reads them, and the cut is checked by `publish.ps1 -Sign`
 against `<Version>` instead (short version, step 2). One trail effect to
 know: the app writes `updated from … to …, by hand` whenever the version it
 last opened as differs, so on a PC with an installed 1.9.3 beside a 2.0.0
-test build, each switch between the two writes one such line.
+test build, each switch between the two writes one such line. **Never install
+an unsigned `publish.ps1` bundle over a real copy**: it carries the
+release-in-progress number, and the update check offers only a NEWER
+version, so that copy would never be offered the real release of the same
+number (#862 review, read from `AppUpdater.cs`, not measured by an install).
 
 **Rejected:** raising it at the cut, as before (the test builds lie for the
 whole of a release); deriving it from the milestone at build time (a build
@@ -1007,7 +1011,11 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     Restore the feed to the previous release's committed bytes first
     (`git checkout <previous release's commit> -- website/updates/windows.xml
     website/updates/windows.xml.signature`) and generate again; check the
-    item's `length` against the installer's size before committing.
+    item's `length` against the installer's size before committing. Restore
+    it BEFORE re-running `publish.ps1 -Sign`, too: since #862 its ledger check
+    runs `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped`, which fails while
+    the feed carries an item `site.json` does not, so `-Sign` refuses (naming
+    that test) until the feed is back.
     `--file-version` is NOT used, and was rejected on measurement: given
     `--file-version 1.4.3` with the 1.4.2 installer, it wrote nothing new and
     said "An app cast item with version 1.4.2 is already in the file". (The
@@ -1054,6 +1062,14 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   any edit after the generator means re-signing by hand). The generator
   cannot write notes as HTML or gather them across items itself; neither is
   needed, because the app does the gathering.
+- **Between committing the new feed and moving `site.json`'s version line
+  (in whichever order a cut makes them), the ordinary Windows suite is
+  RED**, and that is correct:
+  `NamedGapLedgerTests.TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped` fails
+  because one of the two already names the release being cut and the other
+  still names the previous one, which is the same state `build.py --deploy`
+  refuses (#862). It turns green once both have moved. Do not read a mid-cut
+  `dotnet test` failure of that one fact as damage; any other failure is.
 - **Do not rebuild or re-sign the installer after the feed is made**, and
   never let the feed's line endings change: `.gitattributes` marks
   `website/updates/*.xml` and `*.xml.signature` `-text` for that reason

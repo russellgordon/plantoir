@@ -2046,7 +2046,9 @@ mac 1.7.2's sixteen plan-table sentences (#524), held open against #548 on
 2026-10-16, landed with #548's plan table that day ("The plan as a table",
 below); `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
 keeps the rule exercised on made-up entries meanwhile. Since 2026-11-13 it
-holds the v2.0.0 run's 86 entries ("Step 0 of v2.0.0", below).
+holds the v2.0.0 run's entries ("Step 0 of v2.0.0", below; count them in
+`NamedGapLedger.cs` itself, since a number written here goes stale with
+every piece that lands).
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
 BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
@@ -2109,23 +2111,51 @@ two baselines, one fact:
   of plantoir.app reads it since #861 (`website/windows_feed.py` →
   `shipped_version` and `version_refusal`): `website/site.json`'s Windows
   card's `pinned`, else its `version`, and `website/updates/windows.xml`'s
-  newest item (the highest `sparkle:version`, wherever it sits). When the two
-  disagree the higher is used, and
-  `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped` fails for the disagreement
-  itself, as the deploy refuses it. `TheBaselineIsReadFromThePinTheVersionLineAndTheNewestItem`
-  proves the readers on made-up files: a pinned card (a mac-only cut), an
-  unpinned one, a feed whose newest item is neither first nor spelt the same
-  way, and the switch below.
+  newest item (the highest `sparkle:version`, wherever it sits, the
+  enclosure's attribute first and the element when the attribute is missing
+  or empty). Versions are compared as `windows_feed.version_key` compares
+  them (`NamedGapLedgerTests.VersionKey` / `CompareVersions`: numbers part by
+  part, a part that is not a number is -1, trailing zeros dropped, the shorter
+  first when one starts the other), so the two readers reach the same answer
+  even on a hand-edited feed; the first review found three inputs where they
+  did not (a prerelease newest, a four-part version, an empty attribute beside
+  the element) and all three are cases now. Python's order puts "2.0.0-rc1"
+  ABOVE "2.0.0", kept because agreeing is the point; the generator writes
+  plain numbers. A value whose first part is not a number is refused, since
+  it would sort below every milestone. When the two disagree the higher is
+  used, and `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped` fails for the
+  disagreement itself, as the deploy refuses it. **That fact is red during a
+  cut, between committing the new feed and moving `site.json`'s version line
+  (in either order), and that is correct**: it is the state the deploy refuses
+  (`RELEASING.md` → "The update feed (Windows)").
+  `TheBaselineIsReadFromThePinTheVersionLineAndTheNewestItem` proves the
+  readers on made-up files: a pinned card (a mac-only cut), an unpinned one, a
+  feed whose newest item is neither first nor spelt the same way, the three
+  inputs above, and the switch below.
 - **The cut** — `publish.ps1` runs the same fact with
   `PLANTOIR_LEDGER_BASELINE=build`, which compares with `<Version>`, through
   `Invoke-TestRun` and `Get-TestRunOutcome` (the totals, never the exit code),
-  before the signing preflight and before anything is built. With `-Sign` a
-  run that is not `Passed` is a refusal naming each entry; without it, a
-  warning and the unsigned bundle is built anyway; `-CheckLedgerOnly`
-  enforces the check and stops. Any other value of the switch is an error, so
-  a misspelling at the cut cannot quietly fall back to the lenient baseline.
+  before the signing preflight and before anything is built. With `-Sign` any
+  run that is not `Passed` is a refusal; without it, a warning and the
+  unsigned bundle is built anyway; `-CheckLedgerOnly` enforces the check and
+  stops. The refusal names the failing tests and words its remedy by verdict
+  (first review, M1): owed entries are listed with "build each, or move its
+  issue"; another of the ledger's tests failing is shown with its message
+  (for the site-and-feed fact, "restore the committed feed first"); a run with
+  no result shows its build errors. The whole transcript is kept in
+  `%TEMP%\plantoir-publish-ledger-check.txt`, and one line before the run says
+  what the wait is. Any other value of the switch is an error, so a
+  misspelling at the cut cannot quietly fall back to the lenient baseline.
   `InstallerRunningWorkTests.PublishRefusesASignedCutWhileTheLedgerOwesThisRelease`
-  reads the order and the enforcing branch out of the script.
+  reads the order and the enforcing branch out of the script, and that
+  `$enforceLedger` is assigned once and the check sits inside no block (a
+  wrapping `if (-not $Sign)` or a later `$enforceLedger = $false` turned it
+  red, measured).
+- **An unsigned bundle is never installed over a real copy**: it carries the
+  release-in-progress number, and the update check offers only a newer
+  version, so that copy would never be offered the real release of the same
+  number (first review, M2; read from `AppUpdater.cs`, not measured by an
+  install). `publish.ps1`'s header and `RELEASING.md` say so.
 
 **Why the cut is where it is.** The old rule needed a person to re-run the
 suite after the version was set (`RELEASING.md` said so); the new check sits
@@ -2143,8 +2173,14 @@ switch unset (6 of 6); with `PLANTOIR_LEDGER_BASELINE=build`,
 entries; `publish.ps1 -CheckLedgerOnly` exit 1 in 118 s (most of it building
 the test project), saying "116 ledger entries are owed by this release or an
 earlier one" and listing them; the same with `<Version>` set to 1.9.9 in a
-scratch edit, exit 0 ("PASSED - 6 passed"). The unsigned path's warning was
-not run end to end (it would build a 1.2 GB bundle); the source test reads it.
+scratch edit, exit 0 ("PASSED - 6 passed"). After the review's fixes: with
+`<Version>` 1.9.9 and a 2.0.0 item added to a scratch copy of the feed,
+exit 1 naming `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped`, its message,
+and the restore-the-feed remedy; with a planted syntax error in a test file,
+exit 1 with the `error CS1525` line and "did not run to a result". The
+unsigned path's warning was not run end to end (it would build a 1.2 GB
+bundle); the source test reads it. A warm `-CheckLedgerOnly` took 7.7 s
+(the reviewer's measurement).
 
 **Rejected.** Comparing with `<Version>` in every run (the ledger would be red
 for the whole of every release). Reading `site.json` alone (its `version` is

@@ -274,8 +274,10 @@ nothing in it) and stays owed until the Windows catch-up, where
 `publish.ps1 -Sign` stops it; once that cut adds its item to the feed, the
 ordinary suite is red for it too. The rule is "later than", not "empty at the
 cut": an entry owed by a genuinely later release rightly survives. A
-milestone that is not a version fails, because it cannot be compared. **Since 2026-11-13 the ledger holds 86
-entries, every one on v2.0.0** — step 0 of the Windows v2.0.0 run
+milestone that is not a version fails, because it cannot be compared. **Since 2026-11-13 the ledger holds
+entries on v2.0.0 only** (count them in
+`windows-app/Plantoir.Tests/NamedGapLedger.cs`, the one place that says how
+many; a number written here was wrong within the day) — step 0 of the Windows v2.0.0 run
 ([#787](https://github.com/russellgordon/plantoir/issues/787)) held open
 every red the mac's v2.0.0 work brought that a later piece of the same run
 builds, each against its own open `windows` issue, and wired twelve more
