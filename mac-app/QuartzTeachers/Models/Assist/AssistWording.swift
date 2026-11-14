@@ -2428,12 +2428,15 @@ nonisolated enum AssistWording {
     }
 
     /// Under the tree when the search hides ticked pages (#900): they stay
-    /// ticked, and Continue includes them, as it did before the tree.
+    /// ticked and Continue takes them along, as it did before the tree. The
+    /// one sentence is shown in Publish Pages… and in Hide Pages…, so it
+    /// says "ticked" and never "includes", which is the word the app uses
+    /// for publishing (#694; the Fable sweep's first text item).
     static func menuTickedButNotShown(count: Int) -> String {
         if count == 1 {
-            return "1 ticked page is not shown by the search. Continue still includes it."
+            return "1 ticked page is not shown by the search. It is still ticked."
         }
-        return "\(count) ticked pages are not shown by the search. Continue still includes them."
+        return "\(count) ticked pages are not shown by the search. They are still ticked."
     }
 
     /// The picker's and the later-classes list's third column (#608): a

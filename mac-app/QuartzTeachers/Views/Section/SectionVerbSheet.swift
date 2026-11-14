@@ -1551,8 +1551,10 @@ struct PageTickTableRows: TableRowContent {
 /// Its state is SET from the model on every update and a click calls the
 /// model's rule (`SectionVerbSheetModel.flip(_:)` with the group's id, the
 /// path Space takes), so AppKit's own off, on, mixed cycle never decides
-/// what is ticked: a mixed box ticks every shown page, as a Mac does, and
-/// the box is read over every page under it, hidden ones included. Rejected: SwiftUI's
+/// what is ticked: a click ticks the shown pages under the group unless
+/// every one is already ticked, in which case it unticks them, and a page
+/// the search hides is never changed (`PageTickTree`'s rule). The box is
+/// read over every page under it, hidden ones included. Rejected: SwiftUI's
 /// `Toggle(sources:isOn:)`, which draws the mixed state but leaves which way
 /// a click on it goes to the framework (the plan review's amendment 24).
 ///

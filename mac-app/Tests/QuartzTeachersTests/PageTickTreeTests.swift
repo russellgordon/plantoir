@@ -253,7 +253,8 @@ final class PageTickTreeTests: XCTestCase {
     /// as ticking its pages one by one, and through the real runner on the
     /// menu's surface it writes the same files, says the same thing and
     /// leaves ONE undo step holding every page (#899's shadow list, written
-    /// through its door by `carryOut`). Run for Publish and for Hide.
+    /// by the runner, whose `carryOut` opens and closes it around the one
+    /// call). Run for Publish and for Hide.
     func testAUnitsBoxWritesWhatTickingItsPagesOneByOneWrote() async throws {
         for publishing in [true, false] {
             let byPage = try PageTickTreeTests.courseWithAUnit(publishing: publishing)
