@@ -4944,7 +4944,10 @@ works when a student's press reaches it, in **Chrome for Testing and in
 Playwright's WebKit build** (Safari's engine), and that the page reported
 nothing and asked nothing of a host it should not. This piece (597a) runs it
 locally in `verify.sh`; the second half of #597 runs the same file against
-the deployed test sites on every host in a list.
+the deployed test sites on every host in a list, where the hosts the site
+still asks today are counted expected failures and the cold visit takes
+#625's two routes as well (documentation/07-deployment.md → "Rendered in two
+browsers, on the deployed sites (#597)").
 
 **The pieces.**
 
@@ -4987,7 +4990,18 @@ Waits are on the state asked about, with a ceiling.
   any page through, implementation review H1; measured: a frame from
   example.com on the Quiz page was green in both engines). The Embeds page is
   judged like every other: until the fixes review (F2) the own-host row
-  skipped it, so that rule decided nothing.
+  skipped it, so that rule decided nothing. On a deployed site (`--base`)
+  the `thirdPartyHostsToday` hosts still go through the router, but each is
+  an EXPECTED line rather than allowed, and a listed host no page asked is
+  a failure (`browser-checks/lib/expected_failures.mjs`, #597's second half).
+- **A teacher's embed's own console is set aside** (#597's second half,
+  measured 2026-11-13 on the Embeds page under `--base`): a console line
+  that names, or comes from, a request an embed made, a page error thrown
+  by an embed's own script (the first address its stack names), and an
+  embed's own failed request are counted in the clean-page row's line and
+  not judged; the embeds row judges the frames themselves. Without it the
+  row failed both engines on YouTube's advert requests, Vimeo's and PhET's
+  fullscreen checks and GeoGebra reaching for the page.
 - **Until the page is quiet.** Before a page is judged it is scrolled to its
   end a window at a time, so what loads only below the fold is asked for,
   then held until it has asked for nothing for a second and at least 5 s

@@ -49,12 +49,27 @@
 #   ./verify-deploy.sh                     # uses the defaults below
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
-#                                          # Cloudflare (#665) and its retry of a
+#                                          # Cloudflare (#665), its retry of a
 #                                          # new site's files (#740) and pages
-#                                          # (#869), offline, ~75 s
+#                                          # (#869), its counted retry on a plain
+#                                          # run (#762) and its judgement of the
+#                                          # rendered check per host (#597),
+#                                          # offline, ~2 minutes
 #   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
 #                                          # publishes as a NEW teacher would:
 #                                          # new sites, both questions asked (#712)
+#
+# RENDERED IN TWO BROWSERS (#597, the owner's rulings of 2026-10-19,
+# 2026-10-31 and 2026-11-13): after the destinations, each host's site is
+# opened in Chrome for Testing AND in Safari's engine by
+# browser-checks/rendered_features.mjs, on the fixture pages planted from
+# browser-checks/fixtures/rendered/ (removed on any exit). The hosts are a
+# LIST (RENDER_HOSTS below), and every host on it must be reached: a host
+# whose leg never gave an address, or had no credentials, is a FAILURE named
+# "not reached", and a leg that failed before the browser check is said as
+# failed in the Result block even when the browser check passed. No request
+# may leave a deployed site's own host; what the site still asks today is
+# printed and counted as the expected failures #566 removes.
 #
 # It uses ONE course throughout, on purpose: a Netlify site and a Cloudflare
 # project are created once and reused, rather than littering the accounts with
@@ -102,6 +117,38 @@ hdr()  { echo; echo "──────── $1"; }
 CONFIG="$WORKING_FOLDER/courses/$COURSE/course_config.json"
 PUBLIC_DIR="$WORKING_FOLDER/courses/$COURSE/.merged_output/section$SECTION/public"
 MEASURED=()
+# This checkout: the rendered check and its fixture pages are read from here.
+SCRIPT_REPO="$(cd "$(dirname "$0")" && pwd)"
+
+# ------------------------------------------ the hosts the rendered check needs
+# One entry per host a release must see rendered (#597; ruling 2026-10-31: a
+# host is an entry in a list, not a hand-written leg). Each host's deploy
+# block adds its address to RENDER_TARGETS once its leg is done, and the
+# rendered section then runs over THIS list, not over what was added: a host
+# that added nothing is a failure by name. #669 (GitHub Pages) adds `github`
+# here, a deploy block that calls render_target, and a label below.
+RENDER_HOSTS=(netlify cloudflare)
+RENDER_TARGETS=()   # "host|address ending in /|failures in its leg before the browser check"
+RENDER_RESULTS=()   # one line per host for the Result block: checked, FAILED or NOT REACHED
+RENDER_EXPECTED=()  # the expected failures, by host and engine (thirdPartyHostsToday, #566)
+# The checker itself; the self-test puts a stub in its place.
+RENDERED_CHECKER=(node "$SCRIPT_REPO/browser-checks/rendered_features.mjs")
+render_label() {  # render_label <host> -> what a person calls it
+  case "$1" in
+    netlify) echo "Netlify" ;;
+    cloudflare) echo "Cloudflare Pages" ;;
+    github) echo "GitHub Pages" ;;
+    *) echo "$1" ;;
+  esac
+}
+# render_target <host> <address or ""> <$FAIL when its leg began> [why, when there is no address]
+render_target() {
+  if [ -z "$2" ]; then
+    printf -v "RENDER_WHY_$1" '%s' "${4:-its publish printed no address}"
+    return 0
+  fi
+  RENDER_TARGETS+=("$1|${2%/}/|$((FAIL - $3))")
+}
 
 # ------------------------------------- Cloudflare's production address (#665)
 # `wrangler pages deploy` returns when the upload is accepted, not when
@@ -251,6 +298,19 @@ wait_for_new_address() {  # wait_for_new_address <label> <url>
 # already ask again on their own, in every run.
 NS_POLL="${VERIFY_DEPLOY_NS_POLL:-5}"
 NS_WAIT="${VERIFY_DEPLOY_NS_WAIT:-60}"
+# A PLAIN run asks again too, since #762 (seen at the v1.9.3 gate,
+# 2026-11-10: Netlify answered 404 for one file a moment after a deploy, a
+# different file in each of two runs, and both answered 200 minutes later and
+# in the same run's next leg). A plain run's sites are old, but the files are
+# the ones the deploy has just uploaded: so a fetch that does not get the
+# answer it wants is asked once more after NS_PLAIN_FIRST s, then every
+# NS_POLL s until NS_WAIT s, each retry written down and counted in the
+# Result block as "answered on retry". A real fault is still a failure,
+# judged on the last answer; a slow edge is a number. This reverses the
+# rejection written above ("it would hide a real 404 on a site that has
+# existed for weeks"): it hides nothing, because the 404 that stays is still
+# the check's failure and the one that clears is still counted.
+NS_PLAIN_FIRST="${VERIFY_DEPLOY_NS_PLAIN_FIRST:-10}"
 # One deadline for a whole check_engine or check_page_links call as well
 # (#869 review): once it has passed, a fetch that does not settle is asked
 # once and judged, so a genuinely broken new site fails in at most about
@@ -265,6 +325,8 @@ last_header_block() {
 }
 
 # fetch_headers <want> <url> [-o <file>]
+# Asked again as above: on a first publish (#740, #869) and, since #762, on a
+# plain run too; never the preview on localhost.
 # Prints the response headers (\r stripped), as `curl -s -D -` did. Wants
 # that do not follow a redirect: "200" wants HTTP 200; "coep" wants HTTP 200
 # and COEP require-corp. Wants that follow redirects (#869), and print every
@@ -301,14 +363,14 @@ fetch_headers() {
     fi
     waited=$(( $(date +%s) - start ))
     [ "$good" = true ] && break
-    [ "$FIRST_PUBLISH" = true ] || break
     case "$url" in http://localhost:*) break ;; esac  # the preview is no new site
     [ "$(date +%s)" -ge "$deadline" ] && break
     tries=$((tries+1))
-    sleep "$NS_POLL"
+    # A plain run's first retry waits longer (#762); a first publish polls.
+    if [ "$FIRST_PUBLISH" != true ] && [ "$tries" -eq 1 ]; then sleep "$NS_PLAIN_FIRST"; else sleep "$NS_POLL"; fi
   done
   if [ "$tries" -gt 0 ]; then
-    echo "  ↻ a brand-new site: $url needed $tries retr$([ "$tries" -eq 1 ] && echo y || echo ies) over $waited s ($([ "$good" = true ] && echo "then answered" || echo "never answered as wanted"))" >&2
+    echo "  ↻ $([ "$FIRST_PUBLISH" = true ] && echo "a brand-new site" || echo "just uploaded (#762)"): $url needed $tries retr$([ "$tries" -eq 1 ] && echo y || echo ies) over $waited s ($([ "$good" = true ] && echo "then answered" || echo "never answered as wanted"))" >&2
     printf '%s\t%s\t%s\t%s\n' "$url" "$tries" "$waited" "$good" >>"${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}"
   fi
   printf '%s\n' "$headers"
@@ -316,11 +378,18 @@ fetch_headers() {
 
 # One line per site for the Result block: how many of its files (and, since
 # #869, its pages) a brand-new site needed asking again, and the most it took.
+# On a plain run (#762) the line is written only when something was asked
+# again, so the Result block names what answered on retry and stays short.
 measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in /> [what] [counted, one, none]
   local log="${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}" line
-  [ "$FIRST_PUBLISH" = true ] || return 0
   case "$2" in http://localhost:*) return 0 ;; esac
   local what="${3:-}" counted="${4:-file(s)}" one="${5:-one file}" none="${6:-no file}"
+  if [ "$FIRST_PUBLISH" != true ]; then
+    [ -s "$log" ] && awk -F '\t' -v b="$2" 'index($1, b) == 1 { found = 1 } END { exit found ? 0 : 1 }' "$log" 2>/dev/null || return 0
+    what="${what:-files and pages}"
+    what="${what/a brand-new site\'s /}"
+    what="answered on retry (#762), $what"
+  fi
   [ -n "$what" ] || what="a brand-new site's files and pages (#740, #869)"
   line=$(awk -F '\t' -v b="$2" -v counted="$counted" -v one="$one" -v none="$none" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
     END { if (n == 0) print none " needed asking again"; else printf "%d %s needed asking again, %d retries in all, at most %d for %s, the longest %d s", n, counted, t, m, one, w }' "$log" 2>/dev/null)
@@ -478,22 +547,27 @@ check_page_links() {  # check_page_links <label> <site base url ending in /> <ne
   NS_LEG=$(( ${NS_LEG:-0} + 1 ))
   NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
   : >"$NS_RETRY_LOG"
-  said=$(python3 - "$2" "$3" "$FIRST_PUBLISH" "$NS_POLL" "$NS_WAIT" "$NS_RETRY_LOG" "$NS_CALL_WAIT" <<'PY'
+  # "true" on a first publish, "plain" on a plain run (#762): both ask again.
+  said=$(python3 - "$2" "$3" "$([ "$FIRST_PUBLISH" = true ] && echo true || echo plain)" "$NS_POLL" "$NS_WAIT" "$NS_RETRY_LOG" "$NS_CALL_WAIT" "$NS_PLAIN_FIRST" <<'PY'
 import html, re, sys, time, urllib.error, urllib.parse, urllib.request
 base, host_kind = sys.argv[1], sys.argv[2]
-# The five after them are optional, because Windows' verify-deploy.ps1 runs
+# The ones after them are optional, because Windows' verify-deploy.ps1 runs
 # this same program read out of this file and passes the first two only
 # (Get-PageLinksProgram): without them nothing is asked again, as before #869.
 extra = sys.argv[3:8] if len(sys.argv) >= 8 else ["false", "5", "60", "", "180"]
-first_publish, ns_poll, ns_wait, retry_log = extra[0] == "true", float(extra[1]), float(extra[2]), extra[3]
+# extra[0]: "true" (a first publish), "plain" (a plain run, #762) or "false"
+# (nothing asked again). A plain run's first retry waits plain_first s.
+first_publish, ns_poll, ns_wait, retry_log = extra[0] in ("true", "plain"), float(extra[1]), float(extra[2]), extra[3]
+plain = extra[0] == "plain"
+plain_first = float(sys.argv[8]) if len(sys.argv) >= 9 else 10.0
 # One deadline for the whole call, as check_engine's NS_CALL_WAIT.
 call_deadline = time.time() + float(extra[4])
 own = urllib.parse.urlsplit(base).netloc.lower()
 def asked_again(url, attempt, settled):
-    # fetch_headers' rule (#740, #869), for the fetches made here: on a first
-    # publish only, an answer that is not settled is asked again every NS_POLL
-    # s until NS_WAIT s have passed, each retry written down and counted, and
-    # the last answer is what is judged.
+    # fetch_headers' rule (#740, #869, #762), for the fetches made here: an
+    # answer that is not settled is asked again every NS_POLL s (a plain
+    # run's first retry after plain_first s) until NS_WAIT s have passed, each
+    # retry written down and counted, and the last answer is what is judged.
     start = time.time()
     tries = 0
     while True:
@@ -502,10 +576,10 @@ def asked_again(url, attempt, settled):
         if good or not first_publish or url.startswith("http://localhost:") or time.time() >= min(start + ns_wait, call_deadline):
             break
         tries += 1
-        time.sleep(ns_poll)
+        time.sleep(plain_first if plain and tries == 1 else ns_poll)
     if tries:
         waited = int(time.time() - start)
-        print(f"  ↻ a brand-new site: {url} needed {tries} retr{'y' if tries == 1 else 'ies'} over {waited} s ({'then answered' if good else 'never answered as wanted'})", file=sys.stderr)
+        print(f"  ↻ {'just uploaded (#762)' if plain else 'a brand-new site'}: {url} needed {tries} retr{'y' if tries == 1 else 'ies'} over {waited} s ({'then answered' if good else 'never answered as wanted'})", file=sys.stderr)
         with open(retry_log, "a", encoding="utf-8") as log:
             log.write(f"{url}\t{tries}\t{waited}\t{'true' if good else 'false'}\n")
     return answer
@@ -607,6 +681,135 @@ PY
     ok "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
   fi
   measure_new_site_retries "$1" "$2" "a brand-new site's page links (#869)" "page(s) or link(s)" "one page or link" "no page or link"
+}
+
+# ------------------------------------- the rendered check, per host (#597)
+# Runs browser-checks/rendered_features.mjs against each host on
+# RENDER_HOSTS, in Chrome for Testing and Safari's engine, with both engines
+# REQUIRED (a missing one is a failure here, never a skip: this is the
+# release gate, and RELEASING.md step 2 asks for nothing skipped). Any row
+# the checker SKIPPED, for a network it could not reach, is a failure too.
+#
+# Before the browsers: every fixture page is asked for through fetch_headers,
+# so a brand-new site (#740, #869) and a just-uploaded one (#762) are waited
+# for the same bounded way as the files are. Then one counted re-run: a
+# check that did not pass is run once more, whole, and judged on that run;
+# the rows that failed first and passed then are named in the Result block
+# as answered on retry (#762's rule: a real fault still fails, a slow edge
+# is a number). Rejected: a fixed wait before the browsers (a guessed
+# duration for a race), and re-running only the failed rows (a row every
+# page carries cannot be re-run alone without its pages, and a partial run
+# cannot judge whether an expected failure stopped).
+#
+# Per host the Result block says one of three things, and only the first
+# is a pass: "checked" (its leg had no failure and the rendered check
+# passed), "FAILED" (the rendered check did not pass, or its leg failed
+# before the browser check, which is said even when the browsers then
+# passed), and "NOT REACHED" (no address: no credentials, or a publish that
+# printed none). A host not reached is a failure counted here.
+rendered_pages() {  # the fixture pages' addresses under a site, one a line
+  python3 -c 'import json,sys; [print(path) for path in json.load(open(sys.argv[1]))["pages"].values()]' "$SCRIPT_REPO/browser-checks/rendered_rows.json"
+}
+rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures in its leg>
+  local host="$1" label="$2" base="$3" leg_fails="$4" path code missing=0 count=0 status again_status log again rows_first rows_second retried line cold summary
+  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
+  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
+  : >"$NS_RETRY_LOG"
+  NS_CALL_DEADLINE=$(( $(date +%s) + NS_CALL_WAIT ))
+  for path in $(rendered_pages); do
+    count=$((count+1))
+    code=$(fetch_headers page "$base$path" | last_header_block | awk 'NR==1{print $2}')
+    if [ "$code" != "200" ]; then
+      missing=$((missing+1))
+      echo "       $base$path answered HTTP ${code:-000}"
+    fi
+  done
+  NS_CALL_DEADLINE=""
+  measure_new_site_retries "$label" "$base" "the rendered check's pages" "page(s)" "one page" "no page"
+  if [ "$missing" -eq 0 ]; then
+    ok "$label serves the rendered check's $count pages (HTTP 200)"
+  else
+    no "$label: $missing of the rendered check's $count pages did not answer 200"
+  fi
+  if ! command -v node >/dev/null 2>&1 || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+    no "$label: the rendered check needs Node 22 or later on this Mac, and it is not here"
+    RENDER_RESULTS+=("$label: FAILED - the rendered check could not run (no Node 22)")
+    return
+  fi
+  log="$WORK/rendered-$host.log"
+  PLANTOIR_REQUIRE_ENGINES=chromium,webkit "${RENDERED_CHECKER[@]}" --base "$base" --host "$host" --json "$WORK/rendered-$host.json" >"$log" 2>&1
+  status=$?
+  retried=""
+  if [ "$status" -ne 0 ]; then
+    rows_first=$(grep -E '^(FAIL|SKIPPED): ' "$log" | sed -E 's/^(FAIL|SKIPPED): ([^:]*):.*/\2/' | sort -u)
+    echo "  ↻ $label: the rendered check did not pass at first (exit $status; $(grep -c '^FAIL: ' "$log") FAIL, $(grep -c '^SKIPPED: ' "$log") SKIPPED), so it is run once more and judged on that run:"
+    grep -E '^(FAIL|SKIPPED): ' "$log" | cut -c1-400 | sed 's/^/       first: /'
+    again="$WORK/rendered-$host-again.log"
+    PLANTOIR_REQUIRE_ENGINES=chromium,webkit "${RENDERED_CHECKER[@]}" --base "$base" --host "$host" --json "$WORK/rendered-$host-again.json" >"$again" 2>&1
+    again_status=$?
+    rows_second=$(grep -E '^(FAIL|SKIPPED): ' "$again" | sed -E 's/^(FAIL|SKIPPED): ([^:]*):.*/\2/' | sort -u)
+    retried=$(comm -23 <(printf '%s\n' "$rows_first") <(printf '%s\n' "$rows_second") | grep -v '^$' | paste -sd ';' - | sed 's/;/; /g')
+    log="$again"
+    status=$again_status
+    if [ -n "$retried" ]; then
+      MEASURED+=("$label, the rendered check (#597): answered on retry (#762), the whole check run twice: $retried")
+    fi
+  fi
+  # What the checker said, under its line here: every failure and skip, and
+  # the expected failures (counted for the Result block).
+  while IFS= read -r line; do
+    [ -n "$line" ] && RENDER_EXPECTED+=("$label ${line#EXPECTED: }")
+  done < <(grep '^EXPECTED: ' "$log")
+  line=$(grep '^DONE: ' "$log" | tail -1 | sed 's/^DONE: //')
+  if [ "$status" -eq 0 ]; then
+    ok "$label, rendered in Chrome and in Safari's engine: ${line:-no summary}${retried:+ (answered on retry: $retried)}"
+  else
+    case "$status" in
+      3) no "$label, rendered: a row or an engine was SKIPPED, and a release run skips nothing (${line:-no summary})" ;;
+      1) no "$label, rendered: a row FAILED (${line:-no summary})" ;;
+      *) no "$label, rendered: the check could not run (exit $status; ${line:-no summary})" ;;
+    esac
+    grep -E '^(FAIL|SKIPPED): ' "$log" | cut -c1-600 | sed 's/^/       /'
+  fi
+  # The cold visits, measured on every run so a slow drift shows before it
+  # is a failure (#625).
+  cold=$(grep -E '^(OK|FAIL): cold visit ' "$log" | tail -1 | sed -E 's/^(OK|FAIL): cold visit \[webkit\]: //')
+  [ -n "$cold" ] && MEASURED+=("$label, cold visits in Safari's engine (#625): $cold")
+  summary=$(grep '^DONE: ' "$log" | tail -1 | sed 's/^DONE: //')
+  if [ "$leg_fails" -gt 0 ]; then
+    RENDER_RESULTS+=("$label: FAILED before the browser check ($leg_fails failure(s) in its publish leg, above); the rendered check then $([ "$status" -eq 0 ] && echo passed || echo "did not pass") (${summary:-no summary})")
+  elif [ "$status" -eq 0 ]; then
+    RENDER_RESULTS+=("$label: checked - ${summary:-no summary}${retried:+; answered on retry: $retried}")
+  else
+    RENDER_RESULTS+=("$label: FAILED - ${summary:-no summary}")
+  fi
+}
+run_rendered_section() {
+  local host entry found label why entry_base entry_fails
+  for host in "${RENDER_HOSTS[@]}"; do
+    label=$(render_label "$host")
+    found=""
+    for entry in ${RENDER_TARGETS[@]+"${RENDER_TARGETS[@]}"}; do
+      case "$entry" in "$host|"*) found="$entry" ;; esac
+    done
+    if [ -z "$found" ]; then
+      eval "why=\${RENDER_WHY_$host:-its leg never ran}"
+      no "$label: NOT REACHED, so the rendered check did not run on it ($why)"
+      RENDER_RESULTS+=("$label: NOT REACHED - $why")
+      continue
+    fi
+    IFS='|' read -r _ entry_base entry_fails <<<"$found"
+    rendered_one "$host" "$label" "$entry_base" "$entry_fails"
+  done
+}
+# The Result block's lines for the rendered check (printed by the real run
+# and by the self-test alike).
+print_rendered_result() {
+  local line
+  echo "  Rendered in Chrome and in Safari's engine, per host (#597):"
+  for line in ${RENDER_RESULTS[@]+"${RENDER_RESULTS[@]}"}; do echo "    $line"; done
+  echo "  Expected failures, which #566 removes (browser-checks/rendered_rows.json -> thirdPartyHostsToday): ${#RENDER_EXPECTED[@]}"
+  for line in ${RENDER_EXPECTED[@]+"${RENDER_EXPECTED[@]}"}; do echo "    $line"; done
 }
 
 # ----------------------------------------------------------------- self-test
@@ -831,16 +1034,44 @@ STUB
     && ok "the Result block counts them: ${MEASURED[0]#*: }" \
     || no "the Result block's count: ${MEASURED[*]:-nothing}"
 
+  hdr "Self-test — a plain run asks a just-uploaded file again, counted (#762)"
   FIRST_PUBLISH=false
+  NS_PLAIN_FIRST=2
   : >"$NS_RETRY_LOG"
   fs_start 404:2
+  started=$(date +%s)
   out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
-  if [ "$(code_of "$out")" = "404" ] && [ ! -s "$ST_DIR/said.txt" ] && [ ! -s "$NS_RETRY_LOG" ]; then
-    ok "a plain run's long-lived site answers 404: judged at once, never asked again"
+  elapsed=$(( $(date +%s) - started ))
+  if [ "$(code_of "$out")" = "200" ] && grep -q 'just uploaded (#762): .* needed 2 retries' "$ST_DIR/said.txt" \
+     && grep -q $'\t2\t[0-9]*\ttrue$' "$NS_RETRY_LOG" && [ "$elapsed" -ge 3 ]; then
+    ok "a plain run's file answers 404 twice, then the file: asked again (the first time after NS_PLAIN_FIRST s, ${elapsed} s in all), it passes, and the log says it took 2 retries"
   else
-    no "a plain run's 404: HTTP $(code_of "$out"), said: $(cat "$ST_DIR/said.txt")"
+    no "a plain run's 404 then 200: HTTP $(code_of "$out"), ${elapsed} s, said: $(cat "$ST_DIR/said.txt")"
   fi
   st_stop
+  MEASURED=()
+  measure_new_site_retries "Netlify" "http://127.0.0.1:"
+  printf '%s\n' ${MEASURED[@]+"${MEASURED[@]}"} | grep -q "^Netlify, answered on retry (#762), files and pages: 1 file(s) needed asking again, 2 retries in all" \
+    && ok "the Result block counts a plain run's retry as answered on retry: ${MEASURED[0]#*: }" \
+    || no "a plain run's retry in the Result block: ${MEASURED[*]:-nothing}"
+  : >"$NS_RETRY_LOG"
+  MEASURED=()
+  measure_new_site_retries "Netlify" "http://127.0.0.1:"
+  [ "${#MEASURED[@]}" -eq 0 ] \
+    && ok "a plain run with nothing asked again adds no line to the Result block" \
+    || no "a plain run with nothing asked again added: ${MEASURED[*]}"
+  fs_start 404:inf
+  started=$(date +%s)
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  elapsed=$(( $(date +%s) - started ))
+  if [ "$(code_of "$out")" = "404" ] && grep -q 'never answered as wanted' "$ST_DIR/said.txt" \
+     && [ "$elapsed" -ge 4 ] && [ "$elapsed" -le 12 ]; then
+    ok "a plain run's file that stays 404 is still the check's failure, judged on the last answer, at the cap (${elapsed} s)"
+  else
+    no "a plain run's file that stays 404: HTTP $(code_of "$out"), ${elapsed} s, said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+  FIRST_PUBLISH=true
 
   hdr "Self-test — a brand-new site's pages, asked again (#869)"
   # A whole site on 127.0.0.1, so the REAL check_engine and check_page_links
@@ -1061,14 +1292,196 @@ READ
   FIRST_PUBLISH=false
   ws_start 404:2 good 404:1
   out=$(ws_run check_engine; ws_run check_page_links)
-  if printf '%s\n' "$out" | grep -q "page of runnable code answered HTTP 404 or carries no runnable block" \
-     && printf '%s\n' "$out" | grep -q "❌ case's page links" \
-     && ! printf '%s\n' "$out" | grep -q '^MEASURED' && [ ! -s "$ST_DIR/said.txt" ]; then
-    ok "a plain run's long-lived site answers 404 for its page and a link: judged at once, never asked again"
+  if [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 0 ] \
+     && printf '%s\n' "$out" | grep -q "page of runnable code carries its runnable block" \
+     && printf '%s\n' "$out" | grep -q "✅ case's page links: 2 same-site links, 2 answered 200" \
+     && printf '%s\n' "$out" | grep -q '^MEASURED case, answered on retry (#762), files and pages: 1 file(s) needed asking again' \
+     && printf '%s\n' "$out" | grep -q '^MEASURED case, answered on retry (#762), page links (#869): 1 page(s) or link(s) needed asking again'; then
+    ok "a plain run's page answers 404 twice and a link once: both asked again (#762), every check passes, each counted as answered on retry"
   else
-    no "a plain run's page and link 404: $(printf '%s\n' "$out" | grep -E '❌|^MEASURED' | head -4) said: $(cat "$ST_DIR/said.txt")"
+    no "a plain run's page and link 404 at first: $(printf '%s\n' "$out" | grep -E '❌|^MEASURED' | head -4) said: $(cat "$ST_DIR/said.txt")"
   fi
   st_stop
+  NS_PLAIN_FIRST=10
+
+  hdr "Self-test — the rendered check, judged per host (#597)"
+  # The checker's own judgement of the hosts a site still asks, with no
+  # browser: an expected failure is never a pass, and one that stopped is a
+  # failure that says to shorten the list.
+  if node "$SCRIPT_REPO/browser-checks/lib/test_expected_failures.mjs" >"$ST_DIR/expected.txt" 2>&1; then
+    ok "the own-host row's expected failures: $(grep -c '^OK: ' "$ST_DIR/expected.txt") cases, a listed host expected and never allowed on a deployed site, one no page asks reported (browser-checks/lib/test_expected_failures.mjs)"
+  else
+    no "the own-host row's expected failures: $(grep -v '^OK: ' "$ST_DIR/expected.txt" | head -3)"
+  fi
+  # A site whose fixture pages answer 200, or 404 for one of them for the
+  # first K requests; and a stub in the checker's place that says what its
+  # plan says, call by call, and writes down how it was called.
+  cat >"$ST_DIR/pages.py" <<'STUB'
+import http.server, os, pathlib, sys
+portfile, mode = sys.argv[1:3]
+kind, _, limit = mode.partition(":")
+seen = {"n": 0}
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path == "/Rendered-Check/Quiz" and kind == "404":
+            n = seen["n"]; seen["n"] = n + 1
+            if limit == "inf" or n < int(limit):
+                body = b"Not Found\n"
+                self.send_response(404); self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+                return
+        body = b"<html><body>a rendered check page</body></html>"
+        self.send_response(200); self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+STUB
+  cat >"$ST_DIR/checker.py" <<'STUB'
+import os, pathlib, sys
+plan = pathlib.Path(sys.argv[1])
+count = plan / "calls"
+n = int(count.read_text()) + 1 if count.exists() else 1
+count.write_text(str(n))
+with open(plan / "args.log", "a") as log:
+    log.write(f"{n}\t{os.environ.get('PLANTOIR_REQUIRE_ENGINES', '')}\t{' '.join(sys.argv[2:])}\n")
+step = n if (plan / f"{n}.out").exists() else max(int(p.stem) for p in plan.glob("*.out"))
+sys.stdout.write((plan / f"{step}.out").read_text())
+sys.exit(int((plan / f"{step}.rc").read_text()))
+STUB
+  ps_start() {  # ps_start <mode>: good or 404:K
+    rm -f "$ST_DIR/pport"
+    python3 -I "$ST_DIR/pages.py" "$ST_DIR/pport" "$1" &
+    STUB_PID=$!
+    for _ in $(seq 1 100); do [ -s "$ST_DIR/pport" ] && break; sleep 0.1; done
+    PS_URL="http://127.0.0.1:$(cat "$ST_DIR/pport" 2>/dev/null)/"
+  }
+  # plan_step <n> <exit> <lines...>: what the stub checker says on call n.
+  plan_step() {
+    local n="$1" rc="$2"; shift 2
+    mkdir -p "$ST_DIR/plan"
+    printf '%s\n' "$@" >"$ST_DIR/plan/$n.out"
+    printf '%s' "$rc" >"$ST_DIR/plan/$n.rc"
+  }
+  plan_reset() { rm -rf "$ST_DIR/plan"; mkdir -p "$ST_DIR/plan"; }
+  GOOD_LINES=("OK: mermaid [chromium]: 1 diagram(s) drawn" "OK: mermaid [webkit]: 1 diagram(s) drawn"
+    "EXPECTED: own host [chromium]: asked fonts.googleapis.com on 11 of 11 pages (…): an expected failure until #566 removes it"
+    "EXPECTED: own host [webkit]: asked fonts.googleapis.com on 11 of 11 pages (…): an expected failure until #566 removes it"
+    "OK: cold visit [webkit]: first contentful paint after a cold visit or a real press, five samples a route: typed cold: 270 ms"
+    "DONE: 41 OK, 0 FAIL, 0 SKIPPED, 2 EXPECTED in 70 s (stub; ran in chromium and webkit)")
+  # rs_run: the real rendered section over RS_TARGETS, then its Result lines.
+  rs_run() {
+    ( MEASURED=(); NS_LEG=0; RENDER_RESULTS=(); RENDER_EXPECTED=()
+      RENDER_TARGETS=(${RS_TARGETS[@]+"${RS_TARGETS[@]}"})
+      RENDERED_CHECKER=(python3 -I "$ST_DIR/checker.py" "$ST_DIR/plan")
+      RENDER_WHY_cloudflare="no Cloudflare token or account ID in the Keychain"
+      run_rendered_section
+      print_rendered_result
+      for line in ${MEASURED[@]+"${MEASURED[@]}"}; do printf 'MEASURED %s\n' "$line"; done ) 2>"$ST_DIR/said.txt"
+  }
+  WORK="$ST_DIR/work"; mkdir -p "$WORK"
+  FIRST_PUBLISH=false; NS_PLAIN_FIRST=1; NS_POLL=1; NS_WAIT=4; NS_CALL_WAIT=60
+
+  ps_start good
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0" "cloudflare|$PS_URL|0")
+  out=$(rs_run)
+  if [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 0 ] \
+     && [ "$(printf '%s\n' "$out" | grep -c "✅ .*, rendered in Chrome and in Safari's engine: 41 OK")" -eq 2 ] \
+     && printf '%s\n' "$out" | grep -q '^    Netlify: checked - 41 OK' && printf '%s\n' "$out" | grep -q '^    Cloudflare Pages: checked - 41 OK' \
+     && printf '%s\n' "$out" | grep -q 'Expected failures, which #566 removes .*: 4$' \
+     && printf '%s\n' "$out" | grep -q '^MEASURED Netlify, cold visits in Safari' \
+     && [ "$(awk -F '\t' '$2 == "chromium,webkit"' "$ST_DIR/plan/args.log" | wc -l | tr -d ' ')" -eq 2 ] \
+     && grep -q -- "--host netlify" "$ST_DIR/plan/args.log" && grep -q -- "--host cloudflare" "$ST_DIR/plan/args.log"; then
+    ok "both hosts reached and rendered: each 'checked', both engines required of the checker, the four expected failures counted and the cold visits measured"
+  else
+    no "both hosts rendered: $(printf '%s\n' "$out" | grep -E '❌|checked|Expected' | head -4) args: $(head -2 "$ST_DIR/plan/args.log")"
+  fi
+
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|2" "cloudflare|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q '^    Netlify: FAILED before the browser check (2 failure(s) in its publish leg, above); the rendered check then passed' \
+     && ! printf '%s\n' "$out" | grep -q '^    Netlify: checked'; then
+    ok "a Netlify leg that failed before the browser check reads as FAILED in the Result block, though the browsers passed, never as checked"
+  else
+    no "a leg that failed first: $(printf '%s\n' "$out" | grep 'Netlify:' | head -2)"
+  fi
+
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Cloudflare Pages: NOT REACHED, so the rendered check did not run on it (no Cloudflare token or account ID in the Keychain)" \
+     && printf '%s\n' "$out" | grep -q '^    Cloudflare Pages: NOT REACHED' && [ "$(cat "$ST_DIR/plan/calls")" -eq 1 ]; then
+    ok "a host on the list that never gave an address is a failure by name, NOT REACHED, and the checker ran for the other host only"
+  else
+    no "a host not reached: $(printf '%s\n' "$out" | grep -i 'cloudflare' | head -2)"
+  fi
+
+  plan_reset; plan_step 1 3 "SKIPPED: engine [webkit]: Safari's engine is not here" "OK: mermaid [chromium]: drawn" "DONE: 20 OK, 0 FAIL, 1 SKIPPED in 30 s (stub; ran in chromium; NOT run in webkit)"
+  RS_TARGETS=("netlify|$PS_URL|0" "cloudflare|$PS_URL|0")
+  out=$(rs_run)
+  if [ "$(printf '%s\n' "$out" | grep -c "❌ .*, rendered: a row or an engine was SKIPPED, and a release run skips nothing")" -eq 2 ] \
+     && ! printf '%s\n' "$out" | grep -q 'checked -' && [ "$(cat "$ST_DIR/plan/calls")" -eq 4 ]; then
+    ok "a checker that SKIPPED an engine fails each host (asked twice each), never a pass"
+  else
+    no "a skipped engine: $(printf '%s\n' "$out" | grep -E '❌|checked' | head -3), calls $(cat "$ST_DIR/plan/calls")"
+  fi
+
+  plan_reset
+  plan_step 1 1 "FAIL: geogebra [webkit]: the file sketch did not open" "DONE: 40 OK, 1 FAIL, 0 SKIPPED in 70 s (stub)"
+  plan_step 2 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "✅ Netlify, rendered in Chrome and in Safari's engine: 41 OK.*(answered on retry: geogebra \[webkit\])" \
+     && printf '%s\n' "$out" | grep -q 'first: FAIL: geogebra \[webkit\]' \
+     && printf '%s\n' "$out" | grep -q '^MEASURED Netlify, the rendered check (#597): answered on retry (#762), the whole check run twice: geogebra \[webkit\]'; then
+    ok "a row that fails at first and passes when the check is run once more: passed, its first failure printed, and counted as answered on retry by name"
+  else
+    no "a row answered on retry: $(printf '%s\n' "$out" | grep -E '✅|❌|MEASURED|first:' | head -4)"
+  fi
+
+  plan_reset
+  plan_step 1 1 "EXPECTED: own host [chromium]: asked fonts.googleapis.com on 11 of 11 pages" "FAIL: own host, an expected failure that stopped [chromium]: no page asked cdnjs.cloudflare.com any more: take it off rendered_rows.json -> thirdPartyHostsToday" "DONE: 41 OK, 1 FAIL, 0 SKIPPED, 1 EXPECTED in 70 s (stub)"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify, rendered: a row FAILED" \
+     && printf '%s\n' "$out" | grep -q '^       FAIL: own host, an expected failure that stopped \[chromium\]: no page asked cdnjs.cloudflare.com' \
+     && printf '%s\n' "$out" | grep -q '^    Netlify: FAILED'; then
+    ok "an expected failure that stopped failing is a failure, said under the host with the list to shorten"
+  else
+    no "an expected failure that stopped: $(printf '%s\n' "$out" | grep -E '❌|stopped|Netlify:' | head -3)"
+  fi
+  st_stop
+
+  ps_start 404:2
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "✅ Netlify serves the rendered check's 11 pages (HTTP 200)" \
+     && printf '%s\n' "$out" | grep -q "^MEASURED Netlify, answered on retry (#762), the rendered check's pages: 1 page(s) needed asking again, 2 retries in all" \
+     && grep -q 'Rendered-Check/Quiz needed 2 retries' "$ST_DIR/said.txt"; then
+    ok "a fixture page that answers 404 twice is asked again before the browsers, the way the files are, and counted"
+  else
+    no "a fixture page asked again: $(printf '%s\n' "$out" | grep -E "pages|MEASURED" | head -3) said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+  ps_start 404:inf
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify: 1 of the rendered check's 11 pages did not answer 200" \
+     && printf '%s\n' "$out" | grep -q 'Rendered-Check/Quiz answered HTTP 404'; then
+    ok "a fixture page that never answers is a failure that names it"
+  else
+    no "a fixture page that never answers: $(printf '%s\n' "$out" | grep -E "pages|Quiz" | head -3)"
+  fi
+  st_stop
+  NS_PLAIN_FIRST=10
 
   hdr "Result"
   echo "  $PASS passed, $FAIL failed, $SKIP skipped"
@@ -1252,6 +1665,12 @@ restore_what_was_borrowed() {
   if [ -f "$RUNNER_PAGE" ]; then
     rm -f "$RUNNER_PAGE" && echo "  ↩︎  took the borrowed page of runnable code away"
   fi
+  # The rendered check's pages (#597): only the folder that carries
+  # plant_rendered.py's own marker is ever taken away.
+  if [ -f "$WORKING_FOLDER/courses/$COURSE/Rendered Check/.plantoir-rendered-check" ]; then
+    python3 -B "$SCRIPT_REPO/browser-checks/lib/plant_rendered.py" remove "$WORKING_FOLDER/courses/$COURSE" >/dev/null 2>&1 \
+      && echo "  ↩︎  took the rendered check's pages away"
+  fi
   if [ -f "$STASHED_INDEX" ]; then
     mv -f "$STASHED_INDEX" "$WORKING_FOLDER/courses/$COURSE/section$SECTION/index.md" 2>/dev/null \
       && echo "  ↩︎  put the section's front page back"
@@ -1290,12 +1709,12 @@ ok "the course's own settings saved, and restored on any exit"
 HAVE_NETLIFY=false; HAVE_CLOUDFLARE=false
 security find-generic-password -s "containerized-quartz-netlify" -w >/dev/null 2>&1 \
   && { HAVE_NETLIFY=true; ok "Netlify token present"; } \
-  || skip "no Netlify token — Netlify cases will be skipped, not failed"
+  || skip "no Netlify token — Netlify cases will be skipped, and the rendered check fails Netlify as not reached (#597)"
 if security find-generic-password -s "containerized-quartz-cloudflare" -w >/dev/null 2>&1 \
    && security find-generic-password -s "containerized-quartz-cloudflare-account" -w >/dev/null 2>&1; then
   HAVE_CLOUDFLARE=true; ok "Cloudflare token and account ID present"
 else
-  skip "no Cloudflare credentials — Cloudflare cases will be skipped, not failed"
+  skip "no Cloudflare credentials — Cloudflare cases will be skipped, and the rendered check fails Cloudflare as not reached (#597)"
 fi
 CF_ACCOUNT=$(security find-generic-password -s "containerized-quartz-cloudflare-account" -w 2>/dev/null || echo "")
 
@@ -1588,6 +2007,14 @@ RUNNERPAGE
 # one before it, when nothing else in the built site differs.
 printf '\nThis run: %s.\n' "$RUN_MARK" >>"$RUNNER_PAGE"
 ok "a page of runnable code borrowed into section $SECTION (removed on any exit)"
+# The rendered check's pages (#597), the same ones verify.sh plants into
+# EXC2O, planted as the course's shared folder `Rendered Check/` so every
+# destination carries them; removed on any exit (restore_what_was_borrowed).
+if python3 -B "$SCRIPT_REPO/browser-checks/lib/plant_rendered.py" plant "$WORKING_FOLDER/courses/$COURSE" >"$WORK/plant-rendered.log" 2>&1; then
+  ok "the rendered check's pages planted in $COURSE (removed on any exit): $(sed 's/^plant_rendered: //' "$WORK/plant-rendered.log")"
+else
+  no "the rendered check's pages could not be planted, so the rendered check will find nothing: $(cat "$WORK/plant-rendered.log")"
+fi
 # A changed recipe means a new image, and patches that run only when Quartz's
 # scaffold is first copied: so the section is rebuilt from scratch, in the
 # foreground, BEFORE the serve below starts its ten-minute announce wait (an
@@ -1686,6 +2113,7 @@ check_no_marker_folder "folder" "$FOLDER_TARGET/section$SECTION"
 
 hdr "Destination 2 of 3 — Netlify"
 if [ "$HAVE_NETLIFY" = true ]; then
+  LEG_FAIL_START=$FAIL
   set_destination "netlify" "" ""
   : >"$WORK/deploy-netlify.log"
   measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" --target netlify \
@@ -1695,12 +2123,15 @@ if [ "$HAVE_NETLIFY" = true ]; then
   [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" || no "no Netlify address in the output"
   [ -n "$NETLIFY_URL" ] && check_engine "Netlify" "$NETLIFY_URL/"
   [ -n "$NETLIFY_URL" ] && check_page_links "Netlify" "$NETLIFY_URL/" netlify
+  render_target netlify "$NETLIFY_URL" "$LEG_FAIL_START"
 else
   skip "Netlify (no token)"
+  render_target netlify "" 0 "no Netlify token in the Keychain"
 fi
 
 hdr "Destination 3 of 3 — Cloudflare Pages"
 if [ "$HAVE_CLOUDFLARE" = true ]; then
+  LEG_FAIL_START=$FAIL
   set_destination "cloudflare_pages" "" ""
   : >"$WORK/deploy-cloudflare.log"
   measure_deploy "Cloudflare, first publish with the engine" "$WORK/deploy-cloudflare.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
@@ -1713,9 +2144,18 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
   [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
   [ -n "$CF_URL" ] && check_page_links "Cloudflare Pages" "$CF_URL/" cloudflare
+  render_target cloudflare "$CF_URL" "$LEG_FAIL_START"
 else
   skip "Cloudflare (no credentials)"
+  render_target cloudflare "" 0 "no Cloudflare token or account ID in the Keychain"
 fi
+
+# ------------------------------------- rendered in two browsers, per host (#597)
+# Right after the destinations, while each host still serves this run's own
+# deployment of the section (the pairings below re-deploy the same sites, so
+# the rendered check runs once per host, not once per pairing).
+hdr "Rendered in Chrome and in Safari's engine, on every host (#597)"
+run_rendered_section
 
 # ------------------------------------------- sharing unit plans (#709)
 # The course's unit plans shared through deploy.sh --plans, for real, then
@@ -2072,10 +2512,11 @@ delete_sites_made
 
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
+print_rendered_result
 echo "  recipe: this checkout at $RECIPE_COMMIT$( [ "$RECIPE_DIRTY" -gt 0 ] && echo " with $RECIPE_DIRTY uncommitted change(s)" || echo ", clean"); $RECIPE_CHANGED difference(s) mirrored into the folder"
 if [ "${#MEASURED[@]}" -gt 0 ]; then
   echo
-  echo "  Publishing a site that carries the Python engine (#455), and Cloudflare's switch to it (#665), measured:"
+  echo "  Measured: publishing a site that carries the Python engine (#455), Cloudflare's switch to it (#665), what was asked again (#740, #869, #762), and the cold visits (#625):"
   for line in "${MEASURED[@]}"; do echo "    $line"; done
 fi
 echo

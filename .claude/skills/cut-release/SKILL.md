@@ -35,6 +35,12 @@ picture cannot show.
    section (only what shipped, on a one-platform cut), update the "Last
    updated" line and current release number, and check its issue numbers
    against the open milestones (`RELEASING.md` → "Trim the roadmap").
+2c. **The deployed sites, rendered (#597).** Every cut's `./verify-deploy.sh`
+   runs (both the `--first-publish` and the plain run, `RELEASING.md` step 2)
+   end with "Rendered in Chrome and in Safari's engine, per host": both lines
+   must say `checked`, never `FAILED` or `NOT REACHED`. Paste those lines,
+   the expected-failure count (what #566 removes) and any "answered on
+   retry" lines into the release's record, beside the gate's totals.
 3. The bundle(s) to attach:
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer mac-app/publish.sh -Sign`
      — name the Xcode: `xcode-select` points at 27.0 here, and releases are built with 26.6.
