@@ -411,6 +411,9 @@ nonisolated enum ActivityTrail {
         /// Named for the OUTCOME rather than for today's single cause, the way
         /// `folderProblemNotRepaired` is: a second reason a copy is not made
         /// joins this line rather than earning a rename on both platforms.
+        /// The second arrived with #897: Section ▸ Duplicate as Next Class…
+        /// reads its copy back before writing anything, and when the copy
+        /// cannot be made certainly hidden it writes nothing and says so here.
         case classCopyNotMade = "class copy not made"
 
         /// A teacher copied one or more pages out of one course and into
@@ -1419,7 +1422,8 @@ nonisolated enum ActivityTrail {
         /// One of the assistant's functions run from the Section menu or a
         /// section's context menu (#457 batch B) — Publish Pages…, Hide
         /// Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
-        /// Change, Add Next Class, Re-date Classes…, Make Room for Classes…,
+        /// Change, Add Next Class, Add Next Class in a New Unit, Duplicate as
+        /// Next Class… (#897), Re-date Classes…, Make Room for Classes…,
         /// Class Dates… — and Help ▸ Publishing and Deploying…. Carries where
         /// it is in the menus, how it ended (carried out, changed nothing,
         /// cancelled at the plan, rebuilt or not) and counts — never a page's

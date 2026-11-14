@@ -6010,5 +6010,177 @@
         "windows"
       ]
     }
+  },
+  "duplicatingAsTheNextClass": {
+    "note": "GitHub #897 (Russell, 2026-11-13 evening, by dialog). Section > Duplicate as Next Class... copies one of THIS section's class pages and the copy becomes the section's NEXT class: the page Add Next Class would make (NextClassPlanner: the highest unit's next day, or a club's next number, dated by the same rule), with the source's words, hidden. Nothing else is renamed, re-dated or rewritten, so the one created file is the whole change and one undo takes it away. The built-in assistant's own duplicate is NOT this: \"Duplicate Unit 3, Day 2 as my next class\" in its window still puts the copy on the source's next day and moves later classes (the duplication block above, unchanged), because the assistant's behaviour is not changed (the 19:30 ruling on #897). The menu reaches this behaviour through an argument only the menu surface reads (the mac's AssistToolRunner.menuDuplicateFileArgument, duplicateFileFromTheMenu), naming the source by its PATH inside the course folder, .md included. The mac runs these cases in DuplicateAsNextClassTests.testTheMenusDuplicateMatchesTheContract; Windows owes the same reading in its own runner (the windows issue for #897a).",
+    "rule": "The source is named by FILE and must be one of the section's class pages (any page in its class folders, numbered or not); anything else is refused before anything is written, in the menu's words. The copy takes the next class's title and date, its per-section keys are removed BEFORE its plain date and publish flag are written, and it is read back: it is written only when it reads hidden, and it is written without overwriting. One undo entry, with no 'before', so undoing it deletes the copy.",
+    "why": "By file, because a lookup by title answers the first page in path order, and a course-level 'Concepts/Unit 2, Day 3' sorts before 'section1/All Classes/Unit 2, Day 3': the course-level page was copied and the answer said Duplicated, a fault that reports success. At the end, because Russell ruled it: right after the source shifts the rest of the year, and that shuffle has no whole undo. Read back BEFORE writing, because the assistant's order (write a blank page, then fill it) leaves a hidden blank page with no undo entry when the read-back fails.",
+    "rejected": [
+      "Sending the folder-qualified name through the existing 'duplicate' argument: AssistSectionGraph.page(titled:) strips everything before the last '/', so it silently falls back to the first page of that title (the plan review, 2026-11-13).",
+      "Changing the existing 'duplicate' argument to put the copy at the end: that is the built-in assistant's behaviour, which is frozen.",
+      "Offering pages from other sections, or course-level pages: Russell ruled this section's classes only.",
+      "Numbered classes only: numbering was needed only to compute 'the source's day plus one' for the insertion the ruling rejected (the plan review's amendment 8)."
+    ],
+    "cases": [
+      {
+        "name": "the copy is the section's next class, and nothing else moves",
+        "existingClasses": [
+          {
+            "title": "Unit 1, Day 1",
+            "date": "2026-09-08"
+          },
+          {
+            "title": "Unit 1, Day 2",
+            "date": "2026-09-10"
+          },
+          {
+            "title": "Unit 2, Day 1",
+            "date": "2026-09-12"
+          }
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10",
+          "2026-09-12",
+          "2026-09-14",
+          "2026-09-16"
+        ],
+        "source": "section1/All Classes/Unit 1, Day 1.md",
+        "expectNewTitle": "Unit 2, Day 2",
+        "expectDate": "2026-09-14",
+        "expectCopyOf": "Unit 1, Day 1",
+        "expectHidden": true,
+        "expectUndoEntries": 1,
+        "why": "The ruling's own words: pick a class, it becomes the next class. The assistant's duplicate of the same source would have made Unit 1, Day 2 and renamed the old Day 2, which is exactly what the menu does not do."
+      },
+      {
+        "name": "a course-level page with the same title is not the source",
+        "existingClasses": [
+          {
+            "title": "Unit 2, Day 3",
+            "date": "2026-09-08"
+          }
+        ],
+        "otherPages": [
+          {
+            "path": "Concepts/Unit 2, Day 3.md",
+            "words": "the course-level notes"
+          }
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10",
+          "2026-09-12"
+        ],
+        "source": "section1/All Classes/Unit 2, Day 3.md",
+        "expectNewTitle": "Unit 2, Day 4",
+        "expectDate": "2026-09-10",
+        "expectCopyOf": "Unit 2, Day 3",
+        "expectNotCopied": "the course-level notes",
+        "expectHidden": true,
+        "expectUndoEntries": 1,
+        "why": "The fault that reported success. 'concepts/...' sorts before 'section1/...', so a title lookup copied the course-level page."
+      },
+      {
+        "name": "a class page with no numbers in its name can be duplicated",
+        "existingClasses": [
+          {
+            "title": "Unit 1, Day 1",
+            "date": "2026-09-08"
+          },
+          {
+            "title": "Field Trip",
+            "date": "2026-09-10"
+          }
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10",
+          "2026-09-12"
+        ],
+        "source": "section1/All Classes/Field Trip.md",
+        "expectNewTitle": "Unit 1, Day 2",
+        "expectDate": "2026-09-12",
+        "expectCopyOf": "Field Trip",
+        "expectHidden": true,
+        "expectUndoEntries": 1,
+        "why": "The next class is named by the section's numbered pages, as Add Next Class names it; the source's own name plays no part, so it need not be numbered. Dated by position: two class pages, so the third date."
+      },
+      {
+        "scheme": "numbered",
+        "word": "Week",
+        "name": "a numbered course's copy is its next number",
+        "existingClasses": [
+          {
+            "title": "Week 1",
+            "date": "2026-09-08"
+          },
+          {
+            "title": "Week 2",
+            "date": "2026-09-10"
+          }
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10",
+          "2026-09-14",
+          "2026-09-16"
+        ],
+        "source": "section1/All Classes/Week 1.md",
+        "expectNewTitle": "Week 3",
+        "expectDate": "2026-09-14",
+        "expectCopyOf": "Week 1",
+        "expectHidden": true,
+        "expectUndoEntries": 1,
+        "why": "A club (#267): the next number, dated for the first class day after the latest dated meeting, as Add Next Class dates it."
+      },
+      {
+        "name": "a source carrying a per-section publish key still gives a hidden copy",
+        "existingClasses": [
+          {
+            "title": "Unit 1, Day 1",
+            "date": "2026-09-08"
+          }
+        ],
+        "sourceExtraLines": [
+          "publishForSection1: true"
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10"
+        ],
+        "source": "section1/All Classes/Unit 1, Day 1.md",
+        "expectNewTitle": "Unit 1, Day 2",
+        "expectDate": "2026-09-10",
+        "expectCopyOf": "Unit 1, Day 1",
+        "expectHidden": true,
+        "expectUndoEntries": 1,
+        "why": "The build resolves publishForSection<N> over publish, so an inherited 'true' would make the copy visible while its own file read 'publish: false'. The key comes out before the flag is written."
+      },
+      {
+        "name": "a page outside this section's class folders is refused, and nothing is written",
+        "existingClasses": [
+          {
+            "title": "Unit 2, Day 3",
+            "date": "2026-09-08"
+          }
+        ],
+        "otherPages": [
+          {
+            "path": "Concepts/Unit 2, Day 3.md",
+            "words": "the course-level notes"
+          }
+        ],
+        "timetable": [
+          "2026-09-08",
+          "2026-09-10"
+        ],
+        "source": "Concepts/Unit 2, Day 3.md",
+        "expectRefused": "wording.noPageCalledFromTheMenu",
+        "expectNothingWritten": true,
+        "expectUndoEntries": 0,
+        "why": "This section's classes only (Russell's ruling). The sheet never offers such a page; the runner refuses it anyway, before anything is written."
+      }
+    ]
   }
 }
