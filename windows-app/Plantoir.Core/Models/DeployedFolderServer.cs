@@ -344,12 +344,16 @@ public sealed class DeployedFolderServer : IDisposable
                 if (Parse(lines) is not { } parsed) { await AnswerAndClose(connection, 400); return; }
 
                 Interlocked.Increment(ref _requests);
-                if (!_resolver.FolderIsThere() && Interlocked.Exchange(ref _folderGoneReported, 1) == 0)
-                    _onFolderGone?.Invoke();
+                bool folderGone = !_resolver.FolderIsThere() && Interlocked.Exchange(ref _folderGoneReported, 1) == 0;
                 using var answer = _resolver.Answer(parsed.Request, Port);
                 if (answer.Status == 404) Interlocked.Increment(ref _notFound);
                 if (!parsed.KeepsAlive) answer.ClosesTheConnection = true;
-                if (!await Send(connection, answer)) { connection.Reset(); return; }
+                bool sent = await Send(connection, answer);
+                // Told AFTER the answer has gone: the show it ends stops this
+                // server, which would otherwise reset the very connection the
+                // browser is waiting on (found by ARequestThatFindsTheFolderGoneStopsItUntilDismissed).
+                if (folderGone && _onFolderGone is { } gone) _ = Task.Run(gone);
+                if (!sent) { connection.Reset(); return; }
                 if (answer.ClosesTheConnection) { await connection.CloseAfterAnswerAsync(); return; }
 
                 if (buffer.Count == 0)

@@ -256,6 +256,8 @@ public sealed class DeployedFolderServerTests : IDisposable
         Directory.Delete(_root, recursive: true);
         Assert.Equal(404, Exchange(server.Port, Get("/", server.Port), false, TimeSpan.Zero).Status);
         Assert.Equal(404, Exchange(server.Port, Get("/", server.Port), false, TimeSpan.Zero).Status);
+        WaitFor(() => Volatile.Read(ref gone) == 1, TimeSpan.FromSeconds(5));
+        Thread.Sleep(200);
         Assert.Equal(1, gone);
         Assert.Equal(3, server.Requests);
         Assert.Equal(2, server.NotFound);
