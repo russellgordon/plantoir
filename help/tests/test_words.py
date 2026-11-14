@@ -190,5 +190,63 @@ class WordCheckTests(unittest.TestCase):
         self.assertIn("help/outline.json (second-look):1: tone: 'seamlessly'", output)
 
 
+class MachineWordTests(unittest.TestCase):
+    """#898: the reader's computer is {{machine}}, never a typed "Mac"."""
+
+    def setUp(self) -> None:
+        self.fixture = Fixture()
+
+    def tearDown(self) -> None:
+        self.fixture.close()
+
+    REFUSAL = 'says "Mac": write {{machine}}'
+
+    def test_a_bare_mac_in_a_paragraph_is_refused(self) -> None:
+        self.fixture.page("second-look", "The files stay on this Mac.\n")
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("help/pages/second-look.md", output)
+        self.assertIn(self.REFUSAL, output)
+
+    def test_a_bare_mac_in_a_heading_a_description_and_an_alt_line_is_refused(self) -> None:
+        self.fixture.page("second-look", "## On this Mac\n\nWords.\n")
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn(self.REFUSAL, output)
+        self.fixture.page("second-look", "Words.\n")
+        self.fixture.replace("help/pages/second-look.md", "description: ", "description: On a Mac. ")
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn(self.REFUSAL, output)
+
+    def test_the_token_a_mac_run_and_product_names_pass(self) -> None:
+        self.fixture.page(
+            "second-look",
+            "The files stay on this {{machine}}. macOS asks first, on a MacBook too.\n\n"
+            "{{mac}}\nOn a Mac, the lid must be open.\n{{/mac}}\n",
+        )
+        code, output = self.fixture.run("--check")
+        self.assertEqual(code, 0, output)
+        self.assertNotIn(self.REFUSAL, output)
+
+    def test_the_token_is_filled_with_mac_in_both_copies_and_in_a_description(self) -> None:
+        self.fixture.page("second-look", "The files stay on this {{machine}}.\n")
+        self.fixture.replace("help/pages/second-look.md", "description: ", "description: Kept on this {{machine}}. ")
+        out = self.fixture.path("out-web")
+        code, output = self.fixture.run("--web", str(out))
+        self.assertEqual(code, 0, output)
+        page = (out / "second-look.html").read_text(encoding="utf-8")
+        self.assertIn("The files stay on this Mac.", page)
+        self.assertIn("Kept on this Mac.", page)
+        self.assertNotIn("{{machine}}", page)
+
+    def test_a_windows_passage_is_filled_with_pc(self) -> None:
+        from helpbook.tokens import fill_machine, machine_word
+
+        self.assertEqual(machine_word("windows"), "PC")
+        self.assertEqual(machine_word("mac"), "Mac")
+        self.assertEqual(fill_machine("on this {{machine}}", "windows"), "on this PC")
+
+
 if __name__ == "__main__":
     unittest.main()

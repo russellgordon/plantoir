@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Set, Tuple
 
 from .markdown import readable_inline, walk_blocks
 from .render import HelpSource, Page
+from .tokens import MACHINE_TOKEN
 
 SCENE_FIELDS = ["page", "shows", "labels", "expectText", "awaiting_capture", "waiting_on", "setup", "windows", "raw"]
 REQUIRED_SCENE_FIELDS = ["page", "shows", "labels", "awaiting_capture", "setup"]
@@ -144,7 +145,8 @@ def check_tone_file(source: HelpSource) -> None:
 # MARK: what a reader reads
 
 def readable_texts(
-    source: HelpSource, page: Page, include_names: bool = True, skip_runs: Tuple[str, ...] = ()
+    source: HelpSource, page: Page, include_names: bool = True, skip_runs: Tuple[str, ...] = (),
+    include_scenes: bool = True,
 ) -> List[Tuple[int, str]]:
     """Every piece of text a reader reads on the page, with its line.
 
@@ -158,7 +160,8 @@ def readable_texts(
         texts.append((1, page.question))
     if page.is_stub:
         return texts
-    texts.append((1, str(page.fields.get("description", ""))))
+    # A description takes one token, {{machine}}; it is blanked like any other.
+    texts.append((1, str(page.fields.get("description", "")).replace(MACHINE_TOKEN, "computer")))
     if include_names:
         for keyword in page.keywords:
             texts.append((1, keyword))
@@ -187,7 +190,7 @@ def readable_texts(
         elif kind == "picture":
             texts.append((block["line"], readable_inline(block["alt"])))
             scene = source.registries.scenes.get(block["scene"])
-            if scene is not None:
+            if scene is not None and include_scenes:
                 texts.append((block["line"], str(scene.get("shows", ""))))
                 for label in scene.get("labels", []):
                     texts.append((block["line"], str(label)))
@@ -214,6 +217,43 @@ def check_words(source: HelpSource) -> None:
         file: str = source.page_file_label(page)
         for line, text in readable_texts(source, page):
             source.words.check(page.id, file, line, text, source.problems)
+
+
+# MARK: the reader's computer is {{machine}}
+
+BARE_MAC = re.compile(r"\bMac\b")
+
+
+def check_machine_word(source: HelpSource) -> None:
+    """A page's prose never says "Mac" (#898): the same pages are built for
+    Windows, where the reader's computer is a PC. Write {{machine}}, or put a
+    passage that is true only on a Mac in a {{mac}} ... {{/mac}} run, where the
+    word is allowed. Read: the description, headings, paragraphs, list items,
+    table cells and alt lines, with tokens and code blanked, so a label or a
+    sentence the app shows ("A folder on this Mac") is never refused. Not read:
+    keywords (a teacher may type the word), the outline's titles and questions,
+    and scenes.json. Product names pass by themselves: the pattern is the whole
+    word with its capital, so macOS and MacBook do not match. A tone.json
+    exemption (an exact phrase, scoped to pages) covers any other name."""
+    pages: List[Page] = list(source.pages)
+    if source.intro is not None:
+        pages.append(source.intro)
+    for page in pages:
+        if page.is_stub:
+            continue
+        file: str = source.page_file_label(page)
+        texts: List[Tuple[int, str]] = readable_texts(
+            source, page, include_names=False, skip_runs=("mac",), include_scenes=False
+        )
+        for block in walk_blocks(page.blocks, ("mac",)):
+            if block["kind"] == "heading":
+                texts.append((block["line"], readable_inline(block["text"])))
+        for line, text in texts:
+            if BARE_MAC.search(source.words._exempt(page.id, text)) is not None:
+                source.problems.fail(
+                    file, line,
+                    'says "Mac": write {{machine}}, or put what is true only on a Mac in a {{mac}} run (#898)',
+                )
 
 
 # MARK: contract sentences typed by hand
@@ -339,4 +379,5 @@ def run_structural_checks(source: HelpSource) -> None:
     check_tone_file(source)
     check_withheld_file(source)
     check_words(source)
+    check_machine_word(source)
     check_contract_sentences(source)

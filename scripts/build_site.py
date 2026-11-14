@@ -1223,8 +1223,8 @@ def stop_preview_serving(output_dir: Path) -> int:
 # stops in words before it builds, rather than stopping that preview. A
 # claim is a small file in the builder's temporary folder naming the
 # claiming build's process, WHEN that process started, and its course and
-# section. It is released when that build ends (normally, by Stop's SIGINT,
-# or by SIGTERM or SIGHUP, which are turned into an ordinary exit).
+# section. It is released when that build ends (normally, on Cancel's SIGINT,
+# or on Stop's SIGTERM or a SIGHUP, which are turned into an ordinary exit).
 #
 # A claim counts only when it PROVES its holder is still that run: the
 # process id is alive AND started at the moment the claim recorded. The id
