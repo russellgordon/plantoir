@@ -142,7 +142,7 @@
       {
         "carries": "the destination and how many class websites the new token could not reach. Never which ones by name or address.",
         "event": "old deploy token kept in Settings",
-        "line": "Settings \u25b8 Deploying \u2014 kept the old Netlify token: the new one cannot reach 2 class website(s)",
+        "line": "Settings \u25b8 Deploying \u2014 kept the old Netlify token, because the new one cannot reach 2 class website(s)",
         "why": "GitHub #696, the second ruling (Russell, 2026-11-13): a pasted token that cannot reach the course's existing sites is checked before saving and the teacher is offered to keep the old one. This line says they did, so a later 'my new token never took' is not read as a fault."
       },
       {
@@ -26500,7 +26500,7 @@
       "problemUnheard": "Plantoir could not reach {service} to check that token, so nothing was changed. Check that this computer is online, then try again.",
       "problemSitesNotChecked": "Plantoir could not check that token against your class websites, so nothing was changed. Check that this computer is online, then try again.",
       "problemCouldNotSave": "{service} accepted that token, but it could not be saved on this {machine}. Nothing was changed.",
-      "problemAccountNotValid": "The Cloudflare Account ID above is not a whole ID, so the token was not checked or saved. Correct the Account ID first.",
+      "problemAccountNotValid": "The Cloudflare Account ID in Settings is not a whole ID, so the token was not checked or saved. Correct the Account ID first.",
       "problemNotAnswered": "Plantoir could not check that token just now, so nothing was changed. Try again.",
       "unreachableTitle": "That token cannot reach {count} of your class websites",
       "unreachableTitleOne": "That token cannot reach one of your class websites",
@@ -26526,7 +26526,7 @@
         "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
         "removed": "Settings ▸ Deploying — removed the {service} token",
         "refused": "Settings ▸ Deploying — a new {service} token was not saved: {problem}",
-        "keptOld": "Settings ▸ Deploying — kept the old {service} token: the new one cannot reach {count} class website(s)",
+        "keptOld": "Settings ▸ Deploying — kept the old {service} token, because the new one cannot reach {count} class website(s)",
         "endDateLearned": "The Cloudflare token's end date is now {date}, as {source} read it",
         "endDateNone": "The Cloudflare token has no end date, as {source} read it",
         "sourceSettings": "Settings ▸ Deploying",

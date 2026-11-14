@@ -50,6 +50,88 @@ final class DeployTokenTests: XCTestCase {
         XCTAssertEqual(lines, DeployTokenPanel.trailLines)
     }
 
+    /// Every trail line this piece writes reaches the disk as it was
+    /// written (the Fable sweep's F1). The trail is redacted on the way in,
+    /// so a line the redactor rewrites is a line the problem report carries
+    /// changed: the old keptOld line put a colon straight after "token",
+    /// lost its next word to the labelled-secret rule and read as if a
+    /// token had been written down. Each line is filled with realistic
+    /// invented values and handed to the redactor itself, so this follows
+    /// the redactor's rules as they change rather than restating them. The
+    /// five events' example lines in `activityTrail.mustRecord` are checked
+    /// the same way.
+    func testEveryTrailLineReachesTheDiskUnchanged() throws {
+        let shape: [String: Any] = try XCTUnwrap(try DeployTokenTests.section()["answerShape"] as? [String: Any])
+        let problemKeys: [String: String] = try XCTUnwrap(shape["problems"] as? [String: String])
+        var problems: [String] = ["notAnswered", "unheard", "refused", "notSent"]
+        for key in problemKeys.keys.sorted() {
+            problems.append(key)
+        }
+        let kinds: [DeployTokenPanel.TrailLine] = [.changed, .changedAnyway, .removed, .refused, .keptOld]
+        var filledLines: [String] = []
+        for destination in DeployTokenDestination.allCases {
+            for kind in kinds {
+                for problem in problems {
+                    for count in [1, 12] {
+                        let line: String = DeployTokenPanel.trailLine(
+                            kind, destination: destination, problem: problem, count: count
+                        )
+                        filledLines.append(line)
+                    }
+                }
+            }
+        }
+        let sources: [DeployTokenEndReport.Source] = [.settings, .deploy, .scheduledDeploy]
+        let endDates: [String?] = [
+            "2027-07-01T00:00:00Z",
+            "2027-07-01T04:00:00.000-04:00",
+            "2026-12-31T23:59:59.123456789+05:30",
+            nil,
+        ]
+        for source in sources {
+            for endsOn in endDates {
+                filledLines.append(DeployTokenEndReport.trailLine(endsOn: endsOn, source: source))
+            }
+        }
+
+        let contractURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: contractURL)) as? [String: Any]
+        )
+        let activityTrail: [String: Any] = try XCTUnwrap(all["activityTrail"] as? [String: Any])
+        let mustRecord: [[String: Any]] = try XCTUnwrap(activityTrail["mustRecord"] as? [[String: Any]])
+        let events: [ActivityTrail.Event] = [
+            .deployTokenChanged, .deployTokenRemoved, .deployTokenChangeRefused,
+            .deployTokenKeptOld, .deployTokenEndDateLearned,
+        ]
+        var eventNames: Set<String> = []
+        for event in events {
+            eventNames.insert(event.rawValue)
+        }
+        var examplesFound: Int = 0
+        for entry in mustRecord {
+            guard let event = entry["event"] as? String, eventNames.contains(event) else {
+                continue
+            }
+            let example: String = try XCTUnwrap(entry["line"] as? String, event)
+            filledLines.append(example)
+            examplesFound += 1
+        }
+        XCTAssertEqual(examplesFound, events.count, "each of the five events has its example line")
+
+        for line in filledLines {
+            XCTAssertFalse(line.contains("{"), "filled: \(line)")
+            XCTAssertEqual(LogRedactor.redacting(line), line, "the redactor rewrites this trail line")
+            XCTAssertEqual(
+                ProblemReportStore.safeTrailLine(line, keepingLineBreaks: false), line,
+                "the trail writer rewrites this trail line"
+            )
+        }
+    }
+
     func testEveryEndDateCase() throws {
         let endDate: [String: Any] = try XCTUnwrap(try DeployTokenTests.section()["endDate"] as? [String: Any])
         XCTAssertEqual(endDate["warningDays"] as? Int, DeployTokenEndDate.warningDays)
@@ -211,7 +293,7 @@ final class DeployTokenTests: XCTestCase {
         XCTAssertEqual(calls, 1, "nothing more is asked")
         XCTAssertFalse(panel.isShowingChange)
         XCTAssertNil(panel.useTheNewTokenAnyway(), "nothing is held after Keep")
-        XCTAssertTrue(trail().contains("kept the old Cloudflare token: the new one cannot reach 1 class website(s)"), trail())
+        XCTAssertTrue(trail().contains(DeployTokenPanel.trailLine(.keptOld, destination: .cloudflare, count: 1)), trail())
     }
 
     func testARefusedTokenKeepsTheSheetOpenWithItsReason() async throws {

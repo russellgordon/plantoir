@@ -112,7 +112,7 @@ final class DeployTokenPanel {
         "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
         "removed": "Settings ▸ Deploying — removed the {service} token",
         "refused": "Settings ▸ Deploying — a new {service} token was not saved: {problem}",
-        "keptOld": "Settings ▸ Deploying — kept the old {service} token: the new one cannot reach {count} class website(s)",
+        "keptOld": "Settings ▸ Deploying — kept the old {service} token, because the new one cannot reach {count} class website(s)",
         "endDateLearned": "The Cloudflare token's end date is now {date}, as {source} read it",
         "endDateNone": "The Cloudflare token has no end date, as {source} read it",
         "sourceSettings": "Settings ▸ Deploying",

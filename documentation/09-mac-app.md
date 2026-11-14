@@ -16714,17 +16714,19 @@ checked before it is saved (#696)"; the words are
   written into the launcher's standard input BEFORE it starts and the pipe
   closed, so a launcher that exits without reading it cannot make the write
   fail with a broken pipe.
-- **The status line** reads "Connected to Netlify." or, for Cloudflare with
-  an end date, "Connected to Cloudflare. The token ends on 30 June 2027."
-  (the instant's date in the Mac's time zone); under 30 days it says so in
-  orange. Refused, expired, turned off, cannot use the account above, could
+- **The status line** reads `statusConnected`, or for Cloudflare with an
+  end date `statusConnectedEndsOn` (the instant's date in the Mac's time
+  zone); under 30 days it is `statusConnectedEndsSoon`, in orange. Refused, expired, turned off, cannot use the account above, could
   not be checked and not connected each have their own sentence, and so do
   two the implementation review asked for: a token still accepted after its
   end date has passed (`statusConnectedEnded`, M1), and a launcher that gave
   no answer at all (`notAnswered`, `statusNotAnswered`, M2), which used to say
   "It is still saved" when nothing was known. Opening the pane checks both
-  tokens, and changing the Account ID checks Cloudflare's again. A check never
-  clears a token.
+  tokens. A changed Account ID checks Cloudflare's again when the change is
+  noted: Return in the field, Use This ID in its help sheet, or the pane
+  closing (`noteTheChange()`). Until then the token's status line is the one
+  read before the change; Check Again asks at once (the Fable sweep's T5).
+  A check never clears a token.
 - **Change Token…** opens the deploy's own `CredentialRequestSheet`, with the
   same steps, in a settings mode: its own title, Check and Save, a spinner
   while the launcher checks, and the reason under the field when nothing was
@@ -16745,7 +16747,7 @@ checked before it is saved (#696)"; the words are
   in `QuestionKeysTests`) and Use the New Token, which saves it with
   `--use-anyway`. When no token was saved before the change the first button
   says Don't Save It instead, and the trail says a new token was not saved
-  rather than "kept the old" (review M7). Before the pane's first check has
+  rather than writing `keptOld` (review M7). Before the pane's first check has
   answered nothing is known, and it says Don't Save It, which is true either
   way (the fix review's M-c). The pasted token is held in memory
   only while that alert is open.
@@ -16765,7 +16767,18 @@ checked before it is saved (#696)"; the words are
   Settings` (with the problem key), `old deploy token kept in Settings`
   (with a count) and `Cloudflare token end date learned` (the date and what
   read it, review I4). None carries the token, the Account ID, a site's name
-  or an address.
+  or an address. **Every line reaches the disk as it was written**
+  (`DeployTokenTests.testEveryTrailLineReachesTheDiskUnchanged`): the trail
+  is redacted on the way in, and the first `keptOld` wording put a colon
+  straight after "token", so `LogRedactor`'s `labelledSecret` rule took the
+  next word for a secret and the problem report carried "[removed: token]"
+  in a line that holds none (the Fable sweep's F1). Measured with the
+  redactor compiled alone: 4 of 58 filled lines changed on that wording, 0
+  on the new one, and the same against #853's reworked redactor. The test
+  hands each filled line to the redactor itself rather than restating its
+  patterns, so a later rule that would rewrite one of these lines fails it.
+  Rejected: exempting these lines from redaction, which would make the trail
+  writer trust its callers.
 - **Shared words, filled here.** `DeployTokenWording.filled` puts in the
   Mac's word for the computer (`MachineWord`) and the Mac's path to these
   settings for `{deployingSettings}` in every sentence, so the contract's

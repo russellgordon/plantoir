@@ -557,13 +557,23 @@ class TheDeploysOwnPaste(unittest.TestCase):
 # test made is there (a keychain path that does not exist is not an error to
 # `security`, which then writes to the login keychain instead: measured
 # 2026-11-13), and hands each command it reads on to the real `security -i`
-# with that keychain named at the end of the line.
+# with that keychain named at the end of the line. It reads every line
+# before it hands any on, and refuses (exit 98) if one would be over 4000
+# bytes with the keychain named, so nothing it passes on can be split by
+# `security -i` at its 4096-byte line (the Fable sweep's T9 on #696): a
+# split line's first part would name no keychain. Bytes, not characters:
+# LC_ALL=C makes ${#…} count bytes.
 STORE_TOOL_IN_FRONT = r"""#!/bin/bash
+LC_ALL=C
 printf '%s\n' "$*" >> "$STORE_ARGUMENTS"
 [[ -f "$THROWAWAY_KEYCHAIN" && "$THROWAWAY_KEYCHAIN" == *.keychain-db ]] || exit 99
+handed=""
 while IFS= read -r line; do
-  printf '%s "%s"\n' "$line" "$THROWAWAY_KEYCHAIN"
-done | /usr/bin/security "$@"
+  line="$line \"$THROWAWAY_KEYCHAIN\""
+  (( ${#line} <= 4000 )) || exit 98
+  handed+="$line"$'\n'
+done
+printf '%s' "$handed" | /usr/bin/security "$@"
 """
 
 # A stand-in that writes down that it was started, reads what it is handed,

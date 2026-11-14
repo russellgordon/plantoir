@@ -60,7 +60,7 @@ nonisolated enum DeployTokenWording {
     nonisolated static let problemCouldNotSave: String =
         "{service} accepted that token, but it could not be saved on this {machine}. Nothing was changed."
     nonisolated static let problemAccountNotValid: String =
-        "The Cloudflare Account ID above is not a whole ID, so the token was not checked or saved. Correct the Account ID first."
+        "The Cloudflare Account ID in Settings is not a whole ID, so the token was not checked or saved. Correct the Account ID first."
     nonisolated static let problemNotAnswered: String =
         "Plantoir could not check that token just now, so nothing was changed. Try again."
     nonisolated static let unreachableTitle: String = "That token cannot reach {count} of your class websites"

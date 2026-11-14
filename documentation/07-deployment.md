@@ -1422,7 +1422,10 @@ the check was unheard (it fails anyway, later, less clearly); treating only
 401/403 as a refusal (a saved malformed token would never be cleared); a trail
 line for the refusal (Russell's ruling for v1.9.1: the trail already shows
 "asked for a publishing credential" then the failed run, and the problem
-report carries the sentence — the line belongs with #696's retries).
+report carries the sentence). This paragraph once said such a line
+"belongs with #696's retries"; #696 shipped no retry and no line for it, and
+it was drafted as a follow-up issue of its own with #696 (the Fable sweep's
+T6 and FU2).
 
 **Tested.** `scripts/test_deploy_token_refusal.py` copies `deploy.sh` into a
 scratch folder, stubs every Keychain reader and writer and `curl` (answering
@@ -1673,15 +1676,15 @@ own clean-up leaves it behind; `share_plan.py` already treats it as naming no
 site, and `deploy.py` treats a section marker without one as no site and
 makes one. The reviewer measured what the first rule did with it: every
 Cloudflare Change Token… answered `sitesNotChecked`, and a plans share's
-paste stopped with "check that this computer is online", which no retry could
+paste stopped with the `siteNotChecked` refusal, which no retry could
 change. It is read with `plutil`, which ships with macOS, because only a
 JSON reader can tell "not JSON" (still unheard) from "JSON without the key";
 a key holding anything but a string (null, a number) stays unheard. No writer
 on either side makes a section or old-place marker without its key (each is
 the service's own answer, saved whole), so the plans marker is the one shape
 known to need it; the rule is the same for every kind. Any unreachable stops
-the save with the list; the app asks "That token cannot reach N of your class
-websites", naming them, with Keep My Old Token (the default) and Use the New
+the save with the list; the app asks its `unreachableTitle` question, naming
+them, with Keep My Old Token (the default) and Use the New
 Token (`--use-anyway`). Any unheard stops it with `sitesNotChecked`. Without
 it a token from another account made the next deploy build a new site at a new
 address and report success: `deploy.py` prints "Creating a fresh Netlify site
