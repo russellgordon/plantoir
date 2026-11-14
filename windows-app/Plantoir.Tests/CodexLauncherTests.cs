@@ -48,7 +48,10 @@ public class CodexLauncherTests : IDisposable
     public void TheOutsideDoorsPassWhatTheContractSays()
     {
         var section = (JsonObject)ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!;
-        var agents = section["agents"]!.AsArray();
+        // A door this app does not have yet (GitHub Copilot, #884) is held
+        // open by name; every other door is compared as before.
+        var held = NamedGapLedger.OutsideDoorsHeld(section["agents"]!.AsArray().Select(a => a!["key"]!.ToString()));
+        var agents = section["agents"]!.AsArray().Where(a => !held.Contains(a!["key"]!.ToString())).ToList();
         Assert.Equal(2, agents.Count);
         Assert.True(section["greetingIsTheSameForEveryAgent"]!.GetValue<bool>());
         Assert.Equal(new[] { "--mcp-stdio", "{folder}" },
@@ -87,6 +90,7 @@ public class CodexLauncherTests : IDisposable
             Assert.Equal(environment.OrderBy(p => p.Key), passed.OrderBy(p => p.Key));
         }
         Assert.Equal(AssistWorkspace.DoorCourseVariable, section["doorCourseVariable"]!.ToString());
+        Assert.Equal(AssistWorkspace.DoorAssistantVariable, section["doorAssistantVariable"]!.ToString());
 
         // The SERVER each door starts, by the same substitution (#430): the
         // folder and never a course, for the Claude door's file as for the
@@ -159,11 +163,12 @@ public class CodexLauncherTests : IDisposable
     private static void AssertArrived(IReadOnlyList<string> sent, List<string> received, string folder, string course)
     {
         Assert.Equal(sent, received);
-        Assert.Equal(11, received.Count);
+        Assert.Equal(13, received.Count);
         Assert.Equal("-c", received[8]);
         Assert.Equal("mcp_servers.plantoir.env." + AssistWorkspace.DoorCourseVariable + "=" + CodexLauncher.TomlBasicString(course),
                      received[9]);
         Assert.Equal(course, CodexEnvironment(received)[AssistWorkspace.DoorCourseVariable]);
+        Assert.Equal("codex", CodexEnvironment(received)[AssistWorkspace.DoorAssistantVariable]);
         // The args value must still be a LIST of two strings — the silent
         // failure is a value that has become one string.
         string args = received[3]["mcp_servers.plantoir.args=".Length..];

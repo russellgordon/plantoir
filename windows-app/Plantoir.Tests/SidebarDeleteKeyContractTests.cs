@@ -47,6 +47,8 @@ public class SidebarDeleteKeyContractTests
         int checkedCases = 0;
         foreach (var c in SubjectMenusContractTests.Rule["cases"]!.AsArray().Select(c => c!))
         {
+            // A situation this app cannot be in yet is held open by name (#889).
+            if (!SubjectMenusContractTests.CanBeIn(c["situation"]!.AsObject())) continue;
             var situation = SubjectMenusContractTests.Situation(c["situation"]!.AsObject());
             if (situation.Row is not (SubjectMenuRules.Row.Course or SubjectMenuRules.Row.Section)) continue;
             string item = situation.Row == SubjectMenuRules.Row.Course ? "removeCourse" : "removeSection";
