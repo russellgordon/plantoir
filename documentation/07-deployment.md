@@ -3283,7 +3283,17 @@ script:
     own address, kept beside each line as `consoleWhere`. No page a site
     builds makes a srcdoc frame;
   - every document the page was sent could be read for the loader, which is
-    looked for only after the last `</html>`;
+    looked for only after the last `</html>`. That tag is found in the HTML
+    itself, never in a lowercased copy. The first deployed run with a
+    simulation's frame (stack 12, 2026-11-14) failed the Simulation page in
+    both engines with "the 1 of 2 document(s) carrying its loader account
+    for 1" while the page held two badge frames. The simulation
+    (gas-properties 1.1.12) holds eleven `İ` letters (U+0130) in its
+    translations, lowercasing makes each one two code units, and so the
+    index found in the lowercased copy fell 11 characters into the loader's
+    tag in the original. Measured again on a local stand-in edge that
+    appends the loader to every HTML document, with the real simulation:
+    1 of 2 before the fix and 2 of 2 after, in both engines;
   - there are exactly `refusalsPerDocument` (1) such messages for each
     document that carried the loader.
 
