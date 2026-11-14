@@ -16926,12 +16926,16 @@ as it is.
 ### What Windows owes
 
 The same three places in the window, the same wording keys and trail
-events, and an `HttpListener` on `http://127.0.0.1:<port>/` running every
-case. What HTTP.sys answers itself before the app sees a request (a Host it
-does not match, a canonicalised `..`), the excluded port ranges inside and
-below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
-whether an unelevated shell may listen on the block are to be measured
-there. The `windows` issue for #850 carries the list.
+events, and a server running every case. The `windows` issue for #850
+(#889) carries the list. Measured there on 2026-11-13: an `HttpListener`
+(HTTP.sys) answers some requests itself before the app sees them (403 for
+`..`, 400 rather than 414 and 431) and gives the app no connection to close
+when full, so four cases could not be met; Windows serves with a
+`TcpListener` and its own HTTP/1.1 reader instead, as this side does with
+`NWListener`, and the contract is unchanged. Nothing is reserved in the
+block, an unelevated process listens there, and a loopback-only listener
+raises no firewall prompt. `12-windows-app.md` → "A deployed folder opened
+in the browser (#889, the mac's #850)".
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
