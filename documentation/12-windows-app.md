@@ -2186,7 +2186,10 @@ the director's ruling).
 
 The mac merged six pieces into `dev` the same evening (#783 GitHub Copilot,
 #865, #871, #872, #878, #839's Help format, then #850 and #846), and a full
-suite on `dev` 39e7b5cf5 read BASELINE_TOTALS. Step 0's method again: what is
+suite on `dev` 39e7b5cf5 read `Failed: 12, Passed: 3467, Skipped: 0, Total:
+3479` (18 min 51 s on this PC, a Lenovo 20QES70500, i5-8365U, 16 GB, Windows
+11 Pro 26200). Merging `dev` again before the gate brought #859's piece A,
+whose handouts sentence turned six Fix with greeting cases red. Step 0's method again: what is
 a few lines and changes nothing a teacher sees was FIXED, everything a later
 piece of v2.0.0 builds was HELD by name against its open `windows` issue.
 
@@ -2199,7 +2202,10 @@ no lease line changes, so nothing a teacher sees moves; it is the half of #884
 item 7 that cannot go wrong. Proved red on the old code (the two lines taken
 out: `TheOutsideDoorsPassWhatTheContractSays` fails on the env).
 
-**Held, 23 entries, all v2.0.0.** #884 (13): the `copilot` door; the menu
+**Held, 29 entries, all v2.0.0.** #859 (6): the six `fixWith.greetingCases`
+whose message carries `greetingHandoutsSentence`, held while each is the
+contract's message with exactly that sentence left out
+(`FixWithGreetingCases`). #884 (13): the `copilot` door; the menu
 items `courseReviseWithCopilot`, `sectionReviseWithCopilot`; the nine busy
 sentences as said in older words (`AssistWordingSaidDifferently`); and the
 trail line of "outside session held a course" as said in older words. #889
@@ -2216,13 +2222,14 @@ hold names none, and the contract's `anyAssistant` for that is "Claude, Codex
 or GitHub Copilot": a sentence naming a door a Windows teacher cannot open.
 The older "Claude or Codex" is the true sentence on Windows until #884 lands.
 
-**Three new areas** in `NamedGapLedger.cs`, each in an existing shape:
+**Four new areas** in `NamedGapLedger.cs`, each in an existing shape:
 
 | Area | Shape | Read by |
 |---|---|---|
 | `OutsideDoors` (`outsideAgents.agents`, by key) | collected; a door is "here" when `SubjectMenuRules.ReviseTarget` or `CourseActivity.ReviseItem` has it (`OutsideDoorsHeld`) | `TheOutsideDoorsPassWhatTheContractSays`, `TheOutsideAgentsMenuTitles_AreTheContracts`, `PiecesAndBoundsAreTheContracts` (`fixWith.buttons`), `SubjectMenusContractTests.Situation` (`reviseBlocked`), `TheReviseCasesAreTheContracts` (a case's `item`; the held door's mac-only window note must still name `WindowHoldWording.AvailableOnceTheAssistantCloses`) |
 | `SubjectMenuSituationKeys` | collected; a case whose situation names a held key is not run (the key is no `Situation` property, which the closed-check makes sure of); at least 21 cases still run | both `SubjectMenusContractTests` case facts, `SidebarDeleteKeyContractTests.TheMinusButton_FollowsTheMenusRemoval` |
 | `TrailLineSaidDifferently` (`activityTrail.mustRecord`, by event) | held must still DIFFER | `DoorCourseHoldTests.TheTrailLineIsTheContracts` |
+| `FixWithGreetingCases` (`fixWith.greetingCases`, by name) | per case (a theory): held must DIFFER and equal the contract's text with the handouts sentence taken out; `HeldGreetingCasesAreStillTheContracts` is the withdrawn half | `FixWithAssistantContractTests.GreetingCases` |
 
 The two constants among the nine (`AvailableOnceYouFinishRevisingWithClaude`,
 `FinishTheClaudeSessionFirst`) are now asked through `SaidAsTheContract` by
@@ -2234,7 +2241,9 @@ round): `codex` in `OutsideDoors`, `hasFolder` in `SubjectMenuSituationKeys`
 and the product line made equal to the contract's each failed with the
 closed message (8 tests); `gemini`, `noSuchKey` and "no such event" each
 failed with the withdrawn message (8 tests); taking out every entry this
-piece added brought back all twelve C# reds. A trap met doing it: restoring
+piece added brought back all twelve C# reds. For `FixWithGreetingCases`,
+the handouts sentence put into `FixWithAssistant`'s message gave the closed
+message on all six, and a made-up case name the withdrawn one. A trap met doing it: restoring
 a file with `Copy-Item` keeps the copy's OLD modified time, so MSBuild's
 incremental build skips the project and the next run tests the mutated
 assembly; restore by writing the bytes (or touch the file) instead.
