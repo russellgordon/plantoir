@@ -3254,6 +3254,31 @@
         "expect": "git push -u origin issue/853-redactor-shapes",
         "input": "git push -u origin issue/853-redactor-shapes",
         "why": "#853, KEPT: userFlag takes only a value holding a colon. A branch name after -u is not a credential."
+      },
+      {
+        "expect": "Working folder /Users/person/Documents/Teaching/ICS3U",
+        "input": "Working folder /Users/First Last/Documents/Teaching/ICS3U",
+        "why": "#876: an account folder whose name holds a space. School-issued accounts are often First Last, and the rule stopped at the space: `/Users/person Last/…` (measured), the second word of the name left on the trail. Several words are taken when they run on to a separator."
+      },
+      {
+        "expect": "Reading C:\\Users\\person\\Documents\\Teaching",
+        "input": "Reading C:\\Users\\First Last\\Documents\\Teaching",
+        "why": "#876: the same in the Windows shape, `C:\\Users\\person Last\\…` before (measured on the mac's copy of the rule)."
+      },
+      {
+        "expect": "HOME='/Users/person'",
+        "input": "HOME='/Users/First Last'",
+        "why": "#876: a quote, a colon or the end of the line ends the name as a separator does, so a home folder written on its own is taken whole."
+      },
+      {
+        "expect": "cd /users/person/Documents and c:\\users\\person\\AppData",
+        "input": "cd /users/firstlast/Documents and c:\\users\\First Last\\AppData",
+        "why": "#876: read without regard to case, since neither file system minds, and the prefix is kept as it was written."
+      },
+      {
+        "expect": "moved /Users/person to /Users/person/Archive",
+        "input": "moved /Users/sample to /Users/sample/Archive",
+        "why": "#876, KEPT: words that do not run on to a separator are not part of the name, so the words between two paths stay. The one shape still missed is a two-word name followed by words and then another path on the same line: the first word goes and the second stays, as before #876 (documentation/09-mac-app.md)."
       }
     ],
     "note": "What is taken OUT of a problem report before it is written to disk, and - just as important - what is KEPT. Redaction happens as the file is written, never as it is sent: a report that is only safe when it leaves by the right button leaks the first time somebody opens the folder it sits in, and writing it safe is what lets a teacher open the file and see for themselves what they are about to send. The rules lean towards removing too much, because removing a build hash by mistake costs a moment of puzzlement while a surviving token costs the teacher their account - but the KEPT cases below are load-bearing, and a redactor that swallows them produces reports nobody can diagnose from. There is no way to switch this off in a development build: a redactor that is off while it is being worked on is a redactor nobody has run.",
@@ -3275,7 +3300,8 @@
         { "input": "deploy.sh ICS3U 1 --account [removed: account id]", "expect": "deploy.sh ICS3U 1 --account [removed: account id]" },
         { "input": "Authorization: Basic [removed: token]", "expect": "Authorization: Basic [removed: token]" },
         { "input": "curl -u [removed: token] https://plans.example/", "expect": "curl -u [removed: token] https://plans.example/" },
-        { "input": "Opening ftp://[removed: token]@plans.example/", "expect": "Opening ftp://[removed: token]@plans.example/" }
+        { "input": "Opening ftp://[removed: token]@plans.example/", "expect": "Opening ftp://[removed: token]@plans.example/" },
+        { "input": "Reading C:\\Users\\person\\Documents", "expect": "Reading C:\\Users\\person\\Documents" }
       ]
     },
     "secretLength": 40

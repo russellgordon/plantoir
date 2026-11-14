@@ -71,14 +71,22 @@ nonisolated enum LogRedactor {
     /// removed WITH its label kept, rather than being swept up namelessly
     /// by the length rule that runs afterwards.
     static let patternRules: [RedactionRule] = [
+        // An account folder whose name holds a space (#876): school-issued
+        // accounts are often "First Last", and the rule used to stop at the
+        // space and leave the second word of the name behind. Several words
+        // are taken when they run on to a separator, a quote, a colon or the
+        // end of the line; otherwise only the first, as before, so
+        // `/Users/name to /Users/name/Archive` keeps its " to ". Read
+        // without regard to case, since neither file system minds
+        // (`/users/`, `c:\users\`); the prefix is kept as it was written.
         RedactionRule(
             name: "macHomeFolder",
-            pattern: #"/Users/[^/\s"':]+"#,
-            replacement: "/Users/" + removedPersonPath
+            pattern: #"(?im)(/Users/)(?:[^/\s"':]+(?: [^/\s"':]+)*(?=[/"':]|$)|[^/\s"':]+)"#,
+            replacement: "$1" + removedPersonPath
         ),
         RedactionRule(
             name: "windowsHomeFolder",
-            pattern: #"([A-Za-z]:\\Users\\)[^\\\s"':]+"#,
+            pattern: #"(?im)([A-Z]:\\Users\\)(?:[^\\\s"':]+(?: [^\\\s"':]+)*(?=[\\/"':]|$)|[^\\\s"':]+)"#,
             replacement: "$1" + removedPersonPath
         ),
         // A username and password written into an address (#709): before
