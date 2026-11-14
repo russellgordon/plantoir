@@ -13407,6 +13407,14 @@ whose deadlines are the socket's own `ReceiveTimeout` and `SendTimeout`,
 rather than tasks on the thread pool: with the pool starved (the full suite,
 below), a task-based first version left a plain GET unanswered for 20 s and
 fired the 10 s header deadline late. At most 65 background threads a show.
+**An answer over 1 MiB (a video) is sent through a send buffer of one
+piece** rather than Windows' autotuned one: with autotuning the system took
+so much of a 200 MB answer into its buffers that 64 readers that never read
+were still not blocked at 47 s while another suite ran, so the piece
+deadline never started; with one piece they are reset at 30 s. Not for
+every answer: set on every connection it cost about 130 ms a request (the
+ENG2D crawl below took 38.8 s instead of 4.8 s), so pages keep the
+system's buffer.
 
 **The address.** `DeployedFolderAddress.CanonicalPath` is the folder's
 ON-DISK spelling (`GetFinalPathNameByHandle`, `\\?\` taken off), because the
@@ -13483,7 +13491,8 @@ force-killed leaves nothing to clean up: Windows closes its sockets with it.
   8,811 links, 403 addresses, **0 not found** in 6.4 s; ENG2D section 2, 275
   pages, 6,334 links, 284 addresses, 5 not found in 4.7 s, all five a link
   to `Exercises/Media-Analysis-Practice`, a page that build does not hold (a
-  link to a page not published: missing on any host). The must-fail, the
+  link to a page not published: missing on any host). On the final,
+  threaded server, with another suite running: 9.6 s and 5.0 s. The must-fail, the
   same folders through `python -m http.server`: **5,869** and **3,252** not
   found. Before `NoDelay` the ENG2D crawl took **43.9 s** (about 155 ms a
   request: Nagle and the delayed acknowledgement); after, 5.5 s. The

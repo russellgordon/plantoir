@@ -475,6 +475,17 @@ public sealed class DeployedFolderServer : IDisposable
         if (!SendPiece(connection, head)) return false;
         if (answer.File is not { } file || answer.Length <= 0) return true;
 
+        // A large answer (a video) is sent through a send buffer of one piece
+        // rather than Windows' autotuned one: with autotuning the system took
+        // so much of a 200 MB answer into its buffers that 64 readers that
+        // never read were still not blocked at 47 s while another suite ran
+        // (2026-11-14), so the piece deadline never started. Not for every
+        // answer: set on a page's connection it cost about 130 ms a request
+        // (the crawl of 284 addresses took 38.8 s instead of 4.8 s).
+        if (answer.Length > 4L * BytesPerPiece)
+        {
+            try { connection.Socket.SendBufferSize = BytesPerPiece; } catch (SocketException) { }
+        }
         file.Seek(answer.Offset, SeekOrigin.Begin);
         long remaining = answer.Length;
         var piece = new byte[(int)Math.Min(BytesPerPiece, remaining)];
