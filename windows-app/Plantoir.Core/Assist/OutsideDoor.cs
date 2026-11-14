@@ -175,6 +175,9 @@ public static class OutsideDoor
     /// words for "a unit plan for , and 1 more", so a single name still too
     /// long leaves the line over and the door refuses, as it does for an
     /// over-long course name. Null <paramref name="program"/> names them all.
+    /// The handouts and reference-courses sentences are in every candidate
+    /// and never cut (the contract has no words for a shorter list of
+    /// reference courses), so only plan names are dropped (#880).
     /// </summary>
     internal static IReadOnlyList<string> GreetingThatFits(string? program, Plantoir.Core.Models.UnitPlans.Reading? unitPlans,
                                                            Func<int, IReadOnlyList<string>> argumentsNaming)
@@ -201,6 +204,12 @@ public static class OutsideDoor
     /// could-not-start sentence).
     /// </summary>
     public static bool Start(ProcessStartInfo info, TimeSpan? watchFor = null)
+        => StartWatching(info, watchFor ?? StartGrace);
+
+    /// <summary>How long <see cref="Start"/> watches a started <c>.exe</c> for a quick failure, unless told otherwise.</summary>
+    public static readonly TimeSpan StartGrace = TimeSpan.FromMilliseconds(400);
+
+    private static bool StartWatching(ProcessStartInfo info, TimeSpan watchFor)
     {
         try
         {
@@ -209,7 +218,7 @@ public static class OutsideDoor
             if (string.Equals(info.FileName, Cmd, StringComparison.OrdinalIgnoreCase)) { process.Dispose(); return true; }
             try
             {
-                int grace = (int)(watchFor ?? TimeSpan.FromMilliseconds(400)).TotalMilliseconds;
+                int grace = (int)watchFor.TotalMilliseconds;
                 if (process.WaitForExit(grace) && process.ExitCode != 0) { process.Dispose(); return false; }
             }
             catch { /* cannot watch it (no handle through the shell): assume it started */ }
