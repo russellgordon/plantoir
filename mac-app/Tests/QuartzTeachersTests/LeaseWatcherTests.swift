@@ -54,7 +54,7 @@ final class LeaseWatcherTests: XCTestCase {
         let section: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
         let heldElsewhere: [String: Any] = try XCTUnwrap(section["heldElsewhere"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(heldElsewhere["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 13)
+        XCTAssertEqual(cases.count, 18)
         for testCase in cases {
             try await runHeldElsewhereCase(testCase)
         }
@@ -75,19 +75,34 @@ final class LeaseWatcherTests: XCTestCase {
 
         var leases: [URL] = []
         var livingHolders: [Process] = []
+        let sectionNumber: Int = (testCase["section"] as? String) == "sibling" ? 2 : 1
         for hold in try XCTUnwrap(testCase["holds"] as? [[String: Any]], name) {
             let kind: String = try XCTUnwrap(hold["kind"] as? String)
             let course: String = try XCTUnwrap(hold["course"] as? String)
             let holder: String = try XCTUnwrap(hold["holder"] as? String)
             let folderWord: String = try XCTUnwrap(hold["folder"] as? String)
             let into: URL = folderWord == "this" ? courses : anotherFolder.appendingPathComponent("courses")
+            // #835: the sections the lease names, as 'this' (Section 1) and
+            // 'sibling' (Section 2); absent, it names none.
+            var named: [Int]? = nil
+            if let words = hold["sections"] as? [String] {
+                var numbers: [Int] = []
+                for word in words {
+                    numbers.append(word == "sibling" ? 2 : 1)
+                }
+                named = numbers
+            }
             switch holder {
             case "another":
                 let process: Process = try startAHolder()
                 livingHolders.append(process)
-                leases.append(try writeLease(kind: kind, course: course, for: process.processIdentifier, into: into))
+                leases.append(try writeLease(
+                    kind: kind, course: course, for: process.processIdentifier, into: into, sections: named
+                ))
             case "gone":
-                leases.append(try writeLease(kind: kind, course: course, for: try aProcessThatHasEnded(), into: into))
+                leases.append(try writeLease(
+                    kind: kind, course: course, for: try aProcessThatHasEnded(), into: into, sections: named
+                ))
             case "this":
                 let written = WorkLeaseFiles.write(kind: kind, courseCode: course, coursesDirectory: into)
                 leases.append(try XCTUnwrap(written, name).url)
@@ -97,7 +112,6 @@ final class LeaseWatcherTests: XCTestCase {
         }
 
         watcher.start()
-        let sectionNumber: Int = (testCase["section"] as? String) == "sibling" ? 2 : 1
         let folderReady: Bool = try XCTUnwrap(testCase["folderReady"] as? Bool, name)
         let readinessReason: String? = folderReady ? nil : "The folder is still getting ready."
 
@@ -116,14 +130,18 @@ final class LeaseWatcherTests: XCTestCase {
             availability(watcher: watcher, folder: folder, section: sectionNumber, folderReady: folderReady),
             expectedBefore, "\(name): Deploy before anything happens"
         )
+        let holding: WorkLeaseFiles.Holding? = watcher.holding(forCourse: "EXC2O", section: sectionNumber)
         let help: String = SectionDetailView.deployHelp(
             folderReadinessReason: readinessReason,
-            heldElsewhere: watcher.holding(forCourse: "EXC2O") != nil,
-            courseCode: "EXC2O"
+            heldElsewhere: holding != nil,
+            courseCode: "EXC2O",
+            heldSection: SectionDetailView.sectionNamed(by: holding, section: sectionNumber)
         )
         switch try XCTUnwrap(testCase["help"] as? String, name) {
         case "heldElsewhere":
             XCTAssertEqual(help, try contractHelp(course: "EXC2O"), name)
+        case "heldElsewhereForASection":
+            XCTAssertEqual(help, try contractHelp(course: "EXC2O", section: sectionNumber), name)
         case "folderReadinessReason":
             XCTAssertEqual(help, readinessReason, name)
         case "ordinary":
@@ -352,9 +370,18 @@ final class LeaseWatcherTests: XCTestCase {
     /// machinery (CLAUDE.md rule 1).
     func testTheHelpIsTheContractsSentence() throws {
         XCTAssertEqual(SectionDetailView.deployIsHeldElsewhere(course: "ICS3U"), try contractHelp(course: "ICS3U"))
-        let sentence: String = SectionDetailView.deployIsHeldElsewhere(course: "ICS3U").lowercased()
-        for word in ["lease", "process", "program", "script", "container", "docker", "toolchain"] {
-            XCTAssertFalse(sentence.contains(word), "the help says \(word)")
+        XCTAssertEqual(
+            SectionDetailView.deployIsHeldElsewhere(course: "ICS3U", section: 2),
+            try contractHelp(course: "ICS3U", section: 2)
+        )
+        let sentences: [String] = [
+            SectionDetailView.deployIsHeldElsewhere(course: "ICS3U").lowercased(),
+            SectionDetailView.deployIsHeldElsewhere(course: "ICS3U", section: 2).lowercased(),
+        ]
+        for sentence in sentences {
+            for word in ["lease", "process", "program", "script", "container", "docker", "toolchain"] {
+                XCTAssertFalse(sentence.contains(word), "the help says \(word)")
+            }
         }
     }
 
@@ -370,7 +397,7 @@ final class LeaseWatcherTests: XCTestCase {
             sectionNumber: section,
             isBeingCopied: false,
             folderIsGettingReady: !folderReady,
-            heldElsewhere: watcher.holding(forCourse: "EXC2O") != nil
+            heldElsewhere: watcher.holding(forCourse: "EXC2O", section: section) != nil
         )
     }
 
@@ -432,12 +459,18 @@ final class LeaseWatcherTests: XCTestCase {
         }
     }
 
-    /// The contract's sentence for a course.
-    private func contractHelp(course: String) throws -> String {
-        let section: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
-        let heldElsewhere: [String: Any] = try XCTUnwrap(section["heldElsewhere"] as? [String: Any])
-        let help: String = try XCTUnwrap(heldElsewhere["help"] as? String)
+    /// The contract's sentence for a course, or for one section of it
+    /// (#835's `helpForASection`).
+    private func contractHelp(course: String, section: Int? = nil) throws -> String {
+        let rules: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
+        let heldElsewhere: [String: Any] = try XCTUnwrap(rules["heldElsewhere"] as? [String: Any])
+        guard let section else {
+            let help: String = try XCTUnwrap(heldElsewhere["help"] as? String)
+            return help.replacingOccurrences(of: "{course}", with: course)
+        }
+        let help: String = try XCTUnwrap(heldElsewhere["helpForASection"] as? String)
         return help.replacingOccurrences(of: "{course}", with: course)
+            .replacingOccurrences(of: "{section}", with: String(section))
     }
 
     /// A working folder with `courses/.internal/activity/`.
@@ -477,7 +510,9 @@ final class LeaseWatcherTests: XCTestCase {
     /// name and start time the process table reports (none for a process
     /// that has ended, so its lease reads as stale).
     @discardableResult
-    private func writeLease(kind: String, course: String, for pid: Int32, into courses: URL) throws -> URL {
+    private func writeLease(
+        kind: String, course: String, for pid: Int32, into courses: URL, sections: [Int]? = nil
+    ) throws -> URL {
         var name: String = "true"
         var started: String = "1.000000"
         if case .found(let tableName, _, let startTime) = ProcessLiveness.askTheProcessTable(pid: pid) {
@@ -487,7 +522,15 @@ final class LeaseWatcherTests: XCTestCase {
         let directory: URL = WorkLeaseFiles.activityDirectory(coursesDirectory: courses)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url: URL = directory.appendingPathComponent(WorkLeaseFiles.fileName(courseCode: course, kind: kind, pid: pid))
-        let body: String = "\(pid)\n\(name)\n\(ProcessLiveness.leaseMomentText(Date()))\n\(started)\n"
+        let moment: String = ProcessLiveness.leaseMomentText(Date())
+        var body: String = "\(pid)\n\(name)\n\(moment)\n\(started)\n"
+        if let sections {
+            var entries: [WorkLeaseFiles.SectionEntry] = []
+            for section in sections {
+                entries.append(WorkLeaseFiles.SectionEntry(section: section, moment: moment))
+            }
+            body += "\n" + WorkLeaseFiles.sectionsLine(entries) + "\n"
+        }
         try Data(body.utf8).write(to: url, options: .atomic)
         return url
     }

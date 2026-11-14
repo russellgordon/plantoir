@@ -20,9 +20,15 @@ import Foundation
 ///
 /// One file per folder, course and kind: two sections of one course
 /// previewing keep ONE `preview` lease, ending one keeps it, ending both
-/// removes it. Windows' leases name the course and not the section (its
-/// reader reads the kind from the third-last dot), so a build of Section 1
-/// elsewhere declines Section 2 here too — accepted, and said in the sentence.
+/// removes it. Since #835 the file's sixth line names the sections it holds,
+/// each with the moment it was taken, so another copy of Plantoir or an
+/// outside assistant can build a SIBLING section while this one is busy.
+/// Adding a section keeps the moments already there (and line 3, which a
+/// reader that knows no sections compares); only the new section's entry is
+/// stamped now. Course-wide work (plan sharing, under
+/// `PlanSharing.leaseSection`) writes no sixth line, so its lease holds every
+/// section. Windows' leases name no sections, so a build of Section 1 there
+/// still declines Section 2 here — accepted, and said in the sentence.
 ///
 /// The publish set for later runs in a process of its own with no main actor
 /// app, and takes its leases through `WorkLeaseFiles` directly
@@ -54,10 +60,51 @@ enum WorkLeaseRegistry {
         }
     }
 
+    /// What one of this process's lease files should say (#835): the
+    /// sections it holds, a preview's container port for each, and whether
+    /// any of the work on it is course-wide.
+    struct Hold: Equatable {
+
+        // MARK: - Stored properties
+
+        var courseWide: Bool = false
+        var sections: [Int] = []
+        var ports: [Int: Int] = [:]
+    }
+
     /// A lease this process has written.
     struct Written: Equatable {
+
+        // MARK: - Stored properties
+
         let url: URL
+
+        /// Line 3: when the file was first written. Kept on every rewrite,
+        /// because a reader that knows no sections compares it.
         let moment: String
+
+        /// The same moment as a date, to write line 3 again unchanged.
+        let takenAt: Date
+
+        /// Every section this process holds the kind for, each with the
+        /// moment it was TAKEN, kept in memory even while the file is
+        /// course-wide, because each section's claim is its own moment.
+        var entries: [WorkLeaseFiles.SectionEntry] = []
+
+        /// When course-wide work on this kind began, or nil while there is
+        /// none. The claim of a course-wide question.
+        var courseWideSince: String? = nil
+
+        // MARK: - Computed properties
+
+        /// The sixth line's entries as the file carries them: none while any
+        /// work is course-wide, which makes the lease hold the whole course.
+        var sectionsOnDisk: [WorkLeaseFiles.SectionEntry]? {
+            if courseWideSince != nil || entries.isEmpty {
+                return nil
+            }
+            return entries
+        }
     }
 
     // MARK: - Stored properties
@@ -113,36 +160,102 @@ enum WorkLeaseRegistry {
     /// Writes the leases this process should hold and removes the ones it no
     /// longer should.
     static func reconcile() {
-        var wanted: [Wanted] = []
+        var wanted: [Wanted: Hold] = [:]
         for build in CourseActivity.activePreviewBuilds {
-            wanted.append(Wanted(folderPath: build.folderPath, courseCode: build.courseCode, kind: WorkLeaseFiles.buildKind))
+            let key: Wanted = Wanted(folderPath: build.folderPath, courseCode: build.courseCode, kind: WorkLeaseFiles.buildKind)
+            wanted[key] = adding(section: build.sectionNumber, port: nil, to: wanted[key])
         }
         for publish in CourseActivity.activePublishes {
-            wanted.append(Wanted(folderPath: publish.folderPath, courseCode: publish.courseCode, kind: WorkLeaseFiles.buildKind))
-            wanted.append(Wanted(folderPath: publish.folderPath, courseCode: publish.courseCode, kind: WorkLeaseFiles.publishKind))
+            let build: Wanted = Wanted(folderPath: publish.folderPath, courseCode: publish.courseCode, kind: WorkLeaseFiles.buildKind)
+            wanted[build] = adding(section: publish.sectionNumber, port: nil, to: wanted[build])
+            let kind: Wanted = Wanted(folderPath: publish.folderPath, courseCode: publish.courseCode, kind: WorkLeaseFiles.publishKind)
+            wanted[kind] = adding(section: publish.sectionNumber, port: nil, to: wanted[kind])
         }
         for lease in PreviewLeases.active {
-            wanted.append(Wanted(folderPath: lease.folderPath, courseCode: lease.courseCode, kind: WorkLeaseFiles.previewKind))
+            let key: Wanted = Wanted(folderPath: lease.folderPath, courseCode: lease.courseCode, kind: WorkLeaseFiles.previewKind)
+            wanted[key] = adding(section: lease.sectionNumber, port: lease.port, to: wanted[key])
         }
         if let heldForTheConversation {
-            wanted.append(heldForTheConversation)
+            var hold: Hold = wanted[heldForTheConversation] ?? Hold()
+            hold.courseWide = true
+            wanted[heldForTheConversation] = hold
         }
 
-        for item in wanted {
-            if written[item] != nil {
-                continue
-            }
+        for (item, hold) in wanted {
             let coursesDirectory: URL = URL(fileURLWithPath: item.folderPath)
                 .appendingPathComponent("courses", isDirectory: true)
             var assistant: String? = nil
             if item == heldForTheConversation {
                 assistant = heldForTheConversationAssistant
             }
-            if let made = WorkLeaseFiles.write(
+            let now: Date = Date()
+            let nowText: String = ProcessLiveness.leaseMomentText(now)
+            let existing: Written? = written[item]
+            // Leaving: nothing is let go before `releaseEverything()`, so no
+            // entry is dropped and no course-wide hold narrowed.
+            var heldSections: [Int] = hold.sections
+            var ports: [Int: Int] = hold.ports
+            if isLeaving, let existing {
+                for kept in existing.entries where !heldSections.contains(kept.section) {
+                    heldSections.append(kept.section)
+                    if let port = kept.port {
+                        ports[kept.section] = port
+                    }
+                }
+            }
+            var entries: [WorkLeaseFiles.SectionEntry] = []
+            for section in heldSections.sorted() {
+                var moment: String = nowText
+                if let existing {
+                    for kept in existing.entries where kept.section == section {
+                        moment = kept.moment
+                    }
+                }
+                entries.append(WorkLeaseFiles.SectionEntry(section: section, moment: moment, port: ports[section]))
+            }
+            var courseWideSince: String? = nil
+            if hold.courseWide {
+                courseWideSince = existing?.courseWideSince ?? nowText
+            }
+            if isLeaving, let existing, courseWideSince == nil {
+                courseWideSince = existing.courseWideSince
+            }
+
+            guard let existing else {
+                var sectionsToWrite: [WorkLeaseFiles.SectionEntry]? = nil
+                if courseWideSince == nil && !entries.isEmpty {
+                    sectionsToWrite = entries
+                }
+                if let file = WorkLeaseFiles.write(
+                    kind: item.kind, courseCode: item.courseCode, coursesDirectory: coursesDirectory,
+                    moment: now, assistant: assistant, sections: sectionsToWrite
+                ) {
+                    var recorded: Written = Written(url: file.url, moment: file.moment, takenAt: now)
+                    recorded.entries = entries
+                    recorded.courseWideSince = courseWideSince
+                    written[item] = recorded
+                }
+                continue
+            }
+            var changed: Written = existing
+            changed.entries = entries
+            changed.courseWideSince = courseWideSince
+            if changed == existing {
+                continue
+            }
+            if changed.sectionsOnDisk == existing.sectionsOnDisk {
+                // The file would say the same: only this process's claims move.
+                written[item] = changed
+                continue
+            }
+            // Rewritten with line 3 as it was. A rewrite that fails leaves
+            // the record as it was too, so a section it did not add has no
+            // claim, and its look after taking counts every lease.
+            if WorkLeaseFiles.write(
                 kind: item.kind, courseCode: item.courseCode, coursesDirectory: coursesDirectory,
-                assistant: assistant
-            ) {
-                written[item] = Written(url: made.url, moment: made.moment)
+                moment: existing.takenAt, assistant: assistant, sections: changed.sectionsOnDisk
+            ) != nil {
+                written[item] = changed
             }
         }
 
@@ -151,13 +264,30 @@ enum WorkLeaseRegistry {
         }
         var stillWritten: [Wanted: Written] = [:]
         for (item, lease) in written {
-            if wanted.contains(item) {
+            if wanted[item] != nil {
                 stillWritten[item] = lease
             } else {
                 WorkLeaseFiles.remove(at: lease.url)
             }
         }
         written = stillWritten
+    }
+
+    /// A hold with one more piece of work on it. A section of 0 or less is
+    /// course-wide work (`PlanSharing.leaseSection`).
+    static func adding(section: Int, port: Int?, to hold: Hold?) -> Hold {
+        var result: Hold = hold ?? Hold()
+        if section <= 0 {
+            result.courseWide = true
+            return result
+        }
+        if !result.sections.contains(section) {
+            result.sections.append(section)
+        }
+        if let port {
+            result.ports[section] = port
+        }
+        return result
     }
 
     /// Removes every lease this process wrote — at quit, and when the MCP
@@ -235,12 +365,34 @@ enum WorkLeaseRegistry {
 
     /// This process's claim on a course's build — the moment of its own
     /// `build` lease — or nil when it has not written one.
-    static func buildClaim(folderPath: String, courseCode: String) -> WorkLeaseFiles.Claim? {
+    ///
+    /// Per section since #835: the moment THAT section was taken, which is
+    /// later than line 3 when the section was added to a file already held.
+    /// A course-wide question (`section` nil or 0) claims the moment
+    /// course-wide work began. Nil when this process holds no such claim, and
+    /// then its look counts every lease, the strictest reading.
+    static func buildClaim(folderPath: String, courseCode: String, section: Int? = nil) -> WorkLeaseFiles.Claim? {
         let key: Wanted = Wanted(folderPath: folderPath, courseCode: courseCode, kind: WorkLeaseFiles.buildKind)
         guard let lease = written[key] else {
             return nil
         }
-        return WorkLeaseFiles.Claim(moment: lease.moment, pid: getpid())
+        guard let section, section > 0 else {
+            guard let since = lease.courseWideSince else {
+                return nil
+            }
+            return WorkLeaseFiles.Claim(moment: since, pid: getpid())
+        }
+        for entry in lease.entries where entry.section == section {
+            return WorkLeaseFiles.Claim(moment: entry.moment, pid: getpid())
+        }
+        return nil
+    }
+
+    /// The sections this process's own lease of a kind names on disk, or nil
+    /// when it names none (none written, or course-wide). For the tests.
+    static func sectionsOnDisk(folderPath: String, courseCode: String, kind: String) -> [WorkLeaseFiles.SectionEntry]? {
+        let key: Wanted = Wanted(folderPath: folderPath, courseCode: courseCode, kind: kind)
+        return written[key]?.sectionsOnDisk
     }
 
     /// What, held by another live process, stands in the way of a build of
@@ -252,42 +404,65 @@ enum WorkLeaseRegistry {
     /// written, with nothing awaited in between: then only leases taken
     /// before that one count (`WorkLeaseFiles.blocking`), which is what keeps
     /// two processes that look at once from both backing off.
+    ///
+    /// `section` is the section the build is of (#835), or nil for
+    /// course-wide work; nil is the default, so a caller that names none
+    /// holds back for the whole course, the wider and safer reading.
     static func whatBlocksABuild(
         folderPath: String,
         courseCode: String,
         afterTaking: Bool,
-        asker: WorkLeaseFiles.Asker = .aBuild
+        asker: WorkLeaseFiles.Asker = .aBuild,
+        section: Int? = nil
     ) -> WorkLeaseFiles.Holding? {
         let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
             .appendingPathComponent("courses", isDirectory: true)
         let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
             courseCode: courseCode, coursesDirectory: coursesDirectory
         )
+        let asked: Int? = WorkLeaseRegistry.sectionAsked(section)
         var claim: WorkLeaseFiles.Claim? = nil
         if afterTaking {
-            claim = buildClaim(folderPath: folderPath, courseCode: courseCode)
+            claim = buildClaim(folderPath: folderPath, courseCode: courseCode, section: asked)
         }
-        return WorkLeaseFiles.blocking(among: holdings, asker: asker, claim: claim)
+        return WorkLeaseFiles.blocking(among: holdings, asker: asker, claim: claim, section: asked)
+    }
+
+    /// A section number as the lease rules ask it: nil (course-wide) for
+    /// none, and for 0 or less, which is `PlanSharing.leaseSection`.
+    nonisolated static func sectionAsked(_ section: Int?) -> Int? {
+        guard let section, section > 0 else {
+            return nil
+        }
+        return section
     }
 
     /// What an outside assistant's change to this course meets in the other
     /// programs' leases (#433) — `WorkLeaseFiles.whatAnOutsideChangeMeets`
     /// over the leases on disk.
-    static func whatAnOutsideChangeMeets(folderPath: String, courseCode: String) -> WorkLeaseFiles.OutsideChangeMeets {
+    ///
+    /// `section` nil (the default) asks for the whole course, which is what
+    /// an outside assistant's page writes ask (#835).
+    static func whatAnOutsideChangeMeets(
+        folderPath: String, courseCode: String, section: Int? = nil
+    ) -> WorkLeaseFiles.OutsideChangeMeets {
         let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
             .appendingPathComponent("courses", isDirectory: true)
         let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
             courseCode: courseCode, coursesDirectory: coursesDirectory
         )
-        return WorkLeaseFiles.whatAnOutsideChangeMeets(among: holdings)
+        return WorkLeaseFiles.whatAnOutsideChangeMeets(among: holdings, section: sectionAsked(section))
     }
 
     /// Whether ANOTHER live program holds a `build` or `publish` lease on the
     /// course — a deploy or a preview build elsewhere; never this process's
     /// own leases, and never a preview that is only being served. What the
     /// section window asks when its serving preview ends (#433's stack review).
-    static func anotherProgramIsBuilding(folderPath: String, courseCode: String) -> Bool {
-        if case .building = whatAnOutsideChangeMeets(folderPath: folderPath, courseCode: courseCode) {
+    ///
+    /// `section`, since #835: a build of a SIBLING section elsewhere does not
+    /// count, because it does not end this section's preview.
+    static func anotherProgramIsBuilding(folderPath: String, courseCode: String, section: Int? = nil) -> Bool {
+        if case .building = whatAnOutsideChangeMeets(folderPath: folderPath, courseCode: courseCode, section: section) {
             return true
         }
         return false
@@ -308,7 +483,9 @@ enum WorkLeaseRegistry {
         sectionNumber: Int
     ) -> WorkLeaseFiles.Holding? {
         CourseActivity.beginPublish(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
-        if let holding = whatBlocksABuild(folderPath: folderPath, courseCode: courseCode, afterTaking: true) {
+        if let holding = whatBlocksABuild(
+            folderPath: folderPath, courseCode: courseCode, afterTaking: true, section: sectionNumber
+        ) {
             CourseActivity.endPublish(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
             return holding
         }
@@ -327,10 +504,20 @@ enum WorkLeaseRegistry {
     ) {
         ActivityTrail.note(
             .buildDeclinedBusyElsewhere,
-            "declined \(act) — the course is being \(WorkLeaseFiles.describe(holding)) somewhere else on this Mac",
+            WorkLeaseRegistry.declinedLine(act: act, sectionNumber: sectionNumber, holding: holding),
             course: courseCode,
             section: sectionNumber
         )
+    }
+
+    /// The trail line for a decline: the section when the lease in the way
+    /// named it (#835), the course when it named none.
+    nonisolated static func declinedLine(act: String, sectionNumber: Int, holding: WorkLeaseFiles.Holding) -> String {
+        var what: String = "the course"
+        if sectionNumber > 0 && holding.entry(forSection: sectionNumber) != nil {
+            what = "Section \(sectionNumber) of the course"
+        }
+        return "declined \(act) — \(what) is being \(WorkLeaseFiles.describe(holding)) somewhere else on this Mac"
     }
 
     /// Puts a preview declined for its own section's deploy on the trail
