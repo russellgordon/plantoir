@@ -11947,7 +11947,28 @@ piece 785b moves the automatic backups onto it. The code is
   for 31 days by its own `writtenAt`. A reference replace that must not trust
   a zip's listing alone asks `pathsNotHeld(by:)`, which re-hashes each file.
 - **Measured** after the review's fixes (Apple M4 Pro, macOS 26, 2026-11-13,
-  scratch folders and hidden disk images). MEASURE_LINES
+  scratch folders and hidden disk images). The AVI1O example course
+  with its three pictures moved into Media (0.27 MB of pages, 0.62 MB of
+  Media): whole zip 0.07 s and 0.79 MB; each small backup about 0.27 s and a
+  0.17 MB zip, the pictures 0.62 MB in the store once; seven backups 2.05 MB
+  against about 5.5 MB as whole zips. The same course with 120 incompressible
+  4.4 MB stand-in pictures (528.6 MB of Media): whole zip 8.01 s and 528.9 MB;
+  the first small backup 0.84 s, a 0.18 MB zip and 528.6 MB into the store;
+  each later one about 0.70 s and 0.18 MB, adding nothing after a text edit,
+  one 0.2 MB file after one picture changed, nothing after one was renamed;
+  seven backups 530.3 MB against about 3.7 GB. Byte for byte, with trees
+  compared by name BYTES: the store's harness course (892 entries: links to
+  files, to a sibling folder that sorts first, to a folder outside the
+  course, a loop, a link to nothing, names in both Unicode forms, hidden
+  files, permissions, empty files and folders) restored identically to the
+  whole zip on APFS, on a case-sensitive APFS image and on an exFAT image;
+  the review's own course (33 entries) restored identically on APFS and
+  case-sensitive APFS, and on exFAT differed only by an extended attribute
+  the whole zip carries as an AppleDouble `._` file. Each picture keeps its
+  own date, which the whole zip does not: it brought a September date back
+  an hour out (DOS time, across daylight saving). Harness totals: 288 checks
+  on APFS, 299 with a second volume, none failed; fourteen sabotages of the
+  fixed code each turned 1 to 11 checks red.
 - **Rejected.** A guard on a store file's modification date (a copy keeps the
   source's, plan review amendment 1). An `added/` record of when a file
   ENTERED the store, reconsidered after the review's W3 and still rejected: a
@@ -11967,7 +11988,7 @@ piece 785b moves the automatic backups onto it. The code is
   zip's list downloads it under the sweep's lock or fails, and a failure keeps
   everything (review M3, not measured). On exFAT the whole zip also brings back
   a file's extended attributes as an AppleDouble `._` file, which a small
-  backup does not; attributes are not a teacher's content. A server that tells
+  backup does not (measured); attributes are not a teacher's content. A server that tells
   the two Unicode forms apart was not available to measure. Not measured on a
   real iCloud Drive folder, nor with tens of thousands of Media files.
 
