@@ -101,7 +101,8 @@ struct CredentialRequest: Equatable {
                     + "you get back if you skip this does not mention accounts at all.",
                 "Under “TTL”, set the end date to after the end of your school year — next "
                     + "July is a safe choice — or leave it with no end date. An expired token "
-                    + "stops your deploys working, with nothing on screen to say why.",
+                    + "stops your deploys working. Plantoir shows the end date in Settings and "
+                    + "warns you on the Deploy screen for the last 30 days before it.",
                 "Choose “Continue to summary”, then “Create Token”.",
                 "Copy the long code Cloudflare shows you — it is only shown once — and paste it below.",
             ],

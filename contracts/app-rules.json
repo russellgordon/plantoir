@@ -1044,7 +1044,7 @@
           "Name it something you will recognise later, such as “Class websites”.",
           "Give it one permission, chosen from the three dropdowns: Account, then Cloudflare Pages, then Edit.",
           "Under “Account Resources”, choose “Include” and then your own account by name. A token that names no account cannot deploy anything, and what you get back if you skip this does not mention accounts at all.",
-          "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. An expired token stops your deploys working, with nothing on screen to say why.",
+          "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. An expired token stops your deploys working. Plantoir shows the end date in Settings and warns you on the Deploy screen for the last 30 days before it.",
           "Choose “Continue to summary”, then “Create Token”.",
           "Copy the long code Cloudflare shows you — it is only shown once — and paste it below."
         ],
@@ -1512,6 +1512,16 @@
         "expect" : "Plantoir could not reach Netlify to check the saved token, so this section was not deployed there. The token is still saved. Check that this computer is online, then try again in a few minutes.",
         "output" : "🕒 Host timezone offset: -0400\n❌ Plantoir could not reach Netlify to check the saved token, so this section was not deployed there.\n   The token is still saved. Check that this computer is online, then try again in a few minutes.",
         "why" : "GitHub #716, Netlify's saved token: the same rule and the same two lines, so the two destinations behave alike. Captured 2026-11-01 the same way."
+      },
+      {
+        "expect" : "That token cannot reach this section's existing Netlify website, so it was not saved as your token. It may belong to another Netlify account: paste one from the account this section was deployed with. If the website was deleted on purpose, save the token with Change Token… in Plantoir ▸ Settings ▸ Deploying.",
+        "output" : "🕒 Host timezone offset: -0500\n\nConnect to Netlify.\n\nPaste Netlify token: \n❌ That token cannot reach this section's existing Netlify website, so it was not saved as your token.\n   It may belong to another Netlify account: paste one from the account this section was deployed with. If the website was deleted on purpose, save the token with Change Token… in Plantoir ▸ Settings ▸ Deploying.",
+        "why" : "GitHub #696, the second ruling and review MUST 1: a token pasted at a deploy is tried against the section's own website before it is saved, and a token from another account is refused. Before #696 the deploy went on and deploy.py made a new site at a new address. The two lines are shared-rules.json -> deployTokens.deployTimeRefusals.lines.tokenCannotReachSite, lifted and joined (FailureExplainer.tokenNotSavedMarker); scripts/test_deploy_tokens.py runs the launcher for every key."
+      },
+      {
+        "expect" : "What was pasted has a space or a line break inside it, so it was not saved as your token. Copy the token again from Cloudflare's page, and paste only the token itself.",
+        "output" : "Paste Cloudflare token: \nWhat was pasted has a space or a line break inside it, so it was not saved as your token.\nCopy the token again from Cloudflare's page, and paste only the token itself.",
+        "why" : "GitHub #696, the paste rule (deployTokens.paste), in deploy.ps1's shape: no cross and no indent. One sentence for both launchers."
       },
       {
         "expect" : "This website hasn't been built yet. Preview it once, then deploy.",

@@ -17094,6 +17094,107 @@ this is the app's half.
   would otherwise take a `user:password@host` for an address and leave the
   username behind.
 
+## Settings ▸ Deploying: the tokens (#696)
+
+Plantoir ▸ Settings ▸ Deploying has a **Netlify** section above the
+**Cloudflare Pages** one (Russell, 2026-10-27: Netlify in its own section).
+Each shows a status line, **Change Token…**, **Remove Token** and **Check
+Again**. The launcher half, the rules and what was measured and rejected are
+in `documentation/07-deployment.md` → "Deploy tokens in Settings, and a token
+checked before it is saved (#696)"; the words are
+`DeployTokenWording`, pinned key by key to `deployTokens.words`.
+
+- **`DeployTokenPanel`** (`Models/DeployTokens/`, `@Observable`, one per
+  destination) runs `deploy.sh --token …` in the first open window's working
+  folder through `DeployTokenLauncher.run` and reads its one line of JSON
+  (`DeployTokenAnswer`). With no window open the line says to open a working
+  folder. The app never reads or writes the token store; the pasted token is
+  written into the launcher's standard input BEFORE it starts and the pipe
+  closed, so a launcher that exits without reading it cannot make the write
+  fail with a broken pipe.
+- **The status line** reads `statusConnected`, or for Cloudflare with an
+  end date `statusConnectedEndsOn` (the instant's date in the Mac's time
+  zone); under 30 days it is `statusConnectedEndsSoon`, in orange. Refused, expired, turned off, cannot use the account above, could
+  not be checked and not connected each have their own sentence, and so do
+  two the implementation review asked for: a token still accepted after its
+  end date has passed (`statusConnectedEnded`, M1), and a launcher that gave
+  no answer at all (`notAnswered`, `statusNotAnswered`, M2), which used to say
+  "It is still saved" when nothing was known. Opening the pane checks both
+  tokens. A changed Account ID checks Cloudflare's again when the change is
+  noted: Return in the field, Use This ID in its help sheet, or the pane
+  closing (`noteTheChange()`). Until then the token's status line is the one
+  read before the change; Check Again asks at once (the Fable sweep's T5).
+  A check never clears a token.
+- **Change Token…** opens the deploy's own `CredentialRequestSheet`, with the
+  same steps, in a settings mode: its own title, Check and Save, a spinner
+  while the launcher checks, and the reason under the field when nothing was
+  saved (`sheetProblem`). It closes only when a token is saved. **Cancel
+  waits while the token is being checked** (review W2): the button is
+  disabled, the sheet cannot be dismissed (`interactiveDismissDisabled`), and
+  `DeployTokenPanel.cancelChange` does nothing while `isSaving`. Before the
+  fix, Cancel closed the sheet while the save ran on, and the token was saved
+  and the trail said "changed" though the teacher had cancelled. A Help
+  button at the sheet's foot opens Help's `deploy-tokens` page (a stub in
+  `help/outline.json` until the Help writer writes it; owed before the
+  cut). When the new
+  token cannot reach some of the folder's class websites the sheet stays open
+  behind an alert naming them (a course's shared unit plans as "MPM2D unit
+  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default:
+  Return chooses it, and Escape does nothing, because `.cancel` and
+  `.defaultAction` on one alert button give it Return only, as #832 measured
+  in `QuestionKeysTests`) and Use the New Token, which saves it with
+  `--use-anyway`. When no token was saved before the change the first button
+  says Don't Save It instead, and the trail says a new token was not saved
+  rather than writing `keptOld` (review M7). Before the pane's first check has
+  answered nothing is known, and it says Don't Save It, which is true either
+  way (the fix review's M-c). The pasted token is held in memory
+  only while that alert is open.
+- **Remove Token** asks first and says a deploy set for later will not run.
+- **The end date travels to the Deploy screen** through
+  `AppSettings.cloudflareTokenEndsOn`, written by every Settings check and by
+  `DeployTokenEndReport` from a deploy's `PLANTOIR_TOKEN_ENDS:` line (read in
+  `ScriptRunner` and from a scheduled run's log, each naming itself as the
+  source). `DeployTokenEndReport.keep` writes the trail line when the kept
+  date changes and only then. `DeployTokenEndNoticeView`
+  shows the warning above a section's site when the course deploys to
+  Cloudflare Pages and the date is under 30 days away or past, with Open
+  Settings…; Course Settings' Cloudflare part shows the same sentence. No
+  request is made when either opens.
+- **The trail** has five events: `deploy token changed in Settings`,
+  `deploy token removed in Settings`, `deploy token change refused in
+  Settings` (with the problem key), `old deploy token kept in Settings`
+  (with a count) and `Cloudflare token end date learned` (the date and what
+  read it, review I4). None carries the token, the Account ID, a site's name
+  or an address. **Every line reaches the disk as it was written**
+  (`DeployTokenTests.testEveryTrailLineReachesTheDiskUnchanged`): the trail
+  is redacted on the way in, and the first `keptOld` wording put a colon
+  straight after "token", so `LogRedactor`'s `labelledSecret` rule took the
+  next word for a secret and the problem report carried "[removed: token]"
+  in a line that holds none (the Fable sweep's F1). Measured with the
+  redactor compiled alone: 4 of 58 filled lines changed on that wording, 0
+  on the new one, and the same against #853's reworked redactor. The test
+  hands each filled line to the redactor itself rather than restating its
+  patterns, so a later rule that would rewrite one of these lines fails it.
+  Rejected: exempting these lines from redaction, which would make the trail
+  writer trust its callers.
+- **Shared words, filled here.** `DeployTokenWording.filled` puts in the
+  Mac's word for the computer (`MachineWord`) and the Mac's path to these
+  settings for `{deployingSettings}` in every sentence, so the contract's
+  words name no platform (review W5).
+- **Off the undo list on purpose.** Saving and removing a token are not
+  undoable (#899's ruling): nothing here is recorded for Undo.
+
+Measured: a standalone build of `DeployTokenAnswer.swift` and
+`DeployTokenWording.swift` against the contract (scratchpad
+`measure/696/swift`) runs the 12 end-date and 5 marker cases and the words
+key by key with no failure. `DeployTokenTests` runs the same through XCTest
+and the pane's model through a stand-in launcher, including Cancel during a
+save (a stand-in that waits until the test releases it), Don't Save It,
+the end date's trail line, the Cloudflare-only warning
+(`SectionDetailView.deployTokenEndWarning(destinations:…)`), the
+placeholders, and the contract's own forbidden-word list for every sentence;
+it was compiled by `build-for-testing` and is the director's to run.
+
 ## A deployed folder opened in the browser (#850)
 
 GitHub [#850](https://github.com/russellgordon/plantoir/issues/850), v2.0.0.

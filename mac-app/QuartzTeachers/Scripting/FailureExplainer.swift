@@ -47,6 +47,9 @@ struct FailureExplainer {
         if let reason = savedTokenUnheardExplanation(in: output) {
             return reason
         }
+        if let reason = tokenNotSavedExplanation(in: output) {
+            return reason
+        }
         if let reason = unreadableFrontPageExplanation(in: output) {
             return reason
         }
@@ -468,6 +471,18 @@ struct FailureExplainer {
     /// refusal above.
     static func savedTokenUnheardExplanation(in output: String) -> String? {
         return liftedAndJoinedSentence(startingWith: savedTokenUnheardMarker, in: output)
+    }
+
+    /// The words that end the first of the two lines a deploy prints when it
+    /// does not save a token it was just given (#696): the paste rule
+    /// refused it, or it cannot reach the section's existing website.
+    /// `contracts/shared-rules.json` → `deployTokens.deployTimeRefusals`.
+    static let tokenNotSavedMarker: String = "saved as your token"
+
+    /// A token given at a deploy was not saved, and why (#696). Lifted and
+    /// joined like the refusal above.
+    static func tokenNotSavedExplanation(in output: String) -> String? {
+        return liftedAndJoinedSentence(startingWith: tokenNotSavedMarker, in: output)
     }
 
     /// The first line carrying `marker`, lifted, with the next line that has

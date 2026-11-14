@@ -100,6 +100,25 @@ nonisolated enum ActivityTrail {
         /// Cloudflare Pages is the new-course default. Carries whether the
         /// ID is missing or not a whole ID — never the ID.
         case deployRefusedForTheAccountID = "deploy refused for the Cloudflare Account ID"
+        /// A deploy token changed in Plantoir ▸ Settings ▸ Deploying (#696):
+        /// the destination, and whether the teacher chose to use it though it
+        /// could not reach some class websites. NEVER the token.
+        case deployTokenChanged = "deploy token changed in Settings"
+        /// A deploy token removed in Settings ▸ Deploying (#696): the
+        /// destination only.
+        case deployTokenRemoved = "deploy token removed in Settings"
+        /// A new token not saved from Settings ▸ Deploying (#696): the
+        /// destination and the problem key the teacher was shown.
+        case deployTokenChangeRefused = "deploy token change refused in Settings"
+        /// Keep My Old Token, after a new one could not reach the folder's
+        /// class websites (#696, the second ruling): the destination and how
+        /// many websites, never which.
+        case deployTokenKeptOld = "old deploy token kept in Settings"
+        /// The Cloudflare token's end date the app keeps changed (#696,
+        /// review I4): the date (not a secret) or that there is none, and
+        /// what read it (Settings, a deploy, a scheduled deploy). Written
+        /// only on a change. NEVER the token.
+        case deployTokenEndDateLearned = "Cloudflare token end date learned"
         case assistantOpened = "assistant opened"
         /// A Claude, Codex or GitHub Copilot session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when

@@ -62,9 +62,11 @@ import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -126,6 +128,133 @@ NEEDS_AN_ANSWER = 3
 REFUSAL_HEADLINE = "nobody is here to answer"
 
 
+# No test reaches a real host (#696, reviews W4 and the fix review's M-a).
+# Three doors are shut, and each records THAT a request was made, never its
+# arguments, which may hold a token:
+#
+#   * a `curl` first on PATH that writes one line and fails, for `curl`
+#     looked up by name, which is how the launcher calls it;
+#   * HTTPS_PROXY, HTTP_PROXY and ALL_PROXY (and their lower-case spellings)
+#     pointed at a listener on 127.0.0.1 that writes one line for every
+#     connection and closes it, for `/usr/bin/curl`, `command -p curl` and
+#     Python's urllib and http.client, which read those variables. NO_PROXY
+#     names only this computer, so a request to a local stand-in still goes
+#     straight there;
+#   * a `sitecustomize.py` on PYTHONPATH that refuses, and writes a line for,
+#     any Python socket connecting to an address that is not this computer,
+#     for a plain `socket` that reads no proxy variable.
+#
+# `no_request_was_made` raises when any of the three was used, so a test that
+# reaches for the network fails rather than quietly asking Cloudflare. Before
+# #696's review, 25 requests a run went out to api.cloudflare.com from this
+# file and test_deploy_sh_plans. Measured against the fix review's probe
+# (bare curl, /usr/bin/curl, `command -p curl`, urllib): before this, only
+# the first was caught.
+NO_NETWORK_FOLDER = "no-network"
+NO_NETWORK_LOG = "requests-refused.log"
+
+_SITECUSTOMIZE = """\
+# Written by test_deploy_sh_questions.the_network_refused: refuses any socket
+# connecting to an address that is not this computer, and says so in the log.
+import socket as _socket
+
+_LOG = {log!r}
+_LOCAL_NAMES = ("localhost", "127.0.0.1", "::1")
+_connect = _socket.socket.connect
+_connect_ex = _socket.socket.connect_ex
+
+
+def _is_local(address):
+    if not isinstance(address, tuple) or not address:
+        return True
+    host = str(address[0])
+    return host in _LOCAL_NAMES or host.startswith("127.")
+
+
+def _refuse(address):
+    with open(_LOG, "a", encoding="utf-8") as log:
+        log.write("a request was made\\n")
+    raise OSError("a test may not reach a real host")
+
+
+def connect(self, address):
+    if self.family in (_socket.AF_INET, _socket.AF_INET6) and not _is_local(address):
+        _refuse(address)
+    return _connect(self, address)
+
+
+def connect_ex(self, address):
+    if self.family in (_socket.AF_INET, _socket.AF_INET6) and not _is_local(address):
+        _refuse(address)
+    return _connect_ex(self, address)
+
+
+_socket.socket.connect = connect
+_socket.socket.connect_ex = connect_ex
+"""
+
+
+def _a_listener_that_writes_down_every_connection(log: Path) -> int:
+    """A socket on 127.0.0.1 that writes one line to `log` for every
+    connection made to it, reads nothing of what is sent, and closes the
+    connection. The port, for the proxy variables. A daemon thread, so it
+    ends with the test run."""
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+
+    def write_each_one_down():
+        while True:
+            try:
+                connection, _ = listener.accept()
+            except OSError:
+                return
+            with open(log, "a", encoding="utf-8") as record:
+                record.write("a request was made\n")
+            connection.close()
+
+    threading.Thread(target=write_each_one_down, daemon=True).start()
+    return listener.getsockname()[1]
+
+
+def the_network_refused(folder: Path, environment: dict) -> dict:
+    """`environment` with all three doors to the network shut (above)."""
+    shim = folder / NO_NETWORK_FOLDER
+    shim.mkdir(exist_ok=True)
+    log = shim / NO_NETWORK_LOG
+    curl = shim / "curl"
+    curl.write_text(
+        "#!/bin/sh\n"
+        f"printf 'a request was made\\n' >> '{log}'\n"
+        "exit 7\n",
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    (shim / "sitecustomize.py").write_text(_SITECUSTOMIZE.format(log=str(log)), encoding="utf-8")
+    port = _a_listener_that_writes_down_every_connection(log)
+    proxy = f"http://127.0.0.1:{port}"
+    refused = dict(environment)
+    refused["PATH"] = str(shim) + os.pathsep + environment.get("PATH", "")
+    python_path = environment.get("PYTHONPATH", "")
+    refused["PYTHONPATH"] = str(shim) + (os.pathsep + python_path if python_path else "")
+    for name in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy"):
+        refused[name] = proxy
+    for name in ("NO_PROXY", "no_proxy"):
+        refused[name] = "localhost,127.0.0.1,::1"
+    return refused
+
+
+def no_request_was_made(folder: Path) -> None:
+    """Raises when the launcher tried the network during the run."""
+    log = folder / NO_NETWORK_FOLDER / NO_NETWORK_LOG
+    if log.exists():
+        count = len(log.read_text(encoding="utf-8").splitlines())
+        raise AssertionError(
+            f"The launcher made {count} request(s) to a real host during a test. "
+            "Stub the check that made it (review W4 on #696)."
+        )
+
+
 def a_working_folder(tmp: str, course: str = "ICS3U", section: int = 1) -> Path:
     """A scratch folder holding just enough for `deploy.sh` to reach its
     questions: the launcher itself, and a built site to publish."""
@@ -160,13 +289,13 @@ def run_launcher(folder: Path, arguments: list, answer: str = "",
     does not. Sending bytes means the test asks the same question on every
     platform.
     """
-    import os
-    environment = dict(os.environ, USER=NOBODY)
+    environment = the_network_refused(folder, dict(os.environ, USER=NOBODY))
     result = subprocess.run(
         ["bash", str(folder / launcher)] + arguments,
         capture_output=True, timeout=180, cwd=str(folder),
         input=answer.encode("utf-8"), env=environment,
     )
+    no_request_was_made(folder)
     return subprocess.CompletedProcess(
         result.args, result.returncode,
         result.stdout.decode("utf-8", "replace"),
@@ -635,6 +764,66 @@ class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
             "check it, or one was renamed. Both end the same way: a question "
             "nobody has ever seen refused.",
         )
+
+
+
+# 192.0.2.1 is TEST-NET-1 (RFC 5737): an address no host answers on, so a
+# door left open makes the request time out here rather than reach anybody.
+_NOBODYS_ADDRESS = "192.0.2.1"
+
+
+@unittest.skipUnless(HAS_BASH, "no bash here that can reach a scratch folder")
+class TheNetworkGuardShutsEveryDoor(unittest.TestCase):
+    """The fix review's M-a on #696. MUST-FAIL on c4655ba2d, whose guard was a
+    `curl` on PATH alone: every way in below except the first reached the
+    proxy the review stood in for a host, and the guard said nothing."""
+
+    WAYS_IN = (
+        ("curl by name", ["bash", "-c", f"curl -sS --max-time 3 http://{_NOBODYS_ADDRESS}/"]),
+        ("/usr/bin/curl", ["bash", "-c", f"/usr/bin/curl -sS --max-time 3 http://{_NOBODYS_ADDRESS}/"]),
+        ("command -p curl", ["bash", "-c", f"command -p curl -sS --max-time 3 http://{_NOBODYS_ADDRESS}/"]),
+        ("Python's urllib", ["python3", "-c",
+                             "import urllib.request\n"
+                             f"urllib.request.urlopen('http://{_NOBODYS_ADDRESS}/', timeout=3)"]),
+        ("Python's http.client", ["python3", "-c",
+                                  "import http.client\n"
+                                  f"c = http.client.HTTPSConnection('{_NOBODYS_ADDRESS}', timeout=3)\n"
+                                  "c.request('GET', '/')"]),
+        ("a Python socket", ["python3", "-c",
+                             "import socket\n"
+                             f"socket.create_connection(('{_NOBODYS_ADDRESS}', 443), timeout=3)"]),
+    )
+
+    def test_every_way_in_is_caught(self):
+        for name, command in self.WAYS_IN:
+            if command[0] == "python3" and shutil.which("python3") is None:
+                continue
+            with self.subTest(way=name), tempfile.TemporaryDirectory() as tmp:
+                folder = Path(tmp)
+                environment = the_network_refused(folder, dict(os.environ))
+                subprocess.run(command, env=environment, capture_output=True, timeout=30,
+                               stdin=subprocess.DEVNULL)
+                with self.assertRaises(AssertionError):
+                    no_request_was_made(folder)
+
+    def test_this_computer_is_still_reachable(self):
+        """NO_PROXY names this computer, and a local socket is let through,
+        so a stand-in a test starts on 127.0.0.1 still answers."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            environment = the_network_refused(folder, dict(os.environ))
+            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+            try:
+                result = subprocess.run(
+                    ["python3", "-c", f"import socket; socket.create_connection(('127.0.0.1', {port}), timeout=3); print('reached')"],
+                    env=environment, capture_output=True, timeout=30)
+            finally:
+                listener.close()
+            self.assertIn(b"reached", result.stdout, result.stderr)
+            no_request_was_made(folder)
 
 
 if __name__ == "__main__":

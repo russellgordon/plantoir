@@ -15,6 +15,14 @@ import SwiftUI
 /// No data moved: the stored key is the one it always was, so nothing was
 /// migrated (the plan's "first non-empty course value wins" found no
 /// per-course value to read on either platform).
+///
+/// **The tokens (#696).** Each destination also shows its saved token:
+/// whether one is saved and accepted, when it ends where the service says,
+/// Change Token… (checked before it is saved, against this folder's class
+/// websites too) and Remove Token. `DeployTokenRows` draws them and
+/// `DeployTokenPanel` asks `deploy.sh --token`; the app never reads the
+/// token itself. Netlify gets a section of its own above Cloudflare's
+/// (Russell, 2026-10-27).
 struct DeployingSettingsView: View {
 
     // MARK: - Stored properties
@@ -26,11 +34,23 @@ struct DeployingSettingsView: View {
     /// the pane writes one line for a change and nothing for a visit.
     @State var accountIDWhenNoted: String = ""
 
+    /// The Netlify token's part of the pane (#696).
+    @State var netlifyToken: DeployTokenPanel = DeployTokenPanel(destination: .netlify)
+
+    /// The Cloudflare token's part of the pane (#696).
+    @State var cloudflareToken: DeployTokenPanel = DeployTokenPanel(destination: .cloudflare)
+
     // MARK: - Computed properties
 
     var body: some View {
         @Bindable var settings = AppSettings.shared
         Form {
+            Section {
+                DeployTokenRows(panel: netlifyToken)
+            } header: {
+                Text(DeployTokenWording.sectionHeaderNetlify)
+            }
+
             Section {
                 LabeledContent("Cloudflare Account ID") {
                     TextField("", text: $settings.cloudflareAccountID, prompt: Text("32 letters and digits"))
@@ -58,6 +78,8 @@ struct DeployingSettingsView: View {
                         .foregroundStyle(.orange)
                         .accessibilityIdentifier("cloudflareAccountProblem")
                 }
+
+                DeployTokenRows(panel: cloudflareToken)
             } header: {
                 Text("Cloudflare Pages")
             } footer: {
@@ -84,6 +106,12 @@ struct DeployingSettingsView: View {
         }
         .onAppear {
             accountIDWhenNoted = AppSettings.shared.cloudflareAccountID
+        }
+        // Each token is checked when the pane opens: two small requests, and
+        // the pane is opened on purpose. Never cleared from here.
+        .task {
+            await netlifyToken.check()
+            await cloudflareToken.check()
         }
         .onDisappear {
             noteTheChange()
@@ -129,6 +157,10 @@ struct DeployingSettingsView: View {
         let now: String = AppSettings.shared.cloudflareAccountID
         if let line = DeployingSettingsView.trailLine(before: accountIDWhenNoted, after: now) {
             ActivityTrail.note(.cloudflareAccountIDChangedInSettings, line)
+            // The token's check asks about the account, so it is asked again.
+            Task { @MainActor in
+                await cloudflareToken.check()
+            }
         }
         accountIDWhenNoted = now
     }
