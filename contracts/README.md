@@ -262,9 +262,12 @@ entry owed by a genuinely later release rightly survives the cut — the rule is
 "later than this build", not "empty at the cut". A milestone that is not a
 version fails, because it cannot be compared. `RELEASING.md` re-runs the suite
 AFTER the version is set, since a run before the bump compares against the old
-version and passes with entries left. **Since 2026-11-13 the ledger holds 86
-entries, every one on v2.0.0** — step 0 of the Windows v2.0.0 run
-([#787](https://github.com/russellgordon/plantoir/issues/787)) held open
+version and passes with entries left. **Since 2026-11-13 the ledger holds the
+Windows v2.0.0 run's entries, every one on v2.0.0** (how many is read from
+`NamedGapLedger.cs` itself, never from prose: pieces of the run add and close
+entries all day) — step 0 of that run
+([#787](https://github.com/russellgordon/plantoir/issues/787)) held 86 open,
+holding
 every red the mac's v2.0.0 work brought that a later piece of the same run
 builds, each against its own open `windows` issue, and wired twelve more
 lists into the ledger, the launcher runner's rows among them
