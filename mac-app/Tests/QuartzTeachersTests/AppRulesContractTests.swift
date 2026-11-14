@@ -860,9 +860,11 @@ final class AppRulesContractTests: XCTestCase {
         )
     }
 
-    /// Netlify's expiry box starts at 7 days and an expired token announces
-    /// nothing: publishing just stops, weeks later, and gets reported as the
-    /// app breaking. Both token requests must say so, and Cloudflare's must
+    /// Netlify's expiry box starts at 7 days, and a token left at that stops
+    /// every deploy a week later. Before #696 an expired token announced
+    /// nothing and was reported as the app breaking; Settings now says
+    /// whether the saved token still works, but the advice that prevents the
+    /// failure stays. Both token requests must give it, and Cloudflare's must
     /// also name the account-resources step a token cannot publish without.
     func testTheTokenStepsCarryTheAdviceThatPreventsASilentFailure() {
         var netlifySteps: String = ""
