@@ -166,9 +166,9 @@ ready.
   school is now called Grove Colours and is offered to every teacher, and a
   switch that only that school used is gone.
   ([#891](https://github.com/russellgordon/plantoir/issues/891))
-- **The problem report removes more before you send it:** passwords and
-  tokens written in more forms, and the name in a home folder that has a
-  space in it.
+- **Problem reports are more careful with your details.** Plantoir already
+  takes passwords and your name out of a problem report before you send it.
+  It now recognises more of the ways they can be written.
   ([#853](https://github.com/russellgordon/plantoir/issues/853), [#876](https://github.com/russellgordon/plantoir/issues/876))
 - **Windows fixes:** a handout printed on Windows should look the same as one
   printed on a Mac ([#577](https://github.com/russellgordon/plantoir/issues/577)), and a course you keep for reference will stop
