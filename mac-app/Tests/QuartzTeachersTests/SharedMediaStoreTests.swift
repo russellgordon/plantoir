@@ -308,7 +308,7 @@ final class SharedMediaStoreTests: XCTestCase {
 
     /// Two pictures enter the store at the same moment. The backup naming
     /// both is deleted (to the Trash, by Undo); Undo keeps one of them. The
-    /// one Undo names survives every sweep for 31 days by the Undo list's own
+    /// one Undo names survives every sweep for 61 days by the Undo list's own
     /// written moment; the other, of the same age, goes a day after a sweep
     /// first finds it unneeded.
     func testAFileAnUndoStepNamesSurvivesASweepAndOneOfTheSameAgeDoesNot() throws {
@@ -352,13 +352,16 @@ final class SharedMediaStoreTests: XCTestCase {
         clock.now = start.addingTimeInterval(30 * 86_400)
         store.sweep()
         XCTAssertTrue(FileManager.default.fileExists(atPath: kept.path), "and at 30 days")
-        clock.now = start.addingTimeInterval(31 * 86_400 + 60)
+        clock.now = start.addingTimeInterval(45 * 86_400)
         store.sweep()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: kept.path), "found unneeded at 31 days, kept that day")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: kept.path), "and at 45 days, within the journal's grace (#899)")
+        clock.now = start.addingTimeInterval(61 * 86_400 + 60)
+        store.sweep()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: kept.path), "found unneeded at 61 days, kept that day")
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: store.listsURL.appendingPathComponent("undo-THIS-MAC-41.json").path
         ), "the expired Undo list is removed")
-        clock.now = start.addingTimeInterval(32 * 86_400 + 120)
+        clock.now = start.addingTimeInterval(62 * 86_400 + 120)
         store.sweep()
         XCTAssertFalse(FileManager.default.fileExists(atPath: kept.path), "a day after its Undo list expired, it goes")
         XCTAssertThrowsError(try store.keepForUndo(stepID: "../escape", checksums: [], writtenAt: start))

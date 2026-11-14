@@ -293,7 +293,7 @@
       "honoured": {
         "pendingListHours": 24,
         "listWithoutItsZipHours": 24,
-        "undoListDays": 31,
+        "undoListDays": 61,
         "unneededBeforeDeletedHours": 24,
         "unneededBeforeDeletedWhenSharedDays": 14,
         "futureAllowedHours": 24,
@@ -554,14 +554,36 @@
           "expectListsRemoved": []
         },
         {
-          "name": "an Undo list written 32 days ago keeps nothing and is removed",
+          "name": "an Undo list written 40 days ago still keeps its files: the journal keeps a step on the disk for 60 days, 30 offered and a grace of 30 for a clock set wrong (#899)",
           "store": [
             "c"
           ],
           "backups": [],
           "undoLists": [
             {
-              "daysAgo": 32,
+              "daysAgo": 40,
+              "computer": "this",
+              "lists": [
+                "c"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "c": 48
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": []
+        },
+        {
+          "name": "an Undo list written 62 days ago keeps nothing and is removed (61 days: the journal's 60 on the disk, and one more)",
+          "store": [
+            "c"
+          ],
+          "backups": [],
+          "undoLists": [
+            {
+              "daysAgo": 62,
               "computer": "this",
               "lists": [
                 "c"
@@ -907,7 +929,7 @@
           ]
         },
         {
-          "name": "an Undo list dated years ahead, first seen here 32 days ago, keeps nothing and is removed",
+          "name": "an Undo list dated years ahead, first seen here 62 days ago, keeps nothing and is removed",
           "store": [
             "c"
           ],
@@ -915,7 +937,7 @@
           "undoLists": [
             {
               "daysAgo": -3000,
-              "firstSeenDaysAgo": 32,
+              "firstSeenDaysAgo": 62,
               "computer": "this",
               "lists": [
                 "c"

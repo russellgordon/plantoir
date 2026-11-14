@@ -13297,3 +13297,136 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## Undo and Redo: the journal Windows owes (#899, piece U1)
+
+The mac's journal core is described in `documentation/09-mac-app.md` →
+"Undo and Redo: one list for the app (#899)", with what was measured and
+what was rejected. **Do not start it until U1's fix reviews have cleared**:
+the format changed after U1's two reviews and again after its two fix
+reviews (Russell's rulings 17 to 20 and the director's rulings on them),
+before any Windows reader existed, so that it would not change again under
+one, and the issue says when that is settled. The third round (2026-11-14)
+changed no byte a v1 line holds: it stated what a reader does with a
+`cleared` line, a `note`'s required keys and a segment with no time, and
+what `rule.deployed` reads. The Fable sweep the same day added four
+sentences a reader needs, with cases, and no byte of a v1 line changed
+either: the second bullet below. Steps 1 to 8 may start once U1 merges.
+
+Windows inherits free: the format (`contracts/file-formats.json` →
+`undoJournal`, which a reader is meant to be built from alone), the rule and
+every case (`contracts/shared-rules.json` → `undo`: `rule`, `clearReasons`,
+`checkCases`, `stackCases`, `stepCases`, `recoveryCases`, `deployedCases`,
+and `knownLimits`, which says what is deliberately not fixed), the 20 traces in
+`contracts/undo-traces.json`, and `scripts/test_make_undo_traces.py`, which
+`PythonToolchainTests` runs and which checks the traces and the cases
+against a reference model of the same rules. It reads the traces with CR LF
+taken as LF, so a checkout with `core.autocrlf=true` is current (measured
+red before the fix by converting the three files to CR LF).
+
+Six things in the format are easy to get wrong and are the reason it was
+revised:
+
+- **Every object is open.** Only `kind` is required of an op, and only
+  `seq`, `madeAt` and `ops` of a step. A line, step or op a reader cannot
+  read is KEPT (`undoJournal.unknown`): its `seq` still counts for the next
+  number, every blob name its text holds (64 lower-case hex characters) is
+  kept, its segment is kept until the newest `at` written in that segment is
+  more than 60 days old, and while it stands at or above the newest step
+  Undo and Redo are not available. A typed reader that throws on a field it
+  does not expect, and skips the line, is the bug the mac's first version
+  had: it then undid the step BELOW a newer one. The one exception is the
+  `note` event: a reader passes over a note whatever else it carries (no
+  move, no barrier, nothing kept for it); it exists so a later version can
+  add a record an older reader skips.
+- **Which values make a step unreadable, and which are open.** A
+  `recompute` whose `maintainer` the reader does not know (only
+  `sectionFrontPage` exists) makes its op unreadable, and a `holds` other
+  than `section` or `course` makes its step unreadable (absent is fine):
+  both are barriers, never undone with the re-derivation skipped or under
+  the wrong lease. `madeBy`, `class` and `action.key` are OPEN strings: a
+  typed reader must not reject a value it does not know (an enum that
+  throws on one is the mistake to avoid). A key it does not know on a known
+  op is ignored and kept, which is why a later version never adds a
+  meaning-bearing key to a known kind. `madeBy` splits at its ends: the
+  word before the FIRST colon, the id after the LAST, the client name
+  between (it may hold colons). `checkCases` and `stackCases`
+  (`stepFromAnotherVersion:<variant>`) pin each.
+- **A `cleared` line clears whatever its reason says.** A reader never
+  checks the reason against `undo.clearReasons`, which lists only the
+  reasons this version writes: a refused Undo (`changedSince`, ruling 13, and
+  `contentMissing`, held question M9), a step recovery closes `interrupted`,
+  and the flip of the switch (`wentLive`, so steps recorded in shadow are
+  never offered); never a deploy or sharing unit plans (rulings 17 and 18).
+  Checking the reason would make a later version's clearing a barrier. A
+  step another process has in flight when a clearing is written leaves the
+  list when its own work ends. A refused REDO, for a hand edit or for
+  missing content, writes `dropped` (reason `redoRefused`) for the undone
+  steps from it up, and clears nothing (ruling 20). A dead process's step that cannot be
+  settled is never left in flight for ever: recovery closes it
+  `interrupted` when its put-back cannot be planned, and pruning closes it
+  `interrupted` (reason `unsettled`, no clearing) once it is past the
+  limits.
+- **Whether a step was deployed is read from the published-pages record**,
+  never from the journal (`undo.rule.deployed`, `deployedCases`): the newest
+  fragment of each destination the section deploys to NOW, which `deploy.py`
+  and `deploy.ps1` already write; a site marker with no fragment is
+  `cannotTell`; places are compared in NFC (`String.Normalize()`), then
+  ordinally. Nothing on the Windows side writes a deploy into the journal,
+  and nothing should.
+- **The limits are judged when the list is read**, with the clock rules of
+  `undo.rule.limits`, not only when the next step is written.
+- **`folder-id` is shared by both apps** on a synced folder: written lower
+  case, read with either case, a byte-order mark and white space ignored;
+  made with a hard link where there are links and an exclusive create where
+  there are not (exFAT, FAT, SMB); a damaged one set aside, never a block.
+
+It owes, in this order (the contract review's recommendation):
+
+1. `folder-id` and the format reader, lenient as above.
+2. The fold and the `stackCases`.
+3. The lock and the append. The lock must be a wait the system QUEUES:
+   `LockFileEx` on `undo\.lock` without `LOCKFILE_FAIL_IMMEDIATELY`, or a
+   named mutex keyed on the SHA-256 of the canonical path, never an
+   exclusive open retried on a timer (W3; polling on the mac gave up 663 of
+   1,600 begins with 8 processes at once). Readers open with
+   `FileShare.ReadWrite | FileShare.Delete`, retry a sharing violation for a
+   bounded time and never call the list unreadable for it (W2).
+4. The checks: `checkCases`, then `stepCases` and the staged swap that
+   retries a refused rename and names the file still in use (W5).
+5. Write-ahead and recovery, and the `recoveryCases`, including
+   `interrupted` (a file changed by hand stops recovery putting the whole
+   step back: what can be verified is put back and the list is cleared),
+   content missing (closed and cleared), a file in use during recovery
+   (tried again at once by an Undo or a Redo, and otherwise on the schedule
+   in `undo.rule.recovery`: on Windows this is the everyday case, W5, and
+   retrying it at every lock cost the mac 187 to 255 ms on every action,
+   the core review of U1's second round), a step in flight in another process when the clearing is written, and a
+   closed step's staged files removed.
+6. The traces. U1's are written by one small writer
+   (`JournaledWrite.settingEntry`'s rule, setting one front-matter line),
+   and U3 regenerates them through the real action code, so keep the
+   twin of that writer small: U3 replaces it with a wider replayer.
+7. `plantoir-mcp.exe` told the same folder as the window (W4).
+8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
+   section's destinations as Windows knows them (primary and additional, by
+   type) and whether each has a site marker, read from the same
+   `firstDeployMarkers` paths the scheduled deploy reads.
+
+Until each is built it is a named gap. What goes red on that side the day
+U1 merges, measured by reading the tests rather than running them: the
+trail test that enumerates `activityTrail.mustRecord`, for the two events
+`undo could not record a step` and `undo rolled back`, which go in
+`NamedGapLedger` against #899. The case lists and the traces are read
+by key, so nothing reads them yet and they go red nowhere: they are unrun,
+not failing (`deployedCases` included). Ruling 2 puts #899 in v2.0.0 and the cut waits for it, so
+these gaps hold the cut by design.
+
+Two details found on the mac matter there too: a JSON reader may drop a
+byte-order mark inside a string (write the fixture pages from `utf8Hex`),
+and only `begin`, `undoing` and `redoing` need the expensive flush
+(`F_FULLFSYNC` 4.0 ms against 0.03 ms for `fsync` on an M4 Pro; measure
+`FlushFileBuffers` there). Today's publish drops a page's leading
+byte-order mark (`String(contentsOf:)` does, as `File.ReadAllText` does),
+and the traces' writer does the same, so the BOM page in the fixture is
+rewritten without it on both platforms.
