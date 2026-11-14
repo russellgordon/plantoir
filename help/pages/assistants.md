@@ -10,6 +10,7 @@ covers:
 - mac-app/QuartzTeachers/Models/PlanningTab.swift
 - mac-app/QuartzTeachers/Views/Section/ProblemsTableView.swift
 - mac-app/QuartzTeachers/Models/AgentGuidance.swift
+- mac-app/QuartzTeachers/Models/SetUp/SetUpRunner.swift
 - mac-app/Tests/Goldens/menu-bar.txt
 keywords:
 - assistant
@@ -26,6 +27,9 @@ keywords:
 - permission
 - asks before
 - command line
+- install
+- set up
+- set up an assistant
 - terminal
 description: Plantoir works fully without an assistant. This page says what an outside assistant is, which three Plantoir works with, and where each appears.
 ---
@@ -35,19 +39,20 @@ This page says what an outside assistant is, which ones Plantoir works with, and
 
 ## What an outside assistant is
 
-An outside assistant is a separate program, made by another company. You install it yourself and sign in to it yourself, with your own account.
+An outside assistant is a separate program, made by another company. You sign in to it yourself, with your own account.
 
 Plantoir can open that program in your working folder, on one of your courses, with what it needs to know about the course. You then type to the assistant in its own window.
 
-- Plantoir never installs an outside assistant, and never signs in for you.
-- Plantoir does not check whether you are signed in, or what kind of account you have.
+- Plantoir installs an outside assistant only when you ask it to. You can also install one yourself. To have Plantoir do it, choose {{menu:helpSetUpAnAssistant}}. See [Set up an assistant's command-line tool](page:set-up-assistant).
+- Plantoir never signs in for you. Signing in is done in the assistant's own window, with its maker.
+- When Plantoir opens an assistant on a course, it does not check whether you are signed in, or what kind of account you have.
 - What an outside assistant reads is sent to its maker's service.
 
 ## The three Plantoir works with
 
 Plantoir works with three, and names them as its menus do: Claude, Codex and GitHub Copilot. Each is a program that runs in a terminal window: Claude Code, Codex, and GitHub Copilot's command-line tool.
 
-Plantoir looks for each program on this {{machine}} and finds it where its installer put it. An assistant that is not installed is not shown anywhere in Plantoir. Its items are hidden, not greyed. Each of the three is shown or hidden on its own.
+Plantoir looks for each program on this {{machine}} and finds it where its installer put it. The menu items and buttons of an assistant that is not installed are hidden, not greyed. Each of the three is shown or hidden on its own. The Revise With menus are always there, and always end with an item that opens the settings for setting an assistant up.
 
 ## Where each appears
 

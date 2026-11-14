@@ -2196,7 +2196,28 @@
       "deploy-tokens-1",
       "deploy-tokens-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Deploying pane of Plantoir's settings, with its Netlify part and its Cloudflare Pages part, each connected",
+       "labels": [
+        "Status line",
+        "Change Token…",
+        "Remove Token",
+        "Check Again"
+       ],
+       "scene": "deploy-tokens-1"
+      },
+      {
+       "shows": "The question asked when a new token cannot reach some class websites",
+       "labels": [
+        "The sections",
+        "Keep My Old Token",
+        "Use the New Token"
+       ],
+       "scene": "deploy-tokens-2"
+      }
+     ]
     },
     {
      "anchor": "github-pages",

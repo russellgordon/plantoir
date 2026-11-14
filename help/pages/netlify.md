@@ -52,7 +52,7 @@ Deploying is what uses the allowance. Publishing or hiding a page uses none, bec
 1. Select the section and press {{control:deployButton}}.
 2. A sheet titled {{control:connectToNetlifySheetTitle}} opens. It lists the steps for making an access token on Netlify's website, and has a link named {{control:connectToNetlifySheetLink}}. Follow its steps in your browser. One of them matters months later:
    {{say:app-rules#credentialRequests.requests[0].steps[3]}}
-3. Netlify shows the token once. Copy it, paste it into the {{control:connectToNetlifySheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this computer, and Plantoir does not ask for it again.
+3. Netlify shows the token once. Copy it, paste it into the {{control:connectToNetlifySheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this computer, and Plantoir does not ask for it again. [See, change or remove a deploy token](page:deploy-tokens) says where to look at it later.
 4. If a sheet titled {{control:teacherSurnameSheetTitle}} opens, type your surname in the {{control:teacherSurnameSheetSurnameField}} field, using letters only. Plantoir asks once, and uses the surname in the names of your class websites.
 
 {{picture:netlify-1}}
@@ -69,7 +69,7 @@ A scheduled deploy uses the allowance like any other, and the sheet that schedul
 
 ## If it does not work
 
-- **Deploys stop working months later, with nothing on screen to say why.** The token has expired. Netlify's tokens start with an expiry of 7 days unless you change it when you make one.
+- **Deploys stop working months later.** The token has expired. Netlify's tokens start with an expiry of 7 days unless you change it when you make one. Netlify does not tell Plantoir when a token will end, so nothing warns you ahead. Afterwards, the {{control:plantoirSettingsDeployingPane}} pane of Plantoir's settings says the saved token is no longer accepted, and you can change it there. See [See, change or remove a deploy token](page:deploy-tokens).
 - **Students see a notice that the site is not available.** The month's credits may have run out. Netlify brings the sites back when the next month begins.
 - **The name is taken.** Add a number to the end, or your school's initials. See [Your site's address](page:site-address).
 - **Something else went wrong.** See [A deploy did not work](page:deploy-failed).
