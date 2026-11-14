@@ -664,6 +664,17 @@ else
   cat /tmp/verify_swift_launcher_marker_test.log
 fi
 
+# Runnable Swift on Windows (#570), run here as well as in Windows'
+# PythonToolchainTests (#802): the fetch, the compile wrapper's Windows
+# environment and its tidy, against fake installs that run nothing. The parts
+# that need Windows' own expand.exe or msvcrt are skipped here and say so.
+if (cd scripts && python3 test_swift_windows.py) >/tmp/verify_swift_windows_test.log 2>&1; then
+  pass "runnable Swift on Windows: the fetch's pins and trim, the compile wrapper's environment (the toolchain's bin and System32 and nothing else), its tidy and what it caches, read on this Mac against fake installs (scripts/test_swift_windows.py, #570, #802)"
+else
+  fail "runnable Swift on Windows: the fetch, the compile wrapper's environment, its tidy or what it caches does not hold (scripts/test_swift_windows.py, #570, #802)"
+  cat /tmp/verify_swift_windows_test.log
+fi
+
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
