@@ -59,6 +59,64 @@ public class WorkLeaseContractTests
         Assert.True(ran >= 32, $"only {ran} declining cases ran here");
     }
 
+    /// <summary>
+    /// #868 (the mac's #835 part 3): a lease may name the SECTIONS it holds,
+    /// and this app does not read that sixth line yet, so every lease holds
+    /// the whole course here. That is safe only while it holds MORE, never
+    /// less: every <c>workLeases.declining.sections</c> case the contract
+    /// declines must be declined here, and each case it allows is still
+    /// declined here (the course-wide hold). The day this app narrows a hold
+    /// to its section, the second half fails, saying so: walk the cases
+    /// exactly then, with each case's <c>me.section</c> and <c>sections</c>.
+    /// </summary>
+    [Fact]
+    public void UntilTheSixthLineIsReadHere_EverySectionCaseIsDeclinedAtLeastAsOftenAsTheContractSays()
+    {
+        var cases = ContractLoader.LoadJson("shared-rules.json")["workLeases"]!["declining"]!["sections"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 14, $"only {cases.Count} section cases were read");
+
+        var unsafeHere = new List<string>();
+        var narrowedHere = new List<string>();
+        int declinedByBoth = 0, widerHere = 0;
+        foreach (var c in cases.Where(c => AppliesHere(c!)))
+        {
+            var asker = c!["asker"]!.ToString() switch
+            {
+                "aBuild" => WorkLease.Asker.ABuild,
+                "aScheduledPublish" => WorkLease.Asker.AScheduledPublish,
+                "anOutsideDeploy" => WorkLease.Asker.AnOutsideDeploy,
+                var other => throw new InvalidOperationException($"unknown asker {other}"),
+            };
+            int myPid = c["me"]!["pid"]!.GetValue<int>();
+            var claim = c["me"]!["claim"] is JsonObject claimed
+                ? new WorkLease.Claim(claimed["moment"]!.ToString(), claimed["pid"]!.GetValue<int>())
+                : null;
+            // Each other's sections (and sectionsLine) are left unread, as
+            // Others() leaves a real lease's sixth line unread.
+            var others = c["others"]!.AsArray().Select(o => new WorkLease.Other(
+                o!["course"]!.ToString(),
+                o["kind"]!.ToString(),
+                o["pid"]!.GetValue<int>(),
+                o["moment"]?.ToString(),
+                o["alive"]!.GetValue<bool>(),
+                o["nameLine"]?.GetValue<bool>() ?? true)).ToList();
+
+            bool declinedHere = WorkLease.FirstInTheWay(asker, "ICS3U", myPid, claim, others) is not null;
+            bool contractDeclines = c["expect"]!.ToString() == "declined";
+            if (contractDeclines && !declinedHere) unsafeHere.Add($"\"{c["name"]}\"");
+            else if (contractDeclines) declinedByBoth++;
+            else if (declinedHere) widerHere++;
+            else narrowedHere.Add($"\"{c["name"]}\"");
+        }
+        Assert.True(unsafeHere.Count == 0,
+            "a lease the contract says holds this section was let through here, the unsafe direction: " + string.Join(", ", unsafeHere));
+        Assert.True(narrowedHere.Count == 0,
+            "these section cases are now allowed here, so this app narrows a hold to its section (#868): walk " +
+            "workLeases.declining.sections.cases exactly, and replace this test: " + string.Join(", ", narrowedHere));
+        Assert.True(declinedByBoth >= 1 && widerHere >= 1,
+            $"declined by both {declinedByBoth}, held wider here {widerHere}: the section cases no longer test both directions");
+    }
+
     [Fact]
     public void TheScheduledPublishWaitIsTheContractsOwn()
     {
