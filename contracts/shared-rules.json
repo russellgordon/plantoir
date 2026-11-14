@@ -42591,7 +42591,9 @@
       "Obsidian shows the Vimeo picture form as a player only with a community add-on (Simple Vimeo); without it the line looks like a picture that does not load. The class site is unaffected.",
       "A Vimeo showcase is not made a player: its embed address could not be verified (2026-11-13). It stays a picture, with the note.",
       "A video its owner limited to specific domains plays only on the domains listed; the class site's address must be one of them.",
-      "Videos need the internet and do not print."
+      "Videos need the internet and do not print.",
+      "The YouTube rule is Quartz's own ytLinkRegex, copied unchanged, and it is not limited to YouTube's addresses: a picture whose path has a folder ending in v and an 11-character file name (Media/Dev/diagram.png, as ![](...) or ![[...]]) becomes a player for a video that does not exist (measured 2026-11-13, #692 implementation review finding 3). OFM did the same before #692, to youtube.com, and its own step would still do it after PlantoirVideo, so it is a follow-up, not this piece.",
+      "Three Share-button or browser addresses still show a broken picture, as before #692: youtube.com/live/<id> (a live stream or premiere: no player and no note), vimeo.com/showcase/<sid>/video/<id> (one video in a showcase: the note), and vimeo.com/manage/videos/<id> (the address in the owner's own browser after an upload: the note). A YouTube player address's end= and a playlist's index= are dropped. Measured 2026-11-13; a follow-up."
     ],
     "rejected": [
       "A tap before a player loads (a card with the video's title and a Play button): offered on #692 and not chosen.",

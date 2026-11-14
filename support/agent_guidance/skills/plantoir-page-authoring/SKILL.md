@@ -563,7 +563,7 @@ and do not print:
   its privacy-enhanced one (`youtube-nocookie.com`), and Vimeo's is told
   not to track. So a school network has to allow youtube-nocookie.com as
   well as youtube.com; if a YouTube video plays at home and not at school,
-  that is the reason, and the school's network team can allow it.
+  that is the likely reason, and the school's network team can allow it.
 - **The mistakes**: `[words](address)` without the `!` is only a link; a
   `vimeo.com/showcase/...` or a channel's own page is not one video and
   stays a broken picture (the build prints a note naming the line); pasting

@@ -393,6 +393,21 @@ def own_host_embeds_page(site: Path) -> str:
     return f"{count} embeds pointed at the site, a frame and a request of example.com's added"
 
 
+def embeds_unknown_video(site: Path) -> str:
+    # #692: the short-form Vimeo player pointed at a video that does not
+    # exist. player.vimeo.com answers 404 for it (curl, 2026-11-13, id
+    # 9999999999 with dnt=1; the real 22439234 answers 200), so the embeds
+    # row must name that frame. Before the row matched a frame's answer in
+    # full, the pasted player's 200 could answer for a short-form player.
+    path = page_file(site, "Embeds")
+    text = path.read_text(encoding="utf-8")
+    changed = text.replace("https://player.vimeo.com/video/22439234?dnt=1", "https://player.vimeo.com/video/9999999999?dnt=1")
+    if changed == text:
+        raise SystemExit("sabotage: the Embeds page has no short-form Vimeo player")
+    path.write_text(changed, encoding="utf-8")
+    return "the short-form Vimeo player pointed at a video that does not exist"
+
+
 def own_host_late(site: Path) -> str:
     add_script(site, "Quiz", "late.js",
                "addEventListener('load', () => setTimeout(() => fetch('https://example.com/plantoir-rendered-late', { mode: 'no-cors' }).catch(() => {}), 4000))\n")
@@ -491,6 +506,7 @@ DOERS = {
     "katex wrong face": katex_wrong_face,
     "quiz given away": quiz_given_away,
     "own host embeds page": own_host_embeds_page,
+    "embeds unknown video": embeds_unknown_video,
     "own host late": own_host_late,
     "own host lazy": own_host_lazy,
     "own host media": own_host_media,

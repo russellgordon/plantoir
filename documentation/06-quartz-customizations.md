@@ -5319,22 +5319,45 @@ YouTube player that was 650 px wide on a laptop is now 600 px.
   out when OFM's line has moved; the style rule exactly. Red on
   `origin/dev`'s `build_site.py` (3 tests) and with the transformer wired
   after OFM (2).
-- `browser-checks/video_players.mjs` (verify.sh, with Chrome for Testing):
+- `browser-checks/video_players.mjs` (verify.sh 6h-v, in Chrome for Testing
+  and Playwright's WebKit, engines found as the rendered check finds them;
+  an engine that is not there is a SKIP by name, and a failure under
+  `PLANTOIR_REQUIRE_ENGINES`):
   the skill's video example as 6n built it, every request to another host
   refused so nothing loads or plays. 600 px and 16:9 at 1300 px, the
   column's width and 16:9 at 390 px, a title, `loading="lazy"`, the referrer
   policy and a private address on each player; the pasted Vimeo player keeps
-  its own width. Asked of Chrome only: the planner measured the same layout
-  in WebKit, as `picture_heights.mjs` is asked of Chrome. verify.sh breaks a
-  copy of the site three ways and each must fail for its own reason: the
+  its own width. Measured 2026-11-13: 600 x 337.5 at 1300 px and 358 x
+  201.38 at 390 px in both engines. verify.sh breaks a copy of the site
+  three ways and each must fail for its own reason in every engine that
+  ran: the
   size rule out of `index.css` (650 px, measured), the title and `loading`
   off (Quartz's own player's shape), the old `youtube.com` address.
 - verify.sh 6n: the skill's example builds as the three players, the pasted
   Vimeo and PhET code unchanged, and no `www.youtube.com/embed/`.
 - The rendered check's `embeds` row (deployed sites only) has a short-form
-  Vimeo line on the Embeds page and brings each frame into view before it
+  Vimeo line on the Embeds page, for a different video (22439234) from the
+  pasted player (76979871). The row brings each frame into view before it
   waits, since a lazy player far below the window would never ask for its
-  document.
+  document. It files each frame's answer under the address the frame was
+  given (the first request of a redirect chain, without its `#` part) and
+  matches it in FULL, query included; the last response of a chain wins.
+  It passes when every frame's own document answered 2xx. Until the
+  implementation review (finding 1) it matched on the address before its
+  `?`, so the pasted player's 200 answered for a short-form player of the
+  same video that never asked for its own. Its sabotage `embeds unknown
+  video` points the short-form player at id 9999999999, which
+  player.vimeo.com answers 404 (curl, 2026-11-13; 22439234 and 76979871
+  answer 200). It is `gate: false`, run by name with a deployed host's
+  rows, since a gate's local run does not run the row at all. Measured
+  with the row's own code cut out of `rendered_features.mjs`, every
+  off-site request answered by a stub: green on the built Embeds page in
+  Chrome for Testing and WebKit; red on the sabotage in Chrome ("…9999999999?dnt=1
+  answered 404"); and, on the old same-video fixture with the short-form
+  player's request never answered, the OLD row green and the new row red
+  ("answered nothing") in WebKit. The sabotage in WebKit did not finish
+  under that stub (a 404 frame there never reached `load`) and is left to a
+  deployed run.
 - `codeRunnerBlocks.isolation.cases`: a page with a short-form player is a
   `frame` page, never isolated.
 
@@ -5364,9 +5387,22 @@ YouTube player that was 650 px wide on a laptop is now 600 px.
   add-on Simple Vimeo.
 - A video its owner limited to specific domains plays only on the domains
   listed.
-- Not measured here: whether nocookie playlists play, Vimeo's answer for a
-  video that does not exist, and whether YouTube refuses a player sent no
-  referrer. The deployed `embeds` row reads each frame's status.
+- The YouTube rule is Quartz's own `ytLinkRegex`, copied unchanged, and it
+  is not limited to YouTube's addresses. A picture whose path has a folder
+  ending in `v` and an 11-character file name (`Media/Dev/diagram.png`, as
+  `![](...)` or `![[...]]`) becomes a player for a video that does not
+  exist (measured 2026-11-13). OFM did the same before #692, to
+  youtube.com, and would still do it after PlantoirVideo; a follow-up.
+- Three addresses still show a broken picture, as before #692:
+  `youtube.com/live/<id>` (what Share gives for a live stream or premiere;
+  no player and no note), `vimeo.com/showcase/<sid>/video/<id>` (one video
+  in a showcase; the note), and `vimeo.com/manage/videos/<id>` (the address
+  in the owner's browser after an upload; the note). A YouTube player
+  address's `end=` and a playlist's `index=` are dropped. A follow-up.
+- Not measured here: whether nocookie playlists play, and whether YouTube
+  refuses a player sent no referrer. Vimeo answers 404 for a video that
+  does not exist (above). The deployed `embeds` row reads each frame's own
+  status; it cannot tell a Vimeo error page that answers 200 from a video.
 
 ## E. Summary: what is *not* customized
 

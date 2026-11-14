@@ -6175,30 +6175,74 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "a picture had no height until its bytes arrived or until it was scrolled to, the page grew when it did, a sized picture lost its shape in a narrow window, or the page moved by itself as it opened (browser-checks/picture_heights.mjs, #612, #609, #611)"
     cat /tmp/verify_picture_heights.log
   fi
-  # #692: YouTube and Vimeo players made from the picture form, at the size
-  # Russell set (600 px wide at most, 16:9), titled, lazy and privately
-  # addressed, on the skill's video example as 6n built it. Every request to
-  # another host is refused, so no player loads and nothing plays. Then the
-  # check proven to SEE, on copies of the site broken one way each: the size
-  # rule taken out of index.css (the old 650 px player), the title and
-  # loading taken off (the shape of Quartz's own player), and the old
-  # youtube.com address put back.
-  if node browser-checks/video_players.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_video_players.log 2>&1; then
-    pass "YouTube and Vimeo players from the picture form: $(head -1 /tmp/verify_video_players.log | sed 's/^OK: //') (#692, browser-checks/video_players.mjs)"
+  # #576: the Print button's fallback (the print layout's script refused),
+  # asked to print the way each browser answers print(): faces and pictures
+  # loaded before print(), the frame kept for a print put off, the page put
+  # back by the 30 s budget, and words.couldNotPrepare only when no print began.
+  if node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
+    pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes, pictures that never arrive and a print layout that never finishes put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
+  else
+    fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up (on either path) or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
+    cat /tmp/verify_print_fallback.log
+  fi
+  # #545: My Progress in a browser - Progress Fixture's own row, by name.
+  if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
+    pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
+  else
+    fail "My Progress did not count a student's ticks in a browser as the contract says (browser-checks/my_progress.mjs, #545)"
+    cat /tmp/verify_my_progress.log
+  fi
+else
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
+fi
+
+# ---- 6h-v. YouTube and Vimeo players, in Chrome and in Safari's engine (#692) ----
+# Players made from the picture form, at the size Russell set (600 px wide
+# at most, 16:9), titled, lazy and privately addressed, on the skill's video
+# example as 6n built it, in Chrome for Testing and Playwright's WebKit
+# (browser-checks/video_players.mjs). Every request to another host is
+# refused, so no player loads and nothing plays. Then the check proven to
+# SEE, on copies of the site broken one way each: the size rule taken out of
+# index.css (the old 650 px player), the title and loading taken off (the
+# shape of Quartz's own player), and the old youtube.com address put back.
+# An engine that is not on this Mac is a SKIP by name, never a pass.
+echo ""
+echo "🎬 YouTube and Vimeo players, in Chrome and in Safari's engine (#692)…"
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  skip "YouTube and Vimeo players from the picture form in Chrome and Safari's engine (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac"
+else
+  node browser-checks/video_players.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_video_players.log 2>&1
+  VIDEO_PLAYERS_EXIT=$?
+  VIDEO_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_players.log | tail -1 | sed 's/^ENGINES: //')"
+  while IFS= read -r VIDEO_SKIPPED_LINE; do
+    VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_LINE#SKIPPED: }"
+    VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_ENGINE%%:*}"
+    if [[ ",${PLANTOIR_REQUIRE_ENGINES:-}," == *",${VIDEO_SKIPPED_ENGINE},"* ]]; then
+      fail "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) did not run in ${VIDEO_SKIPPED_LINE#SKIPPED: }, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+    else
+      skip "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) in ${VIDEO_SKIPPED_LINE#SKIPPED: }"
+    fi
+  done < <(grep '^SKIPPED: ' /tmp/verify_video_players.log)
+  if [[ $VIDEO_PLAYERS_EXIT -eq 3 ]]; then
+    :
+  elif [[ $VIDEO_PLAYERS_EXIT -eq 0 ]]; then
+    pass "YouTube and Vimeo players from the picture form, in ${VIDEO_ENGINES}: $(head -1 /tmp/verify_video_players.log | sed 's/^OK: //') (#692, browser-checks/video_players.mjs)"
   else
     fail "a YouTube or Vimeo player was the wrong size, untitled, not lazy or not privately addressed (browser-checks/video_players.mjs, #692)"
     cat /tmp/verify_video_players.log
   fi
-  VIDEO_SABOTAGE_SITE="/tmp/plantoir-verify-video-sabotage"
-  for VIDEO_SABOTAGE in size player address; do
-    rm -rf "$VIDEO_SABOTAGE_SITE"
-    cp -R "$SITE_PUBLIC" "$VIDEO_SABOTAGE_SITE"
-    case "$VIDEO_SABOTAGE" in
-      size) VIDEO_SABOTAGE_REASON="px wide, not 600" ;;
-      player) VIDEO_SABOTAGE_REASON="a player has no title" ;;
-      address) VIDEO_SABOTAGE_REASON="neither privacy-enhanced YouTube nor do-not-track Vimeo" ;;
-    esac
-    if ! python3 - "$VIDEO_SABOTAGE_SITE" "$VIDEO_SABOTAGE" <<'VIDEOPY'
+  if [[ $VIDEO_PLAYERS_EXIT -ne 3 ]]; then
+    VIDEO_SABOTAGE_SITE="/tmp/plantoir-verify-video-sabotage"
+    for VIDEO_SABOTAGE in size player address; do
+      rm -rf "$VIDEO_SABOTAGE_SITE"
+      cp -R "$SITE_PUBLIC" "$VIDEO_SABOTAGE_SITE"
+      case "$VIDEO_SABOTAGE" in
+        size) VIDEO_SABOTAGE_REASON="px wide, not 600" ;;
+        player) VIDEO_SABOTAGE_REASON="a player has no title" ;;
+        address) VIDEO_SABOTAGE_REASON="neither privacy-enhanced YouTube nor do-not-track Vimeo" ;;
+      esac
+      if ! python3 - "$VIDEO_SABOTAGE_SITE" "$VIDEO_SABOTAGE" <<'VIDEOPY'
 import re, sys
 from pathlib import Path
 site, kind = Path(sys.argv[1]), sys.argv[2]
@@ -6220,37 +6264,29 @@ for page in sorted(site.glob("Authoring-Example-*.html")):
     sys.exit(0 if changed != text else 1)
 sys.exit(1)
 VIDEOPY
-    then
-      fail "the video players' sabotage '$VIDEO_SABOTAGE' found nothing to break (browser-checks/video_players.mjs, #692)"
-    elif node browser-checks/video_players.mjs "$PRINT_CHROME" "$VIDEO_SABOTAGE_SITE" >/tmp/verify_video_sabotage.log 2>&1; then
-      fail "the video players' check passed on a site broken by '$VIDEO_SABOTAGE', so it cannot see that fault (browser-checks/video_players.mjs, #692)"
-    elif grep -q "$VIDEO_SABOTAGE_REASON" /tmp/verify_video_sabotage.log; then
-      pass "the video players' check sees the '$VIDEO_SABOTAGE' sabotage, for its own reason (#692)"
-    else
-      fail "the video players' check failed the '$VIDEO_SABOTAGE' sabotage for another reason (#692): $(head -c 300 /tmp/verify_video_sabotage.log)"
-    fi
-  done
-  rm -rf "$VIDEO_SABOTAGE_SITE"
-  # #576: the Print button's fallback (the print layout's script refused),
-  # asked to print the way each browser answers print(): faces and pictures
-  # loaded before print(), the frame kept for a print put off, the page put
-  # back by the 30 s budget, and words.couldNotPrepare only when no print began.
-  if node browser-checks/print_fallback.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_print_fallback.log 2>&1; then
-    pass "Print's fallback, the browser laying the handout out itself: every picture and face loaded before print(), a print put off kept until afterprint, one that never comes, pictures that never arrive and a print layout that never finishes put back saying couldNotPrepare by the budget, a print with no afterprint put back quietly with the button free, headless Chrome's own print() put back at once - $(head -1 /tmp/verify_print_fallback.log | sed 's/^OK: //') (#576, browser-checks/print_fallback.mjs)"
-  else
-    fail "Print's fallback printed with the frame still loading, took the frame away before a print put off, or left Preparing to print… up (on either path) or said nothing when no print came (browser-checks/print_fallback.mjs, #576)"
-    cat /tmp/verify_print_fallback.log
+      then
+        fail "the video players' sabotage '$VIDEO_SABOTAGE' found nothing to break (browser-checks/video_players.mjs, #692)"
+        continue
+      fi
+      if node browser-checks/video_players.mjs "$PRINT_CHROME" "$VIDEO_SABOTAGE_SITE" >/tmp/verify_video_sabotage.log 2>&1; then
+        fail "the video players' check passed on a site broken by '$VIDEO_SABOTAGE', so it cannot see that fault (browser-checks/video_players.mjs, #692)"
+        continue
+      fi
+      # Red for its own reason in EVERY engine that ran, not in one of them.
+      VIDEO_SABOTAGE_SEEN=yes
+      for VIDEO_ENGINE in ${VIDEO_ENGINES//,/ }; do
+        if ! tr '|' '\n' </tmp/verify_video_sabotage.log | grep "\[${VIDEO_ENGINE}\]" | grep -q "$VIDEO_SABOTAGE_REASON"; then
+          VIDEO_SABOTAGE_SEEN=no
+        fi
+      done
+      if [[ "$VIDEO_SABOTAGE_SEEN" == "yes" ]]; then
+        pass "the video players' check sees the '$VIDEO_SABOTAGE' sabotage for its own reason, in ${VIDEO_ENGINES} (#692)"
+      else
+        fail "the video players' check failed the '$VIDEO_SABOTAGE' sabotage for another reason, or not in every engine (#692): $(head -c 300 /tmp/verify_video_sabotage.log)"
+      fi
+    done
+    rm -rf "$VIDEO_SABOTAGE_SITE"
   fi
-  # #545: My Progress in a browser - Progress Fixture's own row, by name.
-  if node browser-checks/my_progress.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_my_progress.log 2>&1; then
-    pass "My Progress in a browser: second in the sidebar, first in Key Links, two ticks counted under the right class, kept across a reload, an untick seen after Back, the fixture's row at 1 / 4 on a fresh profile (the teacher's [x]), every total the manifest's, read-only - $(head -1 /tmp/verify_my_progress.log | sed 's/^OK: //') (#545, browser-checks/my_progress.mjs)"
-  else
-    fail "My Progress did not count a student's ticks in a browser as the contract says (browser-checks/my_progress.mjs, #545)"
-    cat /tmp/verify_my_progress.log
-  fi
-else
-  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 
 # ---- 6h-r. The rendered check, in Chrome and in Safari's engine (#597, #807) ----
@@ -6309,7 +6345,7 @@ echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
 rendered_cleanup
 RENDERED_STARTED=$SECONDS
 if python3 browser-checks/lib/test_rendered_lib.py >/tmp/verify_rendered_lib.log 2>&1; then
-  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row but the deployed-only embeds has one, a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
+  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row has one (the deployed-only embeds row's run by name, never at a gate, #692), a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
 else
   fail "the rendered check's planting or sabotages (browser-checks/lib/test_rendered_lib.py, #597)"
   tail -20 /tmp/verify_rendered_lib.log

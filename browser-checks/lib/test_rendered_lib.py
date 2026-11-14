@@ -102,11 +102,18 @@ class Sabotages(unittest.TestCase):
                 self.assertIn(other, rows, one["name"])
             self.assertTrue(one["reason"].strip(), one["name"])
 
-    def test_every_row_but_embeds_is_proven_red_by_some_sabotage(self):
+    def test_every_row_is_proven_red_by_some_sabotage(self):
         aimed = {one["aims"] for one in ROWS["sabotages"]}
         unproven = [row["name"] for row in ROWS["rows"] if row["name"] not in aimed]
-        # Embeds run on deployed sites only; their proof is #597's second half.
-        self.assertEqual(unproven, ["embeds"])
+        self.assertEqual(unproven, [])
+
+    def test_the_embeds_sabotage_is_run_by_name_never_at_a_gate(self):
+        # #692: the embeds row runs on deployed sites only, so a gate's
+        # --expect-red all (a local site) would not run it at all.
+        for one in ROWS["sabotages"]:
+            if one["aims"] == "embeds":
+                self.assertIs(one.get("gate"), False, one["name"])
+                self.assertTrue(one.get("whyNotEveryGate", "").strip(), one["name"])
 
     def test_every_fixture_page_is_named(self):
         pages = {path.stem for path in plant_rendered.PAGES.glob("*.md")}
