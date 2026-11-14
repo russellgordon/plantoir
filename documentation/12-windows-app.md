@@ -6258,11 +6258,22 @@ unchanged, because it exists so a click does not freeze. `OutsideDoorTests`
 was never exposed: its `Run` waits for the stub to exit (30 s) before reading.
 Measured alone, under the suite lock, 10 runs each: before, 2 of 10 failed (7 of 20 over two sets), each in about 1 s. After, 10 of 10 passed, 0.7 to 1 s each.
 
+`OutsideDoorTests.AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor_AndCmdIsNotWatched`
+had the same slowness in a different shape. It asserted that the exit-1 stub
+was caught within the product's 400 ms grace, and on a loaded PC the stub had
+not exited by then (seen once, in a full gate on 2026-11-13). It now passes
+`watchFor` = 10 s, as the next line already did for `stay.exe`. The default
+became `OutsideDoor.StartGrace` (same 400 ms, same behaviour), and
+`TheDefaultGraceIsFourHundredMilliseconds` pins it, so the grace a click pays
+for is still asserted. Alone, 10 times each: 10 of 10 passed before and 10 of
+10 after, because the failure needs a loaded PC.
+
 **Two shared temp paths are left as they are** and filed as findings, because
 neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
 `%TEMP%\plantoir-tests\activity.txt` that every run appends to, and
 `TestAppDataRedirect`'s `plantoir-tests-<pid>` is never deleted, so a recycled
-id inherits a crashed run's settings.
+id inherits ANY earlier run's settings and state, not only a crashed run's (a
+review counted 1,603 such folders in `%TEMP%` on this PC, back to 2026-10-01).
 
 ### Same-second backups wait for the next second (#187)
 

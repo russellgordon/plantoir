@@ -165,12 +165,25 @@ public class OutsideDoorTests : IDisposable
     [Fact]
     public void AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor_AndCmdIsNotWatched()
     {
-        Assert.False(OutsideDoor.Start(NoWindowExe(StubProgramCollection.ExitOneExe)));
+        // Watched for 10 s rather than the product's grace: the .NET Framework
+        // stub can take over a second to exit on a loaded PC, which the 400 ms
+        // default misses (#882 review, M1). The default itself is pinned by
+        // TheDefaultGraceIsFourHundredMilliseconds below.
+        Assert.False(OutsideDoor.Start(NoWindowExe(StubProgramCollection.ExitOneExe), TimeSpan.FromSeconds(10)));
         Assert.True(OutsideDoor.Start(NoWindowExe(StubProgramCollection.StayExe), TimeSpan.FromMilliseconds(250)));
         var clock = Stopwatch.StartNew();
         Assert.True(OutsideDoor.Start(NoWindow("/c ping -n 3 127.0.0.1 >nul")));
         Assert.True(clock.ElapsedMilliseconds < 300, $"cmd was watched: {clock.ElapsedMilliseconds} ms");
     }
+
+    /// <summary>
+    /// The watch a click pays for an <c>.exe</c> door. Short on purpose: a
+    /// multi-second wait freezes every successful open (documentation 12, "A
+    /// door that fails to start is now honest").
+    /// </summary>
+    [Fact]
+    public void TheDefaultGraceIsFourHundredMilliseconds() =>
+        Assert.Equal(TimeSpan.FromMilliseconds(400), OutsideDoor.StartGrace);
 
     private static ProcessStartInfo NoWindowExe(string exe) =>
         new(exe) { UseShellExecute = false, CreateNoWindow = true };

@@ -201,6 +201,12 @@ public static class OutsideDoor
     /// could-not-start sentence).
     /// </summary>
     public static bool Start(ProcessStartInfo info, TimeSpan? watchFor = null)
+        => StartWatching(info, watchFor ?? StartGrace);
+
+    /// <summary>How long <see cref="Start"/> watches a started <c>.exe</c> for a quick failure, unless told otherwise.</summary>
+    public static readonly TimeSpan StartGrace = TimeSpan.FromMilliseconds(400);
+
+    private static bool StartWatching(ProcessStartInfo info, TimeSpan watchFor)
     {
         try
         {
@@ -209,7 +215,7 @@ public static class OutsideDoor
             if (string.Equals(info.FileName, Cmd, StringComparison.OrdinalIgnoreCase)) { process.Dispose(); return true; }
             try
             {
-                int grace = (int)(watchFor ?? TimeSpan.FromMilliseconds(400)).TotalMilliseconds;
+                int grace = (int)watchFor.TotalMilliseconds;
                 if (process.WaitForExit(grace) && process.ExitCode != 0) { process.Dispose(); return false; }
             }
             catch { /* cannot watch it (no handle through the shell): assume it started */ }
