@@ -704,6 +704,7 @@ usage() {
   cat <<USAGE
 🧰 Usage:
   ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF] [--non-interactive]
+  ${SELF_CMD} --token status|save|remove --target netlify|cloudflare [--account <ACCOUNT_ID>] [--use-anyway]
   ${SELF_CMD} <COURSE_CODE> --plans [--protect|--remove-password] [--change-password [--password-only]] [--include-answer-keys] [--year <YYYY>] [--stop-sharing] [--account <ACCOUNT_ID>] [--image REF] [--non-interactive]
 
 Examples:
@@ -728,6 +729,11 @@ Notes:
   when it cannot (a token scoped only to Pages cannot list its own account).
 - Use --reset-token (or --logout) to remove the saved PAT and re-link on next run;
   combine it with --target cloudflare to clear the Cloudflare one instead.
+- --token looks after the saved Netlify or Cloudflare token without deploying
+  anything (#696): status says whether one is saved and accepted and when it
+  ends, save checks a pasted token (read from standard input) against this
+  folder's class websites before keeping it, remove deletes it. Each answers
+  with one line of JSON and never prints the token.
 - --image REF deploys using a particular already-built image; normally the
   image is built locally from this folder's recipe when missing.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
@@ -761,6 +767,591 @@ else
   PREVIEW_CMD="./preview.sh"
 fi
 # ----------------------------------------------------------------------
+
+# -------------------- Where the publishing tokens are kept --------------
+# Defined here, above everything that is about a course, for the --token
+# mode below (#696). Moved from beside the deploy's own token handling;
+# token_check_answer's classifying half is now token_answer_word, so the
+# --token mode's extra checks classify with the same code (#716).
+KEYCHAIN_SERVICE="containerized-quartz-netlify"
+TOKENS_FILE="courses/.internal/tokens.json"
+KEY_FILE="courses/.internal/.key"
+
+get_token_keychain() {
+  /usr/bin/security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
+}
+set_token_keychain() {
+  /usr/bin/security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
+}
+delete_token_keychain() {
+  /usr/bin/security delete-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
+}
+validate_token() {
+  curl -fsS -H "Authorization: Bearer $1" https://api.netlify.com/api/v1/user >/dev/null
+}
+
+# ---- Cloudflare credentials ------------------------------------------
+# Cloudflare's token lives under its own Keychain name, so a teacher who
+# deploys some courses to Netlify and others to Cloudflare keeps both
+# without one clobbering the other. The remembered account ID gets its own
+# entry too — a teacher should never be asked for it twice.
+CF_KEYCHAIN_SERVICE="containerized-quartz-cloudflare"
+CF_ACCOUNT_KEYCHAIN_SERVICE="containerized-quartz-cloudflare-account"
+
+get_cf_token_keychain() {
+  /usr/bin/security find-generic-password -s "$CF_KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
+}
+set_cf_token_keychain() {
+  /usr/bin/security add-generic-password -U -s "$CF_KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
+}
+delete_cf_token_keychain() {
+  /usr/bin/security delete-generic-password -s "$CF_KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
+}
+get_cf_account_keychain() {
+  /usr/bin/security find-generic-password -s "$CF_ACCOUNT_KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
+}
+set_cf_account_keychain() {
+  /usr/bin/security add-generic-password -U -s "$CF_ACCOUNT_KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
+}
+delete_cf_account_keychain() {
+  /usr/bin/security delete-generic-password -s "$CF_ACCOUNT_KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
+}
+
+# Does Cloudflare still recognise this token at all? Kept separate from the
+# account lookup below, because the two can disagree: a token can be
+# perfectly valid and still list no accounts.
+validate_cf_token() {
+  [[ -n "${1:-}" ]] || return 1
+  curl -fsS --max-time 20 -H "Authorization: Bearer $1" \
+    https://api.cloudflare.com/client/v4/user/tokens/verify 2>/dev/null \
+    | grep -q '"success":[[:space:]]*true'
+}
+
+# What a SAVED token's check heard back, as one word (GitHub #716):
+#
+#   accepted  the service answered and took the token
+#   refused   the service answered and said no: HTTP 400, 401 or 403 with
+#             the service's own answer in the body
+#   unheard   anything else — no answer at all (offline, a timeout, a name
+#             that did not resolve), a captive portal's page or redirect, a
+#             429, a 5xx, a 2xx that does not say yes, or a 400/401/403 that
+#             is not the service's answer (a school web filter's block page,
+#             a firewall's challenge in front of the API)
+#
+# Only "refused" may clear a saved token. Until #716 the check was the same
+# yes/no probe the PASTE check uses, which throws curl's errors away, so a Mac
+# on a captive portal or a school network that dropped for a moment lost a
+# good token (and, for Cloudflare, its account) and was sent to make another.
+# 400 is a refusal because Cloudflare answers a malformed token with it
+# (measured 2026-11-01: a three-character token gets 400, code 6003 "Invalid
+# format for Authorization header"; forty characters of nonsense get 401, code
+# 1000 "Invalid API Token"), and a saved token that can never be accepted must
+# not be kept for ever behind a sentence about the connection.
+#
+# The PASTE checks are deliberately simpler: a paste that is refused is not
+# saved, so it costs nothing beyond being asked again on the next deploy.
+# Since #696 a paste is tidied first (tidy_pasted_token) and, for a section
+# that has deployed before, checked against that section's own website
+# before it is saved (site_reachability).
+#
+# Both bodies are checked because a page is not the service just because it
+# came back over its address: a filter that inspects the school's traffic, or
+# a firewall challenging a VPN, answers 403 with a page of its own, and a
+# token must not be cleared on the word of something that never asked the
+# service. Measured 2026-11-01 with made-up tokens: Cloudflare's refusals say
+# `"success":false` (400 code 6003, 401 code 1000), Netlify's say
+# `{"code":401,"message":"Access Denied"}`, and Netlify's yes is the account,
+# which carries `"id"`.
+#
+# $1 the URL, $2 the token, $3 (optional) an extended regular expression the
+# answer's body must match before a 2xx counts as accepted, $4 (optional) one
+# it must match before a 400/401/403 counts as refused.
+#
+# The addresses and the four patterns are contracts/app-rules.json ->
+# savedTokenCheck.services, written here as the contract spells them (#771).
+# deploy.ps1 reads the same patterns with .NET, which takes a POSIX class
+# such as [[:space:]] as a set of letters, so the shared spelling is a
+# bracket holding a real space and a real TAB ($'…' makes the \t a TAB, and
+# grep -E takes a backslash inside a bracket literally). They stay literals
+# because a Mac has no host python3 to read the contract with at run time;
+# scripts/test_deploy_token_refusal.py pins them to the contract and runs
+# every case through token_check_answer, both cut from between the markers.
+# BEGIN saved_token_check_rules
+CLOUDFLARE_TOKEN_CHECK_URL='https://api.cloudflare.com/client/v4/user/tokens/verify'
+CLOUDFLARE_TOKEN_ACCEPTED=$'"success":[ \t]*true'
+CLOUDFLARE_TOKEN_REFUSED=$'"success":[ \t]*false'
+NETLIFY_TOKEN_CHECK_URL='https://api.netlify.com/api/v1/user'
+NETLIFY_TOKEN_ACCEPTED=$'"id"[ \t]*:'
+NETLIFY_TOKEN_REFUSED=$'"code":[ \t]*4[0-9][0-9]'
+# END saved_token_check_rules
+# BEGIN token_check_answer
+# The service's answer to a request made with the token: the body, then the
+# status on a line of its own. -w puts the status after the body; curl
+# writes it even when it gets no answer at all, as 000. No -f, so a 401 is
+# READ rather than turned into an exit code that looks like a dropped
+# network.
+http_answer() {
+  curl -sS --max-time 20 -w '\n%{http_code}' \
+    -H "Authorization: Bearer ${2:-}" "${1:-}" 2>/dev/null || true
+}
+# $1 the status, $2 the body, $3 and $4 the two patterns described above.
+# The one classifier: token_check_answer and the --token mode (#696) both
+# read an answer with it.
+token_answer_word() {
+  local code="${1:-}" body="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
+  case "$code" in
+    400|401|403)
+      if [[ -z "$refusal_must_say" ]] || printf '%s' "$body" | grep -Eq "$refusal_must_say"; then
+        echo "refused"
+      else
+        echo "unheard"
+      fi
+      ;;
+    2[0-9][0-9])
+      if [[ -z "$body_must_say" ]] || printf '%s' "$body" | grep -Eq "$body_must_say"; then
+        echo "accepted"
+      else
+        echo "unheard"
+      fi
+      ;;
+    *)
+      echo "unheard"
+      ;;
+  esac
+}
+token_check_answer() {
+  local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
+  local answer code body
+  if [[ -z "$token" ]]; then
+    echo "refused"
+    return 0
+  fi
+  answer="$(http_answer "$url" "$token")"
+  code="${answer##*$'\n'}"
+  body="${answer%$'\n'*}"
+  token_answer_word "$code" "$body" "$body_must_say" "$refusal_must_say"
+}
+# END token_check_answer
+
+# After migrating, remove just the 'netlify' entry from tokens.json (delete file if empty)
+prune_legacy_netlify_entry() {
+  [[ -f "$TOKENS_FILE" ]] || return 0
+  python3 - "$TOKENS_FILE" <<'PY'
+import sys, json, pathlib
+p = pathlib.Path(sys.argv[1])
+try:
+    data = json.loads(p.read_text(encoding="utf-8"))
+    tokens = data.get("tokens") or {}
+    if "netlify" in tokens:
+        tokens.pop("netlify", None)
+        if tokens:
+            data["tokens"] = tokens
+            p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        else:
+            p.unlink()
+except Exception:
+    pass
+PY
+}
+
+# -------------------- Deploy tokens from Settings (#696) ---------------
+# `deploy.sh --token status|save|remove --target netlify|cloudflare
+# [--account <ID>] [--use-anyway]` looks after the teacher's saved token
+# without a course or a section: Plantoir ▸ Settings ▸ Deploying runs it to
+# say whether a token is saved and accepted and when it ends, to change it
+# (checked BEFORE it is saved, against every class website this folder has
+# deployed), and to remove it. It answers with ONE line of JSON and nothing
+# else, and it never prints, logs or passes on the token:
+#
+#   {"saved":true,"answer":"accepted","endsOn":"2027-07-01T00:00:00Z","problem":null,"unreachable":[]}
+#
+# The shape, every answer and problem word, the paste rule and the cases are
+# contracts/shared-rules.json -> deployTokens; documentation/07-deployment.md
+# -> "Deploy tokens (#696)" says why, what was measured and what was
+# rejected. It runs here, above every course-shaped step, so it never starts
+# the website builder and answers in about the time two requests take.
+#
+# `save` reads the token from standard input (all of it), never from an
+# argument or the environment, because both can be read by other programs
+# while this runs.
+
+# The paste rule (deployTokens.paste): what is kept of what was pasted. Sets
+# TIDIED_TOKEN, and TOKEN_PASTE_PROBLEM to tokenEmpty, tokenHasSpaces or
+# tokenNotPlainText (and TIDIED_TOKEN empty) when it cannot be a token. No
+# subshell, so the token is never in a command substitution's output.
+#
+# Whitespace of every kind is trimmed from both ends (spaces, tabs, line
+# breaks, a no-break space, a zero-width space, a byte-order mark), and one
+# leading "Bearer " in any case, which a page that shows the whole header
+# invites copying. Whitespace left INSIDE is refused rather than removed,
+# because a token never has any and a paste with some is two things pasted.
+# Anything that is not printable ASCII (a curly quote, say) is refused too.
+# BEGIN token_paste_rule
+tidy_pasted_token() {
+  local LC_ALL=C
+  local tidied="${1:-}" before=""
+  local nbsp=$'\xc2\xa0' zwsp=$'\xe2\x80\x8b' bom=$'\xef\xbb\xbf'
+  local stripped_bearer="false"
+  TIDIED_TOKEN=""
+  TOKEN_PASTE_PROBLEM=""
+  while [[ "$tidied" != "$before" ]]; do
+    before="$tidied"
+    tidied="${tidied#[[:space:]]}"
+    tidied="${tidied#"$nbsp"}"
+    tidied="${tidied#"$zwsp"}"
+    tidied="${tidied#"$bom"}"
+    tidied="${tidied%[[:space:]]}"
+    tidied="${tidied%"$nbsp"}"
+    tidied="${tidied%"$zwsp"}"
+    tidied="${tidied%"$bom"}"
+    if [[ "$stripped_bearer" == "false" && "$tidied" =~ ^[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]] ]]; then
+      tidied="${tidied:7}"
+      stripped_bearer="true"
+    fi
+  done
+  if [[ -z "$tidied" ]]; then
+    TOKEN_PASTE_PROBLEM="tokenEmpty"
+    return 1
+  fi
+  if [[ "$tidied" =~ [[:space:]] || "$tidied" == *"$nbsp"* || "$tidied" == *"$zwsp"* || "$tidied" == *"$bom"* ]]; then
+    TOKEN_PASTE_PROBLEM="tokenHasSpaces"
+    return 1
+  fi
+  if [[ "$tidied" =~ [^!-~] ]]; then
+    TOKEN_PASTE_PROBLEM="tokenNotPlainText"
+    return 1
+  fi
+  TIDIED_TOKEN="$tidied"
+  return 0
+}
+# END token_paste_rule
+
+# What Cloudflare's token check says about the token itself
+# (deployTokens.endDate.reading): its status word, and its end date exactly
+# as Cloudflare wrote it, or nothing. Cloudflare documents both fields of
+# GET /user/tokens/verify's `result`: `status` is "active", "disabled" or
+# "expired", and `expires_on` is an optional date-time
+# (developers.cloudflare.com/api/resources/user/subresources/tokens/methods/verify/,
+# read 2026-11-13). An end date that is not an ISO 8601 date and time is
+# dropped rather than guessed at. Netlify's answer names the account, not
+# the token, so Netlify has no end date to read.
+# BEGIN token_end_reading
+cloudflare_token_status_word() {
+  printf '%s' "${1:-}" | grep -Eo '"status"[ 	]*:[ 	]*"[a-z]+"' | head -n 1 \
+    | sed -E 's/.*"([a-z]+)"$/\1/' || true
+}
+cloudflare_token_end() {
+  local found
+  found="$(printf '%s' "${1:-}" | grep -Eo '"expires_on"[ 	]*:[ 	]*"[^"]*"' | head -n 1 \
+    | sed -E 's/.*"([^"]*)"$/\1/' || true)"
+  if [[ "$found" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:?[0-9]{2})$ ]]; then
+    printf '%s' "$found"
+  fi
+}
+# END token_end_reading
+
+# The service's answer about the token, as "<answer> <problem> <endsOn>",
+# with "-" for nothing (deployTokens.check). The answer word comes from
+# token_answer_word, the one classifier (#716); a Cloudflare token it
+# accepts is then refused when Cloudflare itself says it has expired or been
+# turned off, and, with an Account ID, when it cannot see that account's
+# Pages projects. Without an Account ID that last check is not made: every
+# deploy to Cloudflare from Plantoir needs one in Settings anyway (#668).
+token_settings_check() {
+  local target="$1" token="$2" account="${3:-}"
+  local answer code body word status ends
+  if [[ "$target" == "netlify" ]]; then
+    answer="$(http_answer "$NETLIFY_TOKEN_CHECK_URL" "$token")"
+    code="${answer##*$'\n'}"; body="${answer%$'\n'*}"
+    word="$(token_answer_word "$code" "$body" "$NETLIFY_TOKEN_ACCEPTED" "$NETLIFY_TOKEN_REFUSED")"
+    case "$word" in
+      accepted) echo "accepted - -" ;;
+      refused) echo "refused tokenRefused -" ;;
+      *) echo "unheard - -" ;;
+    esac
+    return 0
+  fi
+  answer="$(http_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$token")"
+  code="${answer##*$'\n'}"; body="${answer%$'\n'*}"
+  word="$(token_answer_word "$code" "$body" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")"
+  if [[ "$word" == "refused" ]]; then echo "refused tokenRefused -"; return 0; fi
+  if [[ "$word" != "accepted" ]]; then echo "unheard - -"; return 0; fi
+  status="$(cloudflare_token_status_word "$body")"
+  ends="$(cloudflare_token_end "$body")"
+  case "$status" in
+    expired) echo "refused tokenExpired ${ends:--}"; return 0 ;;
+    disabled) echo "refused tokenDisabled ${ends:--}"; return 0 ;;
+  esac
+  if [[ -n "$account" ]]; then
+    answer="$(http_answer "https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects" "$token")"
+    code="${answer##*$'\n'}"; body="${answer%$'\n'*}"
+    case "$(token_answer_word "$code" "$body" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")" in
+      accepted) ;;
+      refused) echo "refused tokenCannotUseAccount ${ends:--}"; return 0 ;;
+      *)
+        # 404 is how Cloudflare answers an account the token does not name
+        # (to be measured with a test token; a 403 is the other likely
+        # answer, and both are read as "cannot use it" only when the body
+        # is Cloudflare's own refusal).
+        if [[ "$code" == "404" ]] && printf '%s' "$body" | grep -Eq "$CLOUDFLARE_TOKEN_REFUSED"; then
+          echo "refused tokenCannotUseAccount ${ends:--}"
+        else
+          echo "unheard - -"
+        fi
+        return 0
+        ;;
+    esac
+  fi
+  echo "accepted - ${ends:--}"
+}
+
+# Can this token reach one class website deployed from this folder?
+# Answers reachable, unreachable or unheard (deployTokens.reachability).
+# Netlify: GET /sites/{id} of the site the section's marker names. Cloudflare:
+# GET the project the marker names in the account. "unreachable" is the
+# service's own 401, 403 or 404, because that is what makes the next deploy
+# create a NEW site at a new address and report success (deploy.py, where a
+# 404 on the saved site starts "Creating a fresh Netlify site", and
+# remake_pages_project_if_gone). Anything else is unheard.
+site_reachability() {
+  local target="$1" token="$2" account="$3" marker="$4"
+  local key url answer code body pattern
+  if [[ "$target" == "netlify" ]]; then
+    key="id"; pattern="$NETLIFY_TOKEN_REFUSED"
+  else
+    key="name"; pattern="$CLOUDFLARE_TOKEN_REFUSED"
+  fi
+  # Top-level only: the markers are written by deploy.py with indent=2, and
+  # a Netlify site carries other "id"s further in.
+  local value
+  value="$(grep -E "^  \"${key}\": \"[^\"]+\"" "$marker" 2>/dev/null | head -n 1 \
+    | sed -E 's/^  "[a-z]+": "([^"]+)".*$/\1/' || true)"
+  if [[ -z "$value" || ! "$value" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "reachable"
+    return 0
+  fi
+  if [[ "$target" == "netlify" ]]; then
+    url="https://api.netlify.com/api/v1/sites/${value}"
+  else
+    [[ -n "$account" ]] || { echo "reachable"; return 0; }
+    url="https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${value}"
+  fi
+  answer="$(http_answer "$url" "$token")"
+  code="${answer##*$'\n'}"; body="${answer%$'\n'*}"
+  case "$code" in
+    2[0-9][0-9]) echo "reachable" ;;
+    401|403|404)
+      if printf '%s' "$body" | grep -Eq "$pattern"; then echo "unreachable"; else echo "unheard"; fi
+      ;;
+    *) echo "unheard" ;;
+  esac
+}
+
+# The markers of every section this folder has deployed to one destination,
+# one path per line. Only a marker in a course's own folder counts; a
+# course whose folder name starts with a dot is being made and is skipped.
+deployed_section_markers() {
+  local target="$1" folder marker
+  if [[ "$target" == "netlify" ]]; then folder=".netlify_sites"; else folder=".cloudflare_sites"; fi
+  for marker in courses/*/"$folder"/section*.json; do
+    [[ -f "$marker" ]] || continue
+    printf '%s\n' "$marker"
+  done
+}
+
+# "COURSE/SECTION" for a marker's path.
+marker_place() {
+  local path="$1" course section
+  course="${path#courses/}"; course="${course%%/*}"
+  section="${path##*/section}"; section="${section%.json}"
+  printf '%s/%s' "$course" "$section"
+}
+
+token_mode_answer() {
+  # $1 saved, $2 answer, $3 problem or -, $4 endsOn or -, $5 unreachable list
+  local problem="null" ends="null"
+  [[ "${3:--}" == "-" ]] || problem="\"$3\""
+  [[ "${4:--}" == "-" ]] || ends="\"$4\""
+  printf '{"saved":%s,"answer":"%s","endsOn":%s,"problem":%s,"unreachable":[%s]}\n' \
+    "$1" "$2" "$ends" "$problem" "${5:-}"
+}
+
+run_token_mode() {
+  local action="" target="" account="" use_anyway="false"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      status|save|remove) [[ -z "$action" ]] || { echo "❌ --token takes one of status, save or remove."; exit 1; }; action="$1" ;;
+      --target) [[ $# -ge 2 ]] || { echo "❌ Missing value for --target"; exit 1; }; target="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"; shift ;;
+      --target=*) target="$(printf '%s' "${1#*=}" | tr '[:upper:]' '[:lower:]')" ;;
+      --account) [[ $# -ge 2 ]] || { echo "❌ Missing value for --account"; exit 1; }; account="$2"; shift ;;
+      --account=*) account="${1#*=}" ;;
+      --use-anyway) use_anyway="true" ;;
+      *) echo "❌ Unknown option for --token: $1"; exit 1 ;;
+    esac
+    shift
+  done
+  if [[ -z "$action" ]]; then echo "❌ --token takes one of status, save or remove."; exit 1; fi
+  if [[ "$target" != "netlify" && "$target" != "cloudflare" ]]; then
+    echo "❌ --token needs --target netlify or --target cloudflare."
+    exit 1
+  fi
+  if [[ "$_DEPLOY_HOST_OS" != "mac" ]]; then
+    echo "❌ This script targets macOS. On Windows, use: .\\deploy.ps1"
+    exit 1
+  fi
+  account="$(printf '%s' "$account" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  if [[ -n "$account" && ! "$account" =~ ^[0-9a-f]{32}$ ]]; then
+    account=""
+  fi
+
+  local saved_token="" checked answer problem ends
+  if [[ "$action" == "remove" ]]; then
+    if [[ "$target" == "netlify" ]]; then
+      delete_token_keychain
+      prune_legacy_netlify_entry
+    else
+      # The account entry is left alone: the Account ID belongs to Settings
+      # since #457, and the next deploy saves it again from there anyway.
+      delete_cf_token_keychain
+    fi
+    token_mode_answer false notSaved - - ""
+    exit 0
+  fi
+
+  if [[ "$action" == "status" ]]; then
+    if [[ "$target" == "netlify" ]]; then saved_token="$(get_token_keychain)"; else saved_token="$(get_cf_token_keychain)"; fi
+    if [[ -z "$saved_token" ]]; then
+      token_mode_answer false notSaved - - ""
+      exit 0
+    fi
+    checked="$(token_settings_check "$target" "$saved_token" "$account")"
+    saved_token=""
+    read -r answer problem ends <<<"$checked"
+    # Never cleared from here, refused or not: Settings shows it refused and
+    # leaves the change to the teacher.
+    token_mode_answer true "$answer" "$problem" "$ends" ""
+    exit 0
+  fi
+
+  # save
+  local pasted=""
+  if [[ -t 0 ]]; then
+    read -rsp "Paste the token: " pasted; echo >&2
+  else
+    # All of it, so a paste with a line break inside is refused by the
+    # paste rule rather than cut at the break.
+    pasted="$(cat)"
+  fi
+  if ! tidy_pasted_token "$pasted"; then
+    pasted=""
+    token_mode_answer false notSent "$TOKEN_PASTE_PROBLEM" - ""
+    exit 0
+  fi
+  pasted="$TIDIED_TOKEN"
+  TIDIED_TOKEN=""
+  checked="$(token_settings_check "$target" "$pasted" "$account")"
+  read -r answer problem ends <<<"$checked"
+  if [[ "$answer" != "accepted" ]]; then
+    pasted=""
+    token_mode_answer false "$answer" "$problem" "$ends" ""
+    exit 0
+  fi
+
+  # The second ruling on #696 (Russell, 2026-11-13): a token that cannot
+  # reach this folder's existing class websites is not saved until the
+  # teacher says so, because the next deploy would make each one again at a
+  # new address and call it a success.
+  if [[ "$use_anyway" != "true" ]]; then
+    local marker reach unreachable="" unheard_any="false"
+    while IFS= read -r marker; do
+      [[ -n "$marker" ]] || continue
+      reach="$(site_reachability "$target" "$pasted" "$account" "$marker")"
+      if [[ "$reach" == "unreachable" ]]; then
+        if [[ -n "$unreachable" ]]; then unreachable="${unreachable},"; fi
+        unreachable="${unreachable}\"$(marker_place "$marker")\""
+      elif [[ "$reach" == "unheard" ]]; then
+        unheard_any="true"
+      fi
+    done < <(deployed_section_markers "$target")
+    if [[ -n "$unreachable" ]]; then
+      pasted=""
+      token_mode_answer false accepted tokenCannotReachSites "$ends" "$unreachable"
+      exit 0
+    fi
+    if [[ "$unheard_any" == "true" ]]; then
+      pasted=""
+      token_mode_answer false unheard sitesNotChecked - ""
+      exit 0
+    fi
+  fi
+
+  if [[ "$target" == "netlify" ]]; then
+    if ! set_token_keychain "$pasted"; then pasted=""; token_mode_answer false accepted couldNotSave "$ends" ""; exit 0; fi
+  else
+    if ! set_cf_token_keychain "$pasted"; then pasted=""; token_mode_answer false accepted couldNotSave "$ends" ""; exit 0; fi
+  fi
+  pasted=""
+  token_mode_answer true accepted - "$ends" ""
+  exit 0
+}
+
+# What a deploy says when it does not save a token it was just given (#696):
+# two lines, the first ending "saved as your token", which the app's
+# FailureExplainer lifts and joins as it does #695's refusal. The words are
+# contracts/shared-rules.json -> deployTokens.deployTimeRefusals, and
+# scripts/test_deploy_tokens.py runs this function for every key.
+# BEGIN token_not_saved_lines
+say_token_not_saved() {
+  local key="${1:-}" service="${2:-}"
+  case "$key" in
+    tokenEmpty)
+      echo "❌ Nothing was pasted, so nothing was saved as your token."
+      echo "   Copy the token from ${service}'s page, then deploy again and paste it."
+      ;;
+    tokenHasSpaces)
+      echo "❌ What was pasted has a space or a line break inside it, so it was not saved as your token."
+      echo "   Copy the token again from ${service}'s page, and paste only the token itself."
+      ;;
+    tokenNotPlainText)
+      echo "❌ What was pasted has a character no token has, such as a curly quote, so it was not saved as your token."
+      echo "   Copy the token again from ${service}'s page, and paste only the token itself."
+      ;;
+    tokenCannotReachSite)
+      echo "❌ That token cannot reach this section's existing ${service} website, so it was not saved as your token."
+      echo "   It may belong to another ${service} account. Paste a token from the account this section was deployed with."
+      ;;
+    siteNotChecked)
+      echo "❌ Plantoir could not reach ${service} to check that token against this section's website, so it was not saved as your token."
+      echo "   Check that this computer is online, then try again in a few minutes."
+      ;;
+  esac
+}
+# END token_not_saved_lines
+
+# The end date of the Cloudflare token a deploy is using, for the app to
+# keep and show (#696, first ruling: the course's Deploy screen warns when it
+# is under 30 days away). One machinery line, which both apps keep out of the
+# console: `PLANTOIR_TOKEN_ENDS: cloudflare <date-time>`, or `none` for a
+# token with no end date. Nothing at all when Cloudflare could not be asked,
+# so a dropped connection never erases a date the app already has. Never the
+# token. Netlify's answers carry no end date, so nothing is said for it.
+say_token_end() {
+  local target="${1:-}" token="${2:-}" answer code body ends
+  [[ "$target" == "cloudflare" && -n "$token" ]] || return 0
+  answer="$(http_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$token")"
+  code="${answer##*$'\n'}"; body="${answer%$'\n'*}"
+  [[ "$(token_answer_word "$code" "$body" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")" == "accepted" ]] || return 0
+  ends="$(cloudflare_token_end "$body")"
+  echo "PLANTOIR_TOKEN_ENDS: cloudflare ${ends:-none}"
+}
+
+# >>> TOKEN MODE DISPATCH >>>
+if [[ "${1:-}" == "--token" ]]; then
+  shift
+  run_token_mode "$@"
+fi
+# <<< TOKEN MODE DISPATCH <<<
+
 
 if [[ $# -lt 2 ]]; then usage; exit 1; fi
 
@@ -2032,151 +2623,9 @@ if [[ "$_DEPLOY_HOST_OS" != "mac" ]]; then
   exit 1
 fi
 
-KEYCHAIN_SERVICE="containerized-quartz-netlify"
-TOKENS_FILE="courses/.internal/tokens.json"
-KEY_FILE="courses/.internal/.key"
-
-get_token_keychain() {
-  /usr/bin/security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
-}
-set_token_keychain() {
-  /usr/bin/security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
-}
-delete_token_keychain() {
-  /usr/bin/security delete-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
-}
-validate_token() {
-  curl -fsS -H "Authorization: Bearer $1" https://api.netlify.com/api/v1/user >/dev/null
-}
-
-# ---- Cloudflare credentials ------------------------------------------
-# Cloudflare's token lives under its own Keychain name, so a teacher who
-# deploys some courses to Netlify and others to Cloudflare keeps both
-# without one clobbering the other. The remembered account ID gets its own
-# entry too — a teacher should never be asked for it twice.
-CF_KEYCHAIN_SERVICE="containerized-quartz-cloudflare"
-CF_ACCOUNT_KEYCHAIN_SERVICE="containerized-quartz-cloudflare-account"
-
-get_cf_token_keychain() {
-  /usr/bin/security find-generic-password -s "$CF_KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
-}
-set_cf_token_keychain() {
-  /usr/bin/security add-generic-password -U -s "$CF_KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
-}
-delete_cf_token_keychain() {
-  /usr/bin/security delete-generic-password -s "$CF_KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
-}
-get_cf_account_keychain() {
-  /usr/bin/security find-generic-password -s "$CF_ACCOUNT_KEYCHAIN_SERVICE" -a "$USER" -w 2>/dev/null || true
-}
-set_cf_account_keychain() {
-  /usr/bin/security add-generic-password -U -s "$CF_ACCOUNT_KEYCHAIN_SERVICE" -a "$USER" -w "$1" >/dev/null
-}
-delete_cf_account_keychain() {
-  /usr/bin/security delete-generic-password -s "$CF_ACCOUNT_KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
-}
-
-# Does Cloudflare still recognise this token at all? Kept separate from the
-# account lookup below, because the two can disagree: a token can be
-# perfectly valid and still list no accounts.
-validate_cf_token() {
-  [[ -n "${1:-}" ]] || return 1
-  curl -fsS --max-time 20 -H "Authorization: Bearer $1" \
-    https://api.cloudflare.com/client/v4/user/tokens/verify 2>/dev/null \
-    | grep -q '"success":[[:space:]]*true'
-}
-
-# What a SAVED token's check heard back, as one word (GitHub #716):
-#
-#   accepted  the service answered and took the token
-#   refused   the service answered and said no: HTTP 400, 401 or 403 with
-#             the service's own answer in the body
-#   unheard   anything else — no answer at all (offline, a timeout, a name
-#             that did not resolve), a captive portal's page or redirect, a
-#             429, a 5xx, a 2xx that does not say yes, or a 400/401/403 that
-#             is not the service's answer (a school web filter's block page,
-#             a firewall's challenge in front of the API)
-#
-# Only "refused" may clear a saved token. Until #716 the check was the same
-# yes/no probe the PASTE check uses, which throws curl's errors away, so a Mac
-# on a captive portal or a school network that dropped for a moment lost a
-# good token (and, for Cloudflare, its account) and was sent to make another.
-# 400 is a refusal because Cloudflare answers a malformed token with it
-# (measured 2026-11-01: a three-character token gets 400, code 6003 "Invalid
-# format for Authorization header"; forty characters of nonsense get 401, code
-# 1000 "Invalid API Token"), and a saved token that can never be accepted must
-# not be kept for ever behind a sentence about the connection.
-#
-# The PASTE checks above and below are deliberately left as they were: a paste
-# that is refused is not saved, so it costs nothing beyond being asked again
-# on the next deploy, and the paste is where #696 will ask again in the sheet.
-#
-# Both bodies are checked because a page is not the service just because it
-# came back over its address: a filter that inspects the school's traffic, or
-# a firewall challenging a VPN, answers 403 with a page of its own, and a
-# token must not be cleared on the word of something that never asked the
-# service. Measured 2026-11-01 with made-up tokens: Cloudflare's refusals say
-# `"success":false` (400 code 6003, 401 code 1000), Netlify's say
-# `{"code":401,"message":"Access Denied"}`, and Netlify's yes is the account,
-# which carries `"id"`.
-#
-# $1 the URL, $2 the token, $3 (optional) an extended regular expression the
-# answer's body must match before a 2xx counts as accepted, $4 (optional) one
-# it must match before a 400/401/403 counts as refused.
-#
-# The addresses and the four patterns are contracts/app-rules.json ->
-# savedTokenCheck.services, written here as the contract spells them (#771).
-# deploy.ps1 reads the same patterns with .NET, which takes a POSIX class
-# such as [[:space:]] as a set of letters, so the shared spelling is a
-# bracket holding a real space and a real TAB ($'…' makes the \t a TAB, and
-# grep -E takes a backslash inside a bracket literally). They stay literals
-# because a Mac has no host python3 to read the contract with at run time;
-# scripts/test_deploy_token_refusal.py pins them to the contract and runs
-# every case through token_check_answer, both cut from between the markers.
-# BEGIN saved_token_check_rules
-CLOUDFLARE_TOKEN_CHECK_URL='https://api.cloudflare.com/client/v4/user/tokens/verify'
-CLOUDFLARE_TOKEN_ACCEPTED=$'"success":[ \t]*true'
-CLOUDFLARE_TOKEN_REFUSED=$'"success":[ \t]*false'
-NETLIFY_TOKEN_CHECK_URL='https://api.netlify.com/api/v1/user'
-NETLIFY_TOKEN_ACCEPTED=$'"id"[ \t]*:'
-NETLIFY_TOKEN_REFUSED=$'"code":[ \t]*4[0-9][0-9]'
-# END saved_token_check_rules
-# BEGIN token_check_answer
-token_check_answer() {
-  local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
-  local answer code body
-  if [[ -z "$token" ]]; then
-    echo "refused"
-    return 0
-  fi
-  # -w puts the status on a line of its own after the body; curl writes it
-  # even when it gets no answer at all, as 000. No -f, so a 401 is READ
-  # rather than turned into an exit code that looks like a dropped network.
-  answer="$(curl -sS --max-time 20 -w '\n%{http_code}' \
-    -H "Authorization: Bearer $token" "$url" 2>/dev/null)" || true
-  code="${answer##*$'\n'}"
-  body="${answer%$'\n'*}"
-  case "$code" in
-    400|401|403)
-      if [[ -z "$refusal_must_say" ]] || printf '%s' "$body" | grep -Eq "$refusal_must_say"; then
-        echo "refused"
-      else
-        echo "unheard"
-      fi
-      ;;
-    2[0-9][0-9])
-      if [[ -z "$body_must_say" ]] || printf '%s' "$body" | grep -Eq "$body_must_say"; then
-        echo "accepted"
-      else
-        echo "unheard"
-      fi
-      ;;
-    *)
-      echo "unheard"
-      ;;
-  esac
-}
-# END token_check_answer
+# The token store's readers and writers, the checks and token_check_answer
+# are defined above, before the course code is read, so the --token mode
+# (#696) can use them without a course or a section.
 
 # Best-effort account lookup, so that in the common case a teacher pastes a
 # token and nothing else — the account ID is a 32-character hex string buried
@@ -2291,27 +2740,6 @@ read_legacy_token_plain() {
   echo "$line" | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/'
 }
 
-# After migrating, remove just the 'netlify' entry from tokens.json (delete file if empty)
-prune_legacy_netlify_entry() {
-  [[ -f "$TOKENS_FILE" ]] || return 0
-  python3 - "$TOKENS_FILE" <<'PY'
-import sys, json, pathlib
-p = pathlib.Path(sys.argv[1])
-try:
-    data = json.loads(p.read_text(encoding="utf-8"))
-    tokens = data.get("tokens") or {}
-    if "netlify" in tokens:
-        tokens.pop("netlify", None)
-        if tokens:
-            data["tokens"] = tokens
-            p.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        else:
-            p.unlink()
-except Exception:
-    pass
-PY
-}
-
 if [[ "${RESET_TOKEN}" == "true" && "$TARGET" == "cloudflare" ]]; then
   echo "🔒 Clearing saved Cloudflare token from Keychain…"
   delete_cf_token_keychain
@@ -2334,6 +2762,7 @@ fi
 # -------------------- Cloudflare token and account ---------------------
 CF_TOKEN=""
 CF_ACCOUNT=""
+CF_TOKEN_TO_SAVE_AFTER_THE_CHECK="false"
 if [[ "$TARGET" == "cloudflare" ]]; then
   CF_TOKEN="$(get_cf_token_keychain)"
   if [[ -n "$CF_TOKEN" ]]; then
@@ -2387,14 +2816,32 @@ this computer.
 MSG
     assert_can_ask "Paste Cloudflare token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
     read -rsp "Paste Cloudflare token: " cf_pasted; echo
+    # The paste rule (#696, deployTokens.paste) before anything is sent.
+    if ! tidy_pasted_token "$cf_pasted"; then
+      cf_pasted=""
+      say_token_not_saved "$TOKEN_PASTE_PROBLEM" "Cloudflare"
+      exit 1
+    fi
+    cf_pasted="$TIDIED_TOKEN"
+    TIDIED_TOKEN=""
     if ! validate_cf_token "$cf_pasted"; then
       echo "❌ Cloudflare did not accept that token."
       echo "   Check that it has the 'Cloudflare Pages - Edit' permission, then try again."
       exit 1
     fi
-    set_cf_token_keychain "$cf_pasted"
     CF_TOKEN="$cf_pasted"
-    echo "✅ Saved token to macOS Keychain (service: ${CF_KEYCHAIN_SERVICE})."
+    cf_pasted=""
+    # A section that has deployed to Cloudflare before is checked against
+    # its own project BEFORE the token is saved (#696, second ruling): the
+    # project is looked up in the account, which is only known below, so
+    # saving waits until then. A section with no project yet has nothing to
+    # check, and the token is saved at once, as it always was.
+    if [[ "$PLANS_MODE" != "true" && -f "courses/${COURSE_CODE}/.cloudflare_sites/section${SECTION_NUM}.json" ]]; then
+      CF_TOKEN_TO_SAVE_AFTER_THE_CHECK="true"
+    else
+      set_cf_token_keychain "$CF_TOKEN"
+      echo "✅ Saved token to macOS Keychain (service: ${CF_KEYCHAIN_SERVICE})."
+    fi
   fi
 
   # The app collected it from the teacher, which beats any guess made here;
@@ -2443,6 +2890,18 @@ MSG
     CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
     set_cf_account_keychain "$CF_ACCOUNT"
   fi
+
+  # The token pasted above, checked against this section's own project
+  # now that the account is known, and saved only if it can reach it.
+  if [[ "$CF_TOKEN_TO_SAVE_AFTER_THE_CHECK" == "true" ]]; then
+    case "$(site_reachability cloudflare "$CF_TOKEN" "$CF_ACCOUNT" "courses/${COURSE_CODE}/.cloudflare_sites/section${SECTION_NUM}.json")" in
+      unreachable) say_token_not_saved tokenCannotReachSite "Cloudflare"; exit 1 ;;
+      unheard) say_token_not_saved siteNotChecked "Cloudflare"; exit 1 ;;
+    esac
+    set_cf_token_keychain "$CF_TOKEN"
+    echo "✅ Saved token to macOS Keychain (service: ${CF_KEYCHAIN_SERVICE})."
+  fi
+  say_token_end cloudflare "$CF_TOKEN"
 fi
 
 # -------------------- Netlify token ------------------------------------
@@ -2531,9 +2990,27 @@ MSG
   echo ""
   assert_can_ask "Paste Netlify token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
   read -rsp "Paste Netlify token: " pasted; echo
+  # The paste rule (#696, deployTokens.paste) before anything is sent.
+  if ! tidy_pasted_token "$pasted"; then
+    pasted=""
+    say_token_not_saved "$TOKEN_PASTE_PROBLEM" "Netlify"
+    exit 1
+  fi
+  pasted="$TIDIED_TOKEN"
+  TIDIED_TOKEN=""
   if ! validate_token "$pasted"; then
     echo "❌ Token invalid (Netlify rejected it). Please try again."
     exit 1
+  fi
+  # A section that has deployed to Netlify before is checked against its
+  # own site BEFORE the token is saved (#696, second ruling): a token from
+  # another account cannot see it, and deploy.py would make a new site at
+  # a new address and report success.
+  if [[ -f "courses/${COURSE_CODE}/.netlify_sites/section${SECTION_NUM}.json" ]]; then
+    case "$(site_reachability netlify "$pasted" "" "courses/${COURSE_CODE}/.netlify_sites/section${SECTION_NUM}.json")" in
+      unreachable) pasted=""; say_token_not_saved tokenCannotReachSite "Netlify"; exit 1 ;;
+      unheard) pasted=""; say_token_not_saved siteNotChecked "Netlify"; exit 1 ;;
+    esac
   fi
   set_token_keychain "$pasted"
   TOKEN="$pasted"

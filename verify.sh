@@ -922,6 +922,18 @@ else
   cat /tmp/verify_deploy_token_refusal_test.log
 fi
 
+# The teacher's deploy tokens from Settings (GitHub #696): deploy.sh's --token
+# mode, the paste rule, the end date, and the check against the folder's class
+# websites before a token is saved, at Settings and at a deploy's own paste,
+# all run from contracts/shared-rules.json -> deployTokens with the Keychain
+# and curl stubbed.
+if (cd scripts && python3 test_deploy_tokens.py) >/tmp/verify_deploy_tokens_test.log 2>&1; then
+  pass "deploy.sh: a deploy token is checked before it is saved, from Settings and at a deploy's paste (scripts/test_deploy_tokens.py, #696)"
+else
+  fail "deploy.sh: a deploy token is checked before it is saved, from Settings and at a deploy's paste (scripts/test_deploy_tokens.py, #696)"
+  cat /tmp/verify_deploy_tokens_test.log
+fi
+
 # Two deploys, two writers, two previews at once (GitHub #835): each deploy's
 # token reaches the website builder through a file of its own; the course's
 # config and its shared pages survive two builds writing them together; and a

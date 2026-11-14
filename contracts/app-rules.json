@@ -1514,6 +1514,16 @@
         "why" : "GitHub #716, Netlify's saved token: the same rule and the same two lines, so the two destinations behave alike. Captured 2026-11-01 the same way."
       },
       {
+        "expect" : "That token cannot reach this section's existing Netlify website, so it was not saved as your token. It may belong to another Netlify account. Paste a token from the account this section was deployed with.",
+        "output" : "🕒 Host timezone offset: -0500\n\nConnect to Netlify.\n\nPaste Netlify token: \n❌ That token cannot reach this section's existing Netlify website, so it was not saved as your token.\n   It may belong to another Netlify account. Paste a token from the account this section was deployed with.",
+        "why" : "GitHub #696, the second ruling and review MUST 1: a token pasted at a deploy is tried against the section's own website before it is saved, and a token from another account is refused. Before #696 the deploy went on and deploy.py made a new site at a new address. The two lines are shared-rules.json -> deployTokens.deployTimeRefusals.lines.tokenCannotReachSite, lifted and joined (FailureExplainer.tokenNotSavedMarker); scripts/test_deploy_tokens.py runs the launcher for every key."
+      },
+      {
+        "expect" : "What was pasted has a space or a line break inside it, so it was not saved as your token. Copy the token again from Cloudflare's page, and paste only the token itself.",
+        "output" : "Paste Cloudflare token: \nWhat was pasted has a space or a line break inside it, so it was not saved as your token.\nCopy the token again from Cloudflare's page, and paste only the token itself.",
+        "why" : "GitHub #696, the paste rule (deployTokens.paste), in deploy.ps1's shape: no cross and no indent. One sentence for both launchers."
+      },
+      {
         "expect" : "This website hasn't been built yet. Preview it once, then deploy.",
         "output" : "Built site not found at /courses/ICS3U/.merged_output/section1/public"
       },
