@@ -4382,7 +4382,7 @@ the menus already did in full, 8 in part, and 3 gaps. Where each gap went:
 |---|---|
 | Starting a new unit ("Start a new unit for the next class") | Section ▸ Add Class…, in a new unit (#897, [09 → "Add Class…"](09-mac-app.md#add-class-the-next-class-a-new-unit-or-a-copy-897)) |
 | Duplicating a class as the next one | Section ▸ Add Class…, as a copy of a class: at the END, by file, hidden; the window's own duplicate still lands after its source |
-| The rollover's website question | Section ▸ Roll Over to a New Year… (planned, #897 piece B) |
+| The rollover's website question | Section ▸ Roll Over to a New Year… (#897 piece B, [09 → "Roll Over to a New Year…"](09-mac-app.md#roll-over-to-a-new-year-the-rollovers-website-question-in-a-sheet-897-piece-b)): the same call, the question in a sheet with nothing chosen, asked only where there is a website; one undo entry from the menu, the window's two unchanged |
 
 Four were accepted as they are, unasked: one list of every page with its
 state, what a given page links to, a text list of what students see now, and
