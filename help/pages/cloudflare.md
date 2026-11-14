@@ -33,8 +33,8 @@ Cloudflare needs two things from you. Your Account ID says which account your we
 
 1. Make a free account on Cloudflare's website, and sign in to [the Cloudflare dashboard](https://dash.cloudflare.com).
 2. Find the Account ID and copy it. Plantoir's own sheet about the Account ID gives the way:
-   {{say:app-rules#credentialRequests.requests[3].steps[1]}}
-   {{say:app-rules#credentialRequests.requests[3].steps[2]}}
+   {{say:app-rules#credentialRequests.requests[3].steps[1] ~ Choose “Workers & Pages” from}}
+   {{say:app-rules#credentialRequests.requests[3].steps[2] ~ Find “Account ID” on the}}
 
 The ID is also the long run of letters and digits in your browser's address bar, after `dash.cloudflare.com/`.
 
@@ -60,8 +60,8 @@ alt: The Deploying part of a course's settings, with Deploy to set to Cloudflare
 
 1. Select the section and press {{control:deployButton}}.
 2. The first time this {{machine}} deploys to Cloudflare, a sheet titled {{control:connectToCloudflareSheetTitle}} opens. It lists the steps for making a token on Cloudflare's website, and has a link named {{control:connectToCloudflareSheetLink}}. Follow its steps in your browser. Two of them decide whether the token works:
-   {{say:app-rules#credentialRequests.requests[1].steps[3]}}
-   {{say:app-rules#credentialRequests.requests[1].steps[4]}}
+   {{say:app-rules#credentialRequests.requests[1].steps[3] ~ Give it one permission, chosen}}
+   {{say:app-rules#credentialRequests.requests[1].steps[4] ~ Under “Account Resources”, choose “Include”}}
 3. Cloudflare shows the token once. Copy it, paste it into the {{control:connectToCloudflareSheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this {{machine}}. Plantoir does not ask for it again while that token is saved and Cloudflare accepts it. [See, change or remove a deploy token](page:deploy-tokens) says where to look at it later.
 
 {{picture:cloudflare-3}}

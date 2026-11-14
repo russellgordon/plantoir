@@ -92,9 +92,66 @@ class TokenTests(unittest.TestCase):
         self.refused("names a int, not a sentence")
 
     def test_a_say_key_into_a_list(self) -> None:
-        self.fixture.page("second-look", "It is {{say:shared-rules#userFacingLabelWords.forbidden[1]}}.\n")
+        self.fixture.page("second-look", "It is {{say:shared-rules#userFacingLabelWords.forbidden[1] ~ python}}.\n")
         code, output = self.check()
         self.assertEqual(code, 0, output)
+        page_html: str = self.page_html("second-look")
+        self.assertIn("python", page_html)
+        self.assertNotIn("~ python", page_html)
+
+    def page_html(self, page_id: str) -> str:
+        code, output = self.fixture.run("--web", str(self.fixture.out))
+        self.assertEqual(code, 0, output)
+        for path in self.fixture.out.rglob(page_id + ".html"):
+            return path.read_text(encoding="utf-8")
+        raise AssertionError("no " + page_id + ".html in the web copy")
+
+    # Pins (#952): a token that names a sentence by its position in a list.
+
+    def test_a_say_key_into_a_list_needs_a_pin(self) -> None:
+        self.fixture.page("second-look", "It is {{say:shared-rules#userFacingLabelWords.forbidden[1]}}.\n")
+        self.refused(
+            "help/pages/second-look.md:8: {{say:shared-rules#userFacingLabelWords.forbidden[1]}} names a sentence "
+            "by its position in a list"
+        )
+
+    def test_a_pin_that_no_longer_opens_its_sentence_fails_the_check(self) -> None:
+        """The failure #952 is about: a case inserted before the one the page
+        means moves every later sentence along, and the token still resolves."""
+        self.fixture.page("second-look", "It is {{say:shared-rules#userFacingLabelWords.forbidden[1] ~ python}}.\n")
+        code, output = self.check()
+        self.assertEqual(code, 0, output)
+        self.fixture.replace("contracts/shared-rules.json", '"forbidden": ["docker",', '"forbidden": ["shell", "docker",')
+        self.refused(
+            "help/pages/second-look.md:8: {{say:shared-rules#userFacingLabelWords.forbidden[1]}} expects a sentence "
+            "opening 'python' but now reads 'docker'"
+        )
+
+    def test_a_pin_must_tell_its_sentence_from_the_others_in_the_list(self) -> None:
+        self.fixture.page("second-look", "It is {{say:shared-rules#userFacingLabelWords.forbidden[2] ~ script}}.\n")
+        self.refused("forbidden[2]}} has a pin, 'script', that also opens userFacingLabelWords.forbidden[3]")
+
+    def test_an_empty_pin_is_refused(self) -> None:
+        self.fixture.page("second-look", "It is {{say:shared-rules#userFacingLabelWords.forbidden[1] ~ }}.\n")
+        self.refused("forbidden[1]}} has an empty pin")
+
+    def test_a_token_with_no_position_may_carry_a_pin_and_it_is_checked(self) -> None:
+        self.fixture.page("second-look", "It says {{say:shared-rules#fixtureNotice.wording.button ~ Open in}}.\n")
+        code, output = self.check()
+        self.assertEqual(code, 0, output)
+        self.fixture.page("second-look", "It says {{say:shared-rules#fixtureNotice.wording.button ~ Show in}}.\n")
+        self.refused("expects a sentence opening 'Show in' but now reads 'Open in Browser'")
+
+    def test_every_indexed_token_on_the_real_pages_carries_a_pin(self) -> None:
+        import re
+
+        unpinned = []
+        for page in sorted((REPO / "help" / "pages").glob("*.md")):
+            for number, text in enumerate(page.read_text(encoding="utf-8").split("\n"), 1):
+                for found in re.finditer(r"\{\{say:([^{}]*)\}\}", text):
+                    if re.search(r"\[\d+\]", found.group(1)) is not None and "~" not in found.group(1):
+                        unpinned.append(page.name + ":" + str(number))
+        self.assertEqual(unpinned, [])
 
     def test_an_unknown_fact_count_or_key_is_refused(self) -> None:
         self.fixture.page("second-look", "It is {{fact:nope}}.\n")

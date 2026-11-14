@@ -27,14 +27,14 @@ The first preview on a {{machine}} takes a couple of minutes, because Plantoir s
 
 While Plantoir works, the section's window shows a line that says what is happening now. The line changes with each step. For a preview, the lines are, in order:
 
-- {{say:app-rules#milestones.preview[0].label}}
-- {{say:app-rules#milestones.preview[1].label}}
-- {{say:app-rules#milestones.preview[2].label}}
-- {{say:app-rules#milestones.preview[3].label}}
-- {{say:app-rules#milestones.preview[4].label}}
-- {{say:app-rules#milestones.preview[5].label}}
-- {{say:app-rules#milestones.preview[6].label}}
-- {{say:app-rules#milestones.preview[7].label}}
+- {{say:app-rules#milestones.preview[0].label ~ Getting this Mac ready…}}
+- {{say:app-rules#milestones.preview[1].label ~ Building your website builder…}}
+- {{say:app-rules#milestones.preview[2].label ~ Starting up…}}
+- {{say:app-rules#milestones.preview[3].label ~ Gathering your content…}}
+- {{say:app-rules#milestones.preview[4].label ~ Applying your settings…}}
+- {{say:app-rules#milestones.preview[5].label ~ Preparing components…}}
+- {{say:app-rules#milestones.preview[6].label ~ Building your site…}}
+- {{say:app-rules#milestones.preview[7].label ~ Opening the preview…}}
 
 The first two appear only when that part is needed.
 

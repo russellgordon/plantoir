@@ -33,29 +33,29 @@ When a deploy does not finish, the section's window says what went wrong and wha
 Plantoir turns a failure it recognises into one sentence. Find yours here.
 
 - No internet connection:
-  {{say:app-rules#failureExplanations.cases[14].expect}}
+  {{say:app-rules#failureExplanations.cases[14].expect ~ Your computer couldn't reach the}}
 - Netlify asks you to wait. The time it names can differ:
-  {{say:app-rules#failureExplanations.cases[9].expect}}
+  {{say:app-rules#failureExplanations.cases[9].expect ~ Netlify is limiting how often websites can be deployed right now. Try deploying again in about a minute.}}
 - No Netlify token is saved yet:
-  {{say:app-rules#failureExplanations.cases[12].expect}}
+  {{say:app-rules#failureExplanations.cases[12].expect ~ Your Netlify account isn't connected}}
 - Netlify refused the token:
-  {{say:app-rules#failureExplanations.cases[13].expect}}
+  {{say:app-rules#failureExplanations.cases[13].expect ~ Netlify didn't accept your access}}
 - Cloudflare refused the token:
-  {{say:app-rules#failureExplanations.cases[16].expect}}
+  {{say:app-rules#failureExplanations.cases[16].expect ~ Cloudflare did not accept that}}
 - Plantoir could not reach Cloudflare to check the token. There is a sentence like it for Netlify:
-  {{say:app-rules#failureExplanations.cases[18].expect}}
+  {{say:app-rules#failureExplanations.cases[18].expect ~ Plantoir could not reach Cloudflare}}
 - A token you pasted during this deploy was not saved. There are five such sentences, and each says the token was not saved. This is one:
-  {{say:app-rules#failureExplanations.cases[21].expect}}
+  {{say:app-rules#failureExplanations.cases[21].expect ~ What was pasted has a}}
 - A science simulation that a page uses has not been downloaded yet. The sentence names the section, the page and the simulation. See [Science simulations](page:phet). This is one:
-  {{say:app-rules#failureExplanations.cases[1].expect}}
+  {{say:app-rules#failureExplanations.cases[1].expect ~ SPH3U Section 1 was not built: this computer could not reach PhET to download a science simulation}}
 - The website has not been made yet:
-  {{say:app-rules#failureExplanations.cases[22].expect}}
+  {{say:app-rules#failureExplanations.cases[22].expect ~ This website hasn't been built}}
 - The section has no front page:
-  {{say:app-rules#failureExplanations.cases[23].expect}}
+  {{say:app-rules#failureExplanations.cases[23].expect ~ This section has no front}}
 - The front page's settings cannot be read:
-  {{say:app-rules#failureExplanations.cases[25].expect}}
+  {{say:app-rules#failureExplanations.cases[25].expect ~ The settings at the top of this section's front page could not be read, so there is no website to deploy. Open the front page in Obsidian, fix its settings near line 3, then deploy again.}}
 - A deploy to a folder could not copy every page:
-  {{say:app-rules#failureExplanations.cases[8].expect}}
+  {{say:app-rules#failureExplanations.cases[8].expect ~ Plantoir could not copy every}}
 
 {{picture:deploy-failed-2}}
 alt: A deploy that failed, in the section's window, with the sentence that says what went wrong and what to do.

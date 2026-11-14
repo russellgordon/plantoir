@@ -10,7 +10,9 @@ fails the build instead of leaving Help wrong:
 - `{{control:<id>}}` help/controls.json; the label must be a Swift string
                      literal in the named file, the literal of a named
                      `static let`/`var`, or a contract sentence;
-- `{{say:<file>#<key path>}}` a sentence from contracts/<file>.json;
+- `{{say:<file>#<key path>}}` a sentence from contracts/<file>.json; a
+                     path with a list position, `[n]`, carries a pin,
+                     `{{say:<file>#<key path> ~ <opening words>}}` (#952);
 - `{{fact:<id>}}`    help/facts.json;
 - `{{key:<id>}}`     a shortcut: a menu id's key from the golden, or
                      help/controls.json -> keys;
@@ -132,6 +134,20 @@ def resolve_key_path(document: Any, key_path: str) -> Any:
     return value
 
 
+# A say token's pin (#952): `{{say:<file>#<key path> ~ <opening words>}}`.
+# Not `|`, which would split a table cell the token sits in.
+PIN_SEPARATOR = "~"
+INDEX_IN_KEY_PATH = re.compile(r"\[\d+\]")
+
+
+def split_pin(argument: str) -> Tuple[str, Optional[str]]:
+    """A say token's reference and its pin (None when it carries none)."""
+    if PIN_SEPARATOR not in argument:
+        return argument.strip(), None
+    reference, pin = argument.split(PIN_SEPARATOR, 1)
+    return reference.strip(), pin.strip()
+
+
 class Registries:
     """help/'s registries and the repository files the tokens are checked against."""
 
@@ -198,6 +214,55 @@ class Registries:
                 raise KeyError("there is no contracts/" + file_name)
             self._contracts[file_name] = read_json(path)
         return resolve_key_path(self._contracts[file_name], key_path)
+
+    def pin_problem(self, reference: str, pin: Optional[str], value: str) -> Optional[str]:
+        """Why a say token's pin does not hold, or None (#952).
+
+        A token that names a sentence by its position in a list (`cases[9]`)
+        keeps resolving when a case is inserted before it, and then shows the
+        wrong sentence. So such a token carries a pin, the opening words of the
+        sentence it expects, and the pin must open that sentence and no other
+        sentence at the same place in the list. A token with no position may
+        carry a pin too; it is checked the same way."""
+        positions: List[Any] = list(INDEX_IN_KEY_PATH.finditer(reference))
+        if pin is None:
+            if len(positions) == 0:
+                return None
+            return ("names a sentence by its position in a list: write the opening words it expects after it, "
+                    "as {{say:" + reference + " ~ <opening words>}}, so a case inserted before it fails the build")
+        if pin == "":
+            return "has an empty pin: write the opening words of the sentence it expects after the ~"
+        if not value.startswith(pin):
+            return ("expects a sentence opening " + repr(pin) + " but now reads " + repr(value)
+                    + ": the list has changed, so point the token at the sentence the page means")
+        if len(positions) == 0:
+            return None
+        # The same place in every other item of the innermost list: the pin
+        # must tell this sentence from each of them.
+        last = positions[-1]
+        list_path: str = reference[:last.start()]
+        rest: str = reference[last.end():]
+        own_index: int = int(last.group(0)[1:-1])
+        try:
+            items: Any = self.contract_value(list_path)
+        except KeyError:
+            return None
+        if not isinstance(items, list):
+            return None
+        index: int = 0
+        while index < len(items):
+            if index != own_index:
+                other_reference: str = list_path + "[" + str(index) + "]" + rest
+                try:
+                    other: Any = self.contract_value(other_reference)
+                except KeyError:
+                    other = None
+                # Two items that read the same sentence are the same sentence.
+                if isinstance(other, str) and other != value and other.startswith(pin):
+                    return ("has a pin, " + repr(pin) + ", that also opens " + other_reference.split("#", 1)[1]
+                            + ": give more of the sentence's opening words")
+            index += 1
+        return None
 
     def swift_texts(self) -> List[Tuple[Path, str]]:
         if self._swift_texts is None:
@@ -332,14 +397,18 @@ class Registries:
                 label = str(windows_entry["label"])
             return '<b class="control">' + html.escape(label) + "</b>"
         if kind == "say":
+            reference, pin = split_pin(argument)
             try:
-                value = self.contract_value(argument)
+                value = self.contract_value(reference)
             except KeyError as error:
-                problems.fail(file, line, "{{say:" + argument + "}} does not resolve (" + str(error) + ")")
+                problems.fail(file, line, "{{say:" + reference + "}} does not resolve (" + str(error) + ")")
                 return ""
             if not isinstance(value, str):
-                problems.fail(file, line, "{{say:" + argument + "}} names a " + type(value).__name__ + ", not a sentence")
+                problems.fail(file, line, "{{say:" + reference + "}} names a " + type(value).__name__ + ", not a sentence")
                 return ""
+            pin_problem: Optional[str] = self.pin_problem(reference, pin, value)
+            if pin_problem is not None:
+                problems.fail(file, line, "{{say:" + reference + "}} " + pin_problem)
             return '<span class="say">' + html.escape(value) + "</span>"
         if kind == "fact":
             fact = self.facts.get(argument)
