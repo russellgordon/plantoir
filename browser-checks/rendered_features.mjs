@@ -59,6 +59,7 @@ const CONTRACT = JSON.parse(readFileSync(join(HERE, "..", "contracts", "shared-r
 const QUIZ_WORDS = CONTRACT.quizCallouts.words.site
 const PROGRESS_WORDS = CONTRACT.myProgress.words
 const RESET_ICON = CONTRACT.geogebraFences.reset.icon
+const PHET = CONTRACT.phetFences
 // The runner's words for a run that ended without its output, as patterns
 // (a {placeholder} matches anything).
 const RUNNER_ENDS = ["needsWebAddress", "engineMissing", "couldNotLoad", "notReady", "crashed", "finishedWithError", "exitCode"].map((key) =>
@@ -341,7 +342,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], sitePaths: [], engine }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -419,6 +420,9 @@ async function openContext(browser, engine, origin, pageName) {
       return route.abort()
     }
     if (url.host === siteHost) {
+      // What the site itself was asked for, in order (the phet row: nothing
+      // of a simulation before a press).
+      record.sitePaths.push(url.pathname)
       // A worker's script, marked by PAGE_WATCH: fetched without the mark and
       // given WORKER_WATCH in front (after a "use strict" that must stay first).
       if (url.pathname === WATCH_MODULE_PATH) {
@@ -488,6 +492,24 @@ function watchPage(page, record) {
 // -------------------- the rows --------------------
 
 const PAGE_HASH = { Anchor: "#test-of-success" }
+// Nothing plays (#674): a PhET simulation makes its sounds through Web
+// Audio, which no request router sees and which WebKit is not muted for.
+// Every frame's AudioContext is made suspended and kept so, before the
+// page's own scripts run (an init script runs in every frame).
+const SILENT_AUDIO = `(() => {
+  for (const name of ["AudioContext", "webkitAudioContext"]) {
+    const Real = window[name]
+    if (typeof Real !== "function") continue
+    const Silent = function (...given) {
+      const context = new Real(...given)
+      try { context.suspend() } catch {}
+      context.resume = () => Promise.resolve()
+      return context
+    }
+    Silent.prototype = Real.prototype
+    window[name] = Silent
+  }
+})()`
 const NO_ANCHORING = `document.addEventListener("DOMContentLoaded", () => { const s = document.createElement("style"); s.textContent = "html, body, * { overflow-anchor: none !important; }"; document.head.append(s) })`
 
 function pageUrl(base, page) {
@@ -767,6 +789,78 @@ ROW_CHECKS.progress = async ({ page, base }) => {
   const wanted = PROGRESS_WORDS.count.replace("{done}", "1").replace("{total}", "2")
   if (!row.text.includes(wanted)) return { fail: `My Progress did not read 1 of 2 on the Tasks page's row: it reads "${row.text}"` }
   return { ok: `My Progress reads ${wanted} on the Tasks page's row` }
+}
+
+// PhET (#674): the simulation opens on a real press from the site's own
+// copy, its frame's address is the contract's (phetFences.address), it is
+// never cropped, and PhET's credit line is under it. The own-host row on
+// the same page judges every request the simulation's frame made.
+ROW_CHECKS.phet = async ({ page, record }) => {
+  const absent = process.env.PLANTOIR_RENDERED_NO_PHET
+  if (absent) return { skip: `no copy of the simulation on this Mac - ${absent}` }
+  const fixture = ROWS.phetFixture
+  const figure = page.locator("figure.pl-phet").first()
+  if ((await figure.count()) === 0) return { fail: "did not open: there is no simulation's card on the page" }
+  const credit = await page.evaluate(() => {
+    const line = document.querySelector("figure.pl-phet .pl-phet-attribution")
+    if (!line || line.getClientRects().length === 0) return null
+    return { text: line.textContent.replace(/\s+/g, " ").trim(), links: Array.from(line.querySelectorAll("a")).map((a) => ({ href: a.getAttribute("href"), rel: a.getAttribute("rel") ?? "" })) }
+  })
+  if (!credit) return { fail: "the credit line PhET's licence asks for is not under the card" }
+  if (credit.text !== PHET.attribution.sentence) return { fail: `the credit line is not PhET's sentence (phetFences.attribution): "${credit.text}"` }
+  if (!credit.links.some((link) => link.href === PHET.attribution.licenceUrl && /\blicense\b/.test(link.rel)) || !credit.links.some((link) => link.href === PHET.attribution.siteUrl)) {
+    return { fail: `the credit line's links are not the licence's and PhET's (${JSON.stringify(credit.links)})` }
+  }
+  // Where the host isolates a page for live input, this one must be, or the
+  // isolation sabotage would prove nothing (phetFences.isolation).
+  const isolated = await page.evaluate(() => self.crossOriginIsolated === true)
+  if (expectsIsolation() && !isolated) return { fail: `did not open where it must: the Simulation page is not cross-origin isolated on ${options.host}` }
+  const early = record.sitePaths.filter((path) => path.startsWith("/static/phet/") && !path.endsWith(".png"))
+  if (early.length > 0) return { fail: `the simulation was fetched before any press: ${early[0]}` }
+  await figure.locator(".pl-phet-open").click({ timeout: 15000 })
+  const started = Date.now()
+  const outcome = await waitInPage(page, () => {
+    const f = document.querySelector("figure.pl-phet")
+    if (!f) return null
+    if (f.classList.contains("pl-phet-loaded")) return { open: true }
+    const said = f.querySelector(".pl-phet-message")
+    if (said && !said.hidden && said.textContent.trim() !== "") return { open: false, said: said.textContent.trim() }
+    return null
+  }, 90000)
+  if (!outcome?.open) return { fail: `did not open on a real press (the page said: ${outcome?.said ?? "nothing within 90 s"})` }
+  const seconds = ((Date.now() - started) / 1000).toFixed(1)
+  const frame = page.frames().find((one) => one.url().includes(`/static/phet/${fixture.sim}/`))
+  if (!frame) return { fail: "did not open: no frame of the site's own copy" }
+  const address = new URL(frame.url())
+  if (!address.search.startsWith("?" + PHET.address.fixed.join("&") + "&")) return { fail: `the frame's address does not start with ${PHET.address.fixed.join("&")} (yotta): ${address.search}` }
+  const inside = await waitInPage(frame, () => {
+    const phet = window.phet
+    if (!phet || !phet.joist || !phet.joist.sim) return null
+    const asked = phet.chipper.queryParameters
+    return { yotta: asked.yotta, allowLinks: asked.allowLinks, locale: phet.chipper.locale, screens: phet.joist.sim.screens.length }
+  }, 60000)
+  if (!inside) return { fail: "did not open: the simulation never started in its frame" }
+  if (inside.yotta !== false) return { fail: `the simulation reports to PhET: its yotta setting is ${inside.yotta}` }
+  if (inside.allowLinks !== false) return { fail: `the simulation's links to PhET are on: allowLinks is ${inside.allowLinks}` }
+  if (inside.locale !== fixture.locale) return { fail: `the simulation is in ${inside.locale}, not the fence's ${fixture.locale}` }
+  if (inside.screens !== fixture.screens) return { fail: `the simulation shows ${inside.screens} screens, not the fence's ${fixture.screens}` }
+  const box = await page.evaluate(() => {
+    const f = document.querySelector("figure.pl-phet")
+    const stage = f.querySelector(".pl-phet-stage")
+    const shown = stage?.querySelector("iframe")
+    if (!stage || !shown) return null
+    const rect = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
+    const shape = (f.style.getPropertyValue("--pl-phet-ratio") || "1024 / 618").split("/").map((part) => Number(part.trim()))
+    return { frame: rect(shown), stage: rect(stage), figure: rect(f), shape: shape[0] / shape[1] }
+  })
+  if (!box) return { fail: "did not open: the frame is not in the simulation's box" }
+  const within = (inner, outer) => inner.left >= outer.left - 1 && inner.top >= outer.top - 1 && inner.right <= outer.right + 1 && inner.bottom <= outer.bottom + 1
+  const ratio = box.frame.width / box.frame.height
+  const wanted = Number.isFinite(box.shape) && box.shape > 0 ? box.shape : 1024 / 618
+  if (!within(box.frame, box.stage) || !within(box.frame, box.figure) || Math.abs(ratio - wanted) / wanted > 0.03) {
+    return { fail: `cropped: the frame is ${Math.round(box.frame.width)} x ${Math.round(box.frame.height)}, not the simulation's shape (${wanted.toFixed(3)} wide to 1 high), or reaches outside its box, so PhET's logo may be out of view` }
+  }
+  return { ok: `opened on a real press from the site's own copy in ${seconds} s (${inside.locale}, ${inside.screens} screen, yotta and links off, ${Math.round(box.frame.width)} x ${Math.round(box.frame.height)}, ${isolated ? "on an isolated page" : "on a page that is not isolated"}, PhET's credit line under it)` }
 }
 
 // GeoGebra: the applet behind figure `index`, read through its own API.
@@ -1394,6 +1488,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
     if (pageRows.some((row) => row.name === "print")) await context.addInitScript(PRINT_PROBE)
     if (pageRows.some((row) => row.name === "copy")) await context.addInitScript(CLIPBOARD_SPY)
     if (engine === "chromium" && pageRows.some((row) => row.name === "heading anchor")) await context.addInitScript(NO_ANCHORING)
+    if (pageRows.some((row) => row.name === "phet")) await context.addInitScript(SILENT_AUDIO)
     let page
     try {
       page = await openPage(context, record, pageUrl(base, pageName))
@@ -1584,6 +1679,10 @@ async function redRun(engines, network) {
           }
           if (options.expectRed === "all" && sabotage.gateEngines && !sabotage.gateEngines.includes(name)) {
             say("NOTE", `sabotage ${sabotage.name}`, name, `not run in ${name} at a gate (run it by name): ${sabotage.whyGateEngines}`)
+            return
+          }
+          if (aimed.needsCopy === "phet" && process.env.PLANTOIR_RENDERED_NO_PHET) {
+            say("SKIPPED", `sabotage ${sabotage.name}`, name, `no copy of the simulation on this Mac - ${process.env.PLANTOIR_RENDERED_NO_PHET}`)
             return
           }
           if ((aimed.needsNetwork === "cdnjs" && network.cdnjs) || (aimed.needsNetwork === "google" && network.google)) {

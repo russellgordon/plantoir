@@ -12,7 +12,22 @@
     "Embeds": "Rendered-Check/Embeds",
     "Handout": "Rendered-Check/Handout",
     "Wrapped Text": "Rendered-Check/Wrapped-Text",
-    "Anchor": "Rendered-Check/Anchor"
+    "Anchor": "Rendered-Check/Anchor",
+    "Simulation": "Rendered-Check/Simulation"
+  },
+  "phetFixture": {
+    "why": "#674. The simulation the Simulation page names, which the repository never carries (PhET's licence and Russell's ruling: a class site carries a copy, Plantoir does not). browser-checks/lib/plant_phet.py fetch downloads it once into the dev cache (PLANTOIR_PHET_CACHE, else ~/Library/Caches/Plantoir-dev/phet), refusing any file whose SHA-256 is not the one here, and plant_phet.py plant puts it where a build keeps its downloads (keptDownloads.where), so the fixture build asks PhET nothing. No copy on the Mac: the phet row and its sabotages are SKIPS by name; PLANTOIR_REQUIRE_ENGINES makes that a failure in verify.sh.",
+    "sim": "gas-properties",
+    "project": "html/gas-properties",
+    "version": "1.1.12",
+    "locale": "fr",
+    "screens": 1,
+    "titles": {"en": "Gas Properties", "fr": "Propriétés des gaz"},
+    "files": {
+      "simulation.html": {"from": "https://phet.colorado.edu/sims/html/gas-properties/1.1.12/gas-properties_all.html", "bytes": 3046404, "sha256": "11440b2a28cc72d0591ec7ca010e470fb5f9a94ca6f56c77ceb8c3d20fc34f24"},
+      "screenshot.png": {"from": "https://phet.colorado.edu/sims/html/gas-properties/1.1.12/gas-properties-600.png", "bytes": 124133, "sha256": "1ec90b5f1e0a27897a42e2e9f4f639601d4455cfc4eb2199ed9dc44ae20ef39d"}
+    },
+    "measured": "2026-11-13: both files fetched from phet.colorado.edu with Accept: */*, the simulation as PhET publishes it (phetFences.download.removedOnTheWay takes out the analytics script PhET's servers sometimes add; the hash is of the file without it)."
   },
   "thirdPartyHostsToday": {
     "hosts": ["fonts.googleapis.com", "fonts.gstatic.com", "cdnjs.cloudflare.com"],
@@ -43,6 +58,7 @@
     { "name": "geogebra drag", "page": "Sketch", "passes": "point A dragged with real pointer events moves (#755)" },
     { "name": "geogebra reset", "page": "Sketch", "passes": "GeoGebra's reset icon, pressed for real where geogebraFences.reset.icon puts it, puts A back where the sketch opened it (#792)" },
     { "name": "geogebra keys", "page": "Sketch", "passes": "Shift+Tab and Space pressed again and again, the canvas focused before each, while the 150-line sketch's lines run: its points, counted after every press, never fall by more than one while the lines run (a reset getting in empties the construction, which the loader's marker repairs by the end, so the end alone cannot see it); all 150 are there at the end, and a press on its reset icon brings back all 150 (#792 item 12). Judged on its own sabotage only, which runs alone" },
+    { "name": "phet", "page": "Simulation", "needsCopy": "phet", "passes": "PhET's credit line, word for word (phetFences.attribution), under the card with its two links; nothing of the simulation fetched before a press (its picture aside); then a real press opens it from the site's own static/phet/, on a page isolated for live input: the frame's address starts yotta=false&allowLinks=false, and inside the frame the simulation itself reads yotta and allowLinks false, the fence's language (fr) and its one screen; the frame keeps the simulation's own shape (its picture's, else 1024 by 618) inside its box, so it is never cropped. Every request the frame made is judged by the own-host row. Nothing plays: every frame's audio is held suspended" },
     { "name": "embeds", "page": "Embeds", "hosts": ["netlify", "cloudflare", "github"], "allowedFrames": ["www.youtube.com", "www.youtube-nocookie.com", "player.vimeo.com", "www.geogebra.org", "phet.colorado.edu"], "passes": "each YouTube, Vimeo, geogebra.org and PhET frame navigated to a document that answered 2xx (the frame's own response, never only a load event, which also fires on an error page). Deployed sites only: the embeds need the network and nothing in them is the site's" },
     { "name": "pdf", "page": "Handout", "passes": "the handout's PDF link answers 200 with application/pdf" },
     { "name": "print", "page": "Handout", "needsNetwork": "cdnjs", "networkPart": "the diagram on the paper", "passes": "on screen, every answer folded away; then Print pressed for real and a way of printing chosen: the print layout laid out at least one page, the diagram drawn on it, and the handout's Latin Modern face loaded (judged by its FontFace status)" },
@@ -93,6 +109,10 @@
     { "name": "tikz empty", "aims": "tikz", "page": "Diagrams", "reason": "the drawing is empty", "alsoRed": [], "does": "the drawing's svg emptied of everything it drew, its size kept (fixes review F5)" },
     { "name": "handout answers open", "aims": "print", "page": "Handout", "reason": "not folded", "alsoRed": [], "does": "the handout's answer left unfolded on screen (fixes review F5)" },
     { "name": "graph invisible", "aims": "graph", "page": "Graphs", "reason": "cannot be seen", "alsoRed": [], "does": "the graph's curves stroked with nothing (fixes review F5)" },
+    { "name": "phet tracking", "aims": "phet", "page": "Simulation", "reason": "yotta", "alsoRed": ["own host", "clean page"], "does": "the card's address without yotta=false, as PhET's defaults have it: the simulation then asks Google Tag Manager and PhET's own servers (four requests, measured 2026-11-13), which the own-host row sees as well" },
+    { "name": "phet isolation", "aims": "phet", "page": "Simulation", "reason": "did not open", "alsoRed": ["clean page"], "does": "the /static/phet/* rule taken out of the site's _headers, so the page isolated for live input refuses the simulation's frame (measured 2026-11-13: it never opens, in either engine); WebKit says Refused to display, which the clean-page row sees" },
+    { "name": "phet cropped", "aims": "phet", "page": "Simulation", "reason": "cropped", "alsoRed": [], "does": "a stylesheet rule giving the simulation's box a fixed height of 120 px, so the frame loses the simulation's shape and PhET's logo can leave the view" },
+    { "name": "phet credit", "aims": "phet", "page": "Simulation", "reason": "credit line", "alsoRed": [], "does": "the credit line under the card taken out" },
     { "name": "cold visit", "aims": "cold visit", "page": "Python", "reason": "first contentful paint", "alsoRed": [], "does": "the site's stylesheet held for 8 s by the local server, so the page cannot paint" }
   ]
 }
