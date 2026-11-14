@@ -378,7 +378,7 @@ def quiz_given_away(site: Path) -> str:
 
 
 def own_host_embeds_page(site: Path) -> str:
-    # The four planted embeds pointed at a page of the site's own (so the
+    # The five planted embeds pointed at a page of the site's own (so the
     # check needs no network here), then a frame and a request of another
     # host's beside them: the Embeds page is judged like any other, and only
     # frames on the embeds row's allowedFrames may come from elsewhere.
@@ -394,7 +394,8 @@ def own_host_embeds_page(site: Path) -> str:
 
 
 def embeds_refused(site: Path) -> str:
-    # The YouTube frame pointed at the video's watch page, which YouTube
+    # The YouTube frame (since #692 the www.youtube-nocookie.com player,
+    # either address is read) pointed at the video's watch page, which YouTube
     # refuses to be framed in (X-Frame-Options: SAMEORIGIN): the frame's
     # document answers 200 and students see a blank box (597b review
     # finding 1). A teacher pasting the address from the address bar makes
@@ -402,7 +403,7 @@ def embeds_refused(site: Path) -> str:
     # or with --site and --host netlify.
     path = page_file(site, "Embeds")
     text = path.read_text(encoding="utf-8")
-    changed, count = re.subn(r'(<iframe[^>]*\ssrc=")https://www\.youtube\.com/embed/([A-Za-z0-9_-]+)(")', r"\1https://www.youtube.com/watch?v=\2\3", text)
+    changed, count = re.subn(r'(<iframe[^>]*\ssrc=")https://www\.youtube(?:-nocookie)?\.com/embed/([A-Za-z0-9_-]+)(")', r"\1https://www.youtube.com/watch?v=\2\3", text)
     if count == 0:
         raise SystemExit("sabotage: the Embeds page has no YouTube frame")
     path.write_text(changed, encoding="utf-8")
@@ -416,6 +417,21 @@ def own_host_off_its_pin(site: Path) -> str:
     add_script(site, "Quiz", "off-pin.js",
                "fetch('https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js', { mode: 'no-cors' }).catch(() => {})\n")
     return "cdnjs asked for another library from the Quiz page"
+
+
+def embeds_unknown_video(site: Path) -> str:
+    # #692: the short-form Vimeo player pointed at a video that does not
+    # exist. player.vimeo.com answers 404 for it (curl, 2026-11-13, id
+    # 9999999999 with dnt=1; the real 22439234 answers 200), so the embeds
+    # row must name that frame. Before the row matched a frame's answer in
+    # full, the pasted player's 200 could answer for a short-form player.
+    path = page_file(site, "Embeds")
+    text = path.read_text(encoding="utf-8")
+    changed = text.replace("https://player.vimeo.com/video/22439234?dnt=1", "https://player.vimeo.com/video/9999999999?dnt=1")
+    if changed == text:
+        raise SystemExit("sabotage: the Embeds page has no short-form Vimeo player")
+    path.write_text(changed, encoding="utf-8")
+    return "the short-form Vimeo player pointed at a video that does not exist"
 
 
 def own_host_late(site: Path) -> str:
@@ -555,6 +571,7 @@ DOERS = {
     "katex wrong face": katex_wrong_face,
     "quiz given away": quiz_given_away,
     "own host embeds page": own_host_embeds_page,
+    "embeds unknown video": embeds_unknown_video,
     "own host late": own_host_late,
     "own host lazy": own_host_lazy,
     "own host media": own_host_media,

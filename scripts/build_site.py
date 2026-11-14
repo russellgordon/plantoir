@@ -1796,15 +1796,16 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
     the self-check quizzes' (#563), the task boxes' (#519), the picture
-    sizes' (#612), the GeoGebra sketches' (#578) and the PhET
-    simulations' (#674) beside Quartz's own."""
+    sizes' (#612), the GeoGebra sketches' (#578), the PhET simulations'
+    (#674) and the videos' (#692) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
                          ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
                          ("PlantoirPictureSizes", "./plantoirPictureSizes"),
                          ("PlantoirGeoGebra", "./plantoirGeoGebra"),
-                         ("PlantoirPhet", "./plantoirPhet")):
+                         ("PlantoirPhet", "./plantoirPhet"),
+                         ("PlantoirVideo", "./plantoirVideo")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1993,6 +1994,33 @@ def _wire_picture_sizes_transformer(config_ts: Path) -> None:
         print("⚠️ Could not reserve the pictures' space on the site's pages: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirPictureSizes()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_video_transformer(config_ts: Path) -> None:
+    """Put the videos' transformer (#692) straight BEFORE
+    ObsidianFlavoredMarkdown. Quartz runs every transformer's html plugins in
+    the order they are listed, and OFM's own YouTube step replaces a
+    picture's properties, losing the words in its brackets (the player's
+    title). Running first, the videos' transformer turns YouTube and Vimeo
+    pictures into players itself, and OFM's YouTube step finds none left.
+    Anchored on OFM, so a section wired before #692 gets it in the same
+    place as a fresh one. Without that anchor the videos are left to
+    Quartz's own YouTube step, as before #692."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirVideo(" in text:
+        return
+    anchor = "Plugin.ObsidianFlavoredMarkdown("
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.PlantoirVideo(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2344,7 +2372,11 @@ def wire_quartz_additions(output_dir: Path) -> None:
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
-    Print button's component in pictures.scss), My
+    Print button's component in pictures.scss), the videos' one (#692: its
+    transformer straight before ObsidianFlavoredMarkdown, so the player keeps
+    the picture's words as its title; its export rides the transformers
+    index and its one style rule rides the Print button's component in
+    videos.scss), My
     Progress's two (#545: its emitter exported beside Quartz's and put
     before Assets; its script and styles ride as the quizzes' do), the
     emitter that says which runnable blocks the site showed as plain code
@@ -2371,6 +2403,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_phet_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
+        (output_dir / "quartz.config.ts", _wire_video_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
         (output_dir / "quartz.config.ts", _wire_progress_emitter),

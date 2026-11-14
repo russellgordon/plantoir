@@ -29651,7 +29651,8 @@
           "Never a bare `text`: an unwrapped block is always deliberate.",
           "**Anything students copy goes in a text block.**",
           "**The course's How I Teach page comes first.**",
-          "make the exercise as a PDF handout with its hints sheet"
+          "make the exercise as a PDF handout with its hints sheet",
+          "a school network has to allow youtube-nocookie.com as well as youtube.com"
         ],
         "plantoir-printing": [
           "A text block prints wrapped whether or not it says `wrap`.",
@@ -32970,6 +32971,12 @@
           "html": "<head><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"/><link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM Plex Mono:wght@400;600&amp;display=swap\"/><link rel=\"preconnect\" href=\"https://cdnjs.cloudflare.com\" crossorigin=\"anonymous\"/><link rel=\"icon\" href=\"../static/favicon.ico\" sizes=\"32x32\"/><link href=\"../index.css\" rel=\"stylesheet\" type=\"text/css\" spa-preserve/><script src=\"../prescript.js\" type=\"application/javascript\" spa-preserve></script><link rel=\"stylesheet\" href=\"../static/katex/katex.min.css\" spa-preserve/><link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS Feed\" href=\"https://ics3u-s1-2026-testing.netlify.app/index.xml\"/><script src=\"../postscript.js\" type=\"module\"></script></head><div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-swift-1\" data-runner-flags data-runner-language=\"swift\" data-runner-runtime=\"swift-wasm\" data-runner-engine=\"swift\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div>",
           "verdict": "none",
           "readsInput": false
+        },
+        {
+          "name": "a Vimeo player made from the picture form (#692)",
+          "html": "<div class=\"plantoir-runner\" data-runner-id=\"Units/Loops-py-1\" data-runner-flags data-runner-language=\"python\" data-runner-runtime=\"pyodide\" data-runner-engine=\"pyodide\" data-runner-asks=\"input\" data-original=\"print(1)\"><pre><code>print(1)</code></pre></div><p><iframe class=\"external-embed plantoir-video vimeo\" src=\"https://player.vimeo.com/video/76979871?dnt=1\" title=\"Vimeo video\" loading=\"lazy\" allow=\"fullscreen; picture-in-picture; encrypted-media\" allowfullscreen referrerpolicy=\"strict-origin-when-cross-origin\" frameborder=\"0\"></iframe></p>",
+          "verdict": "frame",
+          "readsInput": true
         },
         {
           "name": "a YouTube frame",
@@ -44444,6 +44451,304 @@
       "Deleting the old entry: measured on a copy, the build, the sharing card and the Coverage tab then drew the default colours (False, False, False), and the command-line picker started at the first scheme, so Enter wrote quartz-standard.",
       "Keeping only the old id and renaming it: every new course that picked Grove Colours would write the school's name into its settings.",
       "One entry with the new id and a list of former ids read by every lookup: six readers on two platforms must agree, and a Windows build carrying the new scheme list before its code matched a former id would show the first scheme as chosen and write quartz-standard at the next touch. With two entries a lagging app can only show the name twice."
+    ]
+  },
+  "videoEmbeds": {
+    "rule": "A YouTube or Vimeo address written in the picture form, ![words](address), becomes the video's player on the class site. The address is the one the video site's Share button gives; the words in the brackets become the player's title, read out by a screen reader. A vimeo.com address that is not one video (a showcase, a profile) stays the picture it always was, and the build prints notes.notAVideo. Every other picture, every link, and a player pasted as <iframe> code are left exactly as before.",
+    "rulings": [
+      "Russell, 2026-11-13 (#692, question dialog): YouTube players use the privacy-enhanced address, www.youtube-nocookie.com; Vimeo players carry dnt=1, Vimeo's do-not-track setting; videos do NOT wait for a tap before they load (offered and not chosen). Help and guidance say a school network has to allow youtube-nocookie.com as well as youtube.com.",
+      "Russell, 2026-10-24: every player is 600 px wide at most, 16:9, with no per-video width."
+    ],
+    "order": "The site's transformer (support/quartz/plugins/transformers/plantoirVideo.ts) runs at the html stage, wired straight BEFORE ObsidianFlavoredMarkdown (build_site._wire_video_transformer). Quartz runs html plugins in list order, and OFM's own YouTube step replaces a picture's properties, which loses the words in the brackets. Run first, Plantoir makes both hosts' players itself and OFM's step finds no picture left to change.",
+    "player": {
+      "class": [
+        "external-embed",
+        "plantoir-video"
+      ],
+      "classRule": "The host's own name is the third class: youtube or vimeo. external-embed and youtube are the classes Quartz gave its own YouTube player, kept so nothing that read them stops finding one.",
+      "attributes": {
+        "loading": "lazy",
+        "allow": "fullscreen; picture-in-picture; encrypted-media",
+        "allowfullscreen": true,
+        "referrerpolicy": "strict-origin-when-cross-origin",
+        "frameborder": "0"
+      },
+      "referrerPolicyWhy": "The policy Vimeo's own embed code carries (its oEmbed answer for 76979871, read 2026-11-13). A video its owner limited to specific domains plays only when the player is told the class site's address, and YouTube players are reported to refuse to play when sent no referrer at all. Never tighten it to no-referrer.",
+      "size": "html body iframe.external-embed.plantoir-video { width: 600px; max-width: 100%; height: auto; aspect-ratio: 16 / 9 } in support/quartz/components/styles/videos.scss. It must outrank Quartz's .external-embed.youtube (width: 100%), which comes AFTER it in index.css.",
+      "measuredBefore": "2026-11-13, the verify fixture's YouTube player, Chromium 1243 and WebKit 2359: 650 x 366 at a 1300 px window and 358 x 201 at 390 px (Quartz's width: 100% won over the player's width=\"600px\"); no title, no loading.",
+      "target": "600 x 338 at a 1300 px window, 358 x 201 at 390 px, in both engines."
+    },
+    "titles": {
+      "youtube": "YouTube video",
+      "vimeo": "Vimeo video"
+    },
+    "notes": {
+      "notAVideo": "{page}: line {line}: {address} is not the address of one Vimeo video, so the page shows it as a broken picture. Use the address the video's Share button gives.",
+      "where": "Printed after `plantoir: note: ` on the build's console by the site's transformer. It is not a folder problem on the Problems tab: no Python reads video addresses (#692 plan review S4, accepted)."
+    },
+    "cases": [
+      {
+        "name": "a Vimeo address with words in the brackets",
+        "page": "![Mitosis in three minutes](https://vimeo.com/76979871)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Mitosis in three minutes"
+          }
+        }
+      },
+      {
+        "name": "a Vimeo address with empty brackets takes the fallback title",
+        "page": "![](https://vimeo.com/76979871)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "an unlisted Vimeo video keeps its privacy part, before dnt",
+        "page": "![](https://vimeo.com/123456789/abcdef1234)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/123456789?h=abcdef1234&dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "the Share button's ?share=copy is dropped",
+        "page": "![](https://vimeo.com/123456789/abcdef1234?share=copy)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/123456789?h=abcdef1234&dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "a player address pasted as it is, with its privacy part",
+        "page": "![](https://player.vimeo.com/video/123456789?h=abcdef1234)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/123456789?h=abcdef1234&dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "www.vimeo.com",
+        "page": "![](https://www.vimeo.com/76979871)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "a video in a channel",
+        "page": "![](https://vimeo.com/channels/staffpicks/76979871)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "a video in a group",
+        "page": "![](https://vimeo.com/groups/animation/videos/76979871)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "a Vimeo start time is kept as Vimeo's own #t=",
+        "page": "![](https://vimeo.com/76979871#t=1m30s)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1#t=90s",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "an Obsidian width in the brackets is not part of the title",
+        "page": "![Mitosis|400](https://vimeo.com/76979871)",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Mitosis"
+          }
+        }
+      },
+      {
+        "name": "a Vimeo address in a sentence still becomes the player",
+        "page": "Watch this first: ![](https://vimeo.com/76979871) then answer.",
+        "expect": {
+          "player": {
+            "host": "vimeo",
+            "src": "https://player.vimeo.com/video/76979871?dnt=1",
+            "title": "Vimeo video"
+          }
+        }
+      },
+      {
+        "name": "a Vimeo showcase stays a picture, with a note",
+        "page": "![](https://vimeo.com/showcase/1234567)",
+        "expect": {
+          "picture": true,
+          "note": true
+        }
+      },
+      {
+        "name": "a Vimeo profile stays a picture, with a note",
+        "page": "![](https://vimeo.com/staff)",
+        "expect": {
+          "picture": true,
+          "note": true
+        }
+      },
+      {
+        "name": "a YouTube watch address, privacy-enhanced",
+        "page": "![](https://www.youtube.com/watch?v=WUvTyaaNkzM)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/WUvTyaaNkzM",
+            "title": "YouTube video"
+          }
+        }
+      },
+      {
+        "name": "a YouTube address with words and a start time",
+        "page": "![Slope in two minutes](https://www.youtube.com/watch?v=WUvTyaaNkzM&t=90)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/WUvTyaaNkzM?start=90",
+            "title": "Slope in two minutes"
+          }
+        }
+      },
+      {
+        "name": "a youtu.be address with a start time in minutes and seconds",
+        "page": "![](https://youtu.be/WUvTyaaNkzM?t=1m30s)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/WUvTyaaNkzM?start=90",
+            "title": "YouTube video"
+          }
+        }
+      },
+      {
+        "name": "a YouTube Short",
+        "page": "![](https://www.youtube.com/shorts/WUvTyaaNkzM)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/WUvTyaaNkzM",
+            "title": "YouTube video"
+          }
+        }
+      },
+      {
+        "name": "a YouTube video in a playlist",
+        "page": "![](https://www.youtube.com/watch?v=WUvTyaaNkzM&list=PLexample0123456789)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/WUvTyaaNkzM?list=PLexample0123456789",
+            "title": "YouTube video"
+          }
+        }
+      },
+      {
+        "name": "a YouTube playlist alone",
+        "page": "![](https://www.youtube.com/playlist?list=PLexample0123456789)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/videoseries?list=PLexample0123456789",
+            "title": "YouTube video"
+          }
+        }
+      },
+      {
+        "name": "a YouTube player address pasted in the picture form",
+        "page": "![](https://www.youtube.com/embed/WUvTyaaNkzM)",
+        "expect": {
+          "player": {
+            "host": "youtube",
+            "src": "https://www.youtube-nocookie.com/embed/WUvTyaaNkzM",
+            "title": "YouTube video"
+          }
+        }
+      },
+      {
+        "name": "a YouTube address whose id is not 11 characters stays a picture, as Quartz left it",
+        "page": "![](https://www.youtube.com/watch?v=short)",
+        "expect": {
+          "picture": true,
+          "note": false
+        }
+      },
+      {
+        "name": "a picture from the Media folder is untouched",
+        "page": "![A plant cell](Media/cell-diagram.png)",
+        "expect": {
+          "picture": true,
+          "note": false
+        }
+      },
+      {
+        "name": "a link without ! is a link, not a player",
+        "page": "[Watch the video](https://vimeo.com/76979871)",
+        "expect": {
+          "link": true
+        }
+      },
+      {
+        "name": "a pasted Vimeo player is left exactly as written",
+        "page": "<iframe src=\"https://player.vimeo.com/video/22439234\" width=\"640\" height=\"360\" allow=\"fullscreen; picture-in-picture\" allowfullscreen></iframe>",
+        "expect": {
+          "unchanged": "<iframe src=\"https://player.vimeo.com/video/22439234\" width=\"640\" height=\"360\" allow=\"fullscreen; picture-in-picture\" allowfullscreen></iframe>"
+        }
+      }
+    ],
+    "casesRule": "Each page is read by the site's own Markdown reader (remark-parse with GitHub's extensions), turned to HTML as Quartz does (remark-rehype, allowDangerousHtml), then through PlantoirVideo and OFM's html plugins in the order the build wires them, by scripts/check_video_rules_against_the_site.py in the image. `player` is the one iframe the page holds; `picture` an img still there (`note`: whether notAVideo was printed); `link` an <a> and no iframe; `unchanged` the pasted code found in the HTML byte for byte.",
+    "knownLimits": [
+      "A school network that allows youtube.com and blocks youtube-nocookie.com stops every YouTube video at school while the teacher's preview at home still plays (Google: network administrators must add youtube-nocookie.com to the allowlist, support.google.com/youtube/answer/171780).",
+      "Obsidian shows the Vimeo picture form as a player only with a community add-on (Simple Vimeo); without it the line looks like a picture that does not load. The class site is unaffected.",
+      "A Vimeo showcase is not made a player: its embed address could not be verified (2026-11-13). It stays a picture, with the note.",
+      "A video its owner limited to specific domains plays only on the domains listed; the class site's address must be one of them.",
+      "Videos need the internet and do not print.",
+      "The YouTube rule is Quartz's own ytLinkRegex, copied unchanged, and it is not limited to YouTube's addresses: a picture whose path has a folder ending in v and an 11-character file name (Media/Dev/diagram.png, as ![](...) or ![[...]]) becomes a player for a video that does not exist (measured 2026-11-13, #692 implementation review finding 3). OFM did the same before #692, to youtube.com, and its own step would still do it after PlantoirVideo, so it is a follow-up, not this piece.",
+      "Three Share-button or browser addresses still show a broken picture, as before #692: youtube.com/live/<id> (a live stream or premiere: no player and no note), vimeo.com/showcase/<sid>/video/<id> (one video in a showcase: the note), and vimeo.com/manage/videos/<id> (the address in the owner's own browser after an upload: the note). A YouTube player address's end= and a playlist's index= are dropped. Measured 2026-11-13; a follow-up."
+    ],
+    "rejected": [
+      "A tap before a player loads (a card with the video's title and a Play button): offered on #692 and not chosen.",
+      "Running after OFM and patching its player: the words in the brackets are already gone.",
+      "Turning OFM's enableYouTubeEmbed off: an edit to every section's settings that buys nothing over leaving it to find nothing.",
+      "A per-video width (![Title|400](address)): the size is ruled, and the width part is dropped from the title instead.",
+      "Vimeo's title=0, byline=0 and portrait=0: the video's owner sets them in Vimeo's embed settings, which is Vimeo's default.",
+      "Google Drive, Loom and Stream: each has its own sharing pitfalls, and #692 proposed Vimeo now and the rest later."
     ]
   }
 }

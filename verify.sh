@@ -1763,6 +1763,20 @@ else
   cat /tmp/verify_phet_rules_site.log
 fi
 
+# #692: every videoEmbeds case through the SITE's own pipeline in Node: the
+# Markdown reader, PlantoirVideo, then Quartz's own OFM html plugins (its
+# YouTube step included), bundled from their sources with the image's
+# esbuild; and the titles, attributes and note as videoRules.js has them.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_video_rules_against_the_site.py" /opt/scripts/check_video_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_video_rules_against_the_site.py \
+  >/tmp/verify_video_rules_site.log 2>&1; then
+  pass "every videoEmbeds case holds through the site's own Markdown reader, the videos' transformer and Quartz's own YouTube step - $(tail -1 /tmp/verify_video_rules_site.log | sed 's/^PASS: //') (scripts/check_video_rules_against_the_site.py, #692)"
+else
+  fail "a videoEmbeds case reads differently through the site's own pipeline (scripts/check_video_rules_against_the_site.py, #692)"
+  cat /tmp/verify_video_rules_site.log
+fi
+
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
 # pictureSizes.js (the file the site's transformer imports) reads every
 # picture in scripts/fixtures/picture-sizes/ in Node; each answer must be
@@ -5862,8 +5876,12 @@ claims = [
      lambda a, p: len(re.findall(r'<img src="\./Media/cell-diagram\.png"', a)) == 3 and 'width="300"' in a
      and 'alt="A plant cell with the nucleus labelled"' in a and '<iframe src="./Media/Unit-2-Review.pdf" class="pdf">' in a
      and 'href="./Media/Unit-2-Review.pdf"' in a and has_file("Media/cell-diagram.png") and has_file("Media/Unit-2-Review.pdf")),
-    ("![](https://www.youtube.com/watch?v=", "YouTube and Vimeo players, and no GeoGebra or PhET iframe (#578, #674)",
-     lambda a, p: 'src="https://www.youtube.com/embed/' in a and '<iframe src="https://player.vimeo.com/video/' in a
+    ("https://www.youtube.com/watch?v=WUvTyaaNkzM&t=30", "YouTube and Vimeo players from the picture form, privately addressed and titled, a pasted Vimeo player left as written, and no GeoGebra or PhET iframe (#578, #674, #692)",
+     lambda a, p: 'src="https://www.youtube-nocookie.com/embed/WUvTyaaNkzM?start=30" title="Slope in two minutes" loading="lazy"' in a
+     and 'src="https://player.vimeo.com/video/76979871?dnt=1" title="Mitosis in three minutes" loading="lazy"' in a
+     and 'src="https://player.vimeo.com/video/123456789?h=abcdef1234&amp;dnt=1" title="Vimeo video"' in a
+     and a.count('class="external-embed plantoir-video ') == 3 and 'www.youtube.com/embed/' not in a
+     and '<iframe src="https://player.vimeo.com/video/22439234" width="640" height="360"' in a
      and 'geogebra.org' not in a and 'phet.colorado.edu/sims' not in a),
     ("sim: gas-properties", "a PhET simulation from the site's own copy, with PhET's credit line (#674)",
      lambda a, p: 'class="pl-figure pl-phet"' in a and "static/phet/gas-properties/" in a
@@ -6371,6 +6389,122 @@ else
   echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 
+# ---- 6h-v. YouTube and Vimeo players, in Chrome and in Safari's engine (#692) ----
+# Players made from the picture form, at the size Russell set (600 px wide
+# at most, 16:9), titled, lazy and privately addressed, on the skill's video
+# example as 6n built it, in Chrome for Testing and Playwright's WebKit
+# (browser-checks/video_players.mjs). Every request to another host is
+# refused, so no player loads and nothing plays. Then the check proven to
+# SEE, on copies of the site broken one way each: the size rule taken out of
+# index.css (the old 650 px player), the title and loading taken off (the
+# shape of Quartz's own player), and the old youtube.com address put back.
+# An engine that is not on this Mac is a SKIP by name, never a pass.
+echo ""
+echo "🎬 YouTube and Vimeo players, in Chrome and in Safari's engine (#692)…"
+# The engines a log says ran, in the words 6h-r uses (rendered_engines,
+# defined with 6h-r below and so not yet here).
+video_engine_words() {
+  case "$1" in
+    chromium,webkit|webkit,chromium) echo "in Chrome for Testing and WebKit" ;;
+    chromium) echo "in Chrome for Testing ONLY (WebKit did not run)" ;;
+    webkit) echo "in WebKit ONLY (Chrome for Testing did not run)" ;;
+    *) echo "in no engine" ;;
+  esac
+}
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+  else
+    skip "YouTube and Vimeo players from the picture form in Chrome and Safari's engine (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac"
+  fi
+else
+  # verify.sh runs under set -euo pipefail: every exit is caught here, so a
+  # missing engine is a SKIP and a fault a FAIL, never the end of the run.
+  VIDEO_PLAYERS_EXIT=0
+  run_check node browser-checks/video_players.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_video_players.log 2>&1 || VIDEO_PLAYERS_EXIT=$?
+  VIDEO_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_players.log | tail -1 | sed 's/^ENGINES: //' || true)"
+  while IFS= read -r VIDEO_SKIPPED_LINE; do
+    VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_LINE#SKIPPED: }"
+    VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_ENGINE%%:*}"
+    if [[ ",${PLANTOIR_REQUIRE_ENGINES:-}," == *",${VIDEO_SKIPPED_ENGINE},"* ]]; then
+      fail "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) did not run in ${VIDEO_SKIPPED_LINE#SKIPPED: }, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+    else
+      skip "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) in ${VIDEO_SKIPPED_LINE#SKIPPED: }"
+    fi
+  done < <(grep '^SKIPPED: ' /tmp/verify_video_players.log || true)
+  if [[ $VIDEO_PLAYERS_EXIT -eq 3 ]]; then
+    :
+  elif [[ $VIDEO_PLAYERS_EXIT -eq 0 && -n "$VIDEO_ENGINES" && "$VIDEO_ENGINES" != "none" ]]; then
+    pass "YouTube and Vimeo players from the picture form, $(video_engine_words "$VIDEO_ENGINES"): $(head -1 /tmp/verify_video_players.log | sed 's/^OK: //') (#692, browser-checks/video_players.mjs)"
+  else
+    fail "a YouTube or Vimeo player was the wrong size, untitled, not lazy or not privately addressed, or the check did not finish (browser-checks/video_players.mjs, #692)"
+    cat /tmp/verify_video_players.log
+  fi
+  # The sabotages run only when the clean check passed, as 6h-r's do: a
+  # check already red proves nothing by failing again.
+  if [[ $VIDEO_PLAYERS_EXIT -eq 0 && -n "$VIDEO_ENGINES" && "$VIDEO_ENGINES" != "none" ]]; then
+    VIDEO_SABOTAGE_SITE="/tmp/plantoir-verify-video-sabotage"
+    for VIDEO_SABOTAGE in size player address; do
+      rm -rf "$VIDEO_SABOTAGE_SITE"
+      cp -R "$SITE_PUBLIC" "$VIDEO_SABOTAGE_SITE"
+      case "$VIDEO_SABOTAGE" in
+        size) VIDEO_SABOTAGE_REASON="px wide, not 600" ;;
+        player) VIDEO_SABOTAGE_REASON="a player has no title" ;;
+        address) VIDEO_SABOTAGE_REASON="neither privacy-enhanced YouTube nor do-not-track Vimeo" ;;
+      esac
+      if ! python3 - "$VIDEO_SABOTAGE_SITE" "$VIDEO_SABOTAGE" <<'VIDEOPY'
+import re, sys
+from pathlib import Path
+site, kind = Path(sys.argv[1]), sys.argv[2]
+if kind == "size":
+    css = site / "index.css"
+    text = css.read_text(encoding="utf-8")
+    changed = re.sub(r"html body iframe\.external-embed\.plantoir-video\{[^}]*\}", "", text)
+    css.write_text(changed, encoding="utf-8")
+    sys.exit(0 if changed != text else 1)
+for page in sorted(site.glob("Authoring-Example-*.html")):
+    text = page.read_text(encoding="utf-8")
+    if "plantoir-video" not in text:
+        continue
+    if kind == "player":
+        changed = re.sub(r' title="[^"]*" loading="lazy"', "", text)
+    else:
+        changed = text.replace("https://www.youtube-nocookie.com/embed/", "https://www.youtube.com/embed/")
+    page.write_text(changed, encoding="utf-8")
+    sys.exit(0 if changed != text else 1)
+sys.exit(1)
+VIDEOPY
+      then
+        fail "the video players' sabotage '$VIDEO_SABOTAGE' found nothing to break (browser-checks/video_players.mjs, #692)"
+        continue
+      fi
+      if run_check node browser-checks/video_players.mjs "$PRINT_CHROME" "$VIDEO_SABOTAGE_SITE" >/tmp/verify_video_sabotage.log 2>&1; then
+        fail "the video players' check passed on a site broken by '$VIDEO_SABOTAGE', so it cannot see that fault (browser-checks/video_players.mjs, #692)"
+        continue
+      fi
+      # Red for its own reason in EVERY engine the clean check ran in, and
+      # the sabotage's own run must say it ran in those same engines: a log
+      # with no ENGINES line is a failure, never a pass.
+      VIDEO_SABOTAGE_SEEN=yes
+      VIDEO_SABOTAGE_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_sabotage.log | tail -1 | sed 's/^ENGINES: //' || true)"
+      if [[ "$VIDEO_SABOTAGE_ENGINES" != "$VIDEO_ENGINES" ]]; then
+        VIDEO_SABOTAGE_SEEN=no
+      fi
+      for VIDEO_ENGINE in ${VIDEO_ENGINES//,/ }; do
+        if ! tr '|' '\n' </tmp/verify_video_sabotage.log | grep "\[${VIDEO_ENGINE}\]" | grep -q "$VIDEO_SABOTAGE_REASON"; then
+          VIDEO_SABOTAGE_SEEN=no
+        fi
+      done
+      if [[ "$VIDEO_SABOTAGE_SEEN" == "yes" ]]; then
+        pass "the video players' check sees the '$VIDEO_SABOTAGE' sabotage for its own reason, $(video_engine_words "$VIDEO_ENGINES") (#692)"
+      else
+        fail "the video players' check failed the '$VIDEO_SABOTAGE' sabotage for another reason, or not in every engine (#692): $(head -c 300 /tmp/verify_video_sabotage.log)"
+      fi
+    done
+    rm -rf "$VIDEO_SABOTAGE_SITE"
+  fi
+fi
+
 # ---- 6h-r. The rendered check, in Chrome and in Safari's engine (#597, #807) ----
 # Every kind of diagram, sketch, graph, formula, quiz, task box and runnable
 # program on browser-checks/fixtures/rendered/, pressed for real in Chrome
@@ -6442,7 +6576,7 @@ echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
 rendered_cleanup
 RENDERED_STARTED=$SECONDS
 if python3 browser-checks/lib/test_rendered_lib.py >/tmp/verify_rendered_lib.log 2>&1; then
-  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row has one (the deployed-only embeds row's on its hosts only), a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
+  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row has one (the deployed-only embeds row's on its hosts only, #692), a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
 else
   fail "the rendered check's planting or sabotages (browser-checks/lib/test_rendered_lib.py, #597)"
   tail -20 /tmp/verify_rendered_lib.log

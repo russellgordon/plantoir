@@ -1227,25 +1227,41 @@ ROW_CHECKS["geogebra keys"] = async ({ page }) => {
 
 ROW_CHECKS.embeds = async ({ page, record }) => {
   const frames = await page.evaluate(() => Array.from(document.querySelectorAll("article iframe")).map((frame) => frame.src))
-  if (frames.length < 4) return { fail: `the Embeds page holds ${frames.length} frames, not the four planted` }
+  if (frames.length < 5) return { fail: `the Embeds page holds ${frames.length} frames, not the five planted` }
+  // Each frame's answer is filed under the address the frame was GIVEN: the
+  // first request of a redirect chain, without its #fragment, matched in
+  // full, query included (#692 review finding 1: matching on the address
+  // before its "?" let the pasted Vimeo player's 200 answer for a
+  // short-form player of the same video that never asked for its own).
+  // The last response in a chain wins, so a redirect's 3xx is replaced by
+  // the document it led to.
+  const withoutFragment = (address) => address.split("#")[0]
   const answered = new Map()
   page.on("response", (response) => {
-    const request = response.request()
-    if (request.isNavigationRequest() && request.frame() !== page.mainFrame()) answered.set(request.url(), response.status())
+    let request = response.request()
+    if (!request.isNavigationRequest() || request.frame() === page.mainFrame()) return
+    while (request.redirectedFrom() !== null) request = request.redirectedFrom()
+    answered.set(withoutFragment(request.url()), response.status())
   })
   await untilTheIndexHasArrived(page, record)
   await page.reload({ waitUntil: "load", timeout: 60000 })
+  // The players made from the picture form load lazily (#692), so each frame
+  // is brought into view in turn; a lazy frame far below the window would
+  // otherwise never ask for its document and read as "answered nothing".
+  await page.evaluate(async () => {
+    for (const frame of Array.from(document.querySelectorAll("article iframe"))) {
+      frame.scrollIntoView({ block: "center" })
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+  })
   // Until every frame's document has answered, with a ceiling, never a fixed wait.
-  const answeredFor = (src) => { for (const url of answered.keys()) if (url.split("?")[0] === src.split("?")[0] || url.startsWith(src)) return true; return false }
+  const answeredFor = (src) => answered.has(withoutFragment(src))
   for (let tries = 0; tries < 200 && !frames.every(answeredFor); tries += 1) await pause(150)
   const problems = []
   for (const src of frames) {
-    let status = null
-    for (const [url, code] of answered) {
-      if (url.split("?")[0] === src.split("?")[0] || url.startsWith(src)) status = code
-    }
-    if (status === null) problems.push(`${new URL(src).host} answered nothing`)
-    else if (status < 200 || status > 299) problems.push(`${new URL(src).host} answered ${status}`)
+    const status = answered.has(withoutFragment(src)) ? answered.get(withoutFragment(src)) : null
+    if (status === null) problems.push(`${src} answered nothing`)
+    else if (status < 200 || status > 299) problems.push(`${src} answered ${status}`)
   }
   if (problems.length > 0) return { fail: "a frame's document did not answer 2xx: " + problems.join("; ") }
   // Answering 200 is not being shown: a provider that refuses to be framed

@@ -5,6 +5,8 @@ The rendered check's embeds page (plantoir-rendered-check-597). Nothing here is 
 
 ![A video](https://www.youtube.com/watch?v=WUvTyaaNkzM)
 
+![A video on Vimeo, written as a picture](https://vimeo.com/22439234)
+
 <iframe src="https://player.vimeo.com/video/76979871" width="640" height="360" title="A video on Vimeo"></iframe>
 
 <iframe src="https://www.geogebra.org/m/ju3f2kbg?embed" width="640" height="360" title="A sketch on geogebra.org"></iframe>

@@ -1,6 +1,6 @@
 ---
 name: plantoir-page-authoring
-description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos, GeoGebra sketches students drag, PhET simulations (a phet block), hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
+description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos (the picture form, the Share button's address), GeoGebra sketches students drag, PhET simulations (a phet block), hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
 ---
 
 # Writing pages for a Plantoir class website
@@ -530,22 +530,49 @@ gets every file in it; the sidebar never lists it. Then:
   is a link to it. A worksheet to print is the printing skill's.
 - File names: letters, digits, spaces and hyphens. Never point at a picture
   on another website or on the teacher's own computer
-  (`/Users/...`, `C:\...`) - copy it into `Media`.
+  (`/Users/...`, `C:\...`) - copy it into `Media`. (A YouTube or Vimeo
+  address in the picture form is a video, below, not a picture.)
 
 **Videos and applets** need the internet when a student opens the page,
 and do not print:
 
 ```markdown
-![](https://www.youtube.com/watch?v=WUvTyaaNkzM)
+![Slope in two minutes](https://www.youtube.com/watch?v=WUvTyaaNkzM&t=30)
+
+![Mitosis in three minutes](https://vimeo.com/76979871)
+
+![](https://vimeo.com/123456789/abcdef1234)
 
 <iframe src="https://player.vimeo.com/video/22439234" width="640" height="360" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>
 ```
 
-- **YouTube**: the picture form `![](address)` with the video's ordinary
-  address (`youtube.com/watch?v=...` or `youtu.be/...`) becomes the player.
-- **Vimeo**: paste the `<iframe ...></iframe>` the site's own Share or
-  Embed button gives, **on one line, with an empty line before and
-  after**. The address is `player.vimeo.com/video/<number>`.
+- **YouTube and Vimeo**: the picture form `![words](address)`, **on its
+  own line**, with the address the video site's **Share** button gives,
+  becomes the player. The words in the brackets become the player's title,
+  which a screen reader announces; say what the video is. YouTube's
+  `youtube.com/watch?v=...`, `youtu.be/...` and `youtube.com/shorts/...`
+  all work, and `t=` sets where it starts. For Vimeo, `vimeo.com/<number>`.
+- **An unlisted Vimeo video** has a second part after its number
+  (`vimeo.com/123456789/abcdef1234`). Keep it: without it the video does
+  not play.
+- Every player is 600 px wide at most (narrower on a phone), 16:9. There
+  is no per-video size.
+- The site asks the video site not to track students: YouTube's player is
+  its privacy-enhanced one (`youtube-nocookie.com`), and Vimeo's is told
+  not to track. So a school network has to allow youtube-nocookie.com as
+  well as youtube.com; if a YouTube video plays at home and not at school,
+  that is the likely reason, and the school's network team can allow it.
+- **The mistakes**: `[words](address)` without the `!` is only a link; a
+  `vimeo.com/showcase/...` or a channel's own page is not one video and
+  stays a broken picture (the build prints a note naming the line); pasting
+  `player.vimeo.com` code by habit still works, but that player gets
+  none of the size, the title or the do-not-track setting.
+- Obsidian shows the Vimeo line as a player only with the community add-on
+  Simple Vimeo; without it the line looks like a picture that does not
+  load there, and the class site still shows the player.
+- **A site with no short form**: paste the `<iframe ...></iframe>` the
+  site's own Share or Embed button gives, **on one line, with an empty line
+  before and after**.
 - **GeoGebra and PhET are never an `<iframe>`**: write a ` ```geogebra `
   or a ` ```phet ` block (below).
 - A video file of the teacher's own goes in `Media` and is shown with
