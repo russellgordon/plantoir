@@ -177,9 +177,13 @@ public sealed class LocalSiteGuard
 
     private static readonly HashSet<string> DeviceNames = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Microsoft's "Naming Files, Paths, and Namespaces" list, superscript
+        // digits included, and COM0 and LPT0 besides (790a review L2): that
+        // page names COM0 as a device link in the Win32 namespace though its
+        // list starts at COM1, so both are refused here rather than trusted.
         "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³",
+        "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³",
+        "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³",
     };
 
     /// <summary>
@@ -326,7 +330,7 @@ public sealed class WindowsLocalFiles : ILocalFiles
     {
         try
         {
-            using var handle = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            using var handle = CreateFileW(Extended(path), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                            nint.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nint.Zero);
             return handle.IsInvalid ? null : FinalPathOf(handle);
         }
@@ -339,7 +343,7 @@ public sealed class WindowsLocalFiles : ILocalFiles
     {
         // BACKUP_SEMANTICS so a folder opens too, and is then refused by its
         // attributes rather than failing for a reason nobody can read.
-        var handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        var handle = CreateFileW(Extended(path), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                  nint.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nint.Zero);
         if (handle.IsInvalid) { handle.Dispose(); return null; }
         string? real = FinalPathOf(handle);
@@ -352,6 +356,27 @@ public sealed class WindowsLocalFiles : ILocalFiles
             return real is null ? null : new LocalFile(Stream.Null, real, false);
         }
         return new LocalFile(new FileStream(handle, FileAccess.Read), real, true);
+    }
+
+    /// <summary>
+    /// <paramref name="path"/> made full and given the <c>\\?\</c> prefix
+    /// (<c>\\?\UNC\</c> for a share), so <c>CreateFileW</c> opens a path longer
+    /// than MAX_PATH (790a review L1: a 324-character page inside the root was
+    /// refused as "nothing to read there"; the app's manifest declares no
+    /// long-path awareness, and that would also need the machine's registry
+    /// switch). The prefix turns Windows' own name parsing off, so
+    /// <see cref="Path.GetFullPath(string)"/> takes out <c>.</c> and <c>..</c>
+    /// first; what the prefix would otherwise let through (a trailing dot or
+    /// space, a device name) <see cref="LocalSiteGuard.IsAcceptableSegment"/>
+    /// has already refused in any served address. A path already in a
+    /// <c>\\?\</c> or <c>\\.\</c> form is passed as it is.
+    /// </summary>
+    internal static string Extended(string path)
+    {
+        if (path.StartsWith(@"\\?\", StringComparison.Ordinal) || path.StartsWith(@"\\.\", StringComparison.Ordinal)) return path;
+        string full = Path.GetFullPath(path);
+        if (full.StartsWith(@"\\?\", StringComparison.Ordinal) || full.StartsWith(@"\\.\", StringComparison.Ordinal)) return full;
+        return full.StartsWith(@"\\", StringComparison.Ordinal) ? @"\\?\UNC\" + full[2..] : @"\\?\" + full;
     }
 
     private static string? FinalPathOf(SafeFileHandle handle)

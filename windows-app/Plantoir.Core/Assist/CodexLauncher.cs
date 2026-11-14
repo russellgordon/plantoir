@@ -90,7 +90,7 @@ public static class CodexLauncher
         string? server = ClaudeCodeLauncher.FindServer();
         if (codex is null || server is null) return false;
 
-        var session = Prepare(server, workspacePath, courseCode, courseName, unitPlans, greeting);
+        var session = Prepare(server, workspacePath, courseCode, courseName, unitPlans, greeting, codex);
         // Refuse rather than start into a command line cmd rejects as too long
         // and leaves at a silent prompt. No "assistant opened" line then.
         if (!OutsideDoor.WithinCommandLineLimit(codex, session.Arguments)) return false;
@@ -109,13 +109,17 @@ public static class CodexLauncher
     /// <paramref name="unitPlans"/> and the trail clause with it, or an
     /// opening message that replaces both.
     /// </summary>
+    /// <remarks><paramref name="program"/>: as <see cref="ClaudeCodeLauncher.Prepare"/>'s (790a review M2).</remarks>
     public static OutsideDoor.Session Prepare(string server, string workspacePath, string courseCode, string courseName,
-                                              UnitPlans.Reading? unitPlans, string? openingMessage)
+                                              UnitPlans.Reading? unitPlans, string? openingMessage, string? program = null)
     {
-        string message = openingMessage ?? ClaudeCodeLauncher.Greeting(courseCode, courseName, unitPlans);
         string trail = TrailLinePrefix + courseCode;
-        if (openingMessage is null && unitPlans is not null) trail += UnitPlans.TrailClause(unitPlans);
-        return new OutsideDoor.Session(Arguments(server, workspacePath, courseCode, message), trail);
+        if (openingMessage is not null)
+            return new OutsideDoor.Session(Arguments(server, workspacePath, courseCode, openingMessage), trail);
+        if (unitPlans is not null) trail += UnitPlans.TrailClause(unitPlans);
+        var arguments = OutsideDoor.GreetingThatFits(program, unitPlans,
+            named => Arguments(server, workspacePath, courseCode, ClaudeCodeLauncher.Greeting(courseCode, courseName, unitPlans, named)));
+        return new OutsideDoor.Session(arguments, trail);
     }
 
     /// <summary><c>outsideAgents.agents[codex].trailLine</c>, before the course.</summary>

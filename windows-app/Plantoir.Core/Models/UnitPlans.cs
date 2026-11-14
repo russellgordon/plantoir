@@ -191,7 +191,11 @@ public static class UnitPlans
             }
             return new Plan(slug, unit, title, firstClass, lastClass, sections);
         }
-        catch (JsonException) { return null; }
+        // InvalidOperationException too (790a review M1): JsonDocument accepts
+        // an escaped lone surrogate ("\ud800") and a raw byte that is not
+        // UTF-8 inside a string, and GetString throws on them. Such a file is
+        // a plan that cannot be read, like any other broken one.
+        catch (Exception e) when (e is JsonException or InvalidOperationException) { return null; }
     }
 
     /// <summary>The same, from the file's text.</summary>
@@ -296,10 +300,16 @@ public static class UnitPlans
         return FixWithAssistant.CutToCharacters(name, UnitNameMaxCharacters);
     }
 
-    /// <summary>"A", "A and B", "A, B and C"; past <see cref="MostUnitsNamed"/>, the first six and ", and N more" (<c>joinedAs</c>).</summary>
-    public static string UnitsInTheGreeting(IReadOnlyList<Plan> plans)
+    /// <summary>
+    /// "A", "A and B", "A, B and C"; past <see cref="MostUnitsNamed"/>, the
+    /// first six and ", and N more" (<c>joinedAs</c>). A door whose command
+    /// line the names would push past cmd's limit asks for fewer
+    /// (<paramref name="mostNamed"/>, 790a review M2), and the rest are counted
+    /// into the same <c>more</c> clause, as <c>fixWith.charactersAre</c> says.
+    /// </summary>
+    public static string UnitsInTheGreeting(IReadOnlyList<Plan> plans, int mostNamed = MostUnitsNamed)
     {
-        var names = plans.Take(MostUnitsNamed).Select(NameInTheGreeting).ToList();
+        var names = plans.Take(Math.Clamp(mostNamed, 1, MostUnitsNamed)).Select(NameInTheGreeting).ToList();
         int left = plans.Count - names.Count;
         if (left > 0) return string.Join(", ", names) + MoreClause.Replace("{n}", left.ToString(CultureInfo.InvariantCulture));
         if (names.Count <= 1) return string.Concat(names);
@@ -307,10 +317,10 @@ public static class UnitPlans
     }
 
     /// <summary>The sentence the greeting ends with: <c>none</c>, <c>one</c> or <c>some</c>.</summary>
-    public static string GreetingSentence(IReadOnlyList<Plan> plans)
+    public static string GreetingSentence(IReadOnlyList<Plan> plans, int mostNamed = MostUnitsNamed)
     {
         if (plans.Count == 0) return NoneSentence;
-        return (plans.Count == 1 ? OneSentence : SomeSentence).Replace("{units}", UnitsInTheGreeting(plans));
+        return (plans.Count == 1 ? OneSentence : SomeSentence).Replace("{units}", UnitsInTheGreeting(plans, mostNamed));
     }
 
     /// <summary>

@@ -170,7 +170,7 @@ public static class ClaudeCodeLauncher
         try { configPath = WriteConfig(workspacePath, courseCode, server); }
         catch { return false; }
 
-        var session = Prepare(configPath, courseCode, courseName, unitPlans, greeting);
+        var session = Prepare(configPath, courseCode, courseName, unitPlans, greeting, claude);
         // Refuse rather than start into a command line cmd will reject as too
         // long and leave at a silent prompt — Revise With ▸'s plain greeting
         // puts no cap on the course's name. No "assistant opened" line then.
@@ -202,13 +202,22 @@ public static class ClaudeCodeLauncher
     /// <c>UnitPlansGreetingTests</c> walks <c>greetingUnitPlansCases</c>
     /// through this and <see cref="CodexLauncher.Prepare"/>.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="program"/> is the <c>claude</c> the door will start:
+    /// given, the greeting names fewer plans when all six would push the
+    /// command line past its limit (<see cref="OutsideDoor.GreetingThatFits"/>,
+    /// 790a review M2). The trail clause still counts every plan.
+    /// </remarks>
     public static OutsideDoor.Session Prepare(string configPath, string courseCode, string courseName,
-                                              Plantoir.Core.Models.UnitPlans.Reading? unitPlans, string? openingMessage)
+                                              Plantoir.Core.Models.UnitPlans.Reading? unitPlans, string? openingMessage,
+                                              string? program = null)
     {
-        string message = openingMessage ?? Greeting(courseCode, courseName, unitPlans);
         string trail = TrailLinePrefix + courseCode;
-        if (openingMessage is null && unitPlans is not null) trail += Plantoir.Core.Models.UnitPlans.TrailClause(unitPlans);
-        return new OutsideDoor.Session(Arguments(configPath, message), trail);
+        if (openingMessage is not null) return new OutsideDoor.Session(Arguments(configPath, openingMessage), trail);
+        if (unitPlans is not null) trail += Plantoir.Core.Models.UnitPlans.TrailClause(unitPlans);
+        var arguments = OutsideDoor.GreetingThatFits(program, unitPlans,
+            named => Arguments(configPath, Greeting(courseCode, courseName, unitPlans, named)));
+        return new OutsideDoor.Session(arguments, trail);
     }
 
     /// <summary><c>outsideAgents.agents[claude].trailLine</c>, before the course.</summary>
@@ -258,11 +267,12 @@ public static class ClaudeCodeLauncher
     /// <c>sentences</c>, so adding it changes neither function's shape.
     /// </remarks>
     internal static string Greeting(string courseCode, string courseName,
-                                    Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null)
+                                    Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null,
+                                    int mostNamed = Plantoir.Core.Models.UnitPlans.MostUnitsNamed)
     {
         var sentences = new List<string> { PlainGreeting(courseCode, courseName) };
         // #880: greetingReferenceCourses' sentence is added here, before the unit plans'.
-        if (unitPlans is not null) sentences.Add(Plantoir.Core.Models.UnitPlans.GreetingSentence(unitPlans.Plans));
+        if (unitPlans is not null) sentences.Add(Plantoir.Core.Models.UnitPlans.GreetingSentence(unitPlans.Plans, mostNamed));
         return string.Join(" ", sentences).Replace("\"", "'");
     }
 

@@ -178,4 +178,96 @@ public sealed class UnitPlansGreetingTests : IDisposable
         Assert.True(OutsideDoor.WithinCommandLineLimit(codexShim, codex.Arguments), $"Codex: {codexLength}");
         Assert.Contains(", and 3 more", claude.Arguments[^1]);
     }
+
+    /// <summary>
+    /// 790a review M2: a text element has no bound in UTF-16 units, so six
+    /// names cut to 60 elements can still be far over cmd's 8,191. Measured by
+    /// the reviewer: names of letters each carrying 40 stacked accents make a
+    /// greeting of about 15,000 units, and the door refused to open every
+    /// time. Each door now drops names from the END, counting them into
+    /// <c>greetingUnitPlans.more</c>, until its whole command line is within
+    /// <see cref="OutsideDoor.LimitFor"/> its real program, as
+    /// <c>fixWith.charactersAre</c> says Windows does when its UTF-16 bound
+    /// bites first. The sentence chosen is still by how many plans there are.
+    /// </summary>
+    [Fact]
+    public void NamesTooLongForTheCommandLineAreDroppedFromTheEnd()
+    {
+        string cluster = "a" + new string('\u0301', 40);
+        Assert.Equal(1, new StringInfo(cluster).LengthInTextElements);
+        var plans = Enumerable.Range(1, 6)
+            .Select(i => new UnitPlans.Plan($"unit-{i}", "", i + string.Concat(Enumerable.Repeat(cluster, 70)), null, null, Array.Empty<string>()))
+            .ToList();
+        var reading = new UnitPlans.Reading(plans, 0);
+        string everyName = ClaudeCodeLauncher.Greeting("SNC2D", "Grade 10 Science", reading);
+        _output.WriteLine($"with all six names: {everyName.Length} UTF-16 units");
+        Assert.True(everyName.Length > FixWithAssistant.CommandLineMaxUtf16, everyName.Length.ToString());
+
+        string claudeExe = @"C:\Users\teacher\.local\bin\claude.exe";
+        string shimFolder = @"C:\" + new string('n', 240 - 3);
+        string folder = @"C:\" + new string('w', 240 - 3);
+        string someBefore = UnitPlans.SomeSentence[..UnitPlans.SomeSentence.IndexOf("{units}", StringComparison.Ordinal)];
+        foreach (string program in new[] { claudeExe, Path.Combine(shimFolder, "claude.cmd") })
+        {
+            var claude = ClaudeCodeLauncher.Prepare(Config, "SNC2D", "Grade 10 Science", reading, null, program);
+            AssertNamesWereDropped(program, claude, plans);
+        }
+        foreach (string program in new[] { @"C:\Users\teacher\.local\bin\codex.exe", Path.Combine(shimFolder, "codex.cmd") })
+        {
+            var codex = CodexLauncher.Prepare(Server, folder, "SNC2D", "Grade 10 Science", reading, null, program);
+            AssertNamesWereDropped(program, codex, plans);
+        }
+
+        void AssertNamesWereDropped(string program, OutsideDoor.Session session, IReadOnlyList<UnitPlans.Plan> all)
+        {
+            string greeting = session.Arguments[^1];
+            int named = all.Count(p => greeting.Contains(UnitPlans.NameInTheGreeting(p), StringComparison.Ordinal));
+            _output.WriteLine($"{Path.GetFileName(program)}: {named} named, greeting {greeting.Length}, " +
+                              $"line {OutsideDoor.LineLength(program, session.Arguments)} of {OutsideDoor.LimitFor(program)}");
+            Assert.True(OutsideDoor.WithinCommandLineLimit(program, session.Arguments), program);
+            Assert.InRange(named, 1, all.Count - 1);
+            for (int i = 0; i < named; i++) Assert.Contains(UnitPlans.NameInTheGreeting(all[i]), greeting);
+            string more = UnitPlans.MoreClause.Replace("{n}", (all.Count - named).ToString(CultureInfo.InvariantCulture));
+            Assert.Contains(someBefore, greeting);
+            Assert.Contains(more + UnitPlans.SomeSentence[(UnitPlans.SomeSentence.IndexOf("{units}", StringComparison.Ordinal) + "{units}".Length)..], greeting);
+            Assert.Equal(TrailLineOf(program.Contains("codex") ? "codex" : "claude", "SNC2D") + UnitPlans.TrailClause(reading), session.TrailText);
+        }
+    }
+
+    /// <summary>A greeting that already fits is not changed by knowing the program: every contract case, both doors, an .exe and a long shim.</summary>
+    [Theory]
+    [MemberData(nameof(CaseNames))]
+    public void AGreetingThatFitsIsTheSameWhenTheProgramIsKnown(string name)
+    {
+        var testCase = OutsideAgents()["greetingUnitPlansCases"]!["cases"]!.AsArray().Single(c => c!["name"]!.ToString() == name)!;
+        string code = testCase["course"]!.ToString();
+        string course = Path.Combine(_root, code);
+        Directory.CreateDirectory(course);
+        if (testCase["planningFolder"]!.GetValue<bool>())
+        {
+            string planning = UnitPlans.PlanningFolder(course);
+            Directory.CreateDirectory(planning);
+            foreach (var plan in testCase["plans"]!.AsArray())
+            {
+                string unit = Path.Combine(planning, plan!["folder"]!.ToString());
+                Directory.CreateDirectory(unit);
+                File.WriteAllText(Path.Combine(unit, UnitPlans.PlanFileName), plan["file"]!.ToString(), new UTF8Encoding(false));
+            }
+        }
+        var today = DateOnly.ParseExact(testCase["today"]!.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var reading = UnitPlans.ToMention(course, testCase["referenceCourse"]!.GetValue<bool>(), today);
+        string shim = Path.Combine(@"C:\" + new string('n', 240 - 3), "claude.cmd");
+        Assert.Equal(ClaudeCodeLauncher.Prepare(Config, code, code, reading, null),
+                     ClaudeCodeLauncher.Prepare(Config, code, code, reading, null, shim), SessionComparer.Instance);
+        Assert.Equal(CodexLauncher.Prepare(Server, _root, code, code, reading, null),
+                     CodexLauncher.Prepare(Server, _root, code, code, reading, null, @"C:\bin\codex.exe"), SessionComparer.Instance);
+    }
+
+    private sealed class SessionComparer : IEqualityComparer<OutsideDoor.Session>
+    {
+        public static readonly SessionComparer Instance = new();
+        public bool Equals(OutsideDoor.Session? x, OutsideDoor.Session? y) =>
+            x is not null && y is not null && x.TrailText == y.TrailText && x.Arguments.SequenceEqual(y.Arguments);
+        public int GetHashCode(OutsideDoor.Session obj) => obj.TrailText.GetHashCode();
+    }
 }

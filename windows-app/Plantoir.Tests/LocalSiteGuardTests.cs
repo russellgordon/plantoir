@@ -132,6 +132,48 @@ public sealed class LocalSiteGuardTests : IDisposable
         Assert.Equal(Path.Combine(planning, "index.html"), home.RealPath);
     }
 
+    /// <summary>
+    /// 790a review L1: a page whose path is longer than MAX_PATH (260) is
+    /// served (a deep working folder under OneDrive and a long PDF name pass
+    /// 260), and the containment check holds for such a path: climbing out of
+    /// it with <c>..</c>, or leaving through a junction into a long path
+    /// outside, is refused as OUTSIDE the folder, not merely as unreadable.
+    /// </summary>
+    [Fact]
+    public void APageOverMaxPathIsServedAndStillKeptInside()
+    {
+        string course = Path.Combine(_root, "SNC2D");
+        string planning = UnitPlans.PlanningFolder(course);
+        string deep = Path.Combine(planning, "unit-1", "pdfs", new string('a', 120), new string('b', 120));
+        Directory.CreateDirectory(deep);
+        string page = Path.Combine(deep, "Day 1 - " + new string('c', 40) + ".html");
+        File.WriteAllText(page, "<p>Deep</p>");
+        Assert.True(page.Length > 260, page.Length.ToString());
+
+        string outside = Path.Combine(_root, "elsewhere", new string('d', 120), new string('e', 120));
+        Directory.CreateDirectory(outside);
+        File.WriteAllText(Path.Combine(outside, "secret.html"), "<p>Secret</p>");
+        File.WriteAllText(Path.Combine(course, "secret.html"), "<p>Secret</p>");
+        ReferenceFixtures.Junction(Path.Combine(planning, "unit-1", "away"), Path.Combine(_root, "elsewhere"));
+
+        var guard = Guard(planning);
+        Assert.True(guard.IsInside(page));
+        var served = Assert.IsType<LocalSiteGuard.Verdict.Serve>(guard.Answer(guard.AddressOf(page)!));
+        using (served.Content) Assert.Equal("<p>Deep</p>", new StreamReader(served.Content).ReadToEnd());
+        Assert.Equal(page, served.RealPath, ignoreCase: true);
+
+        // Six folders up from the deep one is the course: outside.
+        string climb = guard.AddressOf(deep, isFolder: true)! + "../../../../../../secret.html";
+        Assert.Equal(Path.Combine(course, "secret.html"), guard.PathOf(climb));
+        Assert.Equal("outside the folder", Assert.IsType<LocalSiteGuard.Verdict.Refuse>(guard.Answer(climb)).Why);
+
+        string throughJunction = Path.Combine(planning, "unit-1", "away", new string('d', 120), new string('e', 120), "secret.html");
+        Assert.True(throughJunction.Length > 260, throughJunction.Length.ToString());
+        Assert.False(guard.IsInside(throughJunction));
+        Assert.Equal("outside the folder",
+                     Assert.IsType<LocalSiteGuard.Verdict.Refuse>(guard.Answer(guard.AddressOf(throughJunction)!)).Why);
+    }
+
     /// <summary>A drive's root is its root, never the drive's current folder, which is what "C:" alone names to Windows.</summary>
     [Fact]
     public void ADrivesRootIsItsRoot()
@@ -146,9 +188,13 @@ public sealed class LocalSiteGuardTests : IDisposable
     public void SegmentsWindowsWouldReadAsAnotherFileAreRefused()
     {
         foreach (string segment in new[] { "", ".", "..", "a.", "a ", "a:b", "a\\b", "a/b", "a*b", "a?b", "a\"b", "a<b", "a|b",
-                                           "CON", "con.html", "Com1.txt", "LPT9", "AUX .md", "COM\u00B9", "CONOUT$", "a\u0001b" })
+                                           "CON", "con.html", "Com1.txt", "LPT9", "AUX .md", "COM\u00B9", "CONOUT$", "a\u0001b",
+                                           // 790a review L2: COM0 and LPT0, and every superscript form.
+                                           "COM0", "COM0.html", "lpt0", "LPT0.html", "COM\u00B2.txt", "COM\u00B3",
+                                           "LPT\u00B9", "LPT\u00B2.html", "lpt\u00B3", "PRN", "NUL.tar.gz", "CONIN$" })
             Assert.False(LocalSiteGuard.IsAcceptableSegment(segment), segment);
-        foreach (string segment in new[] { "index.html", "Day 1 - Warm-up, Answers.pdf", "#3 100%", "CONSOLE.html", "unit-1", ".internal", "Élise" })
+        foreach (string segment in new[] { "index.html", "Day 1 - Warm-up, Answers.pdf", "#3 100%", "CONSOLE.html", "unit-1", ".internal", "Élise",
+                                           "COM10.html", "LPT10", "COM⁴.html", "COMA" })
             Assert.True(LocalSiteGuard.IsAcceptableSegment(segment), segment);
     }
 }

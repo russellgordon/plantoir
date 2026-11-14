@@ -144,6 +144,36 @@ public sealed class UnitPlansTests : IDisposable
     }
 
     /// <summary>A unit folder that is a junction is not read and not counted, as the mac skips a linked folder.</summary>
+    /// <summary>
+    /// 790a review M1: text .NET cannot turn into a string, though
+    /// <c>JsonDocument</c> parsed the file, is a plan that cannot be read, never
+    /// a throw out of <see cref="UnitPlans.PlanFrom(string, byte[])"/>: an
+    /// escaped lone surrogate, and a raw byte that is not UTF-8 inside a string
+    /// (both measured as <c>InvalidOperationException</c> from <c>GetString</c>).
+    /// On disk the same file is left out and counted.
+    /// </summary>
+    [Fact]
+    public void TextThatIsNotAStringIsAPlanThatCannotBeRead()
+    {
+        byte[] loneSurrogate = Encoding.ASCII.GetBytes("{\"unit\": \"Unit \\ud800\", \"title\": \"Matter\"}");
+        var invalidUtf8 = new List<byte>(Encoding.ASCII.GetBytes("{\"unit\": \"Unit "));
+        invalidUtf8.AddRange(new byte[] { 0xC3, 0x28 });
+        invalidUtf8.AddRange(Encoding.ASCII.GetBytes("\", \"title\": \"Matter\"}"));
+
+        foreach (byte[] file in new[] { loneSurrogate, invalidUtf8.ToArray() })
+        {
+            Assert.Null(UnitPlans.PlanFrom("unit-1", file));
+            string course = Course("course-" + Guid.NewGuid().ToString("N"));
+            string unit = Path.Combine(UnitPlans.PlanningFolder(course), "unit-1");
+            Directory.CreateDirectory(unit);
+            File.WriteAllBytes(Path.Combine(unit, UnitPlans.PlanFileName), file);
+            var reading = UnitPlans.Read(course);
+            Assert.Empty(reading.Plans);
+            Assert.Equal(1, reading.Unreadable);
+        }
+        Assert.Null(UnitPlans.PlanFrom("unit-1", "{\"title\": \"\\udc00 Matter\"}"));
+    }
+
     [Fact]
     public void AUnitFolderThatIsAJunctionIsNotAPlan()
     {
