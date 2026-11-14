@@ -12049,7 +12049,8 @@ piece 785b moves the automatic backups onto it. The code is
   kept it and B's restore put it back. A list this computer wrote keeps its
   own moment, since it was dated by this clock and did not travel; counting
   it from first sight too would hold a deleted backup's pictures one more
-  day for nothing (measured in the harness, which caught it). What a crash leaves that names nothing (a `.writing-*.zip`,
+  day for nothing (measured in the harness, which caught it). What a crash
+  leaves that names nothing (a `.writing-*.zip`,
   the store's `.incoming-*` folders, `.writing-*` temporaries) is removed once
   its own date is more than a day old (review I1). It takes the lock
   exclusively without waiting, and deletes nothing while a backup or a
@@ -12152,6 +12153,27 @@ piece 785b moves the automatic backups onto it. The code is
   backup does not (measured); attributes are not a teacher's content. A server that tells
   the two Unicode forms apart was not available to measure. Not measured on a
   real iCloud Drive folder, nor with tens of thousands of Media files.
+  Three more, measured by the pre-merge sweep (2026-11-13):
+  - **An Undo list is counted from its own written moment only**, not from
+    when another computer first saw it, so a computer whose clock runs
+    behind shortens it everywhere else. With B's clock two days behind, A
+    honoured B's Undo list until day 31.1 by A's clock (29.1 days after B
+    wrote it) and deleted the pictures at day 45.2; with B's clock 40 days
+    behind, A removed the list the first time it saw it and deleted the
+    pictures 15 days later, while B's step still had 30 days. The fourteen
+    days' wait hides a clock up to about 15 days behind. #899's Undo piece
+    decides whether to change it.
+  - **A first sight recorded while this computer's clock is far ahead is
+    kept.** `listsFirstSeen` has no guard against this computer's own
+    future, where `unneededSince` has one. With A's clock 400 days ahead
+    for the one sweep that first saw B's pending list, and B's zip never
+    arriving, the list was honoured until day 416.5 and the picture deleted
+    at day 431. It keeps and never loses.
+  - **A Media name holding a backslash refuses every small backup of that
+    course** (the N1 bullet above): the backup fails as `zipFailed`, which
+    says the zip's list could not be read back, after the
+    Media files have been hashed and copied into the store and the pages
+    zipped. Nothing is published. 785b's fallback must handle it.
 
 **Where the space is shown.** The sidebar's Backups header carries the total
 once every backup has been measured; each backup's tooltip, its own pane and
