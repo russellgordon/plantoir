@@ -393,6 +393,31 @@ def own_host_embeds_page(site: Path) -> str:
     return f"{count} embeds pointed at the site, a frame and a request of example.com's added"
 
 
+def embeds_refused(site: Path) -> str:
+    # The YouTube frame pointed at the video's watch page, which YouTube
+    # refuses to be framed in (X-Frame-Options: SAMEORIGIN): the frame's
+    # document answers 200 and students see a blank box (597b review
+    # finding 1). A teacher pasting the address from the address bar makes
+    # exactly this. Needs the network: the embeds row runs on deployed sites,
+    # or with --site and --host netlify.
+    path = page_file(site, "Embeds")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'(<iframe[^>]*\ssrc=")https://www\.youtube\.com/embed/([A-Za-z0-9_-]+)(")', r"\1https://www.youtube.com/watch?v=\2\3", text)
+    if count == 0:
+        raise SystemExit("sabotage: the Embeds page has no YouTube frame")
+    path.write_text(changed, encoding="utf-8")
+    return "the YouTube frame pointed at the video's watch page, which refuses to be framed"
+
+
+def own_host_off_its_pin(site: Path) -> str:
+    # A host the list names, asked from a page and for a path it is not
+    # pinned to (597b review finding 2): cdnjs for another library, from the
+    # Quiz page.
+    add_script(site, "Quiz", "off-pin.js",
+               "fetch('https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js', { mode: 'no-cors' }).catch(() => {})\n")
+    return "cdnjs asked for another library from the Quiz page"
+
+
 def own_host_late(site: Path) -> str:
     add_script(site, "Quiz", "late.js",
                "addEventListener('load', () => setTimeout(() => fetch('https://example.com/plantoir-rendered-late', { mode: 'no-cors' }).catch(() => {}), 4000))\n")
@@ -543,6 +568,8 @@ DOERS = {
     "phet cropped": phet_cropped,
     "phet credit": phet_credit,
     "cold visit": cold_visit,
+    "embeds refused": embeds_refused,
+    "own host off its pin": own_host_off_its_pin,
 }
 
 

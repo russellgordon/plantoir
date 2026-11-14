@@ -16452,7 +16452,7 @@ Keychain never comes into it, because the real launcher never runs.
 
 | Layer | Covered? |
 |---|---|
-| The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`:110-136`). Opt-in, real credentials, real sites — deliberately. |
+| The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`drive_launcher`, its patterns read from `contracts/app-rules.json` → `credentialPrompts` by `launcher_answers` since 2026-11-13). Opt-in, real credentials, real sites — deliberately. |
 | The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Covered since #154** by `NewSiteDialogUITests`, with a stubbed `deploy.sh` whose prompts are read from `contracts/app-rules.json`. In the UI target, which is part of no gate. |
 | A publish with a genuinely invalid saved token | **The launcher's half is covered since #716**: `scripts/test_deploy_token_refusal.py` runs `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed and pins which answers clear the token. The app's half — the window with a real refused token in the real Keychain — is still **not automatable**, for the Keychain reason above; its sentence is a `failureExplanations` case (#695). |
 
@@ -16467,9 +16467,14 @@ way now**, and the second row — the DIALOG — was uncovered on both until
 #154 covered it on the mac.
 
 Two things from that work are worth knowing here rather than being rediscovered.
-Windows carries **no `(y/n)` catch-all**, which this side's `expect` block does:
-nothing in the Windows publish path asks one, and a rule that says yes to
-whatever is asked is a bet that nobody adds a destructive question. And its
+Windows carried **no `(y/n)` catch-all**, which this side's `expect` block
+did until 2026-11-13: nothing in either publish path asks one, and a rule
+that says yes to whatever is asked is a bet that nobody adds a destructive
+question. It was removed when the first deployed run of #597's second half
+showed a loose pattern answering the wrong line ("last name.*: " matched
+deploy.py's "Saved teacher last name …" confirmation and typed the surname
+as the site name); every pattern is now one of the contract's questions
+(documentation/07-deployment.md → "What the first real run showed"). And its
 harness **audits itself afterwards** — it re-reads which prompts were answered
 and fails the run if any is not one `deploy.py` actually asks, which is worth
 copying here, because a rule matching a prompt it was not written for has

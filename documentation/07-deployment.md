@@ -2457,7 +2457,7 @@ destinations before #665. Windows measured 0–1 s typically and under two minut
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 
-**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740 and #869, the retries below) in about 75 s,
+**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740, #869 and #762, the retries below, and since #597 its judgement of the rendered check per host) in about 2 minutes (75 s before #762 and #597),
 with no credentials, no Docker and nothing borrowed from any folder: a stub
 server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
 and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
@@ -2482,9 +2482,9 @@ COEP `require-corp` for the COEP checks) is asked again every 5 s for at most
 `↻` line naming the file, the count and the seconds, and the Result block
 carries one measured line per site ("N file(s) needed asking again, …", or "no
 file needed asking again"). An answer that never comes is still that check's
-failure, judged on the last answer. A plain run asks once, exactly as before,
-and so does the local preview's `check_engine` on any run, since it is no new
-site. The 60 s is a deadline fixed when the first answer is judged, not a count
+failure, judged on the last answer. A plain run asked once until #762, which
+now asks there too (below); the local preview's `check_engine` asks once on
+any run, since it is no new site. The 60 s is a deadline fixed when the first answer is judged, not a count
 of polls, so how many retries fit depends on how long each answer takes. It is
 half the Cloudflare wait's 120 s because the watcher above saw every file served
 within the minute. Each `check_engine` call keeps its own retry log, so a
@@ -2509,14 +2509,16 @@ out of this script.)
 
 Rejected: *a fixed sleep after the site is made*, which is a guessed duration
 for a race. Also, the edges disagree file by file, so "long enough" for one
-file says nothing about the next. Rejected too: *retrying on the plain run*,
-which would hide a real 404 from a site that has existed for weeks. That is
-what this harness exists to catch. *Retrying only Netlify* was considered,
+file says nothing about the next. Rejected too, on that day: *retrying on the
+plain run*, which would hide a real 404 from a site that has existed for weeks.
+That is what this harness exists to catch. (#762 reversed this on 2026-11-13,
+with the count that makes it safe: below.) *Retrying only Netlify* was considered,
 because only Netlify was seen doing it. It was rejected, because a
 first-publish Cloudflare project is just as new and the rule is about the
 site's age, not its host. `--self-test` gained five cases: 404 twice then the
 file; no COEP twice then COEP; never served (still a failure, at the cap);
-the Result block's count; and a plain run judging a 404 at once. The
+the Result block's count; and a plain run judging a 404 at once (changed by
+#762, below). The
 never-served case asserts a RANGE of retries (2 to 5), and the count case
 asserts the total the log holds, never a fixed number. Pinning "8 retries in
 all" failed 3 of 9 review runs (12/1/0), because a second-granular clock let 3
@@ -2608,7 +2610,8 @@ the no-COEP check, and a page that never answers failing the CSP check,
 rather than passing them; the call deadline in `check_engine` (of the page's
 three fetches only the first is asked again) and in `check_page_links` (the
 link fetched after the deadline is asked once); and a plain run judging the
-page and a link once. Measured: 25 passed, 0 failed, in about 75 s, three
+page and a link once (since #762, a plain run asking both again, counted).
+Measured: 25 passed, 0 failed, in about 75 s, three
 runs in a row. The four review cases and the new page-links wording fail on
 247be1336's functions (20 passed, 5 failed). Proved must-fail with the new self-test
 over `origin/dev`'s `fetch_headers`, `check_engine`, `check_page_links` and
@@ -2618,6 +2621,45 @@ second rule to keep in step with #740's), and a single long wait before
 `check_engine` (a guessed duration; the two runs show the edges disagree
 request by request). **Windows owes the same** for `verify-deploy.ps1
 -FirstPublish` (#743's counterpart): the windows issue says what.
+
+**A plain run asks again too, counted (#762, 2026-11-13).** Seen at the
+v1.9.3 gate (2026-11-10, `dev` 1d32c3ef5, the scratch folder's ADA1O section
+1): two runs in a row each failed exactly one check, both on Netlify, on
+different files. The `--first-publish` run's page links got one 404
+(`./key-links/.././learning-goals`, since covered by #869); the plain run got
+a 404 for `static/pyodide/pyodide.asm.wasm`, and the paired Netlify leg later
+in the SAME run got 200 for that file. Minutes later both answered 200 by
+hand, and both runs repeated at once were clean (174/0/0 and 173/0/0). So a
+plain run's site is old, but the files it judges are the ones the deploy has
+just uploaded, and Netlify can serve a deploy before every one of them is
+reachable at the edge.
+
+`fetch_headers` and `check_page_links`' `asked_again` therefore ask again on a
+plain run as well: once after `NS_PLAIN_FIRST` s (10, the override
+`VERIFY_DEPLOY_NS_PLAIN_FIRST` exists for the self-test), then every
+`NS_POLL` s until `NS_WAIT` (60 s), inside the same per-call deadline. Each
+retry prints `↻ just uploaded (#762): …` and is written to the same log; the
+Result block gains a line per call only when something was asked again,
+"<site>, answered on retry (#762), files and pages: N file(s) needed asking
+again, …" (and "… page links (#869)" from `check_page_links`), so a slow edge
+is a number and a clean run's block stays short. A file that stays wrong is
+still the check's failure, judged on the last answer, so a real 404 on a
+site that has existed for weeks is still red; what the earlier rejection
+feared was a fault hidden, and a fault that stays is not hidden by asking
+again. The page-links program takes its mode as its third argument
+("true" on a first publish, "plain" on a plain run, anything else asks once)
+and `NS_PLAIN_FIRST` as its ninth, optional like the rest, so Windows' two
+arguments still ask once. Rejected: *a second run of the whole script when
+one check fails* (twenty minutes to clear one file, and it re-deploys, so it
+judges a different upload); *retrying only on Netlify* (the rule is about a
+just-uploaded file, and Cloudflare's 522 on a new project is the same shape);
+*a fixed sleep after each deploy* (a guessed duration). Self-test: a plain
+run's file 404 twice then 200 (passes, 2 retries, at least `NS_PLAIN_FIRST`
+s); the Result block's line for it, and no line when nothing was asked
+again; a plain run's file that stays 404 (fails at the cap); and the earlier
+"plain run judges at once" case turned round (the page 404 twice and a link
+once, both asked again, every check passing, each counted). Windows owes the
+same in `Get-CheckedResponse` and `Check-PageLinks` (the windows issue).
 
 **This checkout's recipe, mirrored first (#665).** The checks read the
 CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the
@@ -2709,6 +2751,435 @@ Measured 2026-10-31: 173 passed, 1 failed (a Netlify link that was HTTP 404
 on the brand-new site and 200 by hand minutes later) on wrangler 4.80.0;
 175 passed, 0 failed on 4.156.0; transcripts in
 `research/wrangler/2026-10-31-first-upload.md`.
+
+### Rendered in two browsers, on the deployed sites (#597)
+
+The owner, 2026-10-19, after #594 (Mermaid drawn as source text on every
+Netlify site for two months, which every gate missed because no check ran a
+page under the policy a Netlify publish sends): "We should be checking that
+all the various diagram types and interactive figures work with each release
+cut, in Chrome and Safari." Then: the gate MUST run against both hosts,
+Netlify and Cloudflare, every cut (2026-10-19); it is host-agnostic, a host
+is an entry in a list, because #669 adds GitHub Pages as a third (2026-10-31);
+and it asserts that no request leaves the site's own host (2026-11-13).
+
+The checker is the one `verify.sh` runs locally since #597's first half
+(`browser-checks/rendered_features.mjs`, its rows in
+`browser-checks/rendered_rows.json`, documentation 06 → R). `verify-deploy.sh`
+plants the same fixture pages into the course it publishes
+(`browser-checks/lib/plant_rendered.py plant`, as the shared folder `Rendered
+Check/`; removed on any exit by `restore_what_was_borrowed`, which takes
+away only a folder carrying the planter's marker), and after the three
+destinations, while each host still serves this run's own deployment, runs a
+section "Rendered in Chrome and in Safari's engine, on every host":
+
+- **The hosts are a list, `RENDER_HOSTS=(netlify cloudflare)`**, and the
+  section runs over the list, not over what the legs produced. Each host's
+  deploy block ends with `render_target <host> <address> <$FAIL when its leg
+  began>`; a block that had no credentials, or whose publish printed no
+  address, records why instead. A host on the list with no entry is a
+  FAILURE by name, "NOT REACHED" (plan review H2: an entry added only by a
+  leg that answered would let a failed Netlify leg drop out of the loop and
+  the run read as a pass). #669 adds `github` to the list, one deploy block
+  that calls `render_target`, and a label in `render_label`. The pairings
+  re-deploy the same two sites, so the check runs once per host, not per
+  pairing (the plan's rejected option; the review's L6 confirms each leg
+  rebuilds with its own `baseUrl`).
+- **Both engines are required** (`PLANTOIR_REQUIRE_ENGINES=chromium,webkit`
+  on the checker's command): a missing Chrome for Testing, Safari's engine,
+  Playwright's driver or Node 22 is a failure, never a skip. A row the
+  checker SKIPPED (for a network it could not reach) fails the host too,
+  since a release run skips nothing.
+- **A new site is waited for the bounded way the files are.** Every fixture
+  page is asked for through `fetch_headers page` first, so a brand-new site
+  (#740, #869) and a just-uploaded one (#762) get the same retries and the
+  same count in the Result block ("the rendered check's pages"). Then, when
+  the check does not pass, it is run **once more, whole**, and judged on that
+  run; the rows that failed first and passed then are named in the Result
+  block as answered on retry, and the first run's lines are printed under
+  `↻`. Rejected: a fixed wait before the browsers (a guessed duration for a
+  race); re-running only the failed rows (a row every page carries cannot
+  be re-run without its pages, and a partial run cannot judge whether an
+  expected failure stopped).
+- **Per host, the Result block says one of three things**, and only the
+  first is a pass: `checked` (its leg had no failure and the rendered check
+  passed), `FAILED` (the check did not pass, or the host's leg failed before
+  the browser check, which is said even when the browsers then passed), and
+  `NOT REACHED`. Below them, the expected failures, counted, and then what
+  a host's policy refuses on purpose (`refusedByDesign`, below), counted
+  apart.
+
+**No request leaves the site's own host, on a deployed site.** On this Mac
+the own-host row allows `thirdPartyHostsToday` (Google's fonts stylesheet
+and faces, cdnjs for Mermaid), a subset, because verify.sh judges the build
+(plan review M3). On a deployed site (`--base`) the owner's rule holds: each
+of those hosts is an **EXPECTED FAILURE**, an `EXPECTED:` line by host and
+engine with the pages that asked it, counted in the checker's DONE line and
+in the Result block, never a pass and never a failure; any other host is a
+failure, as before. **Each listed host is pinned to the pages that may ask
+it and the paths it may be asked for** (`thirdPartyHostsToday.pinned`: the
+two Google hosts on every page, `/css2` and `/s/`; cdnjs on Diagrams and
+Handout, `/ajax/libs/mermaid/11.4.0/`), on this Mac and on a deployed site
+alike, so cdnjs asked for another library, or from another page, is a
+stranger (597b review finding 2: matching by host alone let both through;
+proved by the gated sabotage "own host off its pin", red in both engines).
+On a deployed site a pinned page that ran without asking its host is a
+FAILURE too ("an expected failure that moved"; proved with Handout's
+diagram taken out of a copy, both engines), and `verify-deploy.sh`
+compares each host's EXPECTED count with the pinned number
+(`expectedLinesPerEngine`, 3, so 6 a host), failing a total that moved
+without the pin. The clean-page row's EXPECTED lines (Netlify's badge,
+`refusedByDesign`) are not in that count; they have their own, page by page. A listed host that no page asked for in an engine's
+whole run is a FAILURE ("an expected failure that stopped … take it off
+`thirdPartyHostsToday`"), so when #566 moves Mermaid and then the fonts onto
+the site, the list has to shrink with it and the gate tightens without
+anyone remembering to. The two judgements are pure functions in
+`browser-checks/lib/expected_failures.mjs`, with a node test the self-test
+runs. Measured on the fixture site served as a deployed site
+(2026-11-13, both engines): cdnjs asked on 2 of 11 pages (Diagrams,
+Handout), both Google hosts on 11 of 11, so 6 expected failures a host, 12
+a run; with the diagrams taken out of a copy, the run failed both engines
+with "no page asked cdnjs.cloudflare.com any more"; with a picture from
+example.com on the Quiz page, both engines failed by name. The expected
+failures as they stand today:
+
+| Host | Pages that ask it | Why | Removed by |
+|---|---|---|---|
+| `fonts.googleapis.com` | every page | the theme's fonts stylesheet | #566 (fonts from the site) |
+| `fonts.gstatic.com` | every page | the faces that stylesheet names | #566 |
+| `cdnjs.cloudflare.com` | Diagrams, Handout | Quartz's Mermaid engine, imported when a page has a diagram | #566 (Mermaid from the site) |
+
+**What the first real run showed, and the five corrections (2026-11-13).**
+The first credentialed `--first-publish` run of this section went red on 13
+rows where four were predicted (the four Cloudflare rows of #892, below).
+The investigation (Opus, the same night, from the run's own logs and one
+launcher reproduction on `dev`) found the other nine were the harness's,
+and each is now corrected, with a self-test case that fails on the old
+script:
+
+- **The folder check looked for the bare text `ws://localhost` in every
+  file**, and GeoGebra's engine carries a default address of that shape
+  (`collabUrl:"ws://localhost:3001"` in its deferred bundle
+  `static/geogebra/…/deferredjs/…/11.cache.js`), shipped because the fixture
+  has a sketch: four false reds. Measured: the run's build had 313 pages and
+  0 carrying the client, and a launcher reproduction (preview, stop, folder
+  deploy) published 312 pages, 0 carrying it. `check_folder` and `check_url`
+  now ask the product's own question, `contracts/app-rules.json` →
+  `buildFreshness.previewBuild.signature.asABasicRegex` (#291), read from the
+  contract (`live_reload_rule`), over `.html` pages only, each read as one
+  record in the C locale, the way `deploy.sh`'s `site_carries_preview_client`
+  reads it. Pages are matched by name without regard to case, `.html` and
+  `.htm` alike (597b fix review, (a)); a client in a `.js` file, an
+  extensionless page or another shape of the client is missed here and by
+  the product's readers alike, which is the follow-up issue drafted as
+  597b-followup-live-reload-shapes. Proved both ways: the real serve-mode page the run saved
+  (`preview.html`) is seen, alone and behind a clean front page with the
+  GeoGebra file beside it; the build with the engine inside, and the engine
+  file itself, are not. A rule that cannot be read is a failure that says
+  so, never a clean folder. Rejected: excluding `static/geogebra/` from the
+  old grep (the next engine with a default address goes red again, and a
+  page that only mentions the address, #291's networking lesson, still
+  would).
+- **`expect`'s `last name.*: ` also matched deploy.py's confirmation line**
+  "Saved teacher last name for future deploys: …", so the surname was typed
+  as the Netlify site's name: the run's site was created as `Testingqznxlc`.
+  Every pattern is now one of deploy.py's questions, read from
+  `contracts/app-rules.json` → `credentialPrompts` (`launcher_answers`): the
+  prompt up to its colon, then prompt()'s ` [<default>]` if any, then `: `,
+  never past the end of a line (Tcl's `.` takes a newline). The `(y/n): `
+  pattern answered "y" went too: no deploy question is worded that way, and
+  an unanticipated question now stops the run at its timeout. The self-test
+  drives the patterns against deploy.py's own two functions (imported, the
+  profile and Netlify's answer stood in for): the old patterns sent
+  `Testingselftest` as the site name, exactly the run's fault.
+- **`judge_og_image` compared host names with case**: Netlify answers its
+  later GET in lower case while the build baked the created spelling. Host
+  names now compare without case (RFC 4343), custom domains included. The
+  build's capital is a product quirk, not a fault of the harness: deploy.py
+  does not tidy the FIRST site name a teacher types (the retry answer is
+  tidied), so a capital makes every later Netlify deploy rebuild, because
+  `ensure_base_url_and_rebuild` compares the two spellings exactly. That is
+  its own issue (drafted as the 597b follow-up), for both platforms.
+- **Netlify's own badge script is refused by our policy on purpose**, and
+  the clean-page row counted that refusal as a failure of all 11 pages in
+  both engines. What identifies it, measured from the run: one refusal a
+  page, worded `Executing inline script violates the following Content
+  Security Policy directive 'script-src …` in Chromium and `Refused to
+  execute a script because its hash, its nonce, or 'unsafe-inline' does not
+  appear in the script-src directive of the Content Security Policy.` in
+  WebKit, while the live policy listed exactly the site's own five inline
+  scripts. The wording alone is not enough, because a policy that lost one
+  of the site's hashes (the drift `netlify_badge.py` exists to prevent) is
+  refused in the same words. So `rendered_rows.json` → `refusedByDesign`
+  names the two wordings, and `browser-checks/lib/refused_by_design.mjs` sets
+  a line aside only on a page holding a refused inline script that is in the
+  page as the browser received it and NOT in the page as the host serves it
+  to a client that is not a browser (the injection is made for browsers; the
+  run's pages fetched with curl carried none). A refused script that is in
+  the site's own page, or that is in neither (made at run time by the page's
+  scripts), fails the row. What is set aside is an `EXPECTED: clean page`
+  line in each engine, counted in the DONE line, named in its own Result
+  block line ("Refused by the site's own policy by design …"), and allowed
+  on Netlify only, one such line an engine; the six-a-host pin of
+  `thirdPartyHostsToday` counts the other EXPECTED lines only. **The count
+  is pinned inside the checker, page by page** (597b fix review, d1: the
+  first version collapsed every page into one EXPECTED line an engine, so
+  its "at most one an engine" could never fail, and one injected script
+  set aside every line in the badge's wording on its page). Now each page
+  may hold at most `refusedScriptsPerDocument` (1) refused script the host
+  sent the browser alone in any one document, and must show exactly
+  `linesPerRefusedScript` (1) message for each; anything else fails the
+  page and names the count. WebKit records one refusal twice (in the
+  console list with the page's address, and in the refused list), and
+  `refusalMessages` counts those as one message, one for one, so two
+  refusals in the same words stay two. Measured on the stand-in edge below,
+  both engines, the new checker: one message a document, so Tasks
+  (loaded, reloaded, taken to My Progress) 3, Embeds (reloaded) 2, every
+  other page 1, and `39 OK, 0 FAIL, 0 SKIPPED, 8 EXPECTED`; before the
+  twin was counted once, WebKit failed every page at 2 against 1. **This
+  logic has not yet met a real Netlify page**: the first run predates it.
+  The next credentialed run must show both clean-page EXPECTED lines with
+  those counts (Tasks 3, Embeds 2, the rest 1) and no clean-page FAIL. A
+  page failing on the badge's own wording with nothing set aside is most
+  likely a redirect whose document Playwright could not read (Netlify's
+  pretty URLs): without the document nothing can be told apart, so it errs
+  red, and that is the first thing to look at. Measured on a local stand-in for Netlify's edge (the run's build
+  with its real `_headers`, a script added to every page for a browser's
+  User-Agent only): the 597b checker gave `39 OK, 2 FAIL, 0 SKIPPED, 6
+  EXPECTED`, the first run's line exactly; the new one `39 OK, 0 FAIL, 0
+  SKIPPED, 8 EXPECTED`. Proved still red: the same script sent to every
+  client, and the run's policy with one of the site's hashes dropped (badge
+  still added), each failed the row in both engines, naming the site's own
+  script. Rejected: ignoring CSP refusals on Netlify (that hides the hash
+  drift), and matching the badge by its content (never read; the sites were
+  deleted).
+- **The tasks row reloaded while the page was still fetching
+  `static/contentIndex.json`**, and WebKit throws "TypeError: Load failed"
+  into the page when a navigation cancels that fetch (Quartz's `fetchData`,
+  which nothing catches). Over a real network it is still in flight, so it
+  showed on Cloudflare (cold first paint about 327 ms there, 142 ms on
+  Netlify). Every row that takes the page elsewhere (the tasks reload, the
+  progress row's next page, the embeds reload) now waits first on the
+  page's own `fetchData` promise, with a 30 s ceiling
+  (`untilTheIndexHasArrived`), never a fixed sleep; the self-test checks
+  that every reload and next page inside a row is preceded by that wait.
+  Reaching the ceiling is said, never silent (597b fix review, d2: an index
+  that never answered passed the clean-page row with no word): the row's
+  line carries the count, the checker prints `NOTE: index wait [engine]:
+  <page>, the <row> row: …`, and `verify-deploy.sh` puts that line in the
+  Result block's measurements (`lib/index_wait.mjs`, its node test and a
+  stub case in the self-test).
+  Measured with 0.5 s added to every answer but the page itself, headless
+  WebKit: the 597b checker failed the clean-page row on Tasks twice of two;
+  the new one passed three runs of three, both engines. Rejected:
+  `waitForLoadState("networkidle")` (a timed quiet period, the guess this
+  repository's rule forbids) and setting aside a "Load failed" whose request
+  the row cancelled (it would hide the same error raised by anything else).
+
+So a run on `dev` without #799 should show exactly the four Cloudflare rows
+of #892 and nothing else, with Netlify's rendered line reading `39 OK, 0
+FAIL, 0 SKIPPED, 8 EXPECTED` and the badge's two lines under their own
+Result heading. The self-test went from 62 cases to 77.
+
+**What a teacher's embed says is set aside, and counted.** The first
+deployed-mode run (the fixture site served under `--base … --host netlify`,
+2026-11-13) failed the clean-page row on the Embeds page in both engines for
+lines that were not the site's: YouTube's advert requests refused by this
+Mac's resolver, Vimeo's "Permissions policy violation: encrypted-media" from
+its own player script, Cloudflare's beacon inside PhET's frame, and page
+errors thrown by GeoGebra's, Vimeo's and PhET's own scripts reaching for the
+page that holds them or checking fullscreen. The router already records
+every request a teacher's embed makes (only on the Embeds page, only from a
+frame on the embeds row's `allowedFrames`); a console line that names one of
+those requests, or comes from one, a page error whose throwing script (the
+first address its stack names) is one of them or on an allowed frame's host,
+and a request of an embed's own that failed, are now counted and set aside,
+and the row's own line says how many (19 in Chromium, 11 in WebKit on that
+run). The embeds row still judges the frames themselves. Rejected: allowing
+the provider hosts on every page (the own-host row already refuses that,
+review H1), and dropping the clean-page row on the Embeds page (it is the
+page most likely to carry a policy refusal of the site's own).
+
+**A frame the provider refuses is a failure, not an embed's own console**
+(597b review finding 1). The set-aside above first let a frame the
+provider refuses to be shown in pass both rows: its document answers 200
+in both engines, then Chromium fails the request (`net::ERR_BLOCKED_BY_RESPONSE`)
+and both log "Refused to display '<url>' in a frame", and that line named
+an embed's own address, so it was set aside. Students see a blank box.
+Now a "Refused to display" line, and a failed document of a frame of the
+page itself (not one inside an embed), fail the embeds row and stay in the
+clean-page row. Proved by copying the 597b file in against a copy whose
+YouTube frame points at the video's watch page (YouTube sends
+`X-Frame-Options: SAMEORIGIN` there, the address a teacher copies from the
+address bar): embeds passed in both engines with the old file, and fails in
+both with the new. It is the sabotage "embeds refused" now, run with
+`--site <folder> --host netlify --expect-red "embeds refused"` (the embeds
+row runs on deployed hosts only, so verify.sh's local `--expect-red all`
+prints a NOTE for it).
+
+**The failed frame document is what catches frame-ancestors, so keep it**
+(597b fix review MINOR 3). The two signs are not redundant. Measured on
+2026-11-13 with headless Chrome for Testing 155 and WebKit 2359 against
+local servers: for a frame refused by `X-Frame-Options`, and for one refused
+by `Content-Security-Policy: frame-ancestors 'none'` or `'self'`, the
+frame's document answers 200 and then fails in both engines
+(`net::ERR_BLOCKED_BY_RESPONSE` in Chromium, `cancelled` in WebKit), and
+that failed request is a frame of the page itself. The "Refused to display"
+line appears for `X-Frame-Options` only. For frame-ancestors, Chromium says
+"Framing '<origin>/' violates the following Content Security Policy
+directive" and WebKit says "Refused to load <url> because it does not
+appear in the frame-ancestors directive", and the check's pattern matches
+neither. GeoGebra's refusal is the frame-ancestors shape. So the failed
+document is the half that fails the embeds row on every refusal in both
+engines, and removing it as a duplicate of the console line would let a
+frame-ancestors refusal pass.
+
+**A refused frame inside an embed is the embed's own, in both halves**
+(597b fix review MINOR 2). The request half counts only a frame whose parent
+is the page. The console half must skip the same frames, because a refused
+frame nested inside an allowed one logs "Refused to display" to the page's
+console in both engines (measured as above), with no location that names
+the frame: WebKit gives none, Chromium gives `chrome-error://chromewebdata/`.
+So the checker records, as each frame is asked for, whether its parent is
+the page or a frame inside an embed, and `browser-checks/lib/frame_refusals.mjs`
+matches the address the line names against the two lists. WebKit names the
+full address; Chromium only the origin. An origin that only an embed's inner
+frames used is the embed's, and so is one used both by the page's own frames
+and by an embed's inner frames, since the request half judges the page's own
+frame either way. A line naming an address the page never asked for stays
+the page's, which is the direction that fails. Measured on the same local
+servers: the nested refusal read as the embed's and the top-level one as
+the page's, in both engines. A provider's own inner frames therefore cannot
+turn a run red. Rejected: dropping the console half altogether, since for
+`X-Frame-Options` its line is the one that says why the frame was refused in
+the row's failure.
+
+**The Embeds fixture's geogebra.org frame had gone.** The same run failed
+the embeds row in both engines with "www.geogebra.org answered 410": the
+fixture used `https://www.geogebra.org/material/iframe/id/ju3f2kbg`, and
+geogebra.org now answers 410 Gone for every `/material/iframe/id/` and
+`/material/show/id/` address (measured with curl for two materials), while
+`/m/ju3f2kbg` and `/m/ju3f2kbg?embed` answer 200. The fixture now uses
+`/m/ju3f2kbg?embed`. A teacher's page that still carries the old embed code
+shows GeoGebra's 410 page in the frame; the build's `material_id:` reading
+still accepts the old address as a way of naming a sketch, which is
+unaffected (it fetches the sketch, not the frame).
+
+**The cold visit takes #625's two routes too, on a deployed site.** Beside
+the typed cold visit of 597a, two routes, each five samples in a new
+context and judged the same way (two of five over 3 s, or the median, fail;
+one slow sample earns one counted retry): from the section's front page into
+the isolated Python page, and from the Python page into the isolated Swift
+page. The press is real, on a link the check adds at the window's corner, so
+the site's own router takes it. Paint is the new document's paint entry, or,
+when the router swaps the page in, the moment the target's title is in the
+article; the pressed document is marked, because WebKit answered two
+`performance.timeOrigin` values for one document and the old page's paint
+was read as the new one's (measured: -70 ms samples, gone with the mark).
+Measured on the fixture site served locally, three runs: front page into
+Python 252 to 457 ms, always a new document (5 of 5); Python into Swift 178
+to 211 ms, always the router (5 of 5), which matches #625's real-Safari
+measurement of the same two hand-offs. Proved red: `index.css` held 8 s
+failed the typed and the front-page routes (8,177 to 8,311 ms); the Swift
+page held 8 s failed the Python-to-Swift route (8,115 and 8,132 ms). The
+numbers go into the Result block's measured lines on every run, so a slow
+drift shows before it is a failure. #625 stays open (the owner, 2026-10-23):
+the row is a regression watch, and it cannot reproduce a fault seen only in
+one signed-in Safari profile. Real Safari through `safaridriver` stays a
+step by hand (it takes the screen); it is not built into this run.
+
+**How the check knows it reads THIS deploy** (597b review finding 5). The
+fixture pages carry no mark of their own; the borrowed page of runnable code
+does: `RUN_MARK` (`plantoir-verify-deploy-run-<UTC time>-<pid>`), written
+fresh for every run. Before the browsers, the rendered section fetches that
+page from each host (through `fetch_headers`, so a new site is waited for)
+and requires this run's mark in it. A host still serving an earlier
+deployment fails there, and its Result line reads `FAILED - it did not
+serve this run's deployment`, whatever the browsers then see. Every page of
+a deploy goes up together (one Netlify deploy, one Cloudflare deployment),
+so the page carrying the mark stands for the fixture pages beside it. On
+Cloudflare the leg's own wait (`wait_for_cloudflare_production`) already
+holds for the same mark; until this check, nothing on Netlify proved it.
+Rejected: a mark on every fixture page (eleven more fetches for what one
+proves).
+
+**A second deploy with nothing changed builds nothing, per host (#892).**
+Asked by Windows' director on #892: a course carrying both a Netlify and a
+Cloudflare record built every Cloudflare deploy again, for ever, because the
+build read the Netlify record whatever the destination was. After the
+rendered section, for each host reached: the destination set to it, one
+deploy to settle (it may build: each site carries its own address, the
+extra build per host the owner accepted on #799), then a second with
+nothing changed, judged from the launcher's own lines: no deploy.sh "🔁"
+build reason and no deploy.py "Rebuilding site for production…"; Netlify's
+"No file uploads needed" (or "Netlify requires 0 file"), Cloudflare's
+"Uploaded 0 files". A log with no upload line is a failure that says it
+could not be judged. A second deploy that exited other than 0 is a failure
+whatever its log said (597b fix review MINOR 1: a log can say "Netlify
+requires 0 file(s)" and then fail), and a settling deploy that exited other
+than 0 is a failure that leaves the second one unrun. A second deploy that
+printed "Updating Quartz baseUrl to …" is named as #892's shape. **Without #799 this is RED for
+Cloudflare** on the test course, which carries both records: #799 is what
+makes a Cloudflare course that also has a Netlify record build for its own
+address. The red is reported by name and not weakened. Cost: two more deploys a host, a minute or two each.
+Rejected: judging the settle deploy (its build is the accepted one).
+
+**The sharing card names its own site (#799).** In every leg that fetches
+a live front page (`check_url`), the page's `og:image` must be an absolute
+address on that site's own host, judged per site (ruled on #799: with two
+web hosts each site carries its own address). Missing or relative is a
+failure; a Cloudflare site whose `og:image` names a Netlify one is named as
+#892's shape, red for the same course without #799.
+
+The host expected is the leg's custom domain when `course_config.json`
+records one for that destination (597b fix review INCOMPLETE 1). Since #799,
+`deploy.py` builds each leg for `leg_custom_domain(…)` or else the
+service's own host, while the Cloudflare leg still prints its `pages.dev`
+address, so judging against the fetched host alone was a false red for every
+section with a custom domain. The rule is the contract's,
+`contracts/file-formats.json` → `custom_domains`:
+`custom_domains.sections.section<N>.<leg's type>` (`netlify`,
+`cloudflare_pages`), and the older bare string is the primary destination's
+(`deploy_target`, Netlify when absent) and no other leg's. The harness
+implements it in `leg_custom_domain` rather than importing `deploy.py`, so
+it does not judge code with that code. With a custom domain recorded, an
+`og:image` on the service's own host fails, named as such. Known limit,
+older than this check: `url_from_log` reads only `*.netlify.app` and
+`*.pages.dev`, so a Netlify site served only on a custom domain Netlify has
+attached is not fetched at all.
+
+**Not on the list, and why.** The folder destination: a deployed folder is
+served by Plantoir itself since #850, and verify.sh crawls one through the
+app's own server; opening it in two browsers here needs the app binary, so
+it is left for a piece that can start it. GitHub Pages: #669.
+
+**The self-test** judges the section against a stub in the checker's place
+and a stub site on 127.0.0.1, offline: both hosts checked (both engines
+required, six expected failures a host counted, the cold visits measured); a
+Netlify leg with two failures reads "FAILED before the browser check" though
+the browsers passed; a host with no address is NOT REACHED and the checker
+runs for the other only; a SKIPPED engine fails each host, asked twice; a
+row that fails then passes is passed and named as answered on retry; an
+expected failure that stopped is a failure printed under its host; a fixture
+page 404 twice is asked again and counted, and one that never answers is a
+failure that names it; plus the node test of `expected_failures.mjs` (pins
+included). Since the review: a Node older than 22, or none, fails each host
+before the checker runs; a checker that could not run (exit 2) fails after
+its re-run; a host whose block never said why is NOT REACHED as "its leg
+never ran"; a re-run that fails again is the host's failure with both runs
+printed; expected failures off their pinned count fail the host; and the
+second deploy's and the sharing card's judgements, six and five cases; and
+a host serving an earlier deployment (no run mark) reads FAILED though
+the browsers passed. Since the fix review: a second deploy that uploaded
+nothing and then exited 1 fails; the sharing card against a recorded custom
+domain (on it passes, on the service's own host fails, the bare string the
+primary's and no other leg's, a domain for one destination never another's)
+and with none recorded (another site's host fails), six cases; and the node
+test of `frame_refusals.mjs`, ten cases. 62 passed. Proved
+must-fail on copies of the script: with a plain run asking once, with a
+leg's failures ignored, with the section running over the legs' entries
+instead of the list, and with a skip read as a pass, the matching cases fail
+(the counts are in the closing note).
 
 ## The scheduled task never refuses over FOLDER PROBLEMS
 
