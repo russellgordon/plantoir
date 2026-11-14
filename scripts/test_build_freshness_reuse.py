@@ -460,6 +460,7 @@ class DeployPyLooksInTheWorkFolderAndAsksThePages(unittest.TestCase):
     def setUpClass(cls):
         import deploy
         cls.deploy = deploy
+        cls.real_rebuild = staticmethod(deploy.rebuild_for_production)
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -556,9 +557,264 @@ class DeployPyLooksInTheWorkFolderAndAsksThePages(unittest.TestCase):
         self.assertIn("  -e PLANTOIR_PAGES_ALREADY_ASKED=1 \\\n", text)
         self.assertEqual(self.deploy.PAGES_ALREADY_ASKED_VARIABLE, "PLANTOIR_PAGES_ALREADY_ASKED")
 
+    def test_a_rebuild_for_the_address_is_asked_for_that_address(self):
+        """#799, measured on Windows: deploy.py's rebuild for a Cloudflare
+        address ran build_site.py, which resolved the address from the
+        course's records again (the Netlify one first), so the rebuild came
+        out with the same wrong address and every Cloudflare deploy rebuilt.
+        The rebuild is now handed the destination's address."""
+        (self.tmp / "work" / "C" / "section1" / "quartz.config.ts").write_text(
+            'baseUrl: "example.netlify.app",\n', encoding="utf-8")
+        self._deploy()
+        self.assertEqual(len(self.rebuilds), 1)
+        self.assertEqual(self.rebuilds[0][3:], ("example.pages.dev",))
+
+    def test_every_rebuild_here_is_asked_for_the_destinations_address(self):
+        with open(self.course / "notes" / "day-1.md", "a", encoding="utf-8") as handle:
+            handle.write("edited\n")
+        self._deploy()
+        self.assertEqual(self.rebuilds[0][3:], ("example.pages.dev",))
+
+    def test_the_rebuild_hands_the_address_to_the_build_alone(self):
+        import subprocess
+        seen = []
+        def run(command, **arguments):
+            seen.append(arguments.get("env"))
+        with mock.patch.object(subprocess, "run", run):
+            with redirect_stdout(io.StringIO()):
+                self.real_rebuild("C", "1", "windows", "example.pages.dev")
+                self.real_rebuild("C", "1", "windows")
+        self.assertEqual(seen[0][self.deploy.DEPLOY_BASE_URL_VARIABLE], "example.pages.dev")
+        self.assertIsNone(seen[1], "a rebuild with no address inherits the environment unchanged")
+        self.assertNotIn(self.deploy.DEPLOY_BASE_URL_VARIABLE, os.environ)
+
     def test_the_build_folder_is_not_a_literal(self):
         source = (REPOSITORY_ROOT / "scripts" / "deploy.py").read_text(encoding="utf-8")
         self.assertNotIn('Path(f"/tmp/quartz-builds/', source)
+
+
+class EachLegIsBuiltForItsOwnCustomDomain(unittest.TestCase):
+    """#799's third review, H1: a section's custom domain, for the leg it is
+    recorded for (contracts/file-formats.json -> custom_domains: by
+    destination type; the older bare string is the primary's), is the
+    address that leg is built for and compared with. Cloudflare's record only
+    ever names <project>.pages.dev, so before this a Cloudflare course with a
+    custom domain was rebuilt with pages.dev and its sharing cards, sitemap
+    and feed dropped the teacher's domain."""
+
+    @classmethod
+    def setUpClass(cls):
+        import deploy
+        cls.deploy = deploy
+
+    def _course(self, config):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        (tmp / "course_config.json").write_text(json.dumps(config), encoding="utf-8")
+        return tmp
+
+    def test_a_cloudflare_course_with_its_own_domain(self):
+        course = self._course({"deploy_target": "cloudflare_pages",
+                               "custom_domains": {"sections": {"section1": {"cloudflare_pages": "https://CF.school.ca/"}}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "CF.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 2, "cloudflare_pages"), "")
+
+    def test_a_netlify_course_with_its_own_domain(self):
+        course = self._course({"deploy_target": "netlify",
+                               "custom_domains": {"sections": {"section1": {"netlify": "ics3u.school.ca"}}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "ics3u.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "")
+
+    def test_two_web_destinations_each_with_its_own_domain(self):
+        course = self._course({"deploy_target": "netlify",
+                               "additional_deploy_targets": [{"type": "cloudflare_pages"}],
+                               "custom_domains": {"sections": {"section1": {
+                                   "netlify": "n.school.ca", "cloudflare_pages": "c.school.ca"}}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "n.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "c.school.ca")
+
+    def test_the_older_bare_string_is_the_primarys_alone(self):
+        course = self._course({"deploy_target": "cloudflare_pages",
+                               "custom_domains": {"sections": {"section1": "old.school.ca"}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "old.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "")
+        course = self._course({"custom_domains": {"sections": {"section1": "old.school.ca"}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "old.school.ca")
+
+    def test_no_settings_or_a_bad_shape_is_no_domain(self):
+        empty = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, empty, True)
+        self.assertEqual(self.deploy.leg_custom_domain(empty, 1, "netlify"), "")
+        for config in ([], {"custom_domains": []}, {"custom_domains": {"sections": {"section1": {"netlify": 7}}}}):
+            with self.subTest(config=config):
+                self.assertEqual(self.deploy.leg_custom_domain(self._course(config), 1, "netlify"), "")
+
+    def test_both_legs_are_built_for_the_leg_custom_domain_first(self):
+        """By source, since both legs talk to a service: the Cloudflare leg
+        compares with the leg's own domain before the project's host, and the
+        Netlify leg before Netlify's ssl_url."""
+        source = (REPOSITORY_ROOT / "scripts" / "deploy.py").read_text(encoding="utf-8")
+        self.assertIn('leg_custom_domain(course_dir, section, "cloudflare_pages") or host', source)
+        self.assertIn('leg_custom_domain(course_dir, args.section, "netlify") or clean_base_url(site_url)', source)
+
+
+class EachLegCarriesItsOwnAddressOverRepeatedDeploys(unittest.TestCase):
+    """#799, by behaviour rather than by source text: deploy.py's address for
+    a leg and build_site.py's step 0 together, over three deploys of the same
+    leg with nothing changed.
+
+    The real publish_to_cloudflare and ensure_base_url_and_rebuild run, with
+    the services stubbed (no token is used, nothing is uploaded). The rebuild
+    is stood in for by what rebuild_for_production does with the address:
+    build_site.resolve_section_domain with DEPLOY_BASE_URL_VARIABLE set, and
+    build_site.patch_quartz_base_url into the build's folder. So a deploy that
+    rebuilds is counted, and what is "uploaded" is the baseUrl the build
+    carries at that moment.
+
+    Fourth review, L2: the third review's H1 (a Cloudflare course with its
+    own domain was rebuilt for pages.dev) is pinned here, and fails on
+    66dec8fc2's deploy.py. Fourth review, M1: the second destination's own
+    domain, in a shape a host-name check refused (a Unicode domain, a
+    trailing dot, a path), is still that destination's address; with the
+    check, build_site fell back to the primary's and rebuilt every deploy."""
+
+    PROJECT = "ics3u-s1"
+    PAGES_HOST = "ics3u-s1.pages.dev"
+    NETLIFY_DOMAIN = "n.school.ca"
+
+    @classmethod
+    def setUpClass(cls):
+        import deploy
+        import build_site
+        cls.deploy = deploy
+        cls.build_site = build_site
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        courses = self.tmp / "courses"
+        self.course = courses / "C"
+        (self.course / ".cloudflare_sites").mkdir(parents=True)
+        (self.course / ".cloudflare_sites" / "section1.json").write_text(json.dumps(
+            {"name": self.PROJECT, "subdomain": self.PAGES_HOST, "account_id": "a"}), encoding="utf-8")
+        (self.course / ".netlify_sites").mkdir()
+        (self.course / ".netlify_sites" / "section1.json").write_text(json.dumps(
+            {"name": "ics3u-n", "ssl_url": "https://ics3u-n.netlify.app"}), encoding="utf-8")
+        self.section = self.tmp / "builds" / "C" / "section1"
+        (self.section / "public").mkdir(parents=True)
+        (self.section / "public" / "index.html").write_text("<html></html>", encoding="utf-8")
+        self.work_config = self.tmp / "work" / "C" / "section1" / "quartz.config.ts"
+        self.work_config.parent.mkdir(parents=True)
+        self.builds = []
+        self.uploaded = []
+        for patch in (
+            mock.patch.object(toolchain_paths, "WORK_DIR", self.tmp / "work"),
+            mock.patch.object(toolchain_paths, "COURSES_DIR", courses),
+            mock.patch.dict(os.environ, {"CLOUDFLARE_API_TOKEN": "not-a-token",
+                                         "CLOUDFLARE_ACCOUNT_ID": "not-an-account"}),
+            # Only the address is asked about here: the pages and the
+            # toolchain have their own tests above.
+            mock.patch.object(self.deploy, "why_this_deploy_builds_first", lambda *arguments: None),
+            mock.patch.object(self.deploy, "remake_pages_project_if_gone", lambda *arguments: None),
+            mock.patch.object(self.deploy, "note_cloudflare_refusals", lambda *arguments, **named: None),
+            mock.patch.object(self.deploy.isolation_headers, "publish_headers", lambda *arguments: None),
+            mock.patch.object(self.deploy, "deploy_to_cloudflare",
+                              lambda *arguments: self.uploaded.append(self._baked())),
+            mock.patch.object(self.deploy, "rebuild_for_production", self._rebuild),
+        ):
+            patch.start()
+            self.addCleanup(patch.stop)
+        os.environ.pop(self.build_site.DEPLOY_BASE_URL_VARIABLE, None)
+
+    def _config(self, config: dict) -> dict:
+        (self.course / "course_config.json").write_text(json.dumps(config), encoding="utf-8")
+        return config
+
+    def _bake(self, address: str):
+        self.work_config.write_text('baseUrl: "quartz.jzhao.xyz",\n', encoding="utf-8")
+        with redirect_stdout(io.StringIO()):
+            self.build_site.patch_quartz_base_url(self.work_config, address)
+
+    def _baked(self) -> str:
+        match = re.search(r"baseUrl\s*:\s*(" + r'"(?:[^"\\\n]|\\.)*"' + ")",
+                          self.work_config.read_text(encoding="utf-8"))
+        return json.loads(match.group(1)) if match else ""
+
+    def _rebuild(self, course_code, section, host_os, base_url=""):
+        config = json.loads((self.course / "course_config.json").read_text(encoding="utf-8"))
+        environment = {self.build_site.DEPLOY_BASE_URL_VARIABLE: base_url} if base_url else {}
+        with mock.patch.dict(os.environ, environment):
+            resolved = self.build_site.resolve_section_domain(self.course, config, int(section))
+        self.builds.append(resolved)
+        self._bake(resolved)
+
+    def _deploy_cloudflare(self, times: int = 3):
+        for _ in range(times):
+            with redirect_stdout(io.StringIO()):
+                self.deploy.publish_to_cloudflare(self.section / "public", self.course, "C", "1", None)
+
+    def _deploy_leg(self, target: str, times: int = 3):
+        """A leg other than Cloudflare's, with the address its caller chose."""
+        for _ in range(times):
+            with redirect_stdout(io.StringIO()):
+                self.deploy.ensure_base_url_and_rebuild(self.section, target, "C", "1", "windows")
+            self.uploaded.append(self._baked())
+
+    def test_a_cloudflare_course_with_its_own_domain_keeps_it_and_builds_nothing(self):
+        """L2: on 66dec8fc2 the leg compared with pages.dev, so every deploy
+        rebuilt and the site went out without the teacher's domain."""
+        self._config({"deploy_target": "cloudflare_pages",
+                      "custom_domains": {"sections": {"section1": {"cloudflare_pages": "cf.school.ca"}}}})
+        self._bake("cf.school.ca")  # the build a preview or the last deploy left
+        self._deploy_cloudflare()
+        self.assertEqual(self.builds, [])
+        self.assertEqual(self.uploaded, ["cf.school.ca"] * 3)
+
+    def test_the_cloudflare_leg_of_a_netlify_course_is_built_for_its_own_domain_once(self):
+        """M1: the Netlify leg built the site last, for the Netlify domain;
+        the Cloudflare leg builds once for ITS domain, whatever its shape,
+        and the next two deploys of it reuse that build."""
+        for own, expected in (("cours.école.ca", "cours.école.ca"),
+                              ("c.school.ca.", "c.school.ca."),
+                              ("https://school.ca/cs/", "school.ca/cs"),
+                              ("c.school.ca", "c.school.ca")):
+            with self.subTest(domain=own):
+                self.builds.clear()
+                self.uploaded.clear()
+                self._config({"deploy_target": "netlify",
+                              "additional_deploy_targets": [{"type": "cloudflare_pages"}],
+                              "custom_domains": {"sections": {"section1": {
+                                  "netlify": self.NETLIFY_DOMAIN, "cloudflare_pages": own}}}})
+                self._bake(self.NETLIFY_DOMAIN)
+                self._deploy_cloudflare()
+                self.assertEqual(self.builds, [expected])
+                self.assertEqual(self.uploaded, [expected] * 3)
+
+    def test_the_netlify_leg_of_a_cloudflare_course_is_built_for_its_own_domain_once(self):
+        """M1's mirror: a Cloudflare-primary course whose Netlify leg has a
+        Unicode domain. The Netlify leg's address is leg_custom_domain's
+        (pinned by source above, as that leg talks to Netlify first)."""
+        self._config({"deploy_target": "cloudflare_pages",
+                      "additional_deploy_targets": [{"type": "netlify"}],
+                      "custom_domains": {"sections": {"section1": {
+                          "cloudflare_pages": "c.school.ca", "netlify": "cours.école.ca"}}}})
+        self._bake("c.school.ca")
+        target = self.deploy.leg_custom_domain(self.course, 1, "netlify")
+        self.assertEqual(target, "cours.école.ca")
+        self._deploy_leg(target)
+        self.assertEqual(self.builds, ["cours.école.ca"])
+        self.assertEqual(self.uploaded, ["cours.école.ca"] * 3)
+
+    def test_the_cloudflare_leg_without_a_domain_of_its_own_is_built_for_pages_dev(self):
+        """A Netlify domain never reaches the Cloudflare site."""
+        self._config({"deploy_target": "netlify",
+                      "additional_deploy_targets": [{"type": "cloudflare_pages"}],
+                      "custom_domains": {"sections": {"section1": {"netlify": self.NETLIFY_DOMAIN}}}})
+        self._bake(self.NETLIFY_DOMAIN)
+        self._deploy_cloudflare()
+        self.assertEqual(self.builds, [self.PAGES_HOST])
+        self.assertEqual(self.uploaded, [self.PAGES_HOST] * 3)
 
 
 class TheNewLinesCarryNoWindowsAnchor(unittest.TestCase):

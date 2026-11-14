@@ -200,9 +200,8 @@ release starts, and the cut CHECKS it rather than raising it.**
      the mac's version line from the last release (`main` to 1.9.4, `dev` to
      2.0.0), so git stops on `project.yml`: resolve it to `dev`'s side,
      because `dev` keeps the next release's number. The csproj conflicts the
-     same way only once #862 has raised `<Version>` on `dev`; until then a
-     Windows hotfix's number merges into `dev` with no conflict, and that is
-     the right number for `dev` too. The next cut's check (checklist step 1)
+     same way since #862 raised `<Version>` on `dev` to 2.0.0 (2026-11-13),
+     and resolves the same way, to `dev`'s side. The next cut's check (checklist step 1)
      confirms the result, since the platform it ships must read that cut's
      tag. Delete the hotfix branch.
   If the hotfix takes the very number `dev` is heading for (`dev` at 1.9.4
@@ -231,6 +230,28 @@ build still carries no update feed (`SUFeedURL` is empty). macOS's Help cache
 files a book by the app's version (#839), so a Debug build at 2.0.0 no longer
 shares an entry with an installed 1.9.3; Debug builds still share one with
 each other, as before.
+
+**On Windows (#862), measured on 2026-11-13 with `<Version>` at 2.0.0 on
+`dev`:** About, the trail's opening line and the problem report read the
+assembly's version, so a test build says 2.0.0 (`AppOpenedAndClosedTests`
+reads the csproj and follows it). A Debug build checks no feed
+(`AppUpdates.FeedFor(developmentBuild)` is null), so it offers, refuses and
+records no update. `publish.ps1` names the installer and zip from it.
+`windows_feed.version_refusal` returns nothing at 2.0.0 on the committed
+files, and `website/test_windows_feed.py` (23) and `test_build_data.py` (66,
+3 skipped as the Mac's) pass. One reader had to change: the named-gap
+ledger's test compared every entry with `<Version>`, which at 2.0.0 turned all
+116 entries owed by v2.0.0 red the day the number moved. It now compares with
+the last release Windows SHIPPED, read from `site.json` and the Windows feed
+as the deploy reads them, and the cut is checked by `publish.ps1 -Sign`
+against `<Version>` instead (short version, step 2). One trail effect to
+know: the app writes `updated from … to …, by hand` whenever the version it
+last opened as differs, so on a PC with an installed 1.9.3 beside a 2.0.0
+test build, each switch between the two writes one such line. **Never install
+an unsigned `publish.ps1` bundle over a real copy**: it carries the
+release-in-progress number, and the update check offers only a NEWER
+version, so that copy would never be offered the real release of the same
+number (#862 review, read from `AppUpdater.cs`, not measured by an install).
 
 **Rejected:** raising it at the cut, as before (the test builds lie for the
 whole of a release); deriving it from the milestone at build time (a build
@@ -303,11 +324,20 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    "Two platforms, one version series" above, and the `cut-release` skill's
    step 5). Until #861 (2026-11-13) this step RAISED the number: for v1.4.0,
    a mac-only cut, `MARKETING_VERSION` went to 1.4.0 before `publish.sh
-   -Sign` and the csproj stayed at 1.1.0. **When the
-   csproj's version changes, run `dotnet test` in `windows-app/` AGAIN** —
-   `NamedGapLedgerTests` compares every ledger entry's milestone with that
-   `<Version>`, and the run in step 1 compared it with the OLD number, so it
-   passes with entries left that this cut must not carry.
+   -Sign` and the csproj stayed at 1.1.0. **The ledger is checked against
+   this cut by `publish.ps1 -Sign` itself** (step 3, #862): the ordinary
+   suite compares every ledger entry's milestone with the last release
+   Windows SHIPPED (`site.json` and `updates/windows.xml`), because
+   `<Version>` already names the release in progress and its entries are
+   allowed while its work is open, so the run in step 1 is green with entries
+   this cut must not carry. `publish.ps1 -Sign` runs `NamedGapLedgerTests`
+   with `PLANTOIR_LEDGER_BASELINE=build` before it signs or builds anything,
+   and REFUSES while any entry's milestone is not later than `<Version>`,
+   naming each; `publish.ps1 -CheckLedgerOnly` makes the same check and stops,
+   so run it here. **Never build the installer another way**: a hand-run
+   `dotnet publish` skips this check, the engine check and the installer.
+   (Until #862 this step said to run `dotnet test` AGAIN once the csproj's
+   version changed, because the suite compared with `<Version>`.)
 3. **Build the signed Windows bundle**: first **re-run
    `windows-app\Vendor\fetch-runtime.ps1`** — it returns at once when the
    runtime is current, and fetches only `runtime\vendor` (Paged.js, Latin
@@ -456,9 +486,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > instead of sitting red — each entry carrying the key, its GitHub issue and
    > its MILESTONE. **Every entry's milestone must be LATER than the release you
    > are cutting, and its issue must still be open.** The first half is a test
-   > since 2026-10-15: `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild`
-   > reads `<Version>` from `Plantoir.csproj` and fails for any entry that is not
-   > — which is why the suite is re-run AFTER the version is set (step 2). The
+   > since 2026-10-15, and since #862 (2026-11-13) it has two baselines:
+   > `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease`
+   > fails in every run for an entry not later than the last release Windows
+   > SHIPPED (`website/site.json`'s Windows pin, else its version line, and
+   > `updates/windows.xml`'s newest item), and `publish.ps1 -Sign` runs the
+   > same fact against `<Version>`, the release being cut, and refuses to build
+   > while any entry is not later than it (short version, step 2). The
    > second half is still yours: open the file and check each entry's issue is
    > open. An entry whose milestone IS this release means the work is owed
    > NOW — build it, or move the issue (and the entry) to a later milestone as
@@ -1035,7 +1069,11 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     Restore the feed to the previous release's committed bytes first
     (`git checkout <previous release's commit> -- website/updates/windows.xml
     website/updates/windows.xml.signature`) and generate again; check the
-    item's `length` against the installer's size before committing.
+    item's `length` against the installer's size before committing. Restore
+    it BEFORE re-running `publish.ps1 -Sign`, too: since #862 its ledger check
+    runs `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped`, which fails while
+    the feed carries an item `site.json` does not, so `-Sign` refuses (naming
+    that test) until the feed is back.
     `--file-version` is NOT used, and was rejected on measurement: given
     `--file-version 1.4.3` with the 1.4.2 installer, it wrote nothing new and
     said "An app cast item with version 1.4.2 is already in the file". (The
@@ -1082,6 +1120,14 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   any edit after the generator means re-signing by hand). The generator
   cannot write notes as HTML or gather them across items itself; neither is
   needed, because the app does the gathering.
+- **Between committing the new feed and moving `site.json`'s version line
+  (in whichever order a cut makes them), the ordinary Windows suite is
+  RED**, and that is correct:
+  `NamedGapLedgerTests.TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped` fails
+  because one of the two already names the release being cut and the other
+  still names the previous one, which is the same state `build.py --deploy`
+  refuses (#862). It turns green once both have moved. Do not read a mid-cut
+  `dotnet test` failure of that one fact as damage; any other failure is.
 - **Do not rebuild or re-sign the installer after the feed is made**, and
   never let the feed's line endings change: `.gitattributes` marks
   `website/updates/*.xml` and `*.xml.signature` `-text` for that reason

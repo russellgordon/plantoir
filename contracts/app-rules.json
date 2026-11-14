@@ -732,7 +732,7 @@
       "knownLimits" : [
         "A file system that keeps times to the second (HFS+) or two seconds (exFAT) can date a save made in the same second as the build's start no later than the start, and it then reads as built. The working folder has to be in the home folder on a Mac (#221), which is APFS there; on Windows an exFAT drive is possible.",
         "Anything that changes a file's metadata without changing what students see costs one build that was not needed: a Finder tag, a quarantine flag, a sync service's own marks, macOS noting when a file was last opened. So does a hidden file or folder being created, removed or replaced in ANY folder of the course (.publish_state, .netlify_sites or .cloudflare_sites at the top the first time, a .DS_Store Finder writes, an editor's swap file), because that folder's own time changes. Each errs toward building, once.",
-        "A symbolic link INSIDE the course is not followed, by any reader: a folder linked in from elsewhere (a section folder kept outside the course, say) changes behind its link and reads as built, while the build follows it. Such a link POINTED at another folder is seen (its own times change, and they are read). The course folder ITSELF being a link is followed (`courseFolderIsALink`). Media is a link only inside the BUILD's own folder (content/Media points at the course's Media, a real folder of the course), so every reader sees a changed picture where it really is.",
+        "A symbolic link INSIDE the course is not followed, by any reader: a folder linked in from elsewhere (a section folder kept outside the course, say) changes behind its link and reads as built, while the build follows it. A Windows JUNCTION inside the course is followed, by both Windows readers (os.walk descends into one, and BuildFreshness does the same), which errs toward building (#799). Such a link POINTED at another folder is seen (its own times change, and they are read). The course folder ITSELF being a link is followed (`courseFolderIsALink`). Media is a link only inside the BUILD's own folder (content/Media points at the course's Media, a real folder of the course), so every reader sees a changed picture where it really is.",
         "The clock guard holds only while the build is still dated later than now. Anything changed while the clock reads earlier than the build's date (a page edited, deleted or renamed), and deployed after real time has passed that date, is sent as last built by every reader: no time a reader can see is later than the build's. A deploy, or Deploy pressed, while the build is still dated ahead rebuilds and closes the window. A fingerprint that needs no clock is a later piece (a digest of every entry's path, size and times, which four readers would have to compute identically).",
         "On Windows a file overwritten in place and given back its old modification time is not seen (`knownLimitOn`): the creation time is read there in place of Windows' change time, which every build changes for the course's pictures by hard-linking them (`rejected`). A reader on Windows skips that case by name and says so.",
         "A deploy typed at a command line for a section that has never been built still refuses (`typedByHand`).",
@@ -2562,6 +2562,16 @@
 
         ],
         "why" : "A support tool, run by hand when a teacher's deploy misbehaves."
+      },
+      {
+        "alsoSpelled" : "--reset-token",
+        "flag" : "--logout",
+        "meaning" : "Clear the saved sign-in for the destination's service (Netlify, or Cloudflare with --target cloudflare or a course that deploys there) and deploy nothing. With a FOLDER destination it is refused in `refusedWithAFolder`'s words, exit 1, and nothing is deployed and nothing is cleared: a --to-folder typed with it, or, with no --target and no --to-folder, a course whose main saved destination is a folder (with either flag the launcher looks only at the main destination, savedDestinations.note). --non-interactive changes nothing.",
+        "refusedWithAFolder" : "A folder on this computer has no sign-in to clear, so nothing was deployed and nothing was cleared: to sign out of Netlify or Cloudflare, give --logout with --target netlify or --target cloudflare.",
+        "usedFor" : [
+
+        ],
+        "why" : "#799, Russell's ruling 2026-11-13. Until #799's review deploy.ps1 ran its folder branch for these flags as well, and with its freshness question skipped for them it mirrored a preview's pages and said \"Deployed.\" (measured on Windows); the first fix then cleared the PC's Netlify token instead, which a folder course never uses, so a scheduled deploy of ANOTHER course to Netlify stopped for its token next morning. A folder has nothing to sign out of, so the one answer that neither copies nor clears something unasked for is to refuse and say how to sign out of a service. A purely web course keeps signing out exactly as before. deploy.sh (the mac) is asked to refuse the same combination with the same words. windows-app/test_launcher_rules.ps1 runs the routes against deploy.ps1 and reads the sentence from here."
       },
       {
         "flag" : "--image <tag>",
