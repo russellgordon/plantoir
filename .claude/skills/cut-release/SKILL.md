@@ -46,7 +46,9 @@ picture cannot show.
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer mac-app/publish.sh -Sign`
      — name the Xcode: `xcode-select` points at 27.0 here, and releases are built with 26.6.
      Check the `Xcode:` line publish.sh prints in its step 3 says 26.6; `RELEASING.md` step 4, #613)
-   - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
+   - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`,
+     which refuses while any named-gap ledger entry is owed by this version or an
+     earlier one, #862; never build the installer another way)
    - (Optional) `windows-app/dist/Plantoir-win-x64.zip` (portable edition)
 
    **A cut may carry one platform's assets only** — see step 5 and
@@ -170,7 +172,7 @@ picture cannot show.
      and make the website commit. Merge `main` back into `dev`: git stops on
      `project.yml` (`main` 1.9.4, `dev` 2.0.0) and it resolves to `dev`'s
      side, which keeps the next release's number; the csproj conflicts the
-     same way only once #862 raises `<Version>` on `dev`. The next cut's
+     same way since #862 raised `<Version>` on `dev`. The next cut's
      step 5 check confirms it. If the hotfix takes the number `dev` is
      heading for, `dev`'s release moves up with its milestone: ask Russell.
 

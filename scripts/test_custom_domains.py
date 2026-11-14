@@ -5,7 +5,9 @@ contracts/file-formats.json -> customDomainReading. The mac's
 FileFormatsContractTests runs the same cases against
 CourseConfiguration.customDomain(forSection:destinationType:).
 
-build_site.py's own use of it (the address a build bakes in) is
+deploy.py's per-destination reader, leg_custom_domain, asks it too and runs
+every case here (DeployAsksTheSameReader). build_site.py's own use of it (the
+address a build bakes in) is
 scripts/test_build_site_domain_resolution.py, which needs the website
 builder's Python; this file needs nothing but the standard library, so
 verify.sh runs it on the host, early.
@@ -52,6 +54,34 @@ class EveryCaseOfTheContract(unittest.TestCase):
         self.assertIn("a folder primary", names)
         self.assertIn("a list", names)
         self.assertIn("a number", names)
+
+
+class DeployAsksTheSameReader(unittest.TestCase):
+    """deploy.py's per-destination reader, `leg_custom_domain` (#799), asks
+    custom_domains.for_destination rather than keeping its own copy. At the
+    join of #799 and #904 the two bodies differed on 4 of 24 shapes (the
+    Fable sweep of the deploy-freshness batch, two of them contract cases),
+    so every case runs through it as well, from a real course_config.json."""
+
+    def test_every_case_through_deploy(self):
+        import tempfile
+        import deploy  # noqa: E402  (imported here: it is the larger module)
+        for case in _the_rule()["cases"]:
+            for section in (1, "1"):
+                with self.subTest(case=case["name"], section=section):
+                    with tempfile.TemporaryDirectory() as folder:
+                        (Path(folder) / "course_config.json").write_text(
+                            json.dumps(case["config"]), encoding="utf-8")
+                        found = deploy.leg_custom_domain(Path(folder), section, case["destination"])
+                    self.assertEqual(found, deploy.clean_base_url(case["expect"]))
+
+    def test_deploy_reads_the_key_nowhere_else(self):
+        source = (REPOSITORY_ROOT / "scripts" / "deploy.py").read_text(encoding="utf-8")
+        self.assertNotIn('.get("custom_domains")', source)
+        self.assertIn("custom_domains.for_destination(", source)
+        build = (REPOSITORY_ROOT / "scripts" / "build_site.py").read_text(encoding="utf-8")
+        self.assertNotIn('config.get("deploy_target") or "netlify"', build,
+                         "the primary is asked one way: custom_domains.primary_destination_type")
 
 
 class TheSettingsThemselvesMayBeAnything(unittest.TestCase):

@@ -70,7 +70,16 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   folder under `public\` that cannot be LISTED answers "rebuild" (review L2):
   its pages were never looked at, and the throw used to escape NeedsRebuild
   and fail the Deploy. Case-sensitivity is pinned by a proposed 16th case
-  (the tag in capitals).
+  (the tag in capitals). **Since #799** the reader is
+  `BuildFreshness.WhyRebuild`, which gives its reason (the trail line's) and
+  reads the whole of `buildFreshness.reuseTheLastBuild`: the course folder's
+  own time, the later of each entry's last-write and CREATION times, folders
+  included, hidden by the name only, a linked course folder read through and
+  as itself, and the clock guard; `ReuseTheLastBuildTests` runs every contract
+  case. The Deploy button, the windowless deploy and the scheduled wrapper
+  all ask now, and `deploy.ps1` asks before every destination, so a Netlify
+  or Cloudflare deploy of an unchanged site no longer rebuilds (it did on
+  every deploy until #768 and #799: 55 to 66 s). 05 → "On Windows (#799)".
 - **Two windows (#272).** Measured by reading and then by test before writing:
   Ctrl+N opens a second window on the same folder and each `WorkspaceViewModel`
   loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
@@ -1289,8 +1298,28 @@ the moment itself (too late to be worth doing, another program building the
 course, whether the task still stands, where the course deploys NOW) and only
 then writes the wrapper script into `%LOCALAPPDATA%\Plantoir\scheduled\` from
 the settings as they are at that moment and runs it. The wrapper fingerprints
-the section, builds it, deploys to each destination un-chained (one failing
-must not stop the others), and writes a record the app picks up.
+the section, builds it when something asks for it, deploys to each
+destination un-chained (one failing must not stop the others), and writes a
+record the app picks up.
+
+**It builds only when something changed (#799).** Until Russell's ruling of
+2026-11-13 the wrapper built unconditionally ("Build first, always"). It now
+asks the runtime's Python, with the same lines `deploy.ps1` asks
+(`BuildBeforeDeployingQuestion.PythonLines`, pinned byte for byte against
+the file), whether the section must be built first: a preview's site, then
+the toolchain, then the clock and the pages. It builds when the answer is
+anything but a plain `reuse` (a question that cannot be asked, a Python
+missing included) and when there is no front page, and after a build that
+went through writes "site built again before deploying" with the reason,
+through a copy of `deploy.ps1`'s `Write-TrailLine` (pinned the same way),
+since nothing reads the run's log afterwards. The variables the question
+needs to name the toolchain as the launchers do are set for the call and put
+back. A reuse runs no build, so that night captures no folder findings and
+the record the last build left stays. The generated code stays ASCII: the
+wrapper has no byte-order mark and Windows PowerShell 5.1 reads it in the
+ANSI code page. `ScheduledDeployReusesTheLastBuildTests` runs the generated
+wrapper against the real shared Python; 8 of its 10 tests fail on the old
+wrapper. Why, and what was rejected: 05 → "On Windows (#799)".
 
 The task is registered from XML (`TaskScheduling.TaskXml`) so that it carries
 four settings the command-line switches cannot set: it may start on battery
@@ -2027,13 +2056,14 @@ cut to it (#481).** Windows is catching up from 1.4.5 to the mac's 1.7.1 in
 batches, and an entry may name work a LATER BATCH owns, on the milestone that
 work shipped in on the mac — `Owed(area, issue, milestone, reason, keys…)`, with
 `V150` … `V171` spelled exactly as the GitHub milestone titles.
-`NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` reads
-`<Version>` from `Plantoir/Plantoir.csproj` and fails for any entry whose
-milestone is not LATER than it — so setting 1.7.1 turns every v1.5.0–v1.7.1
-entry still there red, while an entry owed by a genuinely later release
-survives the cut. It is "later than this build", not "empty at the cut", on
-purpose; a milestone that is not a version fails, because it cannot be
-compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
+`NamedGapLedgerTests` read `<Version>` from `Plantoir/Plantoir.csproj` and
+failed for any entry whose milestone was not LATER than it — so setting 1.7.1
+turned every v1.5.0–v1.7.1 entry still there red, while an entry owed by a
+genuinely later release survived the cut. (Since #862, 2026-11-13, the
+ordinary suite compares with the last release Windows SHIPPED instead, and
+`publish.ps1 -Sign` with `<Version>`: "The ledger's two baselines", below.)
+It is "later than", not "empty at the cut", on purpose; a milestone that is
+not a version fails, because it cannot be compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
 the same shape as the ones below: `toolchain.json` → `pins` with a
 `windowsRuntimeContains` (`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
 — the contract-agrees-with-itself check still runs for every pin; pagedjs
@@ -2052,9 +2082,9 @@ mac 1.7.2's sixteen plan-table sentences (#524), held open against #548 on
 2026-10-16, landed with #548's plan table that day ("The plan as a table",
 below); `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
 keeps the rule exercised on made-up entries meanwhile. Since 2026-11-13 it
-holds the v2.0.0 run's entries: step 0 held 86, and later pieces add and
-close entries, so the count is read from `NamedGapLedger.cs`, not from here
-("Step 0 of v2.0.0" and the sections after it, below).
+holds the v2.0.0 run's entries ("Step 0 of v2.0.0", below; count them in
+`NamedGapLedger.cs` itself, since a number written here goes stale with
+every piece that lands).
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
 BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
@@ -2098,6 +2128,129 @@ three helpers with no key by design, and the issue asked for the file to be
 the list, not for a second allow-list); searching the whole codebase for each
 sentence's text (a sentence built inline from pieces cannot be found by its
 text, and a text search would call a stale copy present).
+
+### The ledger's two baselines: the last Windows release, and the cut (#862, 2026-11-13)
+
+**What changed.** Russell ruled on 2026-11-13 that test builds say the release
+being built (#861 on the mac, #862 here), so `<Version>` in
+`Plantoir/Plantoir.csproj` is 2.0.0 on `dev` and is raised when work on a
+release starts (`RELEASING.md` → "When the number is raised"). The ledger's
+rule compared every entry with `<Version>`, so the raise alone turned all 116
+entries owed by v2.0.0 red (measured: the old `NamedGapLedgerTests` against a
+2.0.0 csproj, `Failed: 1, Passed: 3`, 116 entries named), though every one of
+them is work the run in progress is allowed to have open. So the rule now has
+two baselines, one fact:
+
+- **Every run** —
+  `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease`
+  compares with the last release Windows SHIPPED, read exactly as the deploy
+  of plantoir.app reads it since #861 (`website/windows_feed.py` →
+  `shipped_version` and `version_refusal`): `website/site.json`'s Windows
+  card's `pinned`, else its `version`, and `website/updates/windows.xml`'s
+  newest item (the highest `sparkle:version`, wherever it sits, the
+  enclosure's attribute first and the element when the attribute is missing
+  or empty). Versions are compared as `windows_feed.version_key` compares
+  them (`NamedGapLedgerTests.VersionKey` / `CompareVersions`: numbers part by
+  part, a part that is not a number is -1, trailing zeros dropped, the shorter
+  first when one starts the other), so the two readers reach the same answer
+  even on a hand-edited feed; the first review found three inputs where they
+  did not (a prerelease newest, a four-part version, an empty attribute beside
+  the element) and all three are cases now. Python's order puts "2.0.0-rc1"
+  ABOVE "2.0.0", kept because agreeing is the point; the generator writes
+  plain numbers. A value whose first part is not a number is refused, since
+  it would sort below every milestone. When the two disagree the higher is
+  used, and `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped` fails for the
+  disagreement itself, as the deploy refuses it. **That fact is red during a
+  cut, between committing the new feed and moving `site.json`'s version line
+  (in either order), and that is correct**: it is the state the deploy refuses
+  (`RELEASING.md` → "The update feed (Windows)").
+  `TheBaselineIsReadFromThePinTheVersionLineAndTheNewestItem` proves the
+  readers on made-up files: a pinned card (a mac-only cut), an unpinned one, a
+  feed whose newest item is neither first nor spelt the same way, the three
+  inputs above, and the switch below.
+- **The cut** — `publish.ps1` runs the same fact with
+  `PLANTOIR_LEDGER_BASELINE=build`, which compares with `<Version>`, through
+  `Invoke-TestRun` and `Get-TestRunOutcome` (the totals, never the exit code),
+  before the signing preflight and before anything is built. With `-Sign` any
+  run that is not `Passed` is a refusal; without it, a warning and the
+  unsigned bundle is built anyway; `-CheckLedgerOnly` enforces the check and
+  stops. The refusal names the failing tests and words its remedy by verdict
+  (first review, M1): owed entries are listed with "build each, or move its
+  issue"; every other failing ledger test is shown with its message, owed
+  entries or not (for the site-and-feed fact: the feed or `site.json`'s line
+  has moved ahead of the other, so restore the PREVIOUS release's feed, as
+  `RELEASING.md` → "The update feed (Windows)" says, or put the line back if
+  it moved first); a run with no result shows its build errors. The whole
+  transcript is kept in `%TEMP%\plantoir-publish-ledger-check-<pid>.txt`, one
+  per run, and two lines before the run say what the wait is and where that
+  file is. Any other value of the switch is an error, so a misspelling at the
+  cut cannot quietly fall back to the lenient baseline.
+  `InstallerRunningWorkTests.PublishRefusesASignedCutWhileTheLedgerOwesThisRelease`
+  reads the order and the enforcing branch out of the script, and that
+  `$enforceLedger` is assigned once and the check sits inside no block (a
+  wrapping `if (-not $Sign)` or a later `$enforceLedger = $false` turned it
+  red, measured). It catches the check DRIFTING out of reach, not deliberate
+  sabotage: the second review made it unreachable five other ways (a
+  `$script:` assignment, a `trap`, a forged verdict, a here-string,
+  `Set-Variable`) and it stayed green, which is the limit of reading a
+  script; the behavioural proof is `publish.ps1 -CheckLedgerOnly`, in no
+  suite.
+- **A `<Version>` the cut cannot compare is refused**: blank, `v2.0.0` or any
+  value whose first part is not a number would sort below every milestone, so
+  `NamedGapLedgerTests.BuildVersionIn` throws on it, with the same guard the
+  last-release reader has (second review, L1: before it, a blank `<Version>`
+  gave `-CheckLedgerOnly` exit 0 "nothing owed" with 116 entries owed;
+  measured after, exit 1, "cannot be compared with a milestone").
+- **An unsigned bundle is never installed over a real copy**: it carries the
+  release-in-progress number, and the update check offers only a newer
+  version, so that copy would never be offered the real release of the same
+  number (first review, M2; read from `AppUpdater.cs`, not measured by an
+  install). `publish.ps1`'s header and `RELEASING.md` say so.
+
+**Why the cut is where it is.** The old rule needed a person to re-run the
+suite after the version was set (`RELEASING.md` said so); the new check sits
+in the one command every Windows release runs. The ordinary suite stays a
+backstop: once the cut adds its item to `windows.xml`, the baseline is that
+release, and a leftover entry is red in every run after it. An entry owed by
+v2.0.0 survives a mac-only 2.0.0 cut, because Windows shipped nothing in it
+(its card is pinned, its feed unchanged), and is stopped at the Windows
+catch-up by `publish.ps1 -Sign`.
+
+**Measured** on this PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200), with `<Version>` 2.0.0: the filtered ledger tests green with the
+switch unset (6 of 6); with `PLANTOIR_LEDGER_BASELINE=build`,
+`EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease` red naming 116
+entries; `publish.ps1 -CheckLedgerOnly` exit 1 in 118 s (most of it building
+the test project), saying "116 ledger entries are owed by this release or an
+earlier one" and listing them; the same with `<Version>` set to 1.9.9 in a
+scratch edit, exit 0 ("PASSED - 6 passed"). After the review's fixes: with
+`<Version>` 1.9.9 and a 2.0.0 item added to a scratch copy of the feed,
+exit 1 naming `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped`, its message,
+and the restore-the-feed remedy; with a planted syntax error in a test file,
+exit 1 with the `error CS1525` line and "did not run to a result". The
+unsigned path's warning was not run end to end (it would build a 1.2 GB
+bundle); the source test reads it. A warm `-CheckLedgerOnly` took 7.7 s
+(the reviewer's measurement).
+
+**Rejected.** Comparing with `<Version>` in every run (the ledger would be red
+for the whole of every release). Reading `site.json` alone (its `version` is
+the joint line and moves at a mac-only cut while Windows ships nothing; the pin
+says that, the feed too) or the feed alone (the shared design is #861's
+`shipped_version`, and one reader per question is the point). Enforcing the
+check on every `publish.ps1` run (the unsigned bundle is the documented local
+test build, and `website/shots/capture_windows.py` makes one, both while the
+release's work is open). Reading `NamedGapLedger.cs` with a PowerShell regex
+in `publish.ps1` (a second reader of C# source that drifts the day a milestone
+constant is renamed). A second fact that is skipped unless the switch is set
+(it would add a skip to every run, and a cut check that reports "skipped" when
+its switch did not take is green having run nothing).
+
+**For the trail.** Nothing new: the app's opening line already carries the
+version, and says 2.0.0. The `updated from … to …, by hand` line is written
+whenever the version the app last opened as differs, so on a PC with an
+installed 1.9.3 beside a 2.0.0 test build each switch between them writes one
+(it did the same between 1.8.7 and 1.8.6 on 2026-10-31). No behaviour change
+was asked for, so none was made.
 
 ### Step 0 of v2.0.0: what the ledger holds and how each entry ends (#787, 2026-11-13)
 
@@ -2260,6 +2413,10 @@ assembly; restore by writing the bytes (or touch the file) instead.
 **A difference a teacher may meet today** (#885, not measured here): what
 `plantoir-mcp.exe` answers a call that leaves out `section` or `howMany` is
 the MCP SDK's binding of a non-nullable `int`; #885 says to measure it first.
+*(Measured and fixed since, in #880's batch: "A call that names no section
+(#885, the mac's #865)" below. The #895 six and the #885 four have left the
+ledger with it; the `FixWithGreetingCases` area and its hook stay, empty,
+for the next sentence the mac adds to Fix with's text.)*
 
 ### After the mac's #835 part 3, #855, #839 and #902: held by name again (#868, 2026-11-13)
 
@@ -2342,6 +2499,67 @@ they neither run nor fail here; wiring them in is #886's first piece.
 #902's Planning tab sentences carry `{machine}` as Windows' Planning tab
 already says them. #835's `returningToASectionMidDeploy.heldElsewhere`
 cases and `helpForASection` have no Windows reader yet (#868 owes them).
+
+### After the mac's #897 C and #785a: held by name a third time (#911, #912, 2026-11-14)
+
+At about 01:50 EST the mac merged #897's piece C (Restore from Backup… can put
+back ONE section, staged so a failure part way moves everything back) and
+#785's first piece (small automatic backups keep each Media file once in
+`courses/_backups/.shared-media/`; nothing on the mac calls it yet) into `dev`
+(eae674222..86ae77e53). The diff touches no file under `scripts/` and no
+launcher, so nothing Windows runs today changed. Its contract changes are
+four new `activityTrail.mustRecord` events, the widened `section restored`
+entry, `course-management.json` → `backups.restoreOneSection` and
+`backups.sharedMedia`, `file-formats.json` → `sharedMediaStore`, a reworded
+`backups.mediaIsAlwaysIncludedWhy`, and two `help/controls.json` entries with
+`"windows": null`. Only the four events turned anything red here, all in
+`ContractTests.SharedRules_ActivityTrailEvents_Exist`. Windows reads
+`course-management.json` and `file-formats.json` by key, so the new blocks are
+unrun rather than red. No Windows test reads the `why` or the `carries` of
+`section restored`.
+
+**Held, 4 entries, all v2.0.0, all `ActivityTrailEvents`.** #911 (1):
+`section restore stopped part way`. Windows' section restore is not staged
+yet, so it has no "stopped part way" outcome to record. #912 (3):
+`backup kept its Media files once`, `shared backup Media swept` and
+`backup Media not found`. Windows writes no small backup and sweeps nothing.
+No new area was needed, so the existing area's own closed, withdrawn and
+removal checks cover these entries.
+
+**What a teacher sees today is unchanged, measured.** No small backup is
+written by either app yet. A folder the mac shares later will hold
+`_backups/.shared-media/`. `FindBackups` and `FindArchivedItems` list only
+top-level files of each `_backups/<dir>`, and the store's top-level files
+(`.lock`, `sweep-<computer>.json`) parse as neither. All seven
+`backups.sharedMedia.nameCases` were run through today's `BackupItem.From`
+and `ArchivedItem.From` (a probe on the built `Plantoir.Core.dll`). Every
+name with `readByOlderVersions: false` was unlisted, the two whole names
+were listed, and none read as an archive. So a Windows build never lists a
+small backup it cannot restore (#912's owed item 1). None of the recursive
+deletes in `Plantoir.Core`, `Plantoir` and `Plantoir.Mcp` targets
+`_backups` (they remove a restore's temp staging, a copy's leases, the
+Obsidian add-ons and a reference staging folder), so nothing here can delete
+the store either (owed item 2).
+
+**What bears on #873's staged whole-course restore.** The contract names the
+one-section staging folder `courses/.internal/restoring/<id>/` and the
+stopped-part-way folder `courses/_backups/<CODE>/Section N before a restore
+<stamp>`. Neither is a case list. They appear only in
+`backups.restoreOneSection`'s prose and in the `carries` of `section restore
+stopped part way`. The contract says the whole-course restore is staged on
+neither platform yet. So #873's own staging name binds nothing here. #911's
+section route is where those two folders apply, and the trail line it owes
+names them.
+
+**Filtered totals after the hold**, over `ContractTests`, `NamedGapLedger`,
+`Backups`, `Restore`, `SubjectMenus`, `QuitConfirmation`, `AssistSurface`,
+`AssistCardCommand`, `WorkLease` and `FileFormats`: `Passed!  - Failed:     0,
+Passed:   680, Skipped:     0, Total:   680` (before it: `Failed: 1`, the trail
+test). The other classes that walk `mustRecord` (`AgentGuidanceTests`,
+`BuildMachineLinesTests`, `PrintablePagesTests`, `ReclaimedProcessesTests`,
+`ActivityTrailWiringTests`, `DoorCourseHoldTests`, `SectionRestoreTests`,
+`CourseBackupTests`) passed, 123 of 123. `scripts/test_held_skills.py`, which
+reads `help/`, passed in 9 s.
 
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
@@ -6188,6 +6406,101 @@ the override disabled it went red naming the file it leaked (that one file was
 deleted). Two orphans from 2026-09-09 (`Plantoir-wraprun-a093729a…`) were left
 on Russell's machine for him to remove.
 
+### A run deletes only the temp folders it owns (#882)
+
+Several test runs share this PC on a release night: the director's gate, an
+implementer's filtered runs, a reviewer's scratch worktree. Until #882,
+`StubProgramCollection` (the stub `probe.exe`, `exitone.exe` and `stay.exe` the
+outside-door tests start) deleted EVERY `%TEMP%\plantoir-probe*` folder the
+first time it was used, as crash cleanup. So any second test process on the PC
+deleted the stubs of a suite that was already running, which then failed with
+`DirectoryNotFoundException … plantoir-probe….\probe.exe` in
+`OutsideDoorRefusalTests..ctor`. It spoiled two full suites on 2026-11-13 (3 of
+4 failures in the director's gate on `aea9bf1d2`). `ObsidianFigureAddOnsTests`
+had the same sweep over `plantoir-581-*`: any root holding a denied case was
+deleted, a running suite's included.
+
+Both now go through `Plantoir.Tests/RunOwnedTempFolders.cs`:
+
+- **A folder is named for its owner**:
+  `<prefix><process id>-<process start, UTC ticks>-<random>`. The stubs use
+  `plantoir-stubs-`, the figure add-ons tests `plantoir-figures-`. Each is
+  deleted by its own process on exit (stubs) or by the test's `Dispose`
+  (figures), as before.
+- **The sweep removes a folder only when its owner is provably gone AND the
+  folder is older than an hour** (`SafeAge`). "Gone" means no live process has
+  that id with that start time: an id alone is recycled, so a match on id
+  with a different start time counts as gone. A process whose start time
+  cannot be read (another account's) counts as ALIVE. A name that does not
+  parse as an owner is never swept.
+- **The prefixes do not match the old patterns, on purpose.** Copies of the
+  suite from before #882 keep running in other worktrees until they merge
+  `dev`, and they still delete `plantoir-probe*` and `plantoir-581-*` (the
+  latter when a denied case is inside). With the new names those old runs
+  cannot hit a new run's folders. The price: a crashed OLD run's
+  `plantoir-probe*` or `plantoir-581-*` leftovers are no longer cleaned by
+  the new code. Sweeping them would be the same fault again, because they may
+  belong to an old run that is still going. `RunOwnedTempFoldersTests` pins
+  all of this: an old orphan is swept; a live run's folder is never swept,
+  however old; a recycled id is not the owner; a young orphan waits; an
+  unparseable name is left alone; the new names do not match the old
+  patterns (`FileSystemName.MatchesWin32Expression`).
+
+Nothing in the product reads these names. A grep of `Plantoir`,
+`Plantoir.Core`, `Plantoir.Mcp` and `PtyDriver` finds no temp-path or
+`probe` match (no redaction rule, no process-table match, no stub guard).
+`PLANTOIR_PROBE_OUTPUT` is the stub's output variable, not a folder name, and
+it is unchanged.
+
+**Rejected:** a fixed per-process parent with no start time (a recycled id
+would adopt and later delete a crashed run's folder, or a live one's after a
+reboot); sweeping by age alone (a long suite under load is older than any
+safe age you can pick); and cleaning nothing at all (one folder per run piles
+up in `%TEMP%` for ever, which is why the old sweep was added).
+
+**Measured** (2026-11-13, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200). Two filtered runs
+(`FullyQualifiedName~OutsideDoor|FullyQualifiedName~StubProgram`) were started
+together, five rounds, with `TEMP`/`TMP` pointed at a private folder the pair
+shared, so the old code's sweep could reach only the pair under test and not
+the director's suite running at the same time
+(`plantoir-v2-windows-run\drafts\882-concurrency-proof.ps1`). **Old code: one
+of the two runs failed in every round, 5 of 5,** with 79 to 84 of its 88 tests
+red (`Win32Exception … cannot find the file specified` on
+`plantoir-probe….\probe.exe`, deleted by the other run's sweep). The other run
+passed. **New code: 10 of 10 runs passed, 88 of 88 each.** The private TEMP has
+to be SHORTER than the real one: the door tests build stub paths near
+`MAX_PATH`, and under a longer TEMP a .NET Framework stub hung, which held its
+test host for 90 minutes until it was stopped.
+
+**A second, separate cause in the same class.**
+`OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`
+also failed when run ALONE, as "the door wrote nothing". `OutsideDoor.Start`
+watches a started `.exe` for at most 400 ms. A reviewer measured that the .NET
+Framework stub takes 1.1 to 1.5 s to exit through ShellExecute, so `Open`
+returned before the stub had written, and the test read the file at once. The
+test now polls for the file for up to 15 s. The product's 400 ms grace is
+unchanged, because it exists so a click does not freeze. `OutsideDoorTests`
+was never exposed: its `Run` waits for the stub to exit (30 s) before reading.
+Measured alone, under the suite lock, 10 runs each: before, 2 of 10 failed (7 of 20 over two sets), each in about 1 s. After, 10 of 10 passed, 0.7 to 1 s each.
+
+`OutsideDoorTests.AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor_AndCmdIsNotWatched`
+had the same slowness in a different shape. It asserted that the exit-1 stub
+was caught within the product's 400 ms grace, and on a loaded PC the stub had
+not exited by then (seen once, in a full gate on 2026-11-13). It now passes
+`watchFor` = 10 s, as the next line already did for `stay.exe`. The default
+became `OutsideDoor.StartGrace` (same 400 ms, same behaviour), and
+`TheDefaultGraceIsFourHundredMilliseconds` pins it, so the grace a click pays
+for is still asserted. Alone, 10 times each: 10 of 10 passed before and 10 of
+10 after, because the failure needs a loaded PC.
+
+**Two shared temp paths are left as they are** and filed as findings, because
+neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
+`%TEMP%\plantoir-tests\activity.txt` that every run appends to, and
+`TestAppDataRedirect`'s `plantoir-tests-<pid>` is never deleted, so a recycled
+id inherits ANY earlier run's settings and state, not only a crashed run's (a
+review counted 1,603 such folders in `%TEMP%` on this PC, back to 2026-10-01).
+
 ### Same-second backups wait for the next second (#187)
 
 Two backups stamped in one second used to get `…_221530-2.zip`, a name
@@ -7520,14 +7833,54 @@ does not apply, and the item opened section 1 without saying so. Not a
 teacher's only route: every section row offers it, and so does Section ▸
 Revise With ▸ Local AI Assistant….
 
-**Two deliberate disagreements with the contract's reasoning, both in the
-row, both in the `mac` issue:** the section row keeps **Change Deploy Time
-(…)…**, which `subjectMenus` has no item for (the menu bar follows the
-contract: Schedule Deploy… greyed while one is set, Cancel live), and a
-reference section's row keeps **Cancel Scheduled Deploy…**, which the menu bar
-greys, because Windows does not yet turn such a schedule off itself (the
-mac's `ScheduledDeployCleanup`) and the row is the teacher's only way to stop
-it.
+**One deliberate disagreement with the contract's reasoning, in the row, in
+the `mac` issue:** the section row keeps **Change Deploy Time (…)…**, which
+`subjectMenus` has no item for (the menu bar follows the contract: Schedule
+Deploy… greyed while one is set, Cancel live).
+
+**There were two until #527 (2026-11-13).** A reference section's row also
+kept **Cancel Scheduled Deploy…**, which the menu bar greys, on the reasoning
+(written for #488 on 2026-10-15) that Windows did not turn such a schedule off
+by itself and the row was the teacher's only way to stop it. That reasoning
+was already stale when #527 was opened: since #241 every read of the working
+folder runs `ReferenceCourseUpkeep.BringUpToDate`, which turns off every
+deploy this folder has for a course kept for reference
+(`ScheduledDeployRemoval.TurnOffFirst`, one `scheduled deploy turned off` line
+per section, "turned off: the course is kept for reference, and is never
+deployed") — the contract's case "a course kept for reference is met when the
+working folder is read", played by
+`ReferenceRefusalTests.ReadingTheFolderTurnsOffAReferenceCoursesDeploy`, which
+since #527 also asserts the trail line and that a second read writes nothing.
+So #527 removed the row's item and the row now agrees with the menu bar and
+with the mac, whose row has no Cancel either. `ReferenceInterfaceTests.
+AReferenceSectionsRowOffersNoCancelScheduledDeploy` scans
+`ReferenceSectionMenu` and `ReferenceCourseMenu` for the item, its handler and
+any `TaskScheduling` call (proved red against the old file), and checks
+`SubjectMenuRules` greys the item for a reference section and not a live one.
+
+**Why no teacher is left with a schedule and no way to stop it** — read from
+the code before the item went, every state checked:
+
+- *Set after the course became reference:* the app refuses
+  (`ScheduledDeploy.Problem` and `RefusalOf`, `keptForReference`, first), so
+  only a task made outside Plantoir can exist, and the next read removes it.
+- *Fired before a read removed it:* the run refuses itself
+  (`ScheduledRun`, `keptForReference`); tasks are one-shot
+  (`TaskScheduling.TaskXml`, one `TimeTrigger`), so nothing is left to fire
+  again.
+- *A cancel that failed:* `BringUpToDate` swallows it and the next read tries
+  again; the run's refusal is the backstop. The mac's arrangement is the same.
+- *A task whose course folder was moved or renamed by hand:* the old item found
+  tasks the same way the sweep does (`TaskScheduling.InFolder` + `SameCode`),
+  so it never found that task either; removing it took nothing away.
+- *Becoming reference:* only by Keep a Copy (`ReferenceCopier`) or Import
+  Courses for Reference… (`ReferenceImport`), each a NEW folder and code, so
+  no task is addressed to it, or by hand-editing the marker, which the next
+  read meets.
+
+REJECTED: keeping the item "to be safe" — it could only appear for a task the
+last read had not removed, it contradicted the menu bar beside it, and the
+contract's `subjectMenus` case leaves the item out for exactly this row.
 
 ### REJECTED, with the reason
 
@@ -12987,18 +13340,12 @@ and the three trail events, and turns the greeting's sentence on.
   wired**: `SidebarPane.ReviseWithClaude`/`ReviseWithCodex` pass no plans,
   so today's greeting is exactly what it was; 790b passes
   `UnitPlans.ToMention(course directory, kept for reference, today)`.
-- **Where #880's sentence goes.** `ClaudeCodeLauncher.Greeting` keeps its
-  sentences in a list: the plain greeting, then (marked in the code) the
-  reference-courses sentence of `outsideAgents.greetingReferenceCourses`
-  (#856, owned on Windows by #880), then the unit-plans sentence, joined by
-  one space, and the whole text's double quotes made apostrophes. Adding
-  #880's sentence is one `sentences.Add` before the unit plans' and changes
-  neither function's shape. Since the mac's #859 the plain greeting also
-  ends with `greetingHandoutsSentence`, BEFORE the reference-courses
-  sentence (`greetingReferenceCourses.where`; `greetingHandoutsCases` case 3
-  crosses all three); that is #895's on Windows, held by name in
-  `NamedGapLedger.FixWithGreetingCases`, and it is one more entry at the
-  front of the same list. Only Plan a Unit's message says it today (below).
+- **The greeting's sentences, in order.** `ClaudeCodeLauncher.Greeting`
+  keeps its sentences in a list: the plain greeting, `greetingHandoutsSentence`
+  (#895), the reference-courses sentence (#856), then the unit-plans
+  sentence, joined by one space, and the whole text's double quotes made
+  apostrophes. Built in #880's batch (2026-11-13): see "What an outside
+  assistant is told when a door opens (#895, #856, #791)" below.
 - **The guidance**: `AgentGuidanceTests.TheUnitPlanningSkillIsWrittenWithItsTemplateAndBothRootFilesNameIt`,
   every template file in both homes and each of the 19 fonts by byte count
   and SHA-256 (#790 item 4). A font with one byte appended turns it red.
@@ -13010,11 +13357,144 @@ and the three trail events, and turns the greeting's sentence on.
   the mac's #859 the message ends `{handouts}`, `greetingHandoutsSentence`
   verbatim (`ClaudeCodeLauncher.HandoutsSentence`, pinned to the contract by
   `PlanAUnitTests.TheWordsAreTheContracts`): #895's Plan a Unit part, built
-  here because nothing calls `PlanAUnit.OpeningMessage` until 790b, while
-  the Revise and Fix with doors' handouts sentence stays held for #895.
+  here because nothing calls `PlanAUnit.OpeningMessage` until 790b. The
+  Revise and Fix with doors say it too since #880's batch (below).
   `PlanningAssets.Refresh`: the `assets` mirror.
 - **The guard's Core**, `LocalSiteGuard.cs`, `LocalPageDecision.cs`,
   `PlanNavigation.cs`, `PlanInTheBrowser.cs`, below.
+
+### What an outside assistant is told when a door opens (#895, #856, #791)
+
+Built 2026-11-13 on `issue/880-what-an-outside-assistant-is-told`, Core
+only. The mac's reasoning for each sentence is in
+`documentation/10-local-ai-assistant.md` ("A sentence on every door:
+printed handouts (#859)" and the #856 paragraph); this is what Windows built.
+
+- **The handouts sentence on every door (#895).** The Revise greeting says
+  `greetingHandoutsSentence` straight after "…wait for me to agree.";
+  Fix with's message says it after `fixWith.fixGreeting.planFirst` and
+  before the closing (`FixWithAssistant.Compose`, `PlanFirst` already ends
+  in a space); Plan a Unit said it already (790a). The six
+  `fixWith.greetingCases` held for #895 are the contract's text exactly
+  now. Measured: the sentence is 239 characters, 240 with its space, and
+  every Fix case still names exactly the contract's `rowsNamed` on all
+  four door shapes (the longest case, 7 rows, is 6,321 characters; its
+  codex.cmd command line 6,831 of 8,029 on this PC's npm folder).
+- **The courses kept for reference on a Revise door (#856; #880 item 1).**
+  `ReferenceCoursesToMention.For(course, shelf, today)` makes the list
+  (`greetingReferenceCourses.eachCourse`: same SHOWN code ignoring case,
+  `"{folder} ({year})"` with `SchoolYear.Label` or `Other`, ordinal sort,
+  nothing for a course itself kept for reference) and `Sentence` fills
+  the template. The sentence goes after the handouts sentence and before
+  the unit-plans sentence.
+- **Read at the click, by the door: a Windows-only choice.** Each door's
+  `Open` calls `ReferenceCoursesToMention.ReadFor(folder, code, today)`,
+  which reads `Workspace.DiscoverCourses` and never throws: a folder that
+  cannot be read answers an empty list, so the sentence is dropped and
+  the door still opens. **The mac passes its sidebar's in-memory course
+  list instead**; the sentence is the same either way, so the mac need
+  only know this. Chosen because no caller can forget it (a third door's
+  `Open` calls the same function) and because it costs nothing beside
+  what `Open` already does: 32 ms for 40 courses (warm, mean of 10),
+  against 1.2–1.5 s for `Open` itself (ShellExecute plus its 400 ms
+  watch), Lenovo 20QES70500, i5-8365U. Rejected: passing
+  `Workspace.Courses` from `SidebarPane`'s two call sites, which 790b is
+  rewriting. An opening message (Fix with, Plan a Unit) replaces the
+  greeting, so the folder is not read for one.
+- **Nothing else moved.** `Greeting`, both `Prepare`s and both `Open`s
+  gained one TRAILING parameter each (`referenceCourses`, `today`), so
+  no call site changed. Proved by dump: every `greetingUnitPlansCases`
+  case and every `fixWith.greetingCases` case through both doors, with no
+  program, `claude.exe` and a `claude.cmd`/`codex.cmd` shim, argv and
+  trail line, 201 lines before and after: 198 differ only by the one
+  handouts sentence, 3 (the case with no rows) are identical. No trail
+  clause for either sentence: the contract's "assistant opened" `carries`
+  names one for unit plans only, and `greetingHandoutsSentenceWhy` rules
+  one out.
+- **Never cut.** The contract has no words for a shortened list of
+  reference courses, so both sentences are in every candidate
+  `OutsideDoor.GreetingThatFits` tries and only unit-plan names are
+  dropped from the end. A list too long for the command line then makes
+  the door REFUSE with its could-not-start sentence, which misleads for
+  this cause; accepted, because measured it needs 241 twenty-character
+  entries on codex.cmd with an 80-element emoji course name and six plans
+  (294 with a typical name and no plans) — hundreds of same-code courses
+  kept for reference.
+- **Tests.** `OutsideGreetingContractTests` walks `greetingHandoutsCases`
+  (3), `greetingReferenceCourses.cases` (4) and `.listCases` (10, in
+  memory and from disk) through every door in `agents` less those held by
+  name, a door key it does not map THROWING, so #884's Copilot door
+  inherits the cases by name. `EveryKeyTheGreetingMustSayIsSaid` reads
+  `greetingMustSay` (#791's Windows half): each `(greetingXxx` it names is
+  a key, a string key is said verbatim in every Revise greeting, the
+  handouts sentence in every Fix and Plan a Unit message too, and an entry
+  naming a key the test does not know FAILS. `NoGreetingOffersAHeldSkill`
+  applies `printablePages.agentGuidance.held.words` (proved first on its
+  `mustTrip`/`mustPass`) to every message the doors compose, and FAILS
+  naming #791 when `held.words` is gone, because #791's ruling is
+  permanent and that block is not. `OutsideGreetingOpenTests` drives both
+  real `Open`s against the stub `claude.exe` and `codex.cmd`, POLLING up to
+  15 s for each stub's output (a .NET Framework stub takes 1.1–1.5 s and
+  `Open` watches 400 ms) and opening one door at a time.
+
+### A call that names no section (#885, the mac's #865)
+
+Measured over stdio on this PC (2026-11-13, `plantoir-mcp.exe` x64 Debug
+built from the branch with and without the filter, scratch folder with
+MPM2D in sections 1 and 2, ICS3U in section 1, SNC2D in none): BEFORE,
+`list_curriculum_expectations`, `list_pages` and `deploy_section` with
+`course` only, `list_pages` on the one-section course, and the
+`add_classes` pair with no `unit` or no `howMany` all answered
+`An error occurred invoking '<tool>'.` with `isError` true. The SDK
+(ModelContextProtocol 2.2.0) refuses while binding the non-nullable `int`;
+nothing was planned or deployed, but nothing true was said. AFTER, the
+contract's sentences, and `list_pages` for ICS3U lists Section 1.
+
+- **A call filter, nothing a model is shown.** `MissingArguments.For`
+  runs in `Program.cs`'s call-tool filter, in the order the next bullets
+  give: the course (its own
+  refusal, `noCourseNamed` included), then `noSectionNamed` with the
+  course's "Sections 1 and 2", `noSectionNamedAndNoSections`, or the one
+  section SUPPLIED into the request and the filter's copy (so the
+  reference gate, the outside-change gate and `AfterCall` read it); then,
+  for `add_classes` and `plan_add_classes` only, `addClassesNeedsAUnit`
+  and `addClassesNeedsACount` (a count of 0 or less included). Another tool that requires `unit` keeps the
+  SDK's answer. A named section is untouched, one that is not there
+  included. What a tool requires is read off its own parameters by
+  reflection: 36 of the 43 tools require a section (`back_up_course`
+  among them on Windows; on the mac it is course-wide).
+- **Rejected: `int? section`.** It would change `tools/list`, which the
+  built-in assistant's window reads too (its surface is frozen), and the
+  generated `toolSchemas`, and #885 says not to move a schema. Measured:
+  `tools/list` is identical before and after (43 tools, compared as
+  parsed JSON, 45,899 characters).
+- **The built-in assistant never meets these answers**:
+  `AssistAgent.BoundToThisWindow` writes the window's course and section
+  into every call whose tool declares them, and its 13 local tools do not
+  include the `add_classes` pair (`MissingSectionTests.TheBuiltInAssistantNeverMeetsThem`).
+- **The order, as the mac's** (batch review M1): `Program.cs` asks
+  `MissingArguments.InFrontOfTheTool`, which SUPPLIES the one section
+  first, then asks `ReferenceWriteGate`, then `OutsideChangeGate`, and only
+  then says its own sentence. So a course kept for reference with no
+  section named gets the reference refusal for a writing tool, not a
+  question about a section it would refuse anyway, and a course whose
+  `course_config.json` cannot be read keeps the gate's fail-safe "cannot
+  tell" sentence (measured over stdio, the same answers as before the
+  filter). The first version of this piece said its refusal FIRST and got
+  both wrong. A reading tool on a reference course (`list_pages`) is not
+  gated, so it is asked which section.
+  `MissingSectionTests.TheServerSuppliesFirstThenAsksTheGatesThenTheFilter`
+  pins the order by source, and two behaviour tests pin both cases.
+- **A `howMany` of 0 or less** is asked for with `addClassesNeedsACount`,
+  as the mac's `addClassesQuestion` asks (before, Windows' tool answered
+  "Ask for at least one class.", measured over stdio). No contract case
+  covers 0, or any of these four keys; a case list for them would be the
+  mac's generated half to add.
+- **No trail line**: the contract's `activityTrail.mustRecord` names no
+  event for it and the mac writes none.
+- **Tests**: `MissingSectionTests` (pure, no stdio drive: a server left
+  behind would hold `Plantoir.Core.dll` open), its wiring pinned by the
+  source rule `TheServerAsksTheFilterFirst`.
 
 ### The guard: the folder served by the app itself, at an address that IS the path
 
@@ -13280,3 +13760,136 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## Undo and Redo: the journal Windows owes (#899, piece U1)
+
+The mac's journal core is described in `documentation/09-mac-app.md` →
+"Undo and Redo: one list for the app (#899)", with what was measured and
+what was rejected. **Do not start it until U1's fix reviews have cleared**:
+the format changed after U1's two reviews and again after its two fix
+reviews (Russell's rulings 17 to 20 and the director's rulings on them),
+before any Windows reader existed, so that it would not change again under
+one, and the issue says when that is settled. The third round (2026-11-14)
+changed no byte a v1 line holds: it stated what a reader does with a
+`cleared` line, a `note`'s required keys and a segment with no time, and
+what `rule.deployed` reads. The Fable sweep the same day added four
+sentences a reader needs, with cases, and no byte of a v1 line changed
+either: the second bullet below. Steps 1 to 8 may start once U1 merges.
+
+Windows inherits free: the format (`contracts/file-formats.json` →
+`undoJournal`, which a reader is meant to be built from alone), the rule and
+every case (`contracts/shared-rules.json` → `undo`: `rule`, `clearReasons`,
+`checkCases`, `stackCases`, `stepCases`, `recoveryCases`, `deployedCases`,
+and `knownLimits`, which says what is deliberately not fixed), the 20 traces in
+`contracts/undo-traces.json`, and `scripts/test_make_undo_traces.py`, which
+`PythonToolchainTests` runs and which checks the traces and the cases
+against a reference model of the same rules. It reads the traces with CR LF
+taken as LF, so a checkout with `core.autocrlf=true` is current (measured
+red before the fix by converting the three files to CR LF).
+
+Six things in the format are easy to get wrong and are the reason it was
+revised:
+
+- **Every object is open.** Only `kind` is required of an op, and only
+  `seq`, `madeAt` and `ops` of a step. A line, step or op a reader cannot
+  read is KEPT (`undoJournal.unknown`): its `seq` still counts for the next
+  number, every blob name its text holds (64 lower-case hex characters) is
+  kept, its segment is kept until the newest `at` written in that segment is
+  more than 60 days old, and while it stands at or above the newest step
+  Undo and Redo are not available. A typed reader that throws on a field it
+  does not expect, and skips the line, is the bug the mac's first version
+  had: it then undid the step BELOW a newer one. The one exception is the
+  `note` event: a reader passes over a note whatever else it carries (no
+  move, no barrier, nothing kept for it); it exists so a later version can
+  add a record an older reader skips.
+- **Which values make a step unreadable, and which are open.** A
+  `recompute` whose `maintainer` the reader does not know (only
+  `sectionFrontPage` exists) makes its op unreadable, and a `holds` other
+  than `section` or `course` makes its step unreadable (absent is fine):
+  both are barriers, never undone with the re-derivation skipped or under
+  the wrong lease. `madeBy`, `class` and `action.key` are OPEN strings: a
+  typed reader must not reject a value it does not know (an enum that
+  throws on one is the mistake to avoid). A key it does not know on a known
+  op is ignored and kept, which is why a later version never adds a
+  meaning-bearing key to a known kind. `madeBy` splits at its ends: the
+  word before the FIRST colon, the id after the LAST, the client name
+  between (it may hold colons). `checkCases` and `stackCases`
+  (`stepFromAnotherVersion:<variant>`) pin each.
+- **A `cleared` line clears whatever its reason says.** A reader never
+  checks the reason against `undo.clearReasons`, which lists only the
+  reasons this version writes: a refused Undo (`changedSince`, ruling 13, and
+  `contentMissing`, held question M9), a step recovery closes `interrupted`,
+  and the flip of the switch (`wentLive`, so steps recorded in shadow are
+  never offered); never a deploy or sharing unit plans (rulings 17 and 18).
+  Checking the reason would make a later version's clearing a barrier. A
+  step another process has in flight when a clearing is written leaves the
+  list when its own work ends. A refused REDO, for a hand edit or for
+  missing content, writes `dropped` (reason `redoRefused`) for the undone
+  steps from it up, and clears nothing (ruling 20). A dead process's step that cannot be
+  settled is never left in flight for ever: recovery closes it
+  `interrupted` when its put-back cannot be planned, and pruning closes it
+  `interrupted` (reason `unsettled`, no clearing) once it is past the
+  limits.
+- **Whether a step was deployed is read from the published-pages record**,
+  never from the journal (`undo.rule.deployed`, `deployedCases`): the newest
+  fragment of each destination the section deploys to NOW, which `deploy.py`
+  and `deploy.ps1` already write; a site marker with no fragment is
+  `cannotTell`; places are compared in NFC (`String.Normalize()`), then
+  ordinally. Nothing on the Windows side writes a deploy into the journal,
+  and nothing should.
+- **The limits are judged when the list is read**, with the clock rules of
+  `undo.rule.limits`, not only when the next step is written.
+- **`folder-id` is shared by both apps** on a synced folder: written lower
+  case, read with either case, a byte-order mark and white space ignored;
+  made with a hard link where there are links and an exclusive create where
+  there are not (exFAT, FAT, SMB); a damaged one set aside, never a block.
+
+It owes, in this order (the contract review's recommendation):
+
+1. `folder-id` and the format reader, lenient as above.
+2. The fold and the `stackCases`.
+3. The lock and the append. The lock must be a wait the system QUEUES:
+   `LockFileEx` on `undo\.lock` without `LOCKFILE_FAIL_IMMEDIATELY`, or a
+   named mutex keyed on the SHA-256 of the canonical path, never an
+   exclusive open retried on a timer (W3; polling on the mac gave up 663 of
+   1,600 begins with 8 processes at once). Readers open with
+   `FileShare.ReadWrite | FileShare.Delete`, retry a sharing violation for a
+   bounded time and never call the list unreadable for it (W2).
+4. The checks: `checkCases`, then `stepCases` and the staged swap that
+   retries a refused rename and names the file still in use (W5).
+5. Write-ahead and recovery, and the `recoveryCases`, including
+   `interrupted` (a file changed by hand stops recovery putting the whole
+   step back: what can be verified is put back and the list is cleared),
+   content missing (closed and cleared), a file in use during recovery
+   (tried again at once by an Undo or a Redo, and otherwise on the schedule
+   in `undo.rule.recovery`: on Windows this is the everyday case, W5, and
+   retrying it at every lock cost the mac 187 to 255 ms on every action,
+   the core review of U1's second round), a step in flight in another process when the clearing is written, and a
+   closed step's staged files removed.
+6. The traces. U1's are written by one small writer
+   (`JournaledWrite.settingEntry`'s rule, setting one front-matter line),
+   and U3 regenerates them through the real action code, so keep the
+   twin of that writer small: U3 replaces it with a wider replayer.
+7. `plantoir-mcp.exe` told the same folder as the window (W4).
+8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
+   section's destinations as Windows knows them (primary and additional, by
+   type) and whether each has a site marker, read from the same
+   `firstDeployMarkers` paths the scheduled deploy reads.
+
+Until each is built it is a named gap. What goes red on that side the day
+U1 merges, measured by reading the tests rather than running them: the
+trail test that enumerates `activityTrail.mustRecord`, for the two events
+`undo could not record a step` and `undo rolled back`, which go in
+`NamedGapLedger` against #899. The case lists and the traces are read
+by key, so nothing reads them yet and they go red nowhere: they are unrun,
+not failing (`deployedCases` included). Ruling 2 puts #899 in v2.0.0 and the cut waits for it, so
+these gaps hold the cut by design.
+
+Two details found on the mac matter there too: a JSON reader may drop a
+byte-order mark inside a string (write the fixture pages from `utf8Hex`),
+and only `begin`, `undoing` and `redoing` need the expensive flush
+(`F_FULLFSYNC` 4.0 ms against 0.03 ms for `fsync` on an M4 Pro; measure
+`FlushFileBuffers` there). Today's publish drops a page's leading
+byte-order mark (`String(contentsOf:)` does, as `File.ReadAllText` does),
+and the traces' writer does the same, so the BOM page in the fixture is
+rewritten without it on both platforms.

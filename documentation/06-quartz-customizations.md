@@ -320,7 +320,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting every mapped curriculum folder's name and every coverage map's title (#128 — `Curriculum Coverage` always among them) in both title and slug form — the slug being Quartz's own (`_quartz_segment_slug`: `Q&A Curriculum` is `Q-and-A-Curriculum`; until #569 only spaces were replaced, so a folder named with `&` stayed in every panel). Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
 | C2-22b | **Backlinks overall-expectation map (#505)** | `quartz/components/Backlinks.tsx` | Rewrites the one `const overallChildren = new Map<string, string[]>([…])` line behind the `// CQ4T-OVERALL-ANCHOR` comment, on every build and with or without a coverage map (`set_backlinks_overall_children`, called right after C2-22): each overall expectation page's slug, mapped to its specific expectations' slugs (`overall_backlink_children`). See D1. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
-| C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
+| C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain, or clears it when unpublished: the address a deploy's own rebuild was started for (`PLANTOIR_DEPLOY_BASE_URL`, set by `deploy.py` on that build only, #799: that leg's own custom domain when the course records one for its destination type, else the service's host; taken as given whatever its shape, a Unicode domain included, because the writer escapes it, #871 and #799's fourth review), else the primary destination's advanced custom domain, else the PRIMARY destination's site record (`.cloudflare_sites/` first for a course that deploys to Cloudflare Pages, `.netlify_sites/` first otherwise), else the other one. Until #799 the Netlify record was read first whatever the course deployed to, so a Cloudflare course ever deployed to Netlify carried the Netlify address, and `deploy.py` rebuilt it on every Cloudflare deploy for an address the rebuild never gave it (measured on Windows). Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
 | C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
 | C2-26 | **KaTeX from the site itself (#494)** | `quartz/plugins/transformers/latex.ts`; `quartz/static/katex/` | Quartz v4.5.0's `externalResources` linked `cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css` and `contrib/copy-tex.min.js` on EVERY page (400 links each on a built ICS3U site), while its own lockfile installs **0.16.21** and rehype-katex renders every formula with that at build time — so sites were rendered with one version and styled with another, and the maths depended on a third party and a network. `patch_katex_local` (marker `PLANTOIR-KATEX-LOCAL`, idempotent, independent of C2-20's import) replaces that block with two `additionalHead` functions: `<link rel=stylesheet href="<pathToRoot>/static/katex/katex.min.css" spa-preserve>` and `<script src=".../static/katex/contrib/copy-tex.min.js" defer spa-preserve>`, relative to each page so a site served under a folder finds them, kept across the site's page changes like `index.css`; the 404 page, served at any depth, links from the `baseUrl`'s path (review N6, Head.tsx's own rule). `install_katex_assets` copies the files from Quartz's own `node_modules/katex` every build (05 → Runnable code, step 4): the stylesheet (23,352 bytes), copy-tex (1,673), the **20 woff2 faces** (259,792) and the MIT licence — 284,817 bytes on EVERY site, woff2 only because every browser that can run a site's code takes woff2 first. Netlify's CSP loses `https://cdn.jsdelivr.net` by itself (07). **Rejected:** gating it per site on maths (Python cannot tell maths the way remark-math does — `$` in prose, currency — and a wrong guess breaks every formula silently; the cost is about 2% of Pyodide, uploaded once by content hash); all three font formats (1.10 MB); inlining the CSS into index.css (a generated SCSS file from node_modules every build); absolute `/static/katex/` (breaks a folder published under a subpath). **The print path had to follow** (#455 review S1): a link kept across page changes keeps its RELATIVE href, which then resolves against the new page — one folder off. print.inline.ts now takes every stylesheet for the print frame from the address the sheet was really fetched from (`link.sheet.href`), which fixed the same latent fault in its `index.css` lookup; measured by `browser-checks/maths_offline.mjs`: with the old code a handout printed after a page change from the top of the site to a page one folder down got a 404 KaTeX stylesheet (0 rules), now 249 rules. **The regression the plan expected did not happen:** a folder publish OPENED AS A FILE was expected to lose KaTeX's faces in Chrome (an opaque origin); measured 2026-10-17, Chrome for Testing 155 and Safari 26.6 both loaded `KaTeX_Main` and `KaTeX_Math` from `static/katex/fonts/` beside a page opened from disk, so the maths keeps its look offline from a file too (it used to need the network for the CDN). |
 | C2-27 | **A folder page's table of contents (#520)** | `quartz.layout.ts` | `_wire_list_page_toc`, one of `wire_quartz_additions`' edits, puts `Component.DesktopOnly(Component.TableOfContents())` — the content layout's own — in `defaultListPageLayout`'s right column, which is `[]` in v4.5.0, and touches nothing else. Quartz renders every `folder/index.md` with that layout (and the tag pages), so a curriculum folder's index with `enableToc: true` and five headings of its own showed no table of contents: the data was computed and placed nowhere. Quartz's own rule then decides, as on any page — shown by default, `enableToc: false` hides it, and only with two or more headings of depth 3 or less on the page itself — so tag pages and folder pages with no headings of their own are unchanged. Measured on the #520 plan by editing a built layout and re-running Quartz: the curriculum index showed "Navigate this page" with its strand headings, while `Concepts/index`, `tags/A1` and the front page stayed at 0; expectation pages had shown a table of contents all along. Idempotent, every build; a list layout of another shape warns and is left alone. **Chosen** (ruling Q2 on the plan): on every folder page with the headings, as Quartz does on every other page — 49 of 1,009 folder index pages across `support/` show one, 9 of them without having asked. **Rejected:** only on folder pages that say `enableToc: true` (a wrapper component of our own, and a rule unlike every other page's). `scripts/test_folder_page_toc.py` drives it through `wire_quartz_additions`; verify.sh 6h reads EXC2O's built `Curriculum/index.html`. |
@@ -4959,7 +4959,7 @@ browsers, on the deployed sites (#597)").
 | `browser-checks/fixtures/rendered/` | twelve Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor, Simulation) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
-| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, sent to browsers only) from the site's own script refused; `test_refused_by_design.mjs` beside it |
+| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, refused in the srcdoc frame its appended loader builds) from the site's own script refused; `test_refused_by_design.mjs` beside it |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
@@ -5006,25 +5006,35 @@ Waits are on the state asked about, with a ceiling.
   row failed both engines on YouTube's advert requests, Vimeo's and PhET's
   fullscreen checks and GeoGebra reaching for the page.
 - **A refusal the site's policy makes on purpose is set aside, by what it
-  is, never by its words alone** (#597's second half, the first deployed
-  run, 2026-11-13). Netlify adds its badge as an inline script on a page's
-  way to a browser, and the policy `netlify_badge.py` writes refuses it by
-  design, one refusal a page in both engines. `rendered_rows.json` →
-  `refusedByDesign` names the host and the two engines' wordings, and
-  `browser-checks/lib/refused_by_design.mjs` sets a line aside only on a page
-  holding a refused inline script that is in some document the page was
-  sent, as the browser received it, and in no document fetched again at the
-  same address without a browser's User-Agent; the site's own refused
-  script, or one its scripts made, fails the row, so a policy that lost a
-  hash is still red. The refusals are counted page by page: at most one
-  such script a document (`refusedScriptsPerDocument`) and exactly one
-  message for each (`linesPerRefusedScript`, WebKit's two records of one
-  message counted once), so a second injected script, a refusal more than
-  the scripts account for, or one fewer fails the page and names the count
-  (597b fix review, d1; measured on a stand-in edge: Tasks 3, Embeds 2,
-  every other page 1, in both engines). What is set aside is an EXPECTED
-  line of the clean-page row, with each page's count, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
-  documentation/07-deployment.md has the measurements.
+  is, never by its words alone** (#597's second half). Netlify appends a
+  loader after every page's own `</html>`
+  (`<script async src="/.netlify/scripts/hud?variant=public" …>`). The
+  loader builds `iframe#nl-badge-frame` and writes the badge into its
+  `srcdoc` with one inline script, which the policy `netlify_badge.py`
+  writes refuses by design in both engines. `rendered_rows.json` →
+  `refusedByDesign` names the host, the two engines' wordings, the `frame`
+  the refusal is said in (`about:srcdoc`), the `loader`, and
+  `refusalsPerDocument` (1). `browser-checks/lib/refused_by_design.mjs`
+  sets a message aside only when all of these hold:
+  - it is in those wordings;
+  - the browser said it in that frame (the console message's own address);
+  - every document the page was sent was read for the loader;
+  - there is exactly one for each document that carried the loader.
+
+  The same words said in the page itself fail, whatever the host, so a
+  policy that lost one of the site's hashes is still red. A second refusal
+  in the frame, or one fewer, fails the page and names the count. The
+  first version looked for the refused script in the page's own HTML. It
+  set nothing aside on real Netlify (the second deployed run, 2026-11-14:
+  2 FAIL, 6 EXPECTED where 8 were predicted), because the script is built
+  in the frame at run time. Measured on a stand-in serving Netlify's own
+  loader and `hud.js`: Tasks 3, Embeds 2, every other page 1, in both
+  engines. What is set aside is an EXPECTED line of the clean-page row,
+  with each page's count and what was seen (documents with the loader,
+  where each refusal was said, Chromium's named hash, the srcdoc frames'
+  scripts), never a pass. Its node test runs in
+  `verify-deploy.sh --self-test`; documentation/07-deployment.md has the
+  measurements.
 - **A row that takes the page elsewhere waits for the page's own index
   request first.** Quartz fetches `static/contentIndex.json` as a page loads
   and nothing catches it, so a reload that cancels it makes WebKit throw

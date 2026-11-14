@@ -268,7 +268,7 @@
   "customDomainReading": {
     "issue": "#904",
     "rule": "The teacher's own domain for ONE destination type of one section is read from custom_domains.sections.section<N> (courseConfigKeys -> custom_domains): from a map, the value under that destination type; from the older bare string, the string, but only when that destination type is the course's primary (deploy_target, `netlify` when absent). A destination type with no address (`local_folder`) never has one, whatever the setting says. Any other shape (a list, a number, a map whose value is not a string, a `sections` or `custom_domains` that is not a map) is no domain, never an error. The value is returned as stored; trimming a scheme or a slash is the caller's.",
-    "readers": "custom_domains.for_destination in the shared Python (build_site.py asks it for the primary, the address a build bakes in; deploy.py's per-destination reader, `leg_custom_domain` on Windows' #799 branch, is to call it once #799 lands), CourseConfiguration.customDomain(forSection:destinationType:) on the mac (FileFormatsContractTests), and Windows' reader of the same key.",
+    "readers": "custom_domains.for_destination in the shared Python (build_site.py asks it for the primary, the address a build bakes in; deploy.py's per-destination reader, `leg_custom_domain` from Windows' #799, asks it too since the two were joined on the merge with dev, 2026-11-14: the bodies had differed on 4 of 24 shapes), CourseConfiguration.customDomain(forSection:destinationType:) on the mac (FileFormatsContractTests), and Windows' reader of the same key.",
     "why": "Found by the fourth review of #799 on Windows (2026-11-13). build_site's own reader differed from deploy.py's and both apps' in two ways, measured with Python 3.14: a bare string was applied to a course whose primary is a folder, and a list or a number raised AttributeError, which stops the build (resolve_section_domain is called with no try). One rule, read by every reader from these cases, so the address a build bakes in and the address a deploy leg is built for cannot disagree over the same setting.",
     "casesShape": "config is the course_config.json the case reads (only the keys that matter); the case asks for section 1 and destination; expect is what the reader returns, \"\" for no domain.",
     "cases": [
@@ -2172,5 +2172,194 @@
       "newPasswordWaiting": "true from a Change Password that saved a new password until a share proves the address (unitPlanning.share.changePasswordCases); absent otherwise. Never the password."
     },
     "olderMarkers": "A marker written before #833 has none of keysSince833 and reads as no remembered choices, nothing counted, and no password waiting. A marker holding only `documents` has no address and reads as not shared, to the bar and to deploy.sh's sticky protection alike."
+  },
+  "undoJournal": {
+    "note": "The list of changes for Undo and Redo (#899, piece U1): one for the whole app on each computer, appended to by the app and every outside-assistant process (the mac's --mcp-stdio, Windows' plantoir-mcp.exe), at the same moment; a deploy set for later records nothing (rulings 17 and 18). The RULE for writing it is shared-rules.json -> undo.rule; this is the format every one of them reads and appends, written so that a reader built from these words alone needs nothing else. Behind `undoJournalIsLive`, off: written in shadow, never offered. Revised 2026-11-13, before Windows starts, after two adversarial reviews: every object is open, and `unknown` says what a reader does with what it cannot read. Revised again the same night, after the two fix reviews and Russell's rulings 17 to 20: no clearing for a deploy or a share of unit plans, one neutral `note` event every reader passes over, a refused Redo drops only its redo (`dropped`, reason redoRefused), a dead process's step is never left in flight for ever, and an unreadable line keeps only what it could reference. Revised a third time on 2026-11-14 (the director's rulings on U1's third round): a `cleared` line clears whatever its reason says, a note's required keys are stated, and a segment with no readable time is bounded; nothing a v1 line holds changed. The same day, after the Fable sweep of U1, four sentences were added for a second reader, with cases for each: a `recompute` whose maintainer a reader does not know, and a `holds` it does not know, make the step one it cannot read; `madeBy`, `class` and `action.key` are open strings; a known op kind never gains a key that changes what undoing it does; and `madeBy` is split at its LAST colon. Still no byte a v1 line holds changed. Windows builds from this version.",
+    "directory": "undo/ in the app's own folder: <home>/Library/Application Support/Plantoir/undo/ on the mac, under the home RealHome.forFiles answers (so it follows --state-dir, and the unit suite's throwaway home); %LOCALAPPDATA%\\Plantoir\\undo\\ on Windows (W4). NEVER in a working folder: one list spans every working folder, and a working folder may be synced between two computers. Only this computer reads its list.",
+    "files": {
+      ".lock": "The one exclusive lock (undo.rule.oneLock). Empty; created by whoever takes it first; never deleted.",
+      "computer-id": "An identifier file (identifierFiles), made once.",
+      "journal-NNNNNN.jsonl": "The events, append-only, NNNNNN six digits from 000001. A new segment starts once the newest passes 4 MiB. Segments are deleted only from the oldest end, only while no step on the list has an event in them, and only while they are older than the segment holding the highest seq; a segment holding a line this version cannot read (unknown.unreadableLine) only once the newest `at` written in it, its own record, is more than 60 days before the clock and the clock is not behind the journal (unknown.deleting); the newest is never deleted. A reader that has folded a deleted segment forgets the barriers it held.",
+      "content/<aa>/<sha256>": "Immutable blobs: bytes named by their SHA-256 in lower-case hexadecimal, aa its first two characters. Written under content/<aa>/.tmp-<anything>, made durable, then renamed onto the name with a rename that FAILS if the name exists (never replacing). Where the volume has no such rename (exFAT answers ENOTSUP), the name itself is made with an exclusive create and written whole, then made durable. A blob whose bytes do not hash to its name is treated as missing, and a writer that needs it writes it again. Deleted only when nothing kept can need it (unknown.deleting): no step on the list names it (an op's `blobs`, `beforeSha` or `afterSha`, and for a step this version cannot read, any blob name its begin line holds) and no line this version cannot read, in a segment still kept, holds its name."
+    },
+    "identifierFiles": {
+      "files": "undo/computer-id, and every working folder's courses/.internal/folder-id (made the first time a step is recorded there; the one file of this format both platforms share, on a synced folder).",
+      "written": "A UUID in its canonical 8-4-4-4-12 form, LOWER CASE, then one line feed, in UTF-8 with no byte-order mark. Made exclusively, so two processes making it at once end with one: written whole under a temporary name and hard-linked onto the name where the volume has hard links, otherwise (exFAT, FAT, many SMB shares) created with an exclusive create of the name itself and written in one write. Never replaced while it holds an identifier.",
+      "read": "Leniently: a byte-order mark, white space, carriage returns and line feeds are ignored, either case is accepted, and the identifier is compared in lower case.",
+      "unreadable": "A file that holds no identifier never blocks the folder for good. If it is empty and was written less than ten seconds ago, a creator is at work: not yet (the step is not recorded this time; a live step is refused before anything changes). Ten, not two, because FAT keeps a modification time to two seconds. Otherwise it is set aside under its name plus `.unreadable-<uuid>` and a new identifier is made. It is set aside only while it is still the file inspected (the same file on its volume), and a file found to hold an identifier once it is aside (another process made it between the look and the move) is put back with a rename that fails if the name has been taken, and that identifier is the answer: a good identifier is never moved away. Steps recorded under the old identifier then cannot reach the folder, and Undo waits for them as for an unplugged drive (ruling 10)."
+    },
+    "line": "One event per line: a JSON object, UTF-8, ending in a line feed (\\n, never \\r\\n). Keys may come in any order and strings may be escaped in any valid way: readers never compare a line's bytes (the mac writes keys sorted, for a person reading a diff). A reader counts only complete lines; bytes after the last line feed are a line still being written, or torn by a crash, and are left for the next writer to cut off inside the lock.",
+    "eventKeys": {
+      "v": "The JSON number 1 (not a string). A line whose v is anything else is unreadable (unknown).",
+      "seq": "A JSON whole number. The step the event is about; for `cleared` and `note`, the HIGHEST seq in any line of the journal, readable or not, at the moment the line is written (so a second implementation computes it without guessing, and a note never takes a number). A new step's number is one more than the highest seq in ANY line, readable or not, so a number is never used twice.",
+      "event": "One of `events` (a string). Any other value makes the line unreadable.",
+      "at": "When the line was written, by the writer's clock: UTC, ISO 8601, to the second (2026-11-13T21:04:05Z; a reader also accepts fractions of a second). Optional on read; every line written carries it. Used only by the limits, never as a check of whether a file has changed.",
+      "step": "begin only: the step (stepKeys). A begin whose step is missing, or whose step.seq differs from the line's, is unreadable.",
+      "process": "begin, undoing and redoing: the process that started the work, so recovery can tell whether it is still running: host (for a person; never compared, a Mac's host name changes with its network), pid (a whole number), name (as the process table reports it), started (that platform's own spelling of the process's start time, compared only by that platform).",
+      "phase": "failed, rolledBack and interrupted: what they ended: begin, undoing or redoing. Any other value makes the line unreadable.",
+      "reason": "A word, never page text: failed (nothingTookEffect, refused, actionStopped, differedFromTheRecord), rolledBack (partlyTookEffect), interrupted (changedByHand, partlyTookEffect, couldNotPutBack, unsettled), dropped (newStep, redoRefused), pruned (tooMany, tooOld), cleared (the reasons this version writes are shared-rules.json -> undo.clearReasons; a reader honours a cleared line whatever its reason). Readers never act on a reason: it names a clearing or an ending for a person reading the file.",
+      "paths": "interrupted only: the files left in the way (changed by hand, left part way in shadow, or left part way because they could not be put back), or, for a step closed unsettled, every file the step names; inside the working folder like an op's path. Paths, never content."
+    },
+    "events": {
+      "begin": "A step is written down, before its change. Carries step and process.",
+      "applied": "Its change is made. Every undone step with a lower seq is `dropped` just before it, in the same lock.",
+      "rolledBack": "Part of it took effect when its process died; recovery put that back. With phase.",
+      "interrupted": "Its process died part way and recovery could not put all of it back (a file changed by hand, content it needed missing), or (in shadow) recovery only recorded it, or a dead process's step that could not be settled at all (its folder unreachable, a file held, a step this version cannot read) was closed by pruning past the limits: partly applied or unknown, off the list. With phase and paths. Followed by a `cleared` with reason interrupted, except when pruning closes it (reason unsettled): then nothing older than it is offered any more, and a clearing would take every newer step.",
+      "undoing": "An undo of it started. Carries process.",
+      "undone": "The undo finished.",
+      "redoing": "A redo of it started. Carries process.",
+      "redone": "The redo finished.",
+      "failed": "With phase begin: the step never took effect (or was never kept). With phase undoing or redoing: that undo or redo ended without taking effect, and the step is back where it stood.",
+      "dropped": "An undone step whose redo was cut off: by a newer step (newStep), or by a Redo refused because what it changed was changed by hand since (redoRefused, shared-rules.json -> undo.rule.clearing, ruling 20), which drops that step and every undone step above it.",
+      "pruned": "Past what the disk keeps (undo.rule.limits): never offered again.",
+      "cleared": "The WHOLE list cleared (undo.rule.clearing). Not about one step: see folding.moves. Honoured WHATEVER its reason says, a reason the reader does not know included: a reader never checks the reason, so a later version can clear for one of its own.",
+      "note": "A NEUTRAL line every reader passes over, whatever else it carries: it moves no step, is never a barrier, never stops deletion and never clears. Keys: `v` (the number 1) and `seq` (a whole number) are REQUIRED, or the line is unreadable like any other (unknown.unreadableLine), a barrier; `event` is note; `at` and `about` (a word naming what it records) are optional, and a note with no `about`, or with keys a reader does not know (a `phase` or `reason` of any value included), is still a note. Its seq is the highest seq at writing, as for cleared, and counts toward the highest seq like any line's, so a note never takes a number, and a note whose seq is above every step's raises the next step's number. A later version writes its notes as v 1, so every reader of this version passes over them. Known to every reader from this version on, so a later version can record something an older reader must simply skip; an event a reader does not know is still unreadable (unknown.unreadableLine). U1 writes notes only in the contract's cases and traces."
+    },
+    "stepKeys": {
+      "required": "seq, madeAt and ops. Every other key may be absent; a step with no working folder is readable only when none of its ops has a path.",
+      "seq": "As the line's.",
+      "madeAt": "When it was made, in the line's `at` form. Display and the limits only (undo.rule.limits).",
+      "action": "{key, arguments}: a wording key and its arguments (string to string), so either platform renders the step's name in its own words (U7 names the keys; U1 writes publishPages and hidePages with pageCount). The key is an OPEN string: a reader never rejects a key it does not know, and shows a plain title for it.",
+      "madeBy": "menu, sheet, wizard, builtInAssistant:<conversation id>, or outsideAssistant:<client name>:<session id> (the client name empty until the door names it, #884). Split at the colons from the ends: the word before the FIRST colon says who, and the session id (or conversation id) is what follows the LAST colon, so a client name may hold colons and an id never does (`outsideAssistant:A client: with colons:session-7` is client `A client: with colons`, session `session-7`). An OPEN string: a reader never rejects a value it does not know, and U1 reads nothing from it. No scheduledRun: a deploy, set for later or not, is not a step and clears nothing (rulings 17 and 18).",
+      "workingFolder": "{id, pathAtTheTime}: the working folder's identifier (identifierFiles) and its canonical path when the step was made.",
+      "course": "The course code, when the step belongs to one.",
+      "section": "The section number, when it belongs to one.",
+      "class": "A, B or D (undo.classes, from U3). An OPEN string: a value a reader does not know is kept and never makes the step unreadable.",
+      "holds": "Which lease an undo of it takes: section or course. Absent is readable. Any OTHER value makes the step one this version cannot read (unknown.unreadableStep), so it is a barrier: a reader never undoes a step under a lease it cannot name, or under none (stackCases: another version's step whose holds is a value this version does not know).",
+      "ops": "What it changed, in order (opKinds)."
+    },
+    "opKinds": {
+      "every": "An op is a JSON object with a required `kind` (a string). An op inside a working folder has `path`: relative to the working folder (the folder that holds courses/), with forward slashes, spelled and in the Unicode form the file system gave it, never with an empty part, a `.` or `..` part, a leading slash, a backslash, a drive letter or a NUL; a path that breaks this makes the op unreadable. An op that needs content from the journal lists EVERY blob it needs in `blobs` (an array of names), whatever its kind, so a pruner that cannot read the op still keeps them.",
+      "writeFile": "{kind, path, beforeSha?, afterSha?, blobs}: the whole file's SHA-256 before and after, absent for no file; both are blobs and both are in `blobs`. Undo when the file hashes to afterSha (or is absent when afterSha is), redo when it hashes to beforeSha. A folder or unreadable item at the path is changed since.",
+      "editLine": "{kind, path, key, before?, after?, afterKey?, createdTheBlock?}: one top-level front-matter key's ENTRY before and after (strings: its line and the lines its value runs on to, joined with \\n, carriage returns kept; absent for no such key; at least one present). The block is found with the reader both apps use (PageVisibilityReader.fenceIndices; Windows' twin): three dashes or more, blank lines allowed before the opening fence; a byte-order mark before the fence means no block. An entry is a column-0 `key:` line (quotes round the key taken off) and the lines below it that start with a space or a tab (and are not blank) or are column-0 sequence items (`-`, not `---`); a blank line, a column-0 comment or the next key ends it. afterKey is the key of the entry before this one in the text where this one exists (absent: the first), where an added or removed entry goes back; createdTheBlock means the step gave the page its front matter, so taking the last entry out takes the fences (and the line feed after the closing one) too. The key there twice, or a fence that never closes, reads as changed since. Chosen for a change only when applying its ops to the before text gives the after text byte for byte AND undoing them gives the before text back; otherwise the change is one writeFile.",
+      "recompute": "{kind, path, maintainer, section?}: a file kept true by a rule (maintainer sectionFrontPage: the section's landing page), re-derived after the other ops; no check. Recorded since U1; run by U2. A maintainer a reader does not know makes the op one it cannot read (unknown.unreadableStep), so its step is a barrier: a step is never undone or redone with its re-derivation skipped (checkCases and stackCases: a maintainer this version does not know).",
+      "reserved": {
+        "note": "The shapes later pieces write, fixed now so the format does not change under them. Their keys beyond `kind`, `path` and `blobs` are the piece's to finalise; a U1 reader treats every one of them as unknown (unknown).",
+        "replaceText": "U2. {kind, path, blobs?, before, after, contextBefore, contextAfter}: a body hunk; long text in blobs.",
+        "editJSON": "U2. {kind, path, keyPath, before?, after?, element?}: before and after are ANY JSON value (number, string, object, array, true, false, null), compared as JSON.",
+        "move": "U2. {kind, from, to, listingSha?, blobs?}: no `path`; from and to follow path's rules.",
+        "createTree": "U2. {kind, path, listingSha, blobs}: a folder made, its listing a blob.",
+        "removeTree": "U2/U5. {kind, path, listingSha, blobs, heldBy?}: a folder removed; heldBy names content held outside the journal (a backup zip's path and central-directory digest).",
+        "external": "U2. {kind, target, before?, after?}: outside any working folder (a preference, the LaunchAgent, Obsidian's vault list); no `path`; before and after any JSON.",
+        "trash": "U5. {kind, path, resultingPath, digest}: an item moved to the Trash (ruling 12); resultingPath is where the Trash put it.",
+        "storeHeld": "U5. {kind, store, listName, blobs?}: Media kept once in the 785 store, protected by an undo list."
+      }
+    },
+    "unknown": {
+      "title": "What a reader must do with what it does not know",
+      "keys": "A key a reader does not know, in a line, a step or an op, is ignored and kept: lines are never rewritten, so keeping it is leaving the bytes where they are. That binds every later version: a known op kind NEVER gains a key that changes what undoing or redoing it does, because an older reader would undo it by the old rule (checkCases and stackCases: an editLine carrying `onlyWhen` is undone by the editLine rule). A new meaning needs a new `kind`, which an older reader cannot read and so treats as a barrier.",
+      "unreadableLine": "A line that is not a JSON object, whose v is not 1, whose event is not one of `events`, whose phase is not one of the three, whose begin has no matching step, or that is a second begin with a seq a begin already used (never a guess at which step is meant), is UNREADABLE (a `note` is never unreadable for what else it carries). Its seq still counts (when it is a whole number) for the highest seq. It stands as a barrier at its seq, or, when it has none, at its place in the journal.",
+      "unreadableStep": "A begin that parses but whose step this version cannot fully read (an op of an unknown kind, an op missing what its kind needs, a `recompute` whose maintainer it does not know, a `holds` it does not know, a field of the wrong type, a path that breaks the rules, a step with ops that have paths and no workingFolder) is kept as a step that moves through `folding.moves` like any other, but is UNREADABLE: never undone, redone or settled by recovery, and a barrier at its seq. Past the limits it is pruned like any step (or, left in flight by a dead process, closed unsettled), so it never holds the list on the disk for ever.",
+      "barrier": "While a barrier stands at or above the newest step offered that is not undone (by seq when it has one, by place in the journal when it has none), or anywhere above the oldest-run cut-off when nothing is offered, Undo and Redo are NOT AVAILABLE: greyed, plain \"Undo\", nothing said, as ruling 10 has it. Never undone past, never a reason to clear. A barrier stops counting once a `cleared` line comes after it (by seq, or by place when it has none), or once it is in the oldest run past the limits.",
+      "deleting": "When in doubt, keep, but never for ever (the director's ruling 5 on U1's second reviews). A line this version cannot read, and the begin of a step it cannot read, keep every blob whose name (64 lower-case hexadecimal characters standing alone) their text holds, for as long as they are kept. Such a line also keeps its own segment, and with it every later one (segments go only from the oldest end), until the newest `at` written in that segment, its own record, is more than 60 days before the clock (the limits on the disk) and the clock is not behind the journal; a segment that holds no readable `at` at all is judged instead by the newest `at` of the first later segment that has one (lines are appended in order, so every line in it was written before that segment's), and is kept only while no later segment has one (the director's ruling 7 on U1's third round: before it, such a segment kept itself and every later one for good). Then it goes like any other. Measured (the U1 harness, a simulated school year: five publishes of 233 pages and one whole-file edit a day for 365 days, one unreadable line and a newer version's line naming a blob on day 2): before this rule every deletion stopped for the life of the list, 59.8 MB in 15 segments and 367 blobs at the year's end and 2.9 s for a process's first read; after it, 4.8 MB in 2 segments and 10 blobs, the barriers and the newer version's blob gone by day 90, and 187 ms.",
+      "settling": "Recovery never settles a step it cannot read, and never one whose working folder it cannot reach."
+    },
+    "folding": {
+      "rule": "Where each step stands is FOLDED from the lines in order, segment by segment, line by line; it is never stored. A step is ON THE LIST while it is done, undone, or in flight (begun, undoing, redoing). An event that does not follow from where its step stands is ignored; an event for a seq with no begin is ignored.",
+      "moves": [
+        {
+          "from": "(none)",
+          "on": "begin",
+          "to": "begun"
+        },
+        {
+          "from": "begun",
+          "on": "applied",
+          "to": "done"
+        },
+        {
+          "from": "begun",
+          "on": "failed (phase begin)",
+          "to": "failed"
+        },
+        {
+          "from": "begun",
+          "on": "rolledBack (phase begin)",
+          "to": "rolledBack"
+        },
+        {
+          "from": "begun",
+          "on": "interrupted (phase begin)",
+          "to": "interrupted"
+        },
+        {
+          "from": "done",
+          "on": "undoing",
+          "to": "undoing"
+        },
+        {
+          "from": "done",
+          "on": "pruned",
+          "to": "pruned"
+        },
+        {
+          "from": "undoing",
+          "on": "undone",
+          "to": "undone"
+        },
+        {
+          "from": "undoing",
+          "on": "failed or rolledBack (phase undoing)",
+          "to": "done"
+        },
+        {
+          "from": "undoing",
+          "on": "interrupted (phase undoing)",
+          "to": "interrupted"
+        },
+        {
+          "from": "undone",
+          "on": "redoing",
+          "to": "redoing"
+        },
+        {
+          "from": "undone",
+          "on": "dropped",
+          "to": "dropped"
+        },
+        {
+          "from": "undone",
+          "on": "pruned",
+          "to": "pruned"
+        },
+        {
+          "from": "redoing",
+          "on": "redone",
+          "to": "done"
+        },
+        {
+          "from": "redoing",
+          "on": "failed or rolledBack (phase redoing)",
+          "to": "undone"
+        },
+        {
+          "from": "redoing",
+          "on": "interrupted (phase redoing)",
+          "to": "interrupted"
+        },
+        {
+          "from": "done or undone, seq <= the cleared line's",
+          "on": "cleared",
+          "to": "cleared"
+        },
+        {
+          "from": "in flight, seq <= the cleared line's",
+          "on": "cleared",
+          "to": "(still in flight, marked) then cleared when its work ends in done or undone (undo.rule.clearing)"
+        },
+        {
+          "from": "anything",
+          "on": "note",
+          "to": "(no move: passed over)"
+        },
+        {
+          "from": "anything else",
+          "on": "any other event",
+          "to": "(ignored)"
+        }
+      ],
+      "offered": "What Undo and Redo see is the list with the limits applied at the moment it is judged (undo.rule.limits): the newest step offered that is not undone is what Undo acts on (refused while it is in flight); the redo candidate is the lowest undone step offered above it. An undone step below a step that is not undone was cut off by a newer step and is never a candidate; the next applied drops it. Done, undone and in-flight steps all count toward the 50 (undo.rule.limits)."
+    },
+    "stagedFiles": "While a step, undo or redo swaps files, its new contents and kept originals sit beside their targets as .<file name>.plantoir-undo-<seq>-<apply|undo|redo>-<new|orig> (a recovery's own as …-recover-…): dot files, so Obsidian and the website builder pass over them. Recovery deletes the ones a dead process left. A step closed interrupted leaves none behind: they are deleted when it is closed, and when its working folder cannot be reached then, by the first recovery in each process that reaches it (shared-rules.json -> undo.rule.recovery)."
   }
 }

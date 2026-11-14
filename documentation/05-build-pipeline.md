@@ -46,9 +46,9 @@ support files ──────┘                        │                  
    the Colima container on a bind mount is stamped by the host's clock, the
    same clock as the teacher's Save. Readers: `BuildFreshness.whyRebuild`
    and the scheduled publish's shell (both compare with the EARLIER of the two
-   times); Windows' `BuildFreshness.NeedsRebuild` makes the same choice since
-   #272 (2026-09-30; its scheduled wrapper builds unconditionally, so it has no
-   second reader). Since #768 the launchers read it too
+   times); Windows' `BuildFreshness.WhyRebuild` makes the same choice since
+   #272 (2026-09-30; its scheduled wrapper built unconditionally until #799,
+   and since then asks the shared Python below). Since #768 the launchers read it too
    (`toolchain_paths.why_build_before_deploying`, deploy.sh's
    `pages_or_clock_ask_for_a_build`): see "A deploy asks for itself whether
    anything changed (#768)" below. The reasoning and what was
@@ -2289,24 +2289,29 @@ reads the app's current `.toolchain` directly and `install_quartz_additions`
 refreshes the persistent workspace by content. Hole (2) does: a deploy that
 does not build uploads the old site. Closed in 1.9.3 (#749):
 
-- **The folder publish asks.** `deploy.ps1`'s `--to-folder` branch never
-  enters `deploy.py`, so it calls `Test-BuiltByThisToolchain`, which runs the
-  runtime's Python on `toolchain_paths.site_was_built_by_this_toolchain(<the
-  section's build folder>)`. Only a plain yes skips the build; ANY failure —
-  a traceback, an import that fails, a Python that will not start — builds
-  again, the direction that costs one build rather than a stale site. The
-  call redirects nothing: under `$ErrorActionPreference = 'Stop'`, Windows
+- **Every destination asks (#749 for the folder, #799 for all of them).**
+  1.9.3's `Test-BuiltByThisToolchain` asked only the toolchain, and only in
+  the `--to-folder` branch. Since #799 `deploy.ps1`'s
+  `Get-WhyBuildBeforeDeploying` makes ONE call to the runtime's Python on
+  `toolchain_paths.why_build_before_deploying(<course folder>, <the
+  section's build folder>)`, which asks the preview's site, the toolchain,
+  then the clock and the pages, and `Invoke-BuildFirstWhenAsked` acts on the
+  answer before every destination. Its reading rule and its two call sites
+  are in "On Windows (#799)" in the next section. ANY failure of the
+  question still builds, with the toolchain's words. The call still
+  redirects nothing: under `$ErrorActionPreference = 'Stop'`, Windows
   PowerShell 5.1 turns a native program's redirected stderr into a
   terminating error, which would have made a check that throws end the
   deploy with exit 1 instead of building. The Python silences its own stderr
-  instead, and `test_launcher_rules.ps1` runs a check that throws.
-- **One rebuild, two reasons.** deploy.sh has two rebuild blocks (toolchain,
-  then preview), and prints each failure line in both. `deploy.ps1` works out
-  the reason first — toolchain if the stamp is not this toolchain's, else
-  preview if the site carries live updating — prints that reason's two lines
-  and runs the ONE existing `preview.bat --build-only`, wait and checks, since
-  a build-only build answers both. `TheRebuildLinesAreDeploySHsWordForWord`
-  takes deploy.sh's copies `Distinct().Single()` for that reason.
+  instead, and `test_launcher_rules.ps1` runs a check that throws, one that
+  prints nothing and one that prints a word it does not know.
+- **One rebuild, four reasons.** deploy.sh has two rebuild blocks (toolchain,
+  then preview), and prints each failure line in both. `deploy.ps1` has ONE,
+  `Invoke-BuildFirstWhenAsked`: the reason first, then that reason's two
+  lines (preview, toolchain, pages or clock), then the ONE `preview.bat
+  --build-only`, the wait and the checks, since a build-only build answers
+  every reason. `TheRebuildLinesAreDeploySHsWordForWord` takes deploy.sh's
+  copies `Distinct().Single()` for that reason, and pins all four pairs.
 - **The runtime is part of the identity.** The four roots do not cover the
   bundled runtime: Quartz's ROOT files (`quartz.layout.ts`, where patches
   land), `node_modules`, the vendored engines and Python itself are not
@@ -2379,28 +2384,26 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
   PC, and copying one there would upload it); the stat walk does not read
   files, so it should not depend on that.
 - **Not owed on Windows:** an image or workspace check (it has neither).
-  `BuildFreshness.NeedsRebuild` still does not read the stamp (the
-  "Rejected" above), but since #768 it owes the course folder's own time,
-  the creation time and the clock guard: see the next section.
+  `BuildFreshness` still does not read the stamp (the "Rejected" above);
+  since #799 it reads the course folder's own time, the creation time and
+  the clock guard and gives its reason (`WhyRebuild`): see the next section.
 - **Netlify and Cloudflare** go through `deploy.py`'s
-  `ensure_base_url_and_rebuild`, which looks for the workspace's
+  `ensure_base_url_and_rebuild`, which until #768 looked for the workspace's
   `quartz.config.ts` at the literal `/tmp/quartz-builds/…`. Windows never
-  has it, so its Netlify and Cloudflare deploys rebuild on EVERY deploy —
-  confirmed in 1.9.3's verify-deploy log (" Updating Quartz baseUrl to …"
-  on a site whose address had not changed). That is #768, deliberately not
-  fixed with #749: the stamp makes a skipped rebuild safe for the toolchain
-  and the runtime, but not for an edited page, which deploy.py does not ask
-  about; at the command line the bug is what rebuilds an edited page today.
-  **A safe fix is more than the path.** Pointing it at
-  `toolchain_paths.WORK_DIR` alone would make a `deploy.bat` typed after an
-  edit deploy the last build. It needs a page-freshness signal handed over by
-  whoever knows — the app, which already asks `BuildFreshness` before every
-  window deploy (the assistant always builds, the scheduled wrapper asks its
-  shell twin) — or deploy.py asking the same question itself; and a decision
-  on whether the command line should keep the mac's "deploy publishes what
-  was built" shape. **Done in #768:** deploy.py asks the question itself,
-  and Russell ruled the command line reuses a build only when nothing has
-  changed, on both platforms. See the next section.
+  has it, so until then its Netlify and Cloudflare deploys rebuilt on EVERY
+  deploy (55 to 66 s), confirmed in 1.9.3's verify-deploy log (" Updating
+  Quartz baseUrl to …" on a site whose address had not changed). It was
+  deliberately not fixed with #749: the stamp makes a skipped rebuild safe
+  for the toolchain and the runtime, but not for an edited page, which
+  deploy.py did not ask about, and pointing it at `toolchain_paths.WORK_DIR`
+  alone would have made a `deploy.bat` typed after an edit deploy the last
+  build. **Done in #768 and #799:** deploy.py looks in `WORK_DIR` and asks
+  the pages itself, and `deploy.ps1` asks before it, so a deploy of an
+  unchanged site builds nothing on Netlify and Cloudflare too and a changed
+  one builds once. (This bullet used to say "the assistant always builds,
+  the scheduled wrapper asks its shell twin": both were the mac's shape, not
+  Windows'. On Windows the windowless deploy and the scheduled wrapper built
+  ALWAYS until #799; both ask now.)
 
 ## A deploy asks for itself whether anything changed (#768)
 
@@ -2497,8 +2500,9 @@ build costs a minute, a reused stale one publishes last week's site.
    a new case shape (real time passing the build's date) in two harnesses,
    and Windows' #799, unmerged then, was rewriting the same walk
    (`BuildFreshness.ChangedSince`, `test_build_freshness_reuse.py`). #799 has
-   no fingerprint of its own: it is this rule on Windows. #800's digest is to
-   be computed in that same walk, by each reader, after #799 lands.
+   no fingerprint of its own: it is this rule on Windows. #799 has landed
+   (it is in dev since d75c36543), so #800's digest is to be computed in
+   that same walk, by each reader.
 
    **What a teacher sees while the limit stands:** the deploy reports
    success and students get the last build's pages. It needs a clock that was
@@ -2523,10 +2527,10 @@ marker-against-page test moved to `find` too.
 
 | Reader | Where | Reads the stamp |
 |---|---|---|
-| `toolchain_paths.why_build_before_deploying` | deploy.py (both platforms), deploy.ps1 (owed) | yes |
+| `toolchain_paths.why_build_before_deploying` | deploy.py (both platforms); on Windows also deploy.ps1 before every destination and the scheduled wrapper (`TaskScheduling`), both through the same few lines of Python (`BuildBeforeDeployingQuestion.PythonLines`) | yes |
 | `why_this_deploy_builds_first` (`site_carries_preview_client`, `site_was_built_by_this_toolchain`, `pages_or_clock_ask_for_a_build`) | deploy.sh, every destination | yes |
-| `BuildFreshness.whyRebuild` | the Deploy button, the windowless assistant and MCP deploys | no |
-| `ScheduledDeploy.oneShotCommand`'s shell | a deploy set for later | no |
+| `BuildFreshness.whyRebuild` / `WhyRebuild` | the Deploy button, the windowless assistant and MCP deploys, on both platforms | no |
+| `ScheduledDeploy.oneShotCommand`'s shell | a deploy set for later, on the mac | no |
 
 Every reader asks about a preview's site first: it is not a site to deploy
 whatever else is true, and a preview never stamps its site or leaves a start
@@ -2550,7 +2554,21 @@ shell reader asks `find` twice on the course folder, with `-H` and without;
 Python adds `os.lstat`; the app reads the unresolved path too. The same
 holds one level down: a section folder that is a link and is POINTED at
 another folder changes the link's own times, which the walk reads as an
-entry, so it builds; what is not seen is a change BEHIND such a link. **A link INSIDE the
+entry, so it builds; what is not seen is a change BEHIND such a link. **On
+Windows a JUNCTION inside the course IS followed**, by both Windows readers:
+measured by the #799 plan review with the runtime's Python 3.14.10
+(`os.path.isjunction` true, `islink` false, and `os.walk` descends into it),
+and the app's walk does the same so the two agree; a symbolic link is not
+followed there either. Following one errs toward building. **A junction that
+leads back into the course ends only in the APP's walk**, which keeps a set
+of the folders it reached through junctions. The shared Python has no such
+guard (`os.walk` in `something_in_the_course_is_newer`): measured by #799's
+review with Python 3.14.10, one `back -> course` junction walked in 0.37 s,
+and two did not end in 90 s (it grows exponentially), so `deploy.ps1`,
+`deploy.py` and the scheduled wrapper would hang on such a course rather than
+answer. A known limit of the shared reader, left to its own issue: #799
+changes no shared Python. A teacher's course is unlikely to hold a junction
+loop, but a scheduled run that hangs has nobody watching it. **A symbolic link INSIDE the
 course is still not followed by any reader** (`knownLimits`): a section
 folder kept elsewhere and linked in reads as built after a change behind
 it, while the build follows it. `Media` is not such a link: it is a real
@@ -2593,6 +2611,22 @@ does not print the marker, or a run the app watched would be written twice.
 deploy.py writes nothing: on a Mac it cannot reach the trail, and there it
 builds only for an address or a preview's site.
 
+**On Windows (#799)** every writer is the code that ran the build, and writes
+after its build went through: `deploy.ps1` (`Invoke-BuildFirstWhenAsked`,
+through the guard block's `Write-TrailLine`, for preview, toolchain, pages
+and clock, every destination); `MultiDestinationDeployRunner` after the
+Deploy button's build first (through the pure `TrailLineAfterBuild`, after
+the cancel and failure checks); the windowless deploy (`AssistWorkspace`)
+after its own build; and the scheduled wrapper after its build, through a
+copy of `deploy.ps1`'s `Write-TrailLine` pinned byte for byte. No marker is
+printed on Windows: the wrapper writes the line itself, because the app is
+closed while it runs and nothing reads a log afterwards. One line per build
+holds because each later asker finds the build current: the app or the
+wrapper builds, then `deploy.ps1` asks, reuses, and writes nothing. When the
+app reused but `deploy.ps1` finds `toolchain` (the app does not read the
+stamp: the two `inTheApps` cases), `deploy.ps1` builds and writes the one
+line.
+
 ### A workspace that does not name its toolchain (#748 part 3)
 
 A workspace made without `PLANTOIR_TOOLCHAIN_ID=<its image's tag>` (by hand,
@@ -2622,8 +2656,36 @@ The website builder was Colima's VM (Ubuntu 24.04, kernel 6.8, aarch64),
 the walk run in a throwaway container from `quartz-teacher:dev-test`. A
 file's modification and change times read through the mount are the host's,
 to the nanosecond (measured on one file), so the change time can be trusted
-there. Against a rebuild of a minute the question costs nothing; on Windows,
-under Defender, it is owed as a measurement.
+there. Against a rebuild of a minute the question costs nothing.
+
+**On Windows (#799)**, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200, NTFS, Defender real-time protection ON, runtime Python 3.14.10,
+2026-11-13. SPH3U's example payload copied 9 times under `%TEMP%`: 2,880
+files and 135 folders, 3,015 entries; nothing changed (every entry read):
+
+| Reader | First | Best of 5 |
+|---|---|---|
+| `something_in_the_course_is_newer` (Python, `os.stat` per entry) | 125 ms | 122 ms |
+| `BuildFreshness`'s walk (C#, each entry's own record, `FileSystemInfo.Refresh`) | 170 ms | 150 ms |
+| the same walk with the directory listing's copy of the times | 26 ms | 25 ms |
+| `deploy.ps1`'s whole question as a teacher pays it (Python start, import, the toolchain id from its cache, the preview scan of a 301-page `public\`, the walk) | 235 ms | 210 ms |
+
+The same question after one page was edited (the walk stops at the first
+newer entry): 228 ms, so most of it is the Python start, the id and the
+preview scan. "Cold" cannot be had on this PC without an administrator's
+tool to empty the file cache; the proxy is the first read of a tree this
+session had not read: a test working folder's
+`.toolchain\support\example_content`, last written 2026-10-28, 10,413
+entries: Python 702 ms the first read, 258 ms after; the C# walk, run after
+it, 641 ms then 600 ms (listing times: 89 ms, then 48 ms). About 10 to 15
+times the mac's 10 ms for 3,350 entries, and still a quarter of a second
+against a build of 12 to 74 s (below).
+
+`verify-deploy.ps1` carries the Windows counterpart of verify.sh's proof
+(#799's leg): nothing changed builds nothing and leaves the deployed files
+byte for byte; a page added builds once and leaves ONE trail line; deleted,
+it builds once and leaves the folder; the next deploy builds nothing; and on
+Netlify and Cloudflare a second deploy straight after builds nothing.
 
 `verify.sh` proves end to end that counting the course folder does not make
 every deploy build: a folder deploy with nothing changed builds nothing and
@@ -2653,6 +2715,255 @@ from the image on every build.
 - A Netlify or Cloudflare build by `deploy.sh` whose address is not the
   destination's is built again by deploy.py for the address. That happens
   today and is not a stale path; named so a reviewer does not find it again.
+  The same on Windows after `deploy.ps1`'s own build.
+- **A course that deploys to TWO web hosts builds once per host on EVERY
+  deploy, even with nothing changed** (Russell's ruling on #799, 2026-11-13:
+  each site carries its OWN address, and the cost is accepted). Each leg is
+  built for its own address, Netlify's or Cloudflare's (or that host's own
+  custom domain), so the next leg finds the other address baked in and builds
+  for its own. Measured by #799's third review (three deploys of a Netlify
+  course with a Cloudflare destination too, nothing changed): 1, 3 and 5
+  builds in all, against 1, 2 and 3 before #799, when the second leg rebuilt
+  every time but for an address it never got, so the Cloudflare site
+  carried the Netlify address. So it is one build more than before per
+  unchanged deploy, scheduled nights included. What that costs, on the
+  Lenovo 20QES70500 (i5-8365U, 16 GB): the one extra Cloudflare rebuild
+  measured at the director's gate (`verify-deploy.ps1`'s log) took 69 s, and
+  a section's rebuild here takes 12 to 74 s (the measurement below: 74 s the
+  first time, 12 s the second). No other figure was measured.
+  `verify-deploy.ps1` asserts "a second deploy builds nothing" only for a
+  course with one web destination.
+- **Measured on Windows (#799):** a real native build (`preview.ps1
+  --build-only`, a course of 21 pages and a picture, the Lenovo above, 74 s the
+  first time and 12 s the second) writes NOTHING inside the course: asked at
+  once and 5 s later, after a first build and after a second one, the answer
+  was `reuse` and no entry, the course folder included, was newer than
+  `.build-started`. The first FOLDER deploy of a course makes
+  `.publish_state` at its top (`Record-PublishedPages`), which changes the
+  course folder's own time, so the deploy after it built once (22 s, with
+  one trail line) and the next reused. That is the first item of this list,
+  measured; it happens once in a course's life, as `.netlify_sites` and
+  `.cloudflare_sites` do the first time deploy.py writes them.
+
+### On Windows (#799)
+
+What Windows built of the rule, and the choices a reader of the code cannot
+see the reason for.
+
+- **`deploy.ps1` reads a POSITIVE answer.** The Python prints one word, and
+  only `reuse` with exit 0 reuses; `preview`, `toolchain`, `pages` or `clock`
+  is that reason; anything else (nothing printed, `failed`, a traceback, a
+  word it does not know, a Python that would not start) builds with the
+  toolchain's words, which is what #749's check said for a failure. The
+  issue's "only an empty answer reuses" was REJECTED: an empty stdout is
+  also what a Python that died after replacing `sys.stdout` prints, the one
+  way a failure could read as reuse. `sys.stdout.flush()` comes before
+  `os._exit`, which does not flush. Read only by Windows' own code; nothing
+  shared changed.
+- **A site with files and no front page** (`neverBuilt`; the preflight has
+  already refused an empty one) is asked the preview's client FIRST, then
+  deployed as it stands only if this toolchain stamped it, as deploy.py's
+  `why_this_deploy_builds_first` maps it. The plan mapped it to the stamp
+  alone; its review (M1) found that would have reused a preview's pages on
+  the folder path, which 1.9.3 refused. `test_launcher_rules.ps1` has the
+  case, and it fails on the plan's snippet.
+- **Two call sites, one function.** `Invoke-BuildFirstWhenAsked` is called at
+  the top of the folder branch and at the top of the native run, right
+  after `Enter-NativeRuntime` and BEFORE any token is put in the
+  environment, so a build and its node processes never inherit a deploy
+  token (the review's M3; the stand-in build in `test_launcher_rules.ps1`
+  prints what it inherited, and it is empty). REJECTED: one call before the
+  branch, which would build for a minute and then meet a token refusal;
+  asking early and acting late as deploy.sh does, which deploy.sh needs only
+  because it moves a built site out of the course in between, and Windows
+  has no such move. Nothing between the two places writes inside the course.
+  The refusals that follow a rebuild ("still carries the preview's live
+  updating", "has not appeared") therefore reach Netlify and Cloudflare
+  deploys too, as deploy.sh's always did.
+- **The app's reader** is `BuildFreshness.WhyRebuild` (reasons `neverBuilt`,
+  `frontPageUnreadable`, `preview`, `clock`, `pages`), with the pages and
+  clock half public as `ChangedSince(course, reference, now)`, the one walk
+  (the Coverage tab, #811, reads it too). `ReuseTheLastBuildTests` builds
+  every contract case on the real clock with 50 ms steps (a port of
+  `freshness_cases.py`, JUNCTIONS for the links, since this PC and most
+  teachers' have no Developer Mode) and runs 28 of 29, the knownLimit case
+  skipped by name and pinned so; the two linked-course cases also run
+  through the runtime's Python on junctions, which the Python suite cannot
+  make here. Against 1.9.3's reader five cases went red: the top-level
+  delete and rename, the folder renamed, the clock, the link re-pointed.
+- **Each entry's own times, not the listing's.** The walk reads each entry
+  with `FileSystemInfo.Refresh` (one GetFileAttributesEx) rather than the
+  copy the directory listing carries. The listing is six times cheaper (25
+  ms against 150 ms for 3,015 entries) and agreed in 22 of 22 probes of a
+  file written while held open, but a directory entry's copy is NTFS's to
+  update when it chooses, and a lag is the stale direction; 150 ms once per
+  Deploy is not worth that. A later piece may revisit it with that number.
+- **NTFS tunnelling, measured.** A file DELETED and written again under its
+  name within 15 s is given its old creation time, so with its modification
+  time set back the file itself reads as unchanged and only its folder's
+  time shows it (`APictureDeletedAndWrittenAgainIsCaughtByItsFolderAlone`
+  pins that, so a "files only" simplification fails loudly). A copy MOVED
+  over it (`MoveFileEx` with replace, which is `os.replace` and the
+  contract's `replaceKeepingItsOldTime`) keeps its own new creation time: no
+  tunnelling on that path. The issue said the opposite; it holds for the
+  delete-and-create path only.
+- **A folder that cannot be listed counts as changed** in the app's walk
+  (#799's review, L2): an access-denied folder inside the course answers
+  `pages`, because passing it over would deploy the last build's copy of it
+  (`AFolderThatCannotBeListedCountsAsChanged`, which fails on the code before
+  it). The shared Python's `os.walk` passes such a folder over
+  (`onerror=None`) and reads it as unchanged: a known limit of the shared
+  reader, for the same later issue as the junction loop above. Reach is low:
+  the teacher's own course and a denied ACL. A junction whose TARGET is gone
+  is not such a folder: it is an entry with its own times, read like any
+  other, and is not walked (`ADanglingJunctionInsideTheCourseIsNotAFolderThatCannotBeListed`;
+  the fixes review measured it making every Deploy build before), as
+  `os.walk` passes it over.
+- **A question that FAILED is recorded with the toolchain's words.** A Python
+  that would not start, a traceback or an answer nobody knows builds, and the
+  trail line then says "Plantoir had been updated since it was last built":
+  deploy.sh's choice for the same failure, inherited (#799's review, L3). The
+  words can say an update where there was only a failure; the build itself
+  is the safe direction.
+- **A folder destination with `--logout` or `--reset-token` is refused**
+  (Russell's ruling, 2026-11-13, after #799's two reviews). The flags clear
+  a saved sign-in and deploy nothing. Until #799's first review the folder
+  branch ran for them anyway, and once its question was guarded "not for
+  --reset-token" it mirrored a preview's pages and said "Deployed." (on 1.9.3
+  the same command refused or rebuilt, because the preview check there was
+  not guarded; on the mac today `deploy.sh` mirrors and clears nothing). The
+  first fix sent them on to the token code instead, which cleared the PC's
+  NETLIFY token for a folder course, even one whose web destination is
+  Cloudflare, so a scheduled deploy of another course to Netlify would stop
+  for its token next morning (the fixes review, M1). Now a typed
+  `--to-folder`, or (with no `--target`) a course whose MAIN saved
+  destination is a folder, with either flag and with `--non-interactive` or
+  not, prints `launcherFlags.deployExtras` "--logout" -> `refusedWithAFolder`
+  word for word and exits 1: nothing copied, nothing cleared, and no
+  "Deploying to ..." line (the saved destination's line is no longer printed
+  before a sign-out at all, the review's L1). A purely web course signs out
+  exactly as before, and so does one whose folder is only an ADDITIONAL
+  destination, because with either flag the launcher looks only at the main
+  one (`savedDestinations.note`). The folder branch keeps `-not $RESET_TOKEN`
+  as a belt. `test_launcher_rules.ps1` has seven refusal rows (each red on
+  the code before) and four sign-out rows that still clear a token.
+  REJECTED: dropping the condition only (it still mirrors under a flag that
+  deploys nothing), and clearing the token `--target` names (it clears one
+  the course never uses).
+- **A Cloudflare deploy of an unchanged site built every time, for its
+  ADDRESS, not its pages.** The director's plain `verify-deploy.ps1` found
+  it at #799's gate: "a second Cloudflare deploy with nothing changed built
+  again" took 69 s, while Netlify's second deploy built nothing in 5 s.
+  - **What happened:** `deploy.ps1`'s question answered `reuse`. Then
+    `deploy.py`'s address check found the build's `baseUrl` was the NETLIFY
+    address, and rebuilt "for production".
+  - **Why:** `build_site.resolve_section_domain` read the Netlify record
+    before the Cloudflare one, whatever the course deployed to. This course
+    had both records, as any course deployed to both, or moved from
+    Netlify to Cloudflare, has. The rebuild resolved the same Netlify
+    address again, so every Cloudflare deploy rebuilt, and the live
+    Cloudflare site's social cards named the Netlify site.
+  - **Reproduced offline,** with a real native build of a scratch course
+    carrying both records: the build said `Set Quartz baseUrl ->
+    "...netlify.app"`, then `deploy.py for ...pages.dev -> REBUILDS`.
+  - **Fixed in the shared Python, in two parts:**
+    - The PRIMARY destination's record is read first, so a Cloudflare course
+      gets its `pages.dev` address.
+    - `deploy.py` hands its own rebuild the destination's address in
+      `PLANTOIR_DEPLOY_BASE_URL`, set on that one build only, so a rebuild
+      for an address comes out with that address. That includes a Cloudflare
+      leg of a Netlify-primary course; such a course still rebuilds once per
+      leg for the address ("Known extra builds").
+    - **The address a leg is built for is its OWN CUSTOM DOMAIN when the
+      course records one** (`deploy.leg_custom_domain`, which asks
+      `custom_domains.for_destination`, the one Python reader since #904:
+      `custom_domains.sections.section<N>[<leg's type>]`, or the older bare
+      string for the primary alone, as `contracts/file-formats.json` →
+      `customDomainReading` says), else the
+      service's host. #799's third review measured why (H1): Cloudflare's
+      record only ever names `<project>.pages.dev` (a custom domain lives in
+      the project's own `domains`, which nothing here reads), so the first
+      fix rebuilt a Cloudflare course with a custom domain as `pages.dev`
+      and its sharing cards, sitemap and feed dropped the teacher's domain.
+      Netlify's `ssl_url` IS the custom domain once it is attached on
+      Netlify's side (by reading; not measured, no credentials), so a
+      Netlify course was mostly spared, but a recorded domain that differs
+      from Netlify's primary one (apex against `www`) now wins, because it
+      is what Plantoir links to. The same address names the Netlify site's
+      own links on the way up (`own_host`). The variable is used as given,
+      whatever its shape, because it is already the leg's right address.
+      It cannot break `quartz.config.ts`: `patch_quartz_base_url` writes it
+      through `typescript_string` (#871), which escapes a quote, a backslash
+      and a line break (`test_typescript_strings.py` →
+      `test_the_base_url_reads_back_and_is_replaced_whole`). **Rejected: a
+      host-name shape check** (letters, digits, dots, hyphens, an optional
+      port; the third review's L2), which resolved a value it refused as if
+      the variable were unset. The fourth review measured what that did
+      (M1): for the SECOND destination of a two-host course, a Cloudflare
+      domain of `cours.école.ca` (a Unicode domain, as a French-language
+      school types it) or `c.school.ca.` (a trailing dot) fell through to the
+      records, which follow the primary, so the Cloudflare site went out
+      carrying the NETLIFY address and rebuilt on every deploy. A value with
+      a path (`school.ca/cs`) was refused the same way. Punycoding the
+      domain was not taken either: Quartz would then write the `xn--` host
+      in `og:image`, valid but not the address the app links to.
+  - **Measured after the fix,** with the same reproduction: the build sets
+    `pages.dev` and `deploy.py` reuses, and a Netlify course still builds
+    with, and reuses, its `netlify.app` address.
+  - **Tests:** six new shared tests in `test_build_site_domain_resolution.py`
+    and `test_build_freshness_reuse.py` fail on the old code. The first file
+    imports nothing new: it reads `deploy.py` as text. `verify-deploy.ps1`
+    now also reads each live site's `og:image` host and requires it to be
+    the site's own. Since the fourth review, `test_build_freshness_reuse.py`
+    → `EachLegCarriesItsOwnAddressOverRepeatedDeploys` drives the real
+    `publish_to_cloudflare` and `ensure_base_url_and_rebuild` over three
+    unchanged deploys, the services stubbed and the rebuild stood in for by
+    `build_site.resolve_section_domain` with the variable set: a Cloudflare
+    course with its own domain builds nothing and keeps it (red on
+    66dec8fc2's `deploy.py`: one rebuild, for `pages.dev`), and a second
+    destination with `cours.école.ca`, `c.school.ca.` or a path builds once
+    for its own address and reuses it (red with the shape check: three
+    builds, each for the primary's address). That file already imported
+    `deploy`; it now imports `build_site` too, which the image carries and
+    `test_build_site_domain_resolution.py` imports inside it.
+  - **The mac, by reading only (not measured on a Mac):** it has the same
+    fault, because it runs the same `resolve_section_domain` and the same
+    `ensure_base_url_and_rebuild` inside the website builder. So a mac course
+    deploying to Cloudflare with a Netlify record rebuilt on every Cloudflare
+    deploy too. `verify-deploy.sh` asks no "second deploy builds nothing"
+    question, so it could not see it.
+- **Hidden is the NAME**, never the attribute: the walk skips no attribute (a
+  default `EnumerationOptions` skips Hidden and System, the #272 trap), and
+  a folder given the Hidden attribute without a dot is read (a Windows-only
+  test, proven to fail with the attributes skipped). Not proposed as a
+  contract case: it would oblige the mac to make a Finder-flag fixture for a
+  rule its readers already follow.
+- **Every way of deploying asks, on Windows as on the mac.** The windowless
+  deploy (`AssistWorkspace.Deploy`, the assistant without a window and
+  `plantoir-mcp`) built ALWAYS until #799; it asks `WhyRebuild` now, as the
+  mac's `AssistSiteWork.deploy` does. The deploy set for later (the Task
+  Scheduler wrapper, `TaskScheduling.WriteWrapperScript`) built always too
+  ("Build first, always"); since Russell's ruling of 2026-11-13 it follows
+  #768: it asks the runtime's Python with the same lines `deploy.ps1` asks
+  (pinned byte for byte), builds when the answer is not a plain `reuse` and
+  when there is no front page, and writes the trail line itself. A night
+  that reuses runs no build, so it captures no folder findings: the record
+  the last build left still describes the site being deployed, and stays.
+  **Measured for real** (#799's review asked): the generated wrapper run
+  three times by hand against a scratch working folder, the real launchers,
+  the runtime's Python and NO `PLANTOIR_TOOLCHAIN_ID`, as in production, one
+  folder destination, nothing registered with Task Scheduler. Night 1 built
+  (`neverBuilt`, 120 s), night 2 built ONCE MORE for the pages (34 s),
+  because night 1's folder deploy made `.publish_state` at the course's top,
+  and night 3 reused (6 s, no trail line). Each build left one trail line,
+  and `deploy.ps1` after the wrapper never built. So the wrapper names the
+  same toolchain as `deploy.ps1`, and a course's second night pays the
+  `.publish_state` build once, as "Known extra builds, each once" says.
+  REJECTED for the wrapper: `BuildFreshness` (the app is closed while it
+  runs) and leaving the build to each `deploy.ps1` leg (the wrapper's build
+  is where the folder findings and the "needed an answer" outcome are
+  captured, and moving them would change what a teacher is told in the
+  morning).
 
 ### Rejected
 

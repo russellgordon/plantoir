@@ -33,7 +33,7 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
 
     public ObsidianFigureAddOnsTests()
     {
-        _root = Directory.CreateTempSubdirectory("plantoir-581-").FullName;
+        _root = Directory.CreateTempSubdirectory(RootPrefix + RunOwnedTempFolders.ThisRun + "-").FullName;
         ObsidianFigureAddOnsThisRun.Forget();
     }
 
@@ -893,19 +893,22 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
         info.SetAccessControl(security);
     }
 
-    /// <summary>A run killed mid-case leaves a denied folder behind; take the deny off and remove it before starting.</summary>
-    private static void SweepStaleDeniedFolders()
-    {
-        foreach (string stale in Directory.EnumerateDirectories(Path.GetTempPath(), "plantoir-581-*"))
+    /// <summary>
+    /// Each test's root, named for the process that owns it (#882). Deliberately
+    /// NOT <c>plantoir-581-…</c>: that sweep, still in older copies of this suite,
+    /// deleted every matching folder holding a denied case, a RUNNING suite's
+    /// included.
+    /// </summary>
+    internal const string RootPrefix = "plantoir-figures-";
+
+    /// <summary>A run killed mid-case leaves a denied folder behind; take the deny off and remove it, but only once the run that made it is provably gone.</summary>
+    private static void SweepStaleDeniedFolders() =>
+        RunOwnedTempFolders.SweepOrphans(RootPrefix, stale =>
+        {
             foreach (string denied in Directory.EnumerateDirectories(stale, "plantoir-581-acl-*"))
             {
-                try
-                {
-                    string plugins = Path.Combine(denied, "course", ".obsidian", "plugins");
-                    if (Directory.Exists(plugins)) AllowWriting(plugins);
-                    Directory.Delete(stale, recursive: true);
-                }
-                catch { }
+                string plugins = Path.Combine(denied, "course", ".obsidian", "plugins");
+                if (Directory.Exists(plugins)) AllowWriting(plugins);
             }
-    }
+        });
 }

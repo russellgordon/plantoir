@@ -218,9 +218,21 @@ each of those stopped the build. The four new build tests fail on the old file
 (2 failures, 6 errors) and pass on the new. The mac's reader handed a
 folder-primary course's bare string to its FOLDER leg (harmless, since a
 folder deploy announces no site address for the link to wear, and corrected
-for the rule's sake). On Windows' #799 branch, `deploy.py` gained its own
-`leg_custom_domain`, which already follows the rule; once #799 merges it is to
-call `custom_domains.for_destination` rather than keep a second copy.
+for the rule's sake). Windows' #799 gave `deploy.py` its own
+`leg_custom_domain`, written at the same time as this. Measured by the Fable
+sweep of the batch on a trial merge with dev: its body and
+`custom_domains.for_destination` differed on 4 of 24 shapes, two of them
+contract cases (a folder asked for its domain got the older bare string, or
+one written under its name) and two that no writer produces (a
+`deploy_target` that is a list or a number). None was reachable, since it is
+called only for `netlify` and `cloudflare_pages`. At the merge with dev
+(2026-11-14) it keeps its read of `course_config.json` and asks
+`custom_domains.for_destination`, and `build_site.py` asks
+`custom_domains.primary_destination_type` for the primary's order of marker
+files, so the shared Python reads the key one way. `test_custom_domains.py` →
+`DeployAsksTheSameReader` runs every case through `leg_custom_domain` too and
+reads `deploy.py` for any other `.get("custom_domains")`; on #799's body it
+fails the two contract cases.
 One baked address moves, and only one (the #904 implementation review, old
 tree against new): a course whose primary is a FOLDER, with the older bare
 string and a Netlify (or Cloudflare) secondary, used to bake the bare string

@@ -9,7 +9,8 @@ have more than one destination, a bare string that belongs to the PRIMARY
 destination (`deploy_target`, Netlify when it is absent) and to no other.
 
 Before #904 build_site.py read this itself, and differently from deploy.py's
-own reader (#799's `leg_custom_domain`) and both apps: it applied a bare
+own reader (#799's `leg_custom_domain`, which now asks this module too) and
+both apps: it applied a bare
 string to a course whose primary destination is a folder, which has no site
 address, and it raised on an entry that was a list or a number, which every
 other reader treats as no domain. One function now answers for every Python

@@ -450,6 +450,67 @@ public sealed class InstallerRunningWorkTests
         Assert.True(publish.IndexOf("$missingPublished = ", StringComparison.Ordinal) < publish.IndexOf("& $iscc ", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// #862: since the ordinary suite compares the ledger with the last release
+    /// Windows shipped, the cut is guarded by <c>publish.ps1</c>, which runs
+    /// <see cref="NamedGapLedgerTests"/> with the baseline switched to the
+    /// csproj's <c>&lt;Version&gt;</c> before anything is built or signed,
+    /// judges the run by its totals, and refuses only with <c>-Sign</c> (or
+    /// <c>-CheckLedgerOnly</c>); an unsigned test bundle is warned. Read from
+    /// the script, because running it from inside this suite would build the
+    /// suite's own project underneath it. The refusal itself was measured by
+    /// running <c>publish.ps1 -CheckLedgerOnly</c> (documentation 12 → "Named gaps").
+    /// </summary>
+    [Fact]
+    public void PublishRefusesASignedCutWhileTheLedgerOwesThisRelease()
+    {
+        string publish = Publish;
+        Assert.Contains("[switch]$CheckLedgerOnly,", publish);
+        Assert.Contains($"$env:{NamedGapLedgerTests.BaselineSwitch} = 'build'", publish);
+        Assert.Contains($"'--filter', 'FullyQualifiedName~{nameof(NamedGapLedgerTests)}'", publish);
+        Assert.Contains(". \"$PSScriptRoot\\TestRunOutcome.ps1\"", publish);
+        Assert.Contains("$ledgerOutcome = Get-TestRunOutcome -Output $ledgerRun.Output -ExitCode $ledgerRun.ExitCode", publish);
+        Assert.Contains("if ($ledgerOutcome.Verdict -ne 'Passed') {", publish);
+        // Enforced with -Sign and the check-only switch; a warning otherwise.
+        Assert.Contains("$enforceLedger = $Sign -or $CheckLedgerOnly", publish);
+        Assert.Matches(new Regex(@"if \(\$enforceLedger\) \{\s*throw "), publish);
+        Assert.Contains("Write-Warning \"$ledgerMessage", publish);
+        Assert.Contains("if ($CheckLedgerOnly) { return }", publish);
+        // Before the signing preflight (so no az login is needed to be refused)
+        // and before anything is published.
+        int check = publish.IndexOf("$ledgerOutcome = Get-TestRunOutcome", StringComparison.Ordinal);
+        Assert.True(check < publish.IndexOf("az account show", StringComparison.Ordinal));
+        Assert.True(check < publish.IndexOf("dotnet publish Plantoir\\Plantoir.csproj", StringComparison.Ordinal));
+        Assert.True(publish.IndexOf("if ($CheckLedgerOnly) { return }", StringComparison.Ordinal)
+                    < publish.IndexOf("$missingVendor = ", StringComparison.Ordinal));
+        // Reachable on every run (#862 review L3): the switch that enforces it
+        // is set once and never reassigned, and the run, its verdict and the
+        // refusal sit at the script's top level, inside no condition.
+        Assert.Single(Regex.Matches(publish, @"\$enforceLedger\s*="));
+        foreach (string line in new[] { "$enforceLedger = $Sign -or $CheckLedgerOnly",
+                                        "$env:PLANTOIR_LEDGER_BASELINE = 'build'",
+                                        "$ledgerOutcome = Get-TestRunOutcome",
+                                        "if ($ledgerOutcome.Verdict -ne 'Passed') {",
+                                        "if ($CheckLedgerOnly) { return }" })
+        {
+            int at = publish.IndexOf(line, StringComparison.Ordinal);
+            Assert.True(at >= 0, $"publish.ps1 no longer has: {line}");
+            Assert.True(BraceDepthAt(publish, at) == 0, $"publish.ps1 puts \"{line}\" inside a block, so it may not run.");
+        }
+    }
+
+    /// <summary>How many <c>{</c> are open at <paramref name="index"/> in a comment-stripped script.</summary>
+    private static int BraceDepthAt(string script, int index)
+    {
+        int depth = 0;
+        for (int i = 0; i < index; i++)
+        {
+            if (script[i] == '{') depth++;
+            else if (script[i] == '}') depth--;
+        }
+        return depth;
+    }
+
     [Fact]
     public void FetchLlamaRefusesAZipThatIsNotThePinnedOne()
     {
