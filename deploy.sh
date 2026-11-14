@@ -890,9 +890,15 @@ NETLIFY_TOKEN_REFUSED=$'"code":[ \t]*4[0-9][0-9]'
 # writes it even when it gets no answer at all, as 000. No -f, so a 401 is
 # READ rather than turned into an exit code that looks like a dropped
 # network.
+#
+# The header reaches curl on its STANDARD INPUT (`-H @-`), never in its
+# arguments (#696, review W3): a process's arguments are visible to every
+# program on the Mac through `ps` for as long as it runs, up to the 20 s
+# timeout, and until #696 every check showed the token there. printf is a
+# shell builtin, so the token is in no process's arguments at any point.
 http_answer() {
-  curl -sS --max-time 20 -w '\n%{http_code}' \
-    -H "Authorization: Bearer ${2:-}" "${1:-}" 2>/dev/null || true
+  printf 'Authorization: Bearer %s\n' "${2:-}" \
+    | curl -sS --max-time 20 -w '\n%{http_code}' -H @- "${1:-}" 2>/dev/null || true
 }
 # $1 the status, $2 the body, $3 and $4 the two patterns described above.
 # The one classifier: token_check_answer and the --token mode (#696) both
@@ -929,7 +935,19 @@ token_check_answer() {
   answer="$(http_answer "$url" "$token")"
   code="${answer##*$'\n'}"
   body="${answer%$'\n'*}"
-  token_answer_word "$code" "$body" "$body_must_say" "$refusal_must_say"
+  local word
+  word="$(token_answer_word "$code" "$body" "$body_must_say" "$refusal_must_say")"
+  # A deploy to Cloudflare asks for the token's end date with the same
+  # answer rather than a second request (#696, review M4): with
+  # TOKEN_CHECK_SAYS_THE_END set, an accepted answer is followed by the end
+  # date, or "none". The call site reads the first word as before.
+  if [[ "$word" == "accepted" && "${TOKEN_CHECK_SAYS_THE_END:-}" == "true" ]]; then
+    local ends
+    ends="$(cloudflare_token_end "$body")"
+    echo "accepted ${ends:-none}"
+    return 0
+  fi
+  echo "$word"
 }
 # END token_check_answer
 
@@ -967,13 +985,17 @@ PY
 #
 # The shape, every answer and problem word, the paste rule and the cases are
 # contracts/shared-rules.json -> deployTokens; documentation/07-deployment.md
-# -> "Deploy tokens (#696)" says why, what was measured and what was
+# -> "Deploy tokens in Settings, and a token checked before it is saved
+# (#696)" says why, what was measured and what was
 # rejected. It runs here, above every course-shaped step, so it never starts
 # the website builder and answers in about the time two requests take.
 #
 # `save` reads the token from standard input (all of it), never from an
 # argument or the environment, because both can be read by other programs
-# while this runs.
+# while this runs, and every request below hands it to curl the same way
+# (http_answer). The store's own writer, set_token_keychain, still passes it
+# to the store tool as an argument for an instant, as it always has: that and
+# the older paste checks are a follow-up of their own.
 
 # The paste rule (deployTokens.paste): what is kept of what was pasted. Sets
 # TIDIED_TOKEN, and TOKEN_PASTE_PROBLEM to tokenEmpty, tokenHasSpaces or
@@ -985,7 +1007,8 @@ PY
 # leading "Bearer " in any case, which a page that shows the whole header
 # invites copying. Whitespace left INSIDE is refused rather than removed,
 # because a token never has any and a paste with some is two things pasted.
-# Anything that is not printable ASCII (a curly quote, say) is refused too.
+# Anything that is not printable ASCII (a curly quote, say), or a straight
+# quote mark, is refused too, and so is "Bearer" with nothing after it.
 # BEGIN token_paste_rule
 tidy_pasted_token() {
   local LC_ALL=C
@@ -1009,7 +1032,8 @@ tidy_pasted_token() {
       stripped_bearer="true"
     fi
   done
-  if [[ -z "$tidied" ]]; then
+  # "Bearer" alone is the header's word with nothing after it.
+  if [[ -z "$tidied" || "$tidied" =~ ^[Bb][Ee][Aa][Rr][Ee][Rr]$ ]]; then
     TOKEN_PASTE_PROBLEM="tokenEmpty"
     return 1
   fi
@@ -1017,7 +1041,10 @@ tidy_pasted_token() {
     TOKEN_PASTE_PROBLEM="tokenHasSpaces"
     return 1
   fi
-  if [[ "$tidied" =~ [^!-~] ]]; then
+  # Not printable ASCII, or a quote mark of any kind: no host's token has
+  # one, and a token copied out of a document arrives inside them.
+  local quotes="[\"'\`]"
+  if [[ "$tidied" =~ [^!-~] || "$tidied" =~ $quotes ]]; then
     TOKEN_PASTE_PROBLEM="tokenNotPlainText"
     return 1
   fi
@@ -1107,13 +1134,16 @@ token_settings_check() {
 }
 
 # Can this token reach one class website deployed from this folder?
-# Answers reachable, unreachable or unheard (deployTokens.reachability).
-# Netlify: GET /sites/{id} of the site the section's marker names. Cloudflare:
-# GET the project the marker names in the account. "unreachable" is the
-# service's own 401, 403 or 404, because that is what makes the next deploy
-# create a NEW site at a new address and report success (deploy.py, where a
-# 404 on the saved site starts "Creating a fresh Netlify site", and
-# remake_pages_project_if_gone). Anything else is unheard.
+# Answers reachable, unreachable, unheard or unchecked
+# (deployTokens.reachability). Netlify: GET /sites/{id} of the site the
+# marker names. Cloudflare: GET the project the marker names in the account.
+# "unreachable" is the service's own 401, 403 or 404, because that is what
+# makes the next deploy create a NEW site at a new address and report success
+# (deploy.py, where a 404 on the saved site starts "Creating a fresh Netlify
+# site", and remake_pages_project_if_gone). A marker that cannot be read, or
+# names its site in a shape no host gives, is unheard rather than passed over
+# (review I2). "unchecked" is a Cloudflare marker with no Account ID to look
+# it up in; the caller decides what that means.
 site_reachability() {
   local target="$1" token="$2" account="$3" marker="$4"
   local key url answer code body pattern
@@ -1122,19 +1152,21 @@ site_reachability() {
   else
     key="name"; pattern="$CLOUDFLARE_TOKEN_REFUSED"
   fi
-  # Top-level only: the markers are written by deploy.py with indent=2, and
-  # a Netlify site carries other "id"s further in.
+  # Top-level only: deploy.py and share_plan.py write the markers with
+  # indent=2, and the app's own pretty-printing of a plans marker writes
+  # `"name" : "…"`, so both spellings of the colon are read. A Netlify site
+  # carries other "id"s further in, at a deeper indent.
   local value
-  value="$(grep -E "^  \"${key}\": \"[^\"]+\"" "$marker" 2>/dev/null | head -n 1 \
-    | sed -E 's/^  "[a-z]+": "([^"]+)".*$/\1/' || true)"
+  value="$(grep -E "^  \"${key}\"[ 	]*:[ 	]*\"[^\"]+\"" "$marker" 2>/dev/null | head -n 1 \
+    | sed -E 's/^  "[a-z]+"[ 	]*:[ 	]*"([^"]+)".*$/\1/' || true)"
   if [[ -z "$value" || ! "$value" =~ ^[A-Za-z0-9._-]+$ ]]; then
-    echo "reachable"
+    echo "unheard"
     return 0
   fi
   if [[ "$target" == "netlify" ]]; then
     url="https://api.netlify.com/api/v1/sites/${value}"
   else
-    [[ -n "$account" ]] || { echo "reachable"; return 0; }
+    [[ -n "$account" ]] || { echo "unchecked"; return 0; }
     url="https://api.cloudflare.com/client/v4/accounts/${account}/pages/projects/${value}"
   fi
   answer="$(http_answer "$url" "$token")"
@@ -1148,24 +1180,98 @@ site_reachability() {
   esac
 }
 
-# The markers of every section this folder has deployed to one destination,
-# one path per line. Only a marker in a course's own folder counts; a
-# course whose folder name starts with a dot is being made and is skipped.
+# The markers of the class websites this folder has deployed to one
+# destination, one path per line; with a course (and a section, or "plans"),
+# only that deploy's own. A section's LIVE marker is `section<N>.json` and
+# nothing else: a section cut loose for a new year keeps last year's as
+# `section<N>.previous-<stamp>.json` (DeployCommand.releasedMarkerName,
+# file-formats.json -> firstDeployMarkers), which no deploy reads, and a
+# reference copy renames a plans marker the same way (review W1). A course
+# whose folder name starts with a dot is being made, and the glob skips it.
+#   Netlify: courses/<C>/.netlify_sites/section<N>.json, or, for a section
+#     with none, the old place deploy.py still moves on the next deploy,
+#     courses/<C>/.merged_output/section<N>/.netlify_site.json.
+#   Cloudflare: courses/<C>/.cloudflare_sites/section<N>.json, and a
+#     course's shared unit plans, courses/<C>/.cloudflare_sites/plans-<year>.json.
 deployed_section_markers() {
-  local target="$1" folder marker
-  if [[ "$target" == "netlify" ]]; then folder=".netlify_sites"; else folder=".cloudflare_sites"; fi
-  for marker in courses/*/"$folder"/section*.json; do
+  local target="$1" only_course="${2:-}" only_section="${3:-}"
+  local marker name course section
+  if [[ "$target" == "netlify" ]]; then
+    for marker in courses/*/.netlify_sites/*.json; do
+      [[ -f "$marker" ]] || continue
+      name="${marker##*/}"
+      [[ "$name" =~ ^section[0-9]+\.json$ ]] || continue
+      if marker_is_wanted "$marker" "$only_course" "$only_section"; then printf '%s\n' "$marker"; fi
+    done
+    for marker in courses/*/.merged_output/section*/.netlify_site.json; do
+      [[ -f "$marker" ]] || continue
+      course="${marker#courses/}"; course="${course%%/*}"
+      section="${marker%/.netlify_site.json}"; section="${section##*/section}"
+      [[ "$section" =~ ^[0-9]+$ ]] || continue
+      [[ ! -f "courses/${course}/.netlify_sites/section${section}.json" ]] || continue
+      if marker_is_wanted "$marker" "$only_course" "$only_section"; then printf '%s\n' "$marker"; fi
+    done
+    return 0
+  fi
+  for marker in courses/*/.cloudflare_sites/*.json; do
     [[ -f "$marker" ]] || continue
-    printf '%s\n' "$marker"
+    name="${marker##*/}"
+    [[ "$name" =~ ^section[0-9]+\.json$ || "$name" =~ ^plans-[0-9]{4}\.json$ ]] || continue
+    if marker_is_wanted "$marker" "$only_course" "$only_section"; then printf '%s\n' "$marker"; fi
   done
 }
 
-# "COURSE/SECTION" for a marker's path.
+# "COURSE/SECTION" (or "COURSE/plans-<year>") for a marker's path.
 marker_place() {
-  local path="$1" course section
+  local path="$1" course name
   course="${path#courses/}"; course="${course%%/*}"
-  section="${path##*/section}"; section="${section%.json}"
-  printf '%s/%s' "$course" "$section"
+  if [[ "$path" == */.netlify_site.json ]]; then
+    name="${path%/.netlify_site.json}"; name="${name##*/section}"
+    printf '%s/%s' "$course" "$name"
+    return 0
+  fi
+  name="${path##*/}"; name="${name%.json}"
+  if [[ "$name" == section* ]]; then name="${name#section}"; fi
+  printf '%s/%s' "$course" "$name"
+}
+
+# Whether a marker belongs to the deploy asked about: every marker when no
+# course is given; else that course's, and that section's (or, for
+# "plans", the course's plans markers).
+marker_is_wanted() {
+  local marker="$1" only_course="$2" only_section="$3" place
+  [[ -n "$only_course" ]] || return 0
+  place="$(marker_place "$marker")"
+  if [[ "$only_section" == "plans" ]]; then
+    [[ "$place" == "${only_course}/plans-"* ]]
+    return
+  fi
+  [[ "$place" == "${only_course}/${only_section}" ]]
+}
+
+# A token pasted at a deploy, tried against that deploy's own website(s)
+# before it is saved (#696, review MUST 1). Prints nothing and returns 0 when
+# it may be saved; prints the two lines and exits 1 when not.
+check_the_pasted_token_for_this_deploy() {
+  local target="$1" token="$2" account="$3" service marker reach
+  if [[ "$target" == "netlify" ]]; then service="Netlify"; else service="Cloudflare"; fi
+  local only="${SECTION_NUM}"
+  if [[ "$PLANS_MODE" == "true" ]]; then only="plans"; fi
+  while IFS= read -r marker; do
+    [[ -n "$marker" ]] || continue
+    reach="$(site_reachability "$target" "$token" "$account" "$marker")"
+    case "$reach" in
+      unreachable) say_token_not_saved tokenCannotReachSite "$service"; exit 1 ;;
+      unheard|unchecked) say_token_not_saved siteNotChecked "$service"; exit 1 ;;
+    esac
+  done < <(deployed_section_markers "$target" "$COURSE_CODE" "$only")
+}
+
+# Whether this deploy has any website of its own to try a pasted token on.
+this_deploy_has_a_marker() {
+  local only="${SECTION_NUM}"
+  if [[ "$PLANS_MODE" == "true" ]]; then only="plans"; fi
+  [[ -n "$(deployed_section_markers "$1" "$COURSE_CODE" "$only")" ]]
 }
 
 token_mode_answer() {
