@@ -146,7 +146,8 @@ public static class ClaudeCodeLauncher
     /// started, so the caller can say so rather than leaving a teacher looking
     /// at nothing. <paramref name="greeting"/> is Fix with Claude…'s message
     /// (#736, <see cref="FixWithAssistant"/>); null is Revise With ▸'s plain
-    /// <see cref="Greeting"/>.
+    /// <see cref="Greeting"/>, which ends with the unit-planning sentence when
+    /// <paramref name="unitPlans"/> is given (#790; <see cref="Prepare"/>).
     /// </summary>
     /// <remarks>
     /// Started by <see cref="OutsideDoor.StartInfo"/>: <c>claude.exe</c>
@@ -158,7 +159,8 @@ public static class ClaudeCodeLauncher
     /// cmd read it as part of the command (documentation/12-windows-app.md →
     /// "What the outside doors hand to Windows, and how").
     /// </remarks>
-    public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null)
+    public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null,
+                            Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null)
     {
         string? claude = FindClaude();
         string? server = FindServer();
@@ -168,13 +170,12 @@ public static class ClaudeCodeLauncher
         try { configPath = WriteConfig(workspacePath, courseCode, server); }
         catch { return false; }
 
-        string prompt = greeting ?? Greeting(courseCode, courseName);
-        var arguments = Arguments(configPath, prompt);
+        var session = Prepare(configPath, courseCode, courseName, unitPlans, greeting, claude);
         // Refuse rather than start into a command line cmd will reject as too
         // long and leave at a silent prompt — Revise With ▸'s plain greeting
         // puts no cap on the course's name. No "assistant opened" line then.
-        if (!OutsideDoor.WithinCommandLineLimit(claude, arguments)) return false;
-        if (!OutsideDoor.Start(OutsideDoor.StartInfo(claude, arguments, workspacePath)))
+        if (!OutsideDoor.WithinCommandLineLimit(claude, session.Arguments)) return false;
+        if (!OutsideDoor.Start(OutsideDoor.StartInfo(claude, session.Arguments, workspacePath)))
             return false;
 
         // outsideAgents.agents[claude].trailLine (#210). This door shipped
@@ -182,9 +183,45 @@ public static class ClaudeCodeLauncher
         // Claude, watched it change pages and then reported a problem left a
         // trail with no sign of the session that did the changing.
         Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AssistantOpened,
-            $"started Claude Code for {courseCode}");
+            session.TrailText);
         return true;
     }
+
+    /// <summary>
+    /// What <see cref="Open"/> hands to <c>claude</c> and writes on the trail,
+    /// with nothing started: the argv (<see cref="Arguments"/>) around the
+    /// opening message, and the "assistant opened" line. With no
+    /// <paramref name="openingMessage"/> the message is the plain
+    /// <see cref="Greeting"/>, told about <paramref name="unitPlans"/>, and the
+    /// line gains <see cref="Plantoir.Core.Models.UnitPlans.TrailClause"/>
+    /// (<c>greetingUnitPlans.trail</c>); an opening message (Fix with…,
+    /// Plan a Unit…) replaces the greeting, so neither the sentence nor the
+    /// clause rides along (<c>greetingUnitPlans.where</c>). Null
+    /// <paramref name="unitPlans"/> is a door that says nothing about unit
+    /// planning: a course kept for reference, which no door opens on.
+    /// <c>UnitPlansGreetingTests</c> walks <c>greetingUnitPlansCases</c>
+    /// through this and <see cref="CodexLauncher.Prepare"/>.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="program"/> is the <c>claude</c> the door will start:
+    /// given, the greeting names fewer plans when all six would push the
+    /// command line past its limit (<see cref="OutsideDoor.GreetingThatFits"/>,
+    /// 790a review M2). The trail clause still counts every plan.
+    /// </remarks>
+    public static OutsideDoor.Session Prepare(string configPath, string courseCode, string courseName,
+                                              Plantoir.Core.Models.UnitPlans.Reading? unitPlans, string? openingMessage,
+                                              string? program = null)
+    {
+        string trail = TrailLinePrefix + courseCode;
+        if (openingMessage is not null) return new OutsideDoor.Session(Arguments(configPath, openingMessage), trail);
+        if (unitPlans is not null) trail += Plantoir.Core.Models.UnitPlans.TrailClause(unitPlans);
+        var arguments = OutsideDoor.GreetingThatFits(program, unitPlans,
+            named => Arguments(configPath, Greeting(courseCode, courseName, unitPlans, named)));
+        return new OutsideDoor.Session(arguments, trail);
+    }
+
+    /// <summary><c>outsideAgents.agents[claude].trailLine</c>, before the course.</summary>
+    internal const string TrailLinePrefix = "started Claude Code for ";
 
     /// <summary>
     /// Whether a message would keep this door's whole command line under
@@ -216,12 +253,49 @@ public static class ClaudeCodeLauncher
         "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
 
     /// <summary>
-    /// The opening message. It names the course and points at the plan tools,
-    /// because the safety of every write here depends on a plan being shown to
-    /// the teacher first — and an assistant that starts by reading is far more
-    /// useful than one that starts by asking what to do.
+    /// <c>outsideAgents.greetingHandoutsSentence</c> (the mac's #859 piece A).
+    /// Said today only at the end of Plan a Unit's message
+    /// (<see cref="PlanAUnit.OpeningMessage"/>, <c>planAUnit.courseIsNamedAs</c>);
+    /// the Revise greeting and Fix with…'s message do not carry it yet: that is
+    /// #895, held by name in <c>NamedGapLedger.FixWithGreetingCases</c>.
     /// </summary>
-    internal static string Greeting(string courseCode, string courseName)
+    internal const string HandoutsSentence =
+        "In your first reply, also tell me in one sentence that you can make printed handouts, worksheets and quizzes "
+        + "for this course, each with its answer key, as good-looking PDFs with diagrams and graphs, "
+        + "following the plantoir-handouts guide.";
+
+    /// <summary>
+    /// The opening message of a Revise door: <see cref="PlainGreeting"/>, then
+    /// each sentence that follows it in the order
+    /// <c>app-rules.json</c> → <c>outsideAgents</c> fixes, one space before
+    /// each, and the whole text's double quotes made apostrophes
+    /// (<c>greetingCarriesNoDoubleQuotes</c>), a plan's name included.
+    /// </summary>
+    /// <remarks>
+    /// The order is <c>greetingReferenceCourses.where</c> then
+    /// <c>greetingUnitPlans.where</c>: the reference-courses sentence (#856,
+    /// owned on Windows by #880 and not said here yet) goes BETWEEN the plain
+    /// greeting and the unit-plans sentence, as its own entry in
+    /// <c>sentences</c>, so adding it changes neither function's shape.
+    /// </remarks>
+    internal static string Greeting(string courseCode, string courseName,
+                                    Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null,
+                                    int mostNamed = Plantoir.Core.Models.UnitPlans.MostUnitsNamed)
+    {
+        var sentences = new List<string> { PlainGreeting(courseCode, courseName) };
+        // #880: greetingReferenceCourses' sentence is added here, before the unit plans'.
+        if (unitPlans is not null) sentences.Add(Plantoir.Core.Models.UnitPlans.GreetingSentence(unitPlans.Plans, mostNamed));
+        return string.Join(" ", sentences).Replace("\"", "'");
+    }
+
+    /// <summary>
+    /// The greeting's opening instructions, ending "…and wait for me to
+    /// agree." It names the course and points at the plan tools, because the
+    /// safety of every write here depends on a plan being shown to the teacher
+    /// first — and an assistant that starts by reading is far more useful than
+    /// one that starts by asking what to do.
+    /// </summary>
+    internal static string PlainGreeting(string courseCode, string courseName)
     {
         var text = new StringBuilder();
         text.Append($"I'm a teacher working on {courseCode}");
@@ -243,7 +317,7 @@ public static class ClaudeCodeLauncher
         text.Append(HowITeachSentence + " ");
         text.Append("Before changing anything, use the matching plan tool first and show me what it says, ");
         text.Append("in plain words, and wait for me to agree.");
-        return text.ToString().Replace("\"", "'");
+        return text.ToString();
     }
 
     /// <summary>
@@ -271,6 +345,9 @@ public static class ClaudeCodeLauncher
     /// (<see cref="AssistWorkspace.DoorCourseVariable"/>, fix round ruling 3),
     /// which the server holds an <c>assist</c> lease on without locking to it.
     /// </summary>
+    /// <summary>This door's agent key, <c>outsideAgents.agents[claude].key</c>, written as <see cref="AssistWorkspace.DoorAssistantVariable"/> (#884).</summary>
+    internal const string DoorKey = "claude";
+
     internal static string ConfigText(string workspacePath, string server, string courseCode)
     {
         var config = new
@@ -281,7 +358,11 @@ public static class ClaudeCodeLauncher
                 {
                     command = server,
                     args = ServerArguments(workspacePath),
-                    env = new Dictionary<string, string> { [AssistWorkspace.DoorCourseVariable] = courseCode },
+                    env = new Dictionary<string, string>
+                    {
+                        [AssistWorkspace.DoorCourseVariable] = courseCode,
+                        [AssistWorkspace.DoorAssistantVariable] = DoorKey,
+                    },
                 },
             },
         };

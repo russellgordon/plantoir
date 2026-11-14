@@ -400,9 +400,9 @@ nonisolated enum PlanInTheBrowser {
     static let outsideThePlan: String = "Only a page from this course’s unit plans can be opened in your browser."
     static let pageIsGone: String = "This page is no longer in the course’s unit plans. Reload to see what is there now."
     static let couldNotOpenTitle: String = "Can’t Open in Your Browser"
-    static let couldNotOpen: String = "Your Mac could not open this page in your web browser."
+    static let couldNotOpen: String = "Your {machine} could not open this page in your web browser."
     static let notAPage: String = "Only a page of the plan or one of its PDFs can be opened in your browser."
-    static let noBrowser: String = "No web browser is set on this Mac, so the page was not opened."
+    static let noBrowser: String = "No web browser is set on this {machine}, so the page was not opened."
 
     /// The kinds of file a plan is made of that a browser shows: the pages
     /// the template writes and the PDFs a unit links. Anything else is
@@ -688,7 +688,7 @@ nonisolated enum PlanningTrail {
     static let listOnly: String = "only the list of plans"
     static let nothingToShow: String = "nothing to show yet, offered to plan a unit"
     static let couldNotShow: String =
-        "the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet on this Mac"
+        "the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet"
     static let couldNotRefreshTheLook: String =
         "the Planning tab could not bring the plan's look up to date: {n} file(s) could not be copied"
 
@@ -707,7 +707,8 @@ nonisolated enum PlanningTrail {
 /// Every word the Planning tab shows a teacher, verbatim from
 /// `contracts/shared-rules.json` → `unitPlanning.tab.words`
 /// (`PlanningTabTests` pins them). Plain words only: what the teacher sees,
-/// never how it is shown (rule 1).
+/// never how it is shown (rule 1). A sentence that names the computer
+/// carries `{machine}`, filled with `MachineWord.filling` where it is shown.
 nonisolated enum PlanningWording {
 
     // MARK: - Stored properties
@@ -726,5 +727,5 @@ nonisolated enum PlanningWording {
     static let revertOnPlanning: String = "Revert works on the Settings tab, where the changes are shown."
     static let cannotShowTitle: String = "Unit Plans Can’t Be Shown"
     static let cannotShowDescription: String =
-        "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough."
+        "Plantoir could not get ready to show unit plans on this {machine}. Quitting Plantoir and opening it again may be enough."
 }

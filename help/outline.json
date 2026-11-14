@@ -5,8 +5,8 @@
  "voice": "Documentation, not marketing: one task a page, steps in order, what you see after each, what to do when it goes wrong. Written by Fable from an Opus fact sheet; reviewed adversarially for accuracy, clarity, simple language and tone.",
  "anchorRule": "One anchor a page, written <a name=\"<anchor>\"></a> before the title; the file is <anchor>.html; a Help button opens a PAGE, never a place inside one (measured 2026-11-13: every anchor on a page resolves to its first).",
  "pageCount": 102,
- "sceneCount": 202,
- "pictureFilesMac": 404,
+ "sceneCount": 194,
+ "pictureFilesMac": 388,
  "readingTimeTotalMinutes": 272,
  "landingPage": {
   "indexed": false,
@@ -164,9 +164,10 @@
        "scene": "cloudflare-2"
       },
       {
-       "shows": "The sheet asking for the Cloudflare API token",
+       "shows": "The Connect to Cloudflare sheet asking for the token",
        "labels": [
-        "API token"
+        "Cloudflare token",
+        "Continue"
        ],
        "scene": "cloudflare-3"
       },
@@ -702,16 +703,16 @@
      ],
      "pictures": [
       {
-       "shows": "A section selected with Open in Obsidian in the toolbar",
+       "shows": "A section selected in Plantoir, with Open in Obsidian in the toolbar",
        "labels": [
         "Open in Obsidian"
        ],
        "scene": "write-in-obsidian-1"
       },
       {
-       "shows": "Obsidian open on the course, a class page in its folder",
+       "shows": "Obsidian open on the course, a class page open from the section's All Classes folder",
        "labels": [
-        "Class pages",
+        "All Classes",
         "The page's settings at the top"
        ],
        "scene": "write-in-obsidian-2"
@@ -759,7 +760,7 @@
        "scene": "add-next-class-1"
       },
       {
-       "shows": "The new class page in the sidebar of Obsidian, with its number and date",
+       "shows": "The new class page in Obsidian's file list, in the section's All Classes folder, with its number",
        "labels": [
         "The new page"
        ],
@@ -806,16 +807,18 @@
      ],
      "pictures": [
       {
-       "shows": "The Publish Pages… sheet with pages ticked",
+       "shows": "The Publish Pages sheet with its list of hidden pages, two of them ticked",
        "labels": [
         "Page",
+        "Find a page",
         "Continue"
        ],
        "scene": "publish-pages-1"
       },
       {
-       "shows": "The plan shown after Continue",
+       "shows": "The plan shown after Continue: every page that would change and what changes",
        "labels": [
+        "What changes",
         "Publish"
        ],
        "scene": "publish-pages-2"
@@ -888,7 +891,25 @@
       "publish-class-for-date-1",
       "publish-class-for-date-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Publish Class for a Date sheet with its date field",
+       "labels": [
+        "The day of the class",
+        "Continue"
+       ],
+       "scene": "publish-class-for-date-1"
+      },
+      {
+       "shows": "The plan for one day's class: the class page and the pages it links to",
+       "labels": [
+        "What changes",
+        "Publish"
+       ],
+       "scene": "publish-class-for-date-2"
+      }
+     ]
     },
     {
      "anchor": "links-checklist",
@@ -923,7 +944,25 @@
       "links-checklist-1",
       "links-checklist-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Links to Hidden Pages sheet with its groups of pages, some ticked",
+       "labels": [
+        "Used by a class students can see",
+        "Classes not yet published"
+       ],
+       "scene": "links-checklist-1"
+      },
+      {
+       "shows": "The Links to Hidden Pages sheet with its two notes and its buttons",
+       "labels": [
+        "Not Now",
+        "Publish"
+       ],
+       "scene": "links-checklist-2"
+      }
+     ]
     },
     {
      "anchor": "preview",
@@ -939,9 +978,9 @@
      ],
      "pictures": [
       {
-       "shows": "A section's preview with the toolbar",
+       "shows": "A section's preview in its window, with the toolbar",
        "labels": [
-        "Preview",
+        "Stop Preview",
         "Back",
         "Reload",
         "Open in Browser"
@@ -949,16 +988,16 @@
        "scene": "preview-1"
       },
       {
-       "shows": "The progress while a preview is built",
+       "shows": "The progress shown while a preview is made",
        "labels": [
         "What is happening now"
        ],
        "scene": "preview-2"
       },
       {
-       "shows": "Settings ▸ Preview with the start page choice",
+       "shows": "The Preview pane of Settings with the choice of where a preview opens",
        "labels": [
-        "Where Preview opens"
+        "When you press Preview, open"
        ],
        "scene": "preview-3"
       }
@@ -1045,14 +1084,14 @@
      ],
      "pictures": [
       {
-       "shows": "The deploy's progress in the section",
+       "shows": "The progress of a deploy in the section's window",
        "labels": [
         "Progress"
        ],
        "scene": "deploy-2"
       },
       {
-       "shows": "A finished deploy with its address",
+       "shows": "A finished deploy, with the website's address as a link",
        "labels": [
         "The site's address"
        ],
@@ -1115,7 +1154,18 @@
      "sceneIds": [
       "later-classes-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The sheet that asks about classes dated later, every class ticked",
+       "labels": [
+        "Page",
+        "Date",
+        "Deploy Ticked"
+       ],
+       "scene": "later-classes-1"
+      }
+     ]
     },
     {
      "anchor": "schedule-deploy",
@@ -1133,7 +1183,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Schedule a deploy sheet",
+       "shows": "The Schedule a deploy sheet with its plan",
        "labels": [
         "Deploy at",
         "Schedule"
@@ -1141,9 +1191,9 @@
        "scene": "schedule-deploy-1"
       },
       {
-       "shows": "The clock beside the section in the sidebar, with its hover text",
+       "shows": "The clock beside a section in the sidebar, with its hover text",
        "labels": [
-        "Scheduled"
+        "The clock"
        ],
        "scene": "schedule-deploy-2"
       },
@@ -1201,16 +1251,16 @@
      ],
      "pictures": [
       {
-       "shows": "Class Dates… with pasted dates",
+       "shows": "The class dates sheet with dates pasted in",
        "labels": [
-        "Where the dates are",
+        "Type or paste",
         "Where these came from",
         "Read the Dates"
        ],
        "scene": "class-dates-1"
       },
       {
-       "shows": "The Day First / Month First question",
+       "shows": "The question asked when dates can be read two ways",
        "labels": [
         "Day First",
         "Month First"
@@ -1257,9 +1307,9 @@
      ],
      "pictures": [
       {
-       "shows": "Re-date Classes… listing the classes that move",
+       "shows": "The Re-date Classes sheet showing its plan",
        "labels": [
-        "Classes that move",
+        "The plan",
         "Re-date"
        ],
        "scene": "redate-1"
@@ -1321,7 +1371,25 @@
       "make-room-1",
       "make-room-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Make Room for Classes sheet: the class to go in front of, and how many",
+       "labels": [
+        "The class a new one goes in front of",
+        "How many",
+        "Continue"
+       ],
+       "scene": "make-room-1"
+      },
+      {
+       "shows": "The plan for making room, with its sentence about Undo Last Change",
+       "labels": [
+        "Make Room"
+       ],
+       "scene": "make-room-2"
+      }
+     ]
     },
     {
      "anchor": "start-of-year",
@@ -1340,9 +1408,9 @@
       {
        "shows": "The Get Ready for the Start of the Year sheet with its reasons",
        "labels": [
-        "Goes into draft",
+        "Going into draft",
         "Why",
-        "Get Ready"
+        "Put These into Draft"
        ],
        "scene": "start-of-year-1"
       }
@@ -1458,7 +1526,8 @@
       {
        "shows": "New Course or Club with This is a club on",
        "labels": [
-        "This is a club"
+        "This is a club",
+        "Meetings"
        ],
        "scene": "club-1"
       }
@@ -1497,7 +1566,7 @@
      ],
      "pictures": [
       {
-       "shows": "Add Section… sheet",
+       "shows": "The Add a Section sheet for a course",
        "labels": [
         "Section number",
         "Add Section"
@@ -1681,7 +1750,26 @@
       "course-folders-1",
       "course-folders-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "Content Structure in Course Settings, with the four lists and the + and − buttons under one of them",
+       "labels": [
+        "Shared folders (all sections)",
+        "Per-section folders",
+        "Add"
+       ],
+       "scene": "course-folders-1"
+      },
+      {
+       "shows": "The sheet that renames a folder, with its explanation",
+       "labels": [
+        "New name",
+        "Rename"
+       ],
+       "scene": "course-folders-2"
+      }
+     ]
     },
     {
      "anchor": "special-folders",
@@ -1714,7 +1802,18 @@
      "sceneIds": [
       "special-folders-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Folders Plantoir uses sheet, listing one course's own folders by name",
+       "labels": [
+        "Your lessons",
+        "Images and files you add to pages",
+        "Done"
+       ],
+       "scene": "special-folders-1"
+      }
+     ]
     },
     {
      "anchor": "unit-word",
@@ -1746,7 +1845,16 @@
      "sceneIds": [
       "unit-word-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The sheet that renames the unit word, saying how many class pages and links would change",
+       "labels": [
+        "Rename"
+       ],
+       "scene": "unit-word-1"
+      }
+     ]
     },
     {
      "anchor": "rename-remove",
@@ -1829,7 +1937,24 @@
       "working-folder-1",
       "working-folder-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "Plantoir's window with no working folder open, showing Choose Your Working Folder",
+       "labels": [
+        "Choose Folder…"
+       ],
+       "scene": "working-folder-1"
+      },
+      {
+       "shows": "The File menu open on Open Recent, listing folders opened before",
+       "labels": [
+        "Open Recent",
+        "Clear Menu"
+       ],
+       "scene": "working-folder-2"
+      }
+     ]
     }
    ]
   },
@@ -2014,7 +2139,16 @@
      "sceneIds": [
       "site-address-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Choose a Website Address sheet at a first Netlify deploy, filled with the suggested address",
+       "labels": [
+        "Website address"
+       ],
+       "scene": "site-address-1"
+      }
+     ]
     },
     {
      "anchor": "deploy-tokens",
@@ -2109,7 +2243,7 @@
      ],
      "pictures": [
       {
-       "shows": "A page's settings block in Obsidian, the publish lines marked",
+       "shows": "A shared page's settings in Obsidian, the publish lines marked",
        "labels": [
         "publishForSection1",
         "publishForSection2"
@@ -2227,7 +2361,7 @@
      ],
      "pictures": [
       {
-       "shows": "Course Settings ▸ Printing with the corner sketch",
+       "shows": "Course Settings, the Printing part, with the corner sketch",
        "labels": [
         "School name",
         "Blanks to fill in"
@@ -2308,7 +2442,24 @@
       "notation-1",
       "notation-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A formula between dollar signs as typed in Obsidian, beside the same formula on the class website",
+       "labels": [
+        "What you type",
+        "What students see"
+       ],
+       "scene": "notation-1"
+      },
+      {
+       "shows": "Chemical formulas and an equation on the example course's What This Site Can Do page, on its class website",
+       "labels": [
+        "Chemistry"
+       ],
+       "scene": "notation-2"
+      }
+     ]
     },
     {
      "anchor": "figures",
@@ -2441,7 +2592,17 @@
      "sceneIds": [
       "obsidian-addons-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Obsidian pane of Settings with its one switch",
+       "labels": [
+        "Obsidian",
+        "The switch"
+       ],
+       "scene": "obsidian-addons-1"
+      }
+     ]
     },
     {
      "anchor": "geogebra",
@@ -2548,9 +2709,9 @@
      ],
      "pictures": [
       {
-       "shows": "A coloured code block on a Computer studies course's site",
+       "shows": "A coloured code block on a Computer studies course's site, with the pointer over it",
        "labels": [
-        "Language",
+        "Line numbers",
         "Copy"
        ],
        "scene": "code-blocks-1"
@@ -2687,7 +2848,16 @@
      "sceneIds": [
       "task-boxes-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A checklist on a class page of the class site, some boxes ticked",
+       "labels": [
+        "Boxes a student ticked"
+       ],
+       "scene": "task-boxes-1"
+      }
+     ]
     },
     {
      "anchor": "my-progress",
@@ -2719,7 +2889,25 @@
       "my-progress-1",
       "my-progress-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A page in Obsidian with tick boxes under a Success criteria heading",
+       "labels": [
+        "Success criteria",
+        "Tick boxes"
+       ],
+       "scene": "my-progress-1"
+      },
+      {
+       "shows": "The My Progress page on the class site, with its counts",
+       "labels": [
+        "My Progress",
+        "Ticked"
+       ],
+       "scene": "my-progress-2"
+      }
+     ]
     },
     {
      "anchor": "music-notation",
@@ -2988,7 +3176,31 @@
       "subject-mathematics-2",
       "subject-mathematics-3"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The GeoGebra sketch on MPM2D's page The Slope-Angle Conjecture, opened on the class website",
+       "labels": [
+        "GeoGebra sketch"
+       ],
+       "scene": "subject-mathematics-1"
+      },
+      {
+       "shows": "The graph of two parabolas on MPM2D's page Transformations of Parabolas, on the class website",
+       "labels": [
+        "Graph students can move"
+       ],
+       "scene": "subject-mathematics-2"
+      },
+      {
+       "shows": "MPM2D's page Similar Triangles Practice printed as a handout, its questions beside its answers page",
+       "labels": [
+        "Questions",
+        "Answers"
+       ],
+       "scene": "subject-mathematics-3"
+      }
+     ]
     },
     {
      "anchor": "subject-english",
@@ -2998,7 +3210,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (ENG2D, ENG3U, ENG4U, ENL1W): readings written once in Reading and linked from class pages (ENG2D Romeo and Juliet; link one-lesson), checklists, coverage, diagrams from text (ENG2D Plot and Structure). NOT shown: self-check questions, handouts (none). WITH C2 (question 1): ENG2D gains a self-check on a Reading page and one printable handout with folded answers.",
      "id": "subject-english",
@@ -3018,10 +3230,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-english-1",
-      "subject-english-2",
-      "subject-english-3"
+      "subject-english-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The self-check question on ENG2D's page Romeo and Juliet, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-english-1"
+      },
+      {
+       "shows": "ENG2D's page The Prologue, Line by Line on the class website, with its Print button and a folded answer",
+       "labels": [
+        "Print",
+        "Folded answer"
+       ],
+       "scene": "subject-english-2"
+      }
+     ]
     },
     {
      "anchor": "subject-science",
@@ -3131,7 +3359,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (CGC1W, CGF3M, CHA3U, CHC2D, CHV2O, CIA4U): shared pages linked from class pages (CHC2D Sources, CGF3M Case Studies, CIA4U Models), coverage (CHC2D, 90 expectation pages), checklists, diagrams from text (CIA4U Circular Flow). NOT: videos (CHC2D mentions a film, embeds none; the plan was wrong). WITH C3 (question 1): CHC2D gains an embedded, openly licensed video on a Sources page and a self-check question.",
      "id": "subject-canadian-and-world-studies",
@@ -3151,10 +3379,25 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-canadian-and-world-studies-1",
-      "subject-canadian-and-world-studies-2",
-      "subject-canadian-and-world-studies-3"
+      "subject-canadian-and-world-studies-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The part A film to practise on, on CHC2D's page Photographs, on the class website",
+       "labels": [
+        "Film from YouTube"
+       ],
+       "scene": "subject-canadian-and-world-studies-1"
+      },
+      {
+       "shows": "The self-check question on CHC2D's page Newspapers and Propaganda, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-canadian-and-world-studies-2"
+      }
+     ]
     },
     {
      "anchor": "subject-music",
@@ -3198,7 +3441,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (AVI1O): shared Techniques, Studio Time and Critiques pages linked from class pages, checklists, coverage, diagrams from text (The Creative Process), tables and boxes (What This Site Can Do; link tables-boxes-footnotes). NOT: pictures, printing (none). WITH C1 (question 1): AVI1O gains a few public-domain artwork images in Media, embedded on a Techniques or Critiques page, and a printable critique sheet.",
      "id": "subject-visual-art",
@@ -3218,10 +3461,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-visual-art-1",
-      "subject-visual-art-2",
-      "subject-visual-art-3"
+      "subject-visual-art-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The part Three works to look at twice, on AVI1O's page Looking Twice, on the class website",
+       "labels": [
+        "Picture",
+        "Credit line"
+       ],
+       "scene": "subject-visual-art-1"
+      },
+      {
+       "shows": "AVI1O's page A Looking Sheet on the class website, with its picture, questions and Print button",
+       "labels": [
+        "Print"
+       ],
+       "scene": "subject-visual-art-2"
+      }
+     ]
     },
     {
      "anchor": "subject-drama",
@@ -3231,7 +3490,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (ADA1O): shared Conventions and Warm-Ups pages written once (Tableau), checklists, coverage, diagrams from text (Tableau Story Sequence). NOT: videos. WITH C4 (question 1): ADA1O gains an openly licensed video of a convention and a self-check question on Conventions.",
      "id": "subject-drama",
@@ -3251,10 +3510,25 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-drama-1",
-      "subject-drama-2",
-      "subject-drama-3"
+      "subject-drama-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The part Tableau on the professional stage, on ADA1O's page Tableau, on the class website",
+       "labels": [
+        "Interview from YouTube"
+       ],
+       "scene": "subject-drama-1"
+      },
+      {
+       "shows": "The self-check question on ADA1O's page Thought Tracking, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-drama-2"
+      }
+     ]
     },
     {
      "anchor": "subject-dance",
@@ -3264,7 +3538,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (ATC1O): shared Technique, Choreography and Warm-Ups pages, checklists, coverage, diagrams from text (7 pages); no video. WITH C0 (ruled): a page of openly licensed dance videos, YouTube today and Vimeo with #692; Fable picks them, Russell approves at the UI review (ruled 17:54).",
      "id": "subject-dance",
@@ -3285,10 +3559,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-dance-1",
-      "subject-dance-2",
-      "subject-dance-3"
+      "subject-dance-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "One part of ATC1O's page Four Forms on Film, on the class website, with the film's player and its questions",
+       "labels": [
+        "Film from YouTube",
+        "Questions"
+       ],
+       "scene": "subject-dance-1"
+      },
+      {
+       "shows": "ATC1O's page Four Forms on Film in Obsidian, with the line that holds a film's address",
+       "labels": [
+        "The film's address"
+       ],
+       "scene": "subject-dance-2"
+      }
+     ]
     },
     {
      "anchor": "subject-business",
@@ -3298,7 +3588,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (BOH4M): shared Cases and Simulations pages, coverage (90 pages with a Curriculum connection), checklists, diagrams from text (Levels of Management), tables and boxes, amounts of money written with \\$ (link notation). NOT: handouts, self-check questions. WITH C5 (question 1): BOH4M gains one printable case handout with its answers folded and a self-check question.",
      "id": "subject-business",
@@ -3318,10 +3608,26 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-business-1",
-      "subject-business-2",
-      "subject-business-3"
+      "subject-business-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "BOH4M's page The New Supervisor on the class website, with its Print button and a folded note",
+       "labels": [
+        "Print",
+        "Folded note"
+       ],
+       "scene": "subject-business-1"
+      },
+      {
+       "shows": "The self-check question on BOH4M's page Levels of Management, on the class website",
+       "labels": [
+        "Check"
+       ],
+       "scene": "subject-business-2"
+      }
+     ]
     },
     {
      "anchor": "subject-guidance-and-careers",
@@ -3331,7 +3637,7 @@
      "steps": [
       "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
      ],
-     "scenes": 3,
+     "scenes": 2,
      "readMinutes": 3,
      "notes": "TODAY (GLC2O): Activities and Tasks pages linked from class pages, checklists on all 42 class pages, coverage, diagrams from text (The Pathway Plan), tables and amounts of money (The Cost of a Month). NOT: My Progress (no success-criteria boxes in any course). WITH C6 (question 1): success-criteria tick boxes on GLC2O's task pages give its sections a My Progress page (myProgress.knownLimits in the contract then changes) and a self-check question.",
      "id": "subject-guidance-and-careers",
@@ -3351,10 +3657,27 @@
      "needsPictures": true,
      "sceneIds": [
       "subject-guidance-and-careers-1",
-      "subject-guidance-and-careers-2",
-      "subject-guidance-and-careers-3"
+      "subject-guidance-and-careers-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The success criteria at the end of GLC2O's page The Budget, on the class website",
+       "labels": [
+        "Success criteria",
+        "Tick boxes"
+       ],
+       "scene": "subject-guidance-and-careers-1"
+      },
+      {
+       "shows": "The My Progress page on the website of a section made from GLC2O",
+       "labels": [
+        "My Progress",
+        "Ticked"
+       ],
+       "scene": "subject-guidance-and-careers-2"
+      }
+     ]
     }
    ]
   },
@@ -3375,7 +3698,7 @@
      ],
      "pictures": [
       {
-       "shows": "Keep a Copy for Reference… sheet",
+       "shows": "The Keep a Copy for Reference sheet",
        "labels": [
         "School year",
         "Keep a Copy"
@@ -3383,7 +3706,7 @@
        "scene": "keep-for-reference-1"
       },
       {
-       "shows": "The Reference Courses shelf",
+       "shows": "The Reference Courses shelf in the sidebar, the new copy in its school year's group",
        "labels": [
         "Reference Courses"
        ],
@@ -3446,7 +3769,17 @@
      "sceneIds": [
       "school-year-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Set School Year sheet for a reference course, its School year pop-up open",
+       "labels": [
+        "School year",
+        "Set School Year"
+       ],
+       "scene": "school-year-1"
+      }
+     ]
     },
     {
      "anchor": "import-for-reference",
@@ -3461,9 +3794,10 @@
      ],
      "pictures": [
       {
-       "shows": "Import Courses for Reference… with courses listed",
+       "shows": "The Import courses for reference sheet with courses listed",
        "labels": [
         "Courses to import",
+        "School year",
         "Import"
        ],
        "scene": "import-for-reference-1"
@@ -3506,18 +3840,19 @@
      ],
      "pictures": [
       {
-       "shows": "Copy a Page with its checklist",
+       "shows": "The Copy a Page sheet with its checklist of linked pages",
        "labels": [
         "Page",
-        "Copy to",
-        "Pages it links to"
+        "Copy into",
+        "Also copy the pages this page links to"
        ],
        "scene": "copy-a-page-1"
       },
       {
-       "shows": "The result screen",
+       "shows": "The Copy a Page sheet's result",
        "labels": [
-        "Arrived hidden"
+        "Arrived hidden",
+        "Show in Finder"
        ],
        "scene": "copy-a-page-2"
       }
@@ -3558,7 +3893,7 @@
      ],
      "pictures": [
       {
-       "shows": "The shelf heading's menu",
+       "shows": "The Reference Courses heading's menu, open",
        "labels": [
         "New Reference Course…",
         "New Group…"
@@ -3566,7 +3901,7 @@
        "scene": "reference-groups-1"
       },
       {
-       "shows": "A group with a course in it",
+       "shows": "The Reference Courses shelf with a group the teacher made, a course in it",
        "labels": [
         "Group"
        ],
@@ -3631,7 +3966,18 @@
      "sceneIds": [
       "replace-reference-course-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Replace question with its facts",
+       "labels": [
+        "Being replaced",
+        "Backed up first as",
+        "Replace"
+       ],
+       "scene": "replace-reference-course-1"
+      }
+     ]
     }
    ]
   },
@@ -3653,7 +3999,7 @@
      ],
      "pictures": [
       {
-       "shows": "All Backups",
+       "shows": "All Backups: the table of backups",
        "labels": [
         "All Backups",
         "Made By"
@@ -3661,7 +4007,7 @@
        "scene": "backups-1"
       },
       {
-       "shows": "The Restore question",
+       "shows": "The question asked before a backup is restored",
        "labels": [
         "Restore"
        ],
@@ -3755,7 +4101,7 @@
      ],
      "pictures": [
       {
-       "shows": "A section's Problems tab naming an unreadable page",
+       "shows": "A section's Problems tab naming a page whose settings cannot be read",
        "labels": [
         "Problems",
         "The page"
@@ -3799,14 +4145,14 @@
      ],
      "pictures": [
       {
-       "shows": "The sidebar marker",
+       "shows": "The sidebar, with the warning symbol on a section's row",
        "labels": [
         "Problems marker"
        ],
        "scene": "problems-1"
       },
       {
-       "shows": "The Problems tab with rows",
+       "shows": "The Problems tab with rows, one with a repair button",
        "labels": [
         "Kind",
         "Page",
@@ -3852,9 +4198,10 @@
      ],
      "pictures": [
       {
-       "shows": "The progress view while getting ready",
+       "shows": "The section's window while a first preview is made",
        "labels": [
-        "What is happening now"
+        "What is happening now",
+        "Why might this take a while?"
        ],
        "scene": "slow-first-build-1"
       }
@@ -3893,7 +4240,7 @@
      ],
      "pictures": [
       {
-       "shows": "Deploy greyed with its explanation",
+       "shows": "Deploy greyed in the toolbar, with the help that says why",
        "labels": [
         "Deploy (greyed)",
         "Why"
@@ -3901,7 +4248,7 @@
        "scene": "deploy-failed-1"
       },
       {
-       "shows": "A failed deploy's explanation",
+       "shows": "A failed deploy in the section's window, with the sentence that explains it",
        "labels": [
         "What went wrong"
        ],
@@ -3944,9 +4291,10 @@
      ],
      "pictures": [
       {
-       "shows": "The synced-folder explanation",
+       "shows": "The folder picker's note about a synced folder",
        "labels": [
-        "Use This Folder Anyway"
+        "Use This Folder Anyway",
+        "Choose a Different Folder…"
        ],
        "scene": "synced-folder-1"
       }
@@ -3984,7 +4332,7 @@
      ],
      "pictures": [
       {
-       "shows": "The update offer with its notes",
+       "shows": "The window that offers a new version of Plantoir",
        "labels": [
         "The new version's notes"
        ],
@@ -4049,7 +4397,17 @@
      "sceneIds": [
       "quitting-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The question Plantoir asks when quitting during a deploy",
+       "labels": [
+        "Keep Working",
+        "Quit Anyway"
+       ],
+       "scene": "quitting-1"
+      }
+     ]
     },
     {
      "anchor": "report",
@@ -4064,7 +4422,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Report a Problem dialog",
+       "shows": "The Send a report about a problem alert",
        "labels": [
         "Save Report…"
        ],
@@ -4115,10 +4473,11 @@
      ],
      "pictures": [
       {
-       "shows": "Course ▸ Revise With submenu",
+       "shows": "The Course menu with its Revise With submenu open, listing the assistants found on this Mac",
        "labels": [
         "Claude…",
         "Codex…",
+        "GitHub Copilot…",
         "Local AI Assistant…"
        ],
        "scene": "assistants-1"
@@ -4162,7 +4521,7 @@
       "Set up GitHub Copilot's command-line tool from Plantoir (link set-up-assistant)",
       "What the benefit includes and what it does not"
      ],
-     "scenes": 4,
+     "scenes": 3,
      "readMinutes": 5,
      "notes": "Every fact from GitHub's own documentation, fetched and quoted with the date read; front matter factsChecked and authority; the page prints the date and links GitHub's page as the authority. Pictures from GitHub's public pages; a signed-in view only if Russell walks it once (to ask then). Says first that Plantoir needs no assistant.",
      "id": "github-education",
@@ -4185,10 +4544,32 @@
      "sceneIds": [
       "github-education-1",
       "github-education-2",
-      "github-education-3",
-      "github-education-4"
+      "github-education-3"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "GitHub's public page for teachers, at github.com/education/teachers",
+       "labels": [
+        "GitHub Education"
+       ],
+       "scene": "github-education-1"
+      },
+      {
+       "shows": "GitHub's public instructions for applying to GitHub Education as a teacher",
+       "labels": [
+        "Start an application"
+       ],
+       "scene": "github-education-2"
+      },
+      {
+       "shows": "GitHub's public instructions for turning on GitHub Copilot Pro as a verified teacher",
+       "labels": [
+        "Copilot settings"
+       ],
+       "scene": "github-education-3"
+      }
+     ]
     },
     {
      "anchor": "set-up-assistant",
@@ -4196,7 +4577,7 @@
      "question": "How do I get Claude Code, Codex or GitHub Copilot working with Plantoir?",
      "about": "Setting up Claude Code, Codex or GitHub Copilot's command-line tool from inside Plantoir (#855).",
      "steps": [
-      "Where it is offered: Settings, the Help menu, and Revise With > Set Up Another Assistant...",
+      "Where it is offered: Settings, the Help menu, and Revise With > Set Up an Assistant...",
       "Choose the assistant; Plantoir runs its maker's installer and checks it",
       "Sign in, in the browser",
       "Plantoir confirms it works",
@@ -4262,7 +4643,24 @@
       "copilot-1",
       "copilot-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A GitHub Copilot session opened from Plantoir in a Terminal window, with the opening message already sent",
+       "labels": [
+        "GitHub Copilot"
+       ],
+       "scene": "copilot-1"
+      },
+      {
+       "shows": "GitHub Copilot asking in its own window before it runs a command",
+       "labels": [
+        "Yes",
+        "No"
+       ],
+       "scene": "copilot-2"
+      }
+     ]
     },
     {
      "anchor": "local-assistant",
@@ -4278,7 +4676,7 @@
      ],
      "pictures": [
       {
-       "shows": "Settings > Assistant",
+       "shows": "The Assistant pane of Settings, with the three choices of which assistant runs on this Mac",
        "labels": [
         "Choose for me",
         "The smaller assistant",
@@ -4287,7 +4685,7 @@
        "scene": "local-assistant-1"
       },
       {
-       "shows": "The assistant window with a plan",
+       "shows": "The Assistant window for a section, with what the assistant will do and its question",
        "labels": [
         "Shall I go ahead?",
         "Go"
@@ -4334,14 +4732,14 @@
      ],
      "pictures": [
       {
-       "shows": "Revise With in the Course menu",
+       "shows": "Revise With in the Course menu, with a course selected in the sidebar",
        "labels": [
         "Revise With ▸ Claude…"
        ],
        "scene": "revise-with-1"
       },
       {
-       "shows": "How I Teach in Obsidian",
+       "shows": "A course's How I Teach page open in Obsidian",
        "labels": [
         "How I Teach"
        ],
@@ -4354,7 +4752,7 @@
      "id": "revise-with",
      "section": "Optional: working with an assistant",
      "status": "amended",
-     "amendment": "Revise With is always shown (#855); with no assistant it holds only Set Up Another Assistant...; GitHub Copilot... listed after Codex...",
+     "amendment": "Revise With is always shown (#855); with no assistant it holds only Set Up an Assistant...; GitHub Copilot... listed after Codex...",
      "factSheets": [
       "FS-11-the-assistant-section.md"
      ],
@@ -4403,7 +4801,17 @@
      "sceneIds": [
       "how-i-teach-1"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "The Content Structure part of a course's settings, with the How I Teach page row",
+       "labels": [
+        "How I Teach page",
+        "Create and Open"
+       ],
+       "scene": "how-i-teach-1"
+      }
+     ]
     },
     {
      "anchor": "plan-a-unit",
@@ -4419,7 +4827,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Planning tab on a unit",
+       "shows": "The Planning tab of a course, showing one unit's plan",
        "labels": [
         "Planning",
         "Unit",
@@ -4428,7 +4836,7 @@
        "scene": "plan-a-unit-1"
       },
       {
-       "shows": "All Plans",
+       "shows": "The Planning tab with All Plans chosen in the Unit pop-up",
        "labels": [
         "All Plans"
        ],
@@ -4472,10 +4880,10 @@
      ],
      "pictures": [
       {
-       "shows": "The share bar, not yet shared",
+       "shows": "The share bar at the foot of the Planning tab, before the plans are shared",
        "labels": [
-        "Share",
-        "Protect",
+        "Share Unit Plans",
+        "Protect with a Username and Password",
         "Include Answer Keys"
        ],
        "scene": "share-plan-1"
@@ -4524,7 +4932,7 @@
      ],
      "pictures": [
       {
-       "shows": "The test's files in Finder (where exactly: FS-11 open doubt 1)",
+       "shows": "A unit test's folder in Finder, inside the handouts folder outside the course, with Version A.pdf, Version A - Solutions.pdf and Marking Guide.pdf",
        "labels": [
         "Test",
         "Solutions",
@@ -4567,7 +4975,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Problems tab's Fix with buttons",
+       "shows": "A section's Problems tab, with ticked rows and the Fix with buttons under the table",
        "labels": [
         "Fix with Claude…"
        ],
