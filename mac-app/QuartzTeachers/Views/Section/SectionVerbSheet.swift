@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Observation
 
@@ -131,10 +132,34 @@ final class SectionVerbSheetModel: Identifiable {
 
     var stage: Stage
 
-    /// The page rows — hidden pages to publish, or visible ones to hide.
-    var pageRows: [PageRow] = []
+    /// The page rows — hidden pages to publish, or visible ones to hide — in
+    /// the order the call carries them. Setting them builds the tree of
+    /// checkboxes once (#900), never per draw.
+    var pageRows: [PageRow] = [] {
+        didSet {
+            buildTheTree()
+        }
+    }
     var ticked: Set<String> = []
-    var search: String = ""
+    var search: String = "" {
+        didSet {
+            openGroupsForTheSearch(from: oldValue)
+        }
+    }
+
+    /// The tree of checkboxes (#900): `pageRows` grouped under their unit or
+    /// folder (`PageTickTree.groups`), built when the rows are set.
+    var pageGroups: [PageTickTree.Group] = []
+
+    /// The groups drawn open, and the ones the teacher had open before a
+    /// search opened every group it shows (put back when it is cleared).
+    var openGroups: Set<PageTickTree.RowID> = []
+    var openGroupsBeforeTheSearch: Set<PageTickTree.RowID>?
+
+    /// Pages last ticked by a group's box rather than by their own: counted
+    /// on the trail line only (", 12 by a group's box"), so a report of
+    /// pages published unmeant can be read. Never a title.
+    var tickedByAGroupsBox: Set<String> = []
 
     /// Publish Class for a Date…'s day.
     var day: Date = Date()
@@ -211,6 +236,44 @@ final class SectionVerbSheetModel: Identifiable {
             }
         }
         return shown
+    }
+
+    /// The offered pages as the tree reads them, in `pageRows`' order.
+    var tickPages: [PageTickTree.Page] {
+        var pages: [PageTickTree.Page] = []
+        for row in pageRows {
+            pages.append(SectionVerbSheetModel.tickPage(of: row))
+        }
+        return pages
+    }
+
+    /// The tree's rows for the search as it stands (#900): groups with a
+    /// shown page under them, and those pages. Linear in pages, no file read.
+    var tickRows: [PageTickTree.Row] {
+        return PageTickTree.rows(of: pageGroups, search: search)
+    }
+
+    /// The class groups' names, in the course's noun.
+    var groupNames: PageTickTree.GroupNames {
+        return PageTickTree.GroupNames(
+            otherClasses: AssistWording.menuPageGroupOtherClasses(noun: noun),
+            allClasses: AssistWording.menuPageGroupAllClasses(noun: noun)
+        )
+    }
+
+    /// Ticked pages the search leaves out of view (#900): still ticked, and
+    /// still in the plan, as before the tree.
+    var tickedButNotShown: Int {
+        return PageTickTree.tickedButNotShown(tickPages, ticked: ticked, search: search)
+    }
+
+    /// How many ticked pages a group's box ticked last (#900), for the trail.
+    var tickedByAGroupsBoxCount: Int {
+        var count: Int = 0
+        for name in tickedByAGroupsBox where ticked.contains(name) {
+            count += 1
+        }
+        return count
     }
 
     /// The ways Add Class… can use now, in the sheet's order.
@@ -524,14 +587,20 @@ final class SectionVerbSheetModel: Identifiable {
     }
 
     func binding(for row: PageRow) -> Binding<Bool> {
+        return binding(forPageNamed: row.name)
+    }
+
+    /// A page's own checkbox: ticks or unticks that page alone.
+    func binding(forPageNamed name: String) -> Binding<Bool> {
         return Binding(
-            get: { return self.ticked.contains(row.name) },
+            get: { return self.ticked.contains(name) },
             set: { isOn in
                 if isOn {
-                    self.ticked.insert(row.name)
+                    self.ticked.insert(name)
                 } else {
-                    self.ticked.remove(row.name)
+                    self.ticked.remove(name)
                 }
+                self.tickedByAGroupsBox.remove(name)
             }
         )
     }
@@ -546,7 +615,115 @@ final class SectionVerbSheetModel: Identifiable {
             } else {
                 ticked.insert(row.name)
             }
+            tickedByAGroupsBox.remove(row.name)
         }
+    }
+
+    /// Space on the tree's selected row (#900): a page flips alone; a group
+    /// does what a click on its box does. Only a row the search leaves
+    /// showing.
+    func flip(_ id: PageTickTree.RowID?) {
+        guard let id, let row = PageTickTree.row(withID: id, in: tickRows) else {
+            return
+        }
+        switch id {
+        case .page(let name):
+            flipTick(ofRowWithID: name)
+        case .group:
+            click(group: row)
+        }
+    }
+
+    /// A click on a group's box (#900), decided by the tree's rule
+    /// (`PageTickTree.clicking`): off or mixed ticks every shown page under
+    /// it, on unticks them. A page the search hides is never changed.
+    func click(group row: PageTickTree.Row) {
+        let turningOn: Bool = PageTickTree.state(of: row.shownPageNames, ticked: ticked) != .on
+        ticked = PageTickTree.clicking(row.shownPageNames, ticked: ticked)
+        for name in row.shownPageNames {
+            if turningOn {
+                tickedByAGroupsBox.insert(name)
+            } else {
+                tickedByAGroupsBox.remove(name)
+            }
+        }
+    }
+
+    /// A group's box as it is drawn now.
+    func state(of row: PageTickTree.Row) -> PageTickTree.State {
+        return PageTickTree.state(of: row.shownPageNames, ticked: ticked)
+    }
+
+    /// How many of a group's shown pages are ticked: VoiceOver's value for
+    /// its box ("5 of 12 ticked").
+    func tickedCount(of row: PageTickTree.Row) -> Int {
+        var count: Int = 0
+        for name in row.shownPageNames where ticked.contains(name) {
+            count += 1
+        }
+        return count
+    }
+
+    /// Whether a group is drawn open; the table's own triangle, Right and
+    /// Left change it.
+    func isOpen(_ id: PageTickTree.RowID) -> Binding<Bool> {
+        return Binding(
+            get: { return self.openGroups.contains(id) },
+            set: { open in
+                if open {
+                    self.openGroups.insert(id)
+                } else {
+                    self.openGroups.remove(id)
+                }
+            }
+        )
+    }
+
+    /// The tree, built once from the rows (#900), every group folded or
+    /// open as `PageTickTree.groupsStartFolded` says.
+    func buildTheTree() {
+        pageGroups = PageTickTree.groups(
+            of: tickPages,
+            naming: course.configuration.classPageNaming,
+            courseCode: course.code,
+            names: groupNames
+        )
+        openGroups = []
+        openGroupsBeforeTheSearch = nil
+        if !PageTickTree.groupsStartFolded {
+            for id in PageTickTree.groupIDs(in: PageTickTree.rows(of: pageGroups, search: "")) {
+                openGroups.insert(id)
+            }
+        }
+    }
+
+    /// While the search has text, every group holding a shown page is open,
+    /// so a match is never hidden inside a folded group; clearing the search
+    /// puts back the groups that were open before it (#900, the plan's rule 9).
+    func openGroupsForTheSearch(from previous: String) {
+        if kind != .publishPages && kind != .hidePages {
+            return
+        }
+        let wanted: String = search.trimmingCharacters(in: .whitespaces)
+        let wasSearching: Bool = !previous.trimmingCharacters(in: .whitespaces).isEmpty
+        if wanted.isEmpty {
+            if wasSearching, let before = openGroupsBeforeTheSearch {
+                openGroups = before
+            }
+            openGroupsBeforeTheSearch = nil
+            return
+        }
+        if openGroupsBeforeTheSearch == nil {
+            openGroupsBeforeTheSearch = openGroups
+        }
+        for id in PageTickTree.groupIDs(in: tickRows) {
+            openGroups.insert(id)
+        }
+    }
+
+    /// One row as the tree reads it.
+    static func tickPage(of row: PageRow) -> PageTickTree.Page {
+        return PageTickTree.Page(name: row.name, title: row.title, folder: row.folder, isClass: row.isClass, date: row.date)
     }
 
     /// Space on the later-classes list's selected row (#608).
@@ -639,7 +816,7 @@ struct SectionVerbSheet: View {
 
     /// The picker's and the later-classes list's selected row (#608): what
     /// Space ticks. Selecting a row is not ticking it.
-    @State var pickedRowID: String? = nil
+    @State var pickedRowID: PageTickTree.RowID? = nil
     @State var pickedLaterClassID: String? = nil
 
     static let tallestList: CGFloat = 340
@@ -740,11 +917,13 @@ struct SectionVerbSheet: View {
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
 
-    /// The picker's height (#608): counted from EVERY page offered, not the
-    /// ones the search leaves showing, so the sheet stays still while the
-    /// teacher types; up to `mostPickerRowsShown`, then it scrolls inside.
+    /// The picker's height (#608): counted from EVERY page offered and every
+    /// group (#900, the plan review's amendment 26), not the rows the search
+    /// or a folded group leaves showing, so the sheet stays still while the
+    /// teacher types or opens a group; up to `mostPickerRowsShown`, then it
+    /// scrolls inside.
     var pickerTableHeight: CGFloat {
-        var shown: Int = model.pageRows.count
+        var shown: Int = model.pageRows.count + SectionVerbSheet.groupCount(model.pageGroups)
         if shown > SectionVerbSheet.mostPickerRowsShown {
             shown = SectionVerbSheet.mostPickerRowsShown
         }
@@ -969,6 +1148,14 @@ struct SectionVerbSheet: View {
                 .borderedTextField()
                 .accessibilityIdentifier("sectionVerbSheetSearch")
                 pickerTable
+                // A ticked page the search hides is still in the plan (#900):
+                // said, so a plan longer than the ticks in view is no surprise.
+                if model.tickedButNotShown > 0 {
+                    Text(AssistWording.menuTickedButNotShown(count: model.tickedButNotShown))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("sectionVerbSheetTickedButNotShown")
+                }
             }
         case .publishClass:
             DatePicker("", selection: Binding(
@@ -1066,32 +1253,41 @@ struct SectionVerbSheet: View {
         .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
 
-    /// The pages to tick (#608): a bordered, banded table — Page (with its
-    /// checkbox), Folder and Date — the look of the plan that follows it, so
-    /// the two steps of one flow look alike. A click on a box ticks it;
-    /// Space ticks the selected row. Its rows are in the order `rows` gives
-    /// (classes by date, then the rest by folder), and no header sorts them.
+    /// The pages to tick (#608), as a tree of checkboxes since #900: a
+    /// bordered, banded table — Page (with its checkbox), Folder and Date —
+    /// the look of the plan that follows it, so the two steps of one flow
+    /// look alike. Each unit, the classes outside any unit, and each folder
+    /// is a group with a box of its own that ticks or clears every shown
+    /// page under it and is drawn mixed when only some are ticked
+    /// (`PageTickTree`). A click on a box ticks it; Space ticks the selected
+    /// row, a group's box included; Right and Left open and close a group.
+    /// No header sorts the rows.
+    ///
+    /// `Table(of:selection:columns:rows:)` with `DisclosureTableRow`, not
+    /// `Table(_:children:)`, whose groups cannot be opened from the model
+    /// (the plan review's amendment 23): the search opens every group it
+    /// shows.
     var pickerTable: some View {
-        Table(model.shownRows, selection: $pickedRowID) {
-            TableColumn(AssistWording.menuPlanPageColumn) { (row: SectionVerbSheetModel.PageRow) in
-                Toggle(row.title, isOn: model.binding(for: row))
-                    .toggleStyle(.checkbox)
-                    .lineLimit(1)
-                    .help(row.title)
-                    .accessibilityIdentifier("sectionVerbRow-\(row.name)")
+        Table(of: PageTickTree.Row.self, selection: $pickedRowID) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (row: PageTickTree.Row) in
+                pageCell(for: row)
             }
             .width(min: 90, ideal: 130)
-            TableColumn(AssistWording.menuPlanFolderColumn) { (row: SectionVerbSheetModel.PageRow) in
-                Text(row.folder)
+            TableColumn(AssistWording.menuPlanFolderColumn) { (row: PageTickTree.Row) in
+                Text(row.page?.folder ?? "")
                     .foregroundStyle(.secondary)
-                    .help(row.folder)
+                    .help(row.page?.folder ?? "")
             }
             .width(min: 80, ideal: 110, max: 140)
-            TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.PageRow) in
+            TableColumn(AssistWording.menuPickDateColumn) { (row: PageTickTree.Row) in
                 Text(dateCell(for: row))
                     .foregroundStyle(.secondary)
             }
             .width(min: 120, ideal: 150, max: 180)
+        } rows: {
+            ForEach(model.tickRows) { (row: PageTickTree.Row) in
+                PageTickTableRows(row: row, isOpen: model.isOpen)
+            }
         }
         .tableStyle(.bordered(alternatesRowBackgrounds: true))
         .flexibleTableHeight(pickerTableHeight)
@@ -1099,10 +1295,38 @@ struct SectionVerbSheet: View {
             if pickedRowID == nil {
                 return .ignored
             }
-            model.flipTick(ofRowWithID: pickedRowID)
+            model.flip(pickedRowID)
             return .handled
         }
         .accessibilityIdentifier("sectionVerbSheetPickerTable")
+    }
+
+    /// The Page cell: a group's box (an AppKit checkbox whose state the model
+    /// sets, so it can be mixed and a click is the model's rule), or a page's
+    /// own checkbox.
+    @ViewBuilder
+    func pageCell(for row: PageTickTree.Row) -> some View {
+        if row.isGroup {
+            GroupTickBox(
+                title: row.title,
+                state: model.state(of: row),
+                valueDescription: AssistWording.menuPageGroupTickedCount(
+                    ticked: model.tickedCount(of: row), of: row.shownPageNames.count
+                ),
+                identifier: SectionVerbSheet.identifier(of: row),
+                click: {
+                    model.click(group: row)
+                    return model.state(of: row)
+                }
+            )
+            .help(row.title)
+        } else if let page = row.page {
+            Toggle(page.title, isOn: model.binding(forPageNamed: page.name))
+                .toggleStyle(.checkbox)
+                .lineLimit(1)
+                .help(page.title)
+                .accessibilityIdentifier("sectionVerbRow-\(page.name)")
+        }
     }
 
     @ViewBuilder
@@ -1233,5 +1457,152 @@ struct SectionVerbSheet: View {
             return AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
         }
         return ""
+    }
+
+    /// The tree's Date cell (#900): a class page's day; nothing for a page
+    /// that is not a class, and nothing for a group.
+    func dateCell(for row: PageTickTree.Row) -> String {
+        if let page = row.page, let date = page.date, page.isClass {
+            return AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
+        }
+        return ""
+    }
+
+    /// A tree row's accessibility identifier: a group by its key ("unit 4",
+    /// "folder Concepts/Loops"), so two folders of one name stay apart.
+    static func identifier(of row: PageTickTree.Row) -> String {
+        switch row.id {
+        case .group(let key):
+            return "sectionVerbGroup-" + key
+        case .page(let name):
+            return "sectionVerbRow-" + name
+        }
+    }
+
+    /// How many groups the tree holds, at every depth: counted into the
+    /// picker's height with the pages (#900).
+    static func groupCount(_ groups: [PageTickTree.Group]) -> Int {
+        var count: Int = 0
+        for group in groups {
+            count += 1 + groupCount(group.groups)
+        }
+        return count
+    }
+}
+
+/// The tree's rows (#900): a group as a row that opens onto the rows under
+/// it, at any depth, or a page. Recursive, so it needs `@TableRowBuilder` on
+/// its body (measured by the plan review: without it the two branches do not
+/// typecheck).
+struct PageTickTableRows: TableRowContent {
+
+    // MARK: - Stored properties
+
+    typealias TableRowValue = PageTickTree.Row
+
+    let row: PageTickTree.Row
+    let isOpen: (PageTickTree.RowID) -> Binding<Bool>
+
+    // MARK: - Computed properties
+
+    @TableRowBuilder<PageTickTree.Row>
+    var tableRowBody: some TableRowContent<PageTickTree.Row> {
+        if let children = row.children {
+            DisclosureTableRow(row, isExpanded: isOpen(row.id)) {
+                ForEach(children) { (child: PageTickTree.Row) in
+                    PageTickTableRows(row: child, isOpen: isOpen)
+                }
+            }
+        } else {
+            TableRow(row)
+        }
+    }
+}
+
+/// A group's box in the tree (#900): an AppKit checkbox that can show a
+/// MIXED state, a dash, when only some pages under it are ticked.
+///
+/// Its state is SET from the model on every update and a click calls the
+/// model's rule (`SectionVerbSheetModel.click(group:)`), so AppKit's own
+/// off, on, mixed cycle never decides what is ticked: a mixed box goes to on
+/// and ticks every shown page, as a Mac does. Rejected: SwiftUI's
+/// `Toggle(sources:isOn:)`, which draws the mixed state but leaves which way
+/// a click on it goes to the framework (the plan review's amendment 24).
+///
+/// VoiceOver hears the group's name, the checkbox and its state from
+/// AppKit, and "5 of 12 ticked" as the value's description.
+struct GroupTickBox: NSViewRepresentable {
+
+    // MARK: - Stored properties
+
+    let title: String
+    let state: PageTickTree.State
+    let valueDescription: String
+    let identifier: String
+
+    /// The model's rule, answering the box's state after it.
+    let click: () -> PageTickTree.State
+
+    // MARK: - Functions
+
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(click: click)
+    }
+
+    func makeNSView(context: Context) -> NSButton {
+        let box: NSButton = NSButton(checkboxWithTitle: title, target: context.coordinator, action: #selector(Coordinator.clicked(_:)))
+        box.allowsMixedState = true
+        box.lineBreakMode = .byTruncatingTail
+        box.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        update(box)
+        return box
+    }
+
+    func updateNSView(_ box: NSButton, context: Context) {
+        context.coordinator.click = click
+        update(box)
+    }
+
+    /// The box as the model says it is, whatever a click has just done to it.
+    func update(_ box: NSButton) {
+        box.title = title
+        box.state = GroupTickBox.controlState(for: state)
+        box.setAccessibilityLabel(title)
+        box.setAccessibilityValueDescription(valueDescription)
+        box.setAccessibilityIdentifier(identifier)
+    }
+
+    /// AppKit's state for the tree's.
+    static func controlState(for state: PageTickTree.State) -> NSControl.StateValue {
+        switch state {
+        case .on:
+            return .on
+        case .off:
+            return .off
+        case .mixed:
+            return .mixed
+        }
+    }
+
+    /// Carries the click to the model, and draws the state the model then
+    /// answers, over whatever AppKit's own cycle has just drawn.
+    final class Coordinator: NSObject {
+
+        // MARK: - Stored properties
+
+        var click: () -> PageTickTree.State
+
+        // MARK: - Initializer
+
+        init(click: @escaping () -> PageTickTree.State) {
+            self.click = click
+        }
+
+        // MARK: - Functions
+
+        @objc func clicked(_ sender: NSButton) {
+            let after: PageTickTree.State = click()
+            sender.state = GroupTickBox.controlState(for: after)
+        }
     }
 }

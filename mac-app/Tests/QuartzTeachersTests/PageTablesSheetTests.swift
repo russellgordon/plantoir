@@ -45,8 +45,11 @@ final class PageTablesSheetTests: XCTestCase {
 
     // MARK: - The picker (#608)
 
-    /// The picker is a table: one row per page offered, under Page, Folder
-    /// and Date, and a date only beside a class.
+    /// The picker is a table: under Page, Folder and Date, a group per unit
+    /// and per folder (#900), folded to begin with, and with both open one
+    /// row per page offered, a date only beside a class. Its height is
+    /// counted from every page and every group (#900), so opening a group
+    /// never moves the sheet.
     func testThePickerHasARowPerPageUnderPageFolderAndDate() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {
@@ -59,7 +62,9 @@ final class PageTablesSheetTests: XCTestCase {
             host.close()
         }
         let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
-        XCTAssertEqual(table.numberOfRows, 5)
+        XCTAssertEqual(table.numberOfRows, PageTickTree.groupsStartFolded ? 2 : 7, "a group per unit and per folder")
+        PageTablesSheetTests.openEveryGroup(of: model, in: host)
+        XCTAssertEqual(table.numberOfRows, 7, "the groups and their pages")
         XCTAssertEqual(PageTablesSheetTests.titles(of: table), [
             AssistWording.menuPlanPageColumn, AssistWording.menuPlanFolderColumn, AssistWording.menuPickDateColumn,
         ])
@@ -69,7 +74,7 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertEqual(sheet.dateCell(for: firstClass),
                        AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text))
         XCTAssertEqual(sheet.dateCell(for: model.pageRows[4]), "", "a page that is not a class has no date")
-        XCTAssertEqual(table.enclosingScrollView?.frame.height, ListTableMetrics.height(forRowCount: 5, showsHeader: true))
+        XCTAssertEqual(table.enclosingScrollView?.frame.height, ListTableMetrics.height(forRowCount: 7, showsHeader: true))
     }
 
     /// A click on a row's checkbox ticks that page in the model, and a second
@@ -86,9 +91,11 @@ final class PageTablesSheetTests: XCTestCase {
             host.close()
         }
         let table: NSTableView = try XCTUnwrap(host.tables().first)
+        PageTablesSheetTests.openEveryGroup(of: model, in: host)
         XCTAssertTrue(model.ticked.isEmpty)
+        // Row 3 of Unit 1, Days 1 to 3 under Unit 1, then Concepts: Day 3.
         host.clickCell(of: table, column: 0, row: 3)
-        XCTAssertEqual(model.ticked, [model.pageRows[3].name], "the click did not tick the page in its row")
+        XCTAssertEqual(model.ticked, [model.pageRows[2].name], "the click did not tick the page in its row")
         host.clickCell(of: table, column: 0, row: 3)
         XCTAssertTrue(model.ticked.isEmpty, "a second click did not untick it")
     }
@@ -111,11 +118,13 @@ final class PageTablesSheetTests: XCTestCase {
             host.close()
         }
         let table: NSTableView = try XCTUnwrap(host.tables().first)
+        PageTablesSheetTests.openEveryGroup(of: model, in: host)
+        // Row 2: Unit 1, Day 2 (row 0 is Unit 1's group).
         host.select(row: 2, in: table)
         XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
         XCTAssertTrue(model.ticked.isEmpty, "selecting a row ticked it")
         host.pressSpace()
-        XCTAssertEqual(model.ticked, [model.pageRows[2].name], "Space did not tick the selected row")
+        XCTAssertEqual(model.ticked, [model.pageRows[1].name], "Space did not tick the selected row")
         XCTAssertTrue(model.defaultButtonIsEnabled)
         host.press(keyCode: 36, characters: "\r")
         XCTAssertEqual(presses.defaults, 1, "Return did not reach Continue with a row selected")
@@ -131,9 +140,10 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertTrue(model.ticked.isEmpty, "Space in Find a Page ticked a row")
     }
 
-    /// Typing in Find a Page narrows the rows and leaves the sheet's height
-    /// where it was: the table is counted from every page, not the ones the
-    /// search leaves showing.
+    /// Typing in Find a Page narrows the rows, opens the group they are in
+    /// (#900) and leaves the sheet's height where it was: the table is
+    /// counted from every page and group, not the ones the search leaves
+    /// showing.
     func testSearchingNarrowsThePickerWithoutMovingTheSheet() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {
@@ -147,10 +157,10 @@ final class PageTablesSheetTests: XCTestCase {
             host.close()
         }
         let table: NSTableView = try XCTUnwrap(host.tables().first)
-        XCTAssertEqual(table.numberOfRows, 11)
+        XCTAssertEqual(table.numberOfRows, PageTickTree.groupsStartFolded ? 1 : 12, "the Concepts group")
         model.search = "Page 1"
         host.pump()
-        XCTAssertEqual(table.numberOfRows, 3, "Page 1, Page 10 and Page 11")
+        XCTAssertEqual(table.numberOfRows, 4, "Concepts, opened by the search, with Page 1, Page 10 and Page 11")
         let after: NSSize = PageTablesSheetTests.fittingSize(of: sheet)
         XCTAssertEqual(after.height, before.height, "the sheet changed height as the teacher typed")
     }
@@ -913,6 +923,15 @@ final class PageTablesSheetTests: XCTestCase {
             }
         }
         return nil
+    }
+
+    /// Opens every group of the picker's tree (#900), as the teacher would
+    /// with the triangles, and lets the table catch up.
+    static func openEveryGroup(of model: SectionVerbSheetModel, in host: TableHost) {
+        for id in PageTickTree.groupIDs(in: model.tickRows) {
+            model.openGroups.insert(id)
+        }
+        host.pump()
     }
 
     /// Publish Pages… at its first stage: `classes` classes, dated from

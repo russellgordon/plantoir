@@ -2396,6 +2396,43 @@ nonisolated enum AssistWording {
 
     static let menuFindAPage: String = "Find a page"
 
+    /// The tree of checkboxes in Publish Pages… and Hide Pages… (#900): the
+    /// group for the class pages outside any unit ("Field Trip"), after the
+    /// units. A club's twin says meetings.
+    static func menuPageGroupOtherClasses(noun: ClassNoun = .class) -> String {
+        switch noun {
+        case .class:
+            return "Other classes"
+        case .meeting:
+            return "Other meetings"
+        }
+    }
+
+    /// The one group for every class page of a numbered course, which has no
+    /// units (#900): a club's "Week 3".
+    static func menuPageGroupAllClasses(noun: ClassNoun = .class) -> String {
+        switch noun {
+        case .class:
+            return "All classes"
+        case .meeting:
+            return "All meetings"
+        }
+    }
+
+    /// What VoiceOver hears as a group's box's value (#900): "5 of 12 ticked".
+    static func menuPageGroupTickedCount(ticked: Int, of total: Int) -> String {
+        return "\(ticked) of \(total) ticked"
+    }
+
+    /// Under the tree when the search hides ticked pages (#900): they stay
+    /// ticked, and Continue includes them, as it did before the tree.
+    static func menuTickedButNotShown(count: Int) -> String {
+        if count == 1 {
+            return "1 ticked page is not shown by the search. Continue still includes it."
+        }
+        return "\(count) ticked pages are not shown by the search. Continue still includes them."
+    }
+
     /// The picker's and the later-classes list's third column (#608): a
     /// class's day, as `laterClassesDay` says it. The Page and Folder
     /// columns are the plan table's own (`menuPlanPageColumn`,

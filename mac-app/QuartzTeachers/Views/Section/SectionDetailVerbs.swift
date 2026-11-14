@@ -506,7 +506,14 @@ extension SectionDetailView {
         switch model.kind {
         case .publishPages, .hidePages:
             let count: Int = model.ticked.count
-            return count == 1 ? "1 page ticked" : "\(count) pages ticked"
+            let line: String = count == 1 ? "1 page ticked" : "\(count) pages ticked"
+            // #900: how many of them a unit's or a folder's box ticked, so a
+            // report of pages published unmeant can be read. Never a title.
+            let byAGroupsBox: Int = model.tickedByAGroupsBoxCount
+            if byAGroupsBox == 0 {
+                return line
+            }
+            return line + ", \(byAGroupsBox) by a group's box"
         case .makeRoom:
             return model.howMany == 1 ? "room for 1" : "room for \(model.howMany)"
         case .rollOver:
