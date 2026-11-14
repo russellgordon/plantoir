@@ -45,11 +45,12 @@
 //
 // PLANTOIR_TASK_CHECK_KEEP=<folder> keeps the PDFs there.
 
-import { execFileSync, spawn } from "node:child_process"
+import { execFileSync } from "node:child_process"
 import { createServer } from "node:http"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, siteFolder] = process.argv.slice(2)
 if (!chromePath || !siteFolder) {
@@ -107,7 +108,7 @@ function serve() {
 }
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-task-boxes-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1280,900",
   "--use-mock-keychain", "--password-store=basic",

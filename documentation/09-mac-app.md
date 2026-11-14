@@ -8070,6 +8070,59 @@ payload 2 ms (both kinds); 2,000 generated pages 43 ms inside the suite. The
 plan's "about 10 ms" was the warm figure; the review measured 40–51 ms for
 2,000 pages and 228 ms for 9,790. Both triggers run it off the main actor.
 
+**The suite's check of that speed is relative to the Mac running it (#905).**
+`testTheScanOfTwoThousandPagesIsQuick` used to assert under 5 s, a figure
+chosen on the M4 Pro; on a second Mac (M4, 16 GB, Xcode 27.0) it took 8.05 s
+while the rest of the suite ran, so a gate failed by hardware and the figure
+said nothing about what a teacher's Mac would meet. Three tests replace it,
+and none names a number of seconds.
+
+- `testTheScanOfTwoThousandPagesReadsEachPageOnce` pins the walk and the
+  reads with no clock. The scan takes both its doors to a page as
+  parameters, `isEvicted` and `readPage` (default
+  `ObsidianFigureAddOns.readPage`), and the test counts both: every one of
+  2,000 pages asked of once and read once, nothing in `.trash` and no file
+  that is not a page.
+- `testTheScanReadsPagesOnlyThroughItsReader` reads the scan's own source
+  and fails if its body reads a page any other way (`contentsOf`,
+  `FileHandle`, `InputStream`, `mmap`, `fopen`, `read(`). Without it, a
+  second read that went around `readPage` would not be counted.
+- `testTheScanIsQuickAndGrowsNoFasterThanThePages` times the scan and plain
+  reading of the same pages (`readEveryPage`, the least any scan that reads
+  them must cost) on 500 pages and on 4,000 in the same run, in five
+  interleaved rounds, keeping the fastest of each. The 500-page pair is
+  timed `smallCourseTimingsPerRound` (4) times in each round, because
+  reading 500 pages takes about 10 ms. On 4,000 pages the scan must
+  cost under `scanCostsAtMostThisManyReads` (10) reads, and its cost per
+  read there must be under `perPageCostGrowsAtMost` (2.5) times its cost
+  per read on 500 pages.
+
+Measured standalone at -Onone on the M4 Pro (12 cores). With one timing of
+the 500-page pair per round, 5 of 75 runs under 12 or 24 busy loops failed
+the growth bound (growth up to 6.51), and a quadratic scan passed it in 1 of
+8. Every failing run had a low 500-page ratio: a burst of load had caught all
+five small reads, so the denominator of the growth figure was too small and
+the scan itself was not slow. With four timings per round: 55 runs under 24
+busy loops and 148 under 6 (half the cores, while a `verify.sh` run went
+on beside them, load average 20 to 44) all passed, growth 0.58 to 1.98;
+0 of 100 failed with no busy loops (load average 9 to 18 from other work,
+growth 0.71 to 1.12). A scan that kept a list of the pages it had read and
+searched it for each page failed every run: 8 of 8 under 24 loops (growth
+3.40 to 6.45), 21 of 21 under 6 (2.96 to 4.68), and 20 of 20 with none
+(2.71 to 3.94). Sabotaged copies that read each page two, three or five
+times through `readPage` fail the read count,
+and one that read each page a second time with `Data(contentsOf:)` fails the
+source check. What the tests do not pin: a slower scan whose cost is still
+linear in the pages, up to ten reads' worth (today's measured 1.0 to 1.5
+with no busy loops and up to 2.2 with them);
+and growth too small to show between 500 and 4,000 pages. Rejected: a wider
+fixed limit, which would pass a slow Mac and a slow scan alike; timing one
+size against plain reading, which cannot see growth (the first version of
+this change did that, and the quadratic scan above passed it at 2,000
+pages); a growth bound tighter than 2.5, which the loaded baseline came
+within 0.6 of (1.98); and a 1,000-page small course in place of repeated
+timing, which the review offered as an alternative and nobody measured.
+
 **Backups and reference copies.** `CourseArchiver` adds `zip -x
 <course>/.obsidian/plugins/<id>/*` for each folder carrying the marker,
 worked out at zip time (`ObsidianFigureAddOns.backupExclusions`); the

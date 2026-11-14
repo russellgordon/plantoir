@@ -25,6 +25,7 @@ moves fails the test rather than skipping it. Run with:
     python3 scripts/test_deploy_sh_plans.py
 """
 import datetime as dt
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import json
 import os
 import shutil
