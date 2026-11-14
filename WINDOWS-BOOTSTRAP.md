@@ -166,10 +166,14 @@ reasons rather than tasks:
   from the parity run's bundle 1 (2026-09-30) to the v1.4.0 cut it was the
   parity milestone's burn-down list. Since 2026-10-15 (the catch-up to mac
   1.7.1, #481) every entry carries its OWN milestone, and
-  `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` fails
-  for any entry whose milestone is not later than `Plantoir.csproj`'s
-  `<Version>` — so an entry left at the cut it names is a red suite, not a
-  memory — `documentation/12-windows-app.md` → "Named gaps". Everything not in it is asserted as before, and the ledger fails
+  `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease`
+  fails for any entry whose milestone is not later than the last release
+  Windows SHIPPED (read from `website/site.json` and `updates/windows.xml`,
+  never the csproj, since #862: `<Version>` names the release being built and
+  is raised when its work starts), and `publish.ps1 -Sign` runs the same
+  fact against `<Version>` and refuses to build — so an entry left at the cut
+  it names is a refused installer, not a memory —
+  `documentation/12-windows-app.md` → "Named gaps". Everything not in it is asserted as before, and the ledger fails
   the moment a ledgered thing starts existing here or stops being in the
   contract, so an entry cannot outlive either. **It is allowed only while an
   open issue milestoned LATER than the release being cut owns the work, and

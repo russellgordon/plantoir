@@ -184,11 +184,15 @@ did on its own — and `deploy.py` asks the same in `ensure_base_url_and_rebuild
 Without it 1.9.1's stylesheet changes never reached a redeployed site. What was
 measured, the fix and what was rejected:
 [05 → "Which toolchain built a site (#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746).
-`deploy.ps1`'s folder publish asks the same question since 1.9.3 (#749): it
-runs the shared Python's `site_was_built_by_this_toolchain`, and anything but
-a plain yes builds first, in the one rebuild block it shares with the
-live-reload check below; the Windows section of 05 says how, and why the
-toolchain's id is remembered there.
+`deploy.ps1`'s folder publish asked the toolchain question from 1.9.3 (#749);
+since #799 it asks the WHOLE question before every destination, folder,
+Netlify and Cloudflare: one call to the shared Python's
+`why_build_before_deploying` (a preview's site, the toolchain, the clock,
+the pages), and anything but a plain `reuse` builds first, in the one
+rebuild function, `Invoke-BuildFirstWhenAsked`, which also writes the "site
+built again before deploying" trail line. The Windows section of 05 says how,
+why the toolchain's id is remembered there, and why there are two call sites
+(the native run's comes before any token is in the environment).
 
 ### Automatic production rebuilds (live-reload detection)
 
@@ -253,7 +257,10 @@ lines from deploy.sh rather than retyping them. The other three rebuild lines
 appeared. Nothing was deployed.") followed in v1.4.4 (#441) and the same test
 pins them, with deploy.sh's leading "❌ " trimmed; every other deploy.ps1 line
 that said "published" for a deploy moved with them ("Deploy and publish: the
-two words (v1.4.4, #443)", below).
+two words (v1.4.4, #443)", below). Since #799 those lines are printed before
+any destination, not only the folder leg, and the pages and clock pairs
+("Something in this course has changed since its site was last built…",
+"This site's last build is dated later than now…") are pinned by the same test.
 
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
@@ -266,11 +273,14 @@ they did not agree:
 | The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
 | `deploy.sh`, every destination | one `site_carries_preview_client`, called four times: first in `why_this_deploy_builds_first`, which asks a preview's site before the toolchain for every destination (#768), then three times in the folder leg | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
 | `toolchain_paths.site_carries_preview_client` (deploy.py's `main` and `why_build_before_deploying`, Netlify and Cloudflare, both platforms) | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract; one Python copy since #768 |
-| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)**. *Since #799 deploy.ps1 DECIDES with the shared Python's `site_carries_preview_client` (the row above), before every destination; `Test-CarriesLiveReload` runs only after a rebuild, in its wait and its "still carries" refusal.* |
 | `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 
-(Windows' scheduled task builds unconditionally, so it has no check to get
-wrong.)
+(Windows' scheduled task built unconditionally until #799, so it had no check
+to get wrong. Since then it asks the shared Python before it builds, the
+`toolchain_paths.site_carries_preview_client` row above, through the same
+lines deploy.ps1 asks with; and deploy.ps1's own question runs before EVERY
+destination, not only the folder leg.)
 
 **Why the apps being narrower mattered.** The built tree is replaced file by
 file, so a clean front page in front of a preview's pages is a real state. The
@@ -3366,6 +3376,12 @@ of #892 and nothing else, with Netlify's rendered line reading `39 OK, 0
 FAIL, 0 SKIPPED, 8 EXPECTED` and the badge's two lines under their own
 Result heading. The self-test went from 62 cases to 77.
 
+#799 reached `dev` on 2026-11-14 (3180c439b) and the Mac's stack with it,
+so a run on that tree should show none of the four: 0 failed, both hosts
+`checked`, and both second deploys "built nothing, uploaded nothing", on a
+test course that records no custom domain. A red Cloudflare row of #892's
+shape on that tree is a regression, not the expected red described above.
+
 **What a teacher's embed says is set aside, and counted.** The first
 deployed-mode run (the fixture site served under `--base … --host netlify`,
 2026-11-13) failed the clean-page row on the Embeds page in both engines for
@@ -4475,7 +4491,19 @@ fails there.
   destinations with different addresses** (Netlify AND Cloudflare Pages, say):
   the site is built for one address, and the next destination finds the other
   one baked in and rebuilds for its own. So that one stays reachable whatever
-  happens to #136, and for such a course it is not a first-publish corner. Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
+  happens to #136, and for such a course it is not a first-publish corner.
+  **Measured, and ruled, on #799 (2026-11-13):** each site carries its OWN
+  address (Russell), so such a course builds once per host on every deploy,
+  even with nothing changed: 1, 3 and 5 builds over three unchanged deploys
+  of a Netlify course with a Cloudflare destination too, against 1, 2 and 3
+  before #799, when the Cloudflare leg rebuilt for an address its rebuild
+  never got and the Cloudflare site carried the Netlify address. Accepted.
+  The cost on the Lenovo 20QES70500 (i5-8365U, 16 GB): the one extra
+  Cloudflare rebuild measured at the director's gate (`verify-deploy.ps1`'s
+  log) took 69 s, and a section's rebuild there takes 12 to 74 s (05 →
+  "Known extra builds"). Since #799 a
+  destination is also built for its own custom domain when the course records
+  one (05 → "On Windows (#799)"). Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
   find carrying the preview's live-reload client — reachable in a scheduled run
   only while the wrapper's is-the-site-stale check is narrower than the
   launchers' (the gap described under "How it is tested" below,
@@ -4648,6 +4676,25 @@ with that refusal turned off.
 | `deploy.bat` → `deploy.ps1` | `deploy.ps1`'s own check |
 | `python3 scripts/deploy.py …` | `deploy.py`, first thing in `main()` |
 | `verify-deploy.sh` / `.ps1` | inherits the two launchers' |
+
+### A deploy already set is turned off, so there is nothing to Cancel
+
+A deploy set before the course became one (or arriving with a hand-edited
+marker, or from another machine) is turned off when the working folder is
+READ — `scheduledDeployCancellation`, "a course kept for reference is met when
+the working folder is read" — and the trail gets `scheduled deploy turned off`
+for each section. The mac does it in `ReferenceCourseUpkeep` through
+`ScheduledDeployCleanup` (`Reason.theCourseIsKeptForReference`); Windows in
+`ReferenceCourseUpkeep.BringUpToDate` since #241. The row "already on disk,
+firing" above is the backstop for a task the read has not reached.
+
+So **neither platform offers Cancel Scheduled Deploy… on a reference
+section**: the menu bar greys it (`subjectMenus`), and since #527 (2026-11-13)
+Windows' sidebar row leaves it out too, as the mac's always did. Until then
+the Windows row kept it, on the stale belief that Windows did not turn such a
+deploy off by itself and the row was the only way to stop one. What was
+checked before it went, state by state, is in `12-windows-app.md` → "Menus,
+the Section menu's functions and #475 on Windows".
 
 ### Why door 12 needs the SHELL and not only `deploy.py`
 
