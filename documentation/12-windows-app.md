@@ -13261,3 +13261,187 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## Restoring from a backup never leaves a course emptied (#873), and keeps the kept sketches (#805)
+
+**The fault, as it shipped.** `CourseRestorer.RestoreBackup` unpacked a backup
+into `%TEMP%\restore-<guid>`, DELETED every child of the live course, then
+`Directory.Move`d the unpacked folders in. `Directory.Move` cannot cross
+volumes, and `%TEMP%` is on C:, so for a working folder on D:, a USB drive or a
+share every subfolder was lost and only the top-level files came back; and on
+any disk a move or a delete that failed part way (a file held open) left the
+course partly emptied, with the app reporting a failure over it. The section
+restore (`ReplaceContents`) had a copy fallback for the volume, but deleted
+first too. Found by the shelf plan's review (B-H1), read and not measured then.
+
+**What it does now** (`Plantoir.Core/Models/StagedRestore.cs`, used by
+`RestoreBackup`, `RestoreSection` and `Restore` from Archived):
+
+1. The zip is unpacked into a hidden sibling of the course,
+   `courses\.plantoir-restoring-<FOLDER>-<pid>-<8 hex>\incoming\`. A sibling is
+   on the course's own volume, so every move after this is a rename, which
+   happens whole or not at all. The dot keeps it out of
+   `Workspace.DiscoverCourses`, the builds and Obsidian; the prefix is not
+   `ReferenceStaging.Prefix` (`.plantoir-importing-`), so neither sweep takes
+   the other's folder.
+2. Checked: every file entry of the zip is on disk at its full length. The
+   unzip itself (`ZipFile.ExtractToDirectory`) is the guard against an entry
+   that would land outside (`..\`, a rooted name): it refuses, kept as it was.
+   Every failure here says the restore's existing "The archive could not be
+   opened: …".
+3. The swap: every child of the course is RENAMED into `aside\`, then every
+   child of the backup into the course. The course folder never moves, because
+   it is Obsidian's vault and its watcher is anchored to it (the old restore's
+   reason for replacing contents, kept). On any failure, what moved in goes
+   back out, everything aside comes back, and the error is rethrown: the
+   teacher reads the existing dialog (`BackupProblemTitle.Restoring` and the
+   error's text) over a course that is exactly as it was, and
+   `ConfirmRestoreBackup` writes no "course restored from a backup" line,
+   because it writes that only once the call returns.
+4. Only then are the old contents removed, with the staging folder. A part
+   that will not go (a file still held) is finished by the next launch.
+5. A `journal` (written to a temporary file, flushed to the disk, renamed
+   over) names the step (`unpacking`, `placing`, `aside`, `in` with the
+   incoming names, `done`) and `owner` holds the process as a lease body
+   (pid, name, start). `WorkspaceViewModel.Reload` calls
+   `StagedRestore.RecoverLeftovers` BEFORE `DiscoverCourses`, so a course whose
+   contents were set aside is never listed as missing. It acts only on a folder
+   whose owner is no longer running (`WorkLease.OwnerIsAlive`; another window,
+   `plantoir-mcp` or a restore still running is left alone): nothing aside,
+   removed; `aside` or `in`, the old contents put back, then removed; `done`,
+   finished (old contents removed, the built sites discarded). Anything it
+   cannot make sense of is LEFT IN PLACE (litter, never loss), and an entry in
+   the course it did not put there is moved into `displaced\`, never deleted.
+   It writes a diagnostic line, not a trail line: no event names it (a
+   proposal in #873's closing comment).
+6. The reference lock is taken off before the swap and put back afterwards,
+   whichever way it ended, asked of the settings as they then are. The record
+   of a stopped rename of the unit word is cleared only once the course IS
+   restored: a restore that was put back still holds the pages it describes.
+7. `CourseArchiver.ZipFolder` flushes the zip to the disk (`FlushFileBuffers`)
+   before anything relies on it (the review's B-H2): NTFS journals the renames
+   and deletions that follow, not a file's data.
+
+The section restore is the built-in assistant's own restore tool. Its schema,
+description and fixed phrasings are untouched (Russell's ruling on #897 is that
+the safer restore covers both paths); only the code under it changed.
+
+**Measured** (this PC: Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200; one volume, C:, NTFS, 465 GB, plus a 918 MB recovery partition with no
+letter, not touched):
+
+- **No second volume.** A working folder on another disk could NOT be
+  measured, and this account is not an administrator, so no VHD could be
+  mounted. `subst` was rejected as a stand-in: it is a new letter for the SAME
+  volume, so a rename across it succeeds and proves nothing. What stood in:
+  `EveryMoveIsARenameInsideTheCoursesFolder` (every move's source and target
+  under `courses\`, on the course's volume by its `\\?\Volume{guid}\` name);
+  `ATempFolderThatCannotBeUsedDoesNotMatterBecauseNothingIsUnpackedThere` (TMP
+  and TEMP pointed at a file: the old restore could not run at all, the new one
+  never asks); and `AMoveRefusedBecauseItCrossesVolumesIsPutBackToo` (a move
+  refused with ERROR_NOT_SAME_DEVICE, injected, put back). A course folder that
+  is itself a junction to another disk is the one case where a move can still
+  cross volumes: `MoveEntry` then copies and removes the source, a copy that
+  cannot finish removes what it wrote, and a tree holding a link refuses
+  rather than drop it. That path is NOT exercised by any test.
+- **Open handles** (.NET on this PC): a FOLDER holding any open file cannot be
+  renamed (access denied), even when the file was opened with
+  FILE_SHARE_DELETE; a FILE opened with FILE_SHARE_DELETE (as Node, and so
+  Obsidian, opens one) can be renamed while open; a recursive watcher on the
+  vault root does not stop a subfolder's rename, a watcher on the subfolder
+  itself stops its parent's; a process whose working directory is inside a
+  folder (a terminal from Open in Terminal) stops its rename. Each of those now
+  ends in the dialog over a course as it was. The old restore emptied every
+  child sorted before the held one. Obsidian itself was not driven, so how it
+  holds a vault is not measured; if it watched each folder separately, a
+  restore with Obsidian open would now be refused where the old one deleted
+  through it.
+- **A real kill.** A separate process restoring a 2,001-file course (20
+  folders of 100 pages, a 323 KB zip; one full restore 4.6 s, the backup 25 s
+  with Defender scanning each new file) was killed at a range of moments and
+  the recovery run after it, with the real liveness check:
+
+  | Killed at | What the kill left | The next launch | The course after |
+  |---|---|---|---|
+  | 0.3 s to 3.5 s (nine runs) | the staging folder, step `unpacking`, nothing aside, the course's 22 entries untouched | removed it | as it was |
+  | 4.0 s | step `aside`: 13 entries aside, 9 still in the course | put back | as it was |
+  | 4.5 s | step `done`: the swap complete, the old contents being removed | finished | the backup's |
+  | 6.5 s | (the restore had finished) | nothing to do | the backup's |
+
+  "As it was" and "the backup's" are compared file by file by SHA-256 against
+  snapshots taken before and after an uninterrupted restore; no run left a
+  mixture or a leftover. Unpacking is most of the time, so most kills land
+  there, which costs nothing to undo. The `in` step (all aside, the backup's
+  moving in) lasts milliseconds and no real kill landed in it; the seam tests
+  cover it at every move.
+- **Every step, each in turn** (seam tests): a failure injected at every move
+  of the swap leaves the course byte-identical and no leftover; a kill
+  simulated at every move is recovered to byte-identical (the first one, before
+  anything moved, only removes an unpacked zip), and a kill once swapped is
+  finished to the backup's contents.
+- Read-only files, a path over 260 characters, a junction inside the course
+  (renamed aside as a link; the folder it points at untouched), a symbolic-link
+  entry in a zip (written as an ordinary file by .NET, no link made), and the
+  disk filling while unpacking (ERROR_DISK_FULL injected after part of the zip
+  was written: course as it was, no leftover): each a test.
+- **The flush** (`FileStream.Flush(true)`, FlushFileBuffers, measured on a
+  freshly written file on C:): 2 ms for 1 MB, 37 ms for 50 MB, 379 ms for
+  470 MB, the size of a real course's backup with its Media.
+
+**Tests**: `StagedRestoreTests` (18). Red on the old code by copy-aside (the
+old `CourseRestorer.cs`, `CourseArchiver.cs` and `WorkspaceViewModel.cs` put
+in place, the tests that use only the public restore compiled against them):
+5 of 5 failed: a held file in the course, a held file in a section, the
+unusable TMP, the flush, and the recovery before the list. The seam tests
+need `StagedRestore.Steps`, which the old code lacks; proved by mutation
+instead (the putting back made to return at once): 5 failed.
+
+**Rejected**: unpacking to %TEMP% (cannot cross volumes); deleting first (the
+fault); renaming the whole course folder aside and the unpacked one in
+(Obsidian's watcher would show stale files until the vault was reopened); a
+free-space check before unpacking (it needs a sentence the contract does not
+have, and running out already leaves the course as it was); rolling a `done`
+restore BACK at the next launch (a section restore has already rewritten the
+shared pages' per-section keys by then, so putting its folder back would leave
+the two disagreeing; finishing is the consistent answer); a new trail event
+for the recovery (the contract names none; proposed, not built).
+
+**What a kill in the last moment costs.** Between `done` and the end of the
+call, a kill leaves the backup's contents in place and the next launch
+finishes them, but no "course restored" line is written, and a section restore
+may not have put back the shared pages' keys. Recorded, not fixed.
+
+### The kept copies of geogebra.org sketches survive a restore and follow a rename (#805)
+
+The Windows half of the mac's #789 (`documentation/05-build-pipeline.md` →
+"The kept copies of geogebra.org sketches survive the clear"). Windows has no
+`.merged_output` link and so none of the launcher clears; the one clear was
+the restore's `DiscardBuilds`, which removed `builds\<id>\<CODE>` whole,
+`.geogebra-cache` with it.
+
+- `BuildOutputLocation.DiscardBuiltSitesFor` removes every entry of the
+  course's builds folder except a REAL `.geogebra-cache` folder
+  (`KeptCopiesFolderName`, pinned against
+  `buildOutputLocation.keptCopiesSurviveTheClear.folder`); one that is a file,
+  a junction or a link to itself goes, only the link. A builds folder that is
+  ITSELF a link is never enumerated: only the link goes (the plan review's P5
+  M1). The workspace still goes. Both `RestoreBackup` paths, and the staged
+  restore's recovery, use it. Archiving, and restoring from Archived (whose
+  folder archiving already discarded), still discard everything.
+- `BuildOutputLocation.MoveBuild`, called by `CourseRenamer.Rename` once the
+  course folder has moved: `builds\<id>\<OLD>` becomes `<NEW>`, built sites and
+  copies together (a stale `<NEW>` replaced; the old workspace discarded),
+  best-effort; a link is removed as a link. The rename is already refused
+  while the course previews or deploys in this app (`OpenRenameCourseDialog`).
+- `KeptCopiesTests` walks `keptCopiesSurviveTheClear.cases` from the JSON:
+  every case whose course folder is not "a built site of its own" is run
+  against the clear on the builds folder it describes (Windows has no link,
+  which cannot change the answer); the cases about moving a built site out of
+  the working folder describe a move Windows never makes and are left out by
+  that one rule. A junction stands in for a link (no privilege needed);
+  `mklink /J` makes one to itself.
+- Red on the old code: the restore and rename tests, 4 of 8, with the part-A
+  `CourseRestorer.cs` and `StagedRestore.cs` and the old `CourseRenamer.cs`
+  put back. The clear's cases, by mutation: keeping nothing failed 3,
+  enumerating a linked builds folder failed 1.
+- No trail event: a teacher sees and does nothing new.

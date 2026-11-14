@@ -4882,9 +4882,16 @@ could read as a change, and it would add files to whatever syncs or backs up
 the course, so a second Mac fetches again the first time it builds online,
 as before); keeping `.figure-cache` and `.swift-cache` as well (both are made again on this Mac with no network: the diagrams from the engines the website builder carries, and the Swift blocks by the Swift toolchain, a first download of about 1.3 GB kept in an image of its own that no clear touches; so a clear costs time, every diagram drawn and every Swift block compiled again on the next build, and nothing else; on Windows the toolchain is about 2.3 GB, kept under `%LOCALAPPDATA%`).
 
-**Windows** has no link and so no clear of this kind; it discards a
-course's whole builds folder when a course is restored from a backup, which
-takes `.geogebra-cache` with it. That is the `windows` issue for #789.
+**Windows** has no link and so no clear of this kind. Until #805 it
+discarded a course's whole builds folder when a course was restored from a
+backup, `.geogebra-cache` with it, and a rename left the folder under the old
+code. Since #805 the restore keeps the copies
+(`BuildOutputLocation.DiscardBuiltSitesFor`, the same only-a-real-folder rule,
+and a builds folder that is itself a link is never enumerated) and a rename
+carries `builds\<id>\<OLD>` to `<NEW>` (`MoveBuild`), as the mac's
+`moveBuild` does: `documentation/12-windows-app.md` → "Restoring from a
+backup never leaves a course emptied (#873), and keeps the kept sketches
+(#805)".
 
 **The Windows layout has the same hole in a different shape.** There is no link
 there, so the "no link means clear it" rule cannot be copied — but
