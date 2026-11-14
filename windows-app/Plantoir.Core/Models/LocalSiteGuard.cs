@@ -319,6 +319,15 @@ public interface ILocalFiles
 
     /// <summary>The file at <paramref name="path"/>, opened ONCE with links followed, or null.</summary>
     LocalFile? Open(string path);
+
+    /// <summary>
+    /// The names in the folder at <paramref name="path"/>, links followed, exactly
+    /// as the disk spells them; null when no folder can be listed there. Added for
+    /// the deployed folder's server (#889, the mac's #850), which matches every
+    /// name of a request against its folder's listing, so case counts on NTFS as
+    /// it does on a strict web host and an 8.3 short name never matches.
+    /// </summary>
+    IReadOnlyList<string>? List(string path);
 }
 
 /// <summary>The disk, through one handle per question (<c>CreateFileW</c> and <c>GetFinalPathNameByHandleW</c>).</summary>
@@ -338,6 +347,21 @@ public sealed class WindowsLocalFiles : ILocalFiles
     }
 
     public bool IsFolder(string realPath) => Directory.Exists(realPath);
+
+    public IReadOnlyList<string>? List(string path)
+    {
+        try
+        {
+            var names = new List<string>();
+            foreach (string entry in Directory.EnumerateFileSystemEntries(Extended(path)))
+                names.Add(Path.GetFileName(entry));
+            return names;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
+        {
+            return null;
+        }
+    }
 
     public LocalFile? Open(string path)
     {

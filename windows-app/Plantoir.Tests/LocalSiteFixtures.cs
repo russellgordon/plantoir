@@ -96,6 +96,21 @@ internal static class LocalSiteFixtures
             if (_files.Contains(real)) return new LocalFile(new MemoryStream("made"u8.ToArray()), real, true);
             return Exists(real) ? new LocalFile(Stream.Null, real, false) : null;
         }
+
+        public IReadOnlyList<string>? List(string path)
+        {
+            Calls++;
+            string real = Resolve(path);
+            if (_files.Contains(real) || !Exists(real)) return null;
+            var names = new List<string>();
+            foreach (string entry in _files.Concat(_folders).Concat(_links.Keys))
+            {
+                if (!entry.StartsWith(real + "\\", StringComparison.OrdinalIgnoreCase)) continue;
+                string name = entry[(real.Length + 1)..].Split('\\')[0];
+                if (!names.Contains(name, StringComparer.OrdinalIgnoreCase)) names.Add(name);
+            }
+            return names;
+        }
     }
 
     /// <summary>The real disk, with every question counted.</summary>
@@ -108,6 +123,8 @@ internal static class LocalSiteFixtures
         public bool IsFolder(string realPath) { Calls++; return WindowsLocalFiles.Instance.IsFolder(realPath); }
 
         public LocalFile? Open(string path) { Calls++; return WindowsLocalFiles.Instance.Open(path); }
+
+        public IReadOnlyList<string>? List(string path) { Calls++; return WindowsLocalFiles.Instance.List(path); }
     }
 
     /// <summary>

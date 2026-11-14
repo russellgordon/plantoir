@@ -186,6 +186,14 @@ public sealed class AppSettings
     /// </summary>
     public Dictionary<string, RememberedPlacement> AssistWindowPlacements { get; set; } = new();
 
+    /// <summary>
+    /// The port each deployed folder was last shown at in the web browser, by the
+    /// folder's canonical path (#889, the mac's #850 <c>deployedFolderPorts</c>):
+    /// the same address each time, so what the site keeps per address is still
+    /// there. Read and written through <see cref="SettingsDeployedFolderPorts"/>.
+    /// </summary>
+    public Dictionary<string, int> DeployedFolderPorts { get; set; } = new();
+
     /// <summary>The key for one section's assistant window. The folder comes first so pruning can read it back.</summary>
     public static string AssistWindowKey(string folderPath, string courseCode, int section) =>
         $"{folderPath}|{courseCode}|{section}";
