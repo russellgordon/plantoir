@@ -7736,6 +7736,23 @@ payload 2 ms (both kinds); 2,000 generated pages 43 ms inside the suite. The
 plan's "about 10 ms" was the warm figure; the review measured 40–51 ms for
 2,000 pages and 228 ms for 9,790. Both triggers run it off the main actor.
 
+**The suite's check of that speed is relative to the Mac running it (#905).**
+`testTheScanOfTwoThousandPagesIsQuick` used to assert under 5 s, a figure
+chosen on the M4 Pro; on a second Mac (M4, 16 GB, Xcode 27.0) it took 8.05 s
+while the rest of the suite ran, so a gate failed by hardware and the figure
+said nothing about what a teacher's Mac would meet. It now times, three times
+and interleaved, the scan and plain reading of the same 2,000 pages
+(`readEveryPage`, the least any scan that reads them must cost), and asserts
+the fastest scan under `scanCostsAtMostThisManyReads` (10) times the fastest
+read. Measured standalone at -Onone on the M4 Pro: 1.3 to 1.4 times
+unloaded, 0.7 to 2.8 with 24 busy loops on its 12 cores; a sabotaged scan
+reading each page 20 more times measured 14.8 and fails it. What the scan
+must not do is asserted with no clock at all
+(`testTheScanOfTwoThousandPagesAsksOfEachPageOnce`): every page asked of
+once through the injected `isEvicted`, nothing in `.trash` or in a file that
+is not a page. A wider fixed limit was rejected: it would pass a slow Mac
+and a slow scan alike.
+
 **Backups and reference copies.** `CourseArchiver` adds `zip -x
 <course>/.obsidian/plugins/<id>/*` for each folder carrying the marker,
 worked out at zip time (`ObsidianFigureAddOns.backupExclusions`); the
