@@ -304,15 +304,22 @@ public sealed class DeployedFolderServer : IDisposable
         var chunk = new byte[16384];
         long deadline = Stopwatch.GetTimestamp() + Seconds(SecondsToSendTheHeaders);
         bool waitingForANewRequest = false;
+        // Where the search for the end of the head resumes, so a request
+        // dripped in a byte at a time is not searched from its start each time.
+        int searched = 0;
         try
         {
             while (!connection.IsClosed && !_stopping.IsCancellationRequested)
             {
-                int end = IndexOf(buffer, EndOfHead);
+                int end = IndexOf(buffer, EndOfHead, Math.Max(0, searched - (EndOfHead.Length - 1)));
+                searched = buffer.Count;
                 if (end < 0)
                 {
-                    bool noLineYet = IndexOf(buffer, "\r\n"u8.ToArray()) < 0;
-                    if (noLineYet && buffer.Count > MaximumRequestLineBytes) { await AnswerAndClose(connection, 414); return; }
+                    if (buffer.Count > MaximumRequestLineBytes && IndexOf(buffer, "\r\n"u8.ToArray(), 0) < 0)
+                    {
+                        await AnswerAndClose(connection, 414);
+                        return;
+                    }
                     if (buffer.Count > MaximumRequestLineBytes + MaximumHeaderBytes) { await AnswerAndClose(connection, 431); return; }
                     long remaining = deadline - Stopwatch.GetTimestamp();
                     if (remaining <= 0) { connection.Reset(); return; }
@@ -341,6 +348,7 @@ public sealed class DeployedFolderServer : IDisposable
 
                 byte[] head = buffer.GetRange(0, end).ToArray();
                 buffer.RemoveRange(0, end + EndOfHead.Length);
+                searched = 0;
                 string text = Encoding.Latin1.GetString(head);
                 string[] lines = text.Split("\r\n");
                 int requestLineBytes = lines[0].Length;
@@ -381,9 +389,9 @@ public sealed class DeployedFolderServer : IDisposable
 
     private static long Seconds(int seconds) => seconds * Stopwatch.Frequency;
 
-    private static int IndexOf(List<byte> buffer, byte[] wanted)
+    private static int IndexOf(List<byte> buffer, byte[] wanted, int from)
     {
-        for (int i = 0; i + wanted.Length <= buffer.Count; i++)
+        for (int i = from; i + wanted.Length <= buffer.Count; i++)
         {
             int j = 0;
             while (j < wanted.Length && buffer[i + j] == wanted[j]) j++;
