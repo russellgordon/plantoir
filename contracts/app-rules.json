@@ -1025,7 +1025,7 @@
           "Open the Netlify page linked below, and sign in if you are asked to.",
           "Choose “New access token”.",
           "Describe it as something you will recognise later, such as “Class websites”.",
-          "Change the expiry — it starts at 7 days. A token that expires stops your deploys working, with nothing on screen to say why, so set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered.",
+          "Change the expiry — it starts at 7 days. Set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered. An expired token stops your deploys working. The next deploy then says the saved token no longer works, and Settings shows whether the saved token still works.",
           "Choose “Generate token”, then copy the long code Netlify shows you — it is only shown once.",
           "Paste it below."
         ],
