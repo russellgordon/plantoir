@@ -3026,7 +3026,9 @@ and what was measured.
     - Another account's process shows an ordinary one a null `CommandLine`,
       so it is listed and never counted: the contract's #729 known limit
       ("listed but never counted") comes free here, by the same mechanism as
-      the elevated case below.
+      the elevated case below. Only the elevated case was measured; no
+      second account was available, so this is reasoned from that case and
+      was never measured with a second account.
     - An older `preview.ps1` refuses `--for-deploy` as an unknown option
       (`Unknown option: --for-deploy`, exit 1), and `plantoir-mcp` never
       refreshes a folder's launchers. So the app's one builder

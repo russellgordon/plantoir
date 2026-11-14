@@ -80,7 +80,8 @@ public sealed class PreviewCommandTests : IDisposable
 
     /// <summary>
     /// No <c>"--build-only"</c> string literal is left in the app's code
-    /// outside the builder and the scheduled wrapper's text, and the
+    /// outside the builder and the scheduled wrapper's text (the body of
+    /// <c>TaskScheduling.WriteWrapperScript</c>, not the whole file), and the
     /// wrapper's text never carries <c>--for-deploy</c> (its own script
     /// already counts as 'later'). Comment lines are not code (review L3:
     /// seven doc comments name the flag).
@@ -92,8 +93,17 @@ public sealed class PreviewCommandTests : IDisposable
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             Path.Combine(root, "Plantoir.Core", "Scripting", "PreviewCommand.cs"),
-            Path.Combine(root, "Plantoir.Core", "Assist", "TaskScheduling.cs"),
         };
+        // TaskScheduling.cs is scanned like any other file EXCEPT the body of
+        // WriteWrapperScript, the scheduled wrapper's text (review L5): from
+        // its declaration to the first closing brace at member indent.
+        string scheduling = Path.Combine(root, "Plantoir.Core", "Assist", "TaskScheduling.cs");
+        string[] schedulingLines = File.ReadAllLines(scheduling);
+        int wrapperStart = Array.FindIndex(schedulingLines,
+            line => line.TrimStart().StartsWith("internal static string? WriteWrapperScript(", StringComparison.Ordinal));
+        Assert.True(wrapperStart >= 0, "WriteWrapperScript's declaration was not found in TaskScheduling.cs");
+        int wrapperEnd = Array.FindIndex(schedulingLines, wrapperStart, line => line == "    }");
+        Assert.True(wrapperEnd > wrapperStart, "WriteWrapperScript's closing brace was not found in TaskScheduling.cs");
         var found = new List<string>();
         foreach (string project in new[] { "Plantoir.Core", "Plantoir", "Plantoir.Mcp" })
         {
@@ -103,9 +113,12 @@ public sealed class PreviewCommandTests : IDisposable
                     || file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
                 if (allowed.Contains(file)) continue;
                 int number = 0;
+                bool isScheduling = string.Equals(file, scheduling, StringComparison.OrdinalIgnoreCase);
                 foreach (string line in File.ReadLines(file))
                 {
                     number++;
+                    // number is 1-based; the wrapper's span is 0-based indexes.
+                    if (isScheduling && number - 1 >= wrapperStart && number - 1 <= wrapperEnd) continue;
                     string code = line.TrimStart();
                     if (code.StartsWith("//", StringComparison.Ordinal) || code.StartsWith("*", StringComparison.Ordinal)) continue;
                     // A trailing comment is not code either.

@@ -12844,7 +12844,10 @@ another program holds the course, is 828b and is not described here yet.
   as `another`. `PreviewCommandTests.EveryBuildOnlyLineComesFromTheBuilder`
   fails on a `"--build-only"` string literal anywhere else in `Plantoir.Core`,
   `Plantoir` or `Plantoir.Mcp` (comment lines skipped, review L3), and on
-  `--for-deploy` in the wrapper's source.
+  `--for-deploy` in the wrapper's source. Only the body of
+  `TaskScheduling.WriteWrapperScript` is exempt, not the rest of that file
+  (implementation review L5; measured: a `"--build-only"` constant planted
+  just above the method fails the test, naming its line).
 - **An older launcher is never handed the flag (review M4).** `plantoir-mcp`
   never refreshes a folder's launchers (only the window's
   `ToolchainReadiness.Ensure` does), and an older `preview.ps1` refuses the
@@ -12857,7 +12860,13 @@ another program holds the course, is 828b and is not described here yet.
   two copies of Plantoir of different ages; here the second, non-mirroring
   copy is `plantoir-mcp`. Rejected: the server calling `RefreshLaunchers`
   itself, which would write the folder from a second process while the window
-  may be running `Ensure` on it. Pinned by
+  may be running `Ensure` on it. The other half of two copies of different
+  ages (review L4, reasoned from `LauncherRunner.cs` and the guard, not
+  driven): a `plantoir-mcp` still running from before an update builds a
+  deploy's build leg without the flag, so the new guards count it as
+  `building`, not `another`, and a serving preview pressed during that
+  deploy's build leg is not refused until that assistant session restarts.
+  Pinned by
   `AssistWorkspaceTests.ADeploysBuildLegSaysItIsADeployOnlyWhereTheLauncherTakesIt`
   and `PreviewCommandTests.AnOlderLauncherIsNotHandedTheFlag`.
 - **`FailureExplainer`** reads the two building lines (two more markers;
@@ -12926,13 +12935,17 @@ agents' builds when it began, 2026-11-13.
 
 The guard's own time, from the start of `Get-ProcessTable` to its answer,
 120 runs: median 810 ms, fastest 492 ms, slowest 1,777 ms. So the window in
-which both refuse is about HALF A SECOND to a second on this PC, against "a
+which both refuse is as long as the first launcher's look takes: about one
+second on this PC (median 810 ms, up to 1.8 s under load; both refused 10 of
+10 at 500 ms and 1 of 10 at 1 s), against "a
 few milliseconds" on the Mac (both refused 20 of 20 together, exactly one at
 50 ms and up): PowerShell's start plus the `Win32_Process` query is that
 long. The overlap never got through while both were starting: each look saw
-the other. The one "none refused" at 4 s is the first stand-in having
-finished its 5 s before the second's look (under load the second's start and
-look took over a second); nothing overlapped at that look. The consequence
+the other. The one "none refused" at 4 s is most likely the first stand-in
+having finished its 5 s before the second's look, which needs the second's
+start and look to have taken about 1.8 s or more (the first's look plus
+5 s, less the 4 s gap), at the edge of the slowest measured; this is
+reasoned, not measured (the harness kept no timestamps for that trial). The consequence
 (review L5), written down rather than built: two rebuilds asked of one
 `plantoir-mcp` in parallel tool calls, or a rebuild and a deploy pressed
 within about a second, are BOTH refused, in words ("already being built"),
