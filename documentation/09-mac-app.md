@@ -7740,18 +7740,41 @@ plan's "about 10 ms" was the warm figure; the review measured 40–51 ms for
 `testTheScanOfTwoThousandPagesIsQuick` used to assert under 5 s, a figure
 chosen on the M4 Pro; on a second Mac (M4, 16 GB, Xcode 27.0) it took 8.05 s
 while the rest of the suite ran, so a gate failed by hardware and the figure
-said nothing about what a teacher's Mac would meet. It now times, three times
-and interleaved, the scan and plain reading of the same 2,000 pages
-(`readEveryPage`, the least any scan that reads them must cost), and asserts
-the fastest scan under `scanCostsAtMostThisManyReads` (10) times the fastest
-read. Measured standalone at -Onone on the M4 Pro: 1.3 to 1.4 times
-unloaded, 0.7 to 2.8 with 24 busy loops on its 12 cores; a sabotaged scan
-reading each page 20 more times measured 14.8 and fails it. What the scan
-must not do is asserted with no clock at all
-(`testTheScanOfTwoThousandPagesAsksOfEachPageOnce`): every page asked of
-once through the injected `isEvicted`, nothing in `.trash` or in a file that
-is not a page. A wider fixed limit was rejected: it would pass a slow Mac
-and a slow scan alike.
+said nothing about what a teacher's Mac would meet. Three tests replace it,
+and none names a number of seconds.
+
+- `testTheScanOfTwoThousandPagesReadsEachPageOnce` pins the walk and the
+  reads with no clock. The scan takes both its doors to a page as
+  parameters, `isEvicted` and `readPage` (default
+  `ObsidianFigureAddOns.readPage`), and the test counts both: every one of
+  2,000 pages asked of once and read once, nothing in `.trash` and no file
+  that is not a page.
+- `testTheScanReadsPagesOnlyThroughItsReader` reads the scan's own source
+  and fails if its body reads a page any other way (`contentsOf`,
+  `FileHandle`, `InputStream`, `mmap`, `fopen`, `read(`). Without it, a
+  second read that went around `readPage` would not be counted.
+- `testTheScanIsQuickAndGrowsNoFasterThanThePages` times the scan and plain
+  reading of the same pages (`readEveryPage`, the least any scan that reads
+  them must cost) on 500 pages and on 4,000 in the same run, five times
+  interleaved, keeping the fastest of each. On 4,000 pages the scan must
+  cost under `scanCostsAtMostThisManyReads` (10) reads, and its cost per
+  read there must be under `perPageCostGrowsAtMost` (2.5) times its cost
+  per read on 500 pages.
+
+Measured standalone at -Onone on the M4 Pro (12 cores), the growth figure
+was 1.1 to 1.2 unloaded and 0.4 to 1.6 with 24 busy loops; a scan that kept
+a list of the pages it had read and searched it for each page measured 4.2
+to 4.9 unloaded and 3.4 to 4.6 loaded, and fails. Sabotaged copies that read
+each page two, three or five times through `readPage` fail the read count,
+and one that read each page a second time with `Data(contentsOf:)` fails the
+source check. What the tests do not pin: a slower scan whose cost is still
+linear in the pages, up to ten reads' worth (today's measured 1.1 to 1.5);
+and growth too small to show between 500 and 4,000 pages. Rejected: a wider
+fixed limit, which would pass a slow Mac and a slow scan alike; timing one
+size against plain reading, which cannot see growth (the first version of
+this change did that, and the quadratic scan above passed it at 2,000
+pages); and a growth bound tighter than 2.5, which the loaded baseline came
+within 0.9 of.
 
 **Backups and reference copies.** `CourseArchiver` adds `zip -x
 <course>/.obsidian/plugins/<id>/*` for each folder carrying the marker,
