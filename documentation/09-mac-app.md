@@ -8678,7 +8678,7 @@ BC code no) and follows the code until the teacher touches it. Ticking it:
   noun `meeting`. A field moves only while it still holds the OTHER choice's
   word, so typing survives the box going off and on; the class folder keeps its
   place in the per-section list. Every curriculum folder leaves the shared
-  folders (and the LCS switch cannot bring one back while ticked).
+  folders.
 - gives up a skeleton already adopted for the code (CODING has adopted the
   general one by the time the box ticks itself) and makes adoption a no-op —
   `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` answers
