@@ -181,6 +181,35 @@ class Scratch(unittest.TestCase):
         return outcome, lines
 
 
+# ---- phetFences.download: what counts as "no such simulation" ------------------------
+
+class MetadataShapeTests(unittest.TestCase):
+    """Only PhET's own answer for a misspelt name (an `error`, no projects)
+    reads as no such simulation; an empty answer of any other shape is
+    damaged, so the build stops rather than deploy a page without its
+    simulation under a misspelling's Problems row."""
+
+    def setUp(self):
+        use_the_repository_contract()
+
+    def metadata(self, answer: bytes):
+        class Fetcher:
+            def get(self, url):
+                return answer
+        return phet.PhetSite(fetcher=Fetcher(), base="http://127.0.0.1:1").metadata("gas-properties")
+
+    def test_phets_own_answer_for_a_misspelt_name_is_no_such_simulation(self):
+        self.assertIsNone(self.metadata(b'{"error": ["No sims found with the criteria provided"]}'))
+
+    def test_an_empty_answer_is_damaged(self):
+        for answer in (b"{}", b"null", b'{"projects": []}', b'{"projects": [{}]}', b"[]",
+                       b'{"projects": [{"name": "html/other", "simulations": [{"name": "other"}]}]}'):
+            with self.subTest(answer.decode()):
+                with self.assertRaises(kept_downloads.DownloadFailed) as failed:
+                    self.metadata(answer)
+                self.assertEqual(failed.exception.reason, "damaged")
+
+
 # ---- phetFences: reading ----------------------------------------------------------
 
 class FenceTests(unittest.TestCase):
@@ -192,6 +221,21 @@ class FenceTests(unittest.TestCase):
             with self.subTest(case["name"]):
                 found = [{"block": one["block"], "line": one["line"]} for one in phet.simulations_on_page(case["page"])]
                 self.assertEqual(found, case["found"])
+
+    def test_every_page_with_a_simulation_is_one_the_scan_keeps(self):
+        # The build reads only the pages its scan keeps (pages_students_see's
+        # must_contain), so a fence the reader finds and the scan skips is a
+        # page that deploys without its simulation and says nothing: ``` phet.
+        for case in rules("fences", "cases"):
+            if not case["found"]:
+                continue
+            with self.subTest(case["name"]):
+                with tempfile.TemporaryDirectory() as folder:
+                    content = Path(folder)
+                    (content / "Page.md").write_text(case["page"], encoding="utf-8")
+                    kept = phet.pages_students_see(content, lambda text: False, lambda page: "Page",
+                                                   lambda page: None)
+                self.assertEqual([page["path"] for page in kept], ["Page.md"])
 
     def test_every_key_case(self):
         # The site's half of these cases is scripts/check_phet_rules_against_the_site.py (verify.sh).
@@ -615,6 +659,29 @@ class PassFailsTests(Scratch):
                     with contextlib.redirect_stdout(stopped), self.assertRaises(SystemExit) as exit_code:
                         build_site._stop_for_phet(outcome, "SPH3U", 1)
                     self.assertEqual(exit_code.exception.code, 1)
+
+    def test_the_console_never_names_pythons_class_for_the_fault(self):
+        import contextlib
+        import io
+        import build_site
+        content = self.root / "content" / "class-name"
+        content.mkdir(parents=True, exist_ok=True)
+        (content / "Gases.md").write_text("```phet\nsim: gas-properties\n```\n", encoding="utf-8")
+        real_prepare = phet.prepare
+        for fault in (AttributeError("x"), RuntimeError("x"), KeyError("x"), TimeoutError(), OSError("x")):
+            with self.subTest(type(fault).__name__):
+                def broken(*args, **kwargs):
+                    raise fault
+                phet.prepare = broken
+                printed = io.StringIO()
+                try:
+                    with contextlib.redirect_stdout(printed):
+                        outcome = build_site._prepare_phet(content, self.output, self.root / "course", {},
+                                                           "SPH3U", 1)
+                finally:
+                    phet.prepare = real_prepare
+                self.assertEqual(outcome["stop"]["reason"], "notReady")
+                self.assertEqual(printed.getvalue().strip(), "⚠️ Could not prepare the science simulations.")
 
     def test_when_nothing_can_be_told_the_build_stops_naming_nothing(self):
         def broken():

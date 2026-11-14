@@ -258,14 +258,26 @@ class PhetSite:
 
     def metadata(self, sim: str):
         """{"project", "version", "languages", "titles"} for `sim`, or None
-        when PhET has no such simulation. Raises DownloadFailed (offline)."""
+        when PhET has no such simulation. Raises DownloadFailed (offline, or
+        damaged for an answer of any other shape).
+
+        "No such simulation" is PhET's own answer only: an `error` and no
+        projects, as measured for a misspelt name (phetFences.download). An
+        empty answer ({}, null, no projects, a project naming no simulation)
+        is damaged, so it stops the build as every other odd answer does,
+        rather than reading as a teacher's misspelling while the page
+        deploys without its simulation."""
         data = self.fetcher.get(self._url("metadata", sim=sim))
         try:
             answer = json.loads(data.decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
             raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected") from None
-        if not isinstance(answer, dict) or not answer.get("projects"):
-            return None
+        if not isinstance(answer, dict):
+            raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected")
+        if not answer.get("projects"):
+            if answer.get("error"):
+                return None
+            raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected")
         projects = answer["projects"]
         if not isinstance(projects, list):
             raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected")
@@ -291,7 +303,7 @@ class PhetSite:
                         titles[str(locale)] = str(about["title"])
                 return {"project": project_name, "version": version, "languages": sorted(titles),
                         "titles": titles}
-        return None
+        raise kept_downloads.DownloadFailed("damaged", "PhET's answer named no such simulation")
 
     def all_names(self) -> list:
         try:
@@ -372,15 +384,17 @@ def _megabytes_for_button(gzipped: int) -> str:
 # ---- Which pages count -----------------------------------------------------------
 
 def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None) -> list:
-    """The pages students can see that could hold a simulation, from TWO
-    scans (one per fence character), merged by path, as geogebra.py does;
-    and the pages that paste PhET's own frame, for the note."""
-    merged = {}
-    for opener in ("```" + LANGUAGE, "~~~" + LANGUAGE, "phet.colorado.edu"):
-        for page in figures.pages_students_see(content_root, is_hidden, place_of, source_of,
-                                               skip=skip, must_contain=opener):
-            merged.setdefault(page["path"], page)
-    return [merged[path] for path in sorted(merged)]
+    """The pages students can see that could hold a simulation, and the
+    pages that paste PhET's own frame, for the note: every page whose text
+    holds the language's word at all (phetFences.fences.rule). The scan is a
+    plain substring test, so it looks for the word alone rather than for a
+    fence opener: CommonMark lets spaces stand between the fence and its
+    language (``` phet, ~~~ phet), the site reads those as simulations, and
+    an opener-shaped scan skipped them, so the page deployed with no
+    simulation and nothing said so. simulations_on_page then reads each page
+    exactly; a page that only mentions the word costs one more read."""
+    return figures.pages_students_see(content_root, is_hidden, place_of, source_of,
+                                      skip=skip, must_contain=LANGUAGE)
 
 
 # ---- The words ---------------------------------------------------------------------

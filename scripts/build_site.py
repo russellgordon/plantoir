@@ -2574,9 +2574,13 @@ def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config
                             course_locale=(config.get("locale") or "en-US"),
                             course=course_code, section=section_number)
     except Exception as error:
-        # The plain reason only (a full disk says so), never a path.
-        reason = error.strerror if isinstance(error, OSError) and error.strerror else type(error).__name__
-        print(f"⚠️ Could not prepare the science simulations ({reason}).")
+        # The plain reason only (a full disk says so in the system's own
+        # words), never a path and never Python's name for the fault: the
+        # console is the teacher's, and goes into problem reports.
+        if isinstance(error, OSError) and error.strerror:
+            print(f"⚠️ Could not prepare the science simulations ({error.strerror}).")
+        else:
+            print("⚠️ Could not prepare the science simulations.")
         shutil.rmtree(output_dir / "quartz" / phet.WORKSPACE, ignore_errors=True)
         shutil.rmtree(output_dir / "quartz" / "static" / phet.SITE_FOLDER, ignore_errors=True)
         places = phet.places_after_a_failed_pass(list_pages, content_root)

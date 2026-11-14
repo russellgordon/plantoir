@@ -30402,7 +30402,7 @@
       "first": {
         "offline": "{course} Section {section} was not built: this computer could not reach {source} to download {what} that its pages use for the first time. Connect to the internet, then build again.",
         "damaged": "{course} Section {section} was not built: {what} that its pages use for the first time did not arrive from {source} as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this.",
-        "notReady": "{course} Section {section} was not built: {what} that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu."
+        "notReady": "{course} Section {section} was not built: {what} that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu."
       },
       "item": "“{item}” on “{page}”",
       "andMore": "and {count} more",
@@ -30553,7 +30553,7 @@
             }
           ],
           "lines": [
-            "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu.",
+            "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.",
             "   “gas-properties” on “Unit 3/Gas Laws”"
           ]
         },
@@ -30565,7 +30565,7 @@
           "reason": "notReady",
           "missing": [],
           "lines": [
-            "❌ SPH3U Section 1 was not built: science simulations that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu."
+            "❌ SPH3U Section 1 was not built: science simulations that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu."
           ]
         }
       ],
@@ -30583,7 +30583,7 @@
   "phetFences": {
     "rule": "#674 (v2.0.0). A ```phet fence (or ~~~phet) on a page students can see becomes a card with the simulation's picture, its title, the teacher's description and a button; a tap opens the simulation in place, from the class site's OWN copy, and a student's browser asks PhET nothing. Python prepares and Quartz places, as for geogebraFences: scripts/phet.py reads every fence on the pages students can see (by the gate's own visibility rule), finds the simulation among the copies kept on this computer or downloads it from PhET now (keptDownloads; ruling: downloaded only when a page uses it, and kept), writes it into the site at static/phet/<sim>/ and hands the site's transformer (support/quartz/plugins/transformers/plantoirPhet.ts) a manifest in quartz/plantoir-phet/; the loader (support/quartz/components/scripts/phet.inline.ts) makes the frame only when a student taps. A fence that cannot be shown stays the code block it was and is a folder problem (siteHealth -> phetSimulationsNotReady); a simulation that is not kept and cannot be downloaded STOPS the build (stop). Measured 2026-11-13: documentation/05-build-pipeline.md -> PhET simulations: what the build does; documentation/06-quartz-customizations.md -> S.",
     "fences": {
-      "rule": "The info string's FIRST WORD, exactly `phet`; backticks or tildes; at any quote depth, in a list item, %% comments removed: markdown_code.fenced_blocks, as geogebraFences.fences. Found with TWO page scans, one for ```phet and one for ~~~phet, merged by path (a scan's must_contain is a plain substring test).",
+      "rule": "The info string's FIRST WORD, exactly `phet`; backticks or tildes; at any quote depth, in a list item, %% comments removed: markdown_code.fenced_blocks, as geogebraFences.fences. Found with ONE page scan for the word `phet` alone (a scan's must_contain is a plain substring test, and CommonMark lets spaces stand between the fence and its language: ``` phet is a simulation to the site, so a scan for ```phet missed it and the page deployed without its simulation, measured 2026-11-13 by the fix review); simulations_on_page then reads each page exactly. Every case here whose `found` is not empty is also a page that scan keeps (test_phet.FenceTests).",
       "cases": [
         {
           "name": "a phet fence",
@@ -30622,6 +30622,26 @@
             {
               "block": 1,
               "line": 5
+            }
+          ]
+        },
+        {
+          "name": "a space before the language",
+          "page": "Intro.\n\n``` phet\nsim: gas-properties\n```\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 3
+            }
+          ]
+        },
+        {
+          "name": "tildes with spaces before the language",
+          "page": "~~~   phet\nsim: ph-scale\n~~~\n",
+          "found": [
+            {
+              "block": 1,
+              "line": 1
             }
           ]
         },
@@ -30983,7 +31003,7 @@
       ]
     },
     "download": {
-      "rule": "For a simulation that is not kept: PhET's metadata for that one simulation (`metadata`), which names its project and its current version (`projects[0].version.string`) and its title in each language; then the simulation's all-languages file at THAT version (`simulation`, a pinned address that stays downloadable, measured: an old version answered 200 while a newer was current), then its picture (`screenshot`; none is not an error). What came is cleaned (removedOnTheWay), checked (checks) and kept (keptDownloads.entries). A metadata answer with no simulation of that name is notFound: a folder problem (simulationNotFound), with up to three close names from the whole list (`allNames`, asked only then). Every request is keptDownloads.asking's.",
+      "rule": "For a simulation that is not kept: PhET's metadata for that one simulation (`metadata`), which names its project and its current version (`projects[0].version.string`) and its title in each language; then the simulation's all-languages file at THAT version (`simulation`, a pinned address that stays downloadable, measured: an old version answered 200 while a newer was current), then its picture (`screenshot`; none is not an error). What came is cleaned (removedOnTheWay), checked (checks) and kept (keptDownloads.entries). PhET's own answer for a name it does not have (an `error` and no projects, measured for a misspelt name) is notFound: a folder problem (simulationNotFound), with up to three close names from the whole list (`allNames`, asked only then). Any other answer that names no simulation of that name ({}, null, no projects, a project with no such simulation) is damaged, so it stops the build rather than reading as a misspelling. Every request is keptDownloads.asking's.",
       "base": "https://phet.colorado.edu",
       "hosts": [
         "phet.colorado.edu"
@@ -31128,7 +31148,7 @@
             "expect": {
               "stop": "notReady",
               "lines": [
-                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu.",
+                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.",
                 "   “gas-properties” on “Unit 3/Gas Laws”",
                 "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}"
               ]
@@ -31153,7 +31173,7 @@
             "expect": {
               "stop": "notReady",
               "lines": [
-                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu.",
+                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.",
                 "   “gas-properties” on “Unit 3/Gas Laws”",
                 "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}"
               ]

@@ -3736,14 +3736,18 @@ and `scripts/test_phet.py` runs every case.
    slips past the checks, a full disk, a folder that cannot be written: when
    any page students can see shows a simulation, the build stops with
    `keptDownloads.stop.first.notReady` ("could not be made ready on this
-   computer … choose Report a Problem in the Help menu"), naming each
+   computer", ending with the Help menu's Report a Problem item,
+   `help/menu-paths.json` → `helpReportAProblem`, in the form the app's
+   other sentences already give it), naming each
    simulation and page it can still find. When the visibility rule itself is
    what failed, every Markdown file of the course is read as text for its
    fences; when even that cannot be told, it stops naming nothing (`{what}`
    is then the kind's several with no number). With no simulation on any
    such page the build carries on, since nothing is missing. The console
    line before it gives the plain reason only (a full disk's own words),
-   never a path. Found by the implementation review: until then the pass
+   never a path and never Python's name for the fault: any other fault
+   prints the line with no reason in brackets (the fix review measured
+   `AttributeError` and its kind reaching the console). Found by the implementation review: until then the pass
    caught every error, printed one console line and let the build make a
    site with every phet block left as code, exit 0, which is the fault the
    ruling's stop exists to prevent, reached by another road. GeoGebra's
@@ -3793,9 +3797,17 @@ places.** `scripts/phet.py` does everything that can fail; the contract is
 1. **When.** ALWAYS section, straight after GeoGebra's pass and BEFORE the
    folder checks (`build_site._prepare_phet`). It is the one pass that can
    stop a build (item 6), and stops before anything is said or wired.
-2. **Which pages.** Three scans merged by path: ` ```phet `, `~~~phet`, and
-   `phet.colorado.edu` for the pasted-frame note (item 8). The gate's own
-   visibility rule, as figures and GeoGebra.
+2. **Which pages.** One scan for the word `phet` anywhere in the page's
+   text, which also finds `phet.colorado.edu` for the pasted-frame note
+   (item 8); `simulations_on_page` then reads each kept page exactly. The
+   gate's own visibility rule, as figures and GeoGebra. Rejected: a scan per
+   fence opener (` ```phet `, `~~~phet`), as GeoGebra's. CommonMark lets
+   spaces stand between a fence and its language, the site reads ` ``` phet `
+   as a simulation, and the opener scans skipped that page, so it deployed
+   with no simulation and nothing said so (measured by the fix review,
+   2026-11-13). `phetFences.fences.cases` carries both spaced shapes, and
+   `FenceTests` checks that the scan keeps every case with a simulation.
+   GeoGebra has the same gap; it is a follow-up issue, not this piece.
 3. **Reading a fence** (`read_fence`, `phetFences.settings`, eleven cases).
    Every line is `key: value`; the keys are `sim`, `alt`, `locale`,
    `screens`; anything else is left out with a note. `sim` takes the name or
@@ -3845,7 +3857,13 @@ places.** `scripts/phet.py` does everything that can fail; the contract is
    (`phetSimulationsNotReady`, `simulationNotFound`): the internet was
    there, the next build will not fix a misspelling, and the Problems tab
    names the page and line, with up to three close names from PhET's whole
-   list (asked only then). The fence stays the code block it was. The other
+   list (asked only then). The fence stays the code block it was. A wrong
+   name is only PhET's own answer for one, an `error` with no projects
+   (measured for a misspelt name); an empty answer of any other shape (`{}`,
+   `null`, no projects, a project naming no such simulation) is `damaged`
+   and stops, since reading it as a misspelling would deploy the page
+   without its simulation under a Problems row that blames the teacher
+   (the fix review's finding, 2026-11-13). The other
    problems (`simulationNotNamed`, `simulationNotUnderstood`,
    `screensNotUnderstood`, `localeNotUnderstood`) are read from the fence
    alone. None is repairable.
