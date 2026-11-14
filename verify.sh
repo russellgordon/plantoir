@@ -1792,6 +1792,9 @@ if docker run --rm \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/check_site_files_rules_against_the_site.py \
   >/tmp/verify_site_files_rules_site.log 2>&1; then
   pass "every siteFiles case holds in the site's own emitter over Quartz's own transformers, fails through Quartz's own Assets where it leaves a file off, and the check after the build agrees on every course (scripts/check_site_files_rules_against_the_site.py, #901)"
+  # The count, so a run shows what it held, not only that it passed (901a's
+  # Fable sweep).
+  grep -m1 "contract cases" /tmp/verify_site_files_rules_site.log | sed 's/^/   /'
 else
   fail "a siteFiles case does not hold in the site's own code (scripts/check_site_files_rules_against_the_site.py, #901)"
   cat /tmp/verify_site_files_rules_site.log

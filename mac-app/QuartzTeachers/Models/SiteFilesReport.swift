@@ -23,6 +23,11 @@ struct SiteFilesReport: Equatable {
     /// check took off the rest (`siteFiles.marker.rule`, assetsEmitter).
     nonisolated static let quartzsOwnEmitter: String = "quartz"
 
+    /// The `stopped` value of a build the site's emitter stopped because more
+    /// of the course's own pages load one another than it reads
+    /// (`siteFiles.marker.stoppedRule`).
+    nonisolated static let stoppedAtTheFollowLimitValue: String = "followLimit"
+
     let course: String?
     let section: Int?
     let leftOff: Int
@@ -35,14 +40,22 @@ struct SiteFilesReport: Equatable {
     let firstTime: Bool
     let changed: Bool
     let assetsEmitter: String
+    /// A build stopped at the follow limit carries no counts, only the limit
+    /// (`siteFiles.marker.stoppedRule`, 901a's Fable sweep, MUST 2).
+    var stoppedAtTheFollowLimit: Bool = false
+    var followLimit: Int = 0
 
     // MARK: - Computed properties
 
     /// `siteFiles.marker.writtenWhen`: the first build that leaves files off,
     /// a build whose count changed, a build that put a file back, could not,
-    /// took one out or found one no page names, and a build that used
-    /// Quartz's own emitter. Nothing on a build that changed nothing.
+    /// took one out or found one no page names, a build that used Quartz's
+    /// own emitter, and a build stopped at the follow limit. Nothing on a
+    /// build that changed nothing.
     nonisolated var isWorthWriting: Bool {
+        if stoppedAtTheFollowLimit {
+            return true
+        }
         if firstTime || changed {
             return true
         }
@@ -79,9 +92,14 @@ struct SiteFilesReport: Equatable {
     }
 
     /// The trail line without the course and section, which `noteOnTheTrail`
-    /// puts in front (`activityTrail.mustRecord` → `line`, and
-    /// `lineWhenSortedAfterTheBuild` when Quartz's own emitter ran).
+    /// puts in front (`activityTrail.mustRecord` → `line`,
+    /// `lineWhenSortedAfterTheBuild` when Quartz's own emitter ran, and
+    /// `lineWhenStopped` when the build stopped at the follow limit).
     nonisolated var trailSentence: String {
+        if stoppedAtTheFollowLimit {
+            return "the website was not built: more than \(followLimit) of the course's own web pages "
+                + "and stylesheets load one another"
+        }
         let counts: String = "(\(putBack) put back, \(takenOut) taken out\(countsSaidWhenNotZero))"
         if assetsEmitter == SiteFilesReport.quartzsOwnEmitter {
             return "the website leaves off \(leftOff) files no published page uses, sorted after the build "
@@ -104,8 +122,7 @@ struct SiteFilesReport: Equatable {
             let payload: String = String(line[prefixRange.upperBound...])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let data = payload.data(using: .utf8),
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let leftOff = (object["leftOff"] as? NSNumber)?.intValue else {
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 continue
             }
             var course: String? = object["course"] as? String
@@ -113,6 +130,19 @@ struct SiteFilesReport: Equatable {
                 course = nil
             }
             let section: Int? = object["section"] as? Int
+            if object["stopped"] as? String == stoppedAtTheFollowLimitValue {
+                let limit: Int = (object["limit"] as? NSNumber)?.intValue ?? 0
+                found.append(SiteFilesReport(
+                    course: course, section: section, leftOff: 0, putBack: 0,
+                    putBackFailed: 0, takenOut: 0, unreferenced: 0,
+                    firstTime: false, changed: false, assetsEmitter: "plantoir",
+                    stoppedAtTheFollowLimit: true, followLimit: limit
+                ))
+                continue
+            }
+            guard let leftOff = (object["leftOff"] as? NSNumber)?.intValue else {
+                continue
+            }
             let putBack: Int = (object["putBack"] as? NSNumber)?.intValue ?? 0
             let putBackFailed: Int = (object["putBackFailed"] as? NSNumber)?.intValue ?? 0
             let takenOut: Int = (object["takenOut"] as? NSNumber)?.intValue ?? 0

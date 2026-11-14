@@ -135,6 +135,33 @@ final class SiteFilesReportTests: XCTestCase {
         XCTAssertEqual(allTakenOut.trailSentence, filled(line, ""))
     }
 
+    /// A build stopped at the follow limit is always written, as the
+    /// contract's `lineWhenStopped` with the limit from its own line
+    /// (`siteFiles.marker.stoppedRule`; 901a's Fable sweep, MUST 2: the old
+    /// limit published every file and left no line at all).
+    func testABuildStoppedAtTheFollowLimitIsWrittenInTheContractsLine() throws {
+        let found: [String: Any] = try entry()
+        let template: String = try XCTUnwrap(found["lineWhenStopped"] as? String)
+        var stoppedLine: String = ""
+        for testCase in try trailCases() {
+            if testCase["stopped"] as? Bool == true {
+                stoppedLine = try XCTUnwrap(testCase["line"] as? String)
+            }
+        }
+        XCTAssertFalse(stoppedLine.isEmpty, "the contract has a stopped case")
+        let report: SiteFilesReport = try XCTUnwrap(SiteFilesReport.reports(in: stoppedLine).first)
+        XCTAssertTrue(report.stoppedAtTheFollowLimit)
+        XCTAssertTrue(report.isWorthWriting)
+        let limit: String = String(report.followLimit)
+        XCTAssertEqual(
+            report.trailSentence,
+            template.replacingOccurrences(of: "{course}/{section} · ", with: "")
+                .replacingOccurrences(of: "{limit}", with: limit)
+        )
+        SiteFilesReport.noteOnTheTrail(from: stoppedLine + "\n")
+        XCTAssertTrue(trail.contains("SCH3U/2 · " + report.trailSentence), trail)
+    }
+
     /// A file no page names that is still on the site (the site's text
     /// mentions it, so the check kept it) is written even when nothing else
     /// changed: it is what a problem report needs.

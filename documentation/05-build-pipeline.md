@@ -5063,15 +5063,19 @@ function in the image, so the two cannot drift.
   goes on, the teacher is told, and a trail line is written. Rejected:
   stopping the build; having no second check.
 - **An exposure** (a course file in the site no built page names) is counted
-  as `unreferenced`. One whose name the site's text never mentions is taken
-  out: a page cannot fetch a file whose name it does not contain, so taking
-  it out cannot make a hole. Mention-anywhere alone is too weak for a gate
-  (plan review 901-7: `contentIndex.json` holds every page's text), so the
-  gates fail on `unreferenced`, not on `takenOut`.
+  as `unreferenced`. It is taken out only when every reading agrees that
+  nothing which stays names it (`check.exposure`, rewritten after 901a's
+  Fable sweep, below): the check's reader does not name it, and no text file
+  that stays on the site mentions its name in any spelling the emitter's
+  reading could decode to it. Where the readings disagree the file STAYS and
+  is counted, which fails the gates. Mention-anywhere alone is too weak for
+  a gate (plan review 901-7: `contentIndex.json` holds every page's text),
+  so the gates fail on `unreferenced`, not on `takenOut`.
 - Every safety count above zero is a FAILURE in `verify.sh` and the tests,
   and so is `assetsEmitter: "quartz"` (the swap could not be made, so Quartz's
-  own emitter ran and the check took off every unreferenced file instead:
-  plan review 901-8). In the field they keep a page whole.
+  own emitter ran and the check sorted the files after the build: plan
+  review 901-8; since the Fable sweep it takes out by the same rule as with
+  Plantoir's emitter). In the field they keep a page whole.
 
 **Where it runs, and why there.** On a build for deploying,
 `_check_mirror_and_mark` runs the check on the container's `public/` after
@@ -5215,15 +5219,9 @@ resolves beside it. Only an address that names a course file is followed: one
 on another site, an anchor, or one that names no course file is never read.
 The walk is breadth first from every file the pages use, with a visited set,
 in both readers (`siteFilesRules.followCarriedFiles`,
-`site_files.follow_carried_files`). Past `followed.limits` (depth 16, 10,000
-files read) it does not stop quietly: the emitter carries EVERY course file,
-as Quartz's own Assets did, and prints `plantoir: error:` with
-`followed.limitReached`; the check raises with the same words, so the build
-says `plantoir: error:` and is left unmarked, and the gates fail. A visited
-set already ends a loop, so the limits only bound a course of unusual size.
-The image's check proves both: a chain one deeper than the limit throws, and
-the emitter given a depth of 1 in its side file carries every file and says
-the line.
+`site_files.follow_carried_files`). The limits this round shipped with
+(depth 16, 10,000 files, and every course file carried past either) were
+replaced after the Fable sweep: see "What the Fable sweep found" below.
 
 JavaScript is not read: a file only a script loads (a p5.js sketch's
 `loadImage('cat.png')`) is left off, and `siteFiles.knownLimits` says how a
@@ -5267,6 +5265,118 @@ Python test failed 14 (four `checkCases`, the fixture twice, the six
 following tests, the missing side file's line, and the deploy's build, which
 now hands the check whether the side file was written).
 
+### What the Fable sweep found, and what changed (901a's fourth round)
+
+The Fable sweep of the third round measured two faults, both in that round's
+own additions.
+
+**The check took out a picture a student's page needed.** A published page
+framed `Media/frame.html`, which held `<img src="pics\cat.png">`. The emitter
+carried `Media/pics/cat.png` (a browser, and the emitter's WHATWG `URL`, read
+a backslash as a slash). The check's `urljoin` did not, so it named nothing,
+and its mention search did not read the carried page (it is in `public/`
+with no ending, and `.htm` and `.svg` were not in its list), so it took the
+picture out: `takenOut 1`, nothing said to the teacher. The argument that
+"taking out cannot make a hole" had stopped holding the moment the emitter
+began reading files the mention search did not.
+
+Two changes, each with contract cases:
+
+- **One reading of an address, written once** (`siteFiles.resolve`, its
+  `steps` and `resolveCases`, 37 cases, 24 of them new). Both readers drop
+  the controls and spaces at the edges, drop tabs and line breaks inside,
+  read a backslash as a slash, treat `%2e` spellings of `.` and `..` as dot
+  segments, drop the query and fragment, decode percent escapes as UTF-8
+  (`decodeURIComponent` used to throw on `100%.png`, so the emitter read
+  nothing there), read a run of slashes as one (Python's `urljoin` already
+  merged them and the browser's `URL` did not, so `pics//cat.png` was a put
+  back on every build), and compare letter for letter (`exactMatch`, kept:
+  case and Unicode form stay as written). Whitespace is named character by
+  character in both, because Python's `strip()` and JavaScript's `trim()`
+  disagree on U+001C to U+001F, U+0085 and U+FEFF. Measured over the 24 new
+  cases on Python 3.11.13 and 3.14.4 against the TypeScript under Node 22.6:
+  0 differences; the tip's Python read 9 of them differently.
+- **The mention search reads what stays** (`check.exposure`). Its text is
+  every file the site made, every course file the check names (by the
+  content path's ending, so a course `.html` file in `public/` without its
+  ending is read), and in turn every mentioned course file that is text
+  itself. The name is looked for as written and as the emitter's reading
+  would decode it (character references, JSON `\u` escapes, dropped tabs and
+  line breaks, percent escapes), with case and Unicode form folded, so a
+  spelling difference keeps a file. A file is taken out only when the reader
+  and the search agree nothing that stays names it; where they disagree it
+  stays and is counted in `unreferenced`, which fails the gates. The rule
+  that took every unreferenced file out unread when Quartz's own emitter ran
+  is retired with it, for the same reason.
+
+The proof is a generated set (`siteFiles.disagreeingShapes`): 28 ways of
+writing one picture's address (backslashes, `%2e%2e`, `./`, doubled slashes,
+upper- and lower-case escapes, the other Unicode form, another case, a query,
+an anchor, a tab, a line break, character references, `%2F`) in 13
+containers (a framed page's picture, link, `srcset`, style attribute, style
+element, SVG image, object, poster and refresh, an attribute neither reader
+reads, a script's text, a linked stylesheet, an SVG shown in an object): 364
+runs. Measured with the emitter's rules under Node and Quartz's own parser,
+then the check over what the emitter carried:
+
+| | holes | unreferenced | put back |
+|---|---:|---:|---:|
+| the tip's emitter and check | 70 | 77 | 11 |
+| this round's emitter, the tip's check | 70 | 77 | 0 |
+| this round's emitter and check (3.11 and 3.14) | 0 | 0 | 0 |
+
+The emitter carried the picture in 278 of the 364. `test_site_files.py`
+puts the picture on the site in every run as if it had been carried, and the
+check must never take it out while it takes out a decoy no file names; with
+the tip's `site_files.py` it failed 172 subtests. The image runs the
+emitter's own rules over the same set and fails on any count above zero
+(147 failures with the tip's check). The sweep's reproduction is a
+`checkCase`, with four more for the mention search.
+
+**A depth limit an ordinary course reaches, and a limit that published
+everything.** Seventeen `.htm` slides, each linking the next, passed the old
+depth of 16; the emitter then carried every course file, the unlinked answer
+key included, the check raised, and `_check_mirror_and_mark` still mirrored
+the site, which deployed with exit 0, no marker and no trail line, on every
+later deploy too. The depth limit is gone from both readers (the visited set
+ends the walk, and the walk reads no more files than the course holds); a
+chain of 40 is followed to its end in both. The count limit
+(`followed.limits.files`, 50,000) is the emitter's only: past it the emitter
+writes `followed.stopFile` beside `public/` and throws, Quartz exits
+non-zero, and `build_site._stop_if_the_follow_limit_was_reached` prints
+`words.followLimitStopped` (or its preview form), the marker's stopped line
+(`marker.stoppedRule`, which the apps write as `lineWhenStopped`) and exits
+1, so nothing is mirrored, marked or deployed. The check has no limit of its
+own: it runs only on a build the emitter finished.
+
+The figure: the 26 built sites measured on 2026-11-14 carried 4,321 course
+files together, so the largest carried fewer, and the HTML, SVG and CSS files
+this limit counts fewer still; 50,000 is more than eleven times that total.
+The largest site's own count was not recorded and this round could not
+re-read the sites, so re-measuring it (counts only) is listed as a deferred
+check. Parsing 50,000 pages of 3.7 KB with `hast-util-from-html` is about 7
+seconds (0.147 ms a page over 3,000 pages on the owner's Mac at a load
+average of 5), so the limit costs nothing in time.
+
+Rejected: carrying every file past the limit (it publishes every answer key,
+quietly); a depth limit; a count limit in the check as well (it could only
+stop a build the emitter had already read, and in a preview it would have to
+stop a server another process runs); folding case and Unicode form when
+matching (`exactMatch` was measured at 0 of 530 unmatched references, and a
+preview on a Mac now shows the same missing picture the host would).
+
+Parser differences that remain, measured with an `<img>` inside each element
+of a carried page on Pythons 3.11.13, 3.12.11, 3.13.7 and 3.14.4 against the
+emitter: Python reads an address the emitter does not inside `<template>`,
+`<select>` and a repeated attribute on every version, and inside
+`<textarea>`, `<title>`, `<xmp>`, `<noembed>`, `<plaintext>` and an
+`<iframe>`'s text on 3.11 and 3.12 (a put-back, said, and a failed gate);
+the emitter reads one Python does not in `<image>` outside an SVG, in
+`<noframes>` on 3.14, and in an SVG `<title>` on 3.13 and 3.14 (kept and
+counted). The image runs 3.11 and Windows' runtime 3.14.10, so one course can
+count differently on the two platforms; `knownLimits` says so and a
+follow-up proposes one reading.
+
 ### When the side file could not be written
 
 Measured by the fix review (the side file made a directory inside a
@@ -5278,8 +5388,10 @@ scheduled deploy from an older `.toolchain` runs the older image's Assets
 path, which copies everything. The warning used to say only the footer was
 affected; it now says every file a page uses will be put back
 (`words.sideFileNotWritten`), and after the check the build says ONE line,
-`words.sideFileMissingPutBack` (`…Preview` in a preview), with the count and
-that the site is complete, instead of a line per file (the review counted 66).
+`words.sideFileMissingPutBackSeveral` (`…One` for one file, `…Preview…` in a preview), with the count and
+that the site is complete, instead of a line per file (the review counted 66;
+since the Fable sweep each counted sentence has a form for one file and one
+for several, `words.counted`).
 A file that could not be put back is said on its own line, and then the site
 is not called complete. `verify.sh`'s main-build row fails on
 `sideFileNotWritten`, as on every put-back. It clears at the next build that

@@ -1207,6 +1207,8 @@
         "marker": "PLANTOIR_SITE_FILES: (siteFiles.marker), printed by scripts/site_files.py through build_site.py",
         "line": "{course}/{section} · the website leaves off {leftOff} files no published page uses ({putBack} put back, {takenOut} taken out{notZero})",
         "lineWhenSortedAfterTheBuild": "{course}/{section} · the website leaves off {leftOff} files no published page uses, sorted after the build because the website builder's settings had changed shape ({putBack} put back, {takenOut} taken out{notZero})",
+        "lineWhenStopped": "{course}/{section} · the website was not built: more than {limit} of the course's own web pages and stylesheets load one another",
+        "stoppedRule": "siteFiles.marker.stoppedRule: a build the emitter stopped at the follow limit (siteFiles.followed.limitsRule). Always written: a build that stopped is what a problem report about a section that would not deploy needs (901a's Fable sweep, MUST 2: the old limit published every file with no line at all).",
         "notZero": {
           "rule": "{notZero} is these parts, in this order, each only when its count is above zero; nothing when both are zero.",
           "putBackFailed": ", {putBackFailed} could not be put back",
@@ -45254,22 +45256,26 @@
         ".css": "css"
       },
       "limits": {
-        "depth": 16,
-        "files": 10000
+        "files": 50000
       },
-      "limitsRule": "depth: a carried file is read only when fewer than `depth` carried files lie between it and a page; files: at most `files` carried files are read in one build. Past either, the walk does not stop quietly: the emitter carries EVERY course file, as Quartz's own Assets did, and prints plantoir: error: with limitReached; the check raises with limitReached, so the build says plantoir: error: and is left unmarked (check.failure), and the gates fail. A visited set already ends a loop, so the limits only bound a course of unusual size; no course measured comes near either.",
-      "limitReached": "more of this course's own pages and stylesheets load one another than the website builder follows, so every file in the course was put on the website rather than risk leaving one out that a page needs.",
+      "limitsRule": "files: the EMITTER reads at most `files` carried HTML, SVG and CSS files in one build. There is no depth limit: the visited set already ends the walk, and the walk reads no more files than the course holds (901a's Fable sweep, MUST 2: 17 chained .htm slides passed the old depth of 16, and the emitter then carried every file in the course, the unlinked answer key included, deployed with exit 0, no marker and no trail line). Past `files` the emitter writes stopFile beside public/ and throws FollowLimitReached (with limitReached), so Quartz exits non-zero; build_site.py sees stopFile, prints words.followLimitStopped (followLimitStoppedPreview in a preview) and the marker's stopped line (marker.stoppedRule), and exits 1, so nothing is mirrored, marked or deployed. It never carries every file. The check after the build has no limit of its own: it runs only on a build the emitter finished, and its walk is bounded by the course's files the same way.",
+      "limitsMeasured": "50,000 is more than eleven times every course file on all 26 built sites measured on 2026-11-14 together (4,321 carried, documentation 05 → Measured), so it is more than eleven times the largest of them, and the files this limit counts (HTML, SVG and CSS among them) are fewer still. The largest site's own figure was not recorded by that measurement, and this piece could not re-read the sites; re-measuring it (counts only) is a deferred check, not a reason to move the limit. Parsing 50,000 carried pages of 3.7 KB is about 7 seconds of the build (hast-util-from-html, 0.147 ms a page over 3,000 pages, on the owner's Mac at a load average of 5, 2026-11-14), so the limit costs a teacher nothing in time.",
+      "stopFile": ".plantoir-follow-limit",
+      "limitReached": "more of this course's own web pages and stylesheets load one another than the website builder reads, so the website was not built.",
       "rejected": [
         "Carrying a carried HTML file's whole folder (the review's option b): it carries a teacher's whole export folder, drafts and answer keys beside it included, and still misses a picture in another folder.",
         "Only a knownLimits line and a Help line (the review's option c): the page breaks with putBack at 0 and no sentence said, the worse direction (the director's ruling).",
-        "Following only in the check, which would put the files back: every such build would say a put-back and fail the gates, for a page that is correct."
+        "Following only in the check, which would put the files back: every such build would say a put-back and fail the gates, for a page that is correct.",
+        "Carrying every course file past the limit, as Quartz's own Assets did (901a's third round): it publishes every answer key in the course, quietly and on every later deploy, which is worse than a build that stops and says why (901a's Fable sweep, MUST 2; the director's ruling).",
+        "A depth limit: an ordinary course reaches it (a slide deck exported as a chain of linked pages), and the visited set already ends the walk.",
+        "A count limit in the check too: the check runs only on a build the emitter finished, so a second limit could only stop a build the emitter had already read, and in a preview it would have to stop a server another process runs."
       ]
     },
     "alwaysCarried": [
       "favicon.ico"
     ],
     "declareRule": "A feature that makes a page load a course file the tree does not name as an address records the file's content path on file.data.plantoirFiles in its transformer (PlantoirGeoGebra does), and the emitter carries it.",
-    "exactMatch": "A reference matches a file only letter for letter after decoding: a match by case or by Unicode form is the teacher's own broken link, in the emitter and the check alike (plan review 901-6: on the 27 sites, none of 530 unmatched references matched by case or by NFC/NFD form). Nobody adds normalising to one side only.",
+    "exactMatch": "A reference matches a file only letter for letter after resolve's steps: a match by case or by Unicode form is the teacher's own broken link, in the emitter and the check alike (plan review 901-6: on the 27 sites, none of 530 unmatched references matched by case or by NFC/NFD form). Nobody adds normalising to one side only. The mention search that decides TAKING OUT folds both (check.exposure): there a spelling difference must keep a file, never remove it.",
     "doneMarker": {
       "file": ".plantoir-emit-done",
       "rule": "The section's quartz/build.ts (patches/build.ts, and build_site.patch_quartz_build_done_marker for a section copied before it) writes it beside public/ once every emitter of the first build has finished. build_site.py removes it before Quartz starts. A preview's watcher mirrors nothing and checks nothing until it appears, because Quartz runs its emitters at once and the root index.html is written while course files are still being copied (plan review 901-1). A build.ts that cannot be given the line skips the preview's check, said once (words.previewNotChecked)."
@@ -45283,30 +45289,36 @@
         "followed": "followed, as the contract has it: which carried files are read, and the limits"
       },
       "rule": "Written by build_site.py on every build (ALWAYS section). Read, not imported, by the emitter: missing or broken, only favicon.ico is always carried and no attribute is read, so every file a page uses is left to the check, which puts it back and fails the gates.",
-      "whenMissing": "Measured by 901a's fix review (the side file made a directory inside a container): the build exits 0, every file a page uses is put back, and the site is whole. Only a failed write leaves it missing, since it is written on every build (ALWAYS section) from the same toolchain as the emitter. The build then says words.sideFileNotWritten before Quartz runs, and after the check ONE line, words.sideFileMissingPutBack (sideFileMissingPutBackPreview in a preview), which says how many files were put back and that the site is complete, instead of a line per file; a file that could not be put back is said on its own line and the site is not called complete. verify.sh's main-build row fails on sideFileNotWritten, as on every put-back. It clears at the next build that can write the file: every build writes it, and a build after the toolchain refreshes runs in a new container with a fresh scaffold."
+      "whenMissing": "Measured by 901a's fix review (the side file made a directory inside a container): the build exits 0, every file a page uses is put back, and the site is whole. Only a failed write leaves it missing, since it is written on every build (ALWAYS section) from the same toolchain as the emitter. The build then says words.sideFileNotWritten before Quartz runs, and after the check ONE line, words.sideFileMissingPutBackOne or sideFileMissingPutBackSeveral (the Preview forms in a preview), which says how many files were put back and that the site is complete, instead of a line per file; a file that could not be put back is said on its own line and the site is not called complete. verify.sh's main-build row fails on sideFileNotWritten, as on every put-back. It clears at the next build that can write the file: every build writes it, and a build after the toolchain refreshes runs in a new container with a fresh scaffold."
     },
     "check": {
       "rule": "scripts/site_files.py reads the BUILT site after Quartz has finished, on a deploy's build before it is mirrored to the host and before _mark_build_finished, and on a preview's first build at the done marker, on the site its server serves. It never trusts the emitter: it reads every built page at the places addresses names (the same list as the emitter, read again in Python from the HTML a student is sent, Head included), resolves each from the page's address, and compares with the course's files (site_files.course_files, Assets' own walk).",
       "hole": "A built page names a course file the site lacks: the file is PUT BACK at its address and the teacher is told one line per file (words.putBack; words.putBackFailed when the copy failed). Ruled by Russell 2026-11-13 on #901: put back, the build goes on, the teacher is told, and a trail line is written. Rejected: stopping the build; no second check.",
-      "exposure": "A course file in the site that no built page names is counted (unreferenced). Of those, one whose name the site's text never mentions (any .html, .json, .xml, .js, .css, .txt) is taken out: a page cannot fetch a file whose name it does not contain, so taking it out cannot make a hole. With Quartz's own emitter (marker.assetsEmitter 'quartz'), every unreferenced file is taken out, which is what Plantoir's emitter would have left off.",
+      "exposure": "A course file in the site that no built page names is counted (unreferenced). It is TAKEN OUT only when every reading agrees that nothing which stays names it: the check's reader does not name it, and no text file that stays on the site mentions its name. The text that stays is every file the site made (pages, contentIndex.json, sitemap.xml, scripts and stylesheets: .html, .htm, .svg, .json, .xml, .js, .mjs, .css, .txt, .webmanifest by name), every course file the check names (by its content path's ending, so a course .html file served without its ending is read), and, in turn, every mentioned course file that is text itself. The name is looked for in the text as written and as the emitter's reading would decode it (HTML character references, JSON \\u escapes, the tabs and line breaks a browser drops, percent escapes), with case and Unicode form folded. A browser fetches only an address some file it was sent contains, and every way the emitter reads an address decodes to text the search reads, so TAKING OUT CANNOT MAKE A HOLE. Where the readings disagree the file STAYS and is counted in unreferenced, which fails the gates: a file wrongly left on for one build is the cheaper error, and the gate still sees it (901a's Fable sweep, MUST 1: the search did not read carried files, so a picture a carried page named with a backslash was taken out). The same with Quartz's own emitter (marker.assetsEmitter 'quartz'), which read nothing: the rule that took every unreferenced file out unread is retired.",
       "gates": "putBack, putBackFailed and unreferenced are each a FAILURE in verify.sh and in the tests, and so is assetsEmitter 'quartz': each means the emitter got something wrong, which the safety net must not hide (Russell, #901).",
       "failure": "When the check itself fails, a plantoir: error: line says so and the build is left unmarked (buildFreshness), so the next deploy builds again (plan review 901-3)."
     },
     "words": {
-      "firstTimeDeploy": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. {count} {files} ({size}) that no page students can see uses are left off Section {section}'s website. Publish a page that uses a file to put it back.",
-      "firstTimePreview": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. {count} {files} ({size}) that no page students can see uses are left out of this preview, and will be left off Section {section}'s website when it is next deployed. Publish a page that uses a file to put it back.",
-      "changed": "{count} {files} in this course ({size}) are left off Section {section}'s website because no page students can see uses them.",
+      "counted": "A sentence with a count of files has two keys, <key>One for one file and <key>Several for any other count, the way the app's other counted sentences are kept (assist wording's alreadyHiddenOne and alreadyHiddenSeveral); site_files.counted_key picks one (901a's Fable sweep: one form said 'The 1 file ... were put back').",
+      "firstTimeDeployOne": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. 1 file ({size}) that no page students can see uses is left off Section {section}'s website. Publish a page that uses a file to put it back.",
+      "firstTimeDeploySeveral": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. {count} files ({size}) that no page students can see uses are left off Section {section}'s website. Publish a page that uses a file to put it back.",
+      "firstTimePreviewOne": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. 1 file ({size}) that no page students can see uses is left out of this preview, and will be left off Section {section}'s website when it is next deployed. Publish a page that uses a file to put it back.",
+      "firstTimePreviewSeveral": "From now on, a file in your course goes on the website only when a page students can see shows it or links to it. {count} files ({size}) that no page students can see uses are left out of this preview, and will be left off Section {section}'s website when it is next deployed. Publish a page that uses a file to put it back.",
+      "changedOne": "1 file in this course ({size}) is left off Section {section}'s website because no page students can see uses it.",
+      "changedSeveral": "{count} files in this course ({size}) are left off Section {section}'s website because no page students can see uses them.",
       "putBack": "A page students can see uses {file}, so it was put on the website.",
       "putBackFailed": "A page students can see uses {file}, but it could not be put on the website, so that page will show it as missing.",
       "putBackPreview": "A page students can see uses {file}, so it was put in this preview, and will go on the website when it is next deployed.",
       "putBackFailedPreview": "A page students can see uses {file}, but it could not be put in this preview, so that page shows it as missing.",
       "emitterNotSwapped": "the website builder's settings for this section have changed shape, so the files no page uses were taken off after the build instead.",
       "sideFileNotWritten": "Could not note which files the pages use, so every file a page students can see uses will be put back after the build.",
-      "sideFileMissingPutBack": "The {count} {files} that pages students can see use were put back after the build, so Section {section}'s website is complete.",
-      "sideFileMissingPutBackPreview": "The {count} {files} that pages students can see use were put back after the build, so this preview is complete.",
+      "sideFileMissingPutBackOne": "The file a page students can see uses was put back after the build, so Section {section}'s website is complete.",
+      "sideFileMissingPutBackSeveral": "The {count} files that pages students can see use were put back after the build, so Section {section}'s website is complete.",
+      "sideFileMissingPutBackPreviewOne": "The file a page students can see uses was put back after the build, so this preview is complete.",
+      "sideFileMissingPutBackPreviewSeveral": "The {count} files that pages students can see use were put back after the build, so this preview is complete.",
       "previewNotChecked": "this section's website builder could not be told to say when it has finished, so this preview's files were not checked.",
-      "oneFile": "file",
-      "severalFiles": "files",
+      "followLimitStopped": "Section {section}'s website was not built: more than {limit} of the course's own web pages and stylesheets load one another, which is more than the website builder reads, and building it anyway could put files on the website that no page students can see uses. Move a folder of web pages the course does not use out of the course folder, then deploy again.",
+      "followLimitStoppedPreview": "This preview was not built: more than {limit} of the course's own web pages and stylesheets load one another, which is more than the website builder reads. Move a folder of web pages the course does not use out of the course folder, then preview again.",
       "size": "GB or MB with one decimal (bytes / 10^9, / 10^6) at or above a megabyte, else KB rounded up, at least 1 KB; a full stop whatever the language"
     },
     "whenSaid": {
@@ -45316,7 +45328,8 @@
     "marker": {
       "prefix": "PLANTOIR_SITE_FILES:",
       "rule": "ONE line per build, after the check: {course, section, mode ('preview' or 'deploy'), carried, leftOff, leftOffBytes, putBack, putBackFailed, takenOut, unreferenced, firstTime, changed, assetsEmitter ('plantoir' or 'quartz')}. Counts only: never a file's or a page's name. Both apps read it from the console of a run they start and from a scheduled deploy's record, as PLANTOIR_DOWNLOADED:, and write the trail line (activityTrail.mustRecord: 'site leaves off files no published page uses'). The console a teacher reads leaves it out, by the one rule for every PLANTOIR_ line.",
-      "writtenWhen": "firstTime, or changed, or putBack, putBackFailed, takenOut or unreferenced above zero, or assetsEmitter 'quartz'",
+      "writtenWhen": "firstTime, or changed, or putBack, putBackFailed, takenOut or unreferenced above zero, or assetsEmitter 'quartz', or stopped",
+      "stoppedRule": "A build the emitter stopped at the follow limit (followed.limitsRule) prints instead ONE line {course, section, mode, stopped: 'followLimit', limit}: no counts, because nothing was checked or put on the website. It is always written, as activityTrail.mustRecord's lineWhenStopped (site_files.stopped_marker_line).",
       "trailCases": [
         {
           "name": "the first build that leaves files off",
@@ -45492,6 +45505,14 @@
           "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":41,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":0,\"unreferenced\":1,\"firstTime\":false,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
           "written": true,
           "sentence": "the website leaves off 12 files no published page uses (0 put back, 0 taken out, 1 kept because the website mentions them)"
+        },
+        {
+          "name": "a build the emitter stopped at the follow limit",
+          "stopped": true,
+          "mode": "deploy",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"stopped\":\"followLimit\",\"limit\":50000}",
+          "written": true,
+          "sentence": "the website was not built: more than 50000 of the course's own web pages and stylesheets load one another"
         }
       ]
     },
@@ -45565,6 +45586,21 @@
         "Media/Café-menu.pdf"
       ]
     ],
+    "resolve": {
+      "rule": "The ONE way both readers read an address into the address below the site's root that a browser asks for (901a's Fable sweep, MUST 1: the emitter read pics\\cat.png as a browser does, the check did not, and the check took out a picture a student's page showed). siteFilesRules.resolvedFromPage and site_files.resolved_from_page take these steps in this order, and every case in resolveCases is run through both: the Python one by scripts/test_site_files.py, the TypeScript one in the image by check_site_files_rules_against_the_site.py. The address is resolved from where the page or carried file is served (a page at its name without .html). Whitespace and controls are named character by character in both, because Python's and JavaScript's ideas of whitespace differ.",
+      "steps": [
+        "The characters U+0000 to U+0020 (controls and space) at either end are dropped, as a browser's address reading drops them.",
+        "Every tab, line feed and carriage return inside is dropped.",
+        "Every backslash is read as a slash, as a browser reads one in an https address.",
+        "An address that is then empty, starts with # (a place on the same page), starts with // (another site), or starts with a scheme (https:, mailto:, data:, c:) names no course file.",
+        "The query (from ?) and the fragment (from #) are dropped.",
+        "A path segment written ., %2e, .., .%2e, %2e. or %2e%2e (any case) is a dot segment, and dot segments are resolved from the page's own address, never above the site's root.",
+        "Percent escapes are decoded as UTF-8: an escape that is not valid UTF-8 becomes U+FFFD, and a % without two hex digits after it is kept as written.",
+        "A run of slashes is read as one: a host that merges them serves the file, and carrying a file for a link a stricter host refuses costs nothing.",
+        "The leading slash is dropped. The result is compared with a course file's address letter for letter (exactMatch): case and Unicode form are kept."
+      ],
+      "inOtherPlaces": "Every other place the readers trim or split an address uses the same named whitespace: a url(...), an @import string, an image-set string, a refresh's address and a srcset item are trimmed of ASCII whitespace (tab, line feed, form feed, carriage return, space), and a srcset item is split on it."
+    },
     "resolveCases": [
       [
         "Unit-1/Day-1",
@@ -45630,6 +45666,126 @@
         "Unit-1/Day-1",
         "",
         null
+      ],
+      [
+        "Media/frame",
+        "pics\\cat.png",
+        "Media/pics/cat.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "..\\Media\\a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "\\\\cdn.example.org\\a.png",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "/\\example.org/a.png",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "%2e%2e/Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "%2E./Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        ".%2E/Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "./%2e/a.png",
+        "Unit-1/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "./a.png",
+        "Unit-1/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media//a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "..//Media/a.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/Pic.PNG",
+        "Media/Pic.PNG"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/cafe\u0301.png",
+        "Media/cafe\u0301.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        " \t../Media/a.png\n ",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Me\ndia/a\t.png",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/a.png#top",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/a.png?v=2#top",
+        "Media/a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/100%.png",
+        "Media/100%.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/%C3.png",
+        "Media/\ufffd.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "c:\\Media\\a.png",
+        null
+      ],
+      [
+        "Unit-1/Day-1",
+        "\u00a0a.png",
+        "Unit-1/\u00a0a.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "?x=1",
+        "Unit-1/Day-1"
+      ],
+      [
+        "Unit-1/Day-1",
+        "../Media/a%2Fb.png",
+        "Media/a/b.png"
+      ],
+      [
+        "Unit-1/Day-1",
+        "\u0001../Media/a.png\u001f",
+        "Media/a.png"
       ]
     ],
     "cases": [
@@ -46273,7 +46429,7 @@
         "absent": []
       },
       {
-        "name": "with Quartz's own emitter every unreferenced file is taken out, mentioned or not",
+        "name": "with Quartz's own emitter an unreferenced file the site mentions is kept and counted, as with Plantoir's (901a's Fable sweep, MUST 1)",
         "emitter": "quartz",
         "public": {
           "index.html": "<html><body>Hello</body></html>",
@@ -46284,16 +46440,16 @@
           "Media/answers.pdf"
         ],
         "expect": {
-          "carried": 0,
-          "leftOff": 1,
+          "carried": 1,
+          "leftOff": 0,
           "putBack": 0,
-          "takenOut": 1,
+          "takenOut": 0,
           "unreferenced": 1
         },
-        "present": [],
-        "absent": [
+        "present": [
           "Media/answers.pdf"
-        ]
+        ],
+        "absent": []
       },
       {
         "name": "a hole in a srcset is put back",
@@ -47210,8 +47366,262 @@
         "absent": [
           "Media/cat.png"
         ]
+      },
+      {
+        "name": "the Fable sweep's reproduction: a carried page's picture written with a backslash is named as the emitter reads it, so nothing is taken out (901a's Fable sweep, MUST 1)",
+        "public": {
+          "index.html": "<html><body><iframe src=\"./Media/frame\"></iframe></body></html>",
+          "Media/frame": "<html><body><img src=\"pics\\cat.png\"><img src=\"pics/dog.png\"></body></html>",
+          "Media/pics/cat.png": "cat",
+          "Media/pics/dog.png": "dog"
+        },
+        "content": {
+          "Media/frame.html": "<html><body><img src=\"pics\\cat.png\"><img src=\"pics/dog.png\"></body></html>",
+          "Media/pics/cat.png": "cat",
+          "Media/pics/dog.png": "dog",
+          "Media/key.pdf": "key"
+        },
+        "expect": {
+          "carried": 3,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/pics/cat.png",
+          "Media/pics/dog.png",
+          "Media/frame"
+        ],
+        "absent": [
+          "Media/key.pdf"
+        ]
+      },
+      {
+        "name": "a picture that only a carried page mentions stays and is counted, never taken out: the search reads carried files without an ending (MUST 1)",
+        "public": {
+          "index.html": "<html><body><iframe src=\"./Media/frame\"></iframe></body></html>",
+          "Media/frame": "<html><body><p data-picture=\"pics/cat.png\">a cat</p></body></html>",
+          "Media/pics/cat.png": "cat"
+        },
+        "content": {
+          "Media/frame.html": "<html><body><p data-picture=\"pics/cat.png\">a cat</p></body></html>",
+          "Media/pics/cat.png": "cat"
+        },
+        "expect": {
+          "carried": 2,
+          "leftOff": 0,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 1
+        },
+        "present": [
+          "Media/pics/cat.png"
+        ],
+        "absent": []
+      },
+      {
+        "name": "the search reads, in turn, a mentioned file that stays: a picture only it mentions stays, and a file nothing mentions is taken out (MUST 1)",
+        "public": {
+          "index.html": "<html><body><p>Open notes.htm in the Media folder.</p></body></html>",
+          "Media/notes.htm": "<html><body><p>inner.png is the diagram</p></body></html>",
+          "Media/inner.png": "png",
+          "Media/answers.pdf": "%PDF"
+        },
+        "content": {
+          "Media/notes.htm": "<html><body><p>inner.png is the diagram</p></body></html>",
+          "Media/inner.png": "png",
+          "Media/answers.pdf": "%PDF"
+        },
+        "expect": {
+          "carried": 2,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 1,
+          "unreferenced": 3
+        },
+        "present": [
+          "Media/notes.htm",
+          "Media/inner.png"
+        ],
+        "absent": [
+          "Media/answers.pdf"
+        ]
+      },
+      {
+        "name": "a mention in another spelling keeps a file: another case, a percent escape, a character reference, the other Unicode form (MUST 1)",
+        "public": {
+          "index.html": "<html><body><p>CAT.PNG</p><p>d%6Fg.png</p><p>b&#105;rd.png</p><p>café.png</p></body></html>",
+          "Media/cat.png": "c",
+          "Media/dog.png": "d",
+          "Media/bird.png": "b",
+          "Media/café.png": "e",
+          "Media/gone.png": "g"
+        },
+        "content": [
+          "Media/cat.png",
+          "Media/dog.png",
+          "Media/bird.png",
+          "Media/café.png",
+          "Media/gone.png"
+        ],
+        "expect": {
+          "carried": 4,
+          "leftOff": 1,
+          "putBack": 0,
+          "takenOut": 1,
+          "unreferenced": 5
+        },
+        "present": [
+          "Media/cat.png",
+          "Media/dog.png",
+          "Media/bird.png",
+          "Media/café.png"
+        ],
+        "absent": [
+          "Media/gone.png"
+        ]
+      },
+      {
+        "name": "a carried stylesheet's url() written with %2e%2e names the file as a browser reads it (MUST 1)",
+        "public": {
+          "index.html": "<html><head><link rel=\"stylesheet\" href=\"Media/css/s.css\"></head><body></body></html>",
+          "Media/css/s.css": "p { background: url(%2e%2e/pics/a.png) }",
+          "Media/pics/a.png": "png"
+        },
+        "content": {
+          "Media/css/s.css": "p { background: url(%2e%2e/pics/a.png) }",
+          "Media/pics/a.png": "png"
+        },
+        "expect": {
+          "carried": 2,
+          "leftOff": 0,
+          "putBack": 0,
+          "takenOut": 0,
+          "unreferenced": 0
+        },
+        "present": [
+          "Media/css/s.css",
+          "Media/pics/a.png"
+        ],
+        "absent": []
       }
     ],
+    "disagreeingShapes": {
+      "rule": "A generated set of the shapes in which a carried file can write a picture's address, each written into each container (901a's Fable sweep, MUST 1: prove taking out can never make a hole). scripts/test_site_files.py puts the picture on the site as if the emitter had carried it, for every shape, and the check must never take it out, while a decoy no file names is taken out in the same run. check_site_files_rules_against_the_site.py runs the emitter's own rules over every shape in the image and then the check over what the emitter carried: the check must take out nothing, put back nothing and count nothing unreferenced, so a shape the two readers read differently fails the gate. {address} is replaced by the shape; each shape is written from the container's own folder, Media/.",
+      "picture": "Media/pics/café.png",
+      "decoy": "Media/pics/unused.png",
+      "containers": [
+        {
+          "name": "a picture in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><img src=\"{address}\"></body></html>"
+        },
+        {
+          "name": "a link in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><a href=\"{address}\">the picture</a></body></html>"
+        },
+        {
+          "name": "a srcset in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><img srcset=\"{address} 2x\"></body></html>"
+        },
+        {
+          "name": "a style attribute in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><div style=\"background: url('{address}')\"></div></body></html>"
+        },
+        {
+          "name": "a style element in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><head><style>p { background: url({address}) }</style></head><body></body></html>"
+        },
+        {
+          "name": "an SVG image in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><svg><image href=\"{address}\"></image></svg></body></html>"
+        },
+        {
+          "name": "an object in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><object data=\"{address}\"></object></body></html>"
+        },
+        {
+          "name": "a video's poster in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><video poster=\"{address}\"></video></body></html>"
+        },
+        {
+          "name": "a refresh in a framed page",
+          "file": "Media/frame.htm",
+          "page": "<iframe src=\"Media/frame.htm\"></iframe>",
+          "text": "<html><head><meta http-equiv=\"refresh\" content=\"30; url={address}\"></head><body></body></html>"
+        },
+        {
+          "name": "an attribute neither reader reads, in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><p data-picture=\"{address}\">a picture</p></body></html>"
+        },
+        {
+          "name": "a script's text in a framed page",
+          "file": "Media/frame.html",
+          "page": "<iframe src=\"Media/frame\"></iframe>",
+          "text": "<html><body><script>const picture = \"{address}\"</script></body></html>"
+        },
+        {
+          "name": "a stylesheet a page links",
+          "file": "Media/s.css",
+          "page": "<link rel=\"stylesheet\" href=\"Media/s.css\">",
+          "text": "p { background: url({address}) }"
+        },
+        {
+          "name": "an image inside an SVG a page shows",
+          "file": "Media/d.svg",
+          "page": "<object data=\"Media/d.svg\"></object>",
+          "text": "<svg xmlns=\"http://www.w3.org/2000/svg\"><image href=\"{address}\"></image></svg>"
+        }
+      ],
+      "shapes": [
+        "pics/café.png",
+        "pics\\café.png",
+        "./pics/café.png",
+        ".\\pics\\café.png",
+        "pics//café.png",
+        "pics/caf%C3%A9.png",
+        "pics/caf%c3%a9.png",
+        "%70ics/café.png",
+        "pics/café.png",
+        "pics/CAFÉ.PNG",
+        "pics/café.png?v=1",
+        "pics/café.png#top",
+        " pics/café.png ",
+        "pics/ca\tfé.png",
+        "pics/ca\nfé.png",
+        "../Media/pics/café.png",
+        "%2e%2e/Media/pics/café.png",
+        "%2E%2E\\Media\\pics\\café.png",
+        ".%2e/Media/pics/café.png",
+        "/Media/pics/café.png",
+        "\\Media\\pics\\café.png",
+        "pics/caf&#233;.png",
+        "pics/caf&eacute;.png",
+        "pics/c&#x61;fé.png",
+        "pics%2Fcafé.png",
+        "pics/./café.png",
+        "pics/../pics/café.png",
+        "pics/%2e/café.png"
+      ]
+    },
     "addressFixture": {
       "rule": "A small built site for the third reading (scripts/test_site_files.py: site_files' reader, the test's own reader written from the HTML, SVG and CSS standards, and the test's own list of needed addresses, written there by hand and never derived from this list, must agree with `needed`; the image's rules check reads the same pages through Quartz's HTML parser and siteFilesRules.addressesThePagesUse, following the carried files). Files are content paths; needed are their addresses. fileText is what a course file holds where it matters (a carried HTML, SVG or CSS file); every other file holds a placeholder. Round 3 (901a fix review I1, I2, M3): a page with a refresh, an @import string, an image-set, feImage, an SVG script, a <meta> with both a name and a property, a teacher's own HTML page in a frame that loads its stylesheet, script and picture, stylesheets that import one another in a loop, and a carried SVG's picture.",
       "pages": {
@@ -47339,7 +47749,15 @@
       "A page's own inline <script> is not read for addresses: a teacher's script that fetches a course file by name is not carried. Mention-anywhere keeps such a file from being TAKEN OUT by the check, so a site built by Quartz's own emitter keeps it; Plantoir's emitter leaves it off.",
       "Older deploys on Netlify and Cloudflare can still hold files a newer deploy leaves off; deleting them is piece 901c (Russell, 2026-11-13: both hosts).",
       "A JavaScript file is never read for addresses, carried or not: a file only a script loads is left off. A teacher would meet it as a p5.js sketch exported into Media and shown in a frame: the sketch's page, its sketch.js and the p5 library are carried, but a picture the sketch loads with loadImage('cat.png') is not, and the sketch shows no picture. Naming the file in the sketch's page (an <img hidden src=\"cat.png\">, or a link to it) carries it. A Help line says so.",
-      "An address ending .html that names a course's own .html file, in a page's <form action> or anywhere inside a carried HTML file, names nothing: the site serves a course .html file at its name without .html, and only a page's own links, pictures and frames are rewritten to that name (CrawlLinks). The file is left off, and the address was already broken before #901 (901a fix review, M5). A frame's src in a page is rewritten, so a teacher's page shown in a frame is carried."
+      "An address ending .html that names a course's own .html file, in a page's <form action> or anywhere inside a carried HTML file, names nothing: the site serves a course .html file at its name without .html, and only a page's own links, pictures and frames are rewritten to that name (CrawlLinks). The file is left off, and the address was already broken before #901 (901a fix review, M5). A frame's src in a page is rewritten, so a teacher's page shown in a frame is carried.",
+      "A <frame src> (an old frameset export) is read by neither reader, so its page is left off and the frame shows nothing (901a's Fable sweep; follow-up).",
+      "A <base href> in a carried page is not honoured: both readers resolve its addresses from the page's own address, so a page that relies on it has its files left off (901a's Fable sweep; follow-up).",
+      "An <?xml-stylesheet href?> in an SVG is read by neither reader, so its stylesheet is left off (901a's Fable sweep; follow-up).",
+      "A link written as the section's own full address (https://<the site>/Media/x.pdf, as a teacher copies it from the browser) is read as another site's address by both readers, so the file is left off; the build knows the site's address, so this can be read (901a's Fable sweep; follow-up).",
+      "A url(...) inside a CSS comment is read by both readers, so its file is carried though no browser loads it: wrongly ON, the cheaper direction (901a's Fable sweep).",
+      "An SVG shown as a picture (<img src=d.svg>) has the files inside it carried, though a browser loads nothing an SVG picture names: wrongly ON (901a's Fable sweep).",
+      "The two readers parse HTML with different parsers (Quartz's parse5 and Python's html.parser), and Python's changed between 3.11, the image's, and 3.14.10, Windows' runtime. Measured on 2026-11-14 (an <img> inside each element of a carried page; Pythons 3.11.13, 3.12.11, 3.13.7, 3.14.4): Python reads an address that the emitter does not inside <template>, <select> and a repeated attribute on every version, and inside <textarea>, <title>, <xmp>, <noembed>, <plaintext> and an <iframe>'s text on 3.11 and 3.12 (on 3.13, <xmp>, <noembed>, <plaintext> and an <iframe>'s text; on 3.14, none of these six); the check then PUTS BACK a file no browser loads, says so and fails the gates. The emitter reads one Python does not inside <image> outside an SVG (parse5 reads it as <img>) on every version, inside <noframes> on 3.14, and an <img> inside an SVG <title> on 3.13 and 3.14; the check then keeps the file and counts it (check.exposure), which fails the gates. So the same course can give different counts on a Mac and on Windows; a course of Quartz's own pages cannot, because Quartz writes a built page from its tree (follow-up: one HTML reading on both platforms).",
+      "Two course files with one address (Media/frame.html and Media/frame) leave the choice of the one read to the order each reader walks the folder (glob order in the emitter, sorted order in the check). Not measured (901a's Fable sweep; follow-up)."
     ],
     "rejected": [
       "Choosing the files in Python before Quartz, so only used files go into content/: Python would have to resolve wikilinks as Quartz does (shortest path over allSlugs, ambiguous names), every mismatch is a hole, and taking files out of content/ changes allSlugs, so an ambiguous name could resolve to another file.",

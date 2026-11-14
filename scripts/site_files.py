@@ -19,9 +19,14 @@ site after Quartz has finished (contracts/shared-rules.json -> siteFiles):
   left alone, as before.
 * **An exposure**: a course file in `public/` that no built page names.
   Counted as `unreferenced`, which the gates treat as a failure. Of those, a
-  file whose name is MENTIONED NOWHERE in the built site's text is taken out
-  (`takenOut`): no page can fetch a file whose name it never contains, so
-  that direction cannot make a hole.
+  file is taken out (`takenOut`) only when every reading agrees nothing that
+  stays names it: this reader does not, and no text file that stays on the
+  site (the site's own files, the course files this reader names, and in
+  turn any mentioned course file) mentions its name in any spelling the
+  emitter's reading could decode to it, case and Unicode form folded. A
+  browser fetches only an address some file it was sent contains, so taking
+  out cannot make a hole; where the readings disagree the file STAYS and
+  is counted (901a's Fable sweep, MUST 1).
 
 Both safety counts are zero on a correct build, and verify.sh and the tests
 fail when either is not. In the field they keep a page whole and an unused
@@ -34,7 +39,8 @@ them, and the meta tags whose content is an address). A page that only
 mentions a file's name, in alt text, a link's title, a description or its
 text, does not use the file. A file a CARRIED file loads is used too: a
 carried HTML, SVG or CSS file is read at the same places, from its own
-address, transitively (siteFiles.followed). JavaScript is never read.
+address, transitively (siteFiles.followed). JavaScript is never read. Both
+readers read an address by the same steps (siteFiles.resolve).
 
 It reads `content/` to know which files are the course's (the same walk
 Quartz's Assets emitter makes: every non-page file, no dotted names, not
@@ -68,6 +74,10 @@ RECORD_NAME = ".site-files.json"
 # has finished (siteFiles.doneMarker): the moment a preview's check may read
 # the site. Removed by build_site.py before Quartz starts.
 DONE_MARKER = ".plantoir-emit-done"
+# Written by the emitter beside public/ when it stops a build at the follow
+# limit (siteFiles.followed.stopFile), so build_site.py can say why Quartz
+# exited. Removed by build_site.py before Quartz starts.
+FOLLOW_LIMIT_FILE = ".plantoir-follow-limit"
 SIDE_FILE = "plantoir_site_files.json"
 
 # Quartz 4.5.0's own defaults (quartz.config.ts), the folders its file walk
@@ -79,24 +89,38 @@ ALWAYS_CARRIED = ("favicon.ico",)
 
 _BASE = "https://site.invalid/"
 _SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
-_CSS_URL = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECASE | re.DOTALL)
+# The one way both readers read an address (siteFiles.resolve, cases in
+# siteFiles.resolveCases): siteFilesRules.ts has the same steps. Whitespace
+# is named character by character, because Python's \s and str.strip() and
+# JavaScript's \s and trim() do not agree (U+001C to U+001F, U+0085, U+FEFF).
+_ASCII_SPACE = "\t\n\f\r "
+_URL_EDGES = re.compile("^[\x00-\x20]+|[\x00-\x20]+$")
+_URL_INSIDE = re.compile("[\t\n\r]")
+_SLASHES = re.compile("/{2,}")
+_DOT_SEGMENTS = {".": ".", "%2e": "."}
+_DOT_DOT_SEGMENTS = {"..": "..", ".%2e": "..", "%2e.": "..", "%2e%2e": ".."}
+_CSS_URL = re.compile(r"url\([\t\n\f\r ]*(['\"]?)(.*?)\1[\t\n\f\r ]*\)", re.IGNORECASE | re.DOTALL)
 # CSS's other two places that hold an address as a plain string (901a fix
 # review, I2): `@import "x.css"` and the strings inside image-set(...).
 # siteFilesRules.ts has the same three, letter for letter.
-_CSS_IMPORT = re.compile(r"@import\s+(['\"])([\s\S]*?)\1", re.IGNORECASE)
+_CSS_IMPORT = re.compile(r"@import[\t\n\f\r ]+(['\"])([\s\S]*?)\1", re.IGNORECASE)
 _IMAGE_SET = re.compile(r"image-set\(", re.IGNORECASE)
 # <meta http-equiv="refresh" content="5; url=x.pdf">: the time, a separator,
 # an optional `url=`, then the address, quoted or not (the HTML standard's
 # shared declarative refresh steps, simplified the same way in both readers).
-_REFRESH = re.compile(r"^\s*[0-9.]+\s*[;,]?\s*(?:url\s*=\s*)?([\s\S]*)$", re.IGNORECASE)
+_REFRESH = re.compile(r"^[\t\n\f\r ]*[0-9.]+[\t\n\f\r ]*[;,]?[\t\n\f\r ]*(?:url[\t\n\f\r ]*=[\t\n\f\r ]*)?([\s\S]*)$",
+                      re.IGNORECASE)
 # JavaScript's \s, which Quartz's sluggify uses, is not Python's: it has the
 # byte-order mark and lacks \x1c-\x1f.
 _JS_SPACE = re.compile("[\t\n\v\f\r    -     　﻿]")
 _EXTENSION = re.compile(r"\.[A-Za-z0-9]+$")
 _SRCSET_NAMES = ("srcset", "imagesrcset")
 # Text files the built site is searched for a file's name before it may be
-# taken out (mention-anywhere).
-_TEXT_SUFFIXES = (".html", ".json", ".xml", ".js", ".css", ".txt", ".webmanifest")
+# taken out (mention-anywhere, check.exposure): by the name in public/ for a
+# file the site made, by the content path's ending for a course file (a
+# course .html file is in public/ without its ending).
+_TEXT_SUFFIXES = (".html", ".htm", ".svg", ".json", ".xml", ".js", ".mjs", ".css", ".txt", ".webmanifest")
+_JSON_ESCAPE = re.compile(r"\\u([0-9A-Fa-f]{4})")
 
 
 def rules(*keys, optional: bool = False):
@@ -234,12 +258,12 @@ class _AddressReader(HTMLParser):
             if url is not None:
                 self.addresses.append(url)
         elif read == "fromSiteRoot":
-            if value.strip() != "":
-                self.addresses.append("/" + value.strip().lstrip("/"))
+            if value.strip(_ASCII_SPACE) != "":
+                self.addresses.append("/" + value.strip(_ASCII_SPACE).lstrip("/"))
         elif read == "srcset":
             for item in value.split(","):
-                first = item.strip().split()
-                if first:
+                first = re.split("[\t\n\f\r ]+", item.strip(_ASCII_SPACE))
+                if first and first[0] != "":
                     self.addresses.append(first[0])
         elif read == "address":
             self.addresses.append(value)
@@ -264,7 +288,7 @@ class _AddressReader(HTMLParser):
             named = meta_property if meta_property is not None else meta_name
             if named in self._meta_names and content is not None:
                 self.addresses.append(content)
-            if http_equiv is not None and http_equiv.strip().lower() in self._meta_http_equiv and content is not None:
+            if http_equiv is not None and http_equiv.strip(_ASCII_SPACE).lower() in self._meta_http_equiv and content is not None:
                 refreshed = refresh_address(content)
                 if refreshed is not None:
                     self.addresses.append(refreshed)
@@ -311,9 +335,9 @@ def addresses_in_css(text: str) -> list:
     text = text or ""
     found = []
     for match in _CSS_URL.finditer(text):
-        found.append(match.group(2).strip())
+        found.append(match.group(2).strip(_ASCII_SPACE))
     for match in _CSS_IMPORT.finditer(text):
-        found.append(match.group(2).strip())
+        found.append(match.group(2).strip(_ASCII_SPACE))
     found.extend(_strings_in_image_sets(text))
     return found
 
@@ -333,7 +357,7 @@ def _strings_in_image_sets(text: str) -> list:
                 if closing < 0:
                     break
                 if depth == 1:
-                    found.append(text[position + 1:closing].strip())
+                    found.append(text[position + 1:closing].strip(_ASCII_SPACE))
                 position = closing + 1
                 continue
             if character == "(":
@@ -349,11 +373,11 @@ def refresh_address(content: str):
     match = _REFRESH.match(content or "")
     if match is None:
         return None
-    rest = match.group(1).strip()
+    rest = match.group(1).strip(_ASCII_SPACE)
     if rest[:1] in ("'", '"'):
         closing = rest.find(rest[0], 1)
         rest = rest[1:closing] if closing >= 0 else rest[1:]
-    rest = rest.strip()
+    rest = rest.strip(_ASCII_SPACE)
     if rest == "":
         return None
     return rest
@@ -398,20 +422,39 @@ def page_slug_of(html_relative: str) -> str:
 
 def resolved_from_page(page_slug: str, address: str):
     """The address below the site's root that `address`, written on the page
-    at `page_slug`, asks a browser for: decoded, no query or fragment, no
-    leading slash. None for an address on another site, an anchor, or no
-    address at all."""
-    value = (address or "").strip()
+    (or carried file) at `page_slug`, asks a browser for, read by the steps of
+    siteFiles.resolve, which siteFilesRules.resolvedFromPage takes too: the
+    edges' controls and spaces dropped, tabs and line breaks inside dropped,
+    a backslash read as a slash, dot segments (%2e spellings included)
+    resolved, no query or fragment, decoded, a run of slashes read as one,
+    no leading slash. None for an address on another site, an anchor, or no
+    address at all. Case and Unicode form are kept (exactMatch)."""
+    value = _URL_EDGES.sub("", str(address or ""))
+    value = _URL_INSIDE.sub("", value).replace("\\", "/")
     if value == "" or value.startswith("#") or value.startswith("//") or _SCHEME.match(value):
         return None
+    cut = len(value)
+    for mark in ("?", "#"):
+        found = value.find(mark)
+        if found >= 0 and found < cut:
+            cut = found
+    segments = []
+    for segment in value[:cut].split("/"):
+        lowered = segment.lower()
+        if lowered in _DOT_SEGMENTS:
+            segments.append(_DOT_SEGMENTS[lowered])
+        elif lowered in _DOT_DOT_SEGMENTS:
+            segments.append(_DOT_DOT_SEGMENTS[lowered])
+        else:
+            segments.append(segment)
     try:
-        joined = urljoin(_BASE + page_slug, value)
+        joined = urljoin(_BASE + page_slug, "/".join(segments))
         parts = urlsplit(joined)
     except ValueError:
         return None
     if parts.scheme != "https" or parts.netloc != "site.invalid":
         return None
-    path = unquote(parts.path)
+    path = _SLASHES.sub("/", unquote(parts.path))
     return path.lstrip("/")
 
 
@@ -442,13 +485,6 @@ def addresses_the_site_uses(public_dir: Path) -> set:
 
 # ---- Following a carried file ---------------------------------------------
 
-class FollowLimitReached(RuntimeError):
-    """More carried files load one another than siteFiles.followed.limits
-    allows. Said, never passed over: the check fails loudly (the build's
-    plantoir: error: line, the build left unmarked) and the emitter carries
-    every file rather than leave one out."""
-
-
 def followed_rules() -> dict:
     return rules("followed")
 
@@ -463,8 +499,7 @@ def kind_of_carried_file(relative: str, kinds: dict):
     return None
 
 
-def follow_carried_files(used, files: dict, content_dir, address_rules: dict, followed: dict,
-                         depth_limit=None, files_limit=None) -> set:
+def follow_carried_files(used, files: dict, content_dir, address_rules: dict, followed: dict) -> set:
     """`used`, with every course file a carried HTML, SVG or CSS file loads,
     transitively (siteFiles.followed; 901a fix review, I1). Each carried file
     of a followed kind is read from content/ at the same places as a built
@@ -472,25 +507,18 @@ def follow_carried_files(used, files: dict, content_dir, address_rules: dict, fo
     address is resolved from the file's OWN address, and only a course file
     is followed: an address on another site, or one that names no course
     file, is never read. Breadth first with a visited set, so a loop is read
-    once; past the depth or the count in followed.limits it raises
-    FollowLimitReached rather than stop quietly. JavaScript is never read
-    (siteFiles.knownLimits)."""
+    once and the walk reads no more files than the course holds. No depth
+    limit and no count limit here: the count limit is the emitter's
+    (followed.limits), which stops the build before this check runs
+    (followed.limitsRule). JavaScript is never read (siteFiles.knownLimits)."""
     kinds = followed.get("kinds", {})
-    limits = followed.get("limits", {})
-    if depth_limit is None:
-        depth_limit = int(limits.get("depth", 16))
-    if files_limit is None:
-        files_limit = int(limits.get("files", 10000))
     content = Path(content_dir)
     result = set(used)
-    queue = []
-    for address in sorted(used):
-        queue.append((address, 0))
+    queue = sorted(used)
     visited = set()
-    read = 0
     position = 0
     while position < len(queue):
-        address, depth = queue[position]
+        address = queue[position]
         position += 1
         if address in visited:
             continue
@@ -501,9 +529,6 @@ def follow_carried_files(used, files: dict, content_dir, address_rules: dict, fo
         kind = kind_of_carried_file(relative, kinds)
         if kind is None:
             continue
-        if depth >= depth_limit or read >= files_limit:
-            raise FollowLimitReached(str(followed.get("limitReached", "too many files load one another")))
-        read += 1
         try:
             text = (content / relative).read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -518,30 +543,65 @@ def follow_carried_files(used, files: dict, content_dir, address_rules: dict, fo
                 continue
             result.add(target)
             if target not in visited:
-                queue.append((target, depth + 1))
+                queue.append(target)
     return result
 
 
+def _folded(text: str) -> str:
+    """Composed Unicode form, lower case: the mention search folds both, so
+    no spelling difference can let a file be taken out (check.exposure)."""
+    import unicodedata
+    return unicodedata.normalize("NFC", text).lower()
+
+
+def _mention_forms(text: str) -> list:
+    """The text a file's name is looked for in: as written, and as the
+    emitter's reading would have it after every decoding it makes on the
+    way to an address (an HTML character reference, a JSON \\u escape in
+    data-geogebra or data-phet, the tabs and line breaks a browser drops,
+    a percent escape). Both folded (_folded)."""
+    import html as html_module
+    decoded = html_module.unescape(text)
+    decoded = _JSON_ESCAPE.sub(lambda match: chr(int(match.group(1), 16)), decoded)
+    decoded = _URL_INSIDE.sub("", decoded)
+    decoded = unquote(decoded)
+    forms = [_folded(text)]
+    folded_decoded = _folded(decoded)
+    if folded_decoded != forms[0]:
+        forms.append(folded_decoded)
+    return forms
+
+
 def _mentioned_names(address: str) -> list:
-    """The last part of the file's address, as written and as a browser
-    would encode it."""
+    """The last part of the file's address, folded, as written and as a
+    browser would encode it."""
     from urllib.parse import quote
     name = address.rsplit("/", 1)[-1]
     if name == "":
         return []
-    names = [name]
-    encoded = quote(name, safe="")
-    if encoded != name:
+    names = [_folded(name)]
+    encoded = _folded(quote(name, safe=""))
+    if encoded != names[0]:
         names.append(encoded)
     return names
 
 
-def _addresses_mentioned(public_dir: Path, addresses) -> set:
-    """Which of `addresses` the site's text mentions anywhere (any .html,
-    .json, .xml, .js, .css, .txt, .webmanifest file). Read one file at a
-    time, and stopped as soon as every address has been found, rather than
-    holding the whole site (Pyodide, GeoGebra and KaTeX included) as one
-    string."""
+def _is_text(relative: str) -> bool:
+    return relative.lower().endswith(_TEXT_SUFFIXES)
+
+
+def _addresses_mentioned(public_dir: Path, addresses, files: dict) -> set:
+    """Which of `addresses` (course files on the site that the check's
+    reader does not name) the site's text mentions, where the text is every
+    text file on the site that STAYS: every file the site made (pages,
+    contentIndex.json, sitemap.xml, scripts, stylesheets; by its name in
+    public/), every course file the check names (by its content path's
+    ending, so a course .html file served without its ending is read), and,
+    in turn, every one of `addresses` that is mentioned and is text itself
+    (check.exposure, 901a's Fable sweep, MUST 1: a picture named only by a
+    carried page the check reads differently was taken out). Each file is
+    read once, and the search stops as soon as every address is found."""
+    public = Path(public_dir)
     waiting = {}
     found = set()
     for address in addresses:
@@ -552,22 +612,39 @@ def _addresses_mentioned(public_dir: Path, addresses) -> set:
             waiting[address] = names
     if not waiting:
         return found
-    for folder, _folders, files in os.walk(public_dir):
-        for name in files:
-            if not name.endswith(_TEXT_SUFFIXES):
+    candidates = set(addresses)
+    sources = []
+    for folder, _folders, names in os.walk(public):
+        for name in sorted(names):
+            relative = (Path(folder) / name).relative_to(public).as_posix()
+            if relative in candidates:
                 continue
-            try:
-                text = (Path(folder) / name).read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            for address in list(waiting):
-                for candidate in waiting[address]:
-                    if candidate in text:
-                        found.add(address)
-                        del waiting[address]
+            content_path = files.get(relative)
+            if _is_text(content_path if content_path is not None else relative):
+                sources.append(relative)
+    position = 0
+    while position < len(sources) and waiting:
+        relative = sources[position]
+        position += 1
+        try:
+            text = (public / relative).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        forms = _mention_forms(text)
+        for address in list(waiting):
+            hit = False
+            for candidate in waiting[address]:
+                for form in forms:
+                    if candidate in form:
+                        hit = True
                         break
-            if not waiting:
-                return found
+                if hit:
+                    break
+            if hit:
+                found.add(address)
+                del waiting[address]
+                if _is_text(files.get(address, address)):
+                    sources.append(address)
     return found
 
 
@@ -581,12 +658,13 @@ def check(public_dir, content_dir, *, repair: bool = True, emitter: str = "plant
         {"carried", "leftOff", "leftOffBytes", "putBack", "putBackFailed",
          "takenOut", "unreferenced", "putBackFiles", "putBackFailedFiles"}
 
-    With `repair`, a hole is put back and a file no page names and the site
-    never mentions is taken out. With `emitter` "quartz" (the swap could not
-    be made, so Quartz's own emitter copied everything) every unreferenced
-    file is taken out, which is what Plantoir's emitter would have left off.
-    The `*Files` lists are paths below content/, for the teacher's console
-    only: never on the trail or in the marker.
+    With `repair`, a hole is put back and a file no page names and nothing
+    that stays on the site mentions is taken out (check.exposure), with
+    Plantoir's emitter and with Quartz's own alike: `emitter` changes nothing
+    the check does (901a's Fable sweep, MUST 1, which also retired the
+    quartz-only rule that took every unreferenced file out unread). The
+    `*Files` lists are paths below content/, for the teacher's console only:
+    never on the trail or in the marker.
     """
     public = Path(public_dir)
     content = Path(content_dir)
@@ -623,9 +701,14 @@ def check(public_dir, content_dir, *, repair: bool = True, emitter: str = "plant
         if (public / address).is_file():
             unreferenced.append(address)
 
+    # Taken out only when every reading agrees that nothing which stays names
+    # it: the check's reader does not, and no text that stays mentions it in
+    # any spelling. Where they disagree the file STAYS and is counted in
+    # unreferenced, which fails the gates (check.exposure). The same with
+    # Quartz's own emitter, which read nothing.
     taken_out = 0
     if unreferenced:
-        mentioned = set() if emitter == "quartz" else _addresses_mentioned(public, unreferenced)
+        mentioned = _addresses_mentioned(public, unreferenced, files)
         for address in unreferenced:
             if address in mentioned:
                 continue
@@ -733,9 +816,8 @@ def lines_to_say(outcome: dict, previous: dict | None, *, mode: str, section,
     if not side_file_written and put_back_files and not outcome.get("putBackFailedFiles"):
         whole_key = "sideFileMissingPutBackPreview" if mode == "preview" else "sideFileMissingPutBack"
         put_back_count = len(put_back_files)
-        said.append(_filled(words[whole_key], {
+        said.append(_filled(words[counted_key(whole_key, put_back_count)], {
             "count": put_back_count,
-            "files": words["oneFile"] if put_back_count == 1 else words["severalFiles"],
             "section": section,
         }))
         put_back_files = []
@@ -746,17 +828,24 @@ def lines_to_say(outcome: dict, previous: dict | None, *, mode: str, section,
     count = int(outcome.get("leftOff", 0))
     values = {
         "count": count,
-        "files": words["oneFile"] if count == 1 else words["severalFiles"],
         "size": size_words(int(outcome.get("leftOffBytes", 0))),
         "section": section,
     }
     if previous is None:
         if count > 0:
             key = "firstTimePreview" if mode == "preview" else "firstTimeDeploy"
-            said.append(_filled(words[key], values))
+            said.append(_filled(words[counted_key(key, count)], values))
     elif count != int(previous.get("leftOff", -1)) and (count > 0 or int(previous.get("leftOff", 0)) > 0):
-        said.append(_filled(words["changed"], values))
+        said.append(_filled(words[counted_key("changed", count)], values))
     return said
+
+
+def counted_key(key: str, count: int) -> str:
+    """A counted sentence's key for `count` files (siteFiles.words.counted):
+    `<key>One` for one, `<key>Several` for any other count, the way the app's
+    other counted sentences are kept (assist wording's alreadyHiddenOne and
+    alreadyHiddenSeveral)."""
+    return key + ("One" if count == 1 else "Several")
 
 
 def marker_line(outcome: dict, previous: dict | None, *, course: str, section, mode: str,
@@ -770,6 +859,45 @@ def marker_line(outcome: dict, previous: dict | None, *, course: str, section, m
     payload["changed"] = previous is not None and int(previous.get("leftOff", -1)) != payload["leftOff"]
     payload["assetsEmitter"] = emitter
     return MARKER + " " + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def follow_limit() -> int:
+    """siteFiles.followed.limits.files: how many carried HTML, SVG and CSS
+    files the emitter reads in one build before it stops the build."""
+    return int(followed_rules()["limits"]["files"])
+
+
+def stopped_at_the_follow_limit(output_dir) -> bool:
+    """Whether the emitter of the build in `output_dir` stopped it at the
+    follow limit: it writes followed.stopFile beside public/ before it
+    throws (siteFiles.followed.limitsRule)."""
+    return (Path(output_dir) / FOLLOW_LIMIT_FILE).exists()
+
+
+def forget_the_follow_limit(output_dir) -> None:
+    """Remove an earlier build's stop file, so only this build's is read."""
+    try:
+        (Path(output_dir) / FOLLOW_LIMIT_FILE).unlink()
+    except OSError:
+        pass
+
+
+def stopped_marker_line(*, course: str, section, mode: str) -> str:
+    """The PLANTOIR_SITE_FILES: line of a build the emitter stopped at the
+    follow limit (siteFiles.marker.stoppedRule): no counts, because nothing
+    was checked or put on the website."""
+    payload = {"course": course, "section": section, "mode": mode, "stopped": "followLimit",
+               "limit": follow_limit()}
+    return MARKER + " " + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def stopped_lines(*, course: str, section, mode: str) -> list:
+    """What a build the emitter stopped at the follow limit prints: the
+    teacher's sentence (words.followLimitStopped, or its preview form), then
+    the marker."""
+    key = "followLimitStoppedPreview" if mode == "preview" else "followLimitStopped"
+    sentence = _filled(rules("words", key), {"limit": f"{follow_limit():,}", "section": section})
+    return [sentence, stopped_marker_line(course=course, section=section, mode=mode)]
 
 
 def after_the_build(public_dir, content_dir, host_output_dir, *, course: str, section, mode: str,

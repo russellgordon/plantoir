@@ -29,9 +29,12 @@
 // review I1): a carried HTML, SVG or CSS file (a teacher's own page shown in
 // a frame, a stylesheet a page links) is read at the same places, from its
 // own address, transitively, breadth first with a visited set, and only a
-// course file is followed. Past siteFiles.followed.limits it throws
-// FollowLimitReached rather than stop quietly. JavaScript is never read
-// (siteFiles.knownLimits).
+// course file is followed. Past the count in siteFiles.followed.limits it
+// throws FollowLimitReached, and the emitter stops the build (never carries
+// every file). JavaScript is never read (siteFiles.knownLimits).
+//
+// Both readers read an address by the same steps (siteFiles.resolve, cases
+// in siteFiles.resolveCases), which resolvedFromPage takes in order.
 //
 // A file named only by a hidden page, or only by a page a published page
 // embeds that is itself hidden, is not carried: a student can reach neither.
@@ -49,14 +52,24 @@ export type TreeNode = {
 
 const BASE = "https://site.invalid/"
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/
-const CSS_URL = /url\(\s*(['"]?)([\s\S]*?)\1\s*\)/gi
+// Whitespace named character by character (siteFiles.resolve), because
+// JavaScript's \s and trim() and Python's \s and strip() do not agree.
+const ASCII_SPACE_EDGES = /^[\t\n\f\r ]+|[\t\n\f\r ]+$/g
+const ASCII_SPACES = /[\t\n\f\r ]+/
+const URL_EDGES = /^[\u0000-\u0020]+|[\u0000-\u0020]+$/g
+const URL_INSIDE = /[\t\n\r]/g
+const CSS_URL = /url\([\t\n\f\r ]*(['"]?)([\s\S]*?)\1[\t\n\f\r ]*\)/gi
 // CSS's other two places that hold an address as a plain string (901a fix
 // review, I2): `@import "x.css"` and the strings inside image-set(...).
 // scripts/site_files.py has the same three, letter for letter.
-const CSS_IMPORT = /@import\s+(['"])([\s\S]*?)\1/gi
+const CSS_IMPORT = /@import[\t\n\f\r ]+(['"])([\s\S]*?)\1/gi
 const IMAGE_SET = /image-set\(/gi
 // A refresh: the time, a separator, an optional url=, then the address.
-const REFRESH = /^\s*[0-9.]+\s*[;,]?\s*(?:url\s*=\s*)?([\s\S]*)$/i
+const REFRESH = /^[\t\n\f\r ]*[0-9.]+[\t\n\f\r ]*[;,]?[\t\n\f\r ]*(?:url[\t\n\f\r ]*=[\t\n\f\r ]*)?([\s\S]*)$/i
+
+function stripAsciiSpace(text: string): string {
+  return text.replace(ASCII_SPACE_EDGES, "")
+}
 
 // The publish filter's own rule (patches/publish.ts). On a rebuild Quartz
 // hands emitters every page, hidden ones included, so the emitter checks.
@@ -82,10 +95,10 @@ export function addressesInCss(text: string): string[] {
   const css = String(text ?? "")
   const found: string[] = []
   for (const match of css.matchAll(CSS_URL)) {
-    found.push(match[2].trim())
+    found.push(stripAsciiSpace(match[2]))
   }
   for (const match of css.matchAll(CSS_IMPORT)) {
-    found.push(match[2].trim())
+    found.push(stripAsciiSpace(match[2]))
   }
   for (const item of stringsInImageSets(css)) {
     found.push(item)
@@ -109,7 +122,7 @@ function stringsInImageSets(text: string): string[] {
           break
         }
         if (depth === 1) {
-          found.push(text.slice(position + 1, closing).trim())
+          found.push(stripAsciiSpace(text.slice(position + 1, closing)))
         }
         position = closing + 1
         continue
@@ -131,12 +144,12 @@ export function refreshAddress(content: string): string | null {
   if (match === null) {
     return null
   }
-  let rest = match[1].trim()
+  let rest = stripAsciiSpace(match[1])
   if (rest.startsWith("'") || rest.startsWith('"')) {
     const closing = rest.indexOf(rest[0], 1)
     rest = closing >= 0 ? rest.slice(1, closing) : rest.slice(1)
   }
-  rest = rest.trim()
+  rest = stripAsciiSpace(rest)
   return rest === "" ? null : rest
 }
 
@@ -220,12 +233,12 @@ function addressesInValue(read: string, value: string, into: string[]): void {
       into.push(url)
     }
   } else if (read === "fromSiteRoot") {
-    if (value.trim() !== "") {
-      into.push("/" + value.trim().replace(/^\/+/, ""))
+    if (stripAsciiSpace(value) !== "") {
+      into.push("/" + stripAsciiSpace(value).replace(/^\/+/, ""))
     }
   } else if (read === "srcset") {
     for (const item of value.split(",")) {
-      const first = item.trim().split(/\s+/)[0]
+      const first = stripAsciiSpace(item).split(ASCII_SPACES)[0]
       if (first) {
         into.push(first)
       }
@@ -275,7 +288,7 @@ export function addressesInTree(tree: TreeNode, rules: AddressRules): string[] {
         found.push(content)
       }
       const httpEquiv = stringOf(properties.httpEquiv)
-      if (httpEquiv !== null && content !== null && metaHttpEquiv.has(httpEquiv.trim().toLowerCase())) {
+      if (httpEquiv !== null && content !== null && metaHttpEquiv.has(stripAsciiSpace(httpEquiv).toLowerCase())) {
         const refreshed = refreshAddress(content)
         if (refreshed !== null) {
           found.push(refreshed)
@@ -311,11 +324,17 @@ export function addressesInTree(tree: TreeNode, rules: AddressRules): string[] {
   return found
 }
 
-// The address below the site's root that `address`, written on the page at
-// `pageSlug`, asks a browser for: decoded, no query or fragment, no leading
-// slash. null for another site's address, an anchor, or nothing.
+// The address below the site's root that `address`, written on the page (or
+// carried file) at `pageSlug`, asks a browser for, by the steps of
+// siteFiles.resolve, which scripts/site_files.resolved_from_page takes too:
+// the edges' controls and spaces dropped, tabs and line breaks inside
+// dropped, a backslash read as a slash, dot segments (%2e spellings
+// included, which URL itself resolves) resolved, no query or fragment,
+// decoded, a run of slashes read as one, no leading slash. null for another
+// site's address, an anchor, or nothing. Case and Unicode form are kept
+// (exactMatch).
 export function resolvedFromPage(pageSlug: string, address: string): string | null {
-  const value = String(address ?? "").trim()
+  const value = String(address ?? "").replace(URL_EDGES, "").replace(URL_INSIDE, "").split("\\").join("/")
   if (value === "" || value.startsWith("#") || value.startsWith("//") || SCHEME.test(value)) {
     return null
   }
@@ -328,13 +347,40 @@ export function resolvedFromPage(pageSlug: string, address: string): string | nu
   if (url.origin !== "https://site.invalid") {
     return null
   }
-  let path: string
+  return decodedPath(url.pathname).replace(/\/{2,}/g, "/").replace(/^\/+/, "")
+}
+
+// A path's percent escapes decoded as UTF-8 (siteFiles.resolve): an escape
+// that is not valid UTF-8 becomes U+FFFD and a % without two hex digits is
+// kept, as Python's unquote does, where decodeURIComponent would throw.
+function decodedPath(text: string): string {
   try {
-    path = decodeURIComponent(url.pathname)
+    return decodeURIComponent(text)
   } catch {
-    return null
+    // Read leniently below.
   }
-  return path.replace(/^\/+/, "")
+  let out = ""
+  let bytes: number[] = []
+  const flush = () => {
+    if (bytes.length > 0) {
+      out += new TextDecoder("utf-8").decode(new Uint8Array(bytes))
+      bytes = []
+    }
+  }
+  let position = 0
+  while (position < text.length) {
+    const escape = text.slice(position + 1, position + 3)
+    if (text[position] === "%" && /^[0-9A-Fa-f]{2}$/.test(escape)) {
+      bytes.push(parseInt(escape, 16))
+      position += 3
+      continue
+    }
+    flush()
+    out += text[position]
+    position += 1
+  }
+  flush()
+  return out
 }
 
 export type SitePage = {
@@ -348,8 +394,9 @@ export type SitePage = {
 // siteFiles.followed, as the side file carries it.
 export type Followed = {
   kinds?: Record<string, string>
-  limits?: { depth?: number; files?: number }
+  limits?: { files?: number }
   limitReached?: string
+  stopFile?: string
 }
 
 // quartz/plantoir_site_files.json (siteFiles.sideFile). Without `addresses`
@@ -374,7 +421,8 @@ export type CarriedFiles = {
 }
 
 // Thrown when more carried files load one another than followed.limits
-// allows. The emitter carries every file then, and says so.
+// allows. The emitter stops the build then (followed.limitsRule): it never
+// carries every file.
 export class FollowLimitReached extends Error {
   constructor(message: string) {
     super(message)
@@ -396,8 +444,10 @@ export function kindOfCarriedFile(contentPath: string, followed: Followed | unde
 
 // `used`, with every course file a carried HTML, SVG or CSS file loads,
 // transitively: each is read at the same places as a page, its addresses
-// resolved from its OWN address, and only a course file is followed.
-// scripts/site_files.follow_carried_files is the same walk.
+// resolved from its OWN address, and only a course file is followed. No
+// depth limit: the visited set ends the walk. scripts/site_files.
+// follow_carried_files is the same walk, without the count limit, which
+// only the emitter needs (followed.limitsRule).
 export function followCarriedFiles(
   used: Set<string>,
   fileAddresses: Set<string>,
@@ -405,18 +455,14 @@ export function followCarriedFiles(
   carried: CarriedFiles,
 ): Set<string> {
   const followed = side.followed
-  const depthLimit = Number(followed?.limits?.depth ?? 16)
-  const filesLimit = Number(followed?.limits?.files ?? 10000)
+  const filesLimit = Number(followed?.limits?.files ?? Number.POSITIVE_INFINITY)
   const result = new Set<string>(used)
-  const queue: Array<[string, number]> = []
-  for (const address of [...used].sort()) {
-    queue.push([address, 0])
-  }
+  const queue: string[] = [...used].sort()
   const visited = new Set<string>()
   let read = 0
   let position = 0
   while (position < queue.length) {
-    const [address, depth] = queue[position]
+    const address = queue[position]
     position += 1
     if (visited.has(address)) {
       continue
@@ -433,7 +479,7 @@ export function followCarriedFiles(
     if (kind === null) {
       continue
     }
-    if (depth >= depthLimit || read >= filesLimit) {
+    if (read >= filesLimit) {
       throw new FollowLimitReached(String(followed?.limitReached ?? "too many files load one another"))
     }
     read += 1
@@ -449,7 +495,7 @@ export function followCarriedFiles(
       }
       result.add(target)
       if (!visited.has(target)) {
-        queue.push([target, depth + 1])
+        queue.push(target)
       }
     }
   }

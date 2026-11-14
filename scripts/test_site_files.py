@@ -109,12 +109,14 @@ class TheCheck(unittest.TestCase):
                     self.assertTrue((public / address).is_file(), address + " should be on the site")
                 for address in case["absent"]:
                     self.assertFalse((public / address).exists(), address + " should not be on the site")
-                # A second check of the repaired site finds nothing to do.
+                # A second check of the repaired site finds nothing to do: no
+                # hole, nothing more to take out, and the files kept because
+                # they are mentioned still counted.
                 again = site_files.check(public, content, repair=False,
                                          emitter=case.get("emitter", "plantoir"))
                 self.assertEqual(again["putBack"], 0)
-                if case.get("emitter", "plantoir") == "quartz":
-                    self.assertEqual(again["unreferenced"], 0)
+                self.assertEqual(again["takenOut"], 0)
+                self.assertEqual(again["unreferenced"], case["expect"]["unreferenced"] - case["expect"]["takenOut"])
 
     def test_a_check_without_repair_changes_nothing(self):
         public, content = self.temporary / "public", self.temporary / "content"
@@ -522,6 +524,60 @@ class TheThirdReading(unittest.TestCase):
         self.assertEqual(again["carried"], len(NEEDED_BY_HAND))
 
 
+class TakingOutCannotMakeAHole(unittest.TestCase):
+    """check.exposure (901a's Fable sweep, MUST 1): nothing is taken out
+    unless every reading agrees that nothing which stays names it. Every
+    generated shape in siteFiles.disagreeingShapes, written into every
+    container, with the picture on the site as if the emitter had carried it:
+    the check never takes the picture out, whatever its reader makes of the
+    shape, and in the same run takes out a decoy no file names, so the rule
+    is live in every run. The image runs the emitter's own rules over the
+    same shapes (check_site_files_rules_against_the_site.py)."""
+
+    def setUp(self):
+        self.temporary = Path(tempfile.mkdtemp(prefix="plantoir-site-files-shapes-"))
+
+    def tearDown(self):
+        shutil.rmtree(self.temporary, ignore_errors=True)
+
+    def test_the_set_is_wide(self):
+        shapes = RULES["disagreeingShapes"]
+        self.assertGreaterEqual(len(shapes["shapes"]), 25)
+        self.assertGreaterEqual(len(shapes["containers"]), 12)
+        written = "".join(shapes["shapes"])
+        for spelling in ("\\", "%2e%2e", "%2E%2E", "./", "//", "%C3%A9", "e\u0301", "CAF", "?v=", "#top", "\t", "\n",
+                         "&#233;", "&eacute;"):
+            self.assertIn(spelling, written)
+
+    def test_no_shape_in_any_container_lets_the_check_take_out_a_carried_picture(self):
+        shapes = RULES["disagreeingShapes"]
+        picture = site_files.slugify_file_path(shapes["picture"])
+        decoy = site_files.slugify_file_path(shapes["decoy"])
+        runs = 0
+        named = 0
+        for container_number, container in enumerate(shapes["containers"]):
+            for shape_number, shape in enumerate(shapes["shapes"]):
+                with self.subTest(container=container["name"], shape=shape):
+                    root = self.temporary / f"c{container_number}s{shape_number}"
+                    public, content = root / "public", root / "content"
+                    text = container["text"].replace("{address}", shape)
+                    write_tree(content, {container["file"]: text, shapes["picture"]: "picture",
+                                         shapes["decoy"]: "decoy"})
+                    served = site_files.slugify_file_path(container["file"])
+                    write_tree(public, {"index.html": "<html><body>" + container["page"] + "</body></html>",
+                                        served: text, picture: "picture", decoy: "decoy"})
+                    outcome = site_files.check(public, content, repair=True)
+                    runs += 1
+                    self.assertTrue((public / picture).is_file(), "a carried picture was taken out")
+                    self.assertFalse((public / decoy).exists(), "the decoy no file names stays")
+                    self.assertEqual(outcome["takenOut"], 1)
+                    self.assertEqual(outcome["putBack"], 0)
+                    if outcome["unreferenced"] == 1:
+                        named += 1
+        self.assertEqual(runs, len(shapes["shapes"]) * len(shapes["containers"]))
+        self.assertGreater(named, runs // 2, "the check's reader names most shapes itself")
+
+
 class FollowingACarriedFile(unittest.TestCase):
     """siteFiles.followed (901a fix review, I1): a file a carried HTML, SVG
     or CSS file loads is used too, transitively, and the walk ends."""
@@ -533,10 +589,10 @@ class FollowingACarriedFile(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.temporary, ignore_errors=True)
 
-    def follow(self, used, **limits):
+    def follow(self, used):
         files = site_files.course_files(self.content)
         return site_files.follow_carried_files(set(used), files, self.content, site_files.address_rules(),
-                                               site_files.followed_rules(), **limits)
+                                               site_files.followed_rules())
 
     def test_the_kinds_and_limits_are_the_contracts(self):
         followed = RULES["followed"]
@@ -547,8 +603,13 @@ class FollowingACarriedFile(unittest.TestCase):
         self.assertIsNone(site_files.kind_of_carried_file("Media/sketch.js", followed["kinds"]),
                           "JavaScript is never read (knownLimits)")
         self.assertIsNone(site_files.kind_of_carried_file("Media/a.png", followed["kinds"]))
-        self.assertGreaterEqual(followed["limits"]["depth"], 8)
-        self.assertGreaterEqual(followed["limits"]["files"], 1000)
+        # One count limit, the emitter's, and no depth limit (901a's Fable
+        # sweep, MUST 2). Over ten times every course file on the 26 sites
+        # measured together (4,321: followed.limitsMeasured).
+        self.assertEqual(set(followed["limits"]), {"files"})
+        self.assertGreaterEqual(followed["limits"]["files"], 10 * 4321)
+        self.assertEqual(site_files.follow_limit(), followed["limits"]["files"])
+        self.assertEqual(followed["stopFile"], site_files.FOLLOW_LIMIT_FILE)
 
     def test_a_loop_is_read_once(self):
         write_tree(self.content, {"Media/a.css": '@import "b.css";', "Media/b.css": "@import url(a.css); p{background:url(c.png)}",
@@ -561,44 +622,89 @@ class FollowingACarriedFile(unittest.TestCase):
                                   "Media/x.png": "png"})
         self.assertEqual(self.follow({"Media/page"}), {"Media/page"})
 
-    def test_a_chain_deeper_than_the_limit_says_so_rather_than_stop(self):
-        depth = RULES["followed"]["limits"]["depth"]
-        chain = {}
-        for number in range(depth + 1):
-            chain[f"Media/s{number}.css"] = f'@import "s{number + 1}.css";'
-        chain[f"Media/s{depth + 1}.css"] = "p { color: red }"
-        write_tree(self.content, chain)
-        with self.assertRaises(site_files.FollowLimitReached) as raised:
-            self.follow({"Media/s0.css"})
-        self.assertEqual(str(raised.exception), RULES["followed"]["limitReached"])
-        # A chain whose last stylesheet lies `depth - 1` files below the page
-        # is followed to its end.
-        shorter = self.follow({"Media/s2.css"})
-        self.assertIn(f"Media/s{depth + 1}.css", shorter)
+    def test_a_long_chain_of_pages_is_followed_to_its_end_and_an_unlinked_file_stays_off(self):
+        """The sweep's second reproduction: 17 slides exported as .htm pages,
+        each linking the next, passed the old depth of 16, and then every
+        file in the course was carried, the unlinked answer key included.
+        With no depth limit the chain is read to its end, however long, and
+        a file no slide names is never in it (901a's Fable sweep, MUST 2)."""
+        slides = {}
+        length = 40
+        for number in range(1, length + 1):
+            following = f'<a href="slide{number + 1}.htm">next</a>' if number < length else ""
+            slides[f"Media/slide{number}.htm"] = f"<html><body>slide {number} {following}</body></html>"
+        slides["Media/answer-key.pdf"] = "key"
+        write_tree(self.content, slides)
+        used = self.follow({"Media/slide1.htm"})
+        self.assertEqual(len(used), length)
+        self.assertIn(f"Media/slide{length}.htm", used)
+        self.assertNotIn("Media/answer-key.pdf", used)
 
-    def test_more_files_than_the_limit_says_so(self):
-        write_tree(self.content, {"Media/a.css": '@import "b.css"; @import "c.css";', "Media/b.css": "", "Media/c.css": ""})
-        with self.assertRaises(site_files.FollowLimitReached):
-            self.follow({"Media/a.css"}, files_limit=2)
-        self.assertEqual(len(self.follow({"Media/a.css"}, files_limit=3)), 3)
+    def test_the_check_has_no_limit_of_its_own(self):
+        """Only the emitter stops at followed.limits (followed.limitsRule):
+        the check is never handed a limit, and has no way to raise one."""
+        import inspect
+        self.assertEqual(list(inspect.signature(site_files.follow_carried_files).parameters),
+                         ["used", "files", "content_dir", "address_rules", "followed"])
+        self.assertFalse(hasattr(site_files, "FollowLimitReached"))
 
-    def test_a_check_that_reaches_the_limit_fails_loudly(self):
-        """The check raises, so build_site says plantoir: error: and leaves
-        the build unmarked (check.failure); it never quietly leaves a file
-        off."""
-        public = self.temporary / "public"
-        write_tree(public, {"index.html": '<link rel="stylesheet" href="Media/a.css">', "Media/a.css": "x"})
-        write_tree(self.content, {"Media/a.css": '@import "b.css";', "Media/b.css": '@import "a.css";'})
-        original = site_files.follow_carried_files
 
-        def tight(used, files, content_dir, address_rules, followed, depth_limit=None, files_limit=None):
-            return original(used, files, content_dir, address_rules, followed, depth_limit=1)
-        site_files.follow_carried_files = tight
-        try:
-            with self.assertRaises(site_files.FollowLimitReached):
-                site_files.check(public, self.content, repair=True)
-        finally:
-            site_files.follow_carried_files = original
+class TheBuildStopsAtTheFollowLimit(unittest.TestCase):
+    """Past followed.limits the emitter writes followed.stopFile and throws;
+    build_site.py says why, prints the marker's stopped line and exits 1, so
+    nothing is mirrored, marked or deployed (901a's Fable sweep, MUST 2)."""
+
+    def setUp(self):
+        import build_site
+        self.build_site = build_site
+        self.root = Path(tempfile.mkdtemp(prefix="plantoir-site-files-limit-"))
+        self.output = self.root / "work"
+        self.host = self.root / "host"
+        (self.output / "public").mkdir(parents=True)
+        self.host.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_the_stopped_lines_are_the_contracts(self):
+        words = RULES["words"]
+        limit = f"{RULES['followed']['limits']['files']:,}"
+        deploy = site_files.stopped_lines(course="SCH3U", section=2, mode="deploy")
+        self.assertEqual(deploy[0], words["followLimitStopped"].replace("{limit}", limit).replace("{section}", "2"))
+        self.assertEqual(deploy[1], site_files.stopped_marker_line(course="SCH3U", section=2, mode="deploy"))
+        preview = site_files.stopped_lines(course="SCH3U", section=2, mode="preview")
+        self.assertEqual(preview[0], words["followLimitStoppedPreview"].replace("{limit}", limit))
+        for line in deploy + preview:
+            for machinery in ("script", "Docker", "container", "toolchain", "emitter", "Quartz"):
+                self.assertNotIn(machinery, line)
+
+    def test_a_quartz_that_failed_without_the_stop_file_is_not_said_as_the_limit(self):
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.build_site._stop_if_the_follow_limit_was_reached(self.output, "SBI4U", 1, "deploy")
+        self.assertEqual(said.getvalue(), "")
+
+    def test_the_stop_file_stops_the_build_in_words_with_the_marker_and_exit_1(self):
+        (self.output / site_files.FOLLOW_LIMIT_FILE).write_text("stopped")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            with self.assertRaises(SystemExit) as stopped:
+                self.build_site._stop_if_the_follow_limit_was_reached(self.output, "SBI4U", 1, "deploy")
+        self.assertEqual(stopped.exception.code, 1)
+        lines = said.getvalue().splitlines()
+        self.assertEqual(lines, site_files.stopped_lines(course="SBI4U", section=1, mode="deploy"))
+        self.assertFalse((self.host / "public").exists(), "nothing was mirrored")
+        self.assertFalse((self.host / self.build_site.BUILD_STARTED_MARKER).exists(), "nothing was marked")
+
+    def test_the_stop_file_is_forgotten_before_a_build(self):
+        (self.output / site_files.FOLLOW_LIMIT_FILE).write_text("an earlier build")
+        site_files.forget_the_follow_limit(self.output)
+        self.assertFalse(site_files.stopped_at_the_follow_limit(self.output))
+
+    def test_both_quartz_runs_are_watched_for_the_stop_file(self):
+        """The deploy's build and the preview's serve each go through the
+        check for the stop file, and each forgets an earlier one first."""
+        source = (scripts_dir / "build_site.py").read_text(encoding="utf-8")
+        self.assertEqual(source.count("_stop_if_the_follow_limit_was_reached(output_dir, course_code, section_number,"), 2)
+        self.assertEqual(source.count("site_files.forget_the_follow_limit(output_dir)"), 2)
 
 
 class TheOneList(unittest.TestCase):
@@ -631,7 +737,7 @@ class TheOneList(unittest.TestCase):
         self.assertIn("addresses?: AddressRules", source)
         self.assertNotIn("Object.entries(properties)) {\n      if (typeof value === \"string\")", source)
         for name in ('"imagesrcset"', '"srcSet"', '"datageogebra"', '"data-geogebra"', '"poster"', '"xLinkHref"',
-                     '"feimage"', '"refresh"', '".css"', '".html"', '".svg"', 'depth: 16', 'files: 10000'):
+                     '"feimage"', '"refresh"', '".css"', '".html"', '".svg"', 'depthLimit', 'limits?.depth', '50000', '10000'):
             self.assertFalse(name in source, name + " is the contract's to say, not the rules file's")
 
 
@@ -643,11 +749,11 @@ class WhatIsSaid(unittest.TestCase):
     def test_the_first_build_says_once_in_its_own_words(self):
         words = RULES["words"]
         deploy = site_files.lines_to_say(self.OUTCOME, None, mode="deploy", section=2)
-        self.assertEqual(deploy, [words["firstTimeDeploy"].replace("{count}", "2").replace("{files}", "files")
+        self.assertEqual(deploy, [words["firstTimeDeploySeveral"].replace("{count}", "2")
                                   .replace("{size}", "2.4 MB").replace("{section}", "2")])
         preview = site_files.lines_to_say(self.OUTCOME, None, mode="preview", section=2)
         self.assertEqual(len(preview), 1)
-        self.assertTrue(preview[0].startswith(words["firstTimePreview"].split("{count}")[0]))
+        self.assertTrue(preview[0].startswith(words["firstTimePreviewSeveral"].split("{count}")[0]))
 
     def test_the_same_count_says_nothing_and_a_new_count_says_it(self):
         self.assertEqual(site_files.lines_to_say(self.OUTCOME, {"leftOff": 2}, mode="deploy", section=1), [])
@@ -663,7 +769,39 @@ class WhatIsSaid(unittest.TestCase):
         outcome = dict(self.OUTCOME, leftOff=1, leftOffBytes=500, putBack=1, putBackFiles=["Media/a.png"])
         lines = site_files.lines_to_say(outcome, {"leftOff": 3}, mode="deploy", section=1)
         self.assertEqual(lines[0], RULES["words"]["putBack"].replace("{file}", "Media/a.png"))
-        self.assertIn("1 file in this course (1 KB)", lines[1])
+        self.assertEqual(lines[1], RULES["words"]["changedOne"].replace("{size}", "1 KB").replace("{section}", "1"))
+
+    def test_every_counted_sentence_has_a_form_for_one_and_the_one_form_is_singular(self):
+        """'The 1 file ... were put back' (901a's Fable sweep): each counted
+        sentence has <key>One and <key>Several (words.counted), the One form
+        names no count placeholder and no plural verb, and lines_to_say picks
+        it for exactly one file, in every one of the four places."""
+        words = RULES["words"]
+        for key in ("firstTimeDeploy", "firstTimePreview", "changed", "sideFileMissingPutBack",
+                    "sideFileMissingPutBackPreview"):
+            with self.subTest(key=key):
+                self.assertNotIn(key, words, "the bare key is replaced by its two forms")
+                one, several = words[key + "One"], words[key + "Several"]
+                self.assertNotIn("{count}", one)
+                self.assertNotIn("{files}", one)
+                self.assertNotIn(" are ", one)
+                self.assertNotIn(" were ", one)
+                self.assertIn("{count} files", several)
+        self.assertEqual(site_files.counted_key("changed", 1), "changedOne")
+        self.assertEqual(site_files.counted_key("changed", 0), "changedSeveral")
+        self.assertEqual(site_files.counted_key("changed", 2), "changedSeveral")
+        one = dict(self.OUTCOME, leftOff=1, leftOffBytes=500)
+        self.assertEqual(site_files.lines_to_say(one, None, mode="deploy", section=3),
+                         [words["firstTimeDeployOne"].replace("{size}", "1 KB").replace("{section}", "3")])
+        self.assertEqual(site_files.lines_to_say(one, None, mode="preview", section=3),
+                         [words["firstTimePreviewOne"].replace("{size}", "1 KB").replace("{section}", "3")])
+        put_back = dict(self.OUTCOME, putBack=1, putBackFiles=["Media/a.png"])
+        self.assertEqual(site_files.lines_to_say(put_back, {"leftOff": 2}, mode="deploy", section=3,
+                                                 side_file_written=False),
+                         [words["sideFileMissingPutBackOne"].replace("{section}", "3")])
+        self.assertEqual(site_files.lines_to_say(put_back, {"leftOff": 2}, mode="preview", section=3,
+                                                 side_file_written=False),
+                         [words["sideFileMissingPutBackPreviewOne"]])
 
     def test_a_preview_says_a_put_back_in_its_own_words(self):
         """Nothing is on the website until a deploy (901a review)."""
@@ -701,11 +839,17 @@ class WhatIsSaid(unittest.TestCase):
         build must print exactly them."""
         cases = RULES["marker"]["trailCases"]
         self.assertGreaterEqual(len(cases), 9)
+        stopped = 0
         for case in cases:
             with self.subTest(case=case["name"]):
-                line = site_files.marker_line(case["outcome"], case["previous"], course="SCH3U", section=2,
-                                              mode=case["mode"], emitter=case["emitter"])
+                if case.get("stopped"):
+                    stopped += 1
+                    line = site_files.stopped_marker_line(course="SCH3U", section=2, mode=case["mode"])
+                else:
+                    line = site_files.marker_line(case["outcome"], case["previous"], course="SCH3U", section=2,
+                                                  mode=case["mode"], emitter=case["emitter"])
                 self.assertEqual(line, case["line"])
+        self.assertEqual(stopped, 1, "the build stopped at the follow limit has its case (marker.stoppedRule)")
 
     def test_the_record_keeps_every_key_the_format_names_and_nothing_else(self):
         folder = Path(tempfile.mkdtemp(prefix="plantoir-site-files-record-"))
@@ -731,7 +875,7 @@ class WhatIsSaid(unittest.TestCase):
                                        emitter="plantoir", build_id="b7", printer=said.append)
             self.assertTrue((public / "Media/a.png").is_file())
             self.assertEqual(said[0], RULES["words"]["putBack"].replace("{file}", "Media/a.png"))
-            self.assertTrue(said[1].startswith(RULES["words"]["firstTimeDeploy"][:40]))
+            self.assertTrue(said[1].startswith(RULES["words"]["firstTimeDeployOne"][:40]))
             self.assertTrue(said[-1].startswith(RULES["marker"]["prefix"]))
             self.assertEqual(site_files.read_record(host)["buildId"], "b7")
             said.clear()
@@ -749,11 +893,11 @@ class WhatIsSaid(unittest.TestCase):
         words = RULES["words"]
         outcome = dict(self.OUTCOME, putBack=3, putBackFiles=["Media/a.png", "Media/b.png", "Media/c.png"])
         lines = site_files.lines_to_say(outcome, {"leftOff": 2}, mode="deploy", section=4, side_file_written=False)
-        self.assertEqual(lines, [words["sideFileMissingPutBack"].replace("{count}", "3").replace("{files}", "files")
+        self.assertEqual(lines, [words["sideFileMissingPutBackSeveral"].replace("{count}", "3")
                                  .replace("{section}", "4")])
         one = dict(self.OUTCOME, putBack=1, putBackFiles=["Media/a.png"])
         lines = site_files.lines_to_say(one, {"leftOff": 2}, mode="preview", section=4, side_file_written=False)
-        self.assertEqual(lines, [words["sideFileMissingPutBackPreview"].replace("{count}", "1").replace("{files}", "file")])
+        self.assertEqual(lines, [words["sideFileMissingPutBackPreviewOne"]])
         # A file that could not be put back: the site is not complete, so it
         # is never called complete, and each file is said.
         failed = dict(outcome, putBackFailed=1, putBackFailedFiles=["Media/d.png"])
@@ -763,7 +907,8 @@ class WhatIsSaid(unittest.TestCase):
             self.assertNotIn("complete", line)
         # The side file written: a line per file, as before.
         self.assertEqual(len(site_files.lines_to_say(outcome, {"leftOff": 2}, mode="deploy", section=4)), 3)
-        for key in ("sideFileNotWritten", "sideFileMissingPutBack", "sideFileMissingPutBackPreview"):
+        for key in ("sideFileNotWritten", "sideFileMissingPutBackOne", "sideFileMissingPutBackSeveral",
+                    "sideFileMissingPutBackPreviewOne", "sideFileMissingPutBackPreviewSeveral"):
             self.assertNotIn("footer", words[key])
 
     def test_the_side_file_holds_the_footers_addresses(self):
@@ -775,6 +920,7 @@ class WhatIsSaid(unittest.TestCase):
     def test_the_constants_are_the_contracts(self):
         self.assertEqual(site_files.MARKER, RULES["marker"]["prefix"])
         self.assertEqual(site_files.DONE_MARKER, RULES["doneMarker"]["file"])
+        self.assertEqual(site_files.FOLLOW_LIMIT_FILE, RULES["followed"]["stopFile"])
         self.assertEqual(list(site_files.ALWAYS_CARRIED), RULES["alwaysCarried"])
         self.assertEqual("quartz/" + site_files.SIDE_FILE, RULES["sideFile"]["file"])
         self.assertEqual(site_files.RECORD_NAME,

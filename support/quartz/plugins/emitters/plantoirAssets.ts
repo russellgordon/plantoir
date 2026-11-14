@@ -28,9 +28,12 @@
 // A carried file is read from content/ only when it is of a followed kind,
 // parsed by Quartz's own HTML parser (hast-util-from-html, which
 // plantoirFigures.ts uses too) or read as CSS. When more carried files load
-// one another than followed.limits allows, this carries EVERY file, as
-// Quartz's own Assets did, and says so on a plantoir: error: line: a file
-// wrongly left out breaks a page silently, which is the worse direction.
+// one another than followed.limits allows, this STOPS the build: it writes
+// followed.stopFile beside public/ and throws, so Quartz exits non-zero and
+// build_site.py says why in a teacher's words, prints the marker and exits
+// non-zero (followed.limitsRule). It never carries every file: that would
+// publish every answer key in the course, quietly (901a's Fable sweep,
+// MUST 2), and a file left out would break a page.
 
 import { readFileSync } from "fs"
 import fs from "fs"
@@ -103,14 +106,26 @@ function carriedFiles(directory: string, offered: FilePath[]): CarriedFiles {
 }
 
 // Every address the published pages use, and the files those load. Past the
-// follow limit, every file (siteFiles.followed.limits), said loudly.
-function addressesUsed(content: Content, addresses: Set<string>, directory: string, offered: FilePath[]): Set<string> {
+// follow limit the build stops (siteFiles.followed.limitsRule): the stop
+// file is written beside public/, then the error goes on to Quartz.
+function addressesUsed(
+  content: Content,
+  addresses: Set<string>,
+  directory: string,
+  offered: FilePath[],
+  output: string,
+): Set<string> {
+  const side = sideFile()
   try {
-    return addressesThePagesUse(sitePages(content), addresses, sideFile(), slugOf, carriedFiles(directory, offered))
+    return addressesThePagesUse(sitePages(content), addresses, side, slugOf, carriedFiles(directory, offered))
   } catch (error) {
     if ((error as Error)?.name === "FollowLimitReached") {
-      console.error("plantoir: error: " + (error as Error).message)
-      return new Set<string>(addresses)
+      const stopFile = path.join(output, "..", side.followed?.stopFile ?? ".plantoir-follow-limit")
+      try {
+        fs.writeFileSync(stopFile, (error as Error).message)
+      } catch {
+        // The build still stops; build_site.py then cannot say why.
+      }
     }
     throw error
   }
@@ -146,7 +161,7 @@ export const PlantoirAssets: QuartzEmitterPlugin = () => {
       for (const fp of offered) {
         addresses.add(slugOf(fp))
       }
-      const used = addressesUsed(content as unknown as Content, addresses, argv.directory, offered)
+      const used = addressesUsed(content as unknown as Content, addresses, argv.directory, offered, argv.output)
       ;(globalThis as Record<string, unknown>)[LAST_USED] = used
       for (const fp of offered) {
         if (!used.has(slugOf(fp))) {
@@ -169,7 +184,7 @@ export const PlantoirAssets: QuartzEmitterPlugin = () => {
       for (const fp of offered) {
         addresses.add(slugOf(fp))
       }
-      const used = addressesUsed(content as unknown as Content, addresses, argv.directory, offered)
+      const used = addressesUsed(content as unknown as Content, addresses, argv.directory, offered, argv.output)
       const before = ((globalThis as Record<string, unknown>)[LAST_USED] as Set<string> | undefined) ?? new Set<string>()
       ;(globalThis as Record<string, unknown>)[LAST_USED] = used
       const changed = new Set<string>()

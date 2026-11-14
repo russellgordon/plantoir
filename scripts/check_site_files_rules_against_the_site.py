@@ -30,10 +30,16 @@ run through them in Node:
   (siteFiles.followed): exactly the fixture's `needed` (the Python test reads
   the same fixture twice more, by site_files and by a reader of its own, and
   pins `needed` to a list written there by hand);
-* the follow limits: a chain of stylesheets one deeper than
-  followed.limits.depth throws FollowLimitReached with followed.limitReached,
-  and the emitter, given a lower limit in its side file, carries EVERY file
-  and says plantoir: error: rather than leave one out;
+* no depth limit: a chain of 40 stylesheets is followed to its end; and the
+  count limit: the emitter, given a lower followed.limits.files in its side
+  file, writes followed.stopFile beside public/, throws FollowLimitReached
+  with followed.limitReached and carries NOTHING, so the build stops rather
+  than publish every file (901a's Fable sweep, MUST 2);
+* `disagreeingShapes`: every generated shape in every container through the
+  emitter's own rules and Quartz's own parser, then the check over what the
+  emitter carried: it must take out nothing, put back nothing and count
+  nothing unreferenced, so a shape the two readers read differently fails
+  here (901a's Fable sweep, MUST 1);
 * `cases`: each a small course written to content/, its pages built, and the
   emitter run over the PUBLISHED pages, as Quartz's first emit hands them,
   and again over every page, as a rebuild does: exactly the case's files
@@ -148,31 +154,19 @@ function carriedFrom(files, textOf) {
   const needed = [...fixture.needed].sort()
   if (!same(used, needed)) failures.push(`addressFixture: the emitter's reader needs ${JSON.stringify(used)}, the fixture ${JSON.stringify(needed)}`)
 }
-// The follow limits: one stylesheet deeper than followed.limits.depth throws,
-// with the contract's words; one fewer is followed to its end.
+// No depth limit (followed.limitsRule): a chain of 40 stylesheets is
+// followed to its end.
 {
   count += 1
-  const depth = rules.followed.limits.depth
   const files = []
   const text = {}
-  for (let number = 0; number <= depth + 1; number += 1) {
+  for (let number = 0; number <= 40; number += 1) {
     files.push(`Media/s${number}.css`)
-    text[`Media/s${number}.css`] = number <= depth ? `@import "s${number + 1}.css";` : "p { color: red }"
+    text[`Media/s${number}.css`] = number < 40 ? `@import "s${number + 1}.css";` : "p { color: red }"
   }
-  const fileAddresses = new Set(files)
   const side = { addresses: rules.addresses, followed: rules.followed }
-  const carried = carriedFrom(files, (fp) => text[fp])
-  let thrown = null
-  try {
-    followCarriedFiles(new Set(["Media/s0.css"]), fileAddresses, side, carried)
-  } catch (error) {
-    thrown = error
-  }
-  if (thrown === null || thrown.name !== "FollowLimitReached" || thrown.message !== rules.followed.limitReached) {
-    failures.push(`followed.limits.depth: a chain ${depth + 1} deep did not throw FollowLimitReached with limitReached (${thrown})`)
-  }
-  const shorter = followCarriedFiles(new Set(["Media/s2.css"]), fileAddresses, side, carried)
-  if (!shorter.has(`Media/s${depth + 1}.css`)) failures.push("followed.limits.depth: a chain within the limit was not followed to its end")
+  const followed = followCarriedFiles(new Set(["Media/s0.css"]), new Set(files), side, carriedFrom(files, (fp) => text[fp]))
+  if (!followed.has("Media/s40.css")) failures.push("followed: a chain of 40 stylesheets was not followed to its end")
 }
 for (const [page, address, resolved] of rules.resolveCases) {
   count += 1
@@ -293,9 +287,10 @@ for (const c of rules.cases) {
   }
 }
 
-// The emitter past the follow limit: given a side file whose depth is 1, a
-// page's stylesheet that imports another carries EVERY course file, as
-// Quartz's own Assets did, and says plantoir: error: with limitReached.
+// The emitter past the follow limit: given a side file whose count limit is
+// 1, a page's stylesheet that imports another stops the build: the stop file
+// is written beside public/, FollowLimitReached is thrown with limitReached,
+// and no course file is carried (followed.limitsRule).
 {
   count += 1
   const root = join(work, "follow-limit")
@@ -307,25 +302,60 @@ for (const c of rules.cases) {
     writeFileSync(join(content, name), text)
   }
   mkdirSync(join(root, "quartz"), { recursive: true })
-  const followed = { ...rules.followed, limits: { ...rules.followed.limits, depth: 1 } }
+  const followed = { ...rules.followed, limits: { ...rules.followed.limits, files: 1 } }
   writeFileSync(join(root, "quartz", "plantoir_site_files.json"), JSON.stringify({ ...sides[rules.cases[0].name], followed }))
   const tree = fromHtml('<link rel="stylesheet" href="Media/a.css">')
   const ctx = { argv: { directory: content, output: join(root, "public") }, cfg: { configuration: { ignorePatterns: IGNORE, locale: "en-US" } } }
-  const said = []
-  const error = console.error
-  console.error = (...parts) => said.push(parts.join(" "))
   const cwd = process.cwd()
   process.chdir(root)
+  let thrown = null
   try {
     await drain(PlantoirAssets().emit(ctx, [[tree, { data: { slug: "index", frontmatter: {} } }]], {}))
+  } catch (error) {
+    thrown = error
   } finally {
     process.chdir(cwd)
-    console.error = error
   }
   const got = filesUnder(join(root, "public"))
-  const every = Object.keys(files).sort()
-  if (!same(got, every)) failures.push(`the emitter past the follow limit carried ${JSON.stringify(got)}, not every file ${JSON.stringify(every)}`)
-  if (!said.includes("plantoir: error: " + rules.followed.limitReached)) failures.push(`the emitter past the follow limit said ${JSON.stringify(said)}`)
+  if (thrown === null || thrown.name !== "FollowLimitReached" || thrown.message !== rules.followed.limitReached) failures.push(`the emitter past the follow limit did not throw FollowLimitReached with limitReached (${thrown})`)
+  if (got.length !== 0) failures.push(`the emitter past the follow limit carried ${JSON.stringify(got)}, not nothing`)
+  let stopFile = null
+  try { stopFile = readFileSync(join(root, rules.followed.stopFile), "utf-8") } catch {}
+  if (stopFile === null) failures.push(`the emitter past the follow limit wrote no ${rules.followed.stopFile} beside public/`)
+}
+
+// Every generated shape in every container (disagreeingShapes): the
+// emitter's rules over the page and the carried container, and what it
+// carries written out for the check in Python.
+{
+  const shapes = rules.disagreeingShapes
+  let number = 0
+  for (const container of shapes.containers) {
+    for (const shape of shapes.shapes) {
+      number += 1
+      count += 1
+      const root = join(work, "shape" + number)
+      rmSync(root, { recursive: true, force: true })
+      const text = { [container.file]: container.text.split("{address}").join(shape), [shapes.picture]: "picture", [shapes.decoy]: "decoy" }
+      const files = Object.keys(text)
+      for (const name of files) {
+        mkdirSync(dirname(join(root, "content", name)), { recursive: true })
+        writeFileSync(join(root, "content", name), text[name])
+      }
+      const page = "<html><body>" + container.page + "</body></html>"
+      const fileAddresses = new Set(files.map((fp) => slugifyFilePath(fp)))
+      const side = { addresses: rules.addresses, followed: rules.followed }
+      const used = addressesThePagesUse([{ slug: "index", tree: fromHtml(page), frontmatter: {}, declared: [] }], fileAddresses, side, (fp) => slugifyFilePath(fp), carriedFrom(files, (fp) => text[fp]))
+      mkdirSync(join(root, "public"), { recursive: true })
+      writeFileSync(join(root, "public", "index.html"), page)
+      for (const fp of files) {
+        const address = slugifyFilePath(fp)
+        if (!used.has(address)) continue
+        mkdirSync(dirname(join(root, "public", address)), { recursive: true })
+        writeFileSync(join(root, "public", address), text[fp])
+      }
+    }
+  }
 }
 
 console.log(JSON.stringify({ count, failures, cases: rules.cases.length }))
@@ -381,10 +411,25 @@ def run_the_rules_in_node(folder: Path) -> list:
         if outcome["carried"] != len(case["carried"]) or outcome["leftOff"] != len(case["leftOff"]):
             failures.append(f"case {case['name']}: the check counts {outcome['carried']} carried and "
                             f"{outcome['leftOff']} left off")
+    # The check over what the emitter carried for every generated shape: it
+    # takes out nothing, puts back nothing and counts nothing unreferenced.
+    shapes = contracts.section("shared-rules", "siteFiles", "disagreeingShapes")
+    shape_runs = 0
+    number = 0
+    for container in shapes["containers"]:
+        for shape in shapes["shapes"]:
+            number += 1
+            root = work / f"shape{number}"
+            outcome = site_files.check(root / "public", root / "content", repair=True)
+            shape_runs += 1
+            for key in ("takenOut", "putBack", "putBackFailed", "unreferenced"):
+                if outcome[key]:
+                    failures.append(f"shape {shape!r} in {container['name']}: the check after the emitter counts "
+                                    f"{key} {outcome[key]}")
     print(f"siteFilesRules.ts and plantoirAssets.ts: {result['count']} contract cases and emitter runs in Node "
           f"over Quartz's own FrontMatter, ObsidianFlavoredMarkdown, GitHubFlavoredMarkdown and CrawlLinks, "
           f"{result['cases']} courses against Quartz's own Assets as well; scripts/site_files.py's check "
-          f"over the {checked} built courses")
+          f"over the {checked} built courses and the {shape_runs} generated shapes the emitter carried")
     return failures
 
 

@@ -7798,6 +7798,23 @@ def _forget_the_done_marker(output_dir: Path) -> None:
         pass
 
 
+def _stop_if_the_follow_limit_was_reached(output_dir: Path, course_code: str, section_number,
+                                          mode: str) -> None:
+    """After Quartz exited non-zero: when the site's emitter stopped it at the
+    follow limit (it writes site_files.FOLLOW_LIMIT_FILE first,
+    siteFiles.followed.limitsRule), say why in a teacher's words, print the
+    marker's stopped line (siteFiles.marker.stoppedRule) and exit 1, so
+    nothing is mirrored, marked or deployed. Otherwise return, and the
+    caller lets Quartz's own failure go on as before. The emitter used to
+    carry every course file here instead, which deployed every answer key
+    with exit 0 (901a's Fable sweep, MUST 2)."""
+    if not site_files.stopped_at_the_follow_limit(output_dir):
+        return
+    for line in site_files.stopped_lines(course=course_code, section=section_number, mode=mode):
+        _say_now(line)
+    sys.exit(1)
+
+
 def _check_the_site_files(output_dir: Path, host_output_dir: Path, course_code: str,
                           section_number, mode: str) -> bool:
     """The second reading of which course files the built site carries (#901,
@@ -11333,7 +11350,12 @@ def build_section_site(
         print("\n🏗️  Building static site with Quartz → public/")
         safe_clean_public_dir(output_dir / "public")
         _forget_the_done_marker(output_dir)
-        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
+        site_files.forget_the_follow_limit(output_dir)
+        try:
+            subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
+        except subprocess.CalledProcessError:
+            _stop_if_the_follow_limit_was_reached(output_dir, course_code, section_number, "deploy")
+            raise
 
         public_dir = output_dir / "public"
         if not public_dir.exists():
@@ -11400,6 +11422,7 @@ def build_section_site(
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
         _forget_the_done_marker(output_dir)
+        site_files.forget_the_follow_limit(output_dir)
         # #901: the check runs once the build says it has finished, on the
         # site the server serves, before the first mirror. A build.ts that
         # could not be given the done marker skips it (said once).
@@ -11411,7 +11434,11 @@ def build_section_site(
             print("plantoir: error: " + str(site_files.rules("words", "previewNotChecked", optional=True)
                                             or "this preview's files were not checked."))
             _start_public_sync_watcher(output_dir, host_output_dir)
-        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+        try:
+            subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+        except subprocess.CalledProcessError:
+            _stop_if_the_follow_limit_was_reached(output_dir, course_code, section_number, "preview")
+            raise
 
 # How many 10-apart blocks a preview's port is walked through before giving
 # up — the same forty the launchers walk (contracts/app-rules.json ->
