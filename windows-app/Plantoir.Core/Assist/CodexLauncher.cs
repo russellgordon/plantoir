@@ -84,13 +84,17 @@ public static class CodexLauncher
     /// <paramref name="unitPlans"/> (#790; <see cref="Prepare"/>).
     /// </summary>
     public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null,
-                            UnitPlans.Reading? unitPlans = null)
+                            UnitPlans.Reading? unitPlans = null, DateOnly? today = null)
     {
         string? codex = FindCodex();
         string? server = ClaudeCodeLauncher.FindServer();
         if (codex is null || server is null) return false;
 
-        var session = Prepare(server, workspacePath, courseCode, courseName, unitPlans, greeting, codex);
+        // Read at the click, as ClaudeCodeLauncher.Open does (#856).
+        var referenceCourses = greeting is null
+            ? ReferenceCoursesToMention.ReadFor(workspacePath, courseCode, today ?? DateOnly.FromDateTime(DateTime.Now))
+            : null;
+        var session = Prepare(server, workspacePath, courseCode, courseName, unitPlans, greeting, codex, referenceCourses);
         // Refuse rather than start into a command line cmd rejects as too long
         // and leaves at a silent prompt. No "assistant opened" line then.
         if (!OutsideDoor.WithinCommandLineLimit(codex, session.Arguments)) return false;
@@ -109,16 +113,17 @@ public static class CodexLauncher
     /// <paramref name="unitPlans"/> and the trail clause with it, or an
     /// opening message that replaces both.
     /// </summary>
-    /// <remarks><paramref name="program"/>: as <see cref="ClaudeCodeLauncher.Prepare"/>'s (790a review M2).</remarks>
+    /// <remarks><paramref name="program"/> and <paramref name="referenceCourses"/>: as <see cref="ClaudeCodeLauncher.Prepare"/>'s (790a review M2; #856).</remarks>
     public static OutsideDoor.Session Prepare(string server, string workspacePath, string courseCode, string courseName,
-                                              UnitPlans.Reading? unitPlans, string? openingMessage, string? program = null)
+                                              UnitPlans.Reading? unitPlans, string? openingMessage, string? program = null,
+                                              IReadOnlyList<string>? referenceCourses = null)
     {
         string trail = TrailLinePrefix + courseCode;
         if (openingMessage is not null)
             return new OutsideDoor.Session(Arguments(server, workspacePath, courseCode, openingMessage), trail);
         if (unitPlans is not null) trail += UnitPlans.TrailClause(unitPlans);
         var arguments = OutsideDoor.GreetingThatFits(program, unitPlans,
-            named => Arguments(server, workspacePath, courseCode, ClaudeCodeLauncher.Greeting(courseCode, courseName, unitPlans, named)));
+            named => Arguments(server, workspacePath, courseCode, ClaudeCodeLauncher.Greeting(courseCode, courseName, unitPlans, named, referenceCourses)));
         return new OutsideDoor.Session(arguments, trail);
     }
 

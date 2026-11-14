@@ -160,7 +160,7 @@ public static class ClaudeCodeLauncher
     /// "What the outside doors hand to Windows, and how").
     /// </remarks>
     public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null,
-                            Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null)
+                            Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null, DateOnly? today = null)
     {
         string? claude = FindClaude();
         string? server = FindServer();
@@ -170,7 +170,12 @@ public static class ClaudeCodeLauncher
         try { configPath = WriteConfig(workspacePath, courseCode, server); }
         catch { return false; }
 
-        var session = Prepare(configPath, courseCode, courseName, unitPlans, greeting, claude);
+        // The courses kept for reference, read from the folder at the click
+        // (greetingReferenceCourses, #856): only a Revise greeting names them.
+        var referenceCourses = greeting is null
+            ? ReferenceCoursesToMention.ReadFor(workspacePath, courseCode, today ?? DateOnly.FromDateTime(DateTime.Now))
+            : null;
+        var session = Prepare(configPath, courseCode, courseName, unitPlans, greeting, claude, referenceCourses);
         // Refuse rather than start into a command line cmd will reject as too
         // long and leave at a silent prompt — Revise With ▸'s plain greeting
         // puts no cap on the course's name. No "assistant opened" line then.
@@ -207,16 +212,22 @@ public static class ClaudeCodeLauncher
     /// given, the greeting names fewer plans when all six would push the
     /// command line past its limit (<see cref="OutsideDoor.GreetingThatFits"/>,
     /// 790a review M2). The trail clause still counts every plan.
+    /// <paramref name="referenceCourses"/> is the list
+    /// <see cref="ReferenceCoursesToMention"/> made (#856): the greeting names
+    /// them after the handouts sentence, in every candidate, never cut; null
+    /// or empty, no sentence, and the greeting is byte for byte the one
+    /// before #880. Neither the line nor the trail says anything about them
+    /// (the contract's "assistant opened" carries no such clause).
     /// </remarks>
     public static OutsideDoor.Session Prepare(string configPath, string courseCode, string courseName,
                                               Plantoir.Core.Models.UnitPlans.Reading? unitPlans, string? openingMessage,
-                                              string? program = null)
+                                              string? program = null, IReadOnlyList<string>? referenceCourses = null)
     {
         string trail = TrailLinePrefix + courseCode;
         if (openingMessage is not null) return new OutsideDoor.Session(Arguments(configPath, openingMessage), trail);
         if (unitPlans is not null) trail += Plantoir.Core.Models.UnitPlans.TrailClause(unitPlans);
         var arguments = OutsideDoor.GreetingThatFits(program, unitPlans,
-            named => Arguments(configPath, Greeting(courseCode, courseName, unitPlans, named)));
+            named => Arguments(configPath, Greeting(courseCode, courseName, unitPlans, named, referenceCourses)));
         return new OutsideDoor.Session(arguments, trail);
     }
 
@@ -279,9 +290,11 @@ public static class ClaudeCodeLauncher
     /// </remarks>
     internal static string Greeting(string courseCode, string courseName,
                                     Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null,
-                                    int mostNamed = Plantoir.Core.Models.UnitPlans.MostUnitsNamed)
+                                    int mostNamed = Plantoir.Core.Models.UnitPlans.MostUnitsNamed,
+                                    IReadOnlyList<string>? referenceCourses = null)
     {
         var sentences = new List<string> { PlainGreeting(courseCode, courseName), HandoutsSentence };
+        if (ReferenceCoursesToMention.Sentence(courseCode, referenceCourses) is { } kept) sentences.Add(kept);
         if (unitPlans is not null) sentences.Add(Plantoir.Core.Models.UnitPlans.GreetingSentence(unitPlans.Plans, mostNamed));
         return string.Join(" ", sentences).Replace("\"", "'");
     }
