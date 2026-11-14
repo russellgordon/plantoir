@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The headless harness for the Planning tab's guarded web view (790 plan
+    review M1): the SAME GuardedSite.cs the app compiles, driven against the
+    REAL WebView2 runtime on a WinForms Form that is never shown, so it takes
+    no focus and needs no desktop. GuardedSiteTests (Plantoir.Tests) runs it
+    and reads what it prints. Never shipped: Plantoir.csproj does not
+    reference it, and publish.ps1 does not build it.
+
+    Microsoft.Web.WebView2 is pinned to the version the app's Windows App SDK
+    resolves (obj/project.assets.json: 1.0.3179.45), so the two flavours of
+    Microsoft.Web.WebView2.Core are the same SDK.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);PLANTOIR_GUARD_PROBE</DefineConstants>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Plantoir.Core\Plantoir.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Plantoir\Views\GuardedSite.cs" Link="GuardedSite.cs" />
+    <Compile Include="..\Plantoir\Views\LocalPagesEnvironment.Arguments.cs" Link="LocalPagesEnvironment.Arguments.cs" />
+  </ItemGroup>
+
+</Project>

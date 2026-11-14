@@ -21,6 +21,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Plantoir.Core\Plantoir.Core.csproj" />
     <ProjectReference Include="..\Plantoir.Mcp\Plantoir.Mcp.csproj" />
+    <!-- Built, not referenced: GuardedSiteTests runs it (790 plan review M1),
+         so the gate measures the app's GuardedSite.cs on the real WebView2. -->
+    <ProjectReference Include="..\Plantoir.GuardProbe\Plantoir.GuardProbe.csproj"
+                      ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
   <ItemGroup>
