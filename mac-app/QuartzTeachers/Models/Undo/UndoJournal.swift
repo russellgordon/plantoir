@@ -20,8 +20,10 @@ import Foundation
 ///   journal fresh inside it, and holds it only for journal events (and, the
 ///   one exception, recovery's own repair of a dead process's step).
 /// - A line this version cannot read is kept, its number is never reused,
-///   nothing it might name is deleted, and Undo and Redo are not available
-///   while it stands at or above the head (`UndoFold.offer`).
+///   every blob it names is kept with its segment until that segment is past
+///   the limits on the disk (`UndoPruning`), and Undo and Redo are not
+///   available while it stands at or above the head (`UndoFold.offer`). A
+///   `note` line is the one kind every reader passes over.
 ///
 /// Rejected, with the reasons in `documentation/09-mac-app.md` → "Undo and
 /// Redo: one list for the app": a `head.json`, one file per step plus a head

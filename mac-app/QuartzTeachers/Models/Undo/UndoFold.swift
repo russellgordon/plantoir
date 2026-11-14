@@ -271,19 +271,6 @@ nonisolated struct UndoFold: Equatable, Sendable {
         return result
     }
 
-    /// Whether any line or step on the disk is one this version cannot read.
-    var holdsAnythingUnreadable: Bool {
-        if !barriers.isEmpty {
-            return true
-        }
-        for seq in orderedSeqs {
-            if let record = records[seq], !record.isReadable, record.phase.isOnTheList {
-                return true
-            }
-        }
-        return false
-    }
-
     // MARK: - Functions
 
     /// Takes one line into the fold.

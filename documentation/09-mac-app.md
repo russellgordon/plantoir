@@ -17045,11 +17045,12 @@ after the app updates itself. So now:
   `at` written in that segment is more than 60 days old; then the segment
   goes like any other (`undoJournal.unknown.deleting`). The first fix kept
   EVERYTHING while any unreadable line existed, and the second reviews
-  measured what that costs: the line is never rewritten, so its segment is
-  never deleted, so deletion stopped for the life of the list (about 30 MB
-  a school year at five 233-page publishes a day, and 1.2 s at each
-  process's first action). The measurement after the change is under "The
-  U1 harness".
+  found what that costs: the line is never rewritten, so its segment is
+  never deleted, so deletion stopped for the life of the list. The
+  measurement before and after the change is under "The U1 harness".
+  **Rejected:** retiring the barrier for deletion at the next `cleared` line
+  (the contract review's suggestion): with deploys no longer clearing,
+  clearings are rare, and a list that is never refused would keep growing.
 - **One neutral kind, `note`**, which every reader passes over whatever else
   it carries: no move, no barrier, nothing kept for it. The contract
   review's probe showed why it has to exist from the first version: any
@@ -17428,8 +17429,8 @@ Every core file in `Models/Undo/` except `UndoAppSeams.swift` and
 `CalendarDay` and `AssistPageVisibility`, and
 `Tests/QuartzTeachersTests/UndoContractReplay.swift` and `UndoCoreChecks.swift`
 hold every replay and check without XCTest. The harness runs them for real
-(the latest copy is in the director's scratchpad for the U1 fixes, under
-`u1/harness/`). After the fixes, on an M4 Pro: the 20 traces (641 calls),
+(the first fixes' copy is in the director's scratchpad for the U1 fixes,
+under `u1/harness/`). After the first fixes, on an M4 Pro: the 20 traces (641 calls),
 27 check, 30 stack, 3 step and 15 recovery cases, a torn last line, an
 unwritable list, the three core checks, two writers in one process, two
 PROCESSES appending 200 steps each to one list (interleaved, 400 distinct
@@ -17459,6 +17460,38 @@ guard that deletes nothing while anything is unreadable removed (the
 checks across two cases), and a damaged identifier file not set aside (the
 core check throws). The two-process test in the app (`Plantoir --mcp-stdio`
 beside the window's runner) is U7's.
+
+**After the second round of fixes** (rulings 17 to 20 and the director's
+rulings on the two fix reviews; the harness is under `u1/r2/` in the
+director's scratchpad for that round, built with `-swift-version 6` from
+copies of the core): the 20 regenerated traces (612 calls, with 26 notes
+and 4 refused redos), 27 check, 35 stack, 19 recovery, 13 deployed and 3
+step cases, the torn line, the unwritable list, the three core checks, two
+writers in one process, two PROCESSES and ten real `SIGKILL`s: 0 failures.
+A simulated school year (five publishes of 233 pages and one whole-file
+edit a day for 365 days, 2,190 steps, with one unreadable line and a newer
+version's line naming a blob on day 2), on an M4 Pro with other work
+running:
+
+| | journal at the year's end | blobs | a process's first read | its first publish |
+|---|---|---|---|---|
+| before (the first fix's "keep everything") | 59.8 MB, 15 segments | 367 | 2.9 s | 3.3 s |
+| after (ruling 5) | 4.8 MB, 2 segments | 10 | 187 ms | 335 ms |
+
+The barriers and the newer version's blob were gone by day 90 (the
+segment's own newest time past 60 days). A journal on an exFAT disk image
+recorded a whole-file step and undid it (before: `couldNotRecordTheStep`,
+because `renamex_np` with `RENAME_EXCL` is refused there). The core
+review's two reproductions of a stuck step: 121 on the list and none
+pruned before, 50 on the list after (70 and 20 pruned, the step
+`interrupted`).
+
+Must-fail proofs for this round, each the new code with one fix taken out:
+a refused Redo dropping nothing (4 traces and 6 stack checks red), recovery
+leaving an unplannable step in flight (6 recovery checks red), a `note`
+read as a barrier (333 trace checks red), pruning stopping at a dead
+process's step (2 stack checks red); and the old code (56b2b23a9) on the
+stuck-step reproductions and the year above.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
