@@ -7719,12 +7719,21 @@ course's word and scheme), then one group for the classes outside any unit
 by an unfinished rename to Module), or for a numbered course one group for
 every class (`menuPageGroupAllClasses`; a club's twins say meetings), then
 the other pages under their Folder column's path split on "/", nested,
-subfolders before pages. The rule and fourteen cases are
+subfolders before pages. The rule and fifteen cases are
 `contracts/class-planning.json` → `pagesToTick`, run by
 `PageTickTreeTests.testEveryCaseIsTheContracts`. A group's box is read over
-the SHOWN pages under it (on, off, mixed); a click on an off or mixed box
-ticks every shown page under it, a click on an on box clears them, and a
-page the search hides is never changed by a group's box. A unit's box covers
+EVERY page under it, shown or hidden by the search: on only when every one
+is ticked, mixed when some are, off when none, so a box is never drawn
+ticked while a page under it is not. The row's Date cell shows the same
+count, `menuPageGroupTickedCount` ("2 of 3 ticked"), that VoiceOver hears. A
+click changes the SHOWN pages under it only: it ticks every one unless every
+one is already ticked, and then it unticks every one. With nothing hidden
+that is a Mac's own off or mixed to on, on to off; while the search hides an
+unticked page the box reads mixed before and after the click, and the count
+says why. A page the search hides is never changed by a group's box. A click
+names a group by its key ("unit 4", "folder Concepts/Loops"), never by the
+name shown, since a folder called "Unit 1" shares its name with the unit
+(the contract's fifteenth case). A unit's box covers
 its class pages only (Russell's ruling on #900): the pages its classes link
 to are the plan's and the links checklist's, as before. A ticked page the
 search hides stays ticked and is sent, and `menuTickedButNotShown` says how
@@ -7748,21 +7757,23 @@ under `@TableRowBuilder` (the plan review's amendment 23: the
 `Table(_:children:)` form has no expansion binding, so the search could not
 open the groups it shows). A group's box is `GroupTickBox`, an AppKit
 checkbox with `allowsMixedState` whose state the model SETS on every update
-and whose action calls `SectionVerbSheetModel.click(group:)`, then draws the
-model's answer over AppKit's own off, on, mixed cycle, so the framework never
+and whose action calls `SectionVerbSheetModel.flip(_:)` with the group's
+id, the same fresh lookup Space makes, then draws the model's answer over AppKit's own off, on, mixed cycle, so the framework never
 decides what is ticked (amendment 24). Row ids are an enum
 (`PageTickTree.RowID.group` / `.page`), so a folder group "section1/Notes"
 and a page "section1/Notes" cannot collide (amendment 25). Space on a
 selected group does what its box does; Right and Left open and close a group
 (the outline view's own keys). VoiceOver hears the group's name and the
 checkbox's state from AppKit, and `menuPageGroupTickedCount` ("5 of 12
-ticked") as the value's description. The table's height counts every page
+ticked") as the value's description; a sighted teacher reads the same
+count in the group's row, so a folded group says what its box covers. The table's height counts every page
 AND every group, up to twelve rows (amendment 26), so opening a group or
 typing never moves the sheet. Groups start folded
 (`PageTickTree.groupsStartFolded`, a question for Russell); while the search
 has text every group it shows is open, and clearing it puts back the groups
 that were open before. The trail line's counts gain ", N by a group's box"
-when a group's box ticked N of the ticked pages (`activityTrail.mustRecord` →
+when a group's box itself ticked N of the ticked pages (a page already ticked
+by hand when a box then covered it is not counted) (`activityTrail.mustRecord` →
 `ran from a menu`), so a report of pages published unmeant can be read.
 
 **Measured, 300 and 3,000 generated pages, standalone, `-O`, one core,
@@ -7775,11 +7786,26 @@ sheet is about 320 pages, SPH3U). Sabotage of the copied tree against the
 cases: a click that never clears fails 12 checks, units left unsorted 1, a
 unit read with the word "Unit" in a Module course 1.
 
+**The second round, after the implementation review (2026-11-14).** The
+review measured its own generator and oracle (1,174,496 sequences to depth
+4, 0 failures) and found the box read over the shown pages could read "on"
+during a search while unticked pages of the unit were out of view. The
+director ruled the box is read over every page; the generator, its oracle
+changed to that rule (never on while any page under it is unticked; a click
+changes the shown pages only and never changes nothing), ran 1,174,496
+sequences on the four small courses to depth 4 plus 10,000 random walks on
+300 pages, 85,837,248 checks, 0 failures; the same oracle against a copy
+whose box still reads the shown pages gave 141 failures at depth 2. The
+byte comparison was rerun on the new tree: 888 calls, 0 differ.
+
 **Not measured tonight** (no app run, no test host): that the mixed dash is
 drawn and that the outline's own keys reach the rows in the real sheet, and
-what VoiceOver says. `PageTickTreeTests.testTheDrawnBoxIsMixedAndAClickTicksEveryPage`
-and the updated `PageTablesSheetTests` assert the first two off screen; the
-third is a listen by hand.
+what VoiceOver says. `PageTickTreeTests.testTheDrawnBoxIsMixedAndAClickTicksEveryPage`,
+`testTheDrawnBoxFollowsAPagesTickAndTheSearch` (the box redrawn after a tick
+made in the model, a page's own checkbox and a change of search) and the
+updated `PageTablesSheetTests` assert the first two off screen; the third is
+a listen by hand, and that the count is drawn in the real window is a UI
+test owed.
 
 **REJECTED.** `Toggle(sources:isOn:)`, the plan's control: it typechecks in
 a hierarchical table cell, but which way a click on a mixed box goes is the
@@ -7787,9 +7813,13 @@ framework's, and a wrong guess publishes some pages while the box says all.
 `List` with `DisclosureGroup` (loses the Folder and Date columns #608 chose).
 A full `NSOutlineView` bridge (more code for what `Table` does, kept as the
 fallback if the drawn table fails on the bench). A unit's box that also ticks
-the pages its classes link to (Russell). A box read over hidden pages too (it
-would read mixed with every visible page ticked, and a click would change
-pages out of view). A unit read from the shown title (a frontmatter title
+the pages its classes link to (Russell). A box read over the shown pages only
+(the first build: during a search it read on while hidden pages of the unit
+were unticked). A click that also changes hidden pages so a mixed box can
+always reach on (it would publish or hide pages nobody saw). A click on a
+mixed box that always ticks (with every shown page ticked it would change
+nothing). A group named in the contract by a path of shown names (a folder
+called "Unit 1" is ambiguous). A unit read from the shown title (a frontmatter title
 can say anything; the planners read the file name). "group:"-prefixed string
 ids (a collision made unlikely rather than impossible). Moving the section
 graph read off the main actor in this piece (it changes when the sheet can

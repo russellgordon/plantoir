@@ -9,123 +9,18 @@ import Foundation
 /// both apps run the same cases: `contracts/class-planning.json` →
 /// `pagesToTick`. The drawing is `SectionVerbSheet.pickerTable`.
 ///
-/// What a group's box changes is decided HERE and nowhere else (the plan
-/// review's amendment 24): a box that is off or mixed ticks every shown page
-/// under it, one that is on unticks them, and a page the search hides is
-/// never changed by a group's box. A unit's box covers its CLASS pages only
+/// What a group's box shows and changes is decided HERE and nowhere else
+/// (the plan review's amendment 24). A box is read over EVERY page under it,
+/// shown or hidden by the search, so it is never drawn ticked while a page
+/// under it is not (the director's ruling after the implementation review).
+/// A click changes only the SHOWN pages under it: it ticks them unless every
+/// one is already ticked, in which case it unticks them; a page the search
+/// hides is never changed by a group's box. A unit's box covers its CLASS pages only
 /// (Russell's ruling on #900): the pages those classes link to are handled
 /// by the plan and the links checklist, as they are today.
 ///
 /// `nonisolated`: no state, no files, no main actor.
 nonisolated enum PageTickTree {
-
-    // MARK: - Types
-
-    /// One page a sheet offers, as the tree needs it.
-    struct Page: Equatable, Hashable {
-
-        // MARK: - Stored properties
-
-        /// The name the call carries: folder, then file name
-        /// (`SectionVerbs.name(ofPageAt:in:)`). Also the page's id.
-        let name: String
-
-        /// What the teacher sees the page called (the search reads it).
-        let title: String
-
-        /// Where it is, as the Folder column writes it.
-        let folder: String
-
-        let isClass: Bool
-        let date: CalendarDay?
-
-        // MARK: - Computed properties
-
-        /// The file name without `.md`: what a class page's unit and day are
-        /// read from (`UnitDay`), never the title shown, which a page's
-        /// frontmatter can change.
-        var fileTitle: String {
-            guard let slash = name.range(of: "/", options: .backwards) else {
-                return name
-            }
-            return String(name[slash.upperBound...])
-        }
-    }
-
-    /// A row's id in the table. An enum rather than a prefixed string, so a
-    /// folder group "section1/Notes" and a page named "section1/Notes" can
-    /// never be the same row (the plan review's amendment 25).
-    enum RowID: Hashable {
-        case group(String)
-        case page(String)
-    }
-
-    /// A group's box.
-    enum State: String, Equatable {
-        case on
-        case off
-        case mixed
-    }
-
-    /// The sentences the two class groups are named with: the caller's
-    /// wording (`AssistWording.menuPageGroupOtherClasses` and
-    /// `menuPageGroupAllClasses`), so the tree itself holds no words.
-    struct GroupNames: Equatable {
-
-        // MARK: - Stored properties
-
-        let otherClasses: String
-        let allClasses: String
-    }
-
-    /// A group: a unit, the classes outside any unit, every class of a
-    /// numbered course, or a folder. Built once per sheet (`groups(of:…)`).
-    struct Group: Equatable {
-
-        // MARK: - Stored properties
-
-        /// Stable for the sheet's life: "unit 4", "other classes",
-        /// "all classes" or "folder Concepts/Loops".
-        let key: String
-
-        /// What the teacher sees the group called.
-        let name: String
-
-        /// Folder groups inside this one, before its pages.
-        let groups: [Group]
-
-        /// The pages directly in this group, in the tree's order.
-        let pages: [Page]
-    }
-
-    /// A row as the table draws it, for the search as it stands: a group
-    /// with the rows under it, or a page.
-    struct Row: Identifiable, Equatable {
-
-        // MARK: - Stored properties
-
-        let id: RowID
-
-        /// The group's name, or the page's title.
-        let title: String
-
-        /// The page, for a page row; nil for a group.
-        let page: Page?
-
-        /// The rows under a group, groups first; nil for a page.
-        let children: [Row]?
-
-        /// Every SHOWN page under a group, at every depth, in the tree's
-        /// order: what its box reads and what a click on it changes. Empty
-        /// for a page.
-        let shownPageNames: [String]
-
-        // MARK: - Computed properties
-
-        var isGroup: Bool {
-            return children != nil
-        }
-    }
 
     // MARK: - Stored properties
 
@@ -213,23 +108,41 @@ nonisolated enum PageTickTree {
         return isShown(page, wanted: wanted)
     }
 
-    /// A group's box, over the shown pages under it.
-    static func state(of shownPageNames: [String], ticked: Set<String>) -> State {
-        var tickedCount: Int = 0
-        for name in shownPageNames where ticked.contains(name) {
-            tickedCount += 1
-        }
+    /// Whether `pageNames` are all ticked ("on"), none ("off"), or some
+    /// ("mixed").
+    static func state(of pageNames: [String], ticked: Set<String>) -> State {
+        let tickedCount: Int = count(of: pageNames, in: ticked)
         if tickedCount == 0 {
             return .off
         }
-        if tickedCount == shownPageNames.count {
+        if tickedCount == pageNames.count {
             return .on
         }
         return .mixed
     }
 
-    /// The ticks after a click on a group's box: off or mixed ticks every
-    /// shown page under it, on unticks every one. Nothing else changes.
+    /// A group's box as it is drawn: over EVERY page under it, shown or
+    /// hidden, so it reads "on" only when every one is ticked.
+    static func boxState(of row: Row, ticked: Set<String>) -> State {
+        return state(of: row.everyPageName, ticked: ticked)
+    }
+
+    /// How many of `pageNames` are ticked: the "n" of a group's
+    /// "n of m ticked" (`menuPageGroupTickedCount`).
+    static func count(of pageNames: [String], in ticked: Set<String>) -> Int {
+        var tickedCount: Int = 0
+        for name in pageNames where ticked.contains(name) {
+            tickedCount += 1
+        }
+        return tickedCount
+    }
+
+    /// The ticks after a click on a group's box, which changes the SHOWN
+    /// pages under it only: it ticks every one unless every one is already
+    /// ticked, and then it unticks every one. With nothing hidden this is a
+    /// Mac's own rule (off or mixed goes to on, on goes to off); while the
+    /// search hides an unticked page the box reads mixed, and a click still
+    /// changes something rather than nothing. Nothing else changes.
     static func clicking(_ shownPageNames: [String], ticked: Set<String>) -> Set<String> {
         var after: Set<String> = ticked
         if state(of: shownPageNames, ticked: ticked) == .on {
@@ -267,24 +180,34 @@ nonisolated enum PageTickTree {
         return names
     }
 
-    /// The group whose path of names is `path` ("Concepts", "Loops"), or nil.
-    static func group(at path: [String], in groups: [Group]) -> Group? {
-        guard let first = path.first else {
-            return nil
-        }
-        for group in groups where group.name == first {
-            if path.count == 1 {
+    /// The group whose key is `key` ("unit 4", "folder Concepts/Loops"), at
+    /// any depth, or nil. By key, never by the name shown: a folder called
+    /// "Unit 1" and the unit "Unit 1" share a name and never a key.
+    static func group(withKey key: String, in groups: [Group]) -> Group? {
+        for group in groups {
+            if group.key == key {
                 return group
             }
-            var rest: [String] = []
-            var index: Int = 1
-            while index < path.count {
-                rest.append(path[index])
-                index += 1
+            if let found = self.group(withKey: key, in: group.groups) {
+                return found
             }
-            return self.group(at: rest, in: group.groups)
         }
         return nil
+    }
+
+    /// Every page under `group`, at every depth, shown or not, in the tree's
+    /// order: what its box is read over.
+    static func everyPageName(in group: Group) -> [String] {
+        var names: [String] = []
+        for inner in group.groups {
+            for name in everyPageName(in: inner) {
+                names.append(name)
+            }
+        }
+        for page in group.pages {
+            names.append(page.name)
+        }
+        return names
     }
 
     /// Every group's row id, at every depth: what the search opens.
@@ -327,8 +250,6 @@ nonisolated enum PageTickTree {
         }
         return count
     }
-
-    // MARK: - Building
 
     /// Classes by date, undated last, then title, ignoring case (the order
     /// the sheet listed classes in before the tree).
@@ -428,8 +349,6 @@ nonisolated enum PageTickTree {
         return parts
     }
 
-    // MARK: - Drawing
-
     static func isShown(_ page: Page, wanted: String) -> Bool {
         if wanted.isEmpty {
             return true
@@ -440,21 +359,154 @@ nonisolated enum PageTickTree {
     static func row(of group: Group, wanted: String) -> Row? {
         var children: [Row] = []
         var shownNames: [String] = []
+        var everyName: [String] = []
         for inner in group.groups {
             if let innerRow = row(of: inner, wanted: wanted) {
                 children.append(innerRow)
                 for name in innerRow.shownPageNames {
                     shownNames.append(name)
                 }
+                for name in innerRow.everyPageName {
+                    everyName.append(name)
+                }
+            } else {
+                for name in everyPageName(in: inner) {
+                    everyName.append(name)
+                }
             }
         }
-        for page in group.pages where isShown(page, wanted: wanted) {
-            children.append(Row(id: .page(page.name), title: page.title, page: page, children: nil, shownPageNames: []))
-            shownNames.append(page.name)
+        for page in group.pages {
+            everyName.append(page.name)
+            if isShown(page, wanted: wanted) {
+                children.append(Row(
+                    id: .page(page.name), title: page.title, page: page, children: nil,
+                    shownPageNames: [], everyPageName: []
+                ))
+                shownNames.append(page.name)
+            }
         }
         if shownNames.isEmpty {
             return nil
         }
-        return Row(id: .group(group.key), title: group.name, page: nil, children: children, shownPageNames: shownNames)
+        return Row(
+            id: .group(group.key), title: group.name, page: nil, children: children,
+            shownPageNames: shownNames, everyPageName: everyName
+        )
+    }
+}
+
+/// The tree's types: a page, a row's id, a box's state, the class groups'
+/// names, a group and a drawn row.
+nonisolated extension PageTickTree {
+
+    /// One page a sheet offers, as the tree needs it.
+    struct Page: Equatable, Hashable {
+
+        // MARK: - Stored properties
+
+        /// The name the call carries: folder, then file name
+        /// (`SectionVerbs.name(ofPageAt:in:)`). Also the page's id.
+        let name: String
+
+        /// What the teacher sees the page called (the search reads it).
+        let title: String
+
+        /// Where it is, as the Folder column writes it.
+        let folder: String
+
+        let isClass: Bool
+        let date: CalendarDay?
+
+        // MARK: - Computed properties
+
+        /// The file name without `.md`: what a class page's unit and day are
+        /// read from (`UnitDay`), never the title shown, which a page's
+        /// frontmatter can change.
+        var fileTitle: String {
+            guard let slash = name.range(of: "/", options: .backwards) else {
+                return name
+            }
+            return String(name[slash.upperBound...])
+        }
+    }
+
+    /// A row's id in the table. An enum rather than a prefixed string, so a
+    /// folder group "section1/Notes" and a page named "section1/Notes" can
+    /// never be the same row (the plan review's amendment 25).
+    enum RowID: Hashable {
+        case group(String)
+        case page(String)
+    }
+
+    /// A group's box.
+    enum State: String, Equatable {
+        case on
+        case off
+        case mixed
+    }
+
+    /// The sentences the two class groups are named with: the caller's
+    /// wording (`AssistWording.menuPageGroupOtherClasses` and
+    /// `menuPageGroupAllClasses`), so the tree itself holds no words.
+    struct GroupNames: Equatable {
+
+        // MARK: - Stored properties
+
+        let otherClasses: String
+        let allClasses: String
+    }
+
+    /// A group: a unit, the classes outside any unit, every class of a
+    /// numbered course, or a folder. Built once per sheet (`groups(of:…)`).
+    struct Group: Equatable {
+
+        // MARK: - Stored properties
+
+        /// Stable for the sheet's life, and the id the contract's clicks name
+        /// a group by: "unit 4", "other classes", "all classes" or
+        /// "folder Concepts/Loops". Never shown.
+        let key: String
+
+        /// What the teacher sees the group called.
+        let name: String
+
+        /// Folder groups inside this one, before its pages.
+        let groups: [Group]
+
+        /// The pages directly in this group, in the tree's order.
+        let pages: [Page]
+    }
+
+    /// A row as the table draws it, for the search as it stands: a group
+    /// with the rows under it, or a page.
+    struct Row: Identifiable, Equatable {
+
+        // MARK: - Stored properties
+
+        let id: RowID
+
+        /// The group's name, or the page's title.
+        let title: String
+
+        /// The page, for a page row; nil for a group.
+        let page: Page?
+
+        /// The rows under a group, groups first; nil for a page.
+        let children: [Row]?
+
+        /// Every SHOWN page under a group, at every depth, in the tree's
+        /// order: what a click on its box changes. Empty for a page.
+        let shownPageNames: [String]
+
+        /// Every page under a group, at every depth, shown or hidden by the
+        /// search: what its box and its "n of m ticked" are read over.
+        /// Empty for a page.
+        let everyPageName: [String]
+
+        // MARK: - Computed properties
+
+        var isGroup: Bool {
+            return children != nil
+        }
     }
 }

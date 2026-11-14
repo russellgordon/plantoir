@@ -2419,7 +2419,10 @@ nonisolated enum AssistWording {
         }
     }
 
-    /// What VoiceOver hears as a group's box's value (#900): "5 of 12 ticked".
+    /// A group's count in the tree of checkboxes (#900), shown in the
+    /// group's row and heard by VoiceOver as its box's value: "5 of 12
+    /// ticked", over every page under the group, shown or hidden by the
+    /// search.
     static func menuPageGroupTickedCount(ticked: Int, of total: Int) -> String {
         return "\(ticked) of \(total) ticked"
     }

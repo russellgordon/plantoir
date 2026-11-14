@@ -6184,7 +6184,7 @@
     ]
   },
   "pagesToTick": {
-    "note": "GitHub #900 (#897 piece D; Russell, 2026-11-13 evening: 'Use a hierarchical series of checkboxes, allowing an entire unit of pages to be turned on or off at once'). Section > Publish Pages... and Hide Pages... show the pages they offer as a tree: each unit, the classes outside any unit, and each folder is a group with a box that ticks or clears every SHOWN page under it, drawn mixed when only some are ticked. The mac's reference is PageTickTree (mac-app/QuartzTeachers/Models/PageTickTree.swift), run over these cases by PageTickTreeTests.testEveryCaseIsTheContracts. The look (folded or open, the control) is each platform's; the grouping, the states, what a click changes and what the call carries are these cases.",
+    "note": "GitHub #900 (#897 piece D; Russell, 2026-11-13 evening: 'Use a hierarchical series of checkboxes, allowing an entire unit of pages to be turned on or off at once'). Section > Publish Pages... and Hide Pages... show the pages they offer as a tree: each unit, the classes outside any unit, and each folder is a group with a box that ticks or clears every SHOWN page under it, drawn on only when every page under it is ticked, shown or hidden, and mixed when only some are. The mac's reference is PageTickTree (mac-app/QuartzTeachers/Models/PageTickTree.swift), run over these cases by PageTickTreeTests.testEveryCaseIsTheContracts. The look (folded or open, the control) is each platform's; the grouping, the states, what a click changes and what the call carries are these cases.",
     "rule": [
       "Built from the pages the sheet OFFERS, never from every page of the course, so no group is drawn for a page the sheet would not publish or hide.",
       "Units (the unit_day scheme): a class page whose FILE name parses under the course's naming (word and scheme, class-planning.json -> pageNaming) goes in the group the naming names for its unit ('Unit 4', 'Module 4'). Units by number.",
@@ -6193,17 +6193,21 @@
       "Every other page goes under its folder as the sheet's Folder column writes it, split on '/' into nested groups; a page with no folder under the course code. Folder groups come after the class groups, by name ignoring case; inside a group, its subfolders first, then its pages.",
       "Inside a group, class pages by date, undated last, then title; other pages by title; ignoring case.",
       "The search is the sheet's own (title or folder contains it, ignoring case). A group is shown when at least one page under it is shown; a group's name never matches by itself.",
-      "A group's state is over the SHOWN pages under it, at every depth: all ticked 'on', none 'off', otherwise 'mixed'.",
-      "A click on a group that is 'off' or 'mixed' ticks every shown page under it; on 'on' it unticks every shown page under it. A page the search hides is never changed by a group's box.",
+      "A group's id is 'unit N' for a unit (N its number, whatever the course's word), 'other classes', 'all classes', or 'folder ' followed by its folder path joined with '/' ('folder Concepts/Loops'). Ids are never shown; a click names a group by its id, because two groups can share a name (a folder called 'Unit 1' beside the unit).",
+      "A group's state is over EVERY page under it, at every depth, shown or hidden by the search: all ticked 'on', none 'off', otherwise 'mixed'. A box is never drawn ticked while a page under it is not (the director's ruling after the implementation review). 'expectCounts' maps a group's id to [ticked, total] over the same pages: the row's 'n of m ticked' (wording.menuPageGroupTickedCount), shown beside the box and heard by VoiceOver.",
+      "A click on a group changes only the SHOWN pages under it: it ticks every one of them unless every one is already ticked, and then it unticks every one. With nothing hidden that is 'off' or 'mixed' to 'on', and 'on' to 'off'. While the search hides an unticked page the box reads 'mixed' before and after, and the click still changes what is in view. A page the search hides is never changed by a group's box.",
       "A unit's box covers its class pages only (Russell's ruling on #900). The pages those classes link to are not in the unit; the plan and the links checklist handle them as before.",
       "The call carries every ticked page, shown or not, in the order the sheet offers them ('expectSent'): exactly what ticking the same pages one by one carried before the tree.",
       "'expectNotShownTicked' is how many ticked pages the search hides; the sheet says so under the table (wording.menuTickedButNotShown)."
     ],
-    "caseFields": "Each case: term, scheme, noun and course name the course; pages are what the sheet offers, in its order (name is what the call carries, folder/file; title is what the search reads; date YYYY-MM-DD or absent); 'generate' adds pages {folder}/Unit {unit}, Day 1..{days}, undated, before 'pages'. 'expectTree' is the tree for 'search' and 'ticked' before any click: each node is a group's name, its state, its pages (names, in the tree's order) and its groups. 'clicks' are applied in order, each a group's path of names from the top, each followed by the ticked set ('expectTicked', any order; or 'expectTickedCount') and that group's state after it. 'expectSent' (or 'expectSentCount') is what the call carries after the clicks.",
-    "why": "One tick for a unit (Russell's ruling). Over the shown pages only, because a box that changed pages out of view would publish or hide pages the teacher never saw, the fault that reports success. The same call as before, so the plan, the write, the undo step and the trail are the existing ones, and a unit's tick is one Undo step holding all its pages (#899: one publish_pages call is one step).",
+    "caseFields": "Each case: term, scheme, noun and course name the course; pages are what the sheet offers, in its order (name is what the call carries, folder/file; title is what the search reads; date YYYY-MM-DD or absent); 'generate' adds pages {folder}/Unit {unit}, Day 1..{days}, undated, before 'pages'. 'expectTree' is the tree for 'search' and 'ticked' before any click: each node is a group's name, its state, its pages (names, in the tree's order) and its groups. 'clicks' are applied in order, each naming a group by its id (rule above), each followed by the ticked set ('expectTicked', any order; or 'expectTickedCount'), that group's state after it, and optionally its [ticked, total] count after it ('expectCount'). Each tree node also carries its group's 'id'; 'expectCounts' gives [ticked, total] for the named groups before any click. 'expectSent' (or 'expectSentCount') is what the call carries after the clicks.",
+    "why": "One tick for a unit (Russell's ruling). A click changes the shown pages only, because a box that changed pages out of view would publish or hide pages the teacher never saw, the fault that reports success. The box is READ over every page under it, because a box drawn ticked while a page under it is not says something untrue about what Continue will carry (ticked means included, #694). The same call as before, so the plan, the write, the undo step and the trail are the existing ones, and a unit's tick is one Undo step holding all its pages (#899: one publish_pages call is one step).",
     "rejected": [
       "A unit's box that also ticks the pages its classes link to: rejected by Russell (#900); the links checklist after Publish offers those.",
-      "A box read over every page under it, hidden ones included: drawn mixed while every visible page is ticked, and a click would then change pages out of view.",
+      "A box read over the SHOWN pages only (as first built): with a search, a unit's box read 'on' while unticked pages of that unit were out of view and would not be published, so a box looked ticked while a page under it was not (found by the implementation review, ruled out by the director).",
+      "A click that changes hidden pages too, so that a mixed box could always go to 'on': it would publish or hide pages the teacher never saw, the fault that reports success.",
+      "A click on a mixed box that always ticks, as a Mac's own checkbox does: while the search hides an unticked page and every shown page is ticked, that click would change nothing at all.",
+      "Naming a group in a click by its shown name or a path of names: a folder called 'Unit 1' and the unit 'Unit 1' share a name, and the path reaches the first one only.",
       "A unit read from the page's shown title rather than its file name: a frontmatter title can say anything, and the planners read the file name.",
       "A 'Tick All Shown' button (the audit's suggestion on #897): the ruling chose the hierarchy.",
       "Putting an old-word page ('Unit 4, Day 3' in a Module course) under the new word's unit: it would be ticked as Module 4 while its name says Unit 4."
@@ -6250,6 +6254,7 @@
         "expectTree": [
           {
             "group": "Unit 1",
+            "id": "unit 1",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 1, Day 1",
@@ -6258,6 +6263,7 @@
           },
           {
             "group": "Unit 2",
+            "id": "unit 2",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 2, Day 1"
@@ -6265,6 +6271,7 @@
           },
           {
             "group": "Unit 3",
+            "id": "unit 3",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 3, Day 1"
@@ -6306,6 +6313,7 @@
         "expectTree": [
           {
             "group": "Unit 1",
+            "id": "unit 1",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 1, Day 1",
@@ -6357,6 +6365,7 @@
         "expectTree": [
           {
             "group": "Unit 2",
+            "id": "unit 2",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 2, Day 1",
@@ -6365,6 +6374,7 @@
           },
           {
             "group": "Other classes",
+            "id": "other classes",
             "state": "off",
             "pages": [
               "section1/All Classes/Field Trip"
@@ -6372,6 +6382,7 @@
           },
           {
             "group": "Concepts",
+            "id": "folder Concepts",
             "state": "off",
             "pages": [
               "Concepts/Ohm's Law"
@@ -6381,9 +6392,7 @@
         "expectNotShownTicked": 0,
         "clicks": [
           {
-            "group": [
-              "Unit 2"
-            ],
+            "group": "unit 2",
             "expectTicked": [
               "section1/All Classes/Unit 2, Day 1",
               "section1/All Classes/Unit 2, Day 2"
@@ -6424,6 +6433,7 @@
         "expectTree": [
           {
             "group": "Module 4",
+            "id": "unit 4",
             "state": "off",
             "pages": [
               "section1/All Classes/Module 4, Day 1"
@@ -6431,6 +6441,7 @@
           },
           {
             "group": "Other classes",
+            "id": "other classes",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 4, Day 3"
@@ -6480,6 +6491,7 @@
         "expectTree": [
           {
             "group": "All meetings",
+            "id": "all classes",
             "state": "off",
             "pages": [
               "section1/All Meetings/Week 1",
@@ -6489,6 +6501,7 @@
           },
           {
             "group": "Resources",
+            "id": "folder Resources",
             "state": "off",
             "pages": [
               "Resources/Links"
@@ -6525,6 +6538,7 @@
         "expectTree": [
           {
             "group": "All classes",
+            "id": "all classes",
             "state": "off",
             "pages": [
               "section1/All Classes/Week 1",
@@ -6572,6 +6586,7 @@
         "expectTree": [
           {
             "group": "Assessments",
+            "id": "folder Assessments",
             "state": "off",
             "pages": [
               "Assessments/Quiz 1"
@@ -6579,6 +6594,7 @@
           },
           {
             "group": "Concepts",
+            "id": "folder Concepts",
             "state": "off",
             "pages": [
               "Concepts/Variables"
@@ -6586,6 +6602,7 @@
             "groups": [
               {
                 "group": "Loops",
+                "id": "folder Concepts/Loops",
                 "state": "off",
                 "pages": [
                   "Concepts/Loops/For loops"
@@ -6593,6 +6610,7 @@
                 "groups": [
                   {
                     "group": "Arrays",
+                    "id": "folder Concepts/Loops/Arrays",
                     "state": "off",
                     "pages": [
                       "Concepts/Loops/Arrays/Lists"
@@ -6606,9 +6624,7 @@
         "expectNotShownTicked": 0,
         "clicks": [
           {
-            "group": [
-              "Concepts"
-            ],
+            "group": "folder Concepts",
             "expectTicked": [
               "Concepts/Variables",
               "Concepts/Loops/For loops",
@@ -6617,10 +6633,7 @@
             "expectState": "on"
           },
           {
-            "group": [
-              "Concepts",
-              "Loops"
-            ],
+            "group": "folder Concepts/Loops",
             "expectTicked": [
               "Concepts/Variables"
             ],
@@ -6651,6 +6664,7 @@
         "expectTree": [
           {
             "group": "ICS3U",
+            "id": "folder ICS3U",
             "state": "off",
             "pages": [
               "ICS3U/Course Outline"
@@ -6708,6 +6722,7 @@
         "expectTree": [
           {
             "group": "Unit 4",
+            "id": "unit 4",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 4, Day 1",
@@ -6717,6 +6732,7 @@
           },
           {
             "group": "Unit 40",
+            "id": "unit 40",
             "state": "off",
             "pages": [
               "section1/All Classes/Unit 40, Day 1",
@@ -6727,9 +6743,7 @@
         "expectNotShownTicked": 0,
         "clicks": [
           {
-            "group": [
-              "Unit 4"
-            ],
+            "group": "unit 4",
             "expectTicked": [
               "section1/All Classes/Unit 4, Day 1",
               "section1/All Classes/Unit 4, Day 2",
@@ -6781,38 +6795,49 @@
         "expectTree": [
           {
             "group": "Unit 4",
-            "state": "off",
+            "id": "unit 4",
+            "state": "mixed",
             "pages": [
               "section1/All Classes/Unit 4, Day 1"
             ]
           }
         ],
         "expectNotShownTicked": 1,
+        "expectCounts": {
+          "unit 4": [
+            1,
+            3
+          ]
+        },
         "clicks": [
           {
-            "group": [
-              "Unit 4"
-            ],
+            "group": "unit 4",
             "expectTicked": [
               "section1/All Classes/Unit 4, Day 1",
               "section1/All Classes/Unit 4, Day 3"
             ],
-            "expectState": "on"
+            "expectState": "mixed",
+            "expectCount": [
+              2,
+              3
+            ]
           },
           {
-            "group": [
-              "Unit 4"
-            ],
+            "group": "unit 4",
             "expectTicked": [
               "section1/All Classes/Unit 4, Day 3"
             ],
-            "expectState": "off"
+            "expectState": "mixed",
+            "expectCount": [
+              1,
+              3
+            ]
           }
         ],
         "expectSent": [
           "section1/All Classes/Unit 4, Day 3"
         ],
-        "why": "A page the teacher cannot see is never changed by a group's box: changing it would publish or hide a page nobody looked at. The box is read over the shown pages, so Day 3's tick does not make it mixed while Day 3 is out of view, and the line under the table says one ticked page is not shown."
+        "why": "A page the teacher cannot see is never changed by a group's box: changing it would publish or hide a page nobody looked at. The box is read over every page of the unit, so it is mixed from the start (Day 3 ticked, Day 1 and Day 2 not) and stays mixed after each click, its row says 1, 2 and then 1 of 3 ticked, and the line under the table says one ticked page is not shown. The second click unticks Day 1 because every SHOWN page was ticked."
       },
       {
         "name": "some ticked is mixed; a click on a mixed box ticks every page; a click on a ticked box clears it",
@@ -6858,6 +6883,7 @@
         "expectTree": [
           {
             "group": "Unit 4",
+            "id": "unit 4",
             "state": "mixed",
             "pages": [
               "section1/All Classes/Unit 4, Day 1",
@@ -6870,9 +6896,7 @@
         "expectNotShownTicked": 0,
         "clicks": [
           {
-            "group": [
-              "Unit 4"
-            ],
+            "group": "unit 4",
             "expectTicked": [
               "section1/All Classes/Unit 4, Day 1",
               "section1/All Classes/Unit 4, Day 2",
@@ -6882,9 +6906,7 @@
             "expectState": "on"
           },
           {
-            "group": [
-              "Unit 4"
-            ],
+            "group": "unit 4",
             "expectTicked": [],
             "expectState": "off"
           }
@@ -6893,7 +6915,7 @@
         "why": "Mixed is a third state of its own, never drawn as ticked while a page under it is not (ticked means included, #694). A click on it ticks all, as a Mac's mixed checkbox does."
       },
       {
-        "name": "every page of a group ticked while the search hides one of them: the box reads on, over the shown pages",
+        "name": "every shown page of a group ticked while the search hides unticked ones: the box reads mixed, never on, and a click unticks the shown page",
         "term": "Unit",
         "scheme": "unit_day",
         "noun": "class",
@@ -6928,24 +6950,29 @@
         "expectTree": [
           {
             "group": "Unit 4",
-            "state": "on",
+            "id": "unit 4",
+            "state": "mixed",
             "pages": [
               "section1/All Classes/Unit 4, Day 1"
             ]
           }
         ],
         "expectNotShownTicked": 0,
+        "expectCounts": {
+          "unit 4": [
+            1,
+            3
+          ]
+        },
         "clicks": [
           {
-            "group": [
-              "Unit 4"
-            ],
+            "group": "unit 4",
             "expectTicked": [],
             "expectState": "off"
           }
         ],
         "expectSent": [],
-        "why": "The box describes what it would change. Reading it over hidden pages would draw it mixed and then tick pages out of view."
+        "why": "A box must never look ticked while a page under it is not (the director's ruling after the implementation review): Day 2 and Day 3 are unticked, so the box is mixed although the one page in view is ticked, and its row says 1 of 3 ticked. A click changes the shown page only, and since every shown page was ticked it unticks it; a click that ticked instead would change nothing the teacher can see."
       },
       {
         "name": "a ticked page the search hides stays ticked, is counted under the table, and is sent, in the order the sheet offers the pages",
@@ -6984,6 +7011,7 @@
         "expectTree": [
           {
             "group": "Concepts",
+            "id": "folder Concepts",
             "state": "on",
             "pages": [
               "Concepts/Loops"
@@ -7015,15 +7043,82 @@
         "expectGroupCount": 1,
         "clicks": [
           {
-            "group": [
-              "Unit 3"
-            ],
+            "group": "unit 3",
             "expectTickedCount": 200,
             "expectState": "on"
           }
         ],
         "expectSentCount": 200,
         "why": "Synthetic: the largest unit in the shipped courses is 32 classes (TEJ4M Unit 4). 'generate' makes Unit 3, Day 1 to Unit 3, Day 200, undated, in that folder, in day order."
+      },
+      {
+        "name": "a folder called Unit 1 beside the unit Unit 1: two groups of one name, told apart by their ids, and each box ticks its own pages",
+        "term": "Unit",
+        "scheme": "unit_day",
+        "noun": "class",
+        "course": "ICS3U",
+        "pages": [
+          {
+            "name": "section1/All Classes/Unit 1, Day 1",
+            "title": "Unit 1, Day 1",
+            "folder": "section1/All Classes",
+            "isClass": true,
+            "date": "2026-09-09"
+          },
+          {
+            "name": "Unit 1/Rubric",
+            "title": "Rubric",
+            "folder": "Unit 1",
+            "isClass": false
+          }
+        ],
+        "search": "",
+        "ticked": [],
+        "expectTree": [
+          {
+            "group": "Unit 1",
+            "id": "unit 1",
+            "state": "off",
+            "pages": [
+              "section1/All Classes/Unit 1, Day 1"
+            ]
+          },
+          {
+            "group": "Unit 1",
+            "id": "folder Unit 1",
+            "state": "off",
+            "pages": [
+              "Unit 1/Rubric"
+            ]
+          }
+        ],
+        "expectNotShownTicked": 0,
+        "clicks": [
+          {
+            "group": "folder Unit 1",
+            "expectTicked": [
+              "Unit 1/Rubric"
+            ],
+            "expectState": "on",
+            "expectCount": [
+              1,
+              1
+            ]
+          },
+          {
+            "group": "unit 1",
+            "expectTicked": [
+              "section1/All Classes/Unit 1, Day 1",
+              "Unit 1/Rubric"
+            ],
+            "expectState": "on"
+          }
+        ],
+        "expectSent": [
+          "section1/All Classes/Unit 1, Day 1",
+          "Unit 1/Rubric"
+        ],
+        "why": "A folder may be named like a unit. A click names a group by its id, never by the name shown, so a reader that looked the name up would reach the first group of that name and tick the wrong pages. The page in the folder is not a class, so the unit never holds it."
       }
     ]
   }

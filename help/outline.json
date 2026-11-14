@@ -799,7 +799,7 @@
      "steps": [
       "Select the section",
       "Section > Publish Pages… (or Hide Pages…)",
-      "Tick the pages in the list (columns Page, Folder, Date), or tick a unit's or a folder's box to tick every page under it the search shows (a dash means only some are ticked), and press Continue",
+      "Tick the pages in the list (columns Page, Folder, Date), or tick a unit's or a folder's box to tick every page under it the search shows (a dash means only some of its pages are ticked, hidden ones included; its row says how many, as \"2 of 3 ticked\"), and press Continue",
       "Read the plan, then press Publish (or Hide)",
       "Section > Publish Class for a Date… does a whole class at once (link publish-class-for-date)",
       "Section > Undo Last Change takes back the last change made from the Section menu in this window (not the assistant's, not another window's)",

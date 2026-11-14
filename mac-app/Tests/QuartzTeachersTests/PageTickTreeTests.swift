@@ -32,15 +32,17 @@ final class PageTickTreeTests: XCTestCase {
 
     // MARK: - The contract
 
-    /// Every `pagesToTick` case: the tree for its search and ticks, the
-    /// count of ticked pages out of view, each click's ticks and state, and
-    /// the names the call carries after them.
+    /// Every `pagesToTick` case: the tree for its search and ticks (each
+    /// group's id, name, state over every page under it, and shown pages),
+    /// the groups' counts, the count of ticked pages out of view, each
+    /// click's ticks, state and count, and the names the call carries after
+    /// them. A click names its group by id, never by the name shown.
     func testEveryCaseIsTheContracts() throws {
         let section: [String: Any] = try PageTickTreeTests.contractSection()
         XCTAssertNotNil(section["note"] as? String)
         XCTAssertNotNil(section["why"] as? String)
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 14)
+        XCTAssertGreaterThanOrEqual(cases.count, 15)
         var checks: Int = 0
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -75,9 +77,18 @@ final class PageTickTreeTests: XCTestCase {
                 checks += 1
                 XCTAssertEqual(PageTickTree.tickedButNotShown(offered, ticked: ticked, search: search), expected, name)
             }
+            if let expected = testCase["expectCounts"] as? [String: [Int]] {
+                for (key, count) in expected {
+                    checks += 1
+                    let row: PageTickTree.Row = try XCTUnwrap(
+                        PageTickTree.row(withID: .group(key), in: rows), "\(name): \(key) is not drawn"
+                    )
+                    XCTAssertEqual(PageTickTreeTests.tickedOf(row, ticked: ticked), count, "\(name): \(key)")
+                }
+            }
             for click in (testCase["clicks"] as? [[String: Any]]) ?? [] {
-                let path: [String] = try XCTUnwrap(click["group"] as? [String])
-                let group: PageTickTree.Group = try XCTUnwrap(PageTickTree.group(at: path, in: groups), "\(name): \(path)")
+                let path: String = try XCTUnwrap(click["group"] as? String, "\(name): a click names its group by id")
+                let group: PageTickTree.Group = try XCTUnwrap(PageTickTree.group(withKey: path, in: groups), "\(name): \(path)")
                 let row: PageTickTree.Row = try XCTUnwrap(
                     PageTickTree.row(withID: .group(group.key), in: PageTickTree.rows(of: groups, search: search)),
                     "\(name): \(path) is not drawn"
@@ -91,7 +102,10 @@ final class PageTickTreeTests: XCTestCase {
                     XCTAssertEqual(ticked.count, expected, "\(name): after \(path)")
                 }
                 if let expected = click["expectState"] as? String {
-                    XCTAssertEqual(PageTickTree.state(of: row.shownPageNames, ticked: ticked).rawValue, expected, "\(name): after \(path)")
+                    XCTAssertEqual(PageTickTree.boxState(of: row, ticked: ticked).rawValue, expected, "\(name): after \(path)")
+                }
+                if let expected = click["expectCount"] as? [Int] {
+                    XCTAssertEqual(PageTickTreeTests.tickedOf(row, ticked: ticked), expected, "\(name): after \(path)")
                 }
             }
             if let expected = testCase["expectSent"] as? [String] {
@@ -103,7 +117,7 @@ final class PageTickTreeTests: XCTestCase {
                 XCTAssertEqual(PageTickTree.namesToSend(offered, ticked: ticked).count, expected, name)
             }
         }
-        XCTAssertGreaterThanOrEqual(checks, 45, "the cases have stopped being read")
+        XCTAssertGreaterThanOrEqual(checks, 50, "the cases have stopped being read")
     }
 
     /// The two class groups' names in the contract are the wording keys it
@@ -142,8 +156,10 @@ final class PageTickTreeTests: XCTestCase {
     }
 
     /// A click on a unit's box: mixed goes to every page ticked, ticked goes
-    /// to none, and the trail's count says how many a group's box ticked; a
-    /// page's own box afterwards takes that page out of the count.
+    /// to none, and the trail's count says how many pages the box itself
+    /// ticked: not a page the teacher had already ticked by hand (the
+    /// implementation review's sixth finding); a page's own box afterwards
+    /// takes that page out of the count.
     func testAUnitsBoxTicksEveryPageAndTheTrailCountsIt() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         roots.append(made.root)
@@ -154,15 +170,48 @@ final class PageTickTreeTests: XCTestCase {
         model.click(group: unit)
         XCTAssertEqual(model.state(of: unit), .on)
         XCTAssertEqual(model.ticked.count, 3, "a mixed box did not tick every page under it")
-        XCTAssertEqual(model.tickedByAGroupsBoxCount, 3)
+        XCTAssertEqual(model.tickedByAGroupsBoxCount, 2, "the trail counted a page ticked by hand as ticked by the box")
         XCTAssertFalse(model.ticked.contains("Concepts/Page 1"), "a unit's box ticked a page that is not one of its classes")
         model.binding(forPageNamed: "section1/All Classes/Unit 1, Day 3").wrappedValue = false
         XCTAssertEqual(model.state(of: unit), .mixed)
-        XCTAssertEqual(model.tickedByAGroupsBoxCount, 2)
+        XCTAssertEqual(model.tickedByAGroupsBoxCount, 1)
         model.click(group: unit)
+        XCTAssertEqual(model.tickedByAGroupsBoxCount, 2, "Day 1 and Day 3 were ticked by the box")
         model.click(group: unit)
         XCTAssertTrue(model.ticked.isEmpty, "a ticked box did not clear its pages")
         XCTAssertEqual(model.tickedByAGroupsBoxCount, 0)
+    }
+
+    /// The director's ruling after the implementation review: a box is never
+    /// drawn ticked while a page under it is not. With the search hiding two
+    /// unticked days, a unit whose one shown day is ticked reads MIXED, and
+    /// its row says "1 of 3 ticked" (`menuPageGroupTickedCount`) for a
+    /// sighted teacher as for VoiceOver. A click changes the shown day only.
+    func testABoxIsReadOverEveryPageUnderItShownOrNot() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        roots.append(made.root)
+        let model: SectionVerbSheetModel = PageTickTreeTests.unitModel(course: made.course, classes: 3, pages: 1)
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        model.search = "Day 1"
+        let unitID: PageTickTree.RowID = .group("unit 1")
+        model.flip(unitID)
+        XCTAssertEqual(model.ticked, ["section1/All Classes/Unit 1, Day 1"], "the box changed a page the search hides")
+        let unit: PageTickTree.Row = try XCTUnwrap(PageTickTree.row(withID: unitID, in: model.tickRows))
+        XCTAssertEqual(unit.shownPageNames.count, 1)
+        XCTAssertEqual(unit.everyPageName.count, 3)
+        XCTAssertEqual(model.state(of: unit), .mixed, "a box read on while two pages under it are unticked")
+        XCTAssertEqual(model.state(ofRowWithID: unitID), .mixed)
+        XCTAssertEqual(sheet.dateCell(for: unit), AssistWording.menuPageGroupTickedCount(ticked: 1, of: 3),
+                       "a group's row does not show its count")
+        model.flip(unitID)
+        XCTAssertTrue(model.ticked.isEmpty, "every shown page was ticked, so the click unticks it")
+        XCTAssertEqual(model.state(ofRowWithID: unitID), .off)
+        XCTAssertEqual(sheet.dateCell(for: unit), AssistWording.menuPageGroupTickedCount(ticked: 0, of: 3))
+        model.search = ""
+        for row in model.pageRows where row.isClass {
+            model.binding(for: row).wrappedValue = true
+        }
+        XCTAssertEqual(model.state(ofRowWithID: unitID), .on, "every page ticked and none hidden is on")
     }
 
     /// Space on a selected group does what its box does; on a page, it flips
@@ -294,6 +343,65 @@ final class PageTickTreeTests: XCTestCase {
         XCTAssertEqual(box.state, .off)
     }
 
+    /// The DRAWN box follows what it does not itself cause (the
+    /// implementation review's second gap): a page ticked in the model, a
+    /// page's own checkbox clicked in the open group, and a change of
+    /// search all redraw it, over every page under it; and a click on the
+    /// box after a search changes only the pages now shown. The box is
+    /// looked up again after each change, since the cell may be rebuilt.
+    func testTheDrawnBoxFollowsAPagesTickAndTheSearch() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        roots.append(made.root)
+        let model: SectionVerbSheetModel = PageTickTreeTests.unitModel(course: made.course, classes: 3, pages: 2)
+        let sheet: SectionVerbSheet = SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        let host: TableHost = TableHost(sheet, size: PageTablesSheetTests.fittingSize(of: sheet))
+        defer {
+            host.close()
+        }
+        let identifier: String = "sectionVerbGroup-unit 1"
+        let table: NSTableView = try XCTUnwrap(host.tables().first, "the picker is not a table")
+        var box: NSButton = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window))
+        XCTAssertEqual(box.state, .off)
+
+        // A tick made in the model, not by the box: only a redraw shows it.
+        model.binding(forPageNamed: "section1/All Classes/Unit 1, Day 1").wrappedValue = true
+        host.pump()
+        box = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window))
+        XCTAssertEqual(box.state, .mixed, "the drawn box did not follow a page ticked elsewhere")
+        XCTAssertEqual(box.accessibilityValueDescription(), AssistWording.menuPageGroupTickedCount(ticked: 1, of: 3))
+
+        // A page's own checkbox in the open group: rows are Unit 1, Days 1 to 3, then Concepts.
+        model.openGroups.insert(.group("unit 1"))
+        host.pump()
+        XCTAssertEqual(table.numberOfRows, 5, "Unit 1 did not open")
+        host.clickCell(of: table, column: 0, row: 2)
+        XCTAssertEqual(model.ticked, ["section1/All Classes/Unit 1, Day 1", "section1/All Classes/Unit 1, Day 2"],
+                       "the click did not tick Day 2")
+        box = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window))
+        XCTAssertEqual(box.state, .mixed)
+        XCTAssertEqual(box.accessibilityValueDescription(), AssistWording.menuPageGroupTickedCount(ticked: 2, of: 3))
+
+        // A search that hides the two ticked days: the box still reads over all three.
+        model.search = "Day 3"
+        host.pump()
+        box = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window), "the search hid Unit 1")
+        XCTAssertEqual(box.state, .mixed, "the drawn box did not follow the search, or was read over the shown page only")
+        PageTablesSheetTests.click(box, in: host)
+        XCTAssertEqual(model.ticked.count, 3, "the box did not tick the one page the search shows")
+        box = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window))
+        XCTAssertEqual(box.state, .on)
+
+        // Now hide Day 3 again and show Day 1: a click unticks Day 1 only.
+        model.search = "Day 1"
+        host.pump()
+        box = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window))
+        PageTablesSheetTests.click(box, in: host)
+        XCTAssertEqual(model.ticked, ["section1/All Classes/Unit 1, Day 2", "section1/All Classes/Unit 1, Day 3"],
+                       "a click after a change of search changed a page the search hides")
+        box = try XCTUnwrap(PageTickTreeTests.button(identified: identifier, in: host.window))
+        XCTAssertEqual(box.state, .mixed, "two of three ticked, one of them in view: mixed")
+    }
+
     /// A ticked page the search hides is said under the table.
     func testATickedPageTheSearchHidesIsSaid() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
@@ -348,15 +456,18 @@ final class PageTickTreeTests: XCTestCase {
         return made
     }
 
-    /// The tree as the contract writes it: each group's name, state, pages
-    /// directly in it, and its groups.
+    /// The tree as the contract writes it: each group's name, id, state over
+    /// every page under it, shown pages directly in it, and its groups.
     static func describe(_ rows: [PageTickTree.Row], ticked: Set<String>) -> [[String: Any]] {
         var nodes: [[String: Any]] = []
         for row in rows where row.isGroup {
             var node: [String: Any] = [
                 "group": row.title,
-                "state": PageTickTree.state(of: row.shownPageNames, ticked: ticked).rawValue,
+                "state": PageTickTree.boxState(of: row, ticked: ticked).rawValue,
             ]
+            if case .group(let key) = row.id {
+                node["id"] = key
+            }
             var direct: [String] = []
             var inner: [PageTickTree.Row] = []
             for child in row.children ?? [] {
@@ -374,6 +485,11 @@ final class PageTickTreeTests: XCTestCase {
             nodes.append(node)
         }
         return nodes
+    }
+
+    /// A group's [ticked, total], over every page under it.
+    static func tickedOf(_ row: PageTickTree.Row, ticked: Set<String>) -> [Int] {
+        return [PageTickTree.count(of: row.everyPageName, in: ticked), row.everyPageName.count]
     }
 
     static func canonical(_ value: Any) throws -> String {
