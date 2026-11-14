@@ -102,36 +102,88 @@ picture cannot show.
      s["version"]="<version>"; print(build.release_readiness_refusal(s,
      json.load(open("shots.json"))))'` must print `None`. (On 2026-09-27,
      before v1.4.0, it named eight shots.)
-4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
-   the intended tag, and that the working tree is clean. Confirm you are on
+4. Confirm the version of every platform this cut ships matches the
+   intended tag (step 5 says how), and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
-   and the website commit both land on `main` (CLAUDE.md rule 6). After the
+   and the website commit both land on `main` (CLAUDE.md rule 6). **A hotfix
+   is the exception**: it is built on `hotfix/<version>` from what shipped,
+   `dev` is NOT merged in, and the check is step 5's hotfix bullet. After the
    website push, merge `main` back into `dev` so the branches do not drift.
-5. Check `MARKETING_VERSION` in `mac-app/project.yml` against `<Version>` in
-   the csproj. **A mismatch is a QUESTION, not automatically a stop** —
-   corrected 2026-08-20, when this step still said the two move in lockstep.
-   `RELEASING.md`'s "Two platforms, one version series" replaced that: the
-   version names which CONTRACTS a build passes, so a platform that has not
-   passed the new contracts keeps its old number until it does.
+5. Check `MARKETING_VERSION` in `mac-app/project.yml` and `<Version>` in
+   the csproj against the tag. **This step CHECKS the number; it does not
+   raise it** (#861, 2026-11-13). Each number was raised on `dev` when work
+   on the release started, right after the previous cut's merge back into
+   `dev` (`RELEASING.md` → "When the number is raised"), so test builds say
+   the release they are heading for. A mismatch between the two files is a
+   QUESTION, not automatically a stop: the version names which CONTRACTS a
+   build passes, and a platform that ships nothing in this cut ships no
+   bundle under this tag.
 
    **Decide it from the ASSETS this cut attaches, never from what the two
    files say.** The list you gathered in step 3 is the whole input; do not
-   ask which platforms are "involved", ask which binaries are going up. Then
-   exactly one of these holds:
+   ask which platforms are "involved", ask which binaries are going up. Then:
 
-   - **Every platform whose asset is attached must read the tag's number.**
-     No exceptions and no judgement — an asset labelled anything else is a
-     stop. This is the check that catches the real mistake: a signed bundle
-     built before the bump.
-   - **A mismatch is acceptable ONLY for a platform shipping no asset in
-     this cut.** Its number is correct where it is, and lower. Do not "fix"
-     it to match the tag — re-badging a binary that never ran the new
-     contracts is the precise thing the policy forbids — and do not raise it
-     "so the files agree", because the files disagreeing IS the record of
-     which platform still owes its gate.
-   - **A lagging number that is HIGHER than the tag is always a stop**,
-     whether or not that platform ships. It means the bump landed without
-     the release, and the next cut will silently reuse a number.
+   - **Every platform whose asset is attached must ALREADY read the tag's
+     number.** No exceptions and no judgement. A LOWER number is a stop and
+     a question for Russell: the start-of-work raise was missed, and the
+     platform's gate ran at the old number. Raise it, re-run that gate, and
+     only then build the bundle. A HIGHER number is a stop too: it names a
+     later release, and a bundle built from it would be mislabelled.
+   - **A platform shipping no asset leaves its number where it is**, at,
+     above or below the tag. Below means it has not started on a newer
+     release; at or above means it is working toward one. Do not move it
+     "so the files agree". Nothing reads it to decide what shipped: the
+     download cards and `build.py --deploy`'s feed checks read `site.json`
+     and the feeds (`build.shipped_version`).
+   - **A hotfix is built from what SHIPPED and keeps its own number**
+     (`RELEASING.md` → "When the number is raised" has the measured history
+     and the whole procedure). `main` is not a hotfix base in general: since
+     #861 every merge of `dev` into `main` between cuts brings `dev`'s raised
+     number and unreleased code with it. **`<base>`** is the commit the
+     platform's shipped bundle was built from: the tag for the mac (`v1.9.3`
+     today), the catch-up merge for a platform that joined the tag later
+     (8107d8723 for Windows; from `v1.9.3`, `-- windows-app/` prints 120
+     files, all the catch-up's). Branch `hotfix/<version>` from `<base>` and
+     raise that platform's number there only (1.9.3 to 1.9.4; `dev` keeps
+     2.0.0). **Check on the branch, before building and before it merges:**
+     `git rev-list --first-parent --merges <base>..hotfix/<version>` prints
+     nothing, and READ
+     `git diff --stat <base> hotfix/<version> -- mac-app/ scripts/ support/ patches/ contracts/ Dockerfile setup.sh preview.sh deploy.sh setup.ps1 preview.ps1 deploy.ps1 setup.bat preview.bat deploy.bat`
+     (`windows-app/` in place of `mac-app/` for Windows), which must list
+     only the hotfix's files and the version line. Then confirm
+     `git diff --stat <base> main -- mac-app/ scripts/ support/ patches/ contracts/ Dockerfile setup.sh preview.sh deploy.sh setup.ps1 preview.ps1 deploy.ps1 setup.bat preview.bat deploy.bat`
+     (likewise for Windows) prints nothing, so the tagged merge is the
+     commit the bundle was built from. If it prints anything, or `<base>` is
+     older than `main`'s last release, this procedure does not cover it:
+     ask Russell. **As written today every mac hotfix goes to Russell**: from
+     `v1.9.3` that command prints `10 files changed` (shared `scripts/`
+     files from the Windows catch-up); from 8107d8723 the Windows one prints
+     nothing. Merge the branch into `main` with `--no-ff`, put the TAG on
+     that merge commit on `main` (CLAUDE.md rule 6), never on the branch,
+     and make the website commit. Merge `main` back into `dev`: git stops on
+     `project.yml` (`main` 1.9.4, `dev` 2.0.0) and it resolves to `dev`'s
+     side, which keeps the next release's number; the csproj conflicts the
+     same way only once #862 raises `<Version>` on `dev`. The next cut's
+     step 5 check confirms it. If the hotfix takes the number `dev` is
+     heading for, `dev`'s release moves up with its milestone: ask Russell.
+
+   **After the cut, each platform's number on `dev` is the next release THAT
+   platform will ship.** Once `main` is merged back into `dev` (step 4),
+   raise the number of each platform that SHIPPED in this cut to its next
+   release's milestone number, in a commit of its own, and re-run `xcodegen
+   generate` for the mac. A platform that shipped nothing keeps its number
+   until its own cut. Check the text against the three cases:
+   - Both ship 2.0.0: both read 2.0.0 now; after the merge back both go to
+     the next milestone (say 2.1.0).
+   - The mac ships 2.0.0 alone: `MARKETING_VERSION` goes to 2.1.0 and
+     `<Version>` STAYS at 2.0.0, so the Windows catch-up joins v2.0.0 at the
+     tag's number (the catch-up rule below). `<Version>` goes to 2.1.0 after
+     that catch-up.
+   - A 1.9.4 hotfix while `dev` says 2.0.0: nothing is raised on `dev`;
+     the merge back keeps `dev`'s 2.0.0.
+
+   `website/site.json`'s `version` is NOT raised then: it is the released
+   version line, and it moves in this cut's website step.
 
    **The catch-up cut has its own rule, and it is the one people get wrong.**
    When the lagging platform later joins a tag that already exists, it is
@@ -233,7 +285,9 @@ gh release edit v<version> --draft=false -R <owner/repo>
    `windows-app/release-notes/<version>.md`) and the signature checks are in
    `RELEASING.md` → "The update feed (Windows)". `python website/build.py
    --check` verifies both signatures, and `--deploy` refuses unless the
-   newest item is `<Version>`; confirm too that it carries this installer's
+   newest item is the release `site.json` says Windows shipped in (its
+   card's pin, else the version line, `build.shipped_version`) and
+   `<Version>` is not below the feed's newest item (#861); confirm too that it carries this installer's
    length; if it does not, stop — a Windows release with a
    stale feed is offered to nobody. Never print the private key, and never let
    the feed's line endings change (`.gitattributes` keeps them).
@@ -293,7 +347,9 @@ gh release upload v<version> mac-app/dist/*.delta -R <owner/repo>
 
    **If this cut carries one platform only, pin that platform's download card
    in `website/site.json` → `downloads` in the same commit** — set its
-   `pinned` to the last version that has the asset (since v1.4.0 the cards are
+   `pinned` to the last version that has the asset, which is the newest item
+   in that platform's update feed and never its project file's number (that
+   names the release being built, #861) (since v1.4.0 the cards are
    drawn from that list; `index.html` holds only `{{download_cards}}`). The cards use GitHub's
    evergreen `releases/latest/download/<asset-name>` URL, which starts
    resolving to the NEW release the moment it publishes — and the release has

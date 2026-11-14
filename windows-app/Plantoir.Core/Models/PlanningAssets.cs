@@ -52,19 +52,94 @@ public static class PlanningAssets
     {
         try
         {
-            if (!Directory.Exists(planningFolder) || !Directory.Exists(bundledAssets)) return null;
-            string? internalFolder = Path.GetDirectoryName(Path.GetFullPath(planningFolder).TrimEnd('\\', '/'));
-            if (internalFolder is not null && IsALink(internalFolder)) return null;
-            if (IsALink(planningFolder)) return null;
-            string assets = Path.Combine(planningFolder, FolderName);
-            if (Directory.Exists(assets) && (IsALink(assets) || HoldsALink(assets))) return null;
-            var copied = ToolchainMirror.SyncDirectory(bundledAssets, assets);
-            return new Outcome(copied.Changed, copied.Failed);
+            if (WhyNot(planningFolder, bundledAssets) is not null) return null;
+            return Mirror(bundledAssets, Path.Combine(planningFolder, FolderName));
         }
         catch { return null; }
     }
 
-    private static bool IsALink(string path) => new DirectoryInfo(path).LinkTarget is not null;
+    /// <summary>Why <see cref="Refresh"/> would do nothing, or null when it would mirror.</summary>
+    public enum Refusal { NoPlanningFolder, NoTemplate, ALink }
+
+    /// <summary>
+    /// Why a refresh would do nothing (see the remarks), or null when it would
+    /// mirror. The link checks come before any "is it there": a DANGLING
+    /// junction at <c>assets</c> (its target deleted) is not a folder to
+    /// <see cref="Directory.Exists(string)"/>, so asking that first let it
+    /// through to the mirror, saved only by something throwing (790a review 2,
+    /// L6). A refusal is the caller's to tell apart from a failed copy, which
+    /// is what the contract's <c>couldNotRefreshTheLookLine</c> records.
+    /// </summary>
+    public static Refusal? WhyNot(string planningFolder, string bundledAssets)
+    {
+        if (!Directory.Exists(planningFolder)) return Refusal.NoPlanningFolder;
+        if (!Directory.Exists(bundledAssets)) return Refusal.NoTemplate;
+        string? internalFolder = Path.GetDirectoryName(Path.GetFullPath(planningFolder).TrimEnd('\\', '/'));
+        if (internalFolder is not null && IsALink(internalFolder)) return Refusal.ALink;
+        if (IsALink(planningFolder)) return Refusal.ALink;
+        string assets = Path.Combine(planningFolder, FolderName);
+        if (IsALink(assets)) return Refusal.ALink;
+        if (Directory.Exists(assets) && HoldsALink(assets)) return Refusal.ALink;
+        return null;
+    }
+
+    /// <summary>Whether something at <paramref name="path"/> is a link; false when nothing is there.</summary>
+    private static bool IsALink(string path)
+    {
+        try { return new DirectoryInfo(path).LinkTarget is not null; }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException) { return false; }
+    }
+
+    /// <summary>
+    /// The mirror itself: changed files replaced, missing ones added, extra
+    /// files removed. Kept here rather than <see cref="ToolchainMirror.SyncDirectory"/>
+    /// because a file is NEVER overwritten in place (790a review 2, M1): a
+    /// destination file that differs is deleted and a new one written, so a
+    /// HARD LINK in <c>assets</c> to a file outside the course loses its name
+    /// here and the file outside is untouched. <c>File.Copy(overwrite: true)</c>
+    /// wrote the template's bytes into the teacher's own file (measured with
+    /// <c>CreateHardLink</c>). A file with the template's size and modification
+    /// time is taken as the same, as the toolchain mirror takes it; one of the
+    /// same size is compared byte for byte, and left alone, untouched, when it
+    /// matches. The toolchain mirror's in-place overwrite is unchanged: it
+    /// writes into <c>.toolchain</c>, which no one hard-links into.
+    /// </summary>
+    private static Outcome Mirror(string source, string destination)
+    {
+        int changed = 0, failed = 0;
+        var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in new DirectoryInfo(source).EnumerateFiles("*", SearchOption.AllDirectories))
+        {
+            string relative = Path.GetRelativePath(source, file.FullName);
+            wanted.Add(relative);
+            string target = Path.Combine(destination, relative);
+            try
+            {
+                var existing = new FileInfo(target);
+                if (existing.Exists)
+                {
+                    if (existing.Length == file.Length
+                        && (existing.LastWriteTimeUtc == file.LastWriteTimeUtc
+                            || File.ReadAllBytes(target).AsSpan().SequenceEqual(File.ReadAllBytes(file.FullName))))
+                        continue;
+                    File.Delete(target);
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                File.Copy(file.FullName, target, overwrite: false);
+                File.SetLastWriteTimeUtc(target, file.LastWriteTimeUtc);
+                changed++;
+            }
+            catch { failed++; }
+        }
+        if (Directory.Exists(destination))
+            foreach (var file in new DirectoryInfo(destination).EnumerateFiles("*", SearchOption.AllDirectories))
+            {
+                if (wanted.Contains(Path.GetRelativePath(destination, file.FullName))) continue;
+                try { file.Delete(); changed++; }
+                catch { failed++; }
+            }
+        return new Outcome(changed, failed);
+    }
 
     /// <summary>Whether anything under <paramref name="folder"/> is a link, walked without going through one.</summary>
     private static bool HoldsALink(string folder)

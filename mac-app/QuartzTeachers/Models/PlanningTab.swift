@@ -598,7 +598,8 @@ nonisolated enum PlanAUnit {
 
     // MARK: - Stored properties
 
-    /// `planAUnit.message`, with `{course}` and `{howITeach}` to fill. One
+    /// `planAUnit.message`, with `{course}`, `{howITeach}` and `{handouts}`
+    /// (#859) to fill. One
     /// line with no semicolon, for the reason `FixWithAssistant` gives
     /// (Windows' `cmd /k` and Windows Terminal).
     static let message: String =
@@ -608,7 +609,8 @@ nonisolated enum PlanAUnit {
         + "{howITeach} "
         + "After that, ask me which unit I want to plan, which sections it covers "
         + "and whether a colleague teaches it on other dates. "
-        + "Do not build anything until I say go."
+        + "Do not build anything until I say go. "
+        + "{handouts}"
 
     /// `planAUnit.buttons`.
     static let claudeButtonTitle: String = "Plan a Unit with Claude…"
@@ -636,6 +638,7 @@ nonisolated enum PlanAUnit {
         var text: String = FixWithAssistant.fill(message, [
             "{course}": courseNamed,
             "{howITeach}": ClaudeCodeLauncher.howITeachGreetingSentence,
+            "{handouts}": ClaudeCodeLauncher.handoutsGreetingSentence,
         ])
         for pair in FixWithAssistant.replaceInTheMessage {
             text = text.replacingOccurrences(of: pair[0], with: pair[1])

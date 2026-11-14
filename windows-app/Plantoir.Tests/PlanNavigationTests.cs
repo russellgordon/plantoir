@@ -91,9 +91,11 @@ public sealed class PlanNavigationTests : IDisposable
                 bool folder = Directory.Exists(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(link)!, to!.ToString().Replace('/', '\\'))));
                 if (!LocalSiteFixtures.MakeLink(link, to.ToString(), folder))
                 {
-                    Assert.False(folder, $"{name}: a folder link must always be made, as a junction");
-                    _output.WriteLine($"NOT RUN ON DISK (a file symbolic link this account cannot make): {name}");
-                    return;
+                    // No navigationCases case links a FILE today, so every one runs on
+                    // disk; a case that needs a link this PC cannot make FAILS rather than
+                    // passing having run nothing (790a review 2, L9). If the contract
+                    // gains one, give it a skipped fact by name as PlanInTheBrowserTests does.
+                    Assert.Fail($"{name}: this PC could not make its {(folder ? "folder" : "file")} link, so the case did not run on disk");
                 }
             }
         var guard = new LocalSiteGuard(planning, LocalSiteGuard.PlansHost, LocalSiteGuard.PlanContentTypes);

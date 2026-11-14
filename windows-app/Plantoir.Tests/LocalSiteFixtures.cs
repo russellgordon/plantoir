@@ -115,6 +115,26 @@ internal static class LocalSiteFixtures
     /// here), a symbolic link for a file when this account may make one.
     /// False when it could not, so the caller reports the case by name.
     /// </summary>
+    public static bool CanMakeFileLinks => FileLinks.Value;
+
+    /// <summary>
+    /// Whether this account may make a FILE symbolic link, asked once by
+    /// making one in a temporary folder (WinError 1314 without Developer Mode
+    /// or an administrator; measured on this PC).
+    /// </summary>
+    private static readonly Lazy<bool> FileLinks = new(() =>
+    {
+        string folder = Directory.CreateTempSubdirectory("plantoir-filelink-probe").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "target.txt"), "x");
+            System.IO.File.CreateSymbolicLink(Path.Combine(folder, "link.txt"), "target.txt");
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+        finally { try { Directory.Delete(folder, recursive: true); } catch { } }
+    });
+
     public static bool MakeLink(string link, string target, bool targetIsFolder)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(link)!);
@@ -131,5 +151,21 @@ internal static class LocalSiteFixtures
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+    }
+}
+
+/// <summary>
+/// A fact that needs a FILE symbolic link on disk: SKIPPED, with the cases it
+/// would run named in the reason, when this account cannot make one, so the
+/// totals line counts it as not run rather than as passed (790a review 2, L9).
+/// </summary>
+public sealed class FileLinkFactAttribute : Xunit.FactAttribute
+{
+    public FileLinkFactAttribute()
+    {
+        if (!LocalSiteFixtures.CanMakeFileLinks)
+            Skip = "This account cannot make a file symbolic link (WinError 1314: Developer Mode is off), so the three openInBrowser "
+                 + "cases that link a FILE run against the link map only: 'a shortcut inside the plan that leads out of it', "
+                 + "'a shortcut inside the plan that stays in it', 'a link named like a page that leads to a script'.";
     }
 }

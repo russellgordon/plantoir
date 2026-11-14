@@ -70,6 +70,72 @@ public sealed class PlanningAssetsTests : IDisposable
     }
 
     /// <summary>
+    /// 790a review 2, M1: an <c>assets</c> file that is a HARD LINK to a
+    /// teacher's file outside the course is replaced, never written through:
+    /// the mirror deletes the name and writes a new file, so the file outside
+    /// keeps its own words. (No privilege is needed for a hard link on one
+    /// volume, so this is measured here, unlike a file symbolic link.)
+    /// </summary>
+    [Fact]
+    public void AHardLinkedAssetIsReplacedNeverWrittenThrough()
+    {
+        string planning = UnitPlans.PlanningFolder(Path.Combine(_root, "course"));
+        string assets = Path.Combine(planning, PlanningAssets.FolderName);
+        Directory.CreateDirectory(assets);
+        string templateFile = Directory.EnumerateFiles(TemplateAssets, "*.css").First();
+        string inAssets = Path.Combine(assets, Path.GetFileName(templateFile));
+        string teachers = Path.Combine(_root, "teachers-own.css");
+        File.WriteAllText(teachers, "the teacher's own words");
+        Assert.True(CreateHardLinkW(inAssets, teachers, nint.Zero), "could not make a hard link");
+
+        var outcome = PlanningAssets.Refresh(planning, TemplateAssets);
+        Assert.NotNull(outcome);
+        Assert.Equal(0, outcome!.Value.Failed);
+        Assert.Equal("the teacher's own words", File.ReadAllText(teachers));
+        Assert.Equal(File.ReadAllBytes(templateFile), File.ReadAllBytes(inAssets));
+        Assert.Equal(Files(TemplateAssets), Files(assets));
+    }
+
+    /// <summary>
+    /// 790a review 2, L6: a DANGLING junction at <c>assets</c> (its target
+    /// deleted) is refused by the link check like every other link shape, not
+    /// left to whatever throws: nothing is counted as copied or failed, the
+    /// junction is left as it was, and nothing is made where it pointed.
+    /// </summary>
+    [Fact]
+    public void ADanglingJunctionAtAssetsIsRefusedAsALink()
+    {
+        string planning = UnitPlans.PlanningFolder(Path.Combine(_root, "course"));
+        Directory.CreateDirectory(planning);
+        string gone = Path.Combine(_root, "gone");
+        Directory.CreateDirectory(gone);
+        string assets = Path.Combine(planning, PlanningAssets.FolderName);
+        ReferenceFixtures.Junction(assets, gone);
+        Directory.Delete(gone);
+
+        Assert.Null(PlanningAssets.Refresh(planning, TemplateAssets));
+        Assert.Equal(PlanningAssets.Refusal.ALink, PlanningAssets.WhyNot(planning, TemplateAssets));
+        Assert.NotNull(new DirectoryInfo(assets).LinkTarget);
+        Assert.False(Directory.Exists(gone), "the mirror made the folder a dangling junction pointed at");
+    }
+
+    /// <summary>A planning folder with no <c>assets</c> yet is given one: the link check does not refuse a folder that is not there.</summary>
+    [Fact]
+    public void APlanningFolderWithNoAssetsYetIsGivenThem()
+    {
+        string planning = UnitPlans.PlanningFolder(Path.Combine(_root, "course"));
+        Directory.CreateDirectory(planning);
+        Assert.Null(PlanningAssets.WhyNot(planning, TemplateAssets));
+        var outcome = PlanningAssets.Refresh(planning, TemplateAssets);
+        Assert.Equal(0, outcome!.Value.Failed);
+        Assert.Equal(Files(TemplateAssets), Files(Path.Combine(planning, PlanningAssets.FolderName)));
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool CreateHardLinkW(string lpFileName, string lpExistingFileName, nint lpSecurityAttributes);
+
+    /// <summary>
     /// A link anywhere on the way — the planning folder, <c>.internal</c>,
     /// <c>assets</c>, or a folder inside <c>assets</c> — leaves everything
     /// alone: a photo behind the link survives and nothing is written through it.

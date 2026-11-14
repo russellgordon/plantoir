@@ -36,7 +36,8 @@ public sealed class PlanningTabTests : IDisposable
     public void TheTabsAreThereAsTheContractSays()
     {
         var tabCases = Cases("tabCases");
-        Assert.True(tabCases.Count >= 6);
+        // 8 since #783 gave each case a copilot key and added two (790a review 2, L4).
+        Assert.True(tabCases.Count >= 8, $"tabCases shrank to {tabCases.Count}");
         foreach (var testCase in tabCases)
         {
             bool shown = PlanningTab.IsShown(testCase!["claude"]!.GetValue<bool>(), testCase["codex"]!.GetValue<bool>(),

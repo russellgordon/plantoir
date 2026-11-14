@@ -90,8 +90,39 @@ public sealed class PlanInTheBrowserTests : IDisposable
         "a link named like a page that leads to a script",
     };
 
+    /// <summary>
+    /// Every case on disk, less the three that link a FILE when this account
+    /// cannot make a file symbolic link: those are not run here at all, and
+    /// <see cref="TheFileLinkCasesHoldOnDisk"/> is SKIPPED by name, so the
+    /// totals line shows they did not run (790a review 2, L9: they used to
+    /// return early and count as passed).
+    /// </summary>
+    public static IEnumerable<object[]> DiskCaseNames() =>
+        CaseNames().Where(c => LocalSiteFixtures.CanMakeFileLinks || !FileLinkCases.Contains((string)c[0]));
+
+    /// <summary>The three are cases of the contract, exactly: a renamed case must not drop silently out of the disk run.</summary>
+    [Fact]
+    public void TheFileLinkCasesAreTheContractsThree()
+    {
+        var names = Cases().Select(c => c!["name"]!.ToString()).ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(3, FileLinkCases.Count);
+        foreach (string name in FileLinkCases) Assert.Contains(name, names);
+        Assert.Equal(Cases().Count - (LocalSiteFixtures.CanMakeFileLinks ? 0 : 3), DiskCaseNames().Count());
+    }
+
+    [FileLinkFact]
+    public void TheFileLinkCasesHoldOnDisk()
+    {
+        foreach (string name in FileLinkCases)
+        {
+            ReferenceFixtures.Remove(_root);
+            Directory.CreateDirectory(_root);
+            EveryOpenInBrowserCaseHoldsOnDisk(name);
+        }
+    }
+
     [Theory]
-    [MemberData(nameof(CaseNames))]
+    [MemberData(nameof(DiskCaseNames))]
     public void EveryOpenInBrowserCaseHoldsOnDisk(string name)
     {
         var testCase = Case(name);
@@ -110,11 +141,7 @@ public sealed class PlanInTheBrowserTests : IDisposable
                 string link = Path.Combine(planning, at.Replace('/', '\\'));
                 bool folder = Directory.Exists(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(link)!, to!.ToString().Replace('/', '\\'))));
                 if (!LocalSiteFixtures.MakeLink(link, to.ToString(), folder))
-                {
-                    Assert.True(FileLinkCases.Contains(name), $"{name}: only the three file-link cases may go unmade on disk");
-                    _output.WriteLine($"NOT RUN ON DISK (a file symbolic link this account cannot make; run against the link map only): {name}");
-                    return;
-                }
+                    Assert.Fail($"{name}: this PC could not make its {(folder ? "folder" : "file")} link, so the case did not run on disk");
             }
         Check(testCase, new LocalSiteGuard(planning, LocalSiteGuard.PlansHost, LocalSiteGuard.PlanContentTypes));
     }

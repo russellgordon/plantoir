@@ -20,6 +20,9 @@ public sealed class PlanAUnitTests
     {
         var block = Block();
         Assert.Equal(block["message"]!.ToString(), PlanAUnit.Message);
+        // {handouts} is greetingHandoutsSentence, verbatim (planAUnit.courseIsNamedAs, the mac's #859).
+        Assert.Equal(ContractLoader.LoadJson("app-rules.json")["outsideAgents"]!["greetingHandoutsSentence"]!.ToString(),
+                     ClaudeCodeLauncher.HandoutsSentence);
         Assert.Equal(block["trailLine"]!.ToString(), "{course}" + UnitPlans.TrailSeparator + PlanAUnit.TrailLine);
         var buttons = block["buttons"]!.AsArray();
         var doorsHere = Enum.GetValues<FixWithAssistant.Assistant>().Select(a => a.ToString().ToLowerInvariant()).ToList();

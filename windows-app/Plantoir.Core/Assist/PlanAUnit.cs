@@ -14,7 +14,12 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public static class PlanAUnit
 {
-    /// <summary><c>planAUnit.message</c>, with <c>{course}</c> and <c>{howITeach}</c> to fill: one line, no semicolon.</summary>
+    /// <summary>
+    /// <c>planAUnit.message</c>, with <c>{course}</c>, <c>{howITeach}</c> and
+    /// <c>{handouts}</c> to fill: one line, no semicolon. <c>{handouts}</c> is
+    /// <c>greetingHandoutsSentence</c>, the message's last sentence (the mac's
+    /// #859; on Windows #895's Plan a Unit part, landed with 790a).
+    /// </summary>
     public const string Message =
         "I'm a teacher working on {course} in Plantoir, and I'd like to plan a unit with you. "
         + "Follow the plantoir-unit-planning guide, and use the plantoir tools for anything to do with this course. "
@@ -22,7 +27,7 @@ public static class PlanAUnit
         + "{howITeach} "
         + "After that, ask me which unit I want to plan, which sections it covers "
         + "and whether a colleague teaches it on other dates. "
-        + "Do not build anything until I say go.";
+        + "Do not build anything until I say go. {handouts}";
 
     /// <summary><c>planAUnit.buttons</c>.</summary>
     public const string ClaudeButtonTitle = "Plan a Unit with Claude…";
@@ -46,6 +51,7 @@ public static class PlanAUnit
         {
             ["{course}"] = named,
             ["{howITeach}"] = ClaudeCodeLauncher.HowITeachSentence,
+            ["{handouts}"] = ClaudeCodeLauncher.HandoutsSentence,
         }));
     }
 

@@ -253,6 +253,18 @@ public static class ClaudeCodeLauncher
         "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
 
     /// <summary>
+    /// <c>outsideAgents.greetingHandoutsSentence</c> (the mac's #859 piece A).
+    /// Said today only at the end of Plan a Unit's message
+    /// (<see cref="PlanAUnit.OpeningMessage"/>, <c>planAUnit.courseIsNamedAs</c>);
+    /// the Revise greeting and Fix with…'s message do not carry it yet: that is
+    /// #895, held by name in <c>NamedGapLedger.FixWithGreetingCases</c>.
+    /// </summary>
+    internal const string HandoutsSentence =
+        "In your first reply, also tell me in one sentence that you can make printed handouts, worksheets and quizzes "
+        + "for this course, each with its answer key, as good-looking PDFs with diagrams and graphs, "
+        + "following the plantoir-handouts guide.";
+
+    /// <summary>
     /// The opening message of a Revise door: <see cref="PlainGreeting"/>, then
     /// each sentence that follows it in the order
     /// <c>app-rules.json</c> → <c>outsideAgents</c> fixes, one space before
@@ -333,6 +345,9 @@ public static class ClaudeCodeLauncher
     /// (<see cref="AssistWorkspace.DoorCourseVariable"/>, fix round ruling 3),
     /// which the server holds an <c>assist</c> lease on without locking to it.
     /// </summary>
+    /// <summary>This door's agent key, <c>outsideAgents.agents[claude].key</c>, written as <see cref="AssistWorkspace.DoorAssistantVariable"/> (#884).</summary>
+    internal const string DoorKey = "claude";
+
     internal static string ConfigText(string workspacePath, string server, string courseCode)
     {
         var config = new
@@ -343,7 +358,11 @@ public static class ClaudeCodeLauncher
                 {
                     command = server,
                     args = ServerArguments(workspacePath),
-                    env = new Dictionary<string, string> { [AssistWorkspace.DoorCourseVariable] = courseCode },
+                    env = new Dictionary<string, string>
+                    {
+                        [AssistWorkspace.DoorCourseVariable] = courseCode,
+                        [AssistWorkspace.DoorAssistantVariable] = DoorKey,
+                    },
                 },
             },
         };

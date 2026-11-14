@@ -164,6 +164,32 @@ internal static class NamedGapLedger
     /// <summary><c>app-rules.json</c> → <c>outsideAgents.planAUnit.buttons</c>, by <c>assistant</c> (<c>PlanAUnitTests.TheWordsAreTheContracts</c>).</summary>
     internal const string PlanAUnitButtons = "app-rules.json → outsideAgents.planAUnit.buttons";
 
+    // Wired in by #884's first part (2026-11-13, after the mac's #783 and
+    // #850 merged): each area below holds only what #884 or #889 builds.
+
+    /// <summary>
+    /// <c>app-rules.json</c> → <c>outsideAgents.agents</c>, by agent <c>key</c>: an
+    /// outside door this app does not have yet. "Has it" is read from
+    /// <c>SubjectMenuRules.ReviseTarget</c> and <c>CourseActivity.ReviseItem</c>
+    /// (<see cref="OutsideDoorsHeld"/>), so the entry closes the day either
+    /// gains the door. Read by <c>CodexLauncherTests.TheOutsideDoorsPassWhatTheContractSays</c>,
+    /// <c>ContractTests.TheOutsideAgentsMenuTitles_AreTheContracts</c>,
+    /// <c>FixWithAssistantContractTests.PiecesAndBoundsAreTheContracts</c> (the
+    /// <c>fixWith.buttons</c>, keyed alike), <c>SubjectMenusContractTests.Situation</c>
+    /// (<c>reviseBlocked</c>) and <c>DoorCourseHoldTests.TheReviseCasesAreTheContracts</c>
+    /// (a case's <c>item</c>).
+    /// </summary>
+    internal const string OutsideDoors = "app-rules.json → outsideAgents.agents";
+
+    /// <summary><c>shared-rules.json</c> → <c>subjectMenus.situationKeys</c>, by key: a situation this app cannot be in yet, so a case that names it is not run (<c>SubjectMenusContractTests</c>, <c>SidebarDeleteKeyContractTests</c>).</summary>
+    internal const string SubjectMenuSituationKeys = "shared-rules.json → subjectMenus.situationKeys";
+
+    /// <summary><c>shared-rules.json</c> → <c>activityTrail.mustRecord</c>, by event: an event this app records, whose <c>line</c> it writes in older words (<c>DoorCourseHoldTests.TheTrailLineIsTheContracts</c>); a held line must still differ.</summary>
+    internal const string TrailLineSaidDifferently = "shared-rules.json → activityTrail.mustRecord line (said in older words here)";
+
+    /// <summary><c>app-rules.json</c> → <c>outsideAgents.fixWith.greetingCases</c>, by case <c>name</c>: a message that carries <c>greetingHandoutsSentence</c> (#895, the mac's #859), held while it is the contract's message with exactly that sentence left out (<c>FixWithAssistantContractTests.GreetingCases</c>, <c>HeldGreetingCasesAreStillTheContracts</c>).</summary>
+    internal const string FixWithGreetingCases = "app-rules.json → outsideAgents.fixWith.greetingCases";
+
     /// <summary>
     /// <c>windows-app/test_launcher_rules.ps1</c>'s rows, by <c>"&lt;list&gt;\t&lt;name&gt;"</c>,
     /// the list spelled as the runner's <c>Report</c> names it (per launcher:
@@ -237,6 +263,28 @@ internal static class NamedGapLedger
     private const string Reason828 = "the launchers refusing an overlapping build of a section (#729), and what the app reads from that refusal, are #828's piece of v2.0.0, not built here yet";
     private const string Reason884 = "GitHub Copilot as a third outside assistant (the mac's #783) is #884's piece of v2.0.0; Windows has no Copilot door yet";
     private const string Reason854 = "#835's first part (a hold from a scheduled deploy named as one that is running, not 'set for later') is #854's piece of v2.0.0, not built here yet";
+
+    // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
+    private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
+    private const string Reason884Naming = "naming the assistant at work through {assistant} needs plantoir-mcp to write the door's key as the assist lease's fifth line (#884 item 7, with WorkLease); until then every Windows hold names none, and the contract's anyAssistant for that names GitHub Copilot, which a Windows teacher cannot open yet, so the older 'Claude or Codex' words stay the true ones";
+    private const string Reason885 = "what plantoir-mcp answers a call that names no section (or no howMany) is #885's piece of v2.0.0 (the mac's #865): measured first, then these sentences where it mis-answers; not built here yet";
+    private const string Reason895 = "every outside door's greeting saying it can make printed handouts (greetingHandoutsSentence, the mac's #859 piece A) is #895's piece of v2.0.0, not built here yet";
+    private const string Reason889 ="Open in Browser for a section deployed to a folder is #889's piece of v2.0.0 (the mac's #850), not built here yet";
+
+    /// <summary>
+    /// The outside doors the contract names that this app does not have,
+    /// checked both ways (<see cref="GapsIn(string, IEnumerable{string}, IEnumerable{string})"/>):
+    /// a door is "here" when <c>SubjectMenuRules.ReviseTarget</c> or
+    /// <c>CourseActivity.ReviseItem</c> carries it.
+    /// </summary>
+    internal static IReadOnlyCollection<string> OutsideDoorsHeld(IEnumerable<string> namedByTheContract) =>
+        GapsIn(OutsideDoors, namedByTheContract, OutsideDoorsHere());
+
+    /// <summary>The door keys this app has, read from its two Revise enums.</summary>
+    internal static IEnumerable<string> OutsideDoorsHere() =>
+        Enum.GetValues<Plantoir.Core.Models.SubjectMenuRules.ReviseTarget>().Select(Plantoir.Core.Models.SubjectMenuRules.ContractName)
+            .Concat(Enum.GetValues<Plantoir.Core.Models.CourseActivity.ReviseItem>().Select(item => item.ToString().ToLowerInvariant()))
+            .Distinct();
 
     /// <summary>A launcher-runner row key, as the runner builds it: the list label, a TAB, the case name.</summary>
     private static string Row(string list, string name) => list + "\t" + name;
@@ -326,6 +374,31 @@ internal static class NamedGapLedger
         // and is said filled when that piece adds it.
         Owed(MachineWordUsedIn, 824, V200, Reason824,
              "app-rules.json:credentialRequests.requests[7].explanation"),
+
+        // ---- #884's first part (2026-11-13): what the mac's #783 (GitHub
+        // Copilot, and the busy sentences naming the assistant) and #850
+        // (Open in Browser for a deployed folder) brought. The two doors'
+        // PLANTOIR_DOOR_ASSISTANT was built at once, not held.
+        Owed(OutsideDoors, 884, V200, Reason884Door, "copilot"),
+        Owed(SubjectMenuItems, 884, V200, Reason884Door, "courseReviseWithCopilot", "sectionReviseWithCopilot"),
+        Owed(AssistWordingSaidDifferently, 884, V200, Reason884Naming,
+             "availableOnceYouFinishRevisingWithClaude", "finishTheClaudeSessionFirst",
+             "claudeIsRevisingTheCourseRename", "claudeIsRevisingTheCourseRestore", "claudeIsRevisingTheCourseAddSection",
+             "backupKeptForAClaudeSession", "backupsKeptForAClaudeSession",
+             "finishTheClaudeSessionToDeleteItsBackup", "finishTheClaudeSessionToDeleteItsBackups"),
+        Owed(TrailLineSaidDifferently, 884, V200, Reason884Naming, "outside session held a course"),
+        Owed(ActivityTrailEvents, 889, V200, Reason889,
+             "deployed folder opened in the web browser", "deployed folder no longer shown", "deployed folder could not be opened"),
+        Owed(SubjectMenuItems, 889, V200, Reason889, "stopShowingDeployedFolder"),
+        Owed(SubjectMenuSituationKeys, 889, V200, Reason889, "deployedFolderReady", "deployedFolderShown"),
+        Owed(AssistWordingKeys, 885, V200, Reason885,
+             "noSectionNamed", "noSectionNamedAndNoSections", "addClassesNeedsAUnit", "addClassesNeedsACount"),
+        Owed(FixWithGreetingCases, 895, V200, Reason895,
+             "one problem on a page every section shares",             "a section's own page is not called shared, a problem with no page names none, and a deploy says so",
+             "Cloudflare's refusal alone is cleared by a deploy, not a preview",
+             "a refusal beside a figure needs a preview and a deploy, said in one sentence",
+             "a semicolon a row brings is written as a comma, and a very long course name is cut",
+             "a row's own braces are handed over as written, and a double quote becomes an apostrophe"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")

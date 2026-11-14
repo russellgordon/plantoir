@@ -391,6 +391,7 @@ nonisolated enum FixWithAssistant {
         let ending: String = afterTheRows
             + ClaudeCodeLauncher.howITeachGreetingSentence
             + planFirst
+            + ClaudeCodeLauncher.handoutsGreetingSentence + " "
             + fill(closing(for: rows), ["{section}": section])
 
         var named: [String] = []
