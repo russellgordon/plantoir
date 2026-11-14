@@ -3313,7 +3313,7 @@
         "assembledFrom": {"password": "example-password", "user": "example-user"},
         "expect": "Working folder /Users/person then curl -u [removed: token] https://plans.example/",
         "input": "Working folder /Users/sample then curl -u {user}:{password} https://plans.example/",
-        "why": "#853 round 2, found by the rule-order harness: #876's further words of a name ran on to any colon, so the name took `sample then curl -u example-user` and the password after the colon was written out (`/Users/person:example-password`, measured). A further word now ends at a colon only when white space or the end of the line follows it, and a word that starts with a dash or holds another rule's label is never part of a name."
+        "why": "#853 round 2, found by the rule-order harness: #876's further words of a name ran on to any colon, so the name took `sample then curl -u example-user` and the password after the colon was written out (`/Users/person:example-password`, measured). A further word now ends at a colon only when white space or the end of the line follows it, and a word that starts with a dash is never a further word of a name, nor, since the third round, one that would start another rule's match (a label word followed by `=` or `:`, or `Bearer`, `Authorization` or `Account` not followed by a letter; in the second round, any word holding one of them)."
       },
       {
         "expect": "Working folder /Users/person token: [removed: token]",
@@ -3379,6 +3379,16 @@
         "expect": "Working folder /Users/person/Documents",
         "input": "Working folder /Users/First Secretan/Documents",
         "why": "#853 round 3 (fix review m3), #876: a surname that holds a label word (`Secretan` holds `secret`; `Tokenfield` and `Accountly` the same) is taken with the rest of the name. A further word of a name is refused only when it would start another rule's match: a label word followed by `=` or `:`, or `Bearer`, `Authorization` or `Account` not followed by a letter. Before, any word holding one of those words anywhere stopped the name, and the line read `/Users/person Secretan/Documents` (measured)."
+      },
+      {
+        "expect": "password: Basic token: [removed: token]",
+        "input": "password: Basic token: an-invented-value",
+        "why": "#853 round 4 (Fable sweep F1): a label, then `Basic`, then another label and its value. Round 3 had `labelledSecret` take `Basic` and the word after it, but its refusals were checked before `Basic`, so the word after `Basic` was taken unchecked: here it took `token:` and wrote the value out (`password: [removed: token] an-invented-value`, measured; round 2's patterns removed it). The refusals are now checked after `Basic`, so the outer label leaves the inner label to take its own value, as it does for `token: Bearer …`. `Basic` is read as many times as it is written, so `password: Basic Basic …` loses its value too (before, the last word stayed, on `dev` as well)."
+      },
+      {
+        "expect": "password: Basic --account [removed: account id]",
+        "input": "password: Basic --account 9b2c4d6e8f0a1b3c5d7e9f0a1b2c3d4e",
+        "why": "#853 round 4 (Fable sweep F1): the same with an account flag after `Basic`. Round 3 took `--account` as the password and left the identifier (`password: [removed: token] 9b2c…`, measured). `accountFlag` takes it now, and the second pass changes nothing."
       }
     ],
     "note": "What is taken OUT of a problem report before it is written to disk, and - just as important - what is KEPT. Redaction happens as the file is written, never as it is sent: a report that is only safe when it leaves by the right button leaks the first time somebody opens the folder it sits in, and writing it safe is what lets a teacher open the file and see for themselves what they are about to send. The rules lean towards removing too much, because removing a build hash by mistake costs a moment of puzzlement while a surviving token costs the teacher their account - but the KEPT cases below are load-bearing, and a redactor that swallows them produces reports nobody can diagnose from. There is no way to switch this off in a development build: a redactor that is off while it is being worked on is a redactor nobody has run.",
@@ -3390,7 +3400,7 @@
     },
     "redactedAgainCases": {
       "rule": "Redacting a line that is already redacted changes nothing: `labelledSecret` and `bearerHeader`, and since #853 `basicAuthHeader` and `userFlag`, do not take a value that is already a placeholder (`(?!\\[removed: )` before their `\\S+`); since #853's second round `userFlag` refuses only a placeholder standing alone and reads one inside a value, and none of the three label rules takes another rule's label as its value, nor, since the third round, an account flag or label whose identifier is already a placeholder. Each `input` is redacted once more and must come back as `expect`.",
-      "why": "#780's implementation review: the trail writer redacts a line, cleans it and redacts it again whenever it held a control character, and before this the second pass read `[removed: token]` as a value and wrote `[removed: token] token]`. `basicAuthHeader` did the same until #853 (`Basic [removed: token] token]`, measured); its case is the seventh. #853's second round adds two: `token: Bearer [removed: token]`, which became `token: [removed: token] [removed: token]` when labelledSecret took the word `Bearer` as its value (measured), and a Windows path with doubled backslashes, which the home-folder rule now reads. #853's third round adds two more: `password: --account [removed: account id]` and `password: Account ID: [removed: account id]`, where the second pass took `--account` or `Account` as the label's value once the identifier beside it was a placeholder (measured; 1,012 of the fix review's 30,009 generated lines changed on a second pass that way). It was already happening in v1.9.3 wherever a caller redacted a line before handing it to the trail writer, which redacts again (the mac's `ScriptRunner` 'started …' line is one).",
+      "why": "#780's implementation review: the trail writer redacts a line, cleans it and redacts it again whenever it held a control character, and before this the second pass read `[removed: token]` as a value and wrote `[removed: token] token]`. `basicAuthHeader` did the same until #853 (`Basic [removed: token] token]`, measured); its case is the seventh. #853's second round adds two: `token: Bearer [removed: token]`, which became `token: [removed: token] [removed: token]` when labelledSecret took the word `Bearer` as its value (measured), and a Windows path with doubled backslashes, which the home-folder rule now reads. #853's third round adds two more: `password: --account [removed: account id]` and `password: Account ID: [removed: account id]`, where the second pass took `--account` or `Account` as the label's value once the identifier beside it was a placeholder (measured; 1,012 of the fix review's 30,009 generated lines changed on a second pass that way). #853's fourth round adds `password: Basic token: [removed: token]`, which round 3's patterns turned into `password: [removed: token] [removed: token]` on a second pass (measured). It was already happening in v1.9.3 wherever a caller redacted a line before handing it to the trail writer, which redacts again (the mac's `ScriptRunner` 'started …' line is one).",
       "cases": [
         { "input": "CLOUDFLARE_API_TOKEN=[removed: token]", "expect": "CLOUDFLARE_API_TOKEN=[removed: token]" },
         { "input": "Paste Cloudflare token: [removed: token]", "expect": "Paste Cloudflare token: [removed: token]" },
@@ -3405,7 +3415,8 @@
         { "input": "token: Bearer [removed: token]", "expect": "token: Bearer [removed: token]" },
         { "input": "Reading 'C:\\\\Users\\\\person\\\\AppData'", "expect": "Reading 'C:\\\\Users\\\\person\\\\AppData'" },
         { "input": "password: --account [removed: account id]", "expect": "password: --account [removed: account id]" },
-        { "input": "password: Account ID: [removed: account id]", "expect": "password: Account ID: [removed: account id]" }
+        { "input": "password: Account ID: [removed: account id]", "expect": "password: Account ID: [removed: account id]" },
+        { "input": "password: Basic token: [removed: token]", "expect": "password: Basic token: [removed: token]" }
       ]
     },
     "ruleOrder": {

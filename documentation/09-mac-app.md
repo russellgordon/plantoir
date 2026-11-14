@@ -13940,7 +13940,7 @@ and `example-password`):
 | `curl -u user:pass`, `--user user:pass`, `--user 'user:pass word'` | left whole | `userFlag`, new: a value holding a colon after `-u` or `--user`, a quoted value to its closing quote |
 | `ftp://user:pass@plans.example`, `sftp://…` | the username stayed (`ftp://example-user:[removed: email address]/`) | `urlUserinfo` reads any scheme |
 | a password with a raw `/` or a space | the username and part of the password stayed | `urlUserinfo` takes a `/`, and single spaces unless the password starts with a digit |
-| `Authorization: Basic [removed: token]` redacted again | `… [removed: token] token]` | `basicAuthHeader` and `userFlag` leave a placeholder alone, as #780 made the label rules do |
+| `Authorization: Basic [removed: token]` redacted again | `… [removed: token] token]` | `basicAuthHeader` leaves a placeholder alone, as #780 made the label rules do; `userFlag` leaves one alone that stands by itself, and since the second round reads one inside a value |
 | `/Users/First Last/…`, `C:\Users\First Last\…` | `/Users/person Last/…`: the second word of the name stayed | several words are taken when they run on to a separator, a quote, a colon or the end of the line |
 | `/users/name/…`, `c:\users\name\…` | left whole | the home-folder rules ignore case and keep the prefix as written |
 
@@ -14041,7 +14041,9 @@ stands alone. The email rule takes an address whose name another rule
 already took (`[removed: token]@school…`), except after `://`. A further
 word of a name ends at a colon only when white space or the end of the line
 follows it, and a word that starts with a dash or holds another rule's label
-is never part of a name. After all of it, 0 of 3,149 lines leak through the
+is never a further word of a name (the third round narrowed the second
+condition to a word that would start another rule's match: "How far a
+home-folder name reaches", below). After all of it, 0 of 3,149 lines leak through the
 whole redactor.
 
 Run as a pair alone in the other order, 51 lines in 14 pair-orders still
@@ -14173,7 +14175,9 @@ after `Authorization`, so `password: Basic xq7Kp2mZ`, `token: Basic …` and
 `password: Basic [removed: token]` cannot give up the `Basic` and take it
 as the value. A new case. The two header rules still refuse `Basic` and a
 word, so `Bearer Basic xq7Kp2mZ` is left to nobody; no product line has
-that shape, and it is named here rather than fixed.
+that shape, and it is named here rather than fixed. (The refusals were
+checked before `Basic`, which let the word after it through unchecked; the
+fourth round, below, checks them after it.)
 
 *A second pass that changes nothing.* The label rules refused an account
 flag or label followed by its 16-character identifier, but not once
@@ -14218,9 +14222,11 @@ leaking through the whole redactor, and the same 51 lines in 14 pair-orders
 as before when a pair runs alone in the other order. The three-rule corpus:
 the same 1,436 leaking lines as the round-two file (all nested, none side
 by side), and 12 lines that change on a second pass, from 1,012. The 300
-invented trail lines: identical to `dev`'s. Every trail line template in
-`activityTrail.mustRecord` (105, filled with invented values): none
-changed. The linear-time test, standalone, 40 runs on one core: the
+invented trail lines: identical to `dev`'s. Every string under
+`activityTrail.mustRecord` (845 strings in 194 entries, 69 of which carry
+a `line`), as written and with its placeholders filled with invented
+values: one changes, a `why` that holds a 40-character identifier, as on
+`dev`. The linear-time test, standalone, 40 runs on one core: the
 largest growth 10.6, against the limit of 50. `Basic ` repeated after a
 label, `--account ` repeated after a label, one 100,000-character word
 after a home folder, and a home folder followed by about 11,000 words each
@@ -14233,6 +14239,48 @@ itself a `-u` value, `https://name:-u 'other:secret'@host`, keeps `name`,
 because a further word of a password may not hold a colon (the price of
 the linear-time fix). The three-rule corpus finds 1,436 such lines, every
 one nested and none side by side.
+
+**The fourth round (#853 round 4): a label, `Basic`, and another label.**
+The batch's final sweep (Fable, 2026-11-14) found a leak the third round
+made. `labelledSecret` checked its refusals before `Basic`, so the word
+after `Basic` was taken without them. Measured, invented values:
+
+| Line | Round 3 | `dev` | Now |
+|---|---|---|---|
+| `password: Basic token: abcdefgh12345` | `password: [removed: token] abcdefgh12345` | `password: [removed: token] token: [removed: token]` | `password: Basic token: [removed: token]` |
+| `password: Basic --account <id>` | `password: [removed: token] <id>` | `password: [removed: token] --account [removed: account id]` | `password: Basic --account [removed: account id]` |
+| `password: Basic Account ID: <id>` | `password: [removed: token] ID: <id>` | `password: [removed: token] Account ID: [removed: account id]` | `password: Basic Account ID: [removed: account id]` |
+| `password: Basic Basic abc123` | `password: [removed: token] abc123` | `password: [removed: token] Basic abc123` | `password: [removed: token]` |
+
+`labelledSecret` now reads `Basic` first, as many times as it is written,
+`(?>(?:Basic\s+)*)`, and checks the placeholder and its refusals after it,
+so the outer label leaves an inner label to take its own value, as it does
+for `token: Bearer …`. Two new cases and one new `redactedAgainCases` entry
+(`password: Basic token: [removed: token]`, which round 3 turned into
+`password: [removed: token] [removed: token]`), all three red on round 3's
+file. The generated corpus cannot build this shape (its `Basic` always
+carries `Authorization`), which is why the third round's measurements
+missed it.
+
+REJECTED: the sweep's candidate, which kept the refusals before `Basic` and
+repeated the whole list after it. It gives the same output as the pattern
+above on every line measured (the 30,009 corpus lines and 110 probes; only
+`Basic Basic …` differs, from the `*`), because no refusal can match text
+that starts with `Basic` and a space. One list is shorter for Windows to
+copy and for the next reader to check.
+
+Measured again after the change: all 50 cases, 15 redacted-again cases and
+both order cases pass, and in Windows' current order they all pass too
+(only the name check tells that order from the pinned one). The 30,009
+corpus lines come out exactly as round 3 wrote them (1,436 leaking, all
+nested; 12 changing on a second pass). The pair harness: 3,149 lines, none
+leaking through the whole redactor, and the same 51 lines in 14 pair-orders
+when a pair runs alone. The 300 invented trail lines: identical to `dev`'s.
+The 845 strings under `activityTrail.mustRecord`, and the 71 `line` entries
+of #696's branch: none rewritten that `dev` leaves alone. The linear-time
+harness, 20 runs on one core: the largest growth 10.6, against 50.
+`password: ` followed by `Basic ` repeated, and `password: Basic token: `
+repeated, grew 8.7 and 9.3 times from 10,000 to 100,000 characters.
 
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app

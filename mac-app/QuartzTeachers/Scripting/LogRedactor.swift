@@ -170,7 +170,12 @@ nonisolated enum LogRedactor {
         // word after it together (`password: Basic abc…`, #853 round 3;
         // before, nobody took it). It reads `Basic` atomically, `(?>…)`, so
         // a second pass over `password: Basic [removed: token]` cannot give
-        // up the `Basic` and take it as the value. The two header rules
+        // up the `Basic` and take it as the value, and it reads every
+        // `Basic` written there (`Basic Basic …`). Its refusals are checked
+        // after `Basic`, so `password: Basic token: …` leaves the inner
+        // label to take its own value (#853 round 4; with the refusals
+        // checked before `Basic`, the word after it was taken unchecked
+        // and the value written out). The two header rules
         // still refuse `Basic` and a word, which leaves the contrived
         // `Bearer Basic abc…` to nobody (documentation 09 names it).
         RedactionRule(
@@ -185,7 +190,7 @@ nonisolated enum LogRedactor {
         ),
         RedactionRule(
             name: "labelledSecret",
-            pattern: #"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)(?!\[removed: )(?!Bearer\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*(?:[A-Za-z0-9]{16}|\[removed: account id\])|account\s*id\s*[:=]?\s*(?:[A-Za-z0-9]{16}|\[removed: account id\]))(?>(?:Basic\s+)?)(?!\[removed: )\S+"#,
+            pattern: #"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)(?>(?:Basic\s+)*)(?!\[removed: )(?!Bearer\s+\S|["']?Authorization["']?\s*[:=]|\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s+\S|--account[=\s]\s*(?:[A-Za-z0-9]{16}|\[removed: account id\])|account\s*id\s*[:=]?\s*(?:[A-Za-z0-9]{16}|\[removed: account id\]))\S+"#,
             replacement: "$1" + removedToken
         ),
         RedactionRule(

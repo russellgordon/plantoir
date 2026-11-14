@@ -1559,8 +1559,8 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   `problemReportRedaction.ruleOrder`, pinned by behaviour as well as by
   name since the third round, `ruleOrder.cases`; the `windows` issue for
   that batch says what Windows owes, and `documentation/09-mac-app.md` →
-  "The second round (#853 round 2)" and "The third round (#853 round 3)"
-  say why.)
+  "The second round (#853 round 2)", "The third round (#853 round 3)" and
+  "The fourth round (#853 round 4)" say why.)
   The contract keeps both cases' credentials in pieces (`assembledFrom`, mac
   #844), and `LogRedactorTests.Filled` builds the line before redacting it,
   as `problemReportRedaction.assembledInput.rule` says.
