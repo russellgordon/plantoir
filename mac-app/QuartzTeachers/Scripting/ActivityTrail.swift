@@ -112,8 +112,12 @@ nonisolated enum ActivityTrail {
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"
         /// A teacher put a section back to how it was when an assistant
-        /// conversation started ("Restore Section N…"). Carries the course,
-        /// the section and the backup's FILE NAME — never a page.
+        /// conversation started ("Restore Section N…"), or, since #897 C,
+        /// from Restore from Backup…'s "Restore Section N" for a backup made
+        /// for one section (`restoredOneSectionFromTheMenuLine`: the archive
+        /// made first and how many shared pages made since the backup were
+        /// hidden, too). Carries the course, the section and the backup's
+        /// FILE NAME — never a page.
         ///
         /// It is the one line that explains a section whose pages are older
         /// than the conversation that changed them. Without it the trail shows
@@ -1591,6 +1595,27 @@ nonisolated enum ActivityTrail {
             }
         }
         return nil
+    }
+
+    /// The words for `sectionRestored` when Restore from Backup… put ONE
+    /// section back (#897 C): the backup's file name, the archive made of the
+    /// whole course first, and how many shared pages made since the backup
+    /// were hidden from the section. File names and a count, never a page.
+    static func restoredOneSectionFromTheMenuLine(
+        backupFileName: String,
+        archiveFileName: String?,
+        pagesMadeSinceHidden: Int
+    ) -> String {
+        var line: String = "put the section back from \(backupFileName), from Restore from Backup…"
+        if let archiveFileName {
+            line += "; the course as it was is in Archived as \(archiveFileName)"
+        }
+        if pagesMadeSinceHidden == 1 {
+            line += "; 1 shared page made since the backup is now hidden from this section"
+        } else if pagesMadeSinceHidden > 1 {
+            line += "; \(pagesMadeSinceHidden) shared pages made since the backup are now hidden from this section"
+        }
+        return line
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and
