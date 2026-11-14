@@ -257,6 +257,11 @@ class ContractCaseTests(unittest.TestCase):
                         model.unreachable.discard("@B")
                     elif call == "foreignLine":
                         model.foreign_line()
+                    elif call == "foreignBlobLine":
+                        # Two lines of a newer version (its begin and applied)
+                        # with one number: the model counts the number and
+                        # the barrier; its blob is the Swift replay's to check.
+                        model.foreign_line()
                     elif call == "foreignStep":
                         seq = model.begin([{"kind": "move", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"

@@ -357,7 +357,6 @@ nonisolated enum UndoPruning {
                 return
             }
             try? FileManager.default.removeItem(at: writer.journal.segmentURL(number: number))
-            UndoFoldCache.forget(writer.journal.folderURL)
             index += 1
         }
     }

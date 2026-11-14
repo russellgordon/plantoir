@@ -667,25 +667,87 @@ nonisolated enum UndoLenient {
 }
 
 /// The one spelling of a moment in the journal: UTC, to the second.
+///
+/// Read by hand for the form every line is written in, because the fold reads
+/// a moment for every line and every step: a date formatter made per call
+/// cost about 80 microseconds each, which made a one-page publish cost 83 ms
+/// against a 4 MB journal (measured in the U1 harness, M4 Pro). Any other
+/// ISO 8601 form falls back to the formatter.
 nonisolated enum UndoMoment {
+
+    // MARK: - Stored properties
+
+    /// Formatters are safe to share between threads (Apple's Data Formatting
+    /// Guide); these are made once and never changed.
+    nonisolated(unsafe) private static let writing: ISO8601DateFormatter = {
+        let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    nonisolated(unsafe) private static let readingWithFractions: ISO8601DateFormatter = {
+        let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
     // MARK: - Functions
 
     static func text(_ moment: Date) -> String {
-        let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: moment)
+        return writing.string(from: moment)
     }
 
-    /// A moment as the journal writes it, or with fractions of a second.
+    /// A moment as the journal writes it, or any ISO 8601 moment with an
+    /// offset or fractions of a second.
     static func date(_ text: String) -> Date? {
-        let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        if let plain = formatter.date(from: text) {
+        if let quick = UndoMoment.quickDate(text) {
+            return quick
+        }
+        if let plain = writing.date(from: text) {
             return plain
         }
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: text)
+        return readingWithFractions.date(from: text)
+    }
+
+    /// `2026-11-13T21:04:05Z` exactly, read without a formatter; nil for any
+    /// other shape (which the formatter then reads).
+    static func quickDate(_ text: String) -> Date? {
+        let bytes: [UInt8] = Array(text.utf8)
+        if bytes.count != 20 || bytes[4] != 0x2D || bytes[7] != 0x2D || bytes[10] != 0x54
+            || bytes[13] != 0x3A || bytes[16] != 0x3A || bytes[19] != 0x5A {
+            return nil
+        }
+        func number(_ from: Int, _ count: Int) -> Int? {
+            var value: Int = 0
+            var index: Int = from
+            while index < from + count {
+                let byte: UInt8 = bytes[index]
+                if byte < 0x30 || byte > 0x39 {
+                    return nil
+                }
+                value = value * 10 + Int(byte - 0x30)
+                index += 1
+            }
+            return value
+        }
+        guard let year = number(0, 4), let month = number(5, 2), let day = number(8, 2),
+              let hour = number(11, 2), let minute = number(14, 2), let second = number(17, 2) else {
+            return nil
+        }
+        if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60 {
+            return nil
+        }
+        // Days from 1970-01-01 to the date in the proleptic Gregorian
+        // calendar (Howard Hinnant's days_from_civil).
+        let shiftedYear: Int = month <= 2 ? year - 1 : year
+        let era: Int = (shiftedYear >= 0 ? shiftedYear : shiftedYear - 399) / 400
+        let yearOfEra: Int = shiftedYear - era * 400
+        let shiftedMonth: Int = month > 2 ? month - 3 : month + 9
+        let dayOfYear: Int = (153 * shiftedMonth + 2) / 5 + day - 1
+        let dayOfEra: Int = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+        let days: Int = era * 146_097 + dayOfEra - 719_468
+        let seconds: Int = days * 86_400 + hour * 3_600 + minute * 60 + second
+        return Date(timeIntervalSince1970: TimeInterval(seconds))
     }
 }

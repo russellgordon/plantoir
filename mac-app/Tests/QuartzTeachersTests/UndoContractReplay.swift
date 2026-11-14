@@ -568,6 +568,18 @@ nonisolated enum UndoContractReplay {
                 } else if value == "foreignLine" {
                     let next: Int = try journal().read().highestSeq + 1
                     try appendRaw("{\"v\":2,\"seq\":\(next),\"event\":\"begin\",\"step\":{\"seq\":\(next),\"later\":true}}", to: journal())
+                } else if value == "foreignBlobLine" {
+                    // A newer version's step this version cannot read at all,
+                    // naming a blob: nothing in it can say the blob is needed.
+                    let next: Int = try journal().read().highestSeq + 1
+                    let blob: Data = Data("content a newer Plantoir keeps for a line this one cannot read".utf8)
+                    let sha: String = UndoHash.sha256(of: blob)
+                    try journal().withLock { writer in
+                        try writer.writeBlob(blob)
+                    }
+                    foreignBlob = sha
+                    try appendRaw("{\"v\":2,\"seq\":\(next),\"event\":\"begin\",\"step\":{\"seq\":\(next),\"ops\":[{\"kind\":\"later\",\"blobs\":[\"\(sha)\"]}]}}", to: journal())
+                    try appendRaw("{\"v\":2,\"seq\":\(next),\"event\":\"applied\"}", to: journal())
                 } else if value == "foreignStep" {
                     let next: Int = try journal().read().highestSeq + 1
                     let blob: Data = Data("content a newer Plantoir keeps".utf8)

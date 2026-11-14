@@ -89,14 +89,24 @@ nonisolated struct UndoStepRecord: Equatable, Sendable {
     /// list, it leaves it (`UndoFold.clearingTakesStepsBegunBeforeIt`).
     var clearedWhileInFlight: Bool = false
 
+    /// The step's `madeAt`, read once when its `begin` is folded.
+    let madeAt: Date?
+
     // MARK: - Computed properties
 
     var isReadable: Bool {
         return step.isReadable
     }
 
-    var madeAt: Date? {
-        return UndoMoment.date(step.madeAt)
+    // MARK: - Initializer
+
+    init(step: UndoStep, phase: UndoStepPhase, process: UndoProcess?, segments: Set<Int>, beginPosition: UndoPosition) {
+        self.step = step
+        self.phase = phase
+        self.process = process
+        self.segments = segments
+        self.beginPosition = beginPosition
+        self.madeAt = UndoMoment.date(step.madeAt)
     }
 }
 

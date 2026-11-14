@@ -276,10 +276,12 @@ nonisolated final class UndoJournal: @unchecked Sendable {
 ///
 /// Per process rather than per `UndoJournal`, because the app makes a new
 /// `UndoJournal` for every action. Each segment's remembered end is checked
-/// before it is trusted: the bytes just before it must be the ones read
-/// last time, the file must be at least that long, and no segment may have
-/// gone or appeared below the newest one read. Anything else, a rewrite by
-/// another process included, and the whole journal is read again.
+/// before it is trusted: the file must be the same file, at least that long,
+/// with the bytes just before the end the ones read last time, and no
+/// segment may have appeared below the newest one read or gone from
+/// anywhere but the oldest end (where pruning deletes, and only what is off
+/// the list). Anything else, a rewrite by another process included, and the
+/// whole journal is read again.
 nonisolated enum UndoFoldCache {
 
     // MARK: - Stored properties
@@ -331,6 +333,12 @@ nonisolated enum UndoFoldCache {
         var entry: Entry
         if let cached, stillValid(cached, numbers: numbers, journal: journal) {
             entry = cached
+            for (number, _) in cached.ends where !numbers.contains(number) {
+                entry.ends[number] = nil
+                entry.tails[number] = nil
+                entry.lineCounts[number] = nil
+                entry.fileNumbers[number] = nil
+            }
             readOns += 1
         } else {
             entry = Entry(fold: UndoFold(), ends: [:], tails: [:], lineCounts: [:])
@@ -385,8 +393,17 @@ nonisolated enum UndoFoldCache {
         for (number, _) in entry.ends {
             newestRead = max(newestRead, number)
         }
+        var lowestPresent: Int = Int.max
+        for number in numbers {
+            lowestPresent = min(lowestPresent, number)
+        }
         for (number, end) in entry.ends {
             if !numbers.contains(number) {
+                // Deleted from the oldest end, as pruning deletes: what it
+                // held is off the list, so the fold stays good.
+                if number < lowestPresent {
+                    continue
+                }
                 return false
             }
             let url: URL = journal.segmentURL(number: number)
