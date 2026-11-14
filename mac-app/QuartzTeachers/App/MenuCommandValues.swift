@@ -75,8 +75,7 @@ struct SectionSiteCommands: Equatable {
     var lastChangeIsHere: Bool = false
     var verbIsRunning: Bool = false
 
-    /// What Add Next Class in a New Unit and Duplicate as Next Class… are
-    /// greyed by (#897), read by the section window when it is shown and
+    /// What Add Class… and the ways its sheet offers are greyed by (#897), read by the section window when it is shown and
     /// after each function, never on every drawing of the menu.
     var classPagesAreNumbered: Bool = false
     var unitWordRenameUnfinished: Bool = false

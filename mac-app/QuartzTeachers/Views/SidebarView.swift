@@ -1762,10 +1762,10 @@ struct SidebarView: View {
             sectionVerbItem("Publish Pages…", .publishPages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
-            sectionVerbItem("Add Next Class", .addNextClass, course: course, sectionNumber: sectionNumber, row: row)
-            // #897's two items are in the menu bar only until Russell rules
-            // on this menu. Adding them is one `sectionVerbItem` line each:
-            // the request reaches `performVerb`, which already runs both.
+            // Add Next Class was the fourth item here until #897 replaced it
+            // with Section ▸ Add Class…, which is in the menu bar only
+            // (Russell, 2026-11-13 night). Putting it here would be one
+            // `sectionVerbItem` line: the request reaches `performVerb`.
             Divider()
         }
         // One item or the other, never a
@@ -2195,7 +2195,7 @@ struct SidebarView: View {
              .saveCourseSettings, .revertCourseSettings, .courseReviseWithLocalAssistant,
              .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder, .back, .forward, .reloadPage,
              .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .addNextClassInANewUnit, .duplicateAsNextClass,
+             .addClass,
              .reDateClasses, .makeRoomForClasses, .classDates:
             // Not the sidebar's: File, Course Settings and the section
             // window own these — the assistant's functions run in the

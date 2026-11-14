@@ -61,8 +61,8 @@ final class AssistToolRunner {
     ///
     /// **`.menu` is the third client (#457 batch B):** Section ▸ Publish
     /// Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo
-    /// Last Change, Add Next Class, Re-date Classes… and Make Room for
-    /// Classes…. The menu builds its call in code (`SectionVerbs`) and runs
+    /// Last Change, Add Class… (Add Next Class until #897), Re-date Classes…
+    /// and Make Room for Classes…. The menu builds its call in code (`SectionVerbs`) and runs
     /// it through `run(call:)`, so the reference-course gate and every check
     /// in the tool are the ones the assistant meets — and a teacher who
     /// declined the assistant can use every one of them. It behaves as
@@ -4475,7 +4475,8 @@ final class AssistToolRunner {
 
     // MARK: - Duplicating a class as the next one, from the menu (#897)
 
-    /// The argument Section ▸ Duplicate as Next Class… names its source by:
+    /// The argument Section ▸ Add Class…, as a copy of a class, names its
+    /// source by:
     /// the page's path inside the course folder, ".md" included
     /// (`SectionVerbs.coursePath(ofPageAt:in:)`).
     ///
@@ -4693,7 +4694,7 @@ final class AssistToolRunner {
         return AssistToolOutcome.wrote(summary, detail: request.plan.description + "\n\nDone: " + summary)
     }
 
-    /// Add Next Class in a New Unit, and the duplicate, wait for an
+    /// Add Class…, in a new unit and as a copy, waits for an
     /// unfinished unit-word rename (#897). Only on `.menu`, and only for the
     /// new unit: the window's "Start a new unit" phrasing and every other
     /// call behave exactly as before.

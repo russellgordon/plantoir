@@ -118,13 +118,10 @@ extension SectionDetailView {
         if item == .undoLastChange {
             return lastMenuChangeIsHere
         }
-        // #897: the menu greys these on facts read a moment ago; asked again
-        // here. An unfinished unit-word rename is checked in full by the
-        // runner, which answers with a sentence rather than a beep.
-        if item == .addNextClassInANewUnit && course.configuration.classPageNaming.isNumbered {
-            return false
-        }
-        if item == .duplicateAsNextClass && !SectionVerbs.hasAClassPage(forSection: sectionNumber, in: course) {
+        // #897: the menu greys Add Class… on facts read a moment ago; asked
+        // again here. An unfinished unit-word rename is checked in full by
+        // the runner, which answers with a sentence rather than a beep.
+        if item == .addClass && addClassWaysNow().isEmpty {
             return false
         }
         return true
@@ -185,32 +182,22 @@ extension SectionDetailView {
             model.classRows = SectionVerbSheetModel.classRows(course: course, sectionNumber: sectionNumber)
             model.chosenClass = model.classRows.first?.title ?? ""
             verbSheet = model
-        case .addNextClass:
-            if askForDatesFirst(before: item) {
-                return
-            }
-            runAtOnce(SectionVerbs.addNextClass(course: course.code, section: sectionNumber), item: item, verbs: verbs,
-                      title: AssistWording.menuAddNextClassTitle(noun: course.configuration.classNoun))
-        case .addNextClassInANewUnit:
-            // #897: at once, as Add Next Class (the page arrives hidden, and
-            // Undo Last Change takes it away).
-            if askForDatesFirst(before: item) {
-                return
-            }
-            runAtOnce(SectionVerbs.addNextClassInANewUnit(course: course.code, section: sectionNumber), item: item,
-                      verbs: verbs, title: AssistWording.menuAddNextClassInANewUnitTitle(noun: course.configuration.classNoun))
-        case .duplicateAsNextClass:
-            // #897: choose the class, see the plan, then Duplicate.
+        case .addClass:
+            // #897: how the class is added, then (for a copy) which class and
+            // the plan. Each way is one change, and Undo Last Change takes it
+            // away whole.
             if askForDatesFirst(before: item) {
                 return
             }
             let model: SectionVerbSheetModel = SectionVerbSheetModel(
-                kind: .duplicateClass, course: course, sectionNumber: sectionNumber,
-                title: AssistWording.menuDuplicateTitle(
+                kind: .addClass, course: course, sectionNumber: sectionNumber,
+                title: AssistWording.menuAddClassTitle(
                     course: course.displayCode, section: String(sectionNumber), noun: course.configuration.classNoun
                 ),
                 item: item
             )
+            model.availableWays = addClassWaysNow()
+            model.way = model.availableWays.first
             model.sourceRows = SectionVerbSheetModel.sourceRows(course: course, sectionNumber: sectionNumber)
             verbSheet = model
         case .undoLastChange:
@@ -229,9 +216,8 @@ extension SectionDetailView {
         }
     }
 
-    /// Add Next Class, Re-date Classes… and Make Room for Classes… need the
-    /// section's class dates (and, since #897, Add Next Class in a New Unit
-    /// and Duplicate as Next Class…). With none on file, THIS window asks for them
+    /// Add Class…, Re-date Classes… and Make Room for Classes… need the
+    /// section's class dates. With none on file, THIS window asks for them
     /// first — its own Class Dates sheet, never the assistant's prompt, which
     /// only the assistant's window shows (#457's plan review, blocker 1) —
     /// and the function runs once they are written down. True when it asked.
@@ -244,10 +230,8 @@ extension SectionDetailView {
             kind: .classDates, course: course, sectionNumber: sectionNumber, title: "", item: .classDates
         )
         switch item {
-        case .addNextClass, .addNextClassInANewUnit:
+        case .addClass:
             model.reason = AssistWording.datesForTheNextPage(noun: noun)
-        case .duplicateAsNextClass:
-            model.reason = AssistWording.datesToDuplicate(noun: noun)
         case .reDateClasses:
             model.reason = AssistWording.datesToReDate(noun: noun)
         default:
@@ -262,11 +246,22 @@ extension SectionDetailView {
         return true
     }
 
-    /// Undo Last Change, Rebuild Preview and Add Next Class: no plan, so they
+    /// Add Class…'s ways for this section now (#897), from facts read fresh
+    /// at the click rather than the ones the menu was drawn with.
+    func addClassWaysNow() -> [SubjectMenuRules.AddClassWay] {
+        let facts: SectionVerbs.ClassFacts = SectionVerbs.classFacts(forSection: sectionNumber, in: course)
+        var situation: SubjectMenuRules.Situation = SubjectMenuRules.Situation()
+        situation.classPagesAreNumbered = facts.classPagesAreNumbered
+        situation.unitWordRenameUnfinished = facts.unitWordRenameUnfinished
+        situation.hasAClassPage = facts.hasAClassPage
+        return SubjectMenuRules.addClassWays(situation)
+    }
+
+    /// Undo Last Change and Rebuild Preview: no plan, so they
     /// run at once, and what they said is shown — except a Rebuild Preview
     /// that is rebuilding, which the teacher is watching happen.
     ///
-    /// Undo Last Change and Add Next Class show their sheet AT ONCE, working
+    /// Undo Last Change shows its sheet AT ONCE, working
     /// — a copy of the course is saved first, seconds for a big one (#351) —
     /// and it turns into the answer. Rebuild Preview shows nothing while it
     /// rebuilds: the teacher is watching that happen.
@@ -402,8 +397,22 @@ extension SectionDetailView {
             model.pendingCall = SectionVerbs.makeRoom(
                 course: code, section: sectionNumber, unit: unit, atDay: atDay, howMany: model.howMany, planning: false
             )
-        case .duplicateClass:
-            guard let sourcePath = model.chosenSource else {
+        case .addClass:
+            // The next class in this unit and a new unit have no plan: each
+            // is added at once, as Add Next Class was (Russell's decision 11:
+            // the page arrives hidden and can be undone), and the sheet
+            // shows the answer.
+            if model.way == .nextInThisUnit {
+                model.pendingCall = SectionVerbs.addNextClass(course: code, section: sectionNumber)
+                goAhead(model)
+                return
+            }
+            if model.way == .inANewUnit {
+                model.pendingCall = SectionVerbs.addNextClassInANewUnit(course: code, section: sectionNumber)
+                goAhead(model)
+                return
+            }
+            guard model.way == .asACopyOfAClass, let sourcePath = model.chosenSource else {
                 return
             }
             planCall = SectionVerbs.duplicateAsNextClass(
@@ -498,6 +507,18 @@ extension SectionDetailView {
             return count == 1 ? "1 page ticked" : "\(count) pages ticked"
         case .makeRoom:
             return model.howMany == 1 ? "room for 1" : "room for \(model.howMany)"
+        case .addClass:
+            // How it was added, never the class's title (#897).
+            switch model.way {
+            case .nextInThisUnit:
+                return "the next class in this unit"
+            case .inANewUnit:
+                return "in a new unit"
+            case .asACopyOfAClass:
+                return "as a copy of a class"
+            case nil:
+                return ""
+            }
         default:
             return ""
         }

@@ -283,13 +283,12 @@ struct SectionDetailView: View {
     @State var afterTheVerbSheet: (() -> Void)?
 
     /// The answer of a function with no sheet of its own (Undo Last Change,
-    /// a refused Rebuild Preview, Add Next Class) that arrived while
+    /// a refused Rebuild Preview) that arrived while
     /// something else was on the window — shown when that has gone, never
     /// dropped (#457 batch B's review, note 4).
     @State var pendingVerbResult: SectionVerbSheetModel?
 
-    /// What Add Next Class in a New Unit and Duplicate as Next Class… are
-    /// greyed by (#897), read with the " — Edited" marker: when the section
+    /// What Add Class… and the ways its sheet offers are greyed by (#897), read with the " — Edited" marker: when the section
     /// is shown, when its window comes forward, and after each function —
     /// never on every drawing of the menu.
     @State var menuClassFacts: SectionVerbs.ClassFacts = SectionVerbs.ClassFacts()
@@ -1851,7 +1850,7 @@ struct SectionDetailView: View {
         case .stopShowingDeployedFolder:
             stopShowingTheDeployedFolder()
         case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .addNextClassInANewUnit, .duplicateAsNextClass,
+             .addClass,
              .reDateClasses, .makeRoomForClasses, .classDates:
             performVerb(item)
         default:

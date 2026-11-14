@@ -4,9 +4,9 @@ import Observation
 /// The assistant's functions, run from the Section menu (#457 batch B).
 ///
 /// Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview,
-/// Undo Last Change, Add Next Class, Re-date Classes… and Make Room for
-/// Classes… (and, since #897, Add Next Class in a New Unit and Duplicate as
-/// Next Class…) are the assistant's tools, and they were reachable ONLY through
+/// Undo Last Change, Add Class… (Add Next Class until #897; it also adds a
+/// class in a new unit or as a copy of one), Re-date Classes… and Make Room
+/// for Classes… are the assistant's tools, and they were reachable ONLY through
 /// the assistant — so a teacher who declined its download could not publish
 /// a page by name, take a change back, or make room for a class at all.
 ///
@@ -220,12 +220,8 @@ final class SectionVerbs {
             return "Section ▸ Rebuild Preview"
         case .undoLastChange:
             return "Section ▸ Undo Last Change"
-        case .addNextClass:
-            return "Section ▸ Add Next Class"
-        case .addNextClassInANewUnit:
-            return "Section ▸ Add Next Class in a New Unit"
-        case .duplicateAsNextClass:
-            return "Section ▸ Duplicate as Next Class…"
+        case .addClass:
+            return "Section ▸ Add Class…"
         case .reDateClasses:
             return "Section ▸ Re-date Classes…"
         case .makeRoomForClasses:
@@ -284,7 +280,7 @@ final class SectionVerbs {
         return call("add_next_class", ["course": course, "section": section])
     }
 
-    /// Add Next Class in a New Unit (#897): `unit: "next"`, the argument the
+    /// Add Class… in a new unit (#897): `unit: "next"`, the argument the
     /// window's "Start a new unit for the next class" phrasing sends. The
     /// runner already read it; no schema shows it, so nothing the local
     /// model is shown moves.
@@ -292,7 +288,7 @@ final class SectionVerbs {
         return call("add_next_class", ["course": course, "section": section, "unit": "next"])
     }
 
-    /// Duplicate as Next Class… (or its plan, #897): the source named by its
+    /// Add Class… as a copy of a class (or its plan, #897): the source named by its
     /// FILE inside the course (`coursePath(ofPageAt:in:)`), in an argument
     /// the runner reads from the menu only
     /// (`AssistToolRunner.menuDuplicateFileArgument`). Never `duplicate`,
@@ -326,7 +322,7 @@ final class SectionVerbs {
     }
 
     /// A page's path inside its course folder, `.md` included —
-    /// "section1/All Classes/Unit 2, Day 3.md" — for the menu's duplicate
+    /// "section1/All Classes/Unit 2, Day 3.md" — for Add Class…'s copy
     /// (#897), which names exactly one file.
     static func coursePath(ofPageAt fileURL: URL, in course: Course) -> String {
         let page: String = fileURL.standardizedFileURL.path
@@ -337,10 +333,10 @@ final class SectionVerbs {
         return fileURL.lastPathComponent
     }
 
-    // MARK: - What the #897 items are greyed by
+    // MARK: - What Add Class… is greyed by (#897)
 
-    /// The three facts Add Next Class in a New Unit and Duplicate as Next
-    /// Class… are greyed by. Read when the section window is shown, when it
+    /// The three facts Add Class… and its ways are greyed by
+    /// (`SubjectMenuRules.addClassWays`). Read when the section window is shown, when it
     /// comes to the front and after each function, never per drawing of the
     /// menu (the plan review's amendment 4).
     struct ClassFacts: Equatable {

@@ -760,15 +760,24 @@ enum AssistContract {
             "menuUndoLastChangeTitle": AssistWording.menuUndoLastChangeTitle,
             "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
             "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
-            // #897: Add Next Class in a New Unit and Duplicate as Next Class….
-            "menuAddNextClassInANewUnitTitle": AssistWording.menuAddNextClassInANewUnitTitle(),
-            "menuAddNextClassInANewUnitTitleForAMeeting": AssistWording.menuAddNextClassInANewUnitTitle(
-                noun: .meeting
-            ),
-            "menuDuplicateTitle": AssistWording.menuDuplicateTitle(course: course, section: section),
-            "menuDuplicateTitleForAMeeting": AssistWording.menuDuplicateTitle(
+            // #897: Section ▸ Add Class…, in a new unit or as a copy of a class.
+            "menuAddClassTitle": AssistWording.menuAddClassTitle(course: course, section: section),
+            "menuAddClassTitleForAMeeting": AssistWording.menuAddClassTitle(
                 course: course, section: section, noun: .meeting
             ),
+            "menuHowToAddAClass": AssistWording.menuHowToAddAClass(),
+            "menuHowToAddAClassForAMeeting": AssistWording.menuHowToAddAClass(noun: .meeting),
+            "menuAddClassNextInThisUnit": AssistWording.menuAddClassNextInThisUnit(),
+            "menuAddClassNextInThisUnitForAMeeting": AssistWording.menuAddClassNextInThisUnit(noun: .meeting),
+            "menuAddClassNextInANumberedCourse": AssistWording.menuAddClassNextInThisUnit(numbered: true),
+            "menuAddClassNextInANumberedCourseForAMeeting": AssistWording.menuAddClassNextInThisUnit(
+                noun: .meeting, numbered: true
+            ),
+            "menuAddClassInANewUnit": AssistWording.menuAddClassInANewUnit(),
+            "menuAddClassInANewUnitForAMeeting": AssistWording.menuAddClassInANewUnit(noun: .meeting),
+            "menuAddClassAsACopy": AssistWording.menuAddClassAsACopy(),
+            "menuAddClassAsACopyForAMeeting": AssistWording.menuAddClassAsACopy(noun: .meeting),
+            "menuAddButton": AssistWording.menuAddButton,
             "menuPickClassToDuplicate": AssistWording.menuPickClassToDuplicate(),
             "menuPickClassToDuplicateForAMeeting": AssistWording.menuPickClassToDuplicate(noun: .meeting),
             "menuDuplicateButton": AssistWording.menuDuplicateButton,

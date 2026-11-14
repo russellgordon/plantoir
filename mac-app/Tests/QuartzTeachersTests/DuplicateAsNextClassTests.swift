@@ -1,8 +1,10 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// Section ▸ Add Next Class in a New Unit and Duplicate as Next Class… (#897):
-/// what only the built-in assistant's window could do, put on the menu.
+/// Section ▸ Add Class… (#897), which replaced Add Next Class: its sheet adds
+/// the next class in this unit, the first class of a new unit, or a copy of
+/// one of this section's classes. The last two were what only the built-in
+/// assistant's window could do.
 ///
 /// Three things are pinned here. The menu's duplicate does what
 /// `class-planning.json` → `duplicatingAsTheNextClass` says (the copy is the
@@ -257,16 +259,15 @@ final class DuplicateAsNextClassTests: XCTestCase {
         XCTAssertEqual(duplicate.summary, AssistWording.menuUnitWordRenameUnfinished())
         XCTAssertEqual(DuplicateAsNextClassTests.everyPage(in: made.course), before)
 
-        // And the menu greys both on the cheap fact.
+        // And the sheet greys both ways on the cheap fact, while Add Class…
+        // itself, and its next class in this unit, stay as Add Next Class was.
         let facts: SectionVerbs.ClassFacts = SectionVerbs.classFacts(forSection: 1, in: made.course)
         XCTAssertTrue(facts.unitWordRenameUnfinished)
         var situation: SubjectMenuRules.Situation = DuplicateAsNextClassTests.idleSection()
         situation.unitWordRenameUnfinished = facts.unitWordRenameUnfinished
         situation.hasAClassPage = facts.hasAClassPage
-        let enabled: Set<SubjectMenuRules.Item> = SubjectMenuRules.enabledItems(situation)
-        XCTAssertFalse(enabled.contains(.addNextClassInANewUnit))
-        XCTAssertFalse(enabled.contains(.duplicateAsNextClass))
-        XCTAssertTrue(enabled.contains(.addNextClass))
+        XCTAssertEqual(SubjectMenuRules.addClassWays(situation), [.nextInThisUnit])
+        XCTAssertTrue(SubjectMenuRules.enabledItems(situation).contains(.addClass))
     }
 
     // MARK: - The menu's duplicate, beyond the contract
@@ -339,9 +340,53 @@ final class DuplicateAsNextClassTests: XCTestCase {
 
     /// Each item is on the trail by where it is in the menus, never by its
     /// raw name (`menuPath`'s `default:` returns the raw value).
-    func testTheTrailNamesBothItemsByTheirPlaceInTheMenus() {
-        XCTAssertEqual(SectionVerbs.menuPath(of: .addNextClassInANewUnit), "Section ▸ Add Next Class in a New Unit")
-        XCTAssertEqual(SectionVerbs.menuPath(of: .duplicateAsNextClass), "Section ▸ Duplicate as Next Class…")
+    func testTheTrailNamesTheItemByItsPlaceInTheMenus() {
+        XCTAssertEqual(SectionVerbs.menuPath(of: .addClass), "Section ▸ Add Class…")
+    }
+
+    /// `subjectMenus.addClassSheet`: the ways in the contract's order are
+    /// the app's, each names a sentence, and every case offers exactly the
+    /// ways it says — so a way added on one side alone fails here.
+    func testTheAddClassWaysAreTheContracts() throws {
+        let section: [String: Any] = try SubjectMenuRulesTests.section()
+        let defaults: [String: Any] = try XCTUnwrap(section["situationDefaults"] as? [String: Any])
+        let sheet: [String: Any] = try XCTUnwrap(section["addClassSheet"] as? [String: Any])
+        var contractWays: [String] = []
+        for way in try XCTUnwrap(sheet["ways"] as? [[String: Any]]) {
+            contractWays.append(try XCTUnwrap(way["way"] as? String))
+            XCTAssertTrue(try XCTUnwrap(way["wording"] as? String).hasPrefix("wording.menuAddClass"))
+        }
+        var appWays: [String] = []
+        for way in SubjectMenuRules.AddClassWay.allCases {
+            appWays.append(way.rawValue)
+        }
+        XCTAssertEqual(contractWays, appWays)
+        let cases: [[String: Any]] = try XCTUnwrap(sheet["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 5)
+        for testCase in cases {
+            let why: String = try XCTUnwrap(testCase["why"] as? String)
+            let situation: SubjectMenuRules.Situation = try SubjectMenuRulesTests.situation(
+                from: try XCTUnwrap(testCase["situation"] as? [String: Any]), defaults: defaults
+            )
+            var offered: [String] = []
+            for way in SubjectMenuRules.addClassWays(situation) {
+                offered.append(way.rawValue)
+            }
+            XCTAssertEqual(offered, try XCTUnwrap(testCase["ways"] as? [String]), why)
+        }
+    }
+
+    /// Each way's line in the sheet, in the menu's voice, and a club's first
+    /// way says no unit.
+    func testEachWayHasItsLine() {
+        for way in SubjectMenuRules.AddClassWay.allCases {
+            for numbered in [false, true] {
+                let line: String = SectionVerbSheet.label(of: way, noun: .meeting, numbered: numbered)
+                XCTAssertFalse(line.isEmpty)
+                XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(line), line)
+            }
+        }
+        XCTAssertFalse(SectionVerbSheet.label(of: .nextInThisUnit, noun: .meeting, numbered: true).contains("unit"))
     }
 
     // MARK: - The surface the local model is shown
@@ -380,9 +425,13 @@ final class DuplicateAsNextClassTests: XCTestCase {
 
     func testTheNewSentencesAreInTheMenusVoice() {
         let sentences: [String] = [
-            AssistWording.menuAddNextClassInANewUnitTitle(),
-            AssistWording.menuAddNextClassInANewUnitTitle(noun: .meeting),
-            AssistWording.menuDuplicateTitle(course: "ICS3U", section: "1"),
+            AssistWording.menuAddClassTitle(course: "ICS3U", section: "1"),
+            AssistWording.menuAddClassTitle(course: "ICS3U", section: "1", noun: .meeting),
+            AssistWording.menuHowToAddAClass(),
+            AssistWording.menuAddClassNextInThisUnit(),
+            AssistWording.menuAddClassInANewUnit(),
+            AssistWording.menuAddClassAsACopy(),
+            AssistWording.menuAddButton,
             AssistWording.menuPickClassToDuplicate(),
             AssistWording.menuPickClassToDuplicate(noun: .meeting),
             AssistWording.menuDuplicateButton,

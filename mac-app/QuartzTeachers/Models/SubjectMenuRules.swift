@@ -103,12 +103,12 @@ nonisolated enum SubjectMenuRules {
         case publishClassForADate
         case rebuildPreview
         case undoLastChange
-        case addNextClass
-        /// Add Next Class in a New Unit and Duplicate as Next Class… (#897):
-        /// what only the built-in assistant's window could do before, run
-        /// through the same tool from the menu.
-        case addNextClassInANewUnit
-        case duplicateAsNextClass
+        /// Add Class… (#897): one item, whose sheet asks HOW the class is
+        /// added (`AddClassWay`): the next class in this unit (what Add Next
+        /// Class did, the item it replaces), in a new unit, or as a copy of a
+        /// class. The last two were only the built-in assistant's window's
+        /// before (Russell, 2026-11-13 night: only Add Class… remains).
+        case addClass
         case reDateClasses
         case makeRoomForClasses
         case classDates
@@ -116,6 +116,20 @@ nonisolated enum SubjectMenuRules {
         case back
         case forward
         case reloadPage
+    }
+
+    /// The ways Add Class…'s sheet offers, in the order it lists them
+    /// (`shared-rules.json` → `subjectMenus.addClassSheet.ways`). A way is a
+    /// case here and a name in the contract, so a third way joins as data:
+    /// a case, its line in `addClassWays`, its wording and its call.
+    enum AddClassWay: String, CaseIterable, Sendable {
+        /// The next class in the unit under way: what Section ▸ Add Next
+        /// Class did until #897 replaced it, call for call.
+        case nextInThisUnit
+        /// The first class of the next unit, Unit 5, Day 1.
+        case inANewUnit
+        /// A copy of one of this section's classes, as the next class.
+        case asACopyOfAClass
     }
 
     /// Everything the rule needs to know, gathered from the window's
@@ -184,7 +198,7 @@ nonisolated enum SubjectMenuRules {
         var deployedFolderShown: Bool = false
         /// The selected section's course names its class pages with one
         /// number ("Week 3", a club, #267): it has no units, so a new unit
-        /// cannot be started in it (#897).
+        /// cannot be started in it (#897, Add Class…).
         var classPagesAreNumbered: Bool = false
         /// A rename of the course's unit word stopped part way: the record
         /// a rename leaves is on disk (`UnitWordRenamer.renameMarkerURL`).
@@ -192,7 +206,7 @@ nonisolated enum SubjectMenuRules {
         /// highest unit would be read too low (#897).
         var unitWordRenameUnfinished: Bool = false
         /// The selected section has at least one page in its class folders,
-        /// so Duplicate as Next Class… has something to offer (#897).
+        /// so Add Class… can offer a copy of one (#897).
         var hasAClassPage: Bool = false
     }
 
@@ -355,16 +369,10 @@ nonisolated enum SubjectMenuRules {
                 enabled.insert(.publishPages)
                 enabled.insert(.hidePages)
                 enabled.insert(.publishClassForADate)
-                enabled.insert(.addNextClass)
-                // #897. Not in a numbered course: it has no units, and the
-                // tool would refuse in the conversation's words. Not while a
-                // unit-word rename is unfinished: the planner reads only the
-                // pages named the old way. Duplicate needs a class to copy.
-                if !situation.classPagesAreNumbered && !situation.unitWordRenameUnfinished {
-                    enabled.insert(.addNextClassInANewUnit)
-                }
-                if situation.hasAClassPage && !situation.unitWordRenameUnfinished {
-                    enabled.insert(.duplicateAsNextClass)
+                // #897: live when its sheet has a way to offer, which is
+                // always, since the next class in this unit always is.
+                if !addClassWays(situation).isEmpty {
+                    enabled.insert(.addClass)
                 }
                 enabled.insert(.reDateClasses)
                 enabled.insert(.makeRoomForClasses)
@@ -401,6 +409,33 @@ nonisolated enum SubjectMenuRules {
             }
         }
         return enabled
+    }
+
+    /// The ways Add Class…'s sheet can use in `situation`, in the sheet's
+    /// order (#897). The next class in this unit always, exactly as Add Next
+    /// Class was. Not in a new unit in a numbered course: it has no units,
+    /// and the tool would refuse in the conversation's words. Not as a copy
+    /// with no class page to copy. Neither of those two while a unit-word
+    /// rename is unfinished: the planner reads only the pages named the old
+    /// way. (The next class in this unit keeps Add Next Class's rule, which
+    /// did not wait for one; that is a known limit, not changed here.)
+    static func addClassWays(_ situation: Situation) -> [AddClassWay] {
+        var ways: [AddClassWay] = []
+        for way in AddClassWay.allCases {
+            switch way {
+            case .nextInThisUnit:
+                ways.append(way)
+            case .inANewUnit:
+                if !situation.classPagesAreNumbered && !situation.unitWordRenameUnfinished {
+                    ways.append(way)
+                }
+            case .asACopyOfAClass:
+                if situation.hasAClassPage && !situation.unitWordRenameUnfinished {
+                    ways.append(way)
+                }
+            }
+        }
+        return ways
     }
 
     /// The menu item the Delete key asks for on the selected sidebar row,

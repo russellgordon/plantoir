@@ -250,7 +250,7 @@
       {
         "carries": "which course and section, and WHICH of the two things stopped the copy — the page it would have become still held a lesson, or the copy could not be made certainly hidden — in both cases saying that other classes may already have moved. NOT the titles of either page: the assistant's own \"assistant chose a tool\" leaves argument values out for the same reason, and the line answers the report without them. Two lines share the event on purpose; see why",
         "event": "class copy not made",
-        "why": "Duplicating a class makes the room for the copy FIRST — every later class renamed and re-dated — and only then discovers that the page the copy was meant to become is still somebody's real lesson. The copy is refused rather than written over it, so the teacher sees their classes move and no new page appear. \"I duplicated a class, my classes moved, and nothing was copied\" is then a report nothing else on the trail can answer: the tool that ran is recorded and its conclusion is not. The OTHER refusals on that path deliberately record nothing — a page that is not there, a page with no numbers in its name, a timetable with no class dates left — because they answer before anything has been touched, so there is nothing to explain afterwards. Named for the outcome rather than for today's single cause, the way \"folder problem not repaired\" is: a second reason a copy is not made joins this line instead of earning a rename on both platforms. The second reason arrived with #897: Section > Duplicate as Next Class... builds the copy and reads it back BEFORE writing anything, and when it cannot be made certainly hidden it writes nothing and this line says so ('from the Section menu ... so nothing was written'), since the menu's sheet shows only its sentence."
+        "why": "Duplicating a class makes the room for the copy FIRST — every later class renamed and re-dated — and only then discovers that the page the copy was meant to become is still somebody's real lesson. The copy is refused rather than written over it, so the teacher sees their classes move and no new page appear. \"I duplicated a class, my classes moved, and nothing was copied\" is then a report nothing else on the trail can answer: the tool that ran is recorded and its conclusion is not. The OTHER refusals on that path deliberately record nothing — a page that is not there, a page with no numbers in its name, a timetable with no class dates left — because they answer before anything has been touched, so there is nothing to explain afterwards. Named for the outcome rather than for today's single cause, the way \"folder problem not repaired\" is: a second reason a copy is not made joins this line instead of earning a rename on both platforms. The second reason arrived with #897: Section > Add Class..., as a copy of a class, builds the copy and reads it back BEFORE writing anything, and when it cannot be made certainly hidden it writes nothing and this line says so ('from the Section menu ... so nothing was written'), since the menu's sheet shows only its sentence. (Section > Duplicate as Next Class... became Add Class...'s way asACopyOfAClass the same night.)"
       },
       {
         "carries": "which course and section, and the file name of the copy it was put back from — never a page",
@@ -994,7 +994,7 @@
       },
       {
         "event": "ran from a menu",
-        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Next Class, Add Next Class in a New Unit, Duplicate as Next Class... (#897), Re-date Classes..., Make Room for Classes..., Class Dates..., or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, took part of the last change back (an undo that put some files back and kept the entry because others were edited since, #531), cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
+        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Class... (#897, which replaced Add Next Class: its counts say which way, 'the next class in this unit', 'in a new unit' or 'as a copy of a class'), Re-date Classes..., Make Room for Classes..., Class Dates..., or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, took part of the last change back (an undo that put some files back and kept the entry because others were edited since, #531), cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
         "line": "{course}/{section} · Section ▸ Publish Pages… — {carried out|changed nothing|cancelled at the plan|…}, {N pages ticked}",
         "why": "#457 batch B. The assistant's functions now run from the menu bar for a teacher who never opened the assistant, and the assistant's own trail lines are written by its conversation, which the menu does not have. Without this a page published from the menu is a page nobody can say who published. Not 'section menu item ran': Help is not in the Section menu (the plan review's note 11)."
       },
@@ -27244,7 +27244,7 @@
   },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. OPEN IN BROWSER (#850, Russell 2026-11-13: one Open in Browser for both) is live on a SECTION row when a preview is showing (it opens the preview) or, with none showing, when the section's deployed folder can be opened (deployedFolderReady; it opens the folder, deployedFolderInBrowser.offeredCases); stopShowingDeployedFolder is live while that folder is being shown (deployedFolderShown), whatever else is happening. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. addNextClassInANewUnit and duplicateAsNextClass (#897) follow the same rule, and are greyed besides: addNextClassInANewUnit when classPagesAreNumbered (a club has no units) or unitWordRenameUnfinished, duplicateAsNextClass when hasAClassPage is false (nothing to copy) or unitWordRenameUnfinished. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview. On Windows the alternate is a second visible item (a WinUI menu has no modifier alternates), and it is still the same item for this rule.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. OPEN IN BROWSER (#850, Russell 2026-11-13: one Open in Browser for both) is live on a SECTION row when a preview is showing (it opens the preview) or, with none showing, when the section's deployed folder can be opened (deployedFolderReady; it opens the folder, deployedFolderInBrowser.offeredCases); stopShowingDeployedFolder is live while that folder is being shown (deployedFolderShown), whatever else is happening. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addClass (#897: it replaced addNextClass), reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. ADD CLASS (#897, Russell 2026-11-13 night: only Add Class... remains, and Add Next Class leaves the menus) follows the same rule; its sheet asks how the class is added, and which of its ways can be chosen is addClassSheet below. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview. On Windows the alternate is a second visible item (a WinUI menu has no modifier alternates), and it is still the same item for this rule.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,
@@ -27303,9 +27303,9 @@
       "canGoForward": "The preview can go forward a page.",
       "deployedFolderReady": "The selected section's deployed folder can be opened in the browser: deployedFolderInBrowser.offeredCases decides 'offered' (#850).",
       "deployedFolderShown": "The selected section's deployed folder is being shown in the browser by this app (#850).",
-      "classPagesAreNumbered": "The selected section's course names its class pages with one number, a club's Week 3 (#267). It has no units, so Add Next Class in a New Unit is greyed: the tool would refuse it (noUnitsInANumberedCourse) in the conversation's words (#897).",
-      "unitWordRenameUnfinished": "A rename of the course's unit word stopped part way: the record a rename leaves is on disk (the cheap fact; the full check runs at the click). Pages already under the new word do not read under the old one, so the highest unit and day would be read too low and a new page could repeat a number. Greys both #897 items.",
-      "hasAClassPage": "The selected section has at least one page in its class folders, numbered or not, so Duplicate as Next Class has something to offer. Computed when the section is shown and after each of the Section menu's functions, never on every drawing of the menu (#897)."
+      "classPagesAreNumbered": "The selected section's course names its class pages with one number, a club's Week 3 (#267). It has no units, so Add Class...'s way inANewUnit is greyed: the tool would refuse it (noUnitsInANumberedCourse) in the conversation's words (#897).",
+      "unitWordRenameUnfinished": "A rename of the course's unit word stopped part way: the record a rename leaves is on disk (the cheap fact; the full check runs at the click). Pages already under the new word do not read under the old one, so the highest unit and day would be read too low and a new page could repeat a number. Greys Add Class...'s ways inANewUnit and asACopyOfAClass; nextInThisUnit keeps Add Next Class's rule, which never waited for one.",
+      "hasAClassPage": "The selected section has at least one page in its class folders, numbered or not, so Add Class...'s way asACopyOfAClass has something to offer. Computed when the section is shown and after each of the Section menu's functions, never on every drawing of the menu (#897)."
     },
     "items": [
       "openWorkingFolder",
@@ -27356,9 +27356,7 @@
       "publishClassForADate",
       "rebuildPreview",
       "undoLastChange",
-      "addNextClass",
-      "addNextClassInANewUnit",
-      "duplicateAsNextClass",
+      "addClass",
       "reDateClasses",
       "makeRoomForClasses",
       "classDates",
@@ -27537,14 +27535,12 @@
           "hasAClassPage": true
         },
         "enabled": [
-          "addNextClass",
-          "addNextClassInANewUnit",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
           "copyAPage",
           "deploy",
-          "duplicateAsNextClass",
           "getReadyForTheStartOfTheYear",
           "hidePages",
           "importCoursesForReference",
@@ -27592,15 +27588,13 @@
           "hasAClassPage": true
         },
         "enabled": [
-          "addNextClass",
-          "addNextClassInANewUnit",
+          "addClass",
           "back",
           "backUpNow",
           "cancelScheduledDeploy",
           "classDates",
           "copyAPage",
           "deploy",
-          "duplicateAsNextClass",
           "getReadyForTheStartOfTheYear",
           "hidePages",
           "importCoursesForReference",
@@ -27794,14 +27788,12 @@
           "hasAClassPage": true
         },
         "enabled": [
-          "addNextClass",
-          "addNextClassInANewUnit",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
           "copyAPage",
           "deploy",
-          "duplicateAsNextClass",
           "getReadyForTheStartOfTheYear",
           "hidePages",
           "importCoursesForReference",
@@ -27963,14 +27955,12 @@
           "hasAClassPage": true
         },
         "enabled": [
-          "addNextClass",
-          "addNextClassInANewUnit",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
           "copyAPage",
           "deploy",
-          "duplicateAsNextClass",
           "getReadyForTheStartOfTheYear",
           "hidePages",
           "importCoursesForReference",
@@ -28010,14 +28000,12 @@
           "hasAClassPage": true
         },
         "enabled": [
-          "addNextClass",
-          "addNextClassInANewUnit",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
           "copyAPage",
           "deploy",
-          "duplicateAsNextClass",
           "getReadyForTheStartOfTheYear",
           "hidePages",
           "importCoursesForReference",
@@ -28080,7 +28068,7 @@
         ]
       },
       {
-        "why": "#897: a live section of a numbered course (a club, Week 3) with class pages. Add Next Class in a New Unit is greyed: the course has no units. Duplicate as Next Class is live: the copy becomes the next number.",
+        "why": "#897: a live section of a numbered course (a club, Week 3) with class pages. Add Class... is live; in its sheet, inANewUnit is greyed (addClassSheet).",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -28091,13 +28079,12 @@
           "classPagesAreNumbered": true
         },
         "enabled": [
-          "addNextClass",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
           "copyAPage",
           "deploy",
-          "duplicateAsNextClass",
           "getReadyForTheStartOfTheYear",
           "hidePages",
           "importCoursesForReference",
@@ -28124,7 +28111,7 @@
         ]
       },
       {
-        "why": "#897: a live section whose course's unit-word rename stopped part way. Both new items are greyed, because the planner would read only the pages under the old word; Add Next Class keeps today's rule.",
+        "why": "#897: a live section whose course's unit-word rename stopped part way. Add Class... is live, because its first way (the next class in this unit) keeps Add Next Class's rule; the other two are greyed in its sheet (addClassSheet).",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -28135,7 +28122,7 @@
           "unitWordRenameUnfinished": true
         },
         "enabled": [
-          "addNextClass",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
@@ -28167,7 +28154,7 @@
         ]
       },
       {
-        "why": "#897: a live section with no page in its class folders yet. Duplicate as Next Class is greyed, since there is nothing to copy; Add Next Class in a New Unit is live and makes Unit 1, Day 1.",
+        "why": "#897: a live section with no page in its class folders yet. Add Class... is live; in its sheet, asACopyOfAClass is greyed, since there is nothing to copy.",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -28176,8 +28163,7 @@
           "deployButtonEnabled": true
         },
         "enabled": [
-          "addNextClass",
-          "addNextClassInANewUnit",
+          "addClass",
           "addSection",
           "backUpNow",
           "classDates",
@@ -28209,6 +28195,86 @@
         ]
       }
     ],
+    "addClassSheet": {
+      "note": "GitHub #897 (Russell, 2026-11-13 night, by dialog): ONE Section menu item, Add Class..., replacing Add Next Class, whose sheet asks how the new class is added. The ways are listed in this order, one line each; a way the section cannot use is drawn greyed, never left out, so the sheet reads the same every time. The first way that can be used is chosen when the sheet opens. A third or fourth way joins as data: a name here, its cases, its wording, and the call it makes. Each way is ONE change, which Undo Last Change takes away whole. The mac runs these cases in DuplicateAsNextClassTests.testTheAddClassWaysAreTheContracts.",
+      "ways": [
+        {
+          "way": "nextInThisUnit",
+          "wording": "wording.menuAddClassNextInThisUnit",
+          "numberedWording": "wording.menuAddClassNextInANumberedCourse",
+          "call": "add_next_class with course and section only: exactly what Section > Add Next Class sent until #897",
+          "plan": "none: added at once, the page arrives hidden (Russell's decision 11 on #457)"
+        },
+        {
+          "way": "inANewUnit",
+          "wording": "wording.menuAddClassInANewUnit",
+          "call": "add_next_class with unit: \"next\", the argument the built-in assistant's 'Start a new unit for the next class' phrasing sends",
+          "plan": "none: added at once, hidden"
+        },
+        {
+          "way": "asACopyOfAClass",
+          "wording": "wording.menuAddClassAsACopy",
+          "call": "plan_add_next_class, then add_next_class, with the source's path in the course (class-planning.json -> duplicatingAsTheNextClass)",
+          "plan": "the class to copy is chosen from this section's class pages, then the plan, then Duplicate"
+        }
+      ],
+      "cases": [
+        {
+          "why": "An ordinary section with class pages: every way.",
+          "situation": {
+            "hasAClassPage": true
+          },
+          "ways": [
+            "nextInThisUnit",
+            "inANewUnit",
+            "asACopyOfAClass"
+          ]
+        },
+        {
+          "why": "A section with no class page yet: nothing to copy.",
+          "situation": {},
+          "ways": [
+            "nextInThisUnit",
+            "inANewUnit"
+          ]
+        },
+        {
+          "why": "A club (#267): no units, so no new unit; its next meeting and a copy are offered.",
+          "situation": {
+            "hasAClassPage": true,
+            "classPagesAreNumbered": true
+          },
+          "ways": [
+            "nextInThisUnit",
+            "asACopyOfAClass"
+          ]
+        },
+        {
+          "why": "A unit-word rename stopped part way: the planner reads only the pages under the old word, so neither a new unit nor a copy (which takes the next class's name) is offered. The next class in this unit keeps Add Next Class's rule, which never waited for one.",
+          "situation": {
+            "hasAClassPage": true,
+            "unitWordRenameUnfinished": true
+          },
+          "ways": [
+            "nextInThisUnit"
+          ]
+        },
+        {
+          "why": "A club with no meeting page yet: only its first meeting.",
+          "situation": {
+            "classPagesAreNumbered": true
+          },
+          "ways": [
+            "nextInThisUnit"
+          ]
+        }
+      ],
+      "rejected": [
+        "One menu item per way (Add Next Class in a New Unit, Duplicate as Next Class...), ruled earlier the same evening and replaced: one item and a question reads as one act with three answers.",
+        "Keeping Add Next Class beside Add Class... as a one-step item (Russell, 2026-11-13 night).",
+        "The ways on the section row's right-click menu (the same ruling)."
+      ]
+    },
     "rejected": [
       "One 'Actions' menu for everything (Russell, 2026-10-07): a menu whose half applies to courses and half to sections, with no name for either, is where things go to be lost.",
       "A menu per window kind, swapped in as the window in front changes (rejected as Canopy rejected it, documentation/09-mac-app.md): the menu bar is the app's command memory, and a menu that changes its NAME with focus cannot be learned.",

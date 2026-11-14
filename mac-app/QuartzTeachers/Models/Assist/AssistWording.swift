@@ -2212,7 +2212,8 @@ nonisolated enum AssistWording {
     //
     // The assistant's own functions, reached from Section ▸ Publish Pages…,
     // Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
-    // Change, Add Next Class, Re-date Classes… and Make Room for Classes… —
+    // Change, Add Class… (Add Next Class until #897), Re-date Classes… and
+    // Make Room for Classes… —
     // the same tool code, called with a call built in code and never through
     // a model (`AssistToolRunner.Surface.menu`). What a teacher reads there is
     // not a conversation: nobody said "undo that", there is no "me" to ask
@@ -2412,20 +2413,43 @@ nonisolated enum AssistWording {
     // #897: what only the built-in assistant's window could do before,
     // in the menu's voice. The window's own sentences are unchanged.
 
-    /// The answer sheet's title for Section ▸ Add Next Class in a New Unit.
-    static func menuAddNextClassInANewUnitTitle(noun: ClassNoun = .class) -> String {
-        return "Add next \(noun.singular) in a new unit"
+    /// Section ▸ Add Class…'s sheet: its title, the question, and one
+    /// line per way (`SubjectMenuRules.AddClassWay`), in the sheet's order.
+    static func menuAddClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Add a \(noun.singular) to \(course) Section \(section)"
     }
 
-    /// Section ▸ Duplicate as Next Class…'s sheet.
-    static func menuDuplicateTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
-        return "Duplicate a \(noun.singular) in \(course) Section \(section)"
+    static func menuHowToAddAClass(noun: ClassNoun = .class) -> String {
+        return "How should the new \(noun.singular) be added? It is dated for this section's next "
+             + "\(noun.singular) day and starts hidden."
+    }
+
+    /// The first way: what Add Next Class did. In a numbered course (a club)
+    /// there are no units, and the line says only "the next".
+    static func menuAddClassNextInThisUnit(noun: ClassNoun = .class, numbered: Bool = false) -> String {
+        if numbered {
+            return "As the next \(noun.singular)"
+        }
+        return "As the next \(noun.singular) in the unit under way"
+    }
+
+    /// The second way: Unit 5, Day 1 after Unit 4.
+    static func menuAddClassInANewUnit(noun: ClassNoun = .class) -> String {
+        return "In a new unit, as its first \(noun.singular)"
+    }
+
+    /// The third way: a copy of one of this section's classes.
+    static func menuAddClassAsACopy(noun: ClassNoun = .class) -> String {
+        return "As a copy of a \(noun.singular) in this section"
     }
 
     static func menuPickClassToDuplicate(noun: ClassNoun = .class) -> String {
         return "Choose the \(noun.singular) to copy. The copy becomes the next \(noun.singular), dated for "
              + "this section's next \(noun.singular) day, and starts hidden. Nothing else moves."
     }
+
+    /// The default button for a way that adds at once (a new unit).
+    static let menuAddButton: String = "Add"
 
     static let menuDuplicateButton: String = "Duplicate"
 
@@ -2451,7 +2475,7 @@ nonisolated enum AssistWording {
              + "A page is never written over."
     }
 
-    /// A unit-word rename stopped part way: the two #897 items wait for it.
+    /// A unit-word rename stopped part way: Add Class… waits for it.
     static func menuUnitWordRenameUnfinished(noun: ClassNoun = .class) -> String {
         return "A rename of what this course calls a unit stopped part way, so some \(noun.plural) are "
              + "named the old way and some the new. Nothing was changed. Finish the rename in the "
