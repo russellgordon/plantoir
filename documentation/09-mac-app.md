@@ -17265,7 +17265,7 @@ moves, removals, copies, `setAttributes` (the reference lock's `uchg`) and
 links, a `FileHandle` opened for writing, truncation, and the C calls that
 write (`rename`, `link`, `unlink`, `mkdir`, `chmod`, `open` with a writing
 flag). The count is per file, so a file can swap one write for another and
-stay green; what it catches is a new writer. 73 files write today.
+stay green; what it catches is a new writer. 76 files write today.
 
 ### The U1 harness
 

@@ -1,4 +1,5 @@
 import Foundation
+@testable import QuartzTeachers
 
 /// Checks of the journal core that are not contract cases, because they are
 /// about how the mac's own pieces behave rather than what the list answers:
