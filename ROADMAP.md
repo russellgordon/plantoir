@@ -31,7 +31,8 @@ need to read those to use Plantoir.
 On the Mac and Windows together: neither download is released until both are
 ready.
 
-- **Unit planning beside Plantoir.** When Claude Code or Codex is installed,
+- **Unit planning beside Plantoir.** When Claude Code, Codex or GitHub Copilot is
+  installed,
   the course page gains a Planning tab: an assistant helps you plan a unit —
   a calendar across your sections, lesson cards, day materials, assessment
   drafts, a curriculum correlation — and the plan shows right there, with
@@ -158,7 +159,7 @@ ready.
   near-white, with dark green titles.
   ([#842](https://github.com/russellgordon/plantoir/issues/842))
 - **Better guidance for an assistant writing your pages and handouts.**
-  The notes Claude Code or Codex read before writing a page or a printed
+  The notes Claude Code, Codex or GitHub Copilot read before writing a page or a printed
   handout are brought up to date: copyable text that wraps, lettered parts
   that line up on quizzes and tests, and a settled shape for a lesson page.
   ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
