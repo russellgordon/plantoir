@@ -624,6 +624,11 @@ alt: Pump gas into a box and watch the pressure, temperature and volume change.
   but it reports to PhET and Google from every student's browser: replace
   it with a ` ```phet ` block named by the simulation in its address.
 - A simulation prints as its picture.
+- In a self-check question, put a simulation in the question or the
+  explanation, never inside a choice (the `plantoir-quizzes` skill).
+- The downloaded copies stay with the working folder on this computer: after
+  moving or renaming the working folder, or on a new computer, the next
+  build needs the internet again.
 
 ## 17. Notes only the teacher sees
 
