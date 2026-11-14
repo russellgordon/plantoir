@@ -4176,16 +4176,85 @@
     "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
     "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",
     "greetingIsTheSameForEveryAgent" : true,
+    "greetingMustNotSay" : {
+      "expressions" : [
+        "\\bmark(?:s|ing)?\\b(?!\\s+(?:(?:a|the|this|that|each|every|one|your)\\s+)?pages?\\b)",
+        "\\bgrad(?:e|es|ed|ing)\\b(?!\\s*\\d)",
+        "\\bclass(?:['’]s)?\\s+results?\\b",
+        "\\bresults?\\s+(?:for|of|from)\\s+(?:the|a|my|our|this|your|each|every)\\s+(?:whole\\s+)?class(?:es)?\\b",
+        "\\breport[\\s-]+cards?\\b",
+        "\\bcomments?\\b"
+      ],
+      "mustMatch" : [
+        "I can add up the marks.",
+        "I can help with grading.",
+        "I can write their grades.",
+        "I can grade it for you.",
+        "I can look at the class’s results.",
+        "I can sum up the class's result.",
+        "I can look at results for the class.",
+        "I can look at results for my class.",
+        "I can look at the results of our classes."
+      ],
+      "mustNotMatch" : [
+        "Pages marked for publishing stay as they are.",
+        "Write pages in Markdown.",
+        "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir.",
+        "A benchmark test of the build.",
+        "Publishing only marks a page for inclusion.",
+        "Mark the pages you want published."
+      ],
+      "why" : "Russell, 2026-11-13, in the full ruling on #750 (restated on #791): the greeting an assistant gives when it opens from Plantoir never mentions marking, results for a whole class, or the comments written on a report; those are offered only in context, by the skill in use. Each expression is matched without regard to case in every greeting greetingMustSayHow builds, on every door, so the first catches mark, marks and marking as whole words and leaves marked, Markdown and marking a page alone (the project's word for publishing one, the Fable sweep of #791), the second catches grade, grades, graded and grading but not a grade level such as Grade 11 in a course's name, the third takes a class's result with either apostrophe, and the fourth takes results for, of or from a class or classes in the greeting's own voice (my, our, this) as well as the, a, your, each and every. mustMatch sentences must each be caught by some expression and mustNotMatch sentences by none; they are chosen so that scripts/test_held_skills.py, which reads them too, finds no offer in them. Written as regular expressions, as printablePages.agentGuidance.held.words is, and for the same reason: scripts/test_held_skills.py reads every string in this file, and a rule naming what must not be offered is not an offer. This rule is not the hold: it stays when the held skills come back."
+    },
     "greetingMustSay" : [
-      "the course it is about, by code, and its name when that differs",
-      "that the plantoir tools are the way to do anything to do with this course",
-      "that the session should start by listing the course's sections",
-      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
-      "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)",
-      "when courses with the same code are kept for reference, that they are there to read and build on and are never deployed or changed (greetingReferenceCourses, verbatim)",
-      "that in its first reply the assistant says in one sentence that it can make printed handouts, worksheets and quizzes with their answer keys as PDFs, and where its guide is (greetingHandoutsSentence, verbatim), straight after the plan-first sentence, on every door",
-      "on a Revise door, last: that in its first reply the assistant says in one sentence that it can help plan a unit, or reminds the teacher which units have a plan and that they are on the course's Planning tab, without describing them (greetingUnitPlans)"
+      {
+        "key" : "greetingOpening",
+        "says" : "the course it is about, by code, and its name when that differs",
+        "where" : "first"
+      },
+      {
+        "key" : "greetingToolsSentence",
+        "says" : "that the plantoir tools are the way to do anything to do with this course",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingSectionsSentence",
+        "says" : "that the session should start by listing the course's sections",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingPlanFirstSentence",
+        "says" : "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingHowITeachSentence",
+        "says" : "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingReferenceCourses",
+        "says" : "when courses with the same code are kept for reference, that they are there to read and build on and are never deployed or changed (greetingReferenceCourses, verbatim)",
+        "where" : "whenReferenceCourses"
+      },
+      {
+        "key" : "greetingHandoutsSentence",
+        "says" : "that in its first reply the assistant says in one sentence that it can make printed handouts, worksheets and quizzes with their answer keys as PDFs, and where its guide is (greetingHandoutsSentence, verbatim), straight after the plan-first sentence, on every door",
+        "where" : "afterPlanFirst"
+      },
+      {
+        "key" : "greetingUnitPlans",
+        "says" : "on a Revise door, last: that in its first reply the assistant says in one sentence that it can help plan a unit, or reminds the teacher which units have a plan and that they are on the course's Planning tab, without describing them (greetingUnitPlans)",
+        "where" : "last"
+      }
     ],
+    "greetingMustSayHow" : "GitHub #791: each entry is checked against the greeting each Revise door really sends (prepareSession on every door in outsideAgents.agents, the greeting read off the command line the script starts the assistant with), in three variants: a course whose name differs from its code with no reference courses and nothing said about unit plans; the same course with one reference course and no unit plan yet; and a course whose name is its code. 'key' names the contract key whose text is checked. where: 'first' - the greeting starts with greetingOpening's withName (or withoutName, when the name is empty or is the code), {course} and {courseName} filled, then a space; 'contains' - the key's sentence is in the greeting; 'afterPlanFirst' - greetingPlanFirstSentence, a space, then the key's sentence; 'whenReferenceCourses' - with reference courses, the sentence greetingReferenceCourses makes is in the greeting, and without them its first words ('I also keep earlier') are not; 'last' - with unit plans told (none yet), the greeting ends with a space and greetingUnitPlans.none, and without them it ends with greetingHandoutsSentence (or the reference-courses sentence). Until #791 the entries were prose that no suite read (707a review L9).",
+    "greetingOpening" : {
+      "why" : "GitHub #791. The greeting's first sentence names the course by its code, and by its name in brackets when it has one that is not the code. The name is trimmed of white space at its ends first.",
+      "withName" : "I'm a teacher working on {course} ({courseName}) in Plantoir.",
+      "withoutName" : "I'm a teacher working on {course} in Plantoir."
+    },
+    "greetingPlanFirstSentence" : "Before changing anything, use the matching plan tool first and show me what it says, in plain words, and wait for me to agree.",
     "greetingReferenceCourses" : {
       "cases" : [
         {
@@ -4479,6 +4548,8 @@
       "where" : "After greetingHandoutsSentence, which itself comes straight after the sentence that asks for the plan tool and agreement (it ends 'wait for me to agree.'), with one space before it, and before greetingUnitPlans' sentence when that is said (#859 put the handouts sentence in front of this one, so the plain greeting already carries it and casesHow did not change). {course} is the course's code as the greeting names it; {courses} the list joined by separator. The whole greeting's double quotes become apostrophes as greetingCarriesNoDoubleQuotes says.",
       "why" : "GitHub #856. The mac has said this since v1.3.0 (decision (s): the Revise doors are not offered on a course kept for reference, and a live course's session is told they exist instead), but no contract carried it, so the Windows greeting lacked the sentence and no test on either side noticed. Written here as the mac says it, byte for byte: the greeting reaches an outside assistant, not the local model, and nothing the local model is shown moved (scripts/test_tool_surface_digest.py). It promises nothing Plantoir does: the session reads the courses with its own file tools and the read tools it already has."
     },
+    "greetingSectionsSentence" : "Start by listing its sections so we both know what's there.",
+    "greetingToolsSentence" : "Use the plantoir tools for anything to do with this course.",
     "greetingUnitPlans" : {
       "joinedAs" : "One name alone; two as 'A and B'; three to mostUnitsNamed as 'A, B and C'; past mostUnitsNamed, the first mostUnitsNamed joined by ', ' and then more, with {n} the rest.",
       "more" : ", and {n} more",

@@ -1604,7 +1604,7 @@
      "question": "Where do I change a course's name, footer, printing, folders or sidebar?",
      "about": "Course Settings' course-wide parts (Overall, Deploying, Footer, Printing, Content Structure, Marks, Sidebar Visibility), Save and Revert.",
      "steps": [
-      "Select the course row: its settings show (a Settings and Planning tab bar appears only when Claude Code or Codex is installed)",
+      "Select the course row: its settings show (a Settings and Planning tab bar appears only when Claude Code, Codex or GitHub Copilot is installed)",
       "The parts in order: Overall (Course name, Language and region, read times, the coverage map, the unit word), Deploying, Footer, Printing, Content Structure, Marks, Sidebar Visibility, then one part per section (link section-look)",
       "Press Save (⌘S, also Course > Save Course Settings) or Revert",
       "A preview or deploy started with unsaved changes uses the settings as last saved; after a save while previewing, Preview Again appears",
@@ -4724,11 +4724,11 @@
     },
     {
      "anchor": "revise-with",
-     "title": "Revise a course with Claude or Codex",
-     "question": "How do I open Claude or Codex on a course, and tell it how I teach?",
-     "about": "Course or Section > Revise With > Claude or Codex: the terminal session and the guidance sheet.",
+     "title": "Revise a course with Claude Code, Codex or GitHub Copilot",
+     "question": "How do I open Claude Code, Codex or GitHub Copilot on a course, and tell it how I teach?",
+     "about": "Course or Section > Revise With > Claude…, Codex… or GitHub Copilot…: the terminal session and the guidance sheet.",
      "steps": [
-      "Course ▸ Revise With ▸ Claude… (or Codex…)",
+      "Course ▸ Revise With ▸ Claude…, Codex… or GitHub Copilot…",
       "The session opens in your working folder on that course",
       "Write a How I Teach page at the top of the course",
       "Preview what it changed before you deploy"
@@ -4822,8 +4822,8 @@
      "question": "How do I plan a unit with an assistant and see the plan in Plantoir?",
      "about": "Planning a unit with an assistant and reading it on the Planning tab.",
      "steps": [
-      "Ask Claude Code or Codex to plan the unit (Revise With, or Plan a Unit with Claude… on an empty Planning tab)",
-      "Select the course and open its Planning tab (shown only when Claude Code or Codex is installed)",
+      "Ask Claude Code, Codex or GitHub Copilot to plan the unit (Revise With, or Plan a Unit with Claude… on an empty Planning tab)",
+      "Select the course and open its Planning tab (shown only when Claude Code, Codex or GitHub Copilot is installed)",
       "Choose the unit in the Unit pop-up, or All Plans",
       "Open in Browser to read or print it",
       "Use the section's Coverage tab to see what the course's pages reach"
@@ -4928,7 +4928,7 @@
      "question": "How do I get a test, its solutions and a marking guide drafted?",
      "about": "Asking an assistant for a unit test, its solutions and a marking guide, as paper made outside the course.",
      "steps": [
-      "Revise With > Claude… (or Codex…) on the course",
+      "Revise With > Claude…, Codex… or GitHub Copilot… on the course",
       "Ask for the unit test (also: versions, a practice test, a quiz for marks with a marking guide); it shows back what was taught first",
       "Read every question and answer yourself: it says everything is a suggestion",
       "The test is paper made outside the course, not a page with Print; where its files are saved: TODO(fact) until FS-11's open doubt 1 is settled"
@@ -4968,12 +4968,12 @@
     },
     {
      "anchor": "fix-with",
-     "title": "Fix a problem with Claude or Codex",
+     "title": "Fix a problem with Claude Code, Codex or GitHub Copilot",
      "question": "Can an assistant fix the problems on the Problems tab?",
-     "about": "Fix with Claude or Codex on the Problems tab.",
+     "about": "Fix with Claude…, Fix with Codex… or Fix with GitHub Copilot… on the Problems tab.",
      "steps": [
       "Open the Problems tab",
-      "Fix with Claude… or Fix with Codex…",
+      "Fix with Claude…, Fix with Codex… or Fix with GitHub Copilot…",
       "Preview the result"
      ],
      "pictures": [

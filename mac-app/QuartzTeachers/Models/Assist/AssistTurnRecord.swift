@@ -51,9 +51,11 @@ nonisolated struct AssistTurnRecord {
     /// The record as it is written: one line for the turn, and one for the
     /// sentence behind it.
     var lines: String {
+        // The course and section go through the one function every trail
+        // line about a course uses (#879), which ends with its own separator.
+        let moment: String = AssistTurnRecord.formatter().string(from: at)
+        let place: String = ActivityTrail.place(course: courseCode, section: sectionNumber)
         var parts: [String] = []
-        parts.append(AssistTurnRecord.formatter().string(from: at))
-        parts.append("\(courseCode)/\(sectionNumber)")
         if let toolName {
             parts.append("chose \(toolName)(\(argumentNames.joined(separator: ", ")))")
         } else {
@@ -69,7 +71,7 @@ nonisolated struct AssistTurnRecord {
         // One line whatever the model wrote (#780): the argument names come
         // from the model's own JSON, and this record is written with its line
         // breaks kept, so a name holding one would otherwise start a line.
-        return OneLineText.cleaned(parts.joined(separator: " · "))
+        return OneLineText.cleaned(moment + " · " + place + parts.joined(separator: " · "))
     }
 
     // MARK: - Functions
@@ -100,7 +102,8 @@ nonisolated struct AssistTurnRecord {
         timeZone: TimeZone = TimeZone.current
     ) -> String {
         return AssistTurnRecord.formatter(timeZone: timeZone).string(from: moment)
-            + " · \(courseCode)/\(sectionNumber) · asked the local AI assistant\n"
+            + " · " + ActivityTrail.place(course: courseCode, section: sectionNumber)
+            + "asked the local AI assistant\n"
             + AssistTurnRecord.promptMarker + OneLineText.cleaned(prompt)
     }
 

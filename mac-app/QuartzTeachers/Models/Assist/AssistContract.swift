@@ -1163,9 +1163,16 @@ enum AssistContract {
         // write. A regeneration that dropped the scenarios would look like a
         // successful run and lose the reasoning in the same stroke.
         var cases: [String: Any] = [:]
-        if let data = try? Data(contentsOf: casesURL),
+        let committedCases: Data? = try? Data(contentsOf: casesURL)
+        if let data = committedCases,
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            cases = existing
+            // The generated keys are taken out before the generator's go in,
+            // and a name there the app does not generate stops the run (#866).
+            do {
+                cases = try ContractText.withoutGeneratedKeys(existing, generating: generatedCaseKeys)
+            } catch {
+                return "Could not write the contract: \(error.localizedDescription)"
+            }
         }
         for (key, value) in generatedCases() {
             cases[key] = value
@@ -1191,7 +1198,10 @@ enum AssistContract {
 
         do {
             try encode(wording()).write(to: wordingURL)
-            try encode(cases).write(to: casesURL)
+            try encode(
+                cases, keepingTheTextOf: committedCases,
+                generatedKeys: Set(generatedCaseKeys + ["generated"])
+            ).write(to: casesURL)
         } catch {
             return "Could not write the contract: \(error.localizedDescription)"
         }
@@ -1202,11 +1212,20 @@ enum AssistContract {
     /// Sorted keys and a trailing newline, so a regeneration that changed
     /// nothing produces no diff at all.
     static func encode(_ value: [String: Any]) throws -> Data {
-        var data: Data = try JSONSerialization.data(
-            withJSONObject: value, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        )
-        data.append(contentsOf: [0x0A])
-        return data
+        return try ContractText.sortedEncoding(value)
+    }
+
+    /// A file with an authored half, written over the committed text: every
+    /// top-level key whose value is unchanged keeps its committed text and
+    /// place, because authors edit those keys as text and their order is not
+    /// sorted order (#866, `ContractText`). Every key in `generatedKeys` is
+    /// written in the generator's own text whatever the committed text was.
+    static func encode(
+        _ value: [String: Any],
+        keepingTheTextOf existing: Data?,
+        generatedKeys: Set<String> = []
+    ) throws -> Data {
+        return try ContractText.encode(value, keepingTheTextOf: existing, generatedKeys: generatedKeys)
     }
 
     /// The folder asked for on the command line, if this run is a generation.

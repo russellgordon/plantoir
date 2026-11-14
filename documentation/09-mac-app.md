@@ -4373,7 +4373,11 @@ of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
   preferences, the section's fingerprint) until the section's words change
   or the file goes. Both answers are a trail line, `asked before adding
   guidance to a file`. A file is never appended to without a yes; the skills
-  are written either way.
+  are written either way. The sheet's explanation (`words.askFound`) names
+  Claude Code, Codex and GitHub Copilot as assistants that read the file,
+  since [#887](https://github.com/russellgordon/plantoir/issues/887) (it named
+  the first two until then, though #783's trial had measured that Copilot
+  reads both root files and both skill homes); `words.askFoundWhy` says why.
 
 **It never holds the folder back** (implementation review S1). The first
 version counted a guidance failure in the toolchain copy's outcome, so a
@@ -14698,6 +14702,26 @@ withheld from a report unless they tick the box that includes it — and the
 box only appears if there is anything to include. The events that must be
 recorded are contract data (`activityTrail`), pinned by a test, so a new
 feature cannot ship without deciding what it leaves behind.
+
+**A line about a course with no section named says the course alone, since
+2026-11-14** ([#879](https://github.com/russellgordon/plantoir/issues/879)):
+"ICS3U · declined …", never "ICS3U/0 · declined …". Every line about one
+course goes through `ActivityTrail.place(course:section:)`, which writes
+`{course}/{section} · ` for a section, `{course} · ` when the section is 0 or
+less, and nothing when there is no course either; the cases are
+`activityTrail.lineShape.placeCases`, run by `ActivityTrailPlaceTests`. The
+line it was found on is an outside assistant's change that named no section,
+declined while the course was being built elsewhere
+(`AssistToolRunner.outsideChangeHeldBack` reads a missing section as 0, and
+the course is what that change is about, so the sentence already said "the
+course"). Measured across the app's callers: that is the one place a missing
+section reaches the trail as 0 in use; `ScriptRunner`'s "the preview closed"
+line defaults to 0 only when its own arguments do not parse, and every other
+caller passes a section it has located. The fix is in the one function rather
+than at the call site, so a caller added later cannot bring "/0" back.
+Rejected: a sentence such as "(no section was named)" appended to the decline,
+which repeats what "the course" already says, and changing the call site
+alone, which leaves the next caller to remember.
 
 **Making a course leaves a line saying what it started FROM, since
 2026-09-21** — `course created`, "created ICS4U from the computer studies

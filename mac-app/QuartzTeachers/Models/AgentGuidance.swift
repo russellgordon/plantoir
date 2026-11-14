@@ -337,7 +337,7 @@ nonisolated enum AgentGuidanceWording {
 
     static func askFound(file: String) -> String {
         return "This working folder already has " + file
-            + ", a file that assistants such as Claude Code and Codex read before they start."
+            + ", a file that assistants such as Claude Code, Codex and GitHub Copilot read before they start."
     }
 
 

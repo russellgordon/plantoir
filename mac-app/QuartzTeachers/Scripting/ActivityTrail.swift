@@ -1097,8 +1097,10 @@ nonisolated enum ActivityTrail {
         /// Mac holds a build, publish or preview lease on it (#156) — Preview
         /// or Deploy in the window, the in-app assistant's rebuild or deploy,
         /// or an outside assistant's (`--mcp-stdio`). Carries the course, the
-        /// section asked about, what was asked for, what the other holds and
-        /// its process id. Never anything on a page.
+        /// section asked about (none when an outside assistant's call named
+        /// no section: the line then starts with the course alone, #879),
+        /// what was asked for, what the other holds and its process id.
+        /// Never anything on a page.
         ///
         /// Recorded because the other program is invisible from here: a
         /// teacher who reports "Preview said somebody else was using it"
@@ -1678,7 +1680,24 @@ nonisolated enum ActivityTrail {
     /// Notes something about one section, so the trail says which course and
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
-        ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+        ActivityTrail.note(event, ActivityTrail.place(course: course, section: section) + what, at: moment)
+    }
+
+    /// What goes in front of a line about one course: "ICS3U/2 · " for a
+    /// section, "ICS3U · " when no section was named, and nothing when there
+    /// is no course either (`shared-rules.json` → `activityTrail.lineShape.
+    /// placeCases`, #879). A section is numbered from 1, so 0 or less is
+    /// "none was named": an outside assistant's call that names no section
+    /// used to be written "ICS3U/0", a section that does not exist.
+    static func place(course: String, section: Int) -> String {
+        let trimmedCourse: String = course.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedCourse.isEmpty {
+            return ""
+        }
+        if section <= 0 {
+            return "\(trimmedCourse) · "
+        }
+        return "\(trimmedCourse)/\(section) · "
     }
 
     /// The words for `deployRefusedForTheAccountID` (#668), or nil when the
