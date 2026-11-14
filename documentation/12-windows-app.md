@@ -6251,6 +6251,17 @@ and whether the course that came back is kept for reference, read from its
 restored settings. The line says what Windows did, never the mac's flow
 (plan review L5). `CourseBackupTests.AWholeCourseRestoreSaysWhatCameBackAndFromWhere`.
 
+**Small backups that keep each Media file once (#785) are not built here
+yet.** The mac's store, its format and its rules are 09 → "Small backups:
+each Media file kept once (#785)", `contracts/file-formats.json` →
+`sharedMediaStore` and `course-management.json` → `backups.sharedMedia`.
+Until Windows writes, restores AND sweeps that store, `BackupItem.From` must
+go on reading every `_shared-media` name as no backup at all (it does today:
+a fourth `_` piece is refused), so a Windows build never lists a small backup
+it cannot restore. Nothing on Windows may delete files under
+`courses/_backups/.shared-media/`, including when it removes a course's
+backups folder: the mac's sweep removes what nothing needs.
+
 ### The scheduled-publish toast (#324)
 
 #212's Windows half had not been built, so the toast is built minimally:
