@@ -435,7 +435,7 @@ struct SidebarView: View {
             // A backup made for ONE section offers that section first
             // (#897 C, Russell's ruling: "Restore Section N" is the
             // default), and the whole course beside it.
-            if let sectionNumber = workspace.oneSectionRestoreOffer(for: item) {
+            if let sectionNumber = workspace.backupRestoreOfferedSection {
                 Button(OneSectionRestoreWording.restoreSectionButton(section: sectionNumber)) {
                     Task { await workspace.restoreOneSection(sectionNumber, from: item) }
                 }
@@ -453,7 +453,7 @@ struct SidebarView: View {
                 }
             }
         } message: { item in
-            if let sectionNumber = workspace.oneSectionRestoreOffer(for: item) {
+            if let sectionNumber = workspace.backupRestoreOfferedSection {
                 Text(OneSectionRestoreWording.message(
                     section: sectionNumber, madeBy: item.maker.description, when: item.whenDescription
                 ))

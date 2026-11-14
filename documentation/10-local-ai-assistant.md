@@ -5945,7 +5945,11 @@ the section half empty while the window said "Nothing was put back". Since
 then (Russell's ruling on #897, 2026-11-13) the window's restore uses the same
 staged swap as Restore from Backup…: the backup is unpacked beside the
 courses, the live contents move aside, the backup's move in, and a failure
-sends every moved file back. Nothing the window says on success changed; the
+sends every moved file back. If moving back fails too, the window says the
+restorer's own sentence (`backups.restoreOneSection.wording.stoppedPartWay`:
+the section may be a mix, and where the set-aside files are kept) without its
+usual "Nothing was put back:" in front, which would then be untrue, and the
+trail gets `section restore stopped part way`. Nothing the window says on success changed; the
 swap covers the section folder only, so the window still leaves the class
 dates and the published record as they are, and leaves a shared page made
 since the conversation began alone. Those are the menu route's alone

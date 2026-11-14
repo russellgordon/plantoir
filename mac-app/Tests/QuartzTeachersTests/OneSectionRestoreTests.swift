@@ -19,7 +19,13 @@ final class OneSectionRestoreTests: XCTestCase {
     func testOnlySectionTwoComesBackAndSectionOneIsLeftByteForByte() async throws {
         let fixture: OneSectionFixture = try OneSectionFixture()
         defer { fixture.tearDown() }
+        let sectionOneDates: URL = fixture.outside(".internal/timetable/section1.json")
+        let sectionTwoDates: URL = fixture.outside(".internal/timetable/section2.json")
+        try fixture.write("{\"days\":[\"2025-09-03\"]}", to: sectionOneDates)
+        try fixture.write("{\"days\":[\"2025-09-04\"]}", to: sectionTwoDates)
         let item: BackupItem = try await fixture.backUp()
+        try fixture.write("{\"days\":[\"2026-09-02\"]}", to: sectionOneDates)
+        try fixture.write("{\"days\":[\"2026-09-03\"]}", to: sectionTwoDates)
 
         // The evening's marking in Section 1, and a ruined Section 2.
         try "Section one, marked tonight.".write(to: fixture.page(in: 1), atomically: true, encoding: .utf8)
@@ -45,6 +51,10 @@ final class OneSectionRestoreTests: XCTestCase {
         let outlineAfter: String = try String(contentsOf: fixture.outlineURL, encoding: .utf8)
         XCTAssertTrue(outlineAfter.contains("publishForSection1: false"), "Section 1's key is the live one")
         XCTAssertTrue(outlineAfter.contains("publishForSection2: false"), "Section 2's key is the backup's")
+        // New behaviour, which the window's restore never had: Section 2's
+        // class dates come back, and Section 1's are left as they are now.
+        XCTAssertEqual(try String(contentsOf: sectionTwoDates, encoding: .utf8), "{\"days\":[\"2025-09-04\"]}")
+        XCTAssertEqual(try String(contentsOf: sectionOneDates, encoding: .utf8), "{\"days\":[\"2026-09-02\"]}")
     }
 
     // MARK: - The files outside the section's folder
@@ -138,6 +148,64 @@ final class OneSectionRestoreTests: XCTestCase {
         XCTAssertEqual(fixture.leftInRestoring(), 0, "Nothing is left staged")
     }
 
+    /// Stopped at the moment the old code had an EMPTY section folder: every
+    /// live file set aside, none of the backup's moved in. The section and
+    /// its class dates are as they were, which the old code (empty, then
+    /// refill) could not be.
+    @MainActor
+    func testARestoreStoppedAfterTheLiveFilesAreSetAsideLeavesTheSectionAsItWas() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        try fixture.write("{\"days\":[\"2025-09-03\"]}", to: fixture.outside(".internal/timetable/section2.json"))
+        let item: BackupItem = try await fixture.backUp()
+        try "tonight's work".write(to: fixture.page(in: 2), atomically: true, encoding: .utf8)
+        try fixture.write("{\"days\":[\"2026-09-02\"]}", to: fixture.outside(".internal/timetable/section2.json"))
+        let before: [String: Data] = try OneSectionFixture.snapshot(of: fixture.courseURL)
+
+        let hooks: CourseRestorer.SectionSwapHooks = CourseRestorer.SectionSwapHooks(
+            move: { (source: URL, destination: URL) throws in
+                try FileManager.default.moveItem(at: source, to: destination)
+            },
+            reached: { (point: CourseRestorer.SwapPoint) throws in
+                if point == .setAside {
+                    throw OneSectionFixture.Stop.here
+                }
+            }
+        )
+        XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: hooks
+        )) { (error: Error) in
+            guard case CourseRestorer.Problem.sectionLeftAsItWas(2, _) = error else {
+                XCTFail("Expected sectionLeftAsItWas, got \(error)")
+                return
+            }
+        }
+        XCTAssertEqual(try OneSectionFixture.snapshot(of: fixture.courseURL), before)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// A move that fails while the backup's files OUTSIDE the folder move in
+    /// (the last phase) sends everything back, the section's own files too.
+    @MainActor
+    func testAMoveThatFailsAmongTheOutsideFilesLeavesTheSectionAsItWas() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let dates: URL = fixture.outside(".internal/timetable/section2.json")
+        try fixture.write("{\"days\":[\"2025-09-03\"]}", to: dates)
+        let item: BackupItem = try await fixture.backUp()
+        try "tonight's work".write(to: fixture.page(in: 2), atomically: true, encoding: .utf8)
+        try fixture.write("{\"days\":[\"2026-09-02\"]}", to: dates)
+        let before: [String: Data] = try OneSectionFixture.snapshot(of: fixture.courseURL)
+
+        // Out: index.md (1), the dates (2). In: index.md (3), the dates (4).
+        let counter: OneSectionFixture.MoveCounter = OneSectionFixture.MoveCounter(failFrom: 4, failUntil: 4)
+        XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: counter.hooks
+        ))
+        XCTAssertEqual(counter.count, 7, "three moves made, then three made backwards")
+        XCTAssertEqual(try OneSectionFixture.snapshot(of: fixture.courseURL), before)
+    }
+
     /// A move that fails part way through the swap sends every moved file
     /// back: the section, and the files outside it, are as they were.
     @MainActor
@@ -179,13 +247,22 @@ final class OneSectionRestoreTests: XCTestCase {
         XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
             2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL, hooks: counter.hooks
         )) { (error: Error) in
-            guard case CourseRestorer.Problem.sectionRestoreStoppedPartWay(2) = error else {
+            guard case CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, let keptAt, true) = error else {
                 XCTFail("Expected sectionRestoreStoppedPartWay, got \(error)")
                 return
             }
+            XCTAssertTrue(keptAt.hasPrefix("courses/_backups/ICS3U/Section 2 as it was before a restore, "), keptAt)
+            XCTAssertTrue(error.localizedDescription.contains(keptAt), "the sentence says where")
+            XCTAssertTrue(error.localizedDescription.contains("Archived"), "the menu's route archived first")
         }
-        XCTAssertTrue(fixture.restoringHolds(text: "tonight's work"),
-                      "The live page is kept in courses/.internal/restoring")
+        XCTAssertTrue(fixture.holds(text: "tonight's work", under: "_backups/ICS3U"),
+                      "The live page is kept where Finder shows it")
+        XCTAssertTrue(
+            fixture.trailText().contains(ActivityTrail.sectionRestoreStoppedPartWayLine(keptAt: "courses/_backups/ICS3U/")
+                .components(separatedBy: "courses/_backups/ICS3U/")[0]),
+            "the trail says the section may be a mix"
+        )
+        XCTAssertFalse(fixture.trailText().contains("tonight's work"), "never a page")
     }
 
     /// The assistant window's restore shares the swap (Russell's ruling):
@@ -256,7 +333,41 @@ final class OneSectionRestoreTests: XCTestCase {
         XCTAssertEqual(outcome.pagesMadeSinceHidden, 2)
     }
 
+    /// A template made since the backup is never given a key: every page
+    /// made from it later would carry it.
+    @MainActor
+    func testAPageQuartzNeverPublishesIsLeftAlone() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let item: BackupItem = try await fixture.backUp()
+        let template: URL = fixture.courseURL.appendingPathComponent("templates/Lesson.md")
+        try fixture.write("---\ntitle: Lesson\n---\nTemplate.", to: template)
+
+        let outcome: OneSectionRestore.Outcome = try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertEqual(try String(contentsOf: template, encoding: .utf8), "---\ntitle: Lesson\n---\nTemplate.")
+        XCTAssertEqual(outcome.pagesMadeSinceHidden, 0)
+    }
+
     // MARK: - Refusals
+
+    /// A shared folder renamed since the backup: refused, nothing moves.
+    @MainActor
+    func testARestoreIsRefusedWhenASharedFolderWasRenamed() async throws {
+        let fixture: OneSectionFixture = try OneSectionFixture()
+        defer { fixture.tearDown() }
+        let item: BackupItem = try await fixture.backUp()
+        try fixture.writeConfig(unitWord: nil, sharedFolders: ["Ideas"])
+        XCTAssertThrowsError(try CourseRestorer.restoreSectionFromTheMenu(
+            2, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )) { (error: Error) in
+            guard case CourseRestorer.Problem.namingChangedSinceTheBackup("ICS3U", 2) = error else {
+                XCTFail("Expected namingChangedSinceTheBackup, got \(error)")
+                return
+            }
+        }
+    }
 
     /// The course's word for a unit changed since the backup: refused, and
     /// nothing moves.
@@ -289,9 +400,16 @@ final class OneSectionRestoreTests: XCTestCase {
         defer { fixture.tearDown() }
         let item: BackupItem = try await fixture.backUp()
 
-        let facts: OneSectionRestore.BackupFacts = try XCTUnwrap(OneSectionRestore.readFacts(ofBackupAt: item.fileURL))
+        let facts: OneSectionRestore.BackupFacts = OneSectionRestore.readFacts(ofBackupAt: item.fileURL)
         XCTAssertEqual(facts.sectionsInside, [1, 2])
-        XCTAssertEqual(facts.naming, OneSectionRestore.Naming(word: "Unit", scheme: "unit_day", classFolder: "All Classes"))
+        XCTAssertEqual(facts.naming, OneSectionRestore.Naming(
+            word: "Unit", scheme: "unit_day", classFolder: "All Classes", sharedFolders: [], perSectionFolders: ["All Classes"]
+        ))
+        let unreadable: URL = fixture.coursesDirectoryURL.appendingPathComponent("not-a-zip.zip")
+        try "not a zip".write(to: unreadable, atomically: true, encoding: .utf8)
+        XCTAssertEqual(OneSectionRestore.readFacts(ofBackupAt: unreadable),
+                       OneSectionRestore.BackupFacts(sectionsInside: [], naming: nil),
+                       "an unreadable zip reads as holding nothing, so it is never offered")
     }
 
     /// Each path in the list is the one the file's owner writes, so a file
@@ -391,6 +509,10 @@ final class OneSectionFixture {
     let courseURL: URL
     var course: Course
 
+    /// The trail as it was before the fixture pointed it at a folder of its
+    /// own, put back by `tearDown`.
+    let previousTrail: ProblemReportStore
+
     // MARK: - Computed properties
 
     var outlineURL: URL {
@@ -404,6 +526,8 @@ final class OneSectionFixture {
         let workingFolder: URL = fileManager.temporaryDirectory
             .appendingPathComponent("one-section-restore-\(UUID().uuidString)")
         coursesDirectoryURL = workingFolder.appendingPathComponent("courses")
+        previousTrail = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: workingFolder.appendingPathComponent("trail"))
         courseURL = coursesDirectoryURL.appendingPathComponent("ICS3U")
         for number in [1, 2] {
             let folder: URL = courseURL.appendingPathComponent("section\(number)")
@@ -438,7 +562,7 @@ final class OneSectionFixture {
         return "---\ntitle: Section \(number)\npublish: true\n---\nSection \(number)'s landing page."
     }
 
-    func writeConfig(unitWord: String?) throws {
+    func writeConfig(unitWord: String?, sharedFolders: [String]? = nil) throws {
         var values: [String: Any] = [
             "course_code": "ICS3U",
             "course_name": "One Section Restore Test Course",
@@ -447,6 +571,9 @@ final class OneSectionFixture {
         ]
         if let unitWord {
             values["unit_word"] = unitWord
+        }
+        if let sharedFolders {
+            values["shared_folders"] = sharedFolders
         }
         let data: Data = try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])
         try data.write(to: courseURL.appendingPathComponent("course_config.json"))
@@ -490,9 +617,9 @@ final class OneSectionFixture {
         return entries.count
     }
 
-    /// Whether any file kept under `courses/.internal/restoring` holds this text.
-    func restoringHolds(text: String) -> Bool {
-        let folder: URL = coursesDirectoryURL.appendingPathComponent(".internal/restoring")
+    /// Whether any file under a folder inside `courses/` holds this text.
+    func holds(text: String, under relativeFolder: String) -> Bool {
+        let folder: URL = coursesDirectoryURL.appendingPathComponent(relativeFolder)
         guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil) else {
             return false
         }
@@ -522,7 +649,13 @@ final class OneSectionFixture {
         return result
     }
 
+    /// Everything written on the trail since the fixture was made.
+    func trailText() -> String {
+        return ActivityTrail.store.activityText(includingPrompts: true)
+    }
+
     func tearDown() {
+        ActivityTrail.store = previousTrail
         try? FileManager.default.removeItem(at: coursesDirectoryURL.deletingLastPathComponent())
     }
 }

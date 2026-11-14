@@ -635,6 +635,16 @@ final class AssistSession {
                 sectionNumber: sectionNumber,
                 coursesDirectoryURL: coursesDirectoryURL
             )
+        } catch CourseRestorer.Problem.sectionRestoreStoppedPartWay(let number, let keptAt, let archived) {
+            // Something WAS put back here, so "Nothing was put back" would be
+            // untrue (#897 C): the restorer's own sentence says what is.
+            let stopped: CourseRestorer.Problem = .sectionRestoreStoppedPartWay(number, keptAt: keptAt, archived: archived)
+            restoreNotes.append(RestoreNote(
+                text: stopped.localizedDescription,
+                isProblem: true,
+                saidSoFar: saidSoFar
+            ))
+            return
         } catch {
             restoreNotes.append(RestoreNote(
                 text: "Nothing was put back: \(error.localizedDescription)",

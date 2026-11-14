@@ -24,13 +24,12 @@ enum CourseRestorer {
         case sectionNotInCourse(String, Int)
         /// The staged swap failed and every file went back where it was.
         case sectionLeftAsItWas(Int, String)
-        /// The staged swap failed and putting things back failed as well.
-        /// What the section held is kept in `courses/.internal/restoring/`,
-        /// and the course as it was is in Archived.
-        case sectionRestoreStoppedPartWay(Int)
-        /// The same, from a restore that made no archive first: the
-        /// assistant window's "Restore Section N…".
-        case sectionRestoreStoppedPartWayWithNoArchive(Int)
+        /// The staged swap failed and putting things back failed as well:
+        /// the section may hold a mix of old and new. `keptAt` is where the
+        /// set-aside files were moved, as a path inside the working folder;
+        /// `archived` says whether the whole course was archived first (the
+        /// menu's route) or not (the assistant window's).
+        case sectionRestoreStoppedPartWay(Int, keptAt: String, archived: Bool)
 
         var errorDescription: String? {
             switch self {
@@ -50,12 +49,12 @@ enum CourseRestorer {
                 return OneSectionRestoreWording.sectionNotInCourse(section: number, course: code)
             case .sectionLeftAsItWas(let number, let reason):
                 return OneSectionRestoreWording.leftAsItWas(section: number, reason: reason)
-            case .sectionRestoreStoppedPartWay(let number):
-                return OneSectionRestoreWording.stoppedPartWay(section: number)
-            case .sectionRestoreStoppedPartWayWithNoArchive(let number):
-                return "The restore of Section \(number) stopped part way and could not put everything back as it "
-                     + "was. Nothing was deleted: what Section \(number) had is kept inside the working folder, in "
-                     + "courses/.internal/restoring."
+            case .sectionRestoreStoppedPartWay(let number, let keptAt, let archived):
+                let said: String = OneSectionRestoreWording.stoppedPartWay(section: number, keptAt: keptAt)
+                if archived {
+                    return said + " " + OneSectionRestoreWording.stoppedPartWayArchived
+                }
+                return said
             }
         }
     }
@@ -319,10 +318,14 @@ enum CourseRestorer {
                 hooks: hooks,
                 keepingWhatWasReplaced: nil
             )
-        } catch Problem.sectionRestoreStoppedPartWay(let number) {
+        } catch is WayBackDidNotFinish {
             // The window makes no archive first, so it may not say one is in
             // Archived.
-            throw Problem.sectionRestoreStoppedPartWayWithNoArchive(number)
+            let keptAt: String = keepTheSetAsideFiles(
+                aside, sectionNumber: sectionNumber, courseCode: item.courseCode,
+                coursesDirectoryURL: coursesDirectoryURL
+            )
+            throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: keptAt, archived: false)
         } catch {
             removeStaging(aside)
             throw error
@@ -359,16 +362,68 @@ enum CourseRestorer {
     private static func removeStaging(_ staging: URL) {
         let fileManager: FileManager = FileManager.default
         try? fileManager.removeItem(at: staging)
-        // `restoring`, then `.internal`, each only when it is empty.
+        // `restoring`, then `.internal`, each only when it is empty. `rmdir`
+        // rather than `removeItem`, because `removeItem` deletes a folder
+        // whatever it holds: a lease written into `.internal/activity/`
+        // between a check and the removal would go with it. `rmdir` refuses
+        // a folder that is not empty, so there is no window at all.
         var parent: URL = staging.deletingLastPathComponent()
         for _ in 0..<2 {
-            let left: [String] = (try? fileManager.contentsOfDirectory(atPath: parent.path)) ?? []
-            if !left.isEmpty {
+            if rmdir(parent.path) != 0 {
                 return
             }
-            try? fileManager.removeItem(at: parent)
             parent = parent.deletingLastPathComponent()
         }
+    }
+
+    /// Thrown by `swapSectionInPlace` when a move failed AND a move back
+    /// failed too, so the aside folder holds files the section no longer
+    /// has.
+    struct WayBackDidNotFinish: Error {
+    }
+
+    /// Moves the files a stopped restore set aside to where a teacher can
+    /// open them in Finder: a folder beside the course's backups,
+    /// `courses/_backups/<CODE>/Section N as it was before a restore,
+    /// <stamp>`. The backups folder is the one place in a working folder
+    /// that already holds copies of the course, it is on the same volume
+    /// (so this is a rename), and nothing reads a FOLDER there: the backup
+    /// and archive lists read `.zip` names only. When the move fails, the
+    /// files stay in `courses/.internal/restoring/`, which Finder hides,
+    /// and that path is what is said.
+    ///
+    /// Writes `section restore stopped part way` on the trail: the course,
+    /// the section and that path, never a page.
+    static func keepTheSetAsideFiles(
+        _ aside: URL,
+        sectionNumber: Int,
+        courseCode: String,
+        coursesDirectoryURL: URL
+    ) -> String {
+        let fileManager: FileManager = FileManager.default
+        let workingFolderPath: String = coursesDirectoryURL.deletingLastPathComponent().standardizedFileURL.path + "/"
+        let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups").appendingPathComponent(courseCode)
+        let name: String = "Section \(sectionNumber) as it was before a restore, " + ArchiveStamp.text(for: Date())
+        var keptURL: URL = aside
+        do {
+            try fileManager.createDirectory(at: shelf, withIntermediateDirectories: true)
+            let destination: URL = shelf.appendingPathComponent(name)
+            try fileManager.moveItem(at: aside, to: destination)
+            keptURL = destination
+        } catch {
+            keptURL = aside
+        }
+        var keptAt: String = keptURL.standardizedFileURL.path
+        if keptAt.hasPrefix(workingFolderPath) {
+            keptAt = String(keptAt.dropFirst(workingFolderPath.count))
+        }
+        ActivityTrail.note(
+            .sectionRestoreStoppedPartWay,
+            ActivityTrail.sectionRestoreStoppedPartWayLine(keptAt: keptAt),
+            course: courseCode,
+            section: sectionNumber
+        )
+        return keptAt
     }
 
     /// Points a test can stop a restore at, to prove what is left behind.
@@ -376,6 +431,10 @@ enum CourseRestorer {
         /// The backup is unpacked and checked, and nothing in the course has
         /// moved yet.
         case staged
+        /// Every live file the swap replaces has moved aside, and none of the
+        /// backup's has moved in: the moment the old code had an EMPTY
+        /// section folder.
+        case setAside
     }
 
     /// How a one-section restore moves a file, and what it does at each
@@ -510,13 +569,18 @@ enum CourseRestorer {
                 hooks: hooks,
                 keepingWhatWasReplaced: keepingWhatWasReplaced
             )
-        } catch Problem.sectionRestoreStoppedPartWay(let number) {
-            // What the section held is in `aside`, and stays there.
-            keepStaging = true
-            throw Problem.sectionRestoreStoppedPartWay(number)
+        } catch is WayBackDidNotFinish {
+            // What the section held is in `aside`, and is kept where a
+            // teacher can open it.
+            let keptAt: String = keepTheSetAsideFiles(
+                aside, sectionNumber: sectionNumber, courseCode: item.courseCode,
+                coursesDirectoryURL: coursesDirectoryURL
+            )
+            keepStaging = keptAt.contains(".internal/restoring")
+            throw Problem.sectionRestoreStoppedPartWay(sectionNumber, keptAt: keptAt, archived: true)
         }
 
-        let keys: (pagesNotPutBack: Int, pagesMadeSinceHidden: Int) = restorePerSectionKeys(
+        let keys: (pagesNotPutBack: Int, pagesNotSaved: Int, pagesMadeSinceHidden: Int) = restorePerSectionKeys(
             sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: true
         )
         discardBuiltSiteKeepingItsWebsiteMarker(
@@ -527,6 +591,7 @@ enum CourseRestorer {
         )
         return OneSectionRestore.Outcome(
             pagesNotPutBack: keys.pagesNotPutBack,
+            pagesNotSaved: keys.pagesNotSaved,
             pagesMadeSinceHidden: keys.pagesMadeSinceHidden,
             websiteRecordDiffers: websiteRecordDiffers
         )
@@ -541,9 +606,17 @@ enum CourseRestorer {
     /// never moved, for the reason `restoreBackup` gives (Obsidian's watcher
     /// holds on to its identity). If any move fails, every move already made
     /// is made backwards, last first, and `sectionLeftAsItWas` is thrown; if
-    /// one of THOSE fails, `sectionRestoreStoppedPartWay` is thrown and the
-    /// aside folder must be kept, because it then holds the only copy of
-    /// what the section had.
+    /// one of THOSE fails, `WayBackDidNotFinish` is thrown and the aside
+    /// folder must be kept (`keepTheSetAsideFiles`), because it then holds
+    /// the only copy of what the section had.
+    ///
+    /// **A known limit, measured** (the #897 C implementation review): with a
+    /// failure injected at forward move k and at way-back move j, for every
+    /// k in 2…14 and j < k on a course with four section files and six
+    /// outside files, all 91 cases kept every original file, in the course
+    /// or the aside folder, and 12 of the 91 left `section<N>/` holding a mix
+    /// of live and backup files. That is what the stopped-part-way sentence
+    /// says.
     private static func swapSectionInPlace(
         _ sectionNumber: Int,
         inCourseAt courseURL: URL,
@@ -588,6 +661,7 @@ enum CourseRestorer {
                 try hooks.move(liveFile, destination)
                 done.append(SwapStep(from: liveFile, to: destination))
             }
+            try hooks.reached(.setAside)
             // In: the backup's section files.
             let backedUpChildren: [URL] = try fileManager.contentsOfDirectory(
                 at: backedUpSectionURL, includingPropertiesForKeys: nil, options: []
@@ -621,7 +695,7 @@ enum CourseRestorer {
                 }
             }
             if !everyFileIsBack {
-                throw Problem.sectionRestoreStoppedPartWay(sectionNumber)
+                throw WayBackDidNotFinish()
             }
             throw Problem.sectionLeftAsItWas(sectionNumber, error.localizedDescription)
         }
@@ -642,13 +716,30 @@ enum CourseRestorer {
                 // The deploy stamp says when, not where.
                 continue
             }
-            let live: Data? = try? Data(contentsOf: courseURL.appendingPathComponent(relative))
-            let backedUp: Data? = try? Data(contentsOf: payload.appendingPathComponent(relative))
-            if live != backedUp {
+            // Compared as parsed JSON, so a marker rewritten for the same
+            // site (deploy.py writes it with its own indentation) is not a
+            // difference. With NO live marker nothing is said: the section
+            // then has no address until its next deploy makes one, and "still
+            // goes to the address it has now" would be untrue.
+            guard let live = parsedMarker(at: courseURL.appendingPathComponent(relative)) else {
+                continue
+            }
+            let backedUp: NSDictionary? = parsedMarker(at: payload.appendingPathComponent(relative))
+            if backedUp == nil || !live.isEqual(backedUp) {
                 return true
             }
         }
         return false
+    }
+
+    /// A website marker as a dictionary, or nil when there is none that
+    /// reads.
+    private static func parsedMarker(at url: URL) -> NSDictionary? {
+        guard let data = try? Data(contentsOf: url),
+              let object = try? JSONSerialization.jsonObject(with: data) as? NSDictionary else {
+            return nil
+        }
+        return object
     }
 
     /// `discardBuiltSite`, keeping the one file in the section's built output
@@ -700,20 +791,25 @@ enum CourseRestorer {
     /// assistant window's restore does not do, and leaves everything else as
     /// it is: a shared page the backup LACKS (made since) is hidden from this
     /// section unless it already is, and a page whose rewrite fails is
-    /// counted rather than passed over in silence. Pages inside a hidden
-    /// folder (`.obsidian`, `.trash`) are never hidden that way: no site is
-    /// built from them.
+    /// counted rather than passed over in silence. A page Quartz never
+    /// publishes (`OneSectionRestore.isPublishable`: a dot folder, or
+    /// `private/` or `templates/` at the top) is never given a key that way.
+    /// Identity is the PATH, so a shared page renamed or moved since the
+    /// backup counts as made since and is hidden: the safe direction, and
+    /// the finished line says only that the backup has no page at that
+    /// place.
     private static func restorePerSectionKeys(
         _ sectionNumber: Int,
         inCourseAt courseURL: URL,
         from payload: URL,
         fromTheMenu: Bool
-    ) -> (pagesNotPutBack: Int, pagesMadeSinceHidden: Int) {
+    ) -> (pagesNotPutBack: Int, pagesNotSaved: Int, pagesMadeSinceHidden: Int) {
         var notPutBack: Int = 0
+        var notSaved: Int = 0
         var madeSinceHidden: Int = 0
         let fileManager: FileManager = FileManager.default
         guard let walker = fileManager.enumerator(at: courseURL, includingPropertiesForKeys: nil) else {
-            return (notPutBack, madeSinceHidden)
+            return (notPutBack, notSaved, madeSinceHidden)
         }
         while let entry = walker.nextObject() as? URL {
             let name: String = entry.lastPathComponent
@@ -729,7 +825,7 @@ enum CourseRestorer {
             }
             let backedUpPageURL: URL = payload.appendingPathComponent(relativePath)
             if fromTheMenu && !fileManager.fileExists(atPath: backedUpPageURL.path) {
-                if isInsideAHiddenFolder(relativePath) {
+                if !OneSectionRestore.isPublishable(relativePath: relativePath) {
                     continue
                 }
                 guard let liveText = try? String(contentsOf: entry, encoding: .utf8) else {
@@ -745,7 +841,7 @@ enum CourseRestorer {
                         try text.write(to: entry, atomically: true, encoding: .utf8)
                         madeSinceHidden += 1
                     } catch {
-                        notPutBack += 1
+                        notSaved += 1
                     }
                 }
                 continue
@@ -765,14 +861,14 @@ enum CourseRestorer {
                     do {
                         try rewritten.text.write(to: entry, atomically: true, encoding: .utf8)
                     } catch {
-                        notPutBack += 1
+                        notSaved += 1
                     }
                 } else {
                     try? rewritten.text.write(to: entry, atomically: true, encoding: .utf8)
                 }
             }
         }
-        return (notPutBack, madeSinceHidden)
+        return (notPutBack, notSaved, madeSinceHidden)
     }
 
     /// What hiding a shared page made since the backup comes to.
@@ -810,14 +906,6 @@ enum CourseRestorer {
         }
     }
 
-    /// True for a path with any folder whose name starts with a dot.
-    private static func isInsideAHiddenFolder(_ relativePath: String) -> Bool {
-        let components: [Substring] = relativePath.split(separator: "/")
-        for component in components.dropLast() where component.hasPrefix(".") {
-            return true
-        }
-        return false
-    }
 
     /// One page's text with a single section's per-section key lines put back
     /// exactly as the backup had them, and every other byte left alone — and

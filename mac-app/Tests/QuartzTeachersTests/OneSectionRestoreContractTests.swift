@@ -42,7 +42,7 @@ final class OneSectionRestoreContractTests: XCTestCase {
     func testEveryNamingCase() throws {
         let block: [String: Any] = try OneSectionRestoreContractTests.block()
         let cases: [[String: Any]] = try XCTUnwrap(block["namingCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6, "namingCases has shrunk")
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "namingCases has shrunk")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let live: [String: Any] = try XCTUnwrap(testCase["live"] as? [String: Any], name)
@@ -83,6 +83,7 @@ final class OneSectionRestoreContractTests: XCTestCase {
         let wording: [String: Any] = try XCTUnwrap(block["wording"] as? [String: Any])
         let when: String = "November 13, 2026 at 8:15 PM"
         let madeBy: String = BackupMaker.menu(sectionNumber: 2).description
+        let keptAt: String = "courses/_backups/ICS3U/Section 2 as it was before a restore, 2026-11-13_201500"
         func filled(_ key: String, count: Int = 0, reason: String = "") throws -> String {
             let template: String = try XCTUnwrap(wording[key] as? String, key)
             return template
@@ -92,6 +93,7 @@ final class OneSectionRestoreContractTests: XCTestCase {
                 .replacingOccurrences(of: "{WHEN}", with: when)
                 .replacingOccurrences(of: "{COUNT}", with: String(count))
                 .replacingOccurrences(of: "{REASON}", with: reason)
+                .replacingOccurrences(of: "{KEPT}", with: keptAt)
         }
 
         XCTAssertEqual(OneSectionRestoreWording.title(course: "ICS3U"), try filled("title"))
@@ -103,25 +105,36 @@ final class OneSectionRestoreContractTests: XCTestCase {
         XCTAssertEqual(OneSectionRestoreWording.sectionNotInCourse(section: 2, course: "ICS3U"), try filled("sectionNotInCourse"))
         XCTAssertEqual(OneSectionRestoreWording.busy(section: 2, course: "ICS3U"), try filled("busy"))
         XCTAssertEqual(OneSectionRestoreWording.leftAsItWas(section: 2, reason: "disk full"), try filled("leftAsItWas", reason: "disk full"))
-        XCTAssertEqual(OneSectionRestoreWording.stoppedPartWay(section: 2), try filled("stoppedPartWay"))
+        XCTAssertEqual(OneSectionRestoreWording.stoppedPartWay(section: 2, keptAt: keptAt), try filled("stoppedPartWay"))
+        XCTAssertEqual(OneSectionRestoreWording.stoppedPartWayArchived, try filled("stoppedPartWayArchived"))
+        XCTAssertEqual(OneSectionRestoreWording.renameUnfinished(section: 2, course: "ICS3U"), try filled("renameUnfinished"))
+        // The two routes' joins, as doneJoin says.
+        XCTAssertEqual(
+            CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, keptAt: keptAt, archived: true).localizedDescription,
+            try filled("stoppedPartWay") + " " + filled("stoppedPartWayArchived")
+        )
+        XCTAssertEqual(
+            CourseRestorer.Problem.sectionRestoreStoppedPartWay(2, keptAt: keptAt, archived: false).localizedDescription,
+            try filled("stoppedPartWay")
+        )
 
         let plain: OneSectionRestore.Outcome = OneSectionRestore.Outcome(
-            pagesNotPutBack: 0, pagesMadeSinceHidden: 0, websiteRecordDiffers: false
+            pagesNotPutBack: 0, pagesNotSaved: 0, pagesMadeSinceHidden: 0, websiteRecordDiffers: false
         )
         XCTAssertEqual(OneSectionRestoreWording.done(section: 2, when: when, outcome: plain), try filled("done"))
 
         let ones: OneSectionRestore.Outcome = OneSectionRestore.Outcome(
-            pagesNotPutBack: 1, pagesMadeSinceHidden: 1, websiteRecordDiffers: true
+            pagesNotPutBack: 1, pagesNotSaved: 1, pagesMadeSinceHidden: 1, websiteRecordDiffers: true
         )
         let expectedOnes: String = try filled("done") + "\n\n" + filled("hiddenSinceOne") + "\n\n"
-            + filled("notPutBackOne") + "\n\n" + filled("websiteUnchanged")
+            + filled("notPutBackOne") + "\n\n" + filled("notSavedOne") + "\n\n" + filled("websiteUnchanged")
         XCTAssertEqual(OneSectionRestoreWording.done(section: 2, when: when, outcome: ones), expectedOnes)
 
         let many: OneSectionRestore.Outcome = OneSectionRestore.Outcome(
-            pagesNotPutBack: 3, pagesMadeSinceHidden: 4, websiteRecordDiffers: false
+            pagesNotPutBack: 3, pagesNotSaved: 2, pagesMadeSinceHidden: 4, websiteRecordDiffers: false
         )
         let expectedMany: String = try filled("done") + "\n\n" + filled("hiddenSinceMany", count: 4) + "\n\n"
-            + filled("notPutBackMany", count: 3)
+            + filled("notPutBackMany", count: 3) + "\n\n" + filled("notSavedMany", count: 2)
         XCTAssertEqual(OneSectionRestoreWording.done(section: 2, when: when, outcome: many), expectedMany)
     }
 

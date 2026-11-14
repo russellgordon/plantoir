@@ -11952,12 +11952,16 @@ every sentence are `contracts/course-management.json` →
 `.assistant`, read from the name) names a section; that section is in the
 course now; the course is not kept for reference; no unit-word or folder
 rename has a record still on disk; the zip holds `section<N>/`; and the
-course names its class pages as the backup did (`OneSectionRestore.Naming`:
-the unit word, the class page scheme and the class folder). The zip's part
-is read by `OneSectionRestore.readFacts`, `zipinfo -1` for the listing and
-`unzip -p` for `course_config.json` alone, once per backup, and kept in an
-unobserved cache on the model. Otherwise the alert is the whole-course one,
-unchanged.
+course's naming is the backup's (`OneSectionRestore.Naming`: the unit word,
+the class page scheme, the class folder, and the shared and per-section
+folder lists, because `SpecialFolderRenamer` rewrites the links into a
+renamed folder in every page). The zip's part is read by
+`OneSectionRestore.readFacts`, `zipinfo -1` for the listing and `unzip -p`
+for `course_config.json` alone, once per backup (an unreadable zip is kept
+as holding nothing), when `backupRestoreRequest` is set, never while the
+alert draws. Otherwise the alert is the whole-course one, unchanged. Every
+condition is asked again at the click (`oneSectionRestoreRefusal`) BEFORE the
+whole course is archived, so a refused click leaves nothing in Archived.
 
 **What comes back.** `CourseRestorer.restoreSectionFromTheMenu`:
 
@@ -11978,7 +11982,11 @@ unchanged.
   is kept across the discarded build for the same reason. The finished line
   says the address is unchanged when the backup's record differs;
 - a shared page the backup does not have (made since) is hidden from this
-  section with `AssistPageVisibility.setting`, unless it already is.
+  section with `AssistPageVisibility.setting`, unless it already is. A page
+  Quartz never publishes (a dot folder, or `private/` or `templates/` at the
+  top) is left alone. Identity is the PATH, so a page renamed or moved since
+  the backup is hidden too: the safe direction, and the finished line says
+  only that the backup has no page at that place.
 
 **Measured and rejected.**
 
@@ -11996,11 +12004,12 @@ unchanged.
   holds both shapes.
 - Offering one section after the course's word for a unit changed was
   rejected (amendment 19): the pages come back named for a scheme the course
-  no longer reads. The restore asks again of the unpacked backup and refuses
-  with `wording.namingChanged`, since the alert's answer is read before the
-  click.
+  no longer reads. The same holds for a shared or per-section folder renamed
+  since (the implementation review): the section's pages would link to the
+  old name. The restore asks again of the unpacked backup and refuses with
+  `wording.namingChanged`.
 
-**Staged, then swapped, with a way back (both routes).** The backup is
+**Staged, then swapped, with a way back (both one-section routes).** The backup is
 unpacked into `courses/.internal/restoring/<id>/`, on the courses' own volume
 so every move is a rename (the system temporary folder can be another
 volume, where a move is a copy and a rollback a second copy). Nothing in the
@@ -12008,16 +12017,43 @@ course moves until the backup is unpacked and checked. Then
 `swapSectionInPlace` moves the live children and the live outside files
 aside, moves the backup's in, and on any failure moves every moved file back,
 last first: the teacher is told the section was left as it was. If a move
-back fails too, the aside folder is KEPT (it holds the only copy) and the
-teacher is told the course as it was is in Archived. Measured on 2026-11-13
-with a standalone copy of the swap
-(`S/measure/897c/SwapUnderTest.swift`, `swiftc -default-isolation MainActor`):
-a failure injected at each of the five moves left the section and its class
-dates exactly as they were, and a way back that failed from the second move
-on left the moved file in the aside folder. By Russell's ruling on #897 the
-assistant window's own "Restore Section N…" uses the same swap, over the
-section folder only; nothing it says on success changed. Windows' restore
+back fails too, nothing is deleted: the set-aside files move to
+`courses/_backups/<CODE>/Section N as it was before a restore, <stamp>`, a
+folder Finder shows (`courses/.internal` is a dot folder Finder hides), on
+the same volume, where nothing reads a folder (the backup and archive lists
+read zip names only). The trail gets `section restore stopped part way`
+with that path, and the teacher reads `wording.stoppedPartWay`: the section
+may hold a mix, and where the files are; on the menu's route also that the
+course as it was is in Archived. If that last move fails as well, the files
+stay in `courses/.internal/restoring/` and that path is what is said.
+
+Measured on 2026-11-13. A standalone copy of the swap, the function's text
+sliced out and compiled with `swiftc -default-isolation MainActor`: a failure
+injected at each of the five moves of a small fixture left the section and
+its class dates exactly as they were. The implementation review ran the same
+slice on a larger fixture (four section files, one hidden and one nested; six
+outside files): a failure at each of the 14 forward moves left course and
+payload byte-identical; and a failure at forward move k and way-back move j,
+for every k in 2…14 and j < k, 91 cases, kept every original file in the
+course or the aside folder. **12 of those 91 left `section<N>/` holding a
+mix of live and backup files. That is a known limit**: a way back that
+itself fails cannot be made whole, so it is said rather than hidden.
+
+By Russell's ruling on #897 the assistant window's own "Restore Section N…"
+uses the same swap, over the section folder only; nothing it says on success
+changed, and on a stopped restore it says the restorer's sentence without
+its usual "Nothing was put back:" in front. **Restore Whole Course is NOT
+staged**: `CourseRestorer.restoreBackup` still removes the course's contents
+before moving the backup's in, protected by the archive made first. Whether
+it gets the same swap is a question with Russell. Windows' section restore
 still deletes first (#873).
+
+Two edges, both true of the whole-course restore as well. A section removed
+and later added again under the same number is offered an old backup of
+the section that had that number. And anything in `section<N>/` that backups
+leave out (`CourseArchiver.excludedFromArchives`: `build`, `out`, `dist`,
+`.cache`, `node_modules`, `.git` and the rest) is removed by the swap and is
+in neither the backup nor the archive made first.
 
 **Order around it** (`WorkspaceModel.restoreOneSection`): the
 `structuralRefusal` before and after, a refusal while the Section menu or the

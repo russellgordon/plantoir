@@ -514,7 +514,23 @@ class WorkspaceModel {
     var referenceGroupProblem: ReferenceGroupProblem?
 
     /// The backup a restore confirmation is being shown for, if any.
-    var backupRestoreRequest: BackupItem?
+    ///
+    /// Setting it works out, once, which section the alert offers to put
+    /// back on its own (#897 C), so the alert never reads a zip while it is
+    /// drawn (the implementation review, MINOR 6).
+    var backupRestoreRequest: BackupItem? {
+        didSet {
+            if let request = backupRestoreRequest {
+                backupRestoreOfferedSection = oneSectionRestoreOffer(for: request)
+            } else {
+                backupRestoreOfferedSection = nil
+            }
+        }
+    }
+
+    /// The section the restore confirmation offers to put back on its own,
+    /// or nil for the whole-course question. Set with `backupRestoreRequest`.
+    private(set) var backupRestoreOfferedSection: Int?
 
     /// What each backup zip holds that Restore from Backup… needs to offer
     /// one section (#897 C), by the zip's path. Read once per backup, off
@@ -2903,20 +2919,19 @@ class WorkspaceModel {
             atPath: course.sectionDirectoryURL(forSection: sectionNumber).path
         )
         let sectionExistsNow: Bool = course.sectionNumbers.contains(sectionNumber) && sectionFolderIsThere
-        var facts: OneSectionRestore.BackupFacts? = backupFactsByPath[item.fileURL.path]
-        if facts == nil {
+        // Kept whether or not it read: a zip does not change, and an
+        // unreadable one reads as holding nothing.
+        var facts: OneSectionRestore.BackupFacts
+        if let kept = backupFactsByPath[item.fileURL.path] {
+            facts = kept
+        } else {
             facts = OneSectionRestore.readFacts(ofBackupAt: item.fileURL)
-            if let facts {
-                backupFactsByPath[item.fileURL.path] = facts
-            }
+            backupFactsByPath[item.fileURL.path] = facts
         }
-        var backupHasTheSection: Bool = false
+        let backupHasTheSection: Bool = facts.sectionsInside.contains(sectionNumber)
         var namingSameAsNow: Bool = false
-        if let facts {
-            backupHasTheSection = facts.sectionsInside.contains(sectionNumber)
-            if let backedUpNaming = facts.naming {
-                namingSameAsNow = backedUpNaming == OneSectionRestore.Naming(configuration: course.configuration)
-            }
+        if let backedUpNaming = facts.naming {
+            namingSameAsNow = backedUpNaming == OneSectionRestore.Naming(configuration: course.configuration)
         }
         return OneSectionRestore.offeredSection(
             maker: item.maker,
@@ -2957,6 +2972,14 @@ class WorkspaceModel {
             backupProblem = OneSectionRestoreWording.busy(section: sectionNumber, course: item.courseCode)
             return
         }
+        // The cheap questions BEFORE the archive, which can take ten seconds
+        // and half a gigabyte: a refused click should leave nothing in
+        // Archived (the implementation review, MINORs 2 and 7).
+        if let refusal = oneSectionRestoreRefusal(sectionNumber, from: item) {
+            backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
+            backupProblem = refusal
+            return
+        }
         do {
             var archiveFileName: String?
             for course in courses where course.code == item.courseCode {
@@ -2986,7 +3009,8 @@ class WorkspaceModel {
                 ActivityTrail.restoredOneSectionFromTheMenuLine(
                     backupFileName: item.fileURL.lastPathComponent,
                     archiveFileName: archiveFileName,
-                    pagesMadeSinceHidden: outcome.pagesMadeSinceHidden
+                    pagesMadeSinceHidden: outcome.pagesMadeSinceHidden,
+                    pagesNotSaved: outcome.pagesNotSaved
                 ),
                 course: item.courseCode,
                 section: sectionNumber
@@ -3014,6 +3038,41 @@ class WorkspaceModel {
         selection = nil
         reloadCourses()
         selection = SidebarSelection.section(item.courseCode, sectionNumber)
+    }
+
+    /// Why this section may not be put back on its own from this backup,
+    /// asked again at the click (the alert's answer was worked out when it
+    /// opened), or nil when it may. Each reason is the one
+    /// `OneSectionRestore.offeredSection` would have withheld the offer for.
+    func oneSectionRestoreRefusal(_ sectionNumber: Int, from item: BackupItem) -> String? {
+        var matchingCourse: Course?
+        for course in courses where course.code == item.courseCode {
+            matchingCourse = course
+        }
+        guard let course = matchingCourse else {
+            return CourseRestorer.Problem.courseMissing(item.courseCode).localizedDescription
+        }
+        if course.isKeptForReference {
+            return ReferenceCourseIsFrozen(displayCode: course.displayCode).localizedDescription
+        }
+        let folderIsThere: Bool = FileManager.default.fileExists(
+            atPath: course.sectionDirectoryURL(forSection: sectionNumber).path
+        )
+        if !course.sectionNumbers.contains(sectionNumber) || !folderIsThere {
+            return OneSectionRestoreWording.sectionNotInCourse(section: sectionNumber, course: item.courseCode)
+        }
+        if OneSectionRestore.renameIsUnfinished(courseDirectory: course.directoryURL) {
+            return OneSectionRestoreWording.renameUnfinished(section: sectionNumber, course: item.courseCode)
+        }
+        if oneSectionRestoreOffer(for: item) != sectionNumber {
+            let facts: OneSectionRestore.BackupFacts = backupFactsByPath[item.fileURL.path]
+                ?? OneSectionRestore.readFacts(ofBackupAt: item.fileURL)
+            if !facts.sectionsInside.contains(sectionNumber) {
+                return CourseRestorer.Problem.sectionMissingFromBackup(item.courseCode, sectionNumber).localizedDescription
+            }
+            return OneSectionRestoreWording.namingChanged(section: sectionNumber, course: item.courseCode)
+        }
+        return nil
     }
 
     /// Whether the Section menu or the assistant is changing this section
