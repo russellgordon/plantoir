@@ -463,6 +463,13 @@
    },
    "windows": null
   },
+  "rollOverButton": {
+   "label": "Roll Over",
+   "mac": {
+    "wording": "AssistWording.menuRollOverButton"
+   },
+   "windows": null
+  },
   "makeRoomButton": {
    "label": "Make Room",
    "mac": {

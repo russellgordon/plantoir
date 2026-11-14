@@ -7011,6 +7011,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 | Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |
 | Make Room for Classes… | the class a new one goes in front of, how many (1–10), then the plan | `plan_make_room_for_classes`, then `make_room_for_classes` |
 | Class Dates… | the class dates sheet (`SectionScheduleSheet`) | — |
+| Roll Over to a New Year… (since #897 piece B, in the group above Get Ready for the Start of the Year…) | the dates on file, the website question where there is a website, then the plan (the section "Roll Over to a New Year…" below) | `plan_re_date_classes`, then `re_date_classes`, with `rollover: "yes"` and `website: "new"` or `"same"` |
 
 Help ▸ Publishing and Deploying… says what the two words mean, in an alert of
 its own, with or without a window (`publishingAndDeployingExplained` — said
@@ -7055,8 +7056,8 @@ change made from the menu in THIS window (Russell's decision 4); the
 assistant's window keeps its own list. Opening another folder in the window
 makes a new runner, and the old folder's undo list goes with it.
 
-**Class dates first.** Add Class…, Re-date Classes… and Make Room for
-Classes… need them. With none on file the SECTION WINDOW shows its own class
+**Class dates first.** Add Class…, Re-date Classes…, Roll Over to a New
+Year… and Make Room for Classes… need them. With none on file the SECTION WINDOW shows its own class
 dates sheet with the reason line, and the item runs once they are written —
 never `SectionSchedulePrompt.shared`, whose offer only the assistant's window
 shows: an offer left there asked into nothing and then appeared, stale, the
@@ -7218,6 +7219,183 @@ lookup strips the folder); changing `duplicate` itself (the assistant's
 behaviour is frozen); offering other sections' or course-level pages (ruled
 out); numbered sources only (the plan review's amendment 8: numbering was
 needed only for the insertion the ruling rejected).
+
+### Roll Over to a New Year…: the rollover's website question in a sheet (#897 piece B)
+
+The built-in assistant's window rolls a section over in words: it re-dates,
+then asks "Should this be a new website, or the same one students used last
+year?" and acts on one of two sentences the teacher says (the section of 10
+on `rollover`). Before #897 piece B that was the ONLY way to roll a section
+over with the website settled, so a teacher who declined the assistant could
+re-date but never cut a section loose from last year's site. **Section ▸ Roll
+Over to a New Year…** (Russell's ruling, 2026-11-13: the Section menu, above
+Get Ready for the Start of the Year…, rolling the one section) runs the same
+call, `re_date_classes` with `rollover: "yes"` and `website`, after its plan
+twin. It is greyed exactly where Re-date Classes… is, with no situation key of
+its own, and it is not on the section row's right-click menu (once a year).
+
+**The sheet** (`SectionVerbSheetModel.Kind.rollOver`, drawn by
+`SectionVerbSheetRollOver.swift` so the sheet's main file changes by a case):
+the intro, the dates on file first to last (`menuRollOverDates`), a line when
+the last of them has passed (`menuRollOverDatesAreOld`, pointing at Section ▸
+Class Dates…; the commonest silent failure is a rollover onto last year's
+dates), then the website by ONE rule, `RollOverFromTheMenu.website`
+(`shared-rules.json` → `subjectMenus.rollOverSheet`):
+
+| The section | The sheet | The call sends |
+|---|---|---|
+| any marker on disk (`.netlify_sites`, `.cloudflare_sites`, or the legacy `.merged_output/section<N>/.netlify_site.json`; an unreadable one counts) | the window's question over two radio buttons, NOTHING chosen; Continue is off until one is | the answer |
+| no marker, a web host among its destinations | "not deployed yet", no question | `new` |
+| no marker, folders only | "deploys to a folder", no question | `same` |
+| Cloudflare among its destinations, and a record the section keeps there (its own, or one a rollover set aside) holds the name a new website would get THIS calendar year | "a new website would get the same address", no question | `same` |
+
+**The last row exists because a "new" Cloudflare website would not be new**
+(the implementation review's W1, measured with `deploy.py`'s own functions):
+`suggest_pages_name` names a new project for the course, the section and the
+calendar year, and `ensure_pages_project` reuses a project of that name, so a
+section first deployed in February and rolled over in September is given
+`ics3u-s1-2026-<surname>` both times and the "new" website is February's. A
+semestered teacher would overwrite the site last term's students read while
+the sheet said "leave last year's as it is". The fault is in the deploy path
+and its fix is GitHub #915; this piece only stops the sheet promising it. The
+app does not keep the surname (it is saved with the teacher's sign-in details,
+which the app does not read), so a kept name matches when it is the stem
+`<course>-s<section>-<year>`, cleaned as `sanitize_pages_name` cleans it, or
+begins with the stem and a hyphen (`RollOverFromTheMenu.aNewWebsiteWouldReuseItsAddress`,
+contract `cloudflareAddressReuse`). That errs toward keeping the website
+students use. A rollover in late December deployed in January is told the
+website is kept when the January deploy would in fact have made a new one; the
+year is read when the sheet opens because that is the only moment the app
+knows. Netlify is not affected: its names are global and a taken one is asked
+again. REJECTED: offering "new" with a warning beside it (an answer whose
+result is the opposite of its words is not an answer), and changing the name
+rule here (#915).
+
+**"Not on a website at the moment"** (`menuRollOverNotDeployedYet`, reworded
+after the review's W2): the first wording said the section "has not been
+deployed yet" and that Plantoir "asks what to call it". Both were false in
+cases that reach the row: Cloudflare asks for no name, a course that deploys
+to a folder AND a web host has deployed its folder half, and a section whose
+website an earlier rollover set aside was deployed before. The sentence now
+says only what is true of all of them, and it is also the finished line where
+the window would say `rolloverHadNoWebsiteYet` (whose Cloudflare clause is the
+window's, frozen).
+
+**The finished line for a new website** (`rolloverStartedANewWebsiteFromTheMenu`,
+the Fable sweep's T1) is the window's `rolloverStartedANewWebsite` with its last
+sentence replaced by `rolloverANewWebsiteIsMadeAtTheNextDeploy`. The window's
+ends by saying Plantoir will ask what to call the new website, which is true of
+Netlify and false of Cloudflare, where `deploy.py` names the website itself. It
+is the clause W2 removed from the row above. A course that now deploys only to a
+folder, with a marker an old web host left, ends on `menuRollOverDeploysToAFolder`
+instead, in the finished line and in the plan for either answer (the sweep's T7),
+because no website is made for it. Where the dates are already right the plan's
+line for "new" is `AssistToolRunner.menuRolloverStartsANewWebsite`, the line the
+other branch shows ("It would also start…"), not the window's imperative; the
+window's plan bytes are unchanged. Pinned by
+`RollOverFromTheMenuTests.testANewWebsiteFromTheMenuPromisesNoQuestionAboutItsName`.
+The window's `rolloverCouldNotTurnOffTheScheduledPublish` carries the same
+clause and is not twinned yet.
+
+**The reuse sentence ends with the way forward**: a new website can be started
+once the calendar year changes. That is true as the name rule stands: the name
+carries the year, so from January the kept names no longer match, the section
+with its own marker is asked again, and one with only a set-aside record is sent
+"new" (`RollOverFromTheMenuTests.testASetAsideRecordFromThisYearCountsToo`). The
+only way to start it is another rollover, which sets aside the published-pages
+record again; the sentence names no menu item for that reason.
+
+The marker test is `DeployCommand.sectionIsPinned`, over the same URLs
+`releaseSite` walks (its legacy path is now `legacyMarkerURL`, shared), so the
+sheet and the release cannot disagree. The call carries only "new" or "same",
+so the window's "say one of two sentences" answer never reaches a sheet.
+
+**What differs from the window, all on `.menu` only** (the plan review's
+amendment 1; the window and an outside assistant are unchanged, and
+`RolloverWebsiteTests` stays on `.local`):
+
+- **One undo entry, in both branches** ("rolled the section over to a new
+  year"): the re-date's files, the published-pages record set aside, and the
+  markers released, so Undo Last Change takes the whole year back at once. The
+  window records two (the re-date with the record, then the website), so its
+  Undo takes the website back and leaves the dates; with the dates already
+  right it records the record and the website apart. Measured by
+  `RollOverFromTheMenuTests` (one entry; the window's test pins two).
+- **A copy of the course first when the dates are already right** (amendment
+  11): the window's path saves none there, and a teacher who ran Re-date
+  Classes… first lands exactly there.
+- **No copy, no rollover** (the director's ruling on the review's I2): when
+  that copy cannot be saved (a full disk, a folder that cannot be written),
+  the rollover is REFUSED before the preview is stopped or a file is written,
+  with `startOfYearNeedsABackup`, the start of the year's sentence for the
+  same fact. The window's path says so in `detail` and goes on, as #457 set
+  it; the menu's errs toward refusing because it is the most consequential
+  item on the menu. Pinned by
+  `RollOverFromTheMenuSafetyTests.testARolloverWithNoCopyIsRefusedBeforeAnythingChanges`.
+- **The undo entry holds only the half of each marker's move that left the
+  marker's place** (`AssistToolRunner.onlyTheHalvesMovedAway`; the review's
+  I1, measured there and reproduced by
+  `RollOverFromTheMenuSafetyTests.testAnUndoAfterADeployNeverDeletesTheKeptMarker`).
+  With both halves recorded, a deploy between the rollover and Undo Last
+  Change wrote a new marker in the place, Undo left that alone as edited, and
+  DELETED the kept copy because it still matched, so last year's site id and
+  admin address survived only in the backup zip (and the legacy marker in
+  `.merged_output` in no backup at all). Now an undo puts a marker back only
+  where its place is empty and never deletes a kept copy; after an undo with
+  no deploy between, the kept copy stays beside the restored marker, where
+  nothing reads it. The window keeps both halves. #899's journal reverses a
+  move as a PAIR, never the destination half alone.
+- **The website is settled before the preview is rebuilt.** The measured
+  reason is Quit-safety (the implementation review): every write of the
+  menu's rollover follows its last `await`, so a Quit lands before any write
+  or after all of them, where the window's path awaits the rebuild between
+  the re-date and the website. A side effect is that the preview the menu
+  builds no longer bakes last year's address from the marker
+  (`build_site.resolve_section_domain`). The first reason written here, that
+  the legacy marker is read "before a rebuild can touch it", was not measured
+  and is not true of an ordinary rebuild, which does not clear
+  `.merged_output/section<N>/`.
+- **The plan's card says what happens to the website and what is set aside**
+  (amendment 14): for "same" the window's card is the plain re-date's.
+- **Its own sentences** where the window's speak in the first person
+  (`rolloverCouldNotStartANewWebsiteFromTheMenu`, amendment 13) or call a
+  folder a website (`rolloverDeploysToAFolderFromTheMenu`, amendment 12, also
+  for "same" on a course that deploys only to a folder when an old host's
+  marker made the question appear, the review's M2).
+- **The days are written as the re-date's plan writes them**,
+  "2026-09-08 (Tuesday)", so the dates line and the card after it read alike
+  (the review's M3).
+
+**A known limit.** A deploy scheduled from this folder is turned off by "new"
+(as in the window), and Undo Last Change does not set it again: the finished
+sheet says it was turned off and to set it again. Re-registering it is an
+operation #899's journal does not have yet (amendment 15), so it is listed for
+#899 rather than built here.
+
+The trail line is `ran from a menu` with "Section ▸ Roll Over to a New Year…"
+and the website in its counts ("website: new", "website: kept", "website: not
+deployed yet", "website: deploys to a folder", "website: kept, a new one would
+have the same address"), read from what the call sent, so an unanswered
+question can write no count `mustRecord` does not list (the review's M4). The
+tool's own `section kept its website` and `section started a new website`
+lines are the window's, except that from the menu a folder-only course writes
+"kept deploying the section to its folder", the address case says a new one
+would have had the same address, and a section not on a website "was not on a
+website at the moment" rather than "had not been deployed anywhere yet" (M1).
+
+**Left as it is, for Russell to rule** (drafted as follow-ups): a custom
+domain (`custom_domains.sections.section<N>` in `course_config.json`) survives
+"new", as it does from the window, so the new site names last year's address
+(I3); and `PublishedPagesRecord.release` skips a fragment it cannot move
+without a word (M6). Both are the window's behaviour too.
+
+REJECTED: deciding by markers alone (the plan's first version told every
+teacher who deploys to a folder that the section had never been deployed); a
+Change Class Dates… button inside the sheet that comes back to it (one sheet is
+up at a time, and Cancel there would lose the answer, amendment 16); the Course
+menu, rolling every section at once (Russell); folding the window's two
+entries into one too (the window's behaviour is frozen); a default answer (the
+2026-09-08 decision: neither is guessed).
 
 ### The plan as a table (#524)
 

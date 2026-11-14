@@ -1535,7 +1535,9 @@ nonisolated enum ActivityTrail {
         /// Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
         /// Change, Add Class… (#897, which replaced Add Next Class; the
         /// counts say which way), Re-date Classes…, Make Room for Classes…,
-        /// Class Dates… — and Help ▸ Publishing and Deploying…. Carries where
+        /// Class Dates…, Roll Over to a New Year… (#897 piece B; the counts
+        /// say which way the website went) — and Help ▸ Publishing and
+        /// Deploying…. Carries where
         /// it is in the menus, how it ended (carried out, changed nothing,
         /// cancelled at the plan, rebuilt or not) and counts — never a page's
         /// title. Not "section menu item": Help is not in the Section menu
