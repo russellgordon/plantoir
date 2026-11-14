@@ -251,16 +251,32 @@ The image is layered as follows (in order):
    failure (1). Anywhere else the block does nothing: in the image a missing
    module is a fault in the image, and on Windows, whose fetched runtime
    carries the modules, `PythonToolchainTests` must keep reading one as a
-   failure. `verify.sh` runs the seven only in the image and reads any exit
-   but 0 as a FAIL, 77 included. `scripts/test_image_only_tests_say_so.py`
+   failure. `verify.sh` runs the seven's tests in the image and reads any
+   exit but 0 as a FAIL, 77 included. It also runs one of them on the HOST,
+   in a mode that needs neither module: step 6a2's `python3
+   scripts/test_page_sources.py --site <built> <course>`, which reads a real
+   build's `.page-sources.json` back against what Quartz wrote. So the block
+   lets `--site` through (`sys.argv[1:2] != ["--site"]`). The first version
+   looked at no argument and exited 77 there too, which that step's `if`
+   reads as a FAIL on a good tree; the Fable sweep found it on 2026-11-14,
+   measured on Homebrew Python 3.14.4 and `/usr/bin/python3` 3.9.6, neither
+   of which has the module. With the fix that line gives what it gave on
+   `dev` on both: exit 0 on a built site, exit 1 and "no readable" on a
+   missing one. `scripts/test_image_only_tests_say_so.py`
    keeps no list: it finds the files that carry the block, reads which files
    `verify.sh` runs in the image (`python3 /opt/scripts/test_<name>.py`, 14 on
    2026-11-13), and fails a block in a file `verify.sh` does not run there. On
    a Mac it runs each of the 14 with the modules hidden (1.5 s on the M4 Pro):
    a file with the block must exit 77 with the one line, and one without it
    must pass, so a new image test that needs the module and does not say so
-   is found. It also checks the block is the same everywhere and comes before
-   the imports, and runs it with the modules kept from the child. Rejected:
+   is found. It reads every HOST run of a file that carries the block out of
+   `verify.sh`, `verify-deploy.sh` and the three launchers (both forms,
+   `python3 scripts/test_<name>.py …` and `(cd scripts && python3
+   test_<name>.py …)`; 93 host runs in `verify.sh` on 2026-11-14, one of
+   them a block file) and runs each with its arguments and the modules
+   hidden: it must never stop at 77. Proven red on the first version's
+   `test_page_sources.py`. It also checks the block is the same everywhere
+   and comes before the imports, and runs it with the modules kept from the child. Rejected:
    one shared guard module, which every one of the seven image runs would
    then have to mount (or the Dockerfile bake, shipping test code); and
    skipping the seven by name on a Mac, which a Windows run would inherit;

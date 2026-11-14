@@ -6100,7 +6100,12 @@ if command -v node >/dev/null 2>&1; then
     *) echo "⚠️  $LEFTOVER_BROWSERS" ;;
   esac
   if run_check node browser-checks/lib/test_own_processes.mjs >/tmp/verify_own_processes.log 2>&1; then
-    pass "a browser check ended from outside ends what it started and nothing else: its child gone after SIGTERM, SIGINT, SIGHUP, process.exit and an uncaught error, a bystander left running, a plain spawn's child outliving it (the must-fail), a SIGKILLed check's child named as this checkout's leftover - $(grep -c '^ok' /tmp/verify_own_processes.log) cases$(grep -q '^SKIP' /tmp/verify_own_processes.log && echo ', the real Chrome case skipped: no Chrome for Testing') (browser-checks/lib/test_own_processes.mjs, #906)"
+    pass "a browser check ended from outside ends what it started and nothing else: its child gone after SIGTERM, SIGINT, SIGHUP, process.exit and an uncaught error, a bystander left running, a plain spawn's child outliving it (the must-fail), a SIGKILLed check's child named as this checkout's leftover - $(grep -c '^ok' /tmp/verify_own_processes.log) cases (browser-checks/lib/test_own_processes.mjs, #906)"
+    # The self-test's real-Chrome case is a SKIP of its own, so the last
+    # lines count it with every other SKIP rather than inside a PASS.
+    if grep -q '^SKIP' /tmp/verify_own_processes.log; then
+      skip "a check's real Chrome is ended with it: no Chrome for Testing on this Mac (browser-checks/lib/test_own_processes.mjs, #906)"
+    fi
   else
     fail "a browser check ended from outside leaves what it started running, or ends what it did not start (browser-checks/lib/test_own_processes.mjs, #906)"
     cat /tmp/verify_own_processes.log
@@ -7416,6 +7421,13 @@ echo ""
 echo "==================== verify.sh summary ===================="
 for line in "${RESULTS[@]}"; do echo "$line"; done
 echo "==========================================================="
+# A browser left by an earlier check of this checkout (#906) was named once,
+# before the browser checks; it is named again here, where the last lines are
+# read, whether the run passed or not.
+case "${LEFTOVER_BROWSERS:-NONE:}" in
+  NONE:*) ;;
+  *) echo "⚠️  $LEFTOVER_BROWSERS" ;;
+esac
 if [[ "$FAILED" == "true" ]]; then
   echo "❌ Verification FAILED — see items above."
   exit 1

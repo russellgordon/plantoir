@@ -25,13 +25,15 @@ Two modes.
       verify.sh runs it on the host after its build.
 """
 # ---- runs in the image (#907) ----
-# verify.sh runs this file in the image, where python-frontmatter and the
-# PyYAML it reads with are installed. Run directly on a Mac whose Python has
-# neither, it says so in one line and exits 77, so a caller can tell it from a
-# failure (1). Anywhere else, the image and Windows' fetched runtime included,
-# a missing module stays the failure it is.
+# verify.sh runs this file's tests in the image, where python-frontmatter and
+# the PyYAML it reads with are installed. Run directly on a Mac whose Python
+# has neither, it says so in one line and exits 77, so a caller can tell it
+# from a failure (1). Anywhere else, the image and Windows' fetched runtime
+# included, a missing module stays the failure it is. A mode that needs
+# neither module is let through: `--site`, test_page_sources.py's, which
+# verify.sh runs on the host after its build.
 import sys as _sys
-if _sys.platform == "darwin":
+if _sys.platform == "darwin" and _sys.argv[1:2] != ["--site"]:
     try:
         import frontmatter as _frontmatter  # noqa: F401
     except ModuleNotFoundError as _missing:

@@ -16,8 +16,14 @@ fetched runtime carries the modules, a missing module stays a failure.
 
 How each reads it:
 
-* `verify.sh` runs them only in the image (Linux), where the block does
+* `verify.sh` runs their tests in the image (Linux), where the block does
   nothing, and reads any exit but 0 as a FAIL, 77 included.
+* `verify.sh` also runs one of them on the HOST, in a mode that needs neither
+  module: `python3 scripts/test_page_sources.py --site <built> <course>`
+  (step 6a2). The block lets `--site` through, so that run does what it did
+  before the block. The first version of the block looked at no argument and
+  exited 77 there too, which that step's `if` reads as a FAIL on a good tree
+  (found by the Fable sweep, 2026-11-14); the host-run rule below pins it.
 * A direct run on a Mac without the module: the one line, exit 77.
 * Windows: the block does nothing; a missing module fails the file, and
   PythonToolchainTests reads that as the failure it is.
@@ -31,6 +37,7 @@ Windows. Run with:
 
 import ast
 import re
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -51,6 +58,16 @@ MISSING_MODULE_EXIT = 77
 # fourteen took 1.5 s on the M4 Pro.
 IMAGE_RUN = re.compile(r"python3 /opt/scripts/(test_[a-z0-9_]+\.py)")
 
+# A HOST run, in either form verify.sh writes one: `python3 scripts/test_<name>.py
+# <arguments>` from the checkout's root, or `(cd scripts && python3 test_<name>.py
+# <arguments>)`, up to the first redirect, pipe, bracket or end of command.
+# Read from every script that runs tests or builds. On 2026-11-14 verify.sh
+# ran 93 files on the host this way, and one of them carries the block: step
+# 6a2's `python3 scripts/test_page_sources.py --site ...`. No other script ran
+# a test file on the host.
+HOST_RUN = re.compile(r"python3(?: -[A-Za-z]+)* +(scripts/)?(test_[a-z0-9_]+\.py)([^\n>|;&)]*)")
+SCRIPTS_THAT_RUN_THEM = ("verify.sh", "verify-deploy.sh", "setup.sh", "preview.sh", "deploy.sh")
+
 
 def files_with_the_block() -> list:
     found = []
@@ -69,6 +86,21 @@ def files_verify_runs_in_the_image() -> list:
         if (SCRIPTS / name).exists() and name != Path(__file__).name:
             found.add(name)
     return sorted(found)
+
+def host_runs(names: list) -> list:
+    """Every host run of one of these test files, as (script, folder it runs
+    from, file, arguments), in the words the script wrote them."""
+    found = []
+    for script in SCRIPTS_THAT_RUN_THEM:
+        path = SCRIPTS.parent / script
+        if not path.exists():
+            continue
+        for from_the_root, name, arguments in HOST_RUN.findall(path.read_text(encoding="utf-8")):
+            if name not in names:
+                continue
+            folder = SCRIPTS.parent if from_the_root else SCRIPTS
+            found.append((script, folder, name, shlex.split(arguments)))
+    return found
 
 # Put in front of the child's imports: frontmatter and yaml cannot be found.
 WITHOUT_THE_MODULES = textwrap.dedent("""
@@ -90,12 +122,12 @@ def the_block(text: str) -> str:
     return text[start:text.index(END, start) + len(END)]
 
 
-def run_without_the_modules(name: str) -> subprocess.CompletedProcess:
-    """The file run directly, as `python3 <file>` would run it, with
-    frontmatter and yaml hidden from it."""
+def run_without_the_modules(name: str, arguments: tuple = ()) -> subprocess.CompletedProcess:
+    """The file run directly, as `python3 <file> <arguments>` would run it,
+    with frontmatter and yaml hidden from it."""
     program = WITHOUT_THE_MODULES + textwrap.dedent(f"""
         import runpy
-        sys.argv = [{str(SCRIPTS / name)!r}]
+        sys.argv = {[str(SCRIPTS / name)] + list(arguments)!r}
         sys.path.insert(0, {str(SCRIPTS)!r})
         runpy.run_path(sys.argv[0], run_name="__main__")
     """)
@@ -136,6 +168,29 @@ class ImageOnlyTestsSaySoTests(unittest.TestCase):
         self.assertEqual(unsaid, [], "these fail on a Mac's own Python with frontmatter and yaml hidden, "
                                      "and do not carry the block; the reason may be something else, so read "
                                      "the last line of each")
+
+    def test_every_host_run_of_a_file_with_the_block_runs_its_mode_without_the_modules(self):
+        # The run as the script writes it, its arguments included, from the
+        # repository's root, with frontmatter and yaml hidden. The folders it
+        # names are not there, so the mode itself fails (1) or passes; what it
+        # must never do is stop at the block with 77, which verify.sh reads as
+        # a FAIL on a good tree. On every platform, so the rule holds wherever
+        # the block is edited.
+        checked = []
+        for script, folder, name, arguments in host_runs(files_with_the_block()):
+            program = WITHOUT_THE_MODULES + "sys.platform = 'darwin'\n" + textwrap.dedent(f"""
+                import runpy
+                sys.argv = {[str(SCRIPTS / name)] + arguments!r}
+                sys.path.insert(0, {str(SCRIPTS)!r})
+                runpy.run_path(sys.argv[0], run_name="__main__")
+            """)
+            answer = subprocess.run([sys.executable, "-B", "-c", program], capture_output=True, text=True,
+                                    timeout=120, cwd=folder)
+            said = f"{script}: python3 scripts/{name} {' '.join(arguments)}: exit {answer.returncode}, {answer.stdout}{answer.stderr}"
+            self.assertNotEqual(answer.returncode, MISSING_MODULE_EXIT, said)
+            self.assertNotIn(the_line(name), answer.stdout, said)
+            checked.append(name)
+        self.assertGreaterEqual(len(checked), 1, "the rule no longer finds verify.sh's host run of test_page_sources.py")
 
     def test_every_file_opens_with_the_same_block_before_its_imports(self):
         blocks = set()

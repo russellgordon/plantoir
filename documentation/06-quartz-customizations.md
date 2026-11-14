@@ -5240,9 +5240,12 @@ plainly, the mark of a checkout `/x/plantoir` was the start of the mark of a
 checkout `/x/plantoir two`, and one would have named the other's leftovers.
 `verify.sh` prints that line before its browser checks, with the `kill` that
 ends them, and ends them only with `PLANTOIR_END_LEFTOVER_BROWSERS=1`, since
-the run did not start them. Ended that way, a real Chrome's twelve processes
-took about 9 s to go under load (3 s unloaded). Without `node` the self-test
-is a SKIP line by name.
+the run did not start them. It prints the line again under the summary,
+whether the run passed or failed, because the last lines are the ones read.
+Ended that way, a real Chrome's twelve processes took about 9 s to go under
+load (3 s unloaded). Without `node` the self-test is a SKIP line by name, and
+without Chrome for Testing its real-Chrome case is a SKIP line of its own, so
+the summary's count of SKIPs includes it.
 
 A signal to `verify.sh` alone reaches the browser check it is running. Only
 the browser checks go through `run_check`: during any other step (the image
@@ -5251,8 +5254,8 @@ to end, as it did before. Bash runs a
 trap only after its foreground child ends, so before this a TERM to
 `verify.sh` waited for the check to finish by itself (measured with a 6 s
 child: the trap ran 6 s later), and with no trap at all bash exited at once
-and left the check running with no parent. Every browser check now runs
-through `run_check`, which starts it in the background and waits on it, so
+and left the check running with no parent. Every browser check in
+`verify.sh` now runs through `run_check`, which starts it in the background and waits on it, so
 the signal interrupts the wait at once; `stop_for_signal` passes the signal
 on to that one pid and to nothing else, waits for the check to end (it then
 ends its own Chrome, above), and exits 129, 130 or 143. An INT is passed on

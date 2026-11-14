@@ -7770,11 +7770,13 @@ the growth bound (growth up to 6.51), and a quadratic scan passed it in 1 of
 five small reads, so the denominator of the growth figure was too small and
 the scan itself was not slow. With four timings per round: 55 runs under 24
 busy loops and 148 under 6 (half the cores, while a `verify.sh` run went
-on beside them, load average 20 to 44) all passed, the highest
-growth 1.98; 0 of 100 failed with no busy loops (load average 9 to 18 from other work, growth 0.71 to 1.12). A scan that kept a list of the pages it had read
-and searched it for each page failed every run: 8 of 8 under 24 loops
-(growth 3.40 to 6.45), 21 of 21 under 6 (2.96 to 4.68), and 20 of 20 with none (2.71 to 3.94). Sabotaged copies that read
-each page two, three or five times through `readPage` fail the read count,
+on beside them, load average 20 to 44) all passed, growth 0.58 to 1.98;
+0 of 100 failed with no busy loops (load average 9 to 18 from other work,
+growth 0.71 to 1.12). A scan that kept a list of the pages it had read and
+searched it for each page failed every run: 8 of 8 under 24 loops (growth
+3.40 to 6.45), 21 of 21 under 6 (2.96 to 4.68), and 20 of 20 with none
+(2.71 to 3.94). Sabotaged copies that read each page two, three or five
+times through `readPage` fail the read count,
 and one that read each page a second time with `Data(contentsOf:)` fails the
 source check. What the tests do not pin: a slower scan whose cost is still
 linear in the pages, up to ten reads' worth (today's measured 1.0 to 1.5
