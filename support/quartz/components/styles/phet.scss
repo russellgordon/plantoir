@@ -1,0 +1,198 @@
+// PhET simulations (#674). EVERY rule here is under .pl-phet (the #454 B2
+// lesson): a page with no simulation is not touched by a single
+// declaration, on screen or on paper. The simulation keeps its own colours
+// in a dark theme (colorProfile is not a teacher's setting); the card
+// around it follows the theme.
+
+.pl-figure.pl-phet {
+  text-align: left;
+
+  // The box the picture and, after a tap, the simulation share: the
+  // simulation's own shape (--pl-phet-ratio, its 1024 by 618 layout) at the
+  // page's width, so the frame takes the picture's place and nothing below
+  // it moves. Never a max-height and never cropped: PhET's logo, at the
+  // simulation's bottom right, must stay in view (the licence's brand rule;
+  // the rendered check measures the frame inside this box at this shape).
+  .pl-phet-stage {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    aspect-ratio: var(--pl-phet-ratio, 1024 / 618);
+    margin: 0;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    background: #fff;
+    overflow: visible;
+  }
+
+  .pl-phet-picture {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    margin: 0;
+    border-radius: 6px;
+  }
+
+  .pl-phet-simulation {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  // Until the simulation has opened, the frame is laid out (so it loads at
+  // its real size) but not seen; the picture stays in its place.
+  &:not(.pl-phet-loaded) .pl-phet-simulation {
+    visibility: hidden;
+  }
+
+  &.pl-phet-loaded .pl-phet-picture {
+    visibility: hidden;
+  }
+
+  .pl-phet-loading {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    width: max-content;
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    transform: translateY(-50%);
+    text-align: center;
+
+    &:empty {
+      display: none;
+    }
+
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--lightgray);
+    border-radius: 6px;
+    background: var(--light);
+    color: var(--dark);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+
+    span {
+      display: block;
+    }
+
+    span + span {
+      margin-top: 0.15rem;
+      font-size: 0.9em;
+      color: var(--darkgray);
+    }
+  }
+
+  .pl-phet-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    margin: 0.5rem 0 0;
+  }
+
+  .pl-phet-title {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .pl-phet-description {
+    margin: 0;
+    flex-basis: 100%;
+    color: var(--darkgray);
+  }
+
+  .pl-phet-open {
+    font: inherit;
+    font-weight: 600;
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid var(--secondary);
+    background: var(--light);
+    color: var(--secondary);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--secondary);
+      color: var(--light);
+    }
+
+    &:disabled {
+      cursor: progress;
+      opacity: 0.8;
+    }
+  }
+
+  // Open: the button has done its work.
+  &.pl-phet-loaded .pl-phet-open {
+    display: none;
+  }
+
+  .pl-phet-message {
+    margin: 0.5rem 0 0;
+    color: var(--gray);
+    font-style: italic;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .pl-phet-attribution {
+    margin: 0.35rem 0 0;
+    font-size: 0.8em;
+    color: var(--gray);
+
+    a {
+      color: inherit;
+    }
+  }
+
+  .pl-phet-print-note {
+    display: none;
+  }
+}
+
+@media print {
+  .pl-figure.pl-phet {
+    // A frame prints blank or cropped: the picture prints in its place,
+    // whether or not the simulation was opened.
+    .pl-phet-simulation,
+    .pl-phet-open,
+    .pl-phet-loading,
+    .pl-phet-message {
+      display: none !important;
+    }
+
+    &.pl-phet-loaded .pl-phet-picture {
+      visibility: visible;
+    }
+
+    .pl-phet-stage {
+      border: none;
+    }
+
+    .pl-phet-print-note {
+      display: block;
+      margin: 0.25rem 0 0;
+      font-size: 8pt;
+      color: #000;
+    }
+
+    // The credit line prints as PhET's own sentence, the address in it.
+    .pl-phet-attribution {
+      font-size: 8pt;
+      color: #000;
+    }
+
+    // No picture: the stage prints nothing, and the description does.
+    .pl-phet-stage:not(:has(.pl-phet-picture)) {
+      display: none;
+    }
+  }
+}

@@ -874,12 +874,14 @@ function withoutAnswers(node: any): any {
     if (classes.includes("plantoir-quiz-answer") || classes.includes("plantoir-quiz-explain")) {
       return null
     }
-    if (node.tagName === "figure" && classes.includes("pl-geogebra")) {
+    if (node.tagName === "figure" && (classes.includes("pl-geogebra") || classes.includes("pl-phet"))) {
       // A GeoGebra sketch reads as its description alone (#578 stage 5), as
       // Description - which runs before the sketch's card is put in - read
       // it on every page without a quiz: never the button, the commands or
       // the attribution. Measured: without this, a quiz page's search text
       // carried "Open the sketch (about 2.9 MB)" and "Made with GeoGebra®".
+      // A PhET simulation's card (#674) reads the same way, for the same
+      // reason: never its button or its credit line.
       const captions: any[] = []
       for (const child of node.children ?? []) {
         if (child?.type === "element" && child.tagName === "figcaption") {
