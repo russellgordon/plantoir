@@ -8,8 +8,8 @@
   text-align: left;
 
   // The box the picture and, after a tap, the simulation share: the
-  // simulation's own shape (--pl-phet-ratio, its 1024 by 618 layout) at the
-  // page's width, so the frame takes the picture's place and nothing below
+  // simulation's own shape (--pl-phet-ratio: its picture's, else its 1024
+  // by 618 layout, plantoirPhet.ts) at the page's width, so the frame takes the picture's place and nothing below
   // it moves. Never a max-height and never cropped: PhET's logo, at the
   // simulation's bottom right, must stay in view (the licence's brand rule;
   // the rendered check measures the frame inside this box at this shape).

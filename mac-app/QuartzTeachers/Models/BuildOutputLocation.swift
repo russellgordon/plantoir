@@ -73,6 +73,16 @@ nonisolated enum BuildOutputLocation {
     /// the same folder as `KEPT_COPIES_FOLDER`.
     static let keptCopiesFolderName: String = ".geogebra-cache"
 
+    /// The folder beside the working folder's courses, in its builds folder,
+    /// that holds the files their pages had downloaded the first time a page
+    /// used them: PhET simulations (#674), and the sounds a tune names (#679)
+    /// (`scripts/kept_downloads.py` `FOLDER`, `contracts/shared-rules.json` →
+    /// `keptDownloads.where`). It is not a course, and it serves every course,
+    /// so the sweep for courses that are gone keeps it, as it keeps the
+    /// working folder's marker (`buildOutputLocation.keptDownloadsSurviveTheSweep`).
+    /// Without it the next build would need the internet again, or stop.
+    static let keptDownloadsFolderName: String = ".downloaded"
+
     /// Where builds go. Replaceable so a test can point it somewhere of its
     /// own rather than writing into the teacher's real Application Support.
     nonisolated(unsafe) static var buildsRootOverride: URL?
@@ -393,6 +403,9 @@ nonisolated enum BuildOutputLocation {
         for entry in entries {
             let name: String = entry.lastPathComponent
             if name == workingFolderMarkerName {
+                continue
+            }
+            if name == keptDownloadsFolderName {
                 continue
             }
             if courseCodesPresent.contains(name) {

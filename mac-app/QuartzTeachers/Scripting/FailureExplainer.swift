@@ -17,6 +17,9 @@ struct FailureExplainer {
         if let reason = keptForReferenceExplanation(in: output) {
             return reason
         }
+        if let reason = keptDownloadsStopExplanation(in: output) {
+            return reason
+        }
         if let reason = sectionIsBeingDeployedExplanation(in: output) {
             return reason
         }
@@ -91,6 +94,80 @@ struct FailureExplainer {
             return folderCopyDidNotFinish
         }
         return nil
+    }
+
+    /// The words every first line of a build's stop for a file its pages
+    /// use and that could not be downloaded carries, whatever the reason
+    /// (#674): `shared-rules.json` → `keptDownloads.stop.markerWords` and
+    /// `markerWordsAlso`. Pinned to the contract by `AppRulesContractTests`.
+    static let keptDownloadsStopMarkers: [String] = ["was not built: ", "for the first time"]
+
+    /// `keptDownloads.stop.explained`: the lifted first line, then the place
+    /// lines that follow it, each trimmed, joined with "; ".
+    static let keptDownloadsStopExplained: String = "{first} Not downloaded yet: {items}."
+
+    /// A build stopped because a page uses something this computer has not
+    /// downloaded and could not download now (a PhET simulation, #674): the
+    /// launcher's first line LIFTED, as #381's refusal is, then which page
+    /// uses what, from the indented lines under it. Pinned by the
+    /// `failureExplanations` cases.
+    static func keptDownloadsStopExplanation(in output: String) -> String? {
+        let lines: [Substring] = output.split(separator: "\n", omittingEmptySubsequences: true)
+        var index: Int = 0
+        while index < lines.count {
+            let line: Substring = lines[index]
+            var carriesEveryMarker: Bool = true
+            for marker in keptDownloadsStopMarkers {
+                if !line.contains(marker) {
+                    carriesEveryMarker = false
+                }
+            }
+            if !carriesEveryMarker {
+                index += 1
+                continue
+            }
+            let first: String = liftedSentence(from: line)
+            var items: [String] = []
+            var next: Int = index + 1
+            while next < lines.count && lines[next].hasPrefix("   ") {
+                let item: String = lines[next].trimmingCharacters(in: .whitespacesAndNewlines)
+                if item.isEmpty {
+                    break
+                }
+                items.append(item)
+                next += 1
+            }
+            if items.isEmpty {
+                return first
+            }
+            return filledInOnePass(keptDownloadsStopExplained, values: [
+                "first": first, "items": items.joined(separator: "; ")
+            ])
+        }
+        return nil
+    }
+
+    /// `template` with each `{name}` in `values` replaced in ONE pass, so a
+    /// page name that holds braces is never filled again.
+    static func filledInOnePass(_ template: String, values: [String: String]) -> String {
+        var result: String = ""
+        var rest: Substring = Substring(template)
+        while let open = rest.firstIndex(of: "{") {
+            result += rest[rest.startIndex..<open]
+            guard let close = rest[open...].firstIndex(of: "}") else {
+                rest = rest[open...]
+                break
+            }
+            let name: String = String(rest[rest.index(after: open)..<close])
+            if let value = values[name] {
+                result += value
+            } else {
+                result += rest[open...close]
+            }
+            rest = rest[rest.index(after: close)...]
+        }
+        result += rest
+        return result
     }
 
     /// The words `preview.sh` refuses a preview with while that same section

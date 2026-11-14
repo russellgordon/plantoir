@@ -59,9 +59,14 @@ type Manifest = {
 
 const WORKSPACE = join("quartz", "plantoir-phet")
 const LANGUAGE = "phet"
-// The shape a PhET simulation lays itself out in (its layout bounds,
-// 1024 by 618): the frame takes it at the page's width, so the simulation
-// is never cropped and its logo stays in view (the licence's brand rule).
+// The shape the simulation's box takes at the page's width: its picture's
+// own (PhET's 600 px pictures are the whole simulation window, its
+// navigation bar and logo included, 600 by 394 for gas-properties), else
+// PhET's layout bounds, 1024 by 618. A PhET simulation scales itself to fit
+// whatever box it is given, so its logo stays in view either way (the
+// licence's brand rule); the picture's shape is the one it fills without
+// a margin, and the frame takes the picture's place without moving
+// anything below it.
 const LAYOUT_RATIO = "1024 / 618"
 
 let cached: { stamp: number; manifest: Manifest | null } | null = null
@@ -188,7 +193,11 @@ export const PlantoirPhet: QuartzTransformerPlugin = () => ({
             loadingFirstTime: words.loadingFirstTime,
             couldNotLoad: words.couldNotLoad,
           })
-          node.properties.style = `--pl-phet-ratio: ${LAYOUT_RATIO}`
+          const shape =
+            entry.picture !== null && entry.picture.width && entry.picture.height
+              ? `${entry.picture.width} / ${entry.picture.height}`
+              : LAYOUT_RATIO
+          node.properties.style = `--pl-phet-ratio: ${shape}`
           const stage: ElementContent[] = []
           if (entry.picture !== null) {
             const picture: Record<string, unknown> = {
