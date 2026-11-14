@@ -54,7 +54,7 @@ final class LeaseWatcherTests: XCTestCase {
         let section: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
         let heldElsewhere: [String: Any] = try XCTUnwrap(section["heldElsewhere"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(heldElsewhere["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 18)
+        XCTAssertEqual(cases.count, 19)
         for testCase in cases {
             try await runHeldElsewhereCase(testCase)
         }
