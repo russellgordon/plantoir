@@ -31,20 +31,51 @@ need to read those to use Plantoir.
 On the Mac and Windows together: neither download is released until both are
 ready.
 
-### Still to come
-
+- **Unit planning beside Plantoir.** When Claude Code or Codex is installed,
+  the course page gains a Planning tab: an assistant helps you plan a unit —
+  a calendar across your sections, lesson cards, day materials, assessment
+  drafts, a curriculum correlation — and the plan shows right there, with
+  the files it links. ([#707](https://github.com/russellgordon/plantoir/issues/707),
+  [#708](https://github.com/russellgordon/plantoir/issues/708))
+- **Share a unit plan with a colleague.** Share the plans as their own small
+  website for the school year, kept well apart from your class sites,
+  optionally behind a username and password, and stop sharing them when
+  you're done.
+  ([#709](https://github.com/russellgordon/plantoir/issues/709))
+- **See your curriculum coverage in the app.** Each section gains a Coverage
+  tab: the map of which curriculum expectations your pages cover, as it
+  would be if every page were published.
+  ([#793](https://github.com/russellgordon/plantoir/issues/793))
+- **Reference courses, more flexible.** Add or import a course straight to
+  your reference shelf — even for a course code you're already teaching —
+  arrange the shelf in groups you make yourself, and replace a reference
+  course with a newer version (with a backup kept first).
+  ([#572](https://github.com/russellgordon/plantoir/issues/572))
+- **GitHub Copilot beside Plantoir.** When GitHub Copilot is installed on
+  your Mac, Plantoir offers it wherever it offers Claude Code or Codex, listed
+  after them: revising a course (Revise With ▸ GitHub Copilot…), fixing a
+  section's problems (Fix with GitHub Copilot…) and planning a unit (Plan a
+  Unit with GitHub Copilot…). It asks you in its own window before it changes
+  anything, as the other two do, unless you have set it not to ask. GitHub has its own plans and an education
+  programme for teachers; Help will say what they include, with the date it
+  was checked.
+  ([#783](https://github.com/russellgordon/plantoir/issues/783))
+- **Plantoir can set up an assistant for you.** If you want to use an
+  assistant beside Plantoir and it is not installed yet, Plantoir sets it up
+  when you ask. Plantoir itself needs no assistant.
+  ([#855](https://github.com/russellgordon/plantoir/issues/855))
 - **Undo and Redo for what you do in Plantoir.** Publish or hide pages, add a
   class, restore a backup: Edit ▸ Undo takes the last change back, one step
   at a time, and Redo puts it back. The list is still there after you quit.
   A deploy is never a step; if you undo something that was already
   deployed, Plantoir offers to deploy so your website matches.
   ([#899](https://github.com/russellgordon/plantoir/issues/899))
-- **Everything the built-in assistant can do is also in the menus.** Finished
-  so far: Section ▸ Add Class… (the next class in this unit, the first class
-  of a new unit, or a copy of an earlier class), Section ▸ Roll Over to a
-  New Year…, and putting back a single section from a backup. Still to come:
-  Publish Pages… and Hide Pages… with a box for each unit, so a whole unit
-  can be ticked at once.
+- **Everything the built-in assistant can do is also in the menus.**
+  Section ▸ Add Class… adds the next class in this unit, the first class of a
+  new unit, or a copy of an earlier class; Section ▸ Roll Over to a New Year…
+  starts a section's new year; a single section can be put back from a
+  backup; and Publish Pages… and Hide Pages… gain a box for each unit, so a
+  whole unit can be ticked at once.
   ([#897](https://github.com/russellgordon/plantoir/issues/897), [#900](https://github.com/russellgordon/plantoir/issues/900))
 - **Help inside the app.** A quick start, and a page for each thing you do,
   with pictures of the app, in the Help menu.
@@ -80,10 +111,14 @@ ready.
   ([#691](https://github.com/russellgordon/plantoir/issues/691))
 - **A ready-made Music course.**
   ([#852](https://github.com/russellgordon/plantoir/issues/852))
-- **Deploying, the last pieces.** Plantoir says beforehand when the first
-  scheduled deploy after an update will take longer than usual, and a deploy
-  notices a change you made while the computer's clock was wrong.
-  ([#836](https://github.com/russellgordon/plantoir/issues/836), [#800](https://github.com/russellgordon/plantoir/issues/800))
+- **Deploying you can count on.** A deploy always carries your latest
+  changes, a deleted page included, and reuses the last build only when
+  nothing has changed, even if the computer's clock was wrong when you made
+  a change. Deploy waits, and says why, while another program is already
+  deploying that section, a deploy typed in Terminal included. Plantoir says
+  beforehand when the first scheduled deploy after an update will take
+  longer than usual.
+  ([#768](https://github.com/russellgordon/plantoir/issues/768), [#729](https://github.com/russellgordon/plantoir/issues/729), [#829](https://github.com/russellgordon/plantoir/issues/829), [#836](https://github.com/russellgordon/plantoir/issues/836), [#800](https://github.com/russellgordon/plantoir/issues/800))
 - **A plain explanation when Cloudflare will not make another site**
   because a free account has reached its limit of 100. ([#723](https://github.com/russellgordon/plantoir/issues/723))
 - **Tips that point out what is new**, and one that points a first-time
@@ -103,49 +138,6 @@ ready.
     ([#516](https://github.com/russellgordon/plantoir/issues/516)).
 - **Change the time of a scheduled deploy on the Mac**, without cancelling
   it and scheduling again, as Windows already allows. ([#525](https://github.com/russellgordon/plantoir/issues/525))
-- **Windows fix:** a handout printed on Windows should look the same as one
-  printed on a Mac ([#577](https://github.com/russellgordon/plantoir/issues/577)).
-- Behind the scenes: a check before each release that every kind of
-  diagram and interactive page really draws on the published test sites
-  ([#597](https://github.com/russellgordon/plantoir/issues/597)); old build folders are cleared away
-  ([#722](https://github.com/russellgordon/plantoir/issues/722)); fixes to how plantoir.app's pictures are made; and a
-  handful of checks that the Mac and Windows apps behave the same way.
-
-### Already finished, waiting for the release
-
-- **Unit planning beside Plantoir.** When Claude Code or Codex is installed,
-  the course page gains a Planning tab: an assistant helps you plan a unit —
-  a calendar across your sections, lesson cards, day materials, assessment
-  drafts, a curriculum correlation — and the plan shows right there, with
-  the files it links. ([#707](https://github.com/russellgordon/plantoir/issues/707),
-  [#708](https://github.com/russellgordon/plantoir/issues/708))
-- **Share a unit plan with a colleague.** Share the plans as their own small
-  website for the school year, kept well apart from your class sites,
-  optionally behind a username and password, and stop sharing them when
-  you're done.
-  ([#709](https://github.com/russellgordon/plantoir/issues/709))
-- **See your curriculum coverage in the app.** Each section gains a Coverage
-  tab: the map of which curriculum expectations your pages cover, as it
-  would be if every page were published.
-  ([#793](https://github.com/russellgordon/plantoir/issues/793))
-- **Reference courses, more flexible.** Add or import a course straight to
-  your reference shelf — even for a course code you're already teaching —
-  arrange the shelf in groups you make yourself, and replace a reference
-  course with a newer version (with a backup kept first).
-  ([#572](https://github.com/russellgordon/plantoir/issues/572))
-- **GitHub Copilot beside Plantoir.** When GitHub Copilot is installed on
-  your Mac, Plantoir offers it wherever it offers Claude Code or Codex, listed
-  after them: revising a course (Revise With ▸ GitHub Copilot…), fixing a
-  section's problems (Fix with GitHub Copilot…) and planning a unit (Plan a
-  Unit with GitHub Copilot…). It asks you in its own window before it changes
-  anything, as the other two do, unless you have set it not to ask. GitHub has its own plans and an education
-  programme for teachers; Help will say what they include, with the date it
-  was checked.
-  ([#783](https://github.com/russellgordon/plantoir/issues/783))
-- **Plantoir can set up an assistant for you.** If you want to use an
-  assistant beside Plantoir and it is not installed yet, Plantoir sets it up
-  when you ask. Plantoir itself needs no assistant.
-  ([#855](https://github.com/russellgordon/plantoir/issues/855))
 - **PhET science simulations on your pages**, from the University of
   Colorado's collection: projectile motion, gas laws, circuits, natural
   selection and more. Students tap to open them; nothing loads until then,
@@ -155,11 +147,6 @@ ready.
   button gives, and both use the video site's privacy setting. ([#692](https://github.com/russellgordon/plantoir/issues/692))
 - **See, change or remove a saved Netlify or Cloudflare token** in
   Settings ▸ Deploying. ([#696](https://github.com/russellgordon/plantoir/issues/696))
-- **Deploying you can count on.** A deploy always carries your latest
-  changes, a deleted page included, and reuses the last build only when
-  nothing has changed. Deploy waits, and says why, while another program is
-  already deploying that section, a deploy typed in Terminal included.
-  ([#768](https://github.com/russellgordon/plantoir/issues/768), [#729](https://github.com/russellgordon/plantoir/issues/729), [#829](https://github.com/russellgordon/plantoir/issues/829))
 - **Shorter questions.** When Plantoir asks you something, it says it in one
   sentence and lists the facts beneath it, each with a label.
   ([#834](https://github.com/russellgordon/plantoir/issues/834))
@@ -186,8 +173,14 @@ ready.
   tokens written in more forms, and the name in a home folder that has a
   space in it.
   ([#853](https://github.com/russellgordon/plantoir/issues/853), [#876](https://github.com/russellgordon/plantoir/issues/876))
-- **Windows:** a course you keep for reference stops deploying on a
-  schedule, as it does on the Mac ([#527](https://github.com/russellgordon/plantoir/issues/527)).
+- **Windows fixes:** a handout printed on Windows should look the same as one
+  printed on a Mac ([#577](https://github.com/russellgordon/plantoir/issues/577)), and a course you keep for reference will stop
+  deploying on a schedule, as it does on the Mac ([#527](https://github.com/russellgordon/plantoir/issues/527)).
+- Behind the scenes: a check before each release that every kind of
+  diagram and interactive page really draws on the published test sites
+  ([#597](https://github.com/russellgordon/plantoir/issues/597)); old build folders are cleared away
+  ([#722](https://github.com/russellgordon/plantoir/issues/722)); fixes to how plantoir.app's pictures are made; and a
+  handful of checks that the Mac and Windows apps behave the same way.
 
 ---
 
@@ -195,11 +188,8 @@ ready.
 
 - **Guidance for marking and report comments.** Notes for an assistant
   working beside Plantoir on marking tests and coding assignments onto
-  feedback sheets, and on drafting report comments from the marks. These
-  were planned for 2.0.0; they moved here so that the steps that touch
-  your students' names can be made simpler and checked again, on the Mac
-  and on Windows, before anyone relies on them. Student names stay on your
-  computer.
+  feedback sheets, and on drafting report comments from the marks. Student
+  names stay on your computer.
   ([#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
 - **plantoir.app shows off science**, alongside the maths and coding it
   already shows ([#485](https://github.com/russellgordon/plantoir/issues/485)).
@@ -257,8 +247,10 @@ ready.
 
 *For whoever maintains Plantoir.* This page is trimmed, not appended to:
 
-- **When an issue closes**, move its line into "Already finished, waiting for
-  the release" for that version, or delete it if a teacher would never notice.
+- **When an issue closes**, leave its line where it is until the release
+  ships. This page says what has shipped and what is planned, never how
+  far along the work is: no "finished", "in progress" or "waiting".
+  Delete the line only if a teacher would never notice the change.
 - **When a release is tagged**, delete what it shipped — the release notes
   now say what it brought — and update the current release number at the top.
   On a Mac-only release, keep the Windows lines until the Windows download
