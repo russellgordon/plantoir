@@ -2991,6 +2991,9 @@ enum ScheduledDeploy {
         // A section's Cloudflare project made again by this run's publish
         // (2026-09-30): its address may have changed while nobody watched.
         CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
+        // The Cloudflare token's end date this run's deploy read (#696), so
+        // the section's Deploy screen can warn before it ends.
+        DeployTokenEndReport.remember(from: text)
         // A scheduled run is started by Plantoir itself, so it carries the
         // app's helpers folder and can install from it, or create the
         // website builder, while nobody is watching (#312).

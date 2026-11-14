@@ -555,6 +555,9 @@ struct SectionDetailView: View {
             // While this section's deployed folder is open in the browser,
             // with Stop (#850).
             deployedFolderNotice
+            // The Cloudflare token ends in under 30 days, or has ended
+            // (#696), from the date Plantoir last read.
+            deployTokenEndNotice
             if let unsavedSettingsNotice {
                 // Its own view, and never `fixedSize` — see the view. Since
                 // #335 it may be a deploy's sentence, named for UI tests by

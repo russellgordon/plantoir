@@ -1032,8 +1032,9 @@ tidy_pasted_token() {
 # GET /user/tokens/verify's `result`: `status` is "active", "disabled" or
 # "expired", and `expires_on` is an optional date-time
 # (developers.cloudflare.com/api/resources/user/subresources/tokens/methods/verify/,
-# read 2026-11-13). An end date that is not an ISO 8601 date and time is
-# dropped rather than guessed at. Netlify's answer names the account, not
+# read 2026-11-13). An end date that is not an ISO 8601 date and time (with
+# seconds, then Z or an offset written +hh:mm, the shape the apps read back)
+# is dropped rather than guessed at. Netlify's answer names the account, not
 # the token, so Netlify has no end date to read.
 # BEGIN token_end_reading
 cloudflare_token_status_word() {
@@ -1044,7 +1045,7 @@ cloudflare_token_end() {
   local found
   found="$(printf '%s' "${1:-}" | grep -Eo '"expires_on"[ 	]*:[ 	]*"[^"]*"' | head -n 1 \
     | sed -E 's/.*"([^"]*)"$/\1/' || true)"
-  if [[ "$found" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:?[0-9]{2})$ ]]; then
+  if [[ "$found" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
     printf '%s' "$found"
   fi
 }

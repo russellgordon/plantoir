@@ -375,6 +375,21 @@ private struct CloudflareDetailFields: View {
                 }
             }
 
+            // The token's end date, when it is under 30 days away or past
+            // (#696): the same sentence as the section's Deploy screen, from
+            // the date Plantoir last read. The token is changed in Settings,
+            // which the button above opens.
+            if let warning = DeployTokenWording.deployScreenWarning(
+                rememberedEndsOn: AppSettings.shared.cloudflareTokenEndsOn,
+                now: Date(),
+                timeZone: TimeZone.current
+            ) {
+                Text(warning)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("cloudflareTokenEndWarning")
+            }
+
             // What is wrong with the ID this Mac has, and the 25 MB fact,
             // in ONE block when both apply (#668 review, L5; `notice`): with
             // Cloudflare the default, a new teacher with no ID would
