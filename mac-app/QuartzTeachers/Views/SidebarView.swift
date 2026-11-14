@@ -1615,8 +1615,8 @@ struct SidebarView: View {
     ///
     /// Hidden when Codex is not installed, and hidden INDEPENDENTLY of the
     /// Claude item: a teacher with one of the two sees one item, a teacher
-    /// with both sees both, and a teacher with neither sees no sign that
-    /// either exists. Plantoir sets one up only when the teacher asks, from
+    /// with both sees both, and a teacher with neither sees neither item,
+    /// only Set Up an Assistant…. Plantoir sets one up only when the teacher asks, from
     /// Set Up an Assistant… (#855); the door itself opens onto whatever
     /// copy the search finds.
     @ViewBuilder

@@ -9573,7 +9573,7 @@ and the never-cases. `installedOnlyWhenAsked` replaced `neverInstalled`, and
 `neverProbedForSignIn` was narrowed (the door still never asks; the pane asks
 after a set-up, after a sign-in and on Check Again, keeping the exit code
 only). The quit rule is `shared-rules.json` →
-`quittingWhileWorkIsUnderWay.whileAnAssistantIsSetUp` and its two cases.
+`quittingWhileWorkIsUnderWay.whileAnAssistantIsSetUp` and its three cases.
 
 **How a set-up runs** (`SetUpRunner`, `mac-app/QuartzTeachers/Models/SetUp/`):
 
@@ -9732,7 +9732,7 @@ the pane and the wording are the assistant layer (`AssistantSetUp`,
 `AssistantSetUpCentre`, `AssistantSetUpWording`).
 
 **The trail:** `outside assistant set-up opened` (from where),
-`… set-up started`, `outside assistant set up` (with seconds),
+`… set-up record set aside`, `… set-up started`, `outside assistant set up` (with seconds),
 `outside assistant could not be set up` (why, with seconds),
 `… set-up settled`, `… sign-in opened`, `… sign-in checked` (exit codes
 only), `outside assistant removed` (counts). No path, account or output.

@@ -215,7 +215,7 @@ final class AssistantSetUpCentre {
     }
 
     static func openedLine(from place: AssistantSetUpOpenedFrom) -> String {
-        return "opened setting up another assistant (from \(place.rawValue))"
+        return "opened Set Up an Assistant… (from \(place.rawValue))"
     }
 
     /// Runs the maker's set-up: only ever called from the confirmation's
