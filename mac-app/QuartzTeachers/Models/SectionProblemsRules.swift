@@ -33,6 +33,7 @@ nonisolated enum SectionProblemsRules {
         "quizzesReadDifferently",
         "geogebraSketchesNotReady",
         "phetSimulationsNotReady",
+        "musicTunesNotRight",
     ]
 
     /// `sectionProblems.rowState.notAboutThePage`: reasons that say something
@@ -41,6 +42,7 @@ nonisolated enum SectionProblemsRules {
         "figuresCouldNotBeDrawn": ["tookTooLong", "engineMissing", "graphEngineMissing", "drawingEnded"],
         "swiftCouldNotBePrepared": ["notCompiled", "notDownloaded", "noRoom"],
         "geogebraSketchesNotReady": ["materialCouldNotBeFetched", "engineMissing"],
+        "musicTunesNotRight": ["engineMissing", "drawingStopped"],
     ]
 
     /// The kinds only the site says (`sectionProblems.kinds` → `from: site`).

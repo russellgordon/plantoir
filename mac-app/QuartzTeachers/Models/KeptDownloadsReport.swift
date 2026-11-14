@@ -25,7 +25,8 @@ struct KeptDownloadsReport: Equatable {
     /// builder's) is said as files (`marker.trailWords.unknownKind`), never
     /// dropped. Pinned to the contract by `KeptDownloadsReportTests`.
     nonisolated static let kindWords: [String: (one: String, several: String)] = [
-        "phet": (one: "a science simulation", several: "science simulations")
+        "phet": (one: "a science simulation", several: "science simulations"),
+        "sounds": (one: "a sound", several: "sounds")
     ]
 
     /// `keptDownloads.marker.trailWords.unknownKind`.

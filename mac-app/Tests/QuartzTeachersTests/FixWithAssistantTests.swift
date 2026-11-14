@@ -84,7 +84,7 @@ final class FixWithAssistantTests: XCTestCase {
         for kind in try XCTUnwrap(problems["kinds"] as? [[String: Any]]) {
             kinds.insert(try XCTUnwrap(kind["kind"] as? String))
         }
-        XCTAssertEqual(kinds.count, 17)
+        XCTAssertEqual(kinds.count, 18)
         var deployKinds: Set<String> = []
         for kind in try XCTUnwrap(problems["kinds"] as? [[String: Any]]) where (kind["from"] as? String) == "deploy" {
             deployKinds.insert(try XCTUnwrap(kind["kind"] as? String))
@@ -106,6 +106,12 @@ final class FixWithAssistantTests: XCTestCase {
         let pageAuthoringText: String = try String(contentsOf: pageAuthoring, encoding: .utf8)
         XCTAssertTrue(pageAuthoringText.contains("on the section's Problems tab in Plantoir, as a"), "the skill says where a simulation's problem is named")
         XCTAssertTrue(pageAuthoringText.contains("plantoir: error: Unit 3/Gases.md: phet block 1"), "the skill shows the build's line for a simulation")
+
+        // #679: a tune's row goes to the page-authoring skill too, where
+        // music blocks are written, and the skill must say how it shows up.
+        XCTAssertEqual(FixWithAssistant.skill(forKind: "musicTunesNotRight"), FixWithAssistant.otherwiseSkill)
+        XCTAssertTrue(pageAuthoringText.contains("on the section's Problems tab in Plantoir, as a Music row"), "the skill says where a tune's problem is named")
+        XCTAssertTrue(pageAuthoringText.contains("plantoir: error: Unit 1/Scales.md: abc block 1"), "the skill shows the build's line for a tune")
     }
 
     // MARK: - The contract's cases

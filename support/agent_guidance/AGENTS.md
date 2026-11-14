@@ -11,7 +11,7 @@ that matches the task before writing:
   concept page, a class page, a folder's front page or Key Links: every way
   content can be written for the site (callouts, diagrams, tables, maths,
   checklists, success criteria, links, embedding one page in another,
-  pictures and PDFs in Media, videos, GeoGebra sketches and PhET, hidden
+  pictures and PDFs in Media, videos, GeoGebra sketches and PhET, music notation, hidden
   pages and `publish:`, folders, class pages and their dates) is in
   `.agents/skills/plantoir-page-authoring/SKILL.md` (the same file is at
   `.claude/skills/plantoir-page-authoring/SKILL.md`). Read it first; it

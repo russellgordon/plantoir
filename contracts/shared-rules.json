@@ -31474,6 +31474,16 @@
           "sentence": "could not download a science simulation for the site, so it was not built: something on this computer went wrong while making it ready"
         },
         {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"sounds\",\"course\":\"AMU1O\",\"section\":1,\"downloaded\":2,\"bytes\":5254372,\"seconds\":0.9}",
+          "event": "files for the site downloaded",
+          "sentence": "downloaded 2 sounds for the site (5.3 MB in 0.9 s), kept on this computer for later builds"
+        },
+        {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"sounds\",\"course\":\"AMU1O\",\"section\":1,\"failed\":1,\"reason\":\"offline\"}",
+          "event": "files for the site could not be downloaded",
+          "sentence": "could not download a sound for the site, so it was not built: no internet connection, or the download stopped"
+        },
+        {
           "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"newer\",\"course\":\"SCH3U\",\"section\":2,\"downloaded\":4,\"bytes\":8000000,\"seconds\":2.0}",
           "event": "files for the site downloaded",
           "sentence": "downloaded 4 files for the site (8.0 MB in 2.0 s), kept on this computer for later builds"
@@ -40611,12 +40621,13 @@
     },
     "rowState": {
       "rule": "A row is `current`, or `fixedInTheSource` when ALL of these hold (#717 ruling 11): (1) the row's kind is in clearsAcrossSections; (2) the row's reason is not in notAboutThePage for its kind; (3) of the course's OTHER sections, take the records whose pagesShown holds the row's page, and of those the LATEST alone - never any clean one (implementation review L1: Section 2 clean at 10:00 proves nothing once Section 3 has broken it again at 11:00); (4) that record is later than this one; (5) that record has NO row of the same kind on that page - not merely no row with this id, because the id of a renumbered fence is not the id of the fence it was (plan review, MED 5); (6) for a kind whose `from` is site, that record's siteSaidComplete is true. A fixedInTheSource row stays in the table, says words.fixedInTheSource instead of its item, and keeps the section's marker on: that section's deployed site still carries the broken page until its OWN next build.",
-      "clearsAcrossSections": ["pageSettingsUnreadable", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady", "phetSimulationsNotReady"],
+      "clearsAcrossSections": ["pageSettingsUnreadable", "printPdfNotFound", "figuresCouldNotBeDrawn", "swiftCouldNotBePrepared", "quizzesNotReady", "runnableCodeShownAsPlainCode", "quizzesReadDifferently", "geogebraSketchesNotReady", "phetSimulationsNotReady", "musicTunesNotRight"],
       "clearsAcrossSectionsWhy": "The kinds that depend on the page alone. NOT linksIntoHiddenPages, which depends on what THIS section hides; not the whole-section or whole-course kinds; not a deploy's refusal.",
       "notAboutThePage": {
         "figuresCouldNotBeDrawn": ["tookTooLong", "engineMissing", "graphEngineMissing", "drawingEnded"],
         "swiftCouldNotBePrepared": ["notCompiled", "notDownloaded", "noRoom"],
-        "geogebraSketchesNotReady": ["materialCouldNotBeFetched", "engineMissing"]
+        "geogebraSketchesNotReady": ["materialCouldNotBeFetched", "engineMissing"],
+        "musicTunesNotRight": ["engineMissing", "drawingStopped"]
       },
       "notAboutThePageWhy": "Reasons that say something about the machine the build ran on - a busy machine, an engine or Swift not there yet, geogebra.org out of reach - rather than about the page (plan review, MED 5). Section 1 timing out and section 2 drawing the same fence proves nothing was edited. figures.py does not cache tookTooLong, engineMissing or (#718) drawingEnded for the same reason.",
       "cases": [

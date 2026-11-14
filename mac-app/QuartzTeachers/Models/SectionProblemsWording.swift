@@ -89,6 +89,7 @@ nonisolated enum SectionProblemsWording {
         "quizzesReadDifferently": "Self-check question",
         "geogebraSketchesNotReady": "GeoGebra sketch",
         "phetSimulationsNotReady": "Science simulation",
+        "musicTunesNotRight": "Music",
         "filesTooLargeForCloudflare": "File too large",
     ]
 
@@ -110,6 +111,7 @@ nonisolated enum SectionProblemsWording {
         "quizzesReadDifferently": "page",
         "geogebraSketchesNotReady": "page",
         "phetSimulationsNotReady": "page",
+        "musicTunesNotRight": "page",
         "filesTooLargeForCloudflare": "section",
     ]
 

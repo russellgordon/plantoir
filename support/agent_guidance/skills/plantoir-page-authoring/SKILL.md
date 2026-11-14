@@ -1,6 +1,6 @@
 ---
 name: plantoir-page-authoring
-description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos (the picture form, the Share button's address), GeoGebra sketches students drag, PhET simulations (a phet block), hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
+description: Use FIRST whenever writing, revising or reorganising any Plantoir course page - a lesson, a concept page, a class page, an exercise set, a task, a folder's front page, Key Links. Lists every way content can be written for a class website - page settings, callouts (every kind, foldable), diagrams, tables, maths, checklists students tick, success criteria that roll up to My Progress, links between pages, embedding one page in another, footnotes, tags, pictures and PDFs in the Media folder, YouTube and Vimeo videos (the picture form, the Share button's address), GeoGebra sketches students drag, PhET simulations (a phet block), music notation students play (an abc block), hidden pages and publish, folders and the sidebar, class pages and the dates they give, Key Links - each with the smallest correct Markdown and the mistake that trips people up, and says which of the four feature skills (printable pages, graphs and figures, quizzes, runnable code) to read next.
 ---
 
 # Writing pages for a Plantoir class website
@@ -677,6 +677,68 @@ the simulation's address on phet.colorado.edu, never from its title. A
 the simulation has no version in, a pasted PhET `<iframe>`) is shown on
 the site anyway and is not on the Problems tab. Fix the block and preview
 again.
+
+**Music notation** is a ` ```abc ` block: a tune in ABC notation, the
+plain-text notation the Obsidian plugin "ABC Music Notation" draws. The
+class website draws it when it is built (it prints), and puts a Play
+button under it that plays the tune from the site's own copy, each note
+lit as it sounds.
+
+````markdown
+```abc
+% alt: The G major scale, one octave up, with sol-fa names under the notes.
+% sound: flute
+X:1
+T:A scale to sing
+M:4/4
+L:1/4
+Q:1/4=90
+K:G
+G A B c | d e f g |]
+w: do re mi fa sol la ti do
+```
+````
+
+- The settings are `%` lines (ONE `%`) at the very top, before `X:`:
+  `% alt:` (what a screen reader says in place of the drawing; always
+  write one), `% sound:` (a General MIDI sound in plain words - `flute`,
+  `violin`, `acoustic grand piano`, `nylon guitar` - or its number, 1 to
+  128; piano when there is none), `% sound V:2: cello` (one voice's sound,
+  for a tune with `V:` lines), `% chords: piano` (the sound its chord
+  symbols play in; the tune's sound otherwise), and `% play: no` (no Play
+  button, for a theory example).
+- **Never a `%%` line** (`%%MIDI program 73`, as tunes copied from the web
+  often have): the website reads `%%` as the start or end of a hidden note
+  (section 17), so it would lose part of the tune. Name the sound with
+  `% sound:` instead. Drums cannot be played.
+- One tune a block: a second `X:` tune in the same block is not drawn.
+- **The first build that plays a sound needs the internet**: it downloads
+  that sound (0.6 to 2.3 MB) once onto the teacher's computer, and every
+  later build uses that copy. A build with no internet and a sound not
+  downloaded yet stops and says which sound and which page, so preview
+  once after adding a new sound, before a deploy set for later. After
+  moving the working folder or on a new computer, the next build needs
+  the internet again.
+- Under every tune with Play is a small credit line for the sounds; never
+  write or remove one.
+- In a self-check question, a tune works in the question and the
+  explanation; in a choice it is drawn without Play (a press would pick the
+  choice).
+- Use music in the public domain or the teacher's own arrangements.
+
+A tune that has a problem is still drawn where the notation can be read,
+and one that cannot be drawn at all stays a block of text. The next Preview
+names it on the section's Problems tab in Plantoir, as a Music row, and the
+build's output says which page, which block and which line:
+
+```
+plantoir: error: Unit 1/Scales.md: abc block 1, line 4: there is no sound called “flut” (the closest: flute, pan flute)
+plantoir: error: Unit 1/Scales.md: abc block 2, line 15: the notation has a problem: Expected ']' to end the chords
+plantoir: error: Unit 1/Scales.md: abc block 3, line 22: a line with %% is read by the site as the start or end of a hidden note, so the site leaves out what lies between two of them; name a sound with % sound: flute (one %) at the top of the tune instead of %%MIDI program
+```
+
+`abc block 1` is the first music block on that page, and the line is in
+the teacher's file. Fix the block and preview again.
 
 ## 17. Notes only the teacher sees
 

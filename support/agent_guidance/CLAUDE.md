@@ -13,7 +13,7 @@ matches the task before writing:
   (`.claude/skills/plantoir-page-authoring/SKILL.md`) - every way content can
   be written for the site (callouts, diagrams, tables, maths, checklists,
   success criteria, links, embedding one page in another, pictures and PDFs
-  in Media, videos, GeoGebra sketches and PhET, hidden pages and
+  in Media, videos, GeoGebra sketches and PhET, music notation, hidden pages and
   `publish:`, folders, class pages and their dates). Read it first; it says which of the skills
   below to read as well.
 - **Printable pages** - worksheets, handouts, practice sets, answer keys, or
