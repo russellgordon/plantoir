@@ -75,6 +75,13 @@ struct SectionSiteCommands: Equatable {
     var lastChangeIsHere: Bool = false
     var verbIsRunning: Bool = false
 
+    /// What Add Next Class in a New Unit and Duplicate as Next Class… are
+    /// greyed by (#897), read by the section window when it is shown and
+    /// after each function, never on every drawing of the menu.
+    var classPagesAreNumbered: Bool = false
+    var unitWordRenameUnfinished: Bool = false
+    var hasAClassPage: Bool = false
+
     /// Where a press of Preview opens by default (#504) — Settings ▸ Preview,
     /// read by the section window. In `==` because the menu item's TITLE
     /// follows it ("Preview" or "Preview at Last Viewed").
@@ -100,6 +107,9 @@ struct SectionSiteCommands: Equatable {
             && left.deployedFolderReason == right.deployedFolderReason
             && left.lastChangeIsHere == right.lastChangeIsHere
             && left.verbIsRunning == right.verbIsRunning
+            && left.classPagesAreNumbered == right.classPagesAreNumbered
+            && left.unitWordRenameUnfinished == right.unitWordRenameUnfinished
+            && left.hasAClassPage == right.hasAClassPage
             && left.previewOpensAt == right.previewOpensAt
     }
 }
@@ -172,6 +182,9 @@ enum MenuSituation {
             situation.deployedFolderShown = site.deployedFolderShown
             situation.lastChangeIsHere = site.lastChangeIsHere
             situation.verbIsRunning = site.verbIsRunning
+            situation.classPagesAreNumbered = site.classPagesAreNumbered
+            situation.unitWordRenameUnfinished = site.unitWordRenameUnfinished
+            situation.hasAClassPage = site.hasAClassPage
         }
         if let previewController {
             situation.previewIsShowing = true

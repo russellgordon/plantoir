@@ -277,6 +277,13 @@ struct SectionMenu: Commands {
             Divider()
 
             item("Add Next Class", .addNextClass, enabled)
+            // #897: what only the built-in assistant's window could do. No
+            // key equivalents (no free key worth taking; menu search reaches
+            // both). In a New Unit acts at once, as Add Next Class does (the
+            // page arrives hidden and can be undone); Duplicate asks which
+            // class first, so it carries an ellipsis.
+            item("Add Next Class in a New Unit", .addNextClassInANewUnit, enabled)
+            item("Duplicate as Next Class…", .duplicateAsNextClass, enabled)
             item("Re-date Classes…", .reDateClasses, enabled)
             item("Make Room for Classes…", .makeRoomForClasses, enabled)
             item("Class Dates…", .classDates, enabled)
@@ -346,7 +353,8 @@ struct SectionMenu: Commands {
             switch item {
             case .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder,
                  .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-                 .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+                 .addNextClass, .addNextClassInANewUnit, .duplicateAsNextClass,
+                 .reDateClasses, .makeRoomForClasses, .classDates:
                 site?.perform(item)
             default:
                 sidebar?.perform(item)

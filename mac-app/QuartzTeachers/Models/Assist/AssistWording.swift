@@ -2409,6 +2409,55 @@ nonisolated enum AssistWording {
         return "Add next \(noun.singular)"
     }
 
+    // #897: what only the built-in assistant's window could do before,
+    // in the menu's voice. The window's own sentences are unchanged.
+
+    /// The answer sheet's title for Section ▸ Add Next Class in a New Unit.
+    static func menuAddNextClassInANewUnitTitle(noun: ClassNoun = .class) -> String {
+        return "Add next \(noun.singular) in a new unit"
+    }
+
+    /// Section ▸ Duplicate as Next Class…'s sheet.
+    static func menuDuplicateTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Duplicate a \(noun.singular) in \(course) Section \(section)"
+    }
+
+    static func menuPickClassToDuplicate(noun: ClassNoun = .class) -> String {
+        return "Choose the \(noun.singular) to copy. The copy becomes the next \(noun.singular), dated for "
+             + "this section's next \(noun.singular) day, and starts hidden. Nothing else moves."
+    }
+
+    static let menuDuplicateButton: String = "Duplicate"
+
+    /// The finished sheet: the copy's name, its date, and that it is hidden
+    /// (the plan review's amendment 7: `duplicated` alone says neither).
+    static func duplicatedFromTheMenu(page: String, as copy: String, on date: String) -> String {
+        return "Duplicated “\(page)” as “\(copy)”, dated \(date). The copy is hidden: write it, then "
+             + "publish it when it is ready."
+    }
+
+    /// The copy's visibility could not be read back as hidden, so nothing
+    /// was written: the menu writes the copy only once it reads hidden.
+    static func theCopyCouldNotBeMadeHiddenFromTheMenu(page: String) -> String {
+        return "“\(page)” was not copied, and nothing was written: the copy could not be made certainly "
+             + "hidden, and a lesson students can already see must not turn up somewhere new where they "
+             + "can read it. The settings at the top of “\(page)” are written in a way Plantoir cannot "
+             + "read for certain; open it in Obsidian to look."
+    }
+
+    /// The page the copy would become is already there.
+    static func menuTheNextPageIsAlreadyThere(page: String) -> String {
+        return "A page called “\(page)” is already where the copy would go, so nothing was copied. "
+             + "A page is never written over."
+    }
+
+    /// A unit-word rename stopped part way: the two #897 items wait for it.
+    static func menuUnitWordRenameUnfinished(noun: ClassNoun = .class) -> String {
+        return "A rename of what this course calls a unit stopped part way, so some \(noun.plural) are "
+             + "named the old way and some the new. Nothing was changed. Finish the rename in the "
+             + "course's settings, then choose this again."
+    }
+
     /// Help ▸ Publishing and Deploying…: the difference, said to the teacher
     /// — `whatPublishingMeans` is the assistant's, and says "the teacher".
     static let publishingAndDeployingTitle: String = "Publishing and Deploying"

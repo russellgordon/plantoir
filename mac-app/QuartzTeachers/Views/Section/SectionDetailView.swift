@@ -288,6 +288,12 @@ struct SectionDetailView: View {
     /// dropped (#457 batch B's review, note 4).
     @State var pendingVerbResult: SectionVerbSheetModel?
 
+    /// What Add Next Class in a New Unit and Duplicate as Next Class… are
+    /// greyed by (#897), read with the " — Edited" marker: when the section
+    /// is shown, when its window comes forward, and after each function —
+    /// never on every drawing of the menu.
+    @State var menuClassFacts: SectionVerbs.ClassFacts = SectionVerbs.ClassFacts()
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
@@ -831,6 +837,9 @@ struct SectionDetailView: View {
                 deployedFolderReason: deployedFolderMenuReason,
                 lastChangeIsHere: lastMenuChangeIsHere,
                 verbIsRunning: verbIsRunningHere,
+                classPagesAreNumbered: menuClassFacts.classPagesAreNumbered,
+                unitWordRenameUnfinished: menuClassFacts.unitWordRenameUnfinished,
+                hasAClassPage: menuClassFacts.hasAClassPage,
                 previewOpensAt: AppSettings.shared.previewOpensAt,
                 perform: performSiteMenuItem,
                 preview: previewFromTheSectionMenu
@@ -1842,7 +1851,8 @@ struct SectionDetailView: View {
         case .stopShowingDeployedFolder:
             stopShowingTheDeployedFolder()
         case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+             .addNextClass, .addNextClassInANewUnit, .duplicateAsNextClass,
+             .reDateClasses, .makeRoomForClasses, .classDates:
             performVerb(item)
         default:
             break
@@ -2140,6 +2150,13 @@ struct SectionDetailView: View {
     /// course on a slow network volume must not be able to stutter a
     /// window that is being brought to the front.
     func refreshEditedMarker() {
+        // The #897 items' facts ride on the same moments (the plan review's
+        // amendment 4): a listing of the class folders' names and one file
+        // check, no page read.
+        let facts: SectionVerbs.ClassFacts = SectionVerbs.classFacts(forSection: sectionNumber, in: course)
+        if facts != menuClassFacts {
+            menuClassFacts = facts
+        }
         let courseDirectory: URL = course.directoryURL
         let sectionNumber: Int = self.sectionNumber
         // A course that publishes into a folder inside itself would

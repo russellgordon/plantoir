@@ -118,6 +118,15 @@ extension SectionDetailView {
         if item == .undoLastChange {
             return lastMenuChangeIsHere
         }
+        // #897: the menu greys these on facts read a moment ago; asked again
+        // here. An unfinished unit-word rename is checked in full by the
+        // runner, which answers with a sentence rather than a beep.
+        if item == .addNextClassInANewUnit && course.configuration.classPageNaming.isNumbered {
+            return false
+        }
+        if item == .duplicateAsNextClass && !SectionVerbs.hasAClassPage(forSection: sectionNumber, in: course) {
+            return false
+        }
         return true
     }
 
@@ -182,6 +191,28 @@ extension SectionDetailView {
             }
             runAtOnce(SectionVerbs.addNextClass(course: course.code, section: sectionNumber), item: item, verbs: verbs,
                       title: AssistWording.menuAddNextClassTitle(noun: course.configuration.classNoun))
+        case .addNextClassInANewUnit:
+            // #897: at once, as Add Next Class (the page arrives hidden, and
+            // Undo Last Change takes it away).
+            if askForDatesFirst(before: item) {
+                return
+            }
+            runAtOnce(SectionVerbs.addNextClassInANewUnit(course: course.code, section: sectionNumber), item: item,
+                      verbs: verbs, title: AssistWording.menuAddNextClassInANewUnitTitle(noun: course.configuration.classNoun))
+        case .duplicateAsNextClass:
+            // #897: choose the class, see the plan, then Duplicate.
+            if askForDatesFirst(before: item) {
+                return
+            }
+            let model: SectionVerbSheetModel = SectionVerbSheetModel(
+                kind: .duplicateClass, course: course, sectionNumber: sectionNumber,
+                title: AssistWording.menuDuplicateTitle(
+                    course: course.displayCode, section: String(sectionNumber), noun: course.configuration.classNoun
+                ),
+                item: item
+            )
+            model.sourceRows = SectionVerbSheetModel.sourceRows(course: course, sectionNumber: sectionNumber)
+            verbSheet = model
         case .undoLastChange:
             runAtOnce(SectionVerbs.undoLastChange(), item: item, verbs: verbs, title: AssistWording.menuUndoLastChangeTitle)
         case .rebuildPreview:
@@ -199,7 +230,8 @@ extension SectionDetailView {
     }
 
     /// Add Next Class, Re-date Classes… and Make Room for Classes… need the
-    /// section's class dates. With none on file, THIS window asks for them
+    /// section's class dates (and, since #897, Add Next Class in a New Unit
+    /// and Duplicate as Next Class…). With none on file, THIS window asks for them
     /// first — its own Class Dates sheet, never the assistant's prompt, which
     /// only the assistant's window shows (#457's plan review, blocker 1) —
     /// and the function runs once they are written down. True when it asked.
@@ -212,8 +244,10 @@ extension SectionDetailView {
             kind: .classDates, course: course, sectionNumber: sectionNumber, title: "", item: .classDates
         )
         switch item {
-        case .addNextClass:
+        case .addNextClass, .addNextClassInANewUnit:
             model.reason = AssistWording.datesForTheNextPage(noun: noun)
+        case .duplicateAsNextClass:
+            model.reason = AssistWording.datesToDuplicate(noun: noun)
         case .reDateClasses:
             model.reason = AssistWording.datesToReDate(noun: noun)
         default:
@@ -367,6 +401,16 @@ extension SectionDetailView {
             )
             model.pendingCall = SectionVerbs.makeRoom(
                 course: code, section: sectionNumber, unit: unit, atDay: atDay, howMany: model.howMany, planning: false
+            )
+        case .duplicateClass:
+            guard let sourcePath = model.chosenSource else {
+                return
+            }
+            planCall = SectionVerbs.duplicateAsNextClass(
+                course: code, section: sectionNumber, sourcePath: sourcePath, planning: true
+            )
+            model.pendingCall = SectionVerbs.duplicateAsNextClass(
+                course: code, section: sectionNumber, sourcePath: sourcePath, planning: false
             )
         default:
             return

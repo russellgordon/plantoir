@@ -4049,6 +4049,13 @@ final class AssistToolRunner {
     }
 
     private func planAddNextClass(_ arguments: [String: Any]) -> AssistToolOutcome {
+        // The Section menu's own duplicate (#897), read on `.menu` only.
+        if let fromTheMenu = menuDuplicateAsked(arguments) {
+            return planMenuDuplicate(fromTheMenu)
+        }
+        if let waiting = menuNewUnitWaitsForARename(arguments) {
+            return waiting
+        }
         // Duplicating renames pages the teacher's links point at, so it is
         // described rather than planned-then-described: one description, from
         // the machinery that will do it.
@@ -4463,6 +4470,243 @@ final class AssistToolRunner {
         askForTheTimetable(
             courseCode: located.course.code, sectionNumber: located.sectionNumber,
             because: AssistWording.datesToDuplicate(noun: located.course.configuration.classNoun)
+        )
+    }
+
+    // MARK: - Duplicating a class as the next one, from the menu (#897)
+
+    /// The argument Section ▸ Duplicate as Next Class… names its source by:
+    /// the page's path inside the course folder, ".md" included
+    /// (`SectionVerbs.coursePath(ofPageAt:in:)`).
+    ///
+    /// **Read on `.menu` ONLY** (the plan review's amendment 1). The built-in
+    /// assistant's window and an outside assistant keep `duplicate`, by title,
+    /// and today's behaviour with it: the copy lands on the source's next day
+    /// and later classes move. No schema shows this key, so the surface the
+    /// local model is shown does not move, and an MCP client that sent it
+    /// anyway is answered exactly as if it had not.
+    ///
+    /// **By FILE, never by title.** `AssistSectionGraph.page(titled:)` answers
+    /// the first page in path order, and strips any folder in front of the
+    /// name, so a course-level "Concepts/Unit 2, Day 3" was copied in place of
+    /// the class of that name and the answer said "Duplicated". A path is one
+    /// file or none.
+    static let menuDuplicateFileArgument: String = "duplicateFileFromTheMenu"
+
+    /// Everything both halves of the menu's duplicate need.
+    private struct MenuDuplicateRequest {
+        let located: Located
+        let plan: PlaceholderClassPlan
+        let newPage: QuartzTeachers.PlannedClass
+        let sourceTitle: String
+        let sourceText: String
+        let copyText: String
+    }
+
+    private enum MenuDuplicateAsked {
+        case success(MenuDuplicateRequest)
+        case failure(String)
+        /// The copy did not read back hidden: nothing is written, and the
+        /// trail says so at the write.
+        case copyCannotBeHidden(String)
+    }
+
+    /// The menu's duplicate, or nil when this call is not one: not from the
+    /// menu, or no source file named.
+    ///
+    /// **The copy becomes the NEXT class** (Russell, 2026-11-13 evening, on
+    /// #897): the page Add Next Class would make, with the source's words.
+    /// Planned by `NextClassPlanner`, so nothing else is renamed or re-dated,
+    /// and the one created file is the whole change.
+    ///
+    /// **From THIS section only** (the same ruling): the source must be one
+    /// of the section's own class pages (`ClassPages.list`), numbered or not
+    /// (the plan review's amendment 8: numbering was needed only for the
+    /// insertion the ruling rejected).
+    ///
+    /// **Built and checked before anything is written.** The copy's text is
+    /// made here and read back for visibility here, so a copy that cannot be
+    /// made certainly hidden leaves nothing behind. The assistant's path
+    /// writes a blank page first and fills it after; that order left a hidden
+    /// blank page with no undo entry when the read-back failed (the plan
+    /// review's amendment 6), and the menu does not repeat it.
+    private func menuDuplicateAsked(_ arguments: [String: Any]) -> MenuDuplicateAsked? {
+        if surface != .menu {
+            return nil
+        }
+        let path: String = text(AssistToolRunner.menuDuplicateFileArgument, in: arguments)
+        if path.isEmpty {
+            return nil
+        }
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return .failure(refusal(from: found).message)
+        }
+        let course: Course = located.course
+        let noun: ClassNoun = course.configuration.classNoun
+        if UnitWordRenamer.interruptedRenameTarget(in: course) != nil {
+            return .failure(AssistWording.menuUnitWordRenameUnfinished(noun: noun))
+        }
+
+        let wanted: String = course.directoryURL.appendingPathComponent(path).standardizedFileURL.path
+        let classPages: [ClassPageSummary] = ClassPages.list(forSection: located.sectionNumber, in: course)
+        var source: ClassPageSummary? = nil
+        for page in classPages where page.fileURL.standardizedFileURL.path == wanted {
+            source = page
+        }
+        let shownName: String = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        guard let source else {
+            return .failure(AssistWording.noPageCalledFromTheMenu(
+                page: shownName, course: course.code, section: String(located.sectionNumber)
+            ))
+        }
+        guard let sourceText = try? String(contentsOf: source.fileURL, encoding: .utf8) else {
+            return .failure(AssistWording.noPageCalledFromTheMenu(
+                page: source.title, course: course.code, section: String(located.sectionNumber)
+            ))
+        }
+
+        let plan: PlaceholderClassPlan
+        do {
+            plan = try NextClassPlanner.plan(forSection: located.sectionNumber, in: course)
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+        guard let newPage = plan.classes.first else {
+            return .failure(AssistWording.menuTheNextPageIsAlreadyThere(page: plan.alreadyThere.first ?? ""))
+        }
+
+        // The same three steps as the assistant's copy, in the same order:
+        // the title, every per-section key out FIRST (the build resolves
+        // them over the plain keys, so an inherited `publishForSection1: true`
+        // would beat the `publish: false` below), then the date and the flag.
+        var copied: String = PageFrontmatter.settingTitle(in: sourceText, to: newPage.title)
+        copied = AssistPageVisibility.withoutPerSectionKeys(in: copied)
+        copied = PageFrontmatter.settingCreated(
+            in: copied,
+            key: PageFrontmatter.createdKey(forSection: located.sectionNumber, isSectionLocal: true),
+            to: newPage.date,
+            fallbackTail: ClassPages.siblingTimeAndOffset(from: classPages, forSection: located.sectionNumber)
+        ).text
+        copied = AssistPageVisibility.setting(
+            published: false, in: copied, forSection: located.sectionNumber, isSectionLocal: true
+        ).text
+        if AssistPageVisibility.answer(in: copied, forSection: located.sectionNumber) != .hidden {
+            return .copyCannotBeHidden(source.title)
+        }
+
+        return .success(MenuDuplicateRequest(
+            located: located,
+            plan: plan,
+            newPage: newPage,
+            sourceTitle: source.title,
+            sourceText: sourceText,
+            copyText: copied
+        ))
+    }
+
+    /// The plan the sheet shows before Duplicate is pressed.
+    private func planMenuDuplicate(_ asked: MenuDuplicateAsked) -> AssistToolOutcome {
+        switch asked {
+        case .failure(let message):
+            return AssistToolOutcome.couldNotRead(message)
+        case .copyCannotBeHidden(let page):
+            return AssistToolOutcome.couldNotRead(AssistWording.theCopyCouldNotBeMadeHiddenFromTheMenu(page: page))
+        case .success(let request):
+            var lines: [String] = []
+            lines.append(AssistWording.wouldBeCopiedTo(
+                page: request.sourceTitle, as: request.newPage.title, on: request.newPage.date.text
+            ))
+            lines.append(AssistWording.theCopyStartsHidden)
+            let text: String = lines.joined(separator: "\n")
+            return AssistToolOutcome.planned(
+                "Worked out what duplicating “\(request.sourceTitle)” would do.",
+                plan: text,
+                card: text
+            )
+        }
+    }
+
+    /// The write: one new file, recorded as ONE undo entry with no "before",
+    /// so Undo Last Change deletes it (the ruling: "Undo takes it away
+    /// whole"). Written with `.withoutOverwriting`, so a page that appeared
+    /// at that name while the copy of the course was being saved is never
+    /// written over.
+    private func duplicateAsTheNextClassFromTheMenu(
+        _ arguments: [String: Any], asked: MenuDuplicateAsked
+    ) async -> AssistToolOutcome {
+        let request: MenuDuplicateRequest
+        switch asked {
+        case .failure(let message):
+            return AssistToolOutcome.refused(message)
+        case .copyCannotBeHidden(let page):
+            if case .success(let located) = locate(arguments) {
+                ActivityTrail.note(
+                    .classCopyNotMade,
+                    "did not copy a class from the Section menu — the copy could not be made certainly "
+                    + "hidden, so nothing was written",
+                    course: located.course.code, section: located.sectionNumber
+                )
+            }
+            return AssistToolOutcome.refused(AssistWording.theCopyCouldNotBeMadeHiddenFromTheMenu(page: page))
+        case .success(let made):
+            request = made
+        }
+
+        _ = await backUpOnceForThisConversation(request.located.course, forSection: request.located.sectionNumber)
+        // Held again to the plan after the copy (#351's plan/write gap): the
+        // source's words, the page it becomes and the copy itself.
+        guard case .success(let again)? = menuDuplicateAsked(arguments),
+              again.plan.description == request.plan.description,
+              again.sourceText == request.sourceText,
+              again.newPage.fileURL == request.newPage.fileURL,
+              again.copyText == request.copyText else {
+            return changedWhileSavingACopy(request.located)
+        }
+
+        let target: URL = request.newPage.fileURL
+        do {
+            try FileManager.default.createDirectory(
+                at: target.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try Data(request.copyText.utf8).write(to: target, options: [.withoutOverwriting])
+        } catch {
+            if FileManager.default.fileExists(atPath: target.path) {
+                return AssistToolOutcome.refused(AssistWording.menuTheNextPageIsAlreadyThere(page: request.newPage.title))
+            }
+            return AssistToolOutcome.refused("Nothing was created: \(error.localizedDescription)")
+        }
+
+        history.record(AssistChange(
+            whatHappened: "duplicated “\(request.sourceTitle)” as “\(request.newPage.title)”",
+            courseCode: request.located.course.code,
+            sectionNumber: request.located.sectionNumber,
+            // The copy arrives hidden, so neither making it nor taking it
+            // away changes what the preview shows.
+            rebuildsThePreview: false,
+            files: [AssistSavedFile(fileURL: target, before: nil, after: request.copyText)]
+        ))
+
+        let summary: String = AssistWording.duplicatedFromTheMenu(
+            page: request.sourceTitle, as: request.newPage.title, on: request.newPage.date.text
+        )
+        return AssistToolOutcome.wrote(summary, detail: request.plan.description + "\n\nDone: " + summary)
+    }
+
+    /// Add Next Class in a New Unit, and the duplicate, wait for an
+    /// unfinished unit-word rename (#897). Only on `.menu`, and only for the
+    /// new unit: the window's "Start a new unit" phrasing and every other
+    /// call behave exactly as before.
+    private func menuNewUnitWaitsForARename(_ arguments: [String: Any]) -> AssistToolOutcome? {
+        if surface != .menu || text("unit", in: arguments).lowercased() != "next" {
+            return nil
+        }
+        guard case .success(let located) = locate(arguments),
+              UnitWordRenamer.interruptedRenameTarget(in: located.course) != nil else {
+            return nil
+        }
+        return AssistToolOutcome.refused(
+            AssistWording.menuUnitWordRenameUnfinished(noun: located.course.configuration.classNoun)
         )
     }
 
@@ -5443,6 +5687,14 @@ final class AssistToolRunner {
     }
 
     private func addNextClass(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        // The Section menu's own duplicate and new unit (#897), read on
+        // `.menu` only: every other surface goes on exactly as before.
+        if let fromTheMenu = menuDuplicateAsked(arguments) {
+            return await duplicateAsTheNextClassFromTheMenu(arguments, asked: fromTheMenu)
+        }
+        if let waiting = menuNewUnitWaitsForARename(arguments) {
+            return waiting
+        }
         if let duplicated = await duplicateClassRequested(arguments) {
             return duplicated
         }

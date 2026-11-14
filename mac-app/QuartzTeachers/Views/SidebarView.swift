@@ -1763,6 +1763,9 @@ struct SidebarView: View {
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Add Next Class", .addNextClass, course: course, sectionNumber: sectionNumber, row: row)
+            // #897's two items are in the menu bar only until Russell rules
+            // on this menu. Adding them is one `sectionVerbItem` line each:
+            // the request reaches `performVerb`, which already runs both.
             Divider()
         }
         // One item or the other, never a
@@ -2192,7 +2195,8 @@ struct SidebarView: View {
              .saveCourseSettings, .revertCourseSettings, .courseReviseWithLocalAssistant,
              .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder, .back, .forward, .reloadPage,
              .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
-             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+             .addNextClass, .addNextClassInANewUnit, .duplicateAsNextClass,
+             .reDateClasses, .makeRoomForClasses, .classDates:
             // Not the sidebar's: File, Course Settings and the section
             // window own these — the assistant's functions run in the
             // section window, which shows their sheets (#457 batch B). Local

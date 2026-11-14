@@ -37,6 +37,8 @@ final class SectionVerbSheetModel: Identifiable {
         case publishClass
         case reDateClasses
         case makeRoom
+        /// Duplicate as Next Class… (#897): a class to copy, then the plan.
+        case duplicateClass
         case laterClassesAtDeploy
         case classDates
         case result
@@ -92,6 +94,28 @@ final class SectionVerbSheetModel: Identifiable {
         }
     }
 
+    /// A class page Duplicate as Next Class… can copy (#897): one of this
+    /// section's own, named by its FILE (`path`), never by its title.
+    struct SourceRow: Identifiable, Equatable {
+
+        // MARK: - Stored properties
+
+        /// The page's path inside the course, `.md` included
+        /// (`SectionVerbs.coursePath(ofPageAt:in:)`): what the call carries.
+        let path: String
+
+        /// The file name without `.md`, as Make Room's list shows a class.
+        let title: String
+
+        let date: CalendarDay?
+
+        // MARK: - Computed properties
+
+        var id: String {
+            return path
+        }
+    }
+
     // MARK: - Stored properties
 
     let id: UUID = UUID()
@@ -115,6 +139,10 @@ final class SectionVerbSheetModel: Identifiable {
     var classRows: [ClassRow] = []
     var chosenClass: String = ""
     var howMany: Int = 1
+
+    /// Duplicate as Next Class…'s classes, and the one chosen, by path.
+    var sourceRows: [SourceRow] = []
+    var chosenSource: String?
 
     /// #475: the classes asked about at Deploy, and the ones ticked to GO
     /// OUT (all, to begin with — a ticked box always means included, #694).
@@ -173,6 +201,19 @@ final class SectionVerbSheetModel: Identifiable {
         return shown
     }
 
+    /// The classes Duplicate as Next Class… shows for the search.
+    var shownSourceRows: [SourceRow] {
+        let wanted: String = search.trimmingCharacters(in: .whitespaces).lowercased()
+        if wanted.isEmpty {
+            return sourceRows
+        }
+        var shown: [SourceRow] = []
+        for row in sourceRows where row.title.lowercased().contains(wanted) {
+            shown.append(row)
+        }
+        return shown
+    }
+
     /// The pages ticked, in the rows' order.
     var tickedRows: [PageRow] {
         var chosen: [PageRow] = []
@@ -199,6 +240,8 @@ final class SectionVerbSheetModel: Identifiable {
             return AssistWording.menuPickClassDay(noun: noun)
         case .makeRoom:
             return AssistWording.menuMakeRoomAt(noun: noun)
+        case .duplicateClass:
+            return AssistWording.menuPickClassToDuplicate(noun: noun)
         default:
             return ""
         }
@@ -219,6 +262,8 @@ final class SectionVerbSheetModel: Identifiable {
                 return AssistWording.menuReDateButton
             case .makeRoom:
                 return AssistWording.menuMakeRoomButton
+            case .duplicateClass:
+                return AssistWording.menuDuplicateButton
             default:
                 return AssistWording.menuPublishButton
             }
@@ -236,6 +281,8 @@ final class SectionVerbSheetModel: Identifiable {
                 return !ticked.isEmpty
             case .makeRoom:
                 return !chosenClass.isEmpty
+            case .duplicateClass:
+                return chosenSource != nil
             default:
                 return true
             }
@@ -351,6 +398,22 @@ final class SectionVerbSheetModel: Identifiable {
                 return first.unit < second.unit
             }
             return first.day < second.day
+        }
+        return found
+    }
+
+    /// The classes Duplicate as Next Class… can copy (#897): every page in
+    /// this section's class folders, numbered or not (the plan review's
+    /// amendment 8), in `ClassPages.list`'s order — dated ones by date, the
+    /// rest by name after them. This section's only (Russell's ruling).
+    static func sourceRows(course: Course, sectionNumber: Int) -> [SourceRow] {
+        var found: [SourceRow] = []
+        for page in ClassPages.list(forSection: sectionNumber, in: course) {
+            found.append(SourceRow(
+                path: SectionVerbs.coursePath(ofPageAt: page.fileURL, in: course),
+                title: page.title,
+                date: page.date
+            ))
         }
         return found
     }
@@ -605,6 +668,15 @@ struct SectionVerbSheet: View {
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
 
+    /// Duplicate as Next Class…'s list (#897), the same way.
+    var sourceTableHeight: CGFloat {
+        var shown: Int = model.sourceRows.count
+        if shown > SectionVerbSheet.mostPickerRowsShown {
+            shown = SectionVerbSheet.mostPickerRowsShown
+        }
+        return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
+    }
+
     /// The later-classes list's height (#608), the same way.
     var laterClassesTableHeight: CGFloat {
         var shown: Int = model.laterClasses.count
@@ -830,9 +902,45 @@ struct SectionVerbSheet: View {
                     .monospacedDigit()
             }
             .accessibilityIdentifier("sectionVerbSheetHowMany")
+        case .duplicateClass:
+            if !model.sourceRows.isEmpty {
+                TextField(AssistWording.menuFindAPage, text: Binding(
+                    get: { return model.search },
+                    set: { text in model.search = text }
+                ))
+                .borderedTextField()
+                .accessibilityIdentifier("sectionVerbSheetSearch")
+                sourceTable
+            }
         default:
             EmptyView()
         }
+    }
+
+    /// The classes to copy (#897): one chosen by selecting its row, in the
+    /// picker's look (#608) — Page and Date — with no checkboxes, because
+    /// exactly one class is copied.
+    var sourceTable: some View {
+        Table(model.shownSourceRows, selection: Binding(
+            get: { return model.chosenSource },
+            set: { path in model.chosenSource = path }
+        )) {
+            TableColumn(AssistWording.menuPlanPageColumn) { (row: SectionVerbSheetModel.SourceRow) in
+                Text(row.title)
+                    .lineLimit(1)
+                    .help(row.title)
+                    .accessibilityIdentifier("sectionVerbSource-\(row.path)")
+            }
+            .width(min: 120, ideal: 220)
+            TableColumn(AssistWording.menuPickDateColumn) { (row: SectionVerbSheetModel.SourceRow) in
+                Text(sourceDateCell(for: row))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 150, max: 180)
+        }
+        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .flexibleTableHeight(sourceTableHeight)
+        .accessibilityIdentifier("sectionVerbSheetSourceTable")
     }
 
     /// The pages to tick (#608): a bordered, banded table — Page (with its
@@ -949,6 +1057,14 @@ struct SectionVerbSheet: View {
     /// there are some, and something else to read above them.
     static func foldsAlreadyRight(_ table: AssistPlanTable) -> Bool {
         return !table.rowsAlreadyRight.isEmpty && !table.rowsToRead.isEmpty
+    }
+
+    /// The source list's Date cell (#897), as the picker writes a day.
+    func sourceDateCell(for row: SectionVerbSheetModel.SourceRow) -> String {
+        if let date = row.date {
+            return AssistWording.laterClassesDay(weekday: date.weekdayName, date: date.text)
+        }
+        return ""
     }
 
     /// The picker's Date cell: a class's day, as the later-classes question

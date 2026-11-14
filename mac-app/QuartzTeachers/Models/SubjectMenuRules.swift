@@ -104,6 +104,11 @@ nonisolated enum SubjectMenuRules {
         case rebuildPreview
         case undoLastChange
         case addNextClass
+        /// Add Next Class in a New Unit and Duplicate as Next Class… (#897):
+        /// what only the built-in assistant's window could do before, run
+        /// through the same tool from the menu.
+        case addNextClassInANewUnit
+        case duplicateAsNextClass
         case reDateClasses
         case makeRoomForClasses
         case classDates
@@ -177,6 +182,18 @@ nonisolated enum SubjectMenuRules {
         var deployedFolderReady: Bool = false
         /// This app is showing the selected section's deployed folder.
         var deployedFolderShown: Bool = false
+        /// The selected section's course names its class pages with one
+        /// number ("Week 3", a club, #267): it has no units, so a new unit
+        /// cannot be started in it (#897).
+        var classPagesAreNumbered: Bool = false
+        /// A rename of the course's unit word stopped part way: the record
+        /// a rename leaves is on disk (`UnitWordRenamer.renameMarkerURL`).
+        /// Pages under the new word do not read under the old one, so the
+        /// highest unit would be read too low (#897).
+        var unitWordRenameUnfinished: Bool = false
+        /// The selected section has at least one page in its class folders,
+        /// so Duplicate as Next Class… has something to offer (#897).
+        var hasAClassPage: Bool = false
     }
 
     // MARK: - Functions
@@ -339,6 +356,16 @@ nonisolated enum SubjectMenuRules {
                 enabled.insert(.hidePages)
                 enabled.insert(.publishClassForADate)
                 enabled.insert(.addNextClass)
+                // #897. Not in a numbered course: it has no units, and the
+                // tool would refuse in the conversation's words. Not while a
+                // unit-word rename is unfinished: the planner reads only the
+                // pages named the old way. Duplicate needs a class to copy.
+                if !situation.classPagesAreNumbered && !situation.unitWordRenameUnfinished {
+                    enabled.insert(.addNextClassInANewUnit)
+                }
+                if situation.hasAClassPage && !situation.unitWordRenameUnfinished {
+                    enabled.insert(.duplicateAsNextClass)
+                }
                 enabled.insert(.reDateClasses)
                 enabled.insert(.makeRoomForClasses)
                 enabled.insert(.classDates)

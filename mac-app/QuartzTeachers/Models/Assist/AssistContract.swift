@@ -760,6 +760,27 @@ enum AssistContract {
             "menuUndoLastChangeTitle": AssistWording.menuUndoLastChangeTitle,
             "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
             "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
+            // #897: Add Next Class in a New Unit and Duplicate as Next Class….
+            "menuAddNextClassInANewUnitTitle": AssistWording.menuAddNextClassInANewUnitTitle(),
+            "menuAddNextClassInANewUnitTitleForAMeeting": AssistWording.menuAddNextClassInANewUnitTitle(
+                noun: .meeting
+            ),
+            "menuDuplicateTitle": AssistWording.menuDuplicateTitle(course: course, section: section),
+            "menuDuplicateTitleForAMeeting": AssistWording.menuDuplicateTitle(
+                course: course, section: section, noun: .meeting
+            ),
+            "menuPickClassToDuplicate": AssistWording.menuPickClassToDuplicate(),
+            "menuPickClassToDuplicateForAMeeting": AssistWording.menuPickClassToDuplicate(noun: .meeting),
+            "menuDuplicateButton": AssistWording.menuDuplicateButton,
+            "duplicatedFromTheMenu": AssistWording.duplicatedFromTheMenu(
+                page: pagePlaceholder, as: copyPlaceholder, on: "2026-09-14"
+            ),
+            "theCopyCouldNotBeMadeHiddenFromTheMenu": AssistWording.theCopyCouldNotBeMadeHiddenFromTheMenu(
+                page: pagePlaceholder
+            ),
+            "menuTheNextPageIsAlreadyThere": AssistWording.menuTheNextPageIsAlreadyThere(page: copyPlaceholder),
+            "menuUnitWordRenameUnfinished": AssistWording.menuUnitWordRenameUnfinished(),
+            "menuUnitWordRenameUnfinishedForAMeeting": AssistWording.menuUnitWordRenameUnfinished(noun: .meeting),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
