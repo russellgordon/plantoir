@@ -7737,7 +7737,17 @@ name shown, since a folder called "Unit 1" shares its name with the unit
 its class pages only (Russell's ruling on #900): the pages its classes link
 to are the plan's and the links checklist's, as before. A ticked page the
 search hides stays ticked and is sent, and `menuTickedButNotShown` says how
-many under the table.
+many under the table. The one sentence shows in both sheets, so it says the pages
+are still ticked. REJECTED after the Fable sweep: an ending that said Continue
+still "includes" them, since "included" is the app's word for a page students
+see (#694) and in Hide Pages… those pages are about to be hidden; and a twin
+for the Hide sheet, which one neutral sentence makes unnecessary.
+While a search is on, a click on a mixed box whose shown pages are all ticked
+unticks those shown pages, a page ticked by hand among them (the director's
+ruling on the sweep's first question: kept). Every page that changes is in
+view, the row's count moves, one more click puts them back, and the plan lists
+every page before anything is written; a click that ticked hidden pages, or
+one that did nothing in that state, was rejected.
 
 **The call is unchanged, and that is the safety argument.** Continue sends
 `tickedRows`, the sheet's ticked pages in `pageRows` order, exactly as before
