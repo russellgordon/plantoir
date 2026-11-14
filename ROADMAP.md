@@ -166,9 +166,10 @@ ready.
   school is now called Grove Colours and is offered to every teacher, and a
   switch that only that school used is gone.
   ([#891](https://github.com/russellgordon/plantoir/issues/891))
-- **Problem reports are more careful with your details.** Plantoir already
-  takes passwords and your name out of a problem report before you send it.
-  It now recognises more of the ways they can be written.
+- **A more thorough privacy check on problem reports.** Plantoir does not
+  put your passwords or what is written on your pages into a problem report.
+  As a safeguard, it also checks the report for anything that looks private
+  before you send it, and that check now covers more cases.
   ([#853](https://github.com/russellgordon/plantoir/issues/853), [#876](https://github.com/russellgordon/plantoir/issues/876))
 - **Windows fixes:** a handout printed on Windows should look the same as one
   printed on a Mac ([#577](https://github.com/russellgordon/plantoir/issues/577)), and a course you keep for reference will stop
