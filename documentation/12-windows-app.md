@@ -2571,9 +2571,32 @@ pieces A and C, #785a, #597's second half, #891, #696, #812 and #813, the
 Nothing under `windows-app/` changed. `verify-deploy.ps1` changed in one line
 (the surname prompt it expects, `deploy.py`'s new example). The shared Python
 it changed runs here today through `PythonToolchainTests`. A full suite on
-cadd8eb11 read BASELINE_TOTALS (this PC, a Lenovo 20QES70500, i5-8365U, 16 GB,
-Windows 11 Pro 26200, BASELINE_NOTE). Each red is sorted below by the open
-`windows` issue of v2.0.0 whose body names it.
+cadd8eb11 read `Failed: 19, Passed: 3809, Skipped: 1, Total: 3829, Duration:
+19 m 43 s`. It ran on this PC (a Lenovo 20QES70500, i5-8365U, 16 GB,
+Windows 11 Pro 26200) after a 92-minute wait for the suite lock. Each red is
+sorted below by the open `windows` issue of v2.0.0 whose body names it.
+
+Two of the 19 are not the mac's requests:
+- **`LastViewedPagesTests.OnlyTheNewestAreKept`** (`Actual: "P3"`, 25 s), the
+  ordering flake #916 already names.
+- **`PythonToolchainTests` on `scripts/test_deploy_tokens.py`.** #921 owns
+  it, and its body said to read a red there as a platform question first. It
+  is one. The file's `TheEndDateReading` (6 cases) and two more subtests pass
+  a JSON body to deploy.sh's cut-out functions as an ARGUMENT to Git Bash,
+  and Git Bash's own command-line reading changes such an argument before
+  bash sees it. Measured with `subprocess.run([Git Bash, "-c", 'printf "[%s]"
+  "$1"', "_", arg])` on the runtime's Python:
+  - `{"a":"b"}` arrives empty;
+  - `a"b` arrives as `a\b`;
+  - `{a:b}` arrives as `a:b`;
+  - `"status":"active"` arrives as `\status":"active"`.
+
+  The function itself reads the body right when it is typed into Git Bash
+  (`[active][2027-07-01T00:00:00Z]`). So the red is the shared test's way of
+  passing the body, not `deploy.sh` and not Windows. The fix is in shared
+  Python: hand the body over on standard input or in the environment. It is
+  owed by #921 with the mac, and left red here, because a shared test is not
+  held by name.
 
 **Held, 61 entries from these fourteen, all v2.0.0** (22 more from stack 13, below).
 
@@ -2590,7 +2613,8 @@ Windows 11 Pro 26200, BASELINE_NOTE). Each red is sorted below by the open
 The 34 Add Class… sentences are held, not added: nothing the built-in
 assistant is shown changes. `scripts/test_tool_surface_digest.py` and
 `research/ai-assist/toolhash.py` are untouched by the merge, so the digest's
-expectation did not move, and the test DIGEST_NOTE.
+expectation did not move. The test passed in the baseline, so Windows'
+surface still matches it.
 Add Next Class is not renamed: the issue says renaming the item is the fix,
 and the item is a menu a teacher sees, so it waits for #927's dialog.
 
