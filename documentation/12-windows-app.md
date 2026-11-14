@@ -6256,7 +6256,7 @@ returned before the stub had written, and the test read the file at once. The
 test now polls for the file for up to 15 s. The product's 400 ms grace is
 unchanged, because it exists so a click does not freeze. `OutsideDoorTests`
 was never exposed: its `Run` waits for the stub to exit (30 s) before reading.
-ALONE-NUMBERS
+Measured alone, under the suite lock, 10 runs each: before, 2 of 10 failed (7 of 20 over two sets), each in about 1 s. After, 10 of 10 passed, 0.7 to 1 s each.
 
 **Two shared temp paths are left as they are** and filed as findings, because
 neither is this sweep: `TestTrailRedirect.ScratchTrailPath` is one fixed
