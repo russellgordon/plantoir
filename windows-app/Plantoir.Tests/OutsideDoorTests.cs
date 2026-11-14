@@ -431,15 +431,20 @@ public sealed class StubProgramCollection
 
     private static string MakeFolder()
     {
-        // Clean up any probe folders a crash before this left behind, and the
-        // one this run makes when the process ends: the stub compiler used to
-        // leave a plantoir-probe-* folder in %TEMP% per run.
-        foreach (string old in SafeEnumerate(Path.GetTempPath(), "plantoir-probe*"))
-            try { Directory.Delete(old, recursive: true); } catch { }
-        string folder = Directory.CreateTempSubdirectory("plantoir-probe").FullName;
+        // A folder THIS process owns (#882): sweeping every plantoir-probe*
+        // folder here used to delete the stubs of another test run on the PC
+        // while it was running. The folder goes when this process ends; a
+        // crashed run's is swept only once its owner is provably gone.
+        string folder = RunOwnedTempFolders.Create(FolderPrefix);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { Directory.Delete(folder, recursive: true); } catch { } };
         return folder;
     }
+
+    /// <summary>Deliberately NOT <c>plantoir-probe…</c>: older copies of this suite still delete every folder that matches that.</summary>
+    internal const string FolderPrefix = "plantoir-stubs-";
+
+    /// <summary>The folder the stubs are compiled into, made on first use.</summary>
+    internal static string StubFolder => Folder.Value;
 
     private static string Compile(string name, string code)
     {
@@ -457,11 +462,5 @@ public sealed class StubProgramCollection
         process.WaitForExit();
         if (!File.Exists(exe)) throw new InvalidOperationException("The stub did not compile: " + said);
         return exe;
-    }
-
-    private static IEnumerable<string> SafeEnumerate(string root, string pattern)
-    {
-        try { return Directory.EnumerateDirectories(root, pattern); }
-        catch { return Array.Empty<string>(); }
     }
 }
