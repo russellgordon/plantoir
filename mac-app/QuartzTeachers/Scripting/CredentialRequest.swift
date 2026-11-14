@@ -66,9 +66,9 @@ struct CredentialRequest: Equatable {
                 "Describe it as something you will recognise later, such as “Class websites”.",
                 "Change the expiry — it starts at 7 days. Set a date after the end of your "
                     + "school year: next July is a safe choice. Choose “No expiration” instead "
-                    + "if it is offered. An expired token stops your deploys working. Plantoir "
-                    + "then says the token was not accepted, and Settings shows whether the "
-                    + "saved token still works.",
+                    + "if it is offered. An expired token stops your deploys working. The next "
+                    + "deploy then says the saved token no longer works, and Settings shows "
+                    + "whether the saved token still works.",
                 "Choose “Generate token”, then copy the long code Netlify shows you — it is only shown once.",
                 "Paste it below.",
             ],
