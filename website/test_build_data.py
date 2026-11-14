@@ -23,14 +23,75 @@ import windows_feed  # noqa: E402
 
 
 def expected_pin(site_version: str, platform_version: str):
-    """The version a download card is pinned to, or None (#500).
+    """The version a download card is pinned to, or None (#500, #861).
 
-    A platform whose bundle is at (or, mid-cut, above) the site's version line
-    has its asset in the newest release; one below it does not, and its card
-    points at its own version, the last release its installer joined."""
+    ``platform_version`` is the newest release in that platform's update
+    feed. A platform whose feed is at (or, mid-cut, above) the site's version
+    line has its asset in the newest release; one below it does not, and its
+    card points at the feed's newest release, the last one its installer
+    joined."""
     if windows_feed.version_key(platform_version) >= windows_feed.version_key(site_version):
         return None
     return platform_version
+
+
+def last_shipped_versions(feeds: dict) -> dict:
+    """The version each platform's card is judged against (#500, #861): the
+    newest release in that platform's update feed, the last one its
+    installer joined. Until #861 this read each platform's project file;
+    since #861 that number names the release being BUILT, raised on `dev`
+    when work starts, so it says nothing about what shipped."""
+    return {
+        "Windows": windows_feed.newest_item(feeds["Windows"].read_bytes())["version"],
+        "macOS": update_feeds.newest_version(feeds["macOS"]),
+    }
+
+
+def card_pin_problems(site: dict, feeds: dict) -> list:
+    """Every card whose pin is not the one its feed calls for, or that points
+    at a release whose feed has no such download (a 404)."""
+    versions = last_shipped_versions(feeds)
+    problems: list = []
+    for entry in site["downloads"]:
+        platform = entry["platform"]
+        version = versions[platform]
+        if version is None:
+            problems.append(f"{platform}: its feed offers nothing")
+            continue
+        pin = entry.get("pinned")
+        wanted_pin = expected_pin(site["version"], version)
+        if pin != wanted_pin:
+            problems.append(f"{platform}: pinned {pin}, but its feed is at {version} and the site at "
+                            f"{site['version']}, so it should be {wanted_pin}")
+            continue
+        if pin is None:
+            continue
+        if windows_feed.version_key(pin) >= windows_feed.version_key(site["version"]):
+            problems.append(f"{platform}: pinned {pin}, at or above the site's {site['version']}")
+        wanted = f"/releases/download/v{pin}/{entry['asset']}"
+        found = False
+        for item in update_feeds.items_of(feeds[platform]):
+            if item["url"].endswith(wanted):
+                found = True
+        if not found:
+            problems.append(f"no {platform} feed item downloads {wanted}: the pinned card would 404")
+    return problems
+
+
+MAC_FEED_ITEM = ('<item><sparkle:version>{build}</sparkle:version>'
+                 '<sparkle:shortVersionString>{version}</sparkle:shortVersionString>'
+                 '<enclosure url="https://github.com/russellgordon/plantoir/releases/download/v{version}/'
+                 'Plantoir-macOS.dmg" length="1" /></item>')
+WINDOWS_FEED_ITEM = ('<item><sparkle:version>{version}</sparkle:version>'
+                     '<enclosure url="https://github.com/russellgordon/plantoir/releases/download/v{version}/'
+                     'PlantoirSetup.exe" sparkle:version="{version}" length="1" /></item>')
+
+
+def write_feed(path: Path, items: list) -> Path:
+    path.write_text('<?xml version="1.0" encoding="utf-8"?><rss version="2.0" '
+                    'xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel>'
+                    + "".join(items) + "</channel></rss>", encoding="utf-8")
+    return path
 
 
 def make_support(root: Path, payloads: dict, catalogue: list) -> Path:
@@ -195,15 +256,15 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("PC &middot; version 1.1.0", html)
         self.assertNotIn("Mac &middot; version", html)
 
-    def test_the_expected_pin_follows_the_platform_version(self):
-        # #500: the rule, without the real files. A platform whose bundle
-        # carries the site's version ships in the newest release, so its card
-        # is unpinned; one that lags is pinned to its own version, which is
-        # the last release its installer joined.
+    def test_the_expected_pin_follows_the_newest_release_in_the_feed(self):
+        # #500, #861: the rule, without the real files. A platform whose feed
+        # offers the site's version shipped in the newest release, so its
+        # card is unpinned; one whose feed lags is pinned to the feed's
+        # newest release, the last one its installer joined.
         self.assertIsNone(expected_pin("1.9.3", "1.9.3"))
         self.assertEqual(expected_pin("1.9.3", "1.9.0"), "1.9.0")
-        self.assertEqual(expected_pin("1.10.0", "1.9.3"), "1.9.3")
-        # A bundle raised ahead of the site's version line is a cut in
+        self.assertEqual(expected_pin("2.0.0", "1.9.3"), "1.9.3")
+        # A feed rebuilt ahead of the site's version line is a cut in
         # progress for that platform: it is shipping, so it is not pinned.
         self.assertIsNone(expected_pin("1.9.3", "1.9.4"))
 
@@ -211,44 +272,55 @@ class DownloadTests(unittest.TestCase):
         # #500: this test used to compare the Windows pin with a literal
         # ("1.4.5", then "1.7.1", ... "1.9.0") that had to be edited at every
         # mac-only cut and every Windows catch-up, and failed in between. The
-        # expectation now comes from the data a cut already moves:
-        #   - each platform's version (<Version> in Plantoir.csproj,
-        #     MARKETING_VERSION in mac-app/project.yml), raised only in the
-        #     cut that attaches that platform's asset (RELEASING.md, "Two
-        #     platforms, one version series");
-        #   - the update feeds, whose items name the release each installer
-        #     was uploaded to — the proof that a pinned card points at a
-        #     release that HAS the asset, rather than at a 404.
-        # The history of which card was pinned when is in site.json's
-        # downloads_note.
+        # expectation now comes from the data a cut already moves: the update
+        # feeds, whose newest item is the last release each platform's
+        # installer joined, and whose items name the release each was
+        # uploaded to (the proof that a pinned card points at a release that
+        # HAS the asset, rather than at a 404). Until #861 it read each
+        # platform's project version instead; since #861 that number names
+        # the release being BUILT, raised on `dev` when work starts, so it
+        # says nothing about what shipped. The history of which card was
+        # pinned when is in site.json's downloads_note.
         site = build.read_json(build.WEBSITE / "site.json")
-        versions = {
-            "Windows": windows_feed.csproj_version(),
-            "macOS": update_feeds.marketing_version(build.REPO / "mac-app" / "project.yml"),
-        }
         feeds = {
             "Windows": build.WEBSITE / "updates" / "windows.xml",
             "macOS": build.WEBSITE / "updates" / "macos.xml",
         }
         seen: set = set()
         for entry in site["downloads"]:
-            platform = entry["platform"]
-            seen.add(platform)
-            with self.subTest(platform=platform):
-                self.assertIsNotNone(versions[platform])
-                pin = entry.get("pinned")
-                self.assertEqual(pin, expected_pin(site["version"], versions[platform]),
-                                 f"{platform} is at {versions[platform]} and the site at {site['version']}")
-                if pin is None:
-                    continue
-                self.assertLess(windows_feed.version_key(pin), windows_feed.version_key(site["version"]))
-                wanted = f"/releases/download/v{pin}/{entry['asset']}"
-                addresses: list = []
-                for item in update_feeds.items_of(feeds[platform]):
-                    addresses.append(item["url"])
-                self.assertTrue(any(address.endswith(wanted) for address in addresses),
-                                f"no {platform} feed item downloads {wanted}: the pinned card would 404")
+            seen.add(entry["platform"])
         self.assertEqual(seen, {"Windows", "macOS"})
+        self.assertEqual(card_pin_problems(site, feeds), [])
+
+    def test_a_cut_that_skips_the_mac_pins_its_card_while_its_number_is_ahead(self):
+        # #861, the behaviour that changed, with the REAL mac-app/project.yml,
+        # whose MARKETING_VERSION names the release being built (2.0.0 when
+        # this was written). A Windows-only cut one patch above the mac's
+        # last release: the site's version line moves, the Windows feed
+        # gains that release, the mac feed does not, so the mac card is
+        # pinned to the mac's last release. Judged by the project number, as
+        # before #861, the mac looked like it was shipping and the right pin
+        # was called wrong.
+        mac_released = update_feeds.newest_version(build.WEBSITE / "updates" / "macos.xml")
+        parts = mac_released.split(".")
+        windows_only = f"{parts[0]}.{parts[1]}.{int(parts[2]) + 1}"
+        self.assertGreater(windows_feed.version_key(update_feeds.marketing_version(
+            build.REPO / "mac-app" / "project.yml")), windows_feed.version_key(windows_only),
+            "this case needs MARKETING_VERSION ahead of the Windows-only cut")
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            feeds = {
+                "macOS": write_feed(folder / "macos.xml", [MAC_FEED_ITEM.format(version=mac_released, build=1)]),
+                "Windows": write_feed(folder / "windows.xml", [WINDOWS_FEED_ITEM.format(version=mac_released),
+                                                              WINDOWS_FEED_ITEM.format(version=windows_only)]),
+            }
+            site = {"version": windows_only, "downloads": [
+                {"platform": "macOS", "asset": "Plantoir-macOS.dmg", "pinned": mac_released},
+                {"platform": "Windows", "asset": "PlantoirSetup.exe"},
+            ]}
+            self.assertEqual(card_pin_problems(site, feeds), [])
+            site["downloads"][0]["pinned"] = None
+            self.assertEqual(len(card_pin_problems(site, feeds)), 1, "a forgotten pin must be caught")
 
 
 class ShortcutTests(unittest.TestCase):
