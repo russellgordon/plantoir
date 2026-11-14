@@ -324,9 +324,16 @@ final class SectionVerbs {
     /// A page's path inside its course folder, `.md` included —
     /// "section1/All Classes/Unit 2, Day 3.md" — for Add Class…'s copy
     /// (#897), which names exactly one file.
+    ///
+    /// Both sides in the disk's own spelling (`FolderIdentity.canonicalPath`,
+    /// how the rest of the app compares folders): the class folders are
+    /// listed with links in their ancestors RESOLVED, and a working folder
+    /// opened through a link (a cloud folder linked into the home folder)
+    /// otherwise shares no prefix with its pages (the implementation
+    /// review's finding 8, measured).
     static func coursePath(ofPageAt fileURL: URL, in course: Course) -> String {
-        let page: String = fileURL.standardizedFileURL.path
-        let folder: String = course.directoryURL.standardizedFileURL.path + "/"
+        let page: String = FolderIdentity.canonicalPath(fileURL.standardizedFileURL.path)
+        let folder: String = FolderIdentity.canonicalPath(course.directoryURL.standardizedFileURL.path) + "/"
         if page.hasPrefix(folder) {
             return String(page.dropFirst(folder.count))
         }
@@ -335,34 +342,20 @@ final class SectionVerbs {
 
     // MARK: - What Add Class… is greyed by (#897)
 
-    /// The three facts Add Class… and its ways are greyed by
-    /// (`SubjectMenuRules.addClassWays`). Read when the section window is shown, when it
-    /// comes to the front and after each function, never per drawing of the
-    /// menu (the plan review's amendment 4).
-    struct ClassFacts: Equatable {
-
-        // MARK: - Stored properties
-
-        var classPagesAreNumbered: Bool = false
-        var unitWordRenameUnfinished: Bool = false
-        var hasAClassPage: Bool = false
-    }
-
-    static func classFacts(forSection sectionNumber: Int, in course: Course) -> ClassFacts {
-        var facts: ClassFacts = ClassFacts()
+    /// The facts Add Class…'s sheet decides its ways from, read when it
+    /// OPENS: one listing of the class folders' names and the rename's own
+    /// check. That check (`UnitWordRenamer.interruptedRenameTarget`) is the
+    /// one that clears a record left by a rename that finished, or by a word
+    /// edited by hand, so a stale record never greys a way for good (the
+    /// implementation review's finding 1). REJECTED: greying on the record
+    /// FILE alone, which a stale record held greyed with no way out from the
+    /// sheet, since a greyed way never reaches the runner.
+    static func addClassFacts(forSection sectionNumber: Int, in course: Course) -> SubjectMenuRules.AddClassFacts {
+        var facts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts()
         facts.classPagesAreNumbered = course.configuration.classPageNaming.isNumbered
-        facts.unitWordRenameUnfinished = unitWordRenameRecordIsThere(for: course)
+        facts.unitWordRenameUnfinished = UnitWordRenamer.interruptedRenameTarget(in: course) != nil
         facts.hasAClassPage = hasAClassPage(forSection: sectionNumber, in: course)
         return facts
-    }
-
-    /// The cheap fact: the record a unit-word rename leaves while it runs is
-    /// on disk. The full check, which reads every class folder and clears a
-    /// stale record, runs at the click (`UnitWordRenamer.interruptedRenameTarget`,
-    /// in the runner).
-    static func unitWordRenameRecordIsThere(for course: Course) -> Bool {
-        let record: URL = UnitWordRenamer.renameMarkerURL(courseDirectory: course.directoryURL)
-        return FileManager.default.fileExists(atPath: record.path)
     }
 
     /// Whether the section's class folders hold any page but their landing

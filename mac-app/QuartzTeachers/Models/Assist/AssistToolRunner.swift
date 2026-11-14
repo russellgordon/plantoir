@@ -4051,7 +4051,7 @@ final class AssistToolRunner {
     private func planAddNextClass(_ arguments: [String: Any]) -> AssistToolOutcome {
         // The Section menu's own duplicate (#897), read on `.menu` only.
         if let fromTheMenu = menuDuplicateAsked(arguments) {
-            return planMenuDuplicate(fromTheMenu)
+            return planMenuDuplicate(fromTheMenu, arguments)
         }
         if let waiting = menuNewUnitWaitsForARename(arguments) {
             return waiting
@@ -4549,10 +4549,17 @@ final class AssistToolRunner {
             return .failure(AssistWording.menuUnitWordRenameUnfinished(noun: noun))
         }
 
-        let wanted: String = course.directoryURL.appendingPathComponent(path).standardizedFileURL.path
+        // Both sides in the disk's own spelling, as the app compares folders
+        // everywhere (`FolderIdentity.canonicalPath`): the class folders are
+        // listed with links in their ancestors resolved, and a working folder
+        // opened through a link would otherwise never match (#897a review,
+        // finding 8).
+        let wanted: String = FolderIdentity.canonicalPath(
+            course.directoryURL.appendingPathComponent(path).standardizedFileURL.path
+        )
         let classPages: [ClassPageSummary] = ClassPages.list(forSection: located.sectionNumber, in: course)
         var source: ClassPageSummary? = nil
-        for page in classPages where page.fileURL.standardizedFileURL.path == wanted {
+        for page in classPages where FolderIdentity.canonicalPath(page.fileURL.standardizedFileURL.path) == wanted {
             source = page
         }
         let shownName: String = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
@@ -4571,6 +4578,12 @@ final class AssistToolRunner {
         do {
             plan = try NextClassPlanner.plan(forSection: located.sectionNumber, in: course)
         } catch {
+            // The dates went missing between the sheet's own check and the
+            // press: the menu's sentence, not the conversation's "may I ask
+            // for your dates" (#897a review, finding 12).
+            if case NextClassPlanner.Problem.noTimetable = error {
+                return .failure(AssistWording.menuNeedsClassDatesFirst(noun: noun))
+            }
             return .failure(error.localizedDescription)
         }
         guard let newPage = plan.classes.first else {
@@ -4607,11 +4620,14 @@ final class AssistToolRunner {
     }
 
     /// The plan the sheet shows before Duplicate is pressed.
-    private func planMenuDuplicate(_ asked: MenuDuplicateAsked) -> AssistToolOutcome {
+    private func planMenuDuplicate(_ asked: MenuDuplicateAsked, _ arguments: [String: Any]) -> AssistToolOutcome {
         switch asked {
         case .failure(let message):
             return AssistToolOutcome.couldNotRead(message)
         case .copyCannotBeHidden(let page):
+            // The plan is where this is nearly always caught, so the trail
+            // says so here as well as at the write (#897a review, finding 14).
+            noteTheMenusCopyWasNotMade(arguments)
             return AssistToolOutcome.couldNotRead(AssistWording.theCopyCouldNotBeMadeHiddenFromTheMenu(page: page))
         case .success(let request):
             var lines: [String] = []
@@ -4641,14 +4657,7 @@ final class AssistToolRunner {
         case .failure(let message):
             return AssistToolOutcome.refused(message)
         case .copyCannotBeHidden(let page):
-            if case .success(let located) = locate(arguments) {
-                ActivityTrail.note(
-                    .classCopyNotMade,
-                    "did not copy a class from the Section menu — the copy could not be made certainly "
-                    + "hidden, so nothing was written",
-                    course: located.course.code, section: located.sectionNumber
-                )
-            }
+            noteTheMenusCopyWasNotMade(arguments)
             return AssistToolOutcome.refused(AssistWording.theCopyCouldNotBeMadeHiddenFromTheMenu(page: page))
         case .success(let made):
             request = made
@@ -4671,10 +4680,16 @@ final class AssistToolRunner {
                 at: target.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try Data(request.copyText.utf8).write(to: target, options: [.withoutOverwriting])
+        } catch let error as CocoaError where error.code == .fileWriteFileExists {
+            // A page appeared at that name meanwhile: it is never written over.
+            return AssistToolOutcome.refused(AssistWording.menuTheNextPageIsAlreadyThere(page: request.newPage.title))
         } catch {
-            if FileManager.default.fileExists(atPath: target.path) {
-                return AssistToolOutcome.refused(AssistWording.menuTheNextPageIsAlreadyThere(page: request.newPage.title))
-            }
+            // Any other failure: `.withoutOverwriting` is not atomic, so a
+            // file this call created may be half written. It was not there
+            // before (the write would have been refused), so it is this
+            // call's, and it goes; the copy of the course saved first is the
+            // way back for anything else (#897a review, finding 11).
+            try? FileManager.default.removeItem(at: target)
             return AssistToolOutcome.refused("Nothing was created: \(error.localizedDescription)")
         }
 
@@ -4692,6 +4707,20 @@ final class AssistToolRunner {
             page: request.sourceTitle, as: request.newPage.title, on: request.newPage.date.text
         )
         return AssistToolOutcome.wrote(summary, detail: request.plan.description + "\n\nDone: " + summary)
+    }
+
+    /// The trail line for a menu copy that could not be made certainly
+    /// hidden: nothing was written.
+    private func noteTheMenusCopyWasNotMade(_ arguments: [String: Any]) {
+        guard case .success(let located) = locate(arguments) else {
+            return
+        }
+        ActivityTrail.note(
+            .classCopyNotMade,
+            "did not copy a class from the Section menu — the copy could not be made certainly "
+            + "hidden, so nothing was written",
+            course: located.course.code, section: located.sectionNumber
+        )
     }
 
     /// Add Class…, in a new unit and as a copy, waits for an

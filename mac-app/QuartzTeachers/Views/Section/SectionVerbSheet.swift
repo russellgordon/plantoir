@@ -142,7 +142,7 @@ final class SectionVerbSheetModel: Identifiable {
 
     /// Add Class…'s ways (#897): the ones this section can use now, in the
     /// sheet's order (`SubjectMenuRules.addClassWays`), and the one chosen.
-    var availableWays: [SubjectMenuRules.AddClassWay] = []
+    var addClassFacts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts()
     var way: SubjectMenuRules.AddClassWay?
 
     /// Add Class…'s classes to copy, and the one chosen, by path.
@@ -204,6 +204,47 @@ final class SectionVerbSheetModel: Identifiable {
             }
         }
         return shown
+    }
+
+    /// The ways Add Class… can use now, in the sheet's order.
+    var availableWays: [SubjectMenuRules.AddClassWay] {
+        return SubjectMenuRules.addClassWays(addClassFacts)
+    }
+
+    /// The course's word for a unit, as a sentence says it ("module").
+    var unitWord: String {
+        return course.configuration.classPageNaming.word.lowercased()
+    }
+
+    /// Why each greyed way is greyed, one sentence per reason, in the ways'
+    /// order (#897a review, finding 1): a greyed radio button alone says
+    /// "no" and not what to do about it.
+    var greyedReasons: [String] {
+        var reasons: [String] = []
+        for way in SubjectMenuRules.AddClassWay.allCases {
+            guard let reason = SubjectMenuRules.whyGreyed(way, addClassFacts) else {
+                continue
+            }
+            let sentence: String = SectionVerbSheet.sentence(for: reason, noun: noun, unit: unitWord)
+            if !reasons.contains(sentence) {
+                reasons.append(sentence)
+            }
+        }
+        return reasons
+    }
+
+    /// The search for Add Class…'s list. A chosen class the search hides is
+    /// let go, so Continue never copies a row the teacher cannot see
+    /// (#897a review, finding 13).
+    func searchTheSources(for text: String) {
+        search = text
+        var stillShown: Bool = false
+        for row in shownSourceRows where row.path == chosenSource {
+            stillShown = true
+        }
+        if !stillShown {
+            chosenSource = nil
+        }
     }
 
     /// The classes Add Class… shows for the search.
@@ -681,11 +722,22 @@ struct SectionVerbSheet: View {
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
 
+    /// How many classes Add Class…'s list shows before it scrolls inside
+    /// itself (#897). Fewer than the picker's twelve: this sheet also carries
+    /// the three ways, a line saying why one is greyed and the copy's own
+    /// instruction above the search, about 150 pt more than Publish Pages…'s
+    /// picker, whose forty-page case is measured against the 620 pt a
+    /// 13-inch screen allows (`CopyPageChecklist.tallestSheet`). Seven rows
+    /// give back 120 of them (`ListTableMetrics`: 24 pt a row);
+    /// `DuplicateAsNextClassTests.testTheTallestAddClassSheetStaysOnTheScreen`
+    /// measures it (the implementation review's finding 7).
+    static let mostSourceRowsShown: Int = 7
+
     /// Add Class…'s list of classes to copy (#897), the same way.
     var sourceTableHeight: CGFloat {
         var shown: Int = model.sourceRows.count
-        if shown > SectionVerbSheet.mostPickerRowsShown {
-            shown = SectionVerbSheet.mostPickerRowsShown
+        if shown > SectionVerbSheet.mostSourceRowsShown {
+            shown = SectionVerbSheet.mostSourceRowsShown
         }
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
@@ -925,7 +977,8 @@ struct SectionVerbSheet: View {
             )) {
                 ForEach(SubjectMenuRules.AddClassWay.allCases, id: \.self) { (way: SubjectMenuRules.AddClassWay) in
                     Text(SectionVerbSheet.label(
-                        of: way, noun: model.noun, numbered: model.course.configuration.classPageNaming.isNumbered
+                        of: way, noun: model.noun, unit: model.unitWord,
+                        numbered: model.course.configuration.classPageNaming.isNumbered
                     ))
                         .tag(Optional(way))
                         .disabled(!model.availableWays.contains(way))
@@ -934,12 +987,18 @@ struct SectionVerbSheet: View {
             .pickerStyle(.radioGroup)
             .labelsHidden()
             .accessibilityIdentifier("sectionVerbSheetAddClassWay")
+            ForEach(model.greyedReasons, id: \.self) { (reason: String) in
+                Text(reason)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("sectionVerbSheetAddClassGreyed")
+            }
             if model.way == .asACopyOfAClass && !model.sourceRows.isEmpty {
                 Text(AssistWording.menuPickClassToDuplicate(noun: model.noun))
                     .fixedSize(horizontal: false, vertical: true)
                 TextField(AssistWording.menuFindAPage, text: Binding(
                     get: { return model.search },
-                    set: { text in model.search = text }
+                    set: { text in model.searchTheSources(for: text) }
                 ))
                 .borderedTextField()
                 .accessibilityIdentifier("sectionVerbSheetSearch")
@@ -1093,14 +1152,27 @@ struct SectionVerbSheet: View {
     }
 
     /// One way's line in Add Class…'s sheet (#897).
-    static func label(of way: SubjectMenuRules.AddClassWay, noun: ClassNoun, numbered: Bool) -> String {
+    /// `unit` is the course's own word, as a sentence says it.
+    static func label(of way: SubjectMenuRules.AddClassWay, noun: ClassNoun, unit: String, numbered: Bool) -> String {
         switch way {
         case .nextInThisUnit:
-            return AssistWording.menuAddClassNextInThisUnit(noun: noun, numbered: numbered)
+            return AssistWording.menuAddClassNextInThisUnit(noun: noun, unit: unit, numbered: numbered)
         case .inANewUnit:
-            return AssistWording.menuAddClassInANewUnit(noun: noun)
+            return AssistWording.menuAddClassInANewUnit(noun: noun, unit: unit)
         case .asACopyOfAClass:
             return AssistWording.menuAddClassAsACopy(noun: noun)
+        }
+    }
+
+    /// The sentence under the ways for one reason a way is greyed (#897).
+    static func sentence(for reason: SubjectMenuRules.AddClassGreyedBecause, noun: ClassNoun, unit: String) -> String {
+        switch reason {
+        case .theCourseHasNoUnits:
+            return AssistWording.menuAddClassGreyedNoUnits(noun: noun)
+        case .thereIsNoClassToCopy:
+            return AssistWording.menuAddClassGreyedNothingToCopy(noun: noun)
+        case .aRenameIsUnfinished:
+            return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, unit: unit)
         }
     }
 

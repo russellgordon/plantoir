@@ -6771,12 +6771,26 @@ the class is added. The ways are data, in this order
 | In a new unit | `add_next_class` with `unit: "next"`, the argument the window's "Start a new unit for the next class" phrasing already sends | the course is numbered (a club has no units), or a unit-word rename stopped part way |
 | As a copy of a class in this section | `plan_add_next_class`, then `add_next_class`, with `duplicateFileFromTheMenu`: the source's path in the course, `.md` included | the section's class folders hold no page, or a unit-word rename stopped part way |
 
-A way that cannot be used is drawn greyed, never left out; the first that can
-be is chosen. The first two add at once (the button says Add), as Add Next
-Class did; the copy lists this section's class pages, numbered or not
-(`SectionVerbSheetModel.sourceRows`, from `ClassPages.list`), then shows the
-plan, then Duplicate. The item itself is live wherever Add Next Class was;
-it carries no key equivalent, because Add Next Class had none. The trail line
+A way that cannot be used is drawn greyed, never left out, and a line under
+the ways says why, once per reason, in words a teacher can act on
+(`subjectMenus.addClassSheet.greyedBecause`: `menuAddClassGreyedNoUnits`,
+`menuAddClassGreyedNothingToCopy`, `menuAddClassGreyedRenameUnfinished`); the
+first way that can be used is chosen. The lines use the course's own word
+("in a new module"). The first two add at once (the button says Add), as Add
+Next Class did; the copy lists this section's class pages, numbered or not
+(`SectionVerbSheetModel.sourceRows`, from `ClassPages.list`), seven rows before
+the list scrolls inside itself (`mostSourceRowsShown`, so the tallest sheet
+stays inside the 620 pt a 13-inch screen allows, with the ways and their reason
+above it), then shows the plan, then Duplicate. A class chosen and then hidden
+by the search is let go. The item itself is live wherever Add Next Class was,
+since its first way always can be chosen; it carries no key equivalent,
+because Add Next Class had none. The facts the ways are decided from
+(`SubjectMenuRules.AddClassFacts`) are read when the sheet OPENS
+(`SectionVerbs.addClassFacts`), not when the menu is drawn, and are not keys
+of the menu's situation. REJECTED: reading them with the window's " — Edited"
+marker and greying the item on them (the implementation review's finding 9:
+it changed nothing anyone sees, since the item is never greyed for them, and
+it walked the class folders on the main thread on every window activation). The trail line
 is `ran from a menu` with "Section ▸ Add Class…" and the way in its counts.
 
 **The copy, read on `.menu` only.** `duplicateFileFromTheMenu`
@@ -6805,16 +6819,31 @@ testTheCommittedCasesMatchTheToolSurface` for every byte). The menu's copy
   fails (the plan review's amendment 6); the menu's does not;
 - **is one undo entry** with no "before", so Undo Last Change deletes it.
 
-**An unfinished unit-word rename** greys the second and third ways on the
-cheap fact (the record a rename leaves is on disk), and the runner checks it in
-full at the click (`UnitWordRenamer.interruptedRenameTarget`), refusing on
-`.menu` only with `menuUnitWordRenameUnfinished`. A rename to "Module" that
+**A working folder opened through a link** (a cloud folder linked into the
+home folder): the class folders are listed with links in their ancestors
+resolved, so a path compared in two spellings never matched and every copy was
+refused (the implementation review's finding 8, measured). Both the sheet
+(`SectionVerbs.coursePath`) and the runner compare `FolderIdentity.canonicalPath`
+spellings, as the rest of the app compares folders
+(`DuplicateAsNextClassTests.testACourseReachedThroughALinkCanBeCopied`).
+
+**An unfinished unit-word rename** greys the second and third ways, decided by
+the rename's OWN check (`UnitWordRenamer.interruptedRenameTarget`) as the sheet
+opens, which also clears a record left by a rename that finished or by a word
+edited by hand; the runner checks again at the press, refusing on `.menu` only
+with `menuUnitWordRenameUnfinished`. REJECTED: greying on the record FILE
+alone, which held both ways greyed for good behind a stale record, since a
+greyed way never reaches the runner that would clear it (the implementation
+review's finding 1). A rename to "Module" that
 stopped part way leaves "Module 3" pages the planner cannot read, so a new unit
 would have been "Unit 3, Day 1" beside "Module 3, Day 2". The first way keeps
 Add Next Class's rule, which never waited for a rename: a known limit, left as
-it was. The facts are read with the " — Edited" marker (on showing, on coming
-forward, after each function), never per drawing of the menu
-(`SectionVerbs.classFacts`).
+it was.
+
+**A write that fails part way** (the disk full, say) removes the file it
+created, which no other program can own, since `.withoutOverwriting` refused
+any page already there; only `fileWriteFileExists` is answered "already
+there" (the implementation review's finding 11).
 
 REJECTED: one menu item per way (ruled earlier the same evening, then
 replaced); keeping Add Next Class beside Add Class…; the ways on the row's

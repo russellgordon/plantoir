@@ -2425,17 +2425,44 @@ nonisolated enum AssistWording {
     }
 
     /// The first way: what Add Next Class did. In a numbered course (a club)
-    /// there are no units, and the line says only "the next".
-    static func menuAddClassNextInThisUnit(noun: ClassNoun = .class, numbered: Bool = false) -> String {
+    /// there are no units, and the line says only "the next". `unit` is the
+    /// course's own word, as a teacher reads it in a sentence ("module" in a
+    /// course that calls its units modules; #897a review, finding 10).
+    static func menuAddClassNextInThisUnit(
+        noun: ClassNoun = .class, unit: String = "unit", numbered: Bool = false
+    ) -> String {
         if numbered {
             return "As the next \(noun.singular)"
         }
-        return "As the next \(noun.singular) in the unit under way"
+        return "As the next \(noun.singular) in the \(unit) under way"
     }
 
-    /// The second way: Unit 5, Day 1 after Unit 4.
-    static func menuAddClassInANewUnit(noun: ClassNoun = .class) -> String {
-        return "In a new unit, as its first \(noun.singular)"
+    /// The second way: Unit 5, Day 1 after Unit 4, in the course's word.
+    static func menuAddClassInANewUnit(noun: ClassNoun = .class, unit: String = "unit") -> String {
+        return "In a new \(unit), as its first \(noun.singular)"
+    }
+
+    /// Under the ways: why one is greyed, in a sentence a teacher can act on
+    /// (`SubjectMenuRules.AddClassGreyedBecause`, #897a review, finding 1).
+    static func menuAddClassGreyedNoUnits(noun: ClassNoun = .class) -> String {
+        return "This course numbers its \(noun.plural) one after another, without units, so there is "
+             + "no new unit to start."
+    }
+
+    static func menuAddClassGreyedNothingToCopy(noun: ClassNoun = .class) -> String {
+        return "This section has no \(noun.singular) pages yet, so there is nothing to copy."
+    }
+
+    static func menuAddClassGreyedRenameUnfinished(noun: ClassNoun = .class, unit: String = "unit") -> String {
+        return "A rename of what this course calls a \(unit) stopped part way, so some \(noun.plural) "
+             + "are named the old way. Finish the rename in the course's settings to add a new \(unit) "
+             + "or a copy."
+    }
+
+    /// A copy asked for after the section's class dates went missing.
+    static func menuNeedsClassDatesFirst(noun: ClassNoun = .class) -> String {
+        return "This section has no \(noun.singular) dates on file, so nothing was copied. Add them "
+             + "with Section ▸ Class Dates…, then try again."
     }
 
     /// The third way: a copy of one of this section's classes.

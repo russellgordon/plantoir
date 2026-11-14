@@ -259,15 +259,133 @@ final class DuplicateAsNextClassTests: XCTestCase {
         XCTAssertEqual(duplicate.summary, AssistWording.menuUnitWordRenameUnfinished())
         XCTAssertEqual(DuplicateAsNextClassTests.everyPage(in: made.course), before)
 
-        // And the sheet greys both ways on the cheap fact, while Add Class…
-        // itself, and its next class in this unit, stay as Add Next Class was.
-        let facts: SectionVerbs.ClassFacts = SectionVerbs.classFacts(forSection: 1, in: made.course)
+        // And the sheet, opening, greys both ways and says why, while Add
+        // Class… itself, and its next class in this unit, stay as Add Next
+        // Class was.
+        let facts: SubjectMenuRules.AddClassFacts = SectionVerbs.addClassFacts(forSection: 1, in: made.course)
         XCTAssertTrue(facts.unitWordRenameUnfinished)
-        var situation: SubjectMenuRules.Situation = DuplicateAsNextClassTests.idleSection()
-        situation.unitWordRenameUnfinished = facts.unitWordRenameUnfinished
-        situation.hasAClassPage = facts.hasAClassPage
-        XCTAssertEqual(SubjectMenuRules.addClassWays(situation), [.nextInThisUnit])
-        XCTAssertTrue(SubjectMenuRules.enabledItems(situation).contains(.addClass))
+        XCTAssertEqual(SubjectMenuRules.addClassWays(facts), [.nextInThisUnit])
+        XCTAssertEqual(SubjectMenuRules.whyGreyed(.inANewUnit, facts), .aRenameIsUnfinished)
+        XCTAssertTrue(SubjectMenuRules.enabledItems(DuplicateAsNextClassTests.idleSection()).contains(.addClass))
+    }
+
+    /// The implementation review's finding 1: a rename record left behind
+    /// by a rename that FINISHED (its `from` is no longer the course's word)
+    /// is not an unfinished rename. The sheet reads the rename's own
+    /// judgement as it opens, which clears the record, so both ways are
+    /// offered — where greying on the record file held them greyed for good.
+    func testAStaleRenameRecordGreysNothing() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try DuplicateAsNextClassTests.writeClass("Unit 1, Day 1", on: "2026-09-08", in: made.course)
+        try UnitWordRenamer.recordRenameStarting(from: "Module", to: "Unit", courseDirectory: made.course.directoryURL)
+        let record: URL = UnitWordRenamer.renameMarkerURL(courseDirectory: made.course.directoryURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: record.path), "the fixture wrote no record")
+
+        let facts: SubjectMenuRules.AddClassFacts = SectionVerbs.addClassFacts(forSection: 1, in: made.course)
+        XCTAssertFalse(facts.unitWordRenameUnfinished)
+        XCTAssertEqual(SubjectMenuRules.addClassWays(facts), [.nextInThisUnit, .inANewUnit, .asACopyOfAClass])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "the stale record was not cleared")
+    }
+
+    /// The implementation review's finding 8: a working folder opened
+    /// through a link. The class folders are listed with the link resolved,
+    /// so a comparison of the two spellings found no page and every copy was
+    /// refused. Both sides are now in the disk's own spelling.
+    func testACourseReachedThroughALinkCanBeCopied() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try DuplicateAsNextClassTests.rememberTimetable(["2026-09-08", "2026-09-10"], in: made.course)
+        try DuplicateAsNextClassTests.writeClass("Unit 1, Day 1", on: "2026-09-08", in: made.course)
+        let link: URL = FileManager.default.temporaryDirectory.appendingPathComponent("assist-link-\(UUID().uuidString)")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: made.root)
+        defer {
+            try? FileManager.default.removeItem(at: link)
+        }
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.chooseWorkspace(at: link)
+        var found: Course? = nil
+        for candidate in workspace.courses where candidate.code == "ICS3U" {
+            found = candidate
+        }
+        let linked: Course = try XCTUnwrap(found)
+        XCTAssertTrue(linked.directoryURL.path.hasPrefix(link.path), "the course was not reached through the link")
+        let runner: AssistToolRunner = AssistToolRunner(
+            workspace: workspace, siteWork: StubSiteWork(),
+            today: { return CalendarDay(year: 2026, month: 9, day: 8)! },
+            launchControl: SilentLaunchControl(), openMainWindow: nil, surface: .menu
+        )
+        let rows: [SectionVerbSheetModel.SourceRow] = SectionVerbSheetModel.sourceRows(course: linked, sectionNumber: 1)
+        XCTAssertEqual(rows.first?.path, "section1/All Classes/Unit 1, Day 1.md")
+        let said: AssistToolOutcome = await runner.run(call: SectionVerbs.duplicateAsNextClass(
+            course: "ICS3U", section: 1, sourcePath: try XCTUnwrap(rows.first?.path), planning: false
+        ))
+        XCTAssertEqual(said.summary, AssistWording.duplicatedFromTheMenu(
+            page: "Unit 1, Day 1", as: "Unit 1, Day 2", on: "2026-09-10"
+        ))
+    }
+
+    /// The implementation review's finding 7: the tallest Add Class… sheet
+    /// (a club, so a line says why the new unit is greyed; the copy chosen;
+    /// forty classes to choose from) fits the 620 pt a 13-inch screen
+    /// allows. Deferred: it lays the sheet out, as its neighbour
+    /// `PageTablesSheetTests.testTheTallestPickerStaysOnTheScreen` does.
+    func testTheTallestAddClassSheetStaysOnTheScreen() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .addClass, course: made.course, sectionNumber: 1,
+            title: AssistWording.menuAddClassTitle(course: "ICS3U", section: "1"), item: .addClass
+        )
+        model.addClassFacts = SubjectMenuRules.AddClassFacts(
+            classPagesAreNumbered: true, unitWordRenameUnfinished: false, hasAClassPage: true
+        )
+        model.way = .asACopyOfAClass
+        for number in 1...40 {
+            model.sourceRows.append(SectionVerbSheetModel.SourceRow(
+                path: "section1/All Classes/Week \(number).md", title: "Week \(number)",
+                date: CalendarDay(year: 2026, month: 9, day: 8)
+            ))
+        }
+        XCTAssertEqual(model.greyedReasons.count, 1)
+        let height: CGFloat = PageTablesSheetTests.fittingSize(
+            of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
+        ).height
+        XCTAssertLessThanOrEqual(height, CopyPageChecklist.tallestSheet, "the tallest Add Class sheet is \(height) pt")
+        print("DuplicateAsNextClassTests: tallest Add Class sheet \(height) pt against \(CopyPageChecklist.tallestSheet)")
+    }
+
+    /// The implementation review's finding 13: a chosen class the search
+    /// hides is let go, so Continue cannot copy a row nobody can see.
+    func testASearchThatHidesTheChosenClassLetsItGo() throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .addClass, course: made.course, sectionNumber: 1, title: "", item: .addClass
+        )
+        model.addClassFacts = SubjectMenuRules.AddClassFacts(
+            classPagesAreNumbered: false, unitWordRenameUnfinished: false, hasAClassPage: true
+        )
+        model.way = .asACopyOfAClass
+        model.sourceRows = [
+            SectionVerbSheetModel.SourceRow(path: "section1/All Classes/Unit 1, Day 1.md", title: "Unit 1, Day 1", date: nil),
+            SectionVerbSheetModel.SourceRow(path: "section1/All Classes/Field Trip.md", title: "Field Trip", date: nil),
+        ]
+        model.chosenSource = "section1/All Classes/Field Trip.md"
+        XCTAssertTrue(model.defaultButtonIsEnabled)
+        model.searchTheSources(for: "Field")
+        XCTAssertEqual(model.chosenSource, "section1/All Classes/Field Trip.md")
+        model.searchTheSources(for: "Unit")
+        XCTAssertNil(model.chosenSource)
+        XCTAssertFalse(model.defaultButtonIsEnabled)
     }
 
     // MARK: - The menu's duplicate, beyond the contract
@@ -331,11 +449,11 @@ final class DuplicateAsNextClassTests: XCTestCase {
         defer {
             try? FileManager.default.removeItem(at: made.root)
         }
-        XCTAssertEqual(SectionVerbs.classFacts(forSection: 1, in: made.course), SectionVerbs.ClassFacts())
+        XCTAssertEqual(SectionVerbs.addClassFacts(forSection: 1, in: made.course), SubjectMenuRules.AddClassFacts())
         try DuplicateAsNextClassTests.writeClass("Unit 1, Day 1", on: "2026-09-08", in: made.course)
-        XCTAssertTrue(SectionVerbs.classFacts(forSection: 1, in: made.course).hasAClassPage)
+        XCTAssertTrue(SectionVerbs.addClassFacts(forSection: 1, in: made.course).hasAClassPage)
         try AssistFixture.setClubNaming(.meeting, in: made.course)
-        XCTAssertTrue(SectionVerbs.classFacts(forSection: 1, in: made.course).classPagesAreNumbered)
+        XCTAssertTrue(SectionVerbs.addClassFacts(forSection: 1, in: made.course).classPagesAreNumbered)
     }
 
     /// Each item is on the trail by where it is in the menus, never by its
@@ -346,11 +464,20 @@ final class DuplicateAsNextClassTests: XCTestCase {
 
     /// `subjectMenus.addClassSheet`: the ways in the contract's order are
     /// the app's, each names a sentence, and every case offers exactly the
-    /// ways it says — so a way added on one side alone fails here.
+    /// ways it says and greys the rest for the reason it says — so a way or
+    /// a reason added on one side alone fails here.
     func testTheAddClassWaysAreTheContracts() throws {
         let section: [String: Any] = try SubjectMenuRulesTests.section()
-        let defaults: [String: Any] = try XCTUnwrap(section["situationDefaults"] as? [String: Any])
         let sheet: [String: Any] = try XCTUnwrap(section["addClassSheet"] as? [String: Any])
+        let defaults: [String: Any] = try XCTUnwrap(sheet["factDefaults"] as? [String: Any])
+        let keys: [String: Any] = try XCTUnwrap(sheet["factKeys"] as? [String: Any])
+        XCTAssertEqual(Set(keys.keys), Set(defaults.keys))
+        let reasons: [String: String] = try XCTUnwrap(sheet["greyedBecause"] as? [String: String])
+        var appReasons: Set<String> = []
+        for reason in SubjectMenuRules.AddClassGreyedBecause.allCases {
+            appReasons.insert(reason.rawValue)
+        }
+        XCTAssertEqual(Set(reasons.keys), appReasons)
         var contractWays: [String] = []
         for way in try XCTUnwrap(sheet["ways"] as? [[String: Any]]) {
             contractWays.append(try XCTUnwrap(way["way"] as? String))
@@ -362,17 +489,31 @@ final class DuplicateAsNextClassTests: XCTestCase {
         }
         XCTAssertEqual(contractWays, appWays)
         let cases: [[String: Any]] = try XCTUnwrap(sheet["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 5)
+        XCTAssertGreaterThanOrEqual(cases.count, 6)
         for testCase in cases {
             let why: String = try XCTUnwrap(testCase["why"] as? String)
-            let situation: SubjectMenuRules.Situation = try SubjectMenuRulesTests.situation(
-                from: try XCTUnwrap(testCase["situation"] as? [String: Any]), defaults: defaults
+            var merged: [String: Any] = defaults
+            for (key, value) in try XCTUnwrap(testCase["facts"] as? [String: Any]) {
+                XCTAssertNotNil(defaults[key], "a fact with no default: \(key)")
+                merged[key] = value
+            }
+            let facts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts(
+                classPagesAreNumbered: try XCTUnwrap(merged["classPagesAreNumbered"] as? Bool),
+                unitWordRenameUnfinished: try XCTUnwrap(merged["unitWordRenameUnfinished"] as? Bool),
+                hasAClassPage: try XCTUnwrap(merged["hasAClassPage"] as? Bool)
             )
             var offered: [String] = []
-            for way in SubjectMenuRules.addClassWays(situation) {
+            for way in SubjectMenuRules.addClassWays(facts) {
                 offered.append(way.rawValue)
             }
             XCTAssertEqual(offered, try XCTUnwrap(testCase["ways"] as? [String]), why)
+            var greyed: [String: String] = [:]
+            for way in SubjectMenuRules.AddClassWay.allCases {
+                if let reason = SubjectMenuRules.whyGreyed(way, facts) {
+                    greyed[way.rawValue] = reason.rawValue
+                }
+            }
+            XCTAssertEqual(greyed, try XCTUnwrap(testCase["greyed"] as? [String: String]), why)
         }
     }
 
@@ -381,12 +522,19 @@ final class DuplicateAsNextClassTests: XCTestCase {
     func testEachWayHasItsLine() {
         for way in SubjectMenuRules.AddClassWay.allCases {
             for numbered in [false, true] {
-                let line: String = SectionVerbSheet.label(of: way, noun: .meeting, numbered: numbered)
+                let line: String = SectionVerbSheet.label(of: way, noun: .meeting, unit: "module", numbered: numbered)
                 XCTAssertFalse(line.isEmpty)
                 XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(line), line)
+                XCTAssertFalse(line.contains("unit"), "the course's word is module: \(line)")
             }
         }
-        XCTAssertFalse(SectionVerbSheet.label(of: .nextInThisUnit, noun: .meeting, numbered: true).contains("unit"))
+        XCTAssertFalse(
+            SectionVerbSheet.label(of: .nextInThisUnit, noun: .meeting, unit: "unit", numbered: true).contains("unit")
+        )
+        for reason in SubjectMenuRules.AddClassGreyedBecause.allCases {
+            let sentence: String = SectionVerbSheet.sentence(for: reason, noun: .class, unit: "unit")
+            XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(sentence), sentence)
+        }
     }
 
     // MARK: - The surface the local model is shown

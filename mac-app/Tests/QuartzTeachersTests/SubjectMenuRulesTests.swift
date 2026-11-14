@@ -52,9 +52,6 @@ final class SubjectMenuRulesTests: XCTestCase {
         situation.canGoForward = try XCTUnwrap(merged["canGoForward"] as? Bool)
         situation.deployedFolderReady = try XCTUnwrap(merged["deployedFolderReady"] as? Bool)
         situation.deployedFolderShown = try XCTUnwrap(merged["deployedFolderShown"] as? Bool)
-        situation.classPagesAreNumbered = try XCTUnwrap(merged["classPagesAreNumbered"] as? Bool)
-        situation.unitWordRenameUnfinished = try XCTUnwrap(merged["unitWordRenameUnfinished"] as? Bool)
-        situation.hasAClassPage = try XCTUnwrap(merged["hasAClassPage"] as? Bool)
         return situation
     }
 

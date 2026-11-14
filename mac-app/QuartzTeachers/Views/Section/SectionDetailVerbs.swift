@@ -118,12 +118,6 @@ extension SectionDetailView {
         if item == .undoLastChange {
             return lastMenuChangeIsHere
         }
-        // #897: the menu greys Add Class… on facts read a moment ago; asked
-        // again here. An unfinished unit-word rename is checked in full by
-        // the runner, which answers with a sentence rather than a beep.
-        if item == .addClass && addClassWaysNow().isEmpty {
-            return false
-        }
         return true
     }
 
@@ -196,7 +190,7 @@ extension SectionDetailView {
                 ),
                 item: item
             )
-            model.availableWays = addClassWaysNow()
+            model.addClassFacts = SectionVerbs.addClassFacts(forSection: sectionNumber, in: course)
             model.way = model.availableWays.first
             model.sourceRows = SectionVerbSheetModel.sourceRows(course: course, sectionNumber: sectionNumber)
             verbSheet = model
@@ -244,17 +238,6 @@ extension SectionDetailView {
         }
         verbSheet = model
         return true
-    }
-
-    /// Add Class…'s ways for this section now (#897), from facts read fresh
-    /// at the click rather than the ones the menu was drawn with.
-    func addClassWaysNow() -> [SubjectMenuRules.AddClassWay] {
-        let facts: SectionVerbs.ClassFacts = SectionVerbs.classFacts(forSection: sectionNumber, in: course)
-        var situation: SubjectMenuRules.Situation = SubjectMenuRules.Situation()
-        situation.classPagesAreNumbered = facts.classPagesAreNumbered
-        situation.unitWordRenameUnfinished = facts.unitWordRenameUnfinished
-        situation.hasAClassPage = facts.hasAClassPage
-        return SubjectMenuRules.addClassWays(situation)
     }
 
     /// Undo Last Change and Rebuild Preview: no plan, so they

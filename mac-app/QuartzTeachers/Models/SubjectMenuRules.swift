@@ -196,18 +196,35 @@ nonisolated enum SubjectMenuRules {
         var deployedFolderReady: Bool = false
         /// This app is showing the selected section's deployed folder.
         var deployedFolderShown: Bool = false
-        /// The selected section's course names its class pages with one
-        /// number ("Week 3", a club, #267): it has no units, so a new unit
-        /// cannot be started in it (#897, Add Class…).
+    }
+
+    /// What Add Class…'s sheet decides its ways from (#897), read when the
+    /// sheet OPENS (`SectionVerbs.addClassFacts`), never per drawing of the
+    /// menu: the item itself is live wherever Add Next Class was, because its
+    /// first way always is. In the contract as
+    /// `subjectMenus.addClassSheet.factDefaults`.
+    struct AddClassFacts: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        /// The course names its class pages with one number ("Week 3", a
+        /// club, #267): it has no units.
         var classPagesAreNumbered: Bool = false
-        /// A rename of the course's unit word stopped part way: the record
-        /// a rename leaves is on disk (`UnitWordRenamer.renameMarkerURL`).
-        /// Pages under the new word do not read under the old one, so the
-        /// highest unit would be read too low (#897).
+        /// A rename of the course's unit word stopped part way, as the
+        /// rename itself judges it (`UnitWordRenamer.interruptedRenameTarget`,
+        /// which clears a stale record). Pages under the new word do not
+        /// read under the old one, so the highest unit would be read too low.
         var unitWordRenameUnfinished: Bool = false
-        /// The selected section has at least one page in its class folders,
-        /// so Add Class… can offer a copy of one (#897).
+        /// The section has at least one page in its class folders.
         var hasAClassPage: Bool = false
+    }
+
+    /// Why a way is greyed in Add Class…'s sheet, said under the ways in a
+    /// sentence a teacher can act on (`AssistWording.menuAddClassGreyed…`).
+    enum AddClassGreyedBecause: String, CaseIterable, Sendable {
+        case theCourseHasNoUnits
+        case thereIsNoClassToCopy
+        case aRenameIsUnfinished
     }
 
     // MARK: - Functions
@@ -369,11 +386,10 @@ nonisolated enum SubjectMenuRules {
                 enabled.insert(.publishPages)
                 enabled.insert(.hidePages)
                 enabled.insert(.publishClassForADate)
-                // #897: live when its sheet has a way to offer, which is
-                // always, since the next class in this unit always is.
-                if !addClassWays(situation).isEmpty {
-                    enabled.insert(.addClass)
-                }
+                // #897: live wherever Add Next Class was, since its sheet's
+                // first way is exactly Add Next Class. Which other ways the
+                // sheet offers is `addClassWays`, decided when it opens.
+                enabled.insert(.addClass)
                 enabled.insert(.reDateClasses)
                 enabled.insert(.makeRoomForClasses)
                 enabled.insert(.classDates)
@@ -411,7 +427,7 @@ nonisolated enum SubjectMenuRules {
         return enabled
     }
 
-    /// The ways Add Class…'s sheet can use in `situation`, in the sheet's
+    /// The ways Add Class…'s sheet can use, in the sheet's
     /// order (#897). The next class in this unit always, exactly as Add Next
     /// Class was. Not in a new unit in a numbered course: it has no units,
     /// and the tool would refuse in the conversation's words. Not as a copy
@@ -419,23 +435,37 @@ nonisolated enum SubjectMenuRules {
     /// rename is unfinished: the planner reads only the pages named the old
     /// way. (The next class in this unit keeps Add Next Class's rule, which
     /// did not wait for one; that is a known limit, not changed here.)
-    static func addClassWays(_ situation: Situation) -> [AddClassWay] {
+    static func addClassWays(_ facts: AddClassFacts) -> [AddClassWay] {
         var ways: [AddClassWay] = []
-        for way in AddClassWay.allCases {
-            switch way {
-            case .nextInThisUnit:
-                ways.append(way)
-            case .inANewUnit:
-                if !situation.classPagesAreNumbered && !situation.unitWordRenameUnfinished {
-                    ways.append(way)
-                }
-            case .asACopyOfAClass:
-                if situation.hasAClassPage && !situation.unitWordRenameUnfinished {
-                    ways.append(way)
-                }
-            }
+        for way in AddClassWay.allCases where whyGreyed(way, facts) == nil {
+            ways.append(way)
         }
         return ways
+    }
+
+    /// Why `way` cannot be chosen, or nil when it can. One reason per way,
+    /// the first that applies: a club has no units before anything else.
+    static func whyGreyed(_ way: AddClassWay, _ facts: AddClassFacts) -> AddClassGreyedBecause? {
+        switch way {
+        case .nextInThisUnit:
+            return nil
+        case .inANewUnit:
+            if facts.classPagesAreNumbered {
+                return .theCourseHasNoUnits
+            }
+            if facts.unitWordRenameUnfinished {
+                return .aRenameIsUnfinished
+            }
+            return nil
+        case .asACopyOfAClass:
+            if !facts.hasAClassPage {
+                return .thereIsNoClassToCopy
+            }
+            if facts.unitWordRenameUnfinished {
+                return .aRenameIsUnfinished
+            }
+            return nil
+        }
     }
 
     /// The menu item the Delete key asks for on the selected sidebar row,
