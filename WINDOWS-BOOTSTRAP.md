@@ -71,8 +71,9 @@ pieces into `dev`; a cut still starts with him asking.
    Write-ups for work that already shipped on this port are in
    `documentation/13-windows-port-archive.md` — history, not a specification.
 4. **`contracts/README.md`**, then the eleven JSON files. The coverage table
-   there says what is shared and what deliberately is not. Three of the ten are
-   GENERATED from the mac and must never be hand-edited; the other seven are
+   there says what is shared and what deliberately is not. Three of the eleven
+   are GENERATED from the mac and one (`undo-traces.json`) by
+   `scripts/make_undo_traces.py`, and none of those four is hand-edited; the other seven are
    authored and can be corrected from either side — `contracts/README.md` says
    which is which.
 5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed up to

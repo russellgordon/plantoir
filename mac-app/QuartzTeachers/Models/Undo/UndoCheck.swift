@@ -496,8 +496,10 @@ nonisolated enum UndoOutcome: Equatable, Sendable {
     /// above the head something this version cannot read: greyed, plain
     /// "Undo", nothing said (ruling 10; the director's ruling 1).
     case notAvailable
-    /// Refused, nothing written. For a step whose page was changed by hand,
-    /// `clearedTheList` is true (ruling 13).
+    /// Refused, nothing written to the pages. For an Undo whose page was
+    /// changed by hand, `clearedTheList` is true (ruling 13); for a Redo
+    /// refused the same way, only the redo branch is dropped (ruling 20) and
+    /// it is false.
     case refused(UndoRefusal, clearedTheList: Bool)
     /// The list itself could not be read or written.
     case listUnavailable
@@ -506,18 +508,18 @@ nonisolated enum UndoOutcome: Equatable, Sendable {
 }
 
 /// Why the whole list was cleared: the `reason` of a `cleared` line.
+///
+/// Two reasons, and only two. A deploy and sharing unit plans are not on the
+/// list and clear nothing (rulings 17 and 18, which replaced 14 and 16):
+/// whether a step was deployed since is read from the deploy markers when
+/// Undo is offered (`UndoWebsite`), never written into the journal.
 nonisolated enum UndoClearing: String, Sendable, CaseIterable {
     /// Undo refused the newest step because what it changed was changed by
     /// hand since (ruling 13).
     case changedSince
-    /// A deploy happened: it cannot be undone and cuts the list off
-    /// (ruling 14, which replaced ruling 1).
-    case deploy
-    /// Unit plans were shared: the same as a deploy (ruling 16).
-    case shareUnitPlans
-    /// A step's process died part way and a file changed by hand stopped
-    /// recovery putting the step wholly back (the director's ruling 7 on
-    /// U1's review).
+    /// A step's process died part way and recovery could not put the step
+    /// wholly back (the director's ruling 7 on U1's first reviews, and 4 on
+    /// its second).
     case interrupted
 }
 
@@ -540,30 +542,6 @@ nonisolated extension UndoJournal {
         recompute: (UndoOp, URL) -> Void = { _, _ in }
     ) -> UndoOutcome {
         return move(.forward, resolveRoot: resolveRoot, recompute: recompute)
-    }
-
-    /// Clears the whole list for a reason: nothing before this can be undone
-    /// or redone. The line's `seq` is the highest step number in the journal
-    /// when it is written, read or not.
-    func clearTheList(because reason: UndoClearing) throws {
-        try withLock { writer in
-            UndoJournal.appendClearing(reason, writer)
-            UndoPruning.prune(writer)
-        }
-    }
-
-    /// Appends a clearing when anything is on the list to clear.
-    static func appendClearing(_ reason: UndoClearing, _ writer: UndoJournalWriter) {
-        var hasAnything: Bool = false
-        for record in writer.fold.stepsOnTheList {
-            if !record.phase.isInFlight || UndoFold.clearingTakesStepsBegunBeforeIt {
-                hasAnything = true
-            }
-        }
-        if !hasAnything {
-            return
-        }
-        try? writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason.rawValue))
     }
 
     /// What Undo or Redo would act on now: for the menu, which greys the
@@ -616,16 +594,15 @@ nonisolated extension UndoJournal {
 
         // 2. Check every op, writing nothing.
         let plan: UndoPlan = UndoCheck.plan(record.step.ops, direction: direction, root: root, journal: self)
+        if UndoKillPoints.stopsHere(.afterTheCheck) {
+            return .stoppedByATest
+        }
         guard case .ready(let targets, let recomputes) = plan else {
             if case .refused(let refusal) = plan {
                 if refusal == .notReadable {
                     return .notAvailable
                 }
-                var cleared: Bool = false
-                if direction == .backward, case .changedSince = refusal {
-                    cleared = (try? clearAfterARefusal(of: seq)) == true
-                }
-                return .refused(refusal, clearedTheList: cleared)
+                return .refused(refusal, clearedTheList: answerARefusal(refusal, of: seq, direction: direction))
             }
             return .listUnavailable
         }
@@ -658,13 +635,9 @@ nonisolated extension UndoJournal {
         switch UndoSwap.swap(targets, label: label) {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
-            var cleared: Bool = false
-            if direction == .backward, case .changedSince = refusal {
-                // Caught at the swap rather than the check: the same hand
-                // edit, so the same answer (ruling 13; the core review's M2).
-                cleared = (try? clearAfterARefusal(of: seq)) == true
-            }
-            return .refused(refusal, clearedTheList: cleared)
+            // Caught at the swap rather than the check: the same hand edit,
+            // so the same answer (rulings 13 and 20; the core review's M2).
+            return .refused(refusal, clearedTheList: answerARefusal(refusal, of: seq, direction: direction))
         case .stoppedByATest:
             return .stoppedByATest
         case .swapped:
@@ -678,6 +651,35 @@ nonisolated extension UndoJournal {
         }
         JournaledWrite.finish(seq: seq, with: ending, phase: nil, reason: nil, in: self, mode: .live)
         return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
+    }
+
+    /// What a refusal because the page was changed by hand does to the list:
+    /// an Undo clears it (ruling 13), a Redo drops only the redo branch
+    /// (ruling 20). Any other refusal (a file in use, missing content)
+    /// leaves the list as it was, to be tried again. True when it cleared.
+    private func answerARefusal(_ refusal: UndoRefusal, of seq: Int, direction: UndoDirection) -> Bool {
+        guard case .changedSince = refusal else {
+            return false
+        }
+        if direction == .backward {
+            return (try? clearAfterARefusal(of: seq)) == true
+        }
+        try? dropTheRedoBranchAfterARefusal(of: seq)
+        return false
+    }
+
+    /// Ruling 20: the refused step is still the one Redo offers, so it and
+    /// every undone step above it are dropped, and Redo has nothing until
+    /// the next undo. Undo is untouched.
+    private func dropTheRedoBranchAfterARefusal(of seq: Int) throws {
+        try withLock { writer in
+            guard writer.fold.offer(now: now()).redoCandidate?.step.seq == seq else {
+                return
+            }
+            for record in writer.fold.stepsOnTheList where record.phase == .undone && record.step.seq >= seq {
+                try writer.append(UndoEventLine(seq: record.step.seq, event: .dropped, reason: "redoRefused"))
+            }
+        }
     }
 
     /// Ruling 13: the refused step is still the head, so the list is cleared.

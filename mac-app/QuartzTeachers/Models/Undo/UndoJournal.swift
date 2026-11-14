@@ -110,13 +110,28 @@ nonisolated final class UndoJournal: @unchecked Sendable {
         defer {
             writer.close()
         }
-        for pending in UndoFoldCache.takePendingClosings(for: folderURL) {
+        let pendingClosings: [UndoEventLine] = UndoFoldCache.takePendingClosings(for: folderURL)
+        var index: Int = 0
+        while index < pendingClosings.count {
+            let pending: UndoEventLine = pendingClosings[index]
             if writer.fold.records[pending.seq]?.phase.isInFlight == true {
-                if pending.event == UndoEventKind.applied.rawValue {
-                    JournaledWrite.dropTheRedoBranch(below: pending.seq, writer)
+                do {
+                    if pending.event == UndoEventKind.applied.rawValue {
+                        JournaledWrite.dropTheRedoBranch(below: pending.seq, writer)
+                    }
+                    try writer.append(pending)
+                } catch {
+                    // Kept for the next lock, this one and every one after
+                    // it (the core review's second MINOR 2).
+                    var rest: Int = index
+                    while rest < pendingClosings.count {
+                        UndoFoldCache.keepPendingClosing(pendingClosings[rest], for: folderURL)
+                        rest += 1
+                    }
+                    throw error
                 }
-                try writer.append(pending)
             }
+            index += 1
         }
         let result: Result = try body(writer)
         try writer.syncIfWritten()
@@ -339,6 +354,7 @@ nonisolated enum UndoFoldCache {
                 entry.tails[number] = nil
                 entry.lineCounts[number] = nil
                 entry.fileNumbers[number] = nil
+                entry.fold.forgetSegment(number)
             }
             readingOn = true
         } else {
@@ -581,7 +597,17 @@ nonisolated final class UndoJournalWriter {
         openSegment = nil
     }
 
-    /// Stores content as an immutable blob named by its SHA-256.
+    /// Forgets a segment this writer has just deleted from the oldest end.
+    func forgetSegment(_ number: Int) {
+        fold.forgetSegment(number)
+    }
+
+    /// Stores content as an immutable blob named by its SHA-256: written
+    /// under a temporary name and renamed onto its own with a rename that
+    /// fails if the name exists. Where the volume has no such rename (exFAT
+    /// answers ENOTSUP: the core review's second MINOR 3), the name itself
+    /// is made with an exclusive create and written whole; a blob that does
+    /// not hash to its name is treated as missing and written again.
     @discardableResult
     func writeBlob(_ data: Data) throws -> String {
         let sha: String = UndoHash.sha256(of: data)
@@ -610,6 +636,19 @@ nonisolated final class UndoJournalWriter {
                 }
                 try? FileManager.default.removeItem(at: finalURL)
                 return try writeBlob(data)
+            }
+            if failure == ENOTSUP || failure == EINVAL {
+                do {
+                    try UndoFiles.writeDurably(data, to: finalURL)
+                } catch UndoJournalError.couldNotStoreContent(let reason) where reason == EEXIST {
+                    if journal.readBlob(sha: sha) != nil {
+                        return sha
+                    }
+                    try? FileManager.default.removeItem(at: finalURL)
+                    try UndoFiles.writeDurably(data, to: finalURL)
+                }
+                UndoFiles.syncFolder(folder)
+                return sha
             }
             throw UndoJournalError.couldNotStoreContent(failure)
         }
@@ -770,16 +809,20 @@ nonisolated enum UndoFiles {
 /// whole), and where it has none (exFAT, FAT, many SMB shares: the core
 /// review's I2) an exclusive create of the name, written in one write. A file
 /// that holds no identifier never blocks for good: one that is not empty, or
-/// that has been empty for more than two seconds (a creator that died
-/// between creating it and writing it), is set aside under a new name and a
-/// new identifier made. One empty and younger than that is a creator at
-/// work: not yet, and the next attempt reads its identifier.
+/// that has been empty for more than ten seconds (a creator that died
+/// between creating it and writing it; ten, not two, because FAT keeps a
+/// modification time to two seconds: the core review's second MINOR 4), is
+/// set aside under a new name and a new identifier made. One empty and
+/// younger than that is a creator at work: not yet, and the next attempt
+/// reads its identifier. Setting aside never takes a good identifier: the
+/// file must still be the one inspected, and a file found to hold one once
+/// it is aside is put back (the contract review's second MINOR 6).
 nonisolated enum UndoIdentifierFile {
 
     // MARK: - Stored properties
 
     /// How long an empty file may be a creator at work.
-    static let emptyFileGraceSeconds: Double = 2.0
+    static let emptyFileGraceSeconds: Double = 10.0
 
     // MARK: - Functions
 
@@ -795,7 +838,10 @@ nonisolated enum UndoIdentifierFile {
             if size == 0 && Date().timeIntervalSince(changed) < emptyFileGraceSeconds {
                 throw UndoJournalError.identifierBeingMade
             }
-            setAside(url)
+            let inspected: UInt64 = UndoFoldCache.fileNumber(of: url)
+            if let good = setAside(url, ifStillFileNumber: inspected) {
+                return good
+            }
         }
         let identifier: String = UUID().uuidString.lowercased()
         let contents: Data = Data((identifier + "\n").utf8)
@@ -851,10 +897,34 @@ nonisolated enum UndoIdentifierFile {
         return parsed.uuidString.lowercased()
     }
 
-    /// Moves a file that holds no identifier out of the way, keeping it.
-    static func setAside(_ url: URL) {
+    /// Moves a file that holds no identifier out of the way, keeping it,
+    /// only while it is still the file inspected. If what was moved turns
+    /// out to hold an identifier after all (another process made it between
+    /// the look and the move), it is put back where nothing has taken its
+    /// place since, and that identifier is the answer.
+    static func setAside(_ url: URL, ifStillFileNumber inspected: UInt64) -> String? {
+        if inspected == 0 || UndoFoldCache.fileNumber(of: url) != inspected {
+            return read(at: url)
+        }
         let asideURL: URL = url.deletingLastPathComponent()
             .appendingPathComponent(url.lastPathComponent + ".unreadable-" + UUID().uuidString.lowercased())
-        try? FileManager.default.moveItem(at: url, to: asideURL)
+        if (try? FileManager.default.moveItem(at: url, to: asideURL)) == nil {
+            return read(at: url)
+        }
+        guard let identifier = read(at: asideURL) else {
+            return nil
+        }
+        let putBack: Int32 = asideURL.withUnsafeFileSystemRepresentation { from in
+            return url.withUnsafeFileSystemRepresentation { to in
+                guard let from, let to else {
+                    return -1
+                }
+                return renamex_np(from, to, UInt32(RENAME_EXCL))
+            }
+        }
+        if putBack == 0 {
+            return identifier
+        }
+        return read(at: url)
     }
 }

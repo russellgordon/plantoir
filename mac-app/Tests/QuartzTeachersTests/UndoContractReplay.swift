@@ -293,15 +293,17 @@ nonisolated enum UndoContractReplay {
                         if others != int(call["others"]) {
                             failures.append("\(where_): \(others) others, not \(int(call["others"]) ?? -1)")
                         }
-                        if !cleared {
-                            failures.append("\(where_): the refusal did not clear the list (ruling 13)")
+                        if kind == "undo" && !cleared {
+                            failures.append("\(where_): the refused undo did not clear the list (ruling 13)")
+                        }
+                        if kind == "redo" && cleared {
+                            failures.append("\(where_): the refused redo cleared the list (ruling 20 drops only the redo)")
                         }
                     }
                 case "handEdit":
                     try handEdit(string(call["kind"]) ?? "", at: pathOfPage[string(call["page"]) ?? ""] ?? "", in: root)
-                case "clear":
-                    let reason: UndoClearing = UndoClearing(rawValue: string(call["reason"]) ?? "") ?? .deploy
-                    try journal.clearTheList(because: reason)
+                case "note":
+                    try appendNote(to: journal)
                 default:
                     failures.append("\(where_): unknown call \(kind)")
                 }
@@ -454,8 +456,18 @@ nonisolated enum UndoContractReplay {
     static let stackKeys: Set<String> = [
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-        "blobKept", "pendingRuling",
+        "blobKept", "interrupted",
     ]
+
+    /// Holds a step begun from inside a hook, so the case can finish it.
+    final class HeldStep {
+
+        // MARK: - Stored properties
+
+        var seq: Int = 0
+
+        var change: UndoFileChange? = nil
+    }
 
     static func intList(_ value: Any?) -> [Int]? {
         guard let numbers = value as? [NSNumber] else {
@@ -473,9 +485,17 @@ nonisolated enum UndoContractReplay {
         let traces: [String: Any] = try contract("undo-traces.json")
         var pagePath: String = ""
         var pageText: String = ""
-        for page in traces["fixture"] as? [[String: Any]] ?? [] where string(page["page"]) == "p1" {
-            pagePath = string(page["path"]) ?? ""
-            pageText = string(page["text"]) ?? ""
+        var otherPagePath: String = ""
+        var otherPageText: String = ""
+        for page in traces["fixture"] as? [[String: Any]] ?? [] {
+            if string(page["page"]) == "p1" {
+                pagePath = string(page["path"]) ?? ""
+                pageText = string(page["text"]) ?? ""
+            }
+            if string(page["page"]) == "p2" {
+                otherPagePath = string(page["path"]) ?? ""
+                otherPageText = string(page["text"]) ?? ""
+            }
         }
         let secondPagePath: String = pagePath.replacingOccurrences(of: "TST1O", with: "TST2O")
         var failures: [String] = []
@@ -493,12 +513,13 @@ nonisolated enum UndoContractReplay {
             let rootB: URL = second.root
             let rootBAway: URL = rootB.deletingLastPathComponent().appendingPathComponent("wf-away", isDirectory: true)
             try write(pageText, to: pagePath, in: root)
+            try write(otherPageText, to: otherPagePath, in: root)
             try write(pageText, to: secondPagePath, in: rootB)
             var clockDays: Double = 0
             var last: String = ""
-            var linesBeforeClearing: Int = -1
-            var linesAfterClearing: Int = -1
-            var held: (seq: Int, change: UndoFileChange)? = nil
+            var linesBeforeTheDeploy: Int = -1
+            var linesAfterTheDeploy: Int = -1
+            let held: HeldStep = HeldStep()
             var foreignBlob: String? = nil
             let folderOfB: String = rootB.path
 
@@ -533,9 +554,18 @@ nonisolated enum UndoContractReplay {
                 }
             }
 
+            func beginHeld() throws {
+                let change: [UndoFileChange] = flip(in: root, at: pagePath)
+                let heldDraft: UndoStepDraft = draft(changes: change, root: root, action: "publishPages")
+                held.seq = try JournaledWrite.begin(heldDraft, ops: JournaledWrite.ops(for: heldDraft), in: journal(), mode: .live)
+                held.change = change.first
+            }
+
             for value in testCase["calls"] as? [String] ?? [] {
                 if value == "step" {
                     oneStep(folderRoot: root, path: pagePath, daysAgo: 0)
+                } else if value == "stepOn:p2" {
+                    oneStep(folderRoot: root, path: otherPagePath, daysAgo: 0)
                 } else if value == "step@B" {
                     oneStep(folderRoot: rootB, path: secondPagePath, daysAgo: 0)
                 } else if value.hasPrefix("step:") && value.hasSuffix("daysAgo") {
@@ -556,11 +586,35 @@ nonisolated enum UndoContractReplay {
                     last = outcomeWord(journal().redoNewest(resolveRoot: resolve))
                 } else if value == "editTheLineByHand" {
                     try handEdit("sameLine", at: pagePath, in: root)
-                } else if value.hasPrefix("clear:") {
-                    let reason: UndoClearing = UndoClearing(rawValue: String(value.dropFirst("clear:".count))) ?? .deploy
-                    linesBeforeClearing = try lineCount(in: journal())
-                    try journal().clearTheList(because: reason)
-                    linesAfterClearing = try lineCount(in: journal())
+                } else if value == "undoWhileAStepBegins" {
+                    // Another process begins a step after this undo has
+                    // checked its ops and before it answers the refusal.
+                    var begun: Bool = false
+                    UndoKillPoints.hook = { point in
+                        if point == .afterTheCheck && !begun {
+                            begun = true
+                            try? beginHeld()
+                        }
+                        return false
+                    }
+                    last = outcomeWord(journal().undoNewest(resolveRoot: resolve))
+                    UndoKillPoints.hook = nil
+                } else if value == "deploy" {
+                    // What a deploy leaves: a fragment of the section's
+                    // published-pages record, and nothing in the list.
+                    linesBeforeTheDeploy = try rawLineCount(in: journal())
+                    try writeAFragment(courseFolder: root.appendingPathComponent("courses/TST1O"), section: 1, places: ["Section 1/Classes/Day 1"])
+                    linesAfterTheDeploy = try rawLineCount(in: journal())
+                } else if value == "note" {
+                    try appendNote(to: journal())
+                } else if value == "begin:dead@B" {
+                    // A step in folder B whose process then died, before any
+                    // file was touched.
+                    let change: [UndoFileChange] = flip(in: rootB, at: secondPagePath)
+                    let deadDraft: UndoStepDraft = draft(changes: change, root: rootB, action: "publishPages")
+                    let moment: Date = Date().addingTimeInterval(clockDays * 86_400)
+                    let dying: UndoJournal = UndoJournal(folderURL: place.journalFolder, process: goneProcess, now: { moment })
+                    _ = try JournaledWrite.begin(deadDraft, ops: JournaledWrite.ops(for: deadDraft), in: dying, mode: .live)
                 } else if value == "moveFolder:B" {
                     try FileManager.default.moveItem(at: rootB, to: rootBAway)
                 } else if value == "restoreFolder:B" {
@@ -593,16 +647,13 @@ nonisolated enum UndoContractReplay {
                     try appendRaw(begin, to: journal())
                     try appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal())
                 } else if value == "begin:held" {
-                    let change: [UndoFileChange] = flip(in: root, at: pagePath)
-                    let heldDraft: UndoStepDraft = draft(changes: change, root: root, action: "publishPages")
-                    let seq: Int = try JournaledWrite.begin(heldDraft, ops: JournaledWrite.ops(for: heldDraft), in: journal(), mode: .live)
-                    if let first = change.first {
-                        held = (seq: seq, change: first)
-                    }
+                    try beginHeld()
                 } else if value == "finish:held" {
-                    if let held {
-                        try (held.change.after ?? Data()).write(to: root.appendingPathComponent(held.change.relativePath))
+                    if let change = held.change {
+                        try (change.after ?? Data()).write(to: root.appendingPathComponent(change.relativePath))
                         JournaledWrite.finish(seq: held.seq, with: .applied, phase: nil, reason: nil, in: journal(), mode: .live)
+                    } else {
+                        failures.append("stackCases '\(name)': no step was held to finish")
                     }
                 } else {
                     failures.append("stackCases '\(name)': unknown call \(value)")
@@ -664,8 +715,17 @@ nonisolated enum UndoContractReplay {
             if let wantedSeq = int(testCase["clearedSeq"]), clearings.last?.seq != wantedSeq {
                 failures.append("stackCases '\(name)': the clearing's seq is \(String(describing: clearings.last?.seq)), not \(wantedSeq)")
             }
-            if let written = int(testCase["linesWritten"]), linesAfterClearing - linesBeforeClearing != written {
-                failures.append("stackCases '\(name)': a clearing wrote \(linesAfterClearing - linesBeforeClearing) lines, not \(written)")
+            if let written = int(testCase["linesWritten"]), linesAfterTheDeploy - linesBeforeTheDeploy != written {
+                failures.append("stackCases '\(name)': a deploy wrote \(linesAfterTheDeploy - linesBeforeTheDeploy) lines to the list, not \(written)")
+            }
+            if let wanted = intList(testCase["interrupted"]) {
+                var interrupted: [Int] = []
+                for seq in fold.orderedSeqs where fold.records[seq]?.phase == .interrupted {
+                    interrupted.append(seq)
+                }
+                if interrupted != wanted {
+                    failures.append("stackCases '\(name)': interrupted \(interrupted), not \(wanted)")
+                }
             }
             if let kept = testCase["blobKept"] as? Bool {
                 let present: Bool = foreignBlob != nil && journal().readBlob(sha: foreignBlob ?? "") != nil
@@ -714,6 +774,37 @@ nonisolated enum UndoContractReplay {
         return try lines(in: journal).count
     }
 
+    /// Every complete line in the journal, read or not.
+    static func rawLineCount(in journal: UndoJournal) throws -> Int {
+        var count: Int = 0
+        for number in try journal.segmentNumbers() {
+            let data: Data = (try? Data(contentsOf: journal.segmentURL(number: number))) ?? Data()
+            count += UndoJournal.completeLines(in: data).count
+        }
+        return count
+    }
+
+    /// A `note` line, as a later version might write one: its `seq` the
+    /// highest in the journal, an `about`, and keys this version does not
+    /// know, one of them a `phase` no event has. Every reader passes over it.
+    static func appendNote(to journal: UndoJournal) throws {
+        let highest: Int = try journal.read().highestSeq
+        let line: String = "{\"about\":\"aLaterRecord\",\"at\":\"\(UndoMoment.text(journal.now()))\",\"event\":\"note\",\"later\":{\"pages\":[1,2]},\"phase\":\"notOneOfTheThree\",\"reason\":7,\"seq\":\(highest),\"v\":1}"
+        try appendRaw(line, to: journal)
+    }
+
+    /// One fragment of a section's published-pages record, as a deploy
+    /// writes it (`contracts/file-formats.json` → `publishedPagesRecord`).
+    static func writeAFragment(courseFolder: URL, section: Int, places: [String]) throws {
+        let folder: URL = courseFolder
+            .appendingPathComponent(".publish_state", isDirectory: true)
+            .appendingPathComponent("section\(section).published-pages", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let object: [String: Any] = ["version": 1, "course": courseFolder.lastPathComponent, "section": section, "buildId": "b1", "places": places]
+        let data: Data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        try data.write(to: folder.appendingPathComponent("20261113T210405Z-netlify.json"))
+    }
+
     static func clearingLines(in journal: UndoJournal) throws -> [UndoEventLine] {
         var found: [UndoEventLine] = []
         for event in try lines(in: journal) where event.event == UndoEventKind.cleared.rawValue {
@@ -737,7 +828,8 @@ nonisolated enum UndoContractReplay {
 
     static let recoveryKeys: Set<String> = [
         "name", "work", "stopAt", "mode", "processAlive", "files", "phase", "head", "undo",
-        "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery",
+        "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
+        "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
     ]
 
     static func runRecoveryCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
@@ -746,6 +838,7 @@ nonisolated enum UndoContractReplay {
         var number: Int = 0
         defer {
             UndoKillPoints.hook = nil
+            UndoKillPoints.fileInUseAtSwap = nil
         }
         for testCase in cases {
             number += 1
@@ -761,6 +854,20 @@ nonisolated enum UndoContractReplay {
             try write(beforeText.replacingOccurrences(of: "title: A", with: "title: B"), to: second, in: root)
             let beforeHashes: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
 
+            // Another, RUNNING process begins a step on a third page first,
+            // and is still at work when recovery clears the list.
+            var heldSeq: Int = 0
+            var heldChange: UndoFileChange? = nil
+            if testCase["anotherStepInFlight"] as? Bool == true {
+                let third: String = "courses/TST1O/Section 1/Classes/C.md"
+                try write(beforeText.replacingOccurrences(of: "title: A", with: "title: C"), to: third, in: root)
+                let heldChanges: [UndoFileChange] = changes(setting: [(path: third, key: "publish", line: "publish: true")], in: root)
+                let heldDraft: UndoStepDraft = draft(changes: heldChanges, root: root, action: "publishPages")
+                heldSeq = try JournaledWrite.begin(heldDraft, ops: JournaledWrite.ops(for: heldDraft), in: UndoJournal(folderURL: place.journalFolder), mode: .live)
+                heldChange = heldChanges.first
+            }
+            let workSeq: Int = heldSeq + 1
+
             let alive: Bool = testCase["processAlive"] as? Bool == true
             let dying: UndoJournal = UndoJournal(
                 folderURL: place.journalFolder,
@@ -774,7 +881,18 @@ nonisolated enum UndoContractReplay {
                 (path: first, key: "publish", line: "publish: true"),
                 (path: second, key: "publish", line: "publish: true"),
             ]
-            let stepDraft: UndoStepDraft = draft(changes: changes(setting: edits, in: root), root: root, action: "publishPages")
+            var stepChanges: [UndoFileChange] = changes(setting: edits, in: root)
+            if testCase["wholeFile"] as? Bool == true {
+                // The body changes too, so each page is one writeFile op
+                // whose content is a blob.
+                var wholeFileChanges: [UndoFileChange] = []
+                for change in stepChanges {
+                    let after: Data = (change.after ?? Data()) + Data("A line the step added.\n".utf8)
+                    wholeFileChanges.append(UndoFileChange(relativePath: change.relativePath, before: change.before, after: after))
+                }
+                stepChanges = wholeFileChanges
+            }
+            let stepDraft: UndoStepDraft = draft(changes: stepChanges, root: root, action: "publishPages")
             var afterHashes: [String?] = []
 
             if work == "step" {
@@ -808,14 +926,25 @@ nonisolated enum UndoContractReplay {
             let asLeft: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
             let reachable: Bool = testCase["moveFolderBeforeRecovery"] as? Bool != true
             let resolveRoot: (UndoWorkingFolder) -> URL? = { _ in reachable ? root : nil }
+            if testCase["contentRemovedBeforeRecovery"] as? Bool == true {
+                try FileManager.default.removeItem(at: dying.contentFolderURL)
+            }
 
             // Another process, which sees the first as gone, runs recovery.
             let survivor: UndoJournal = UndoJournal(
                 folderURL: place.journalFolder,
                 processIsAlive: { process in process.pid != 2_000_000_001 || alive }
             )
+            if testCase["fileInUseDuringRecovery"] as? Bool == true {
+                UndoKillPoints.fileInUseAtSwap = { _ in true }
+            }
             try survivor.withLock { writer in
                 UndoRecovery.run(writer, mode: mode, resolveRoot: resolveRoot)
+            }
+            UndoKillPoints.fileInUseAtSwap = nil
+            if let heldChange {
+                try (heldChange.after ?? Data()).write(to: root.appendingPathComponent(heldChange.relativePath))
+                JournaledWrite.finish(seq: heldSeq, with: .applied, phase: nil, reason: nil, in: UndoJournal(folderURL: place.journalFolder), mode: .live)
             }
 
             let now: [String?] = [hash(of: first, in: root), hash(of: second, in: root)]
@@ -840,9 +969,15 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': the files are not \(string(testCase["files"]) ?? "?")")
             }
             let fold: UndoFold = try survivor.read()
-            let phase: String = fold.records[1]?.phase.rawValue ?? "missing"
+            let phase: String = fold.records[workSeq]?.phase.rawValue ?? "missing"
             if phase != string(testCase["phase"]) {
                 failures.append("recoveryCases '\(name)': the step is \(phase), not \(string(testCase["phase"]) ?? "?")")
+            }
+            if let wanted = string(testCase["stepInFlight"]) {
+                let heldPhase: String = fold.records[heldSeq]?.phase.rawValue ?? "missing"
+                if heldSeq == 0 || heldPhase != wanted {
+                    failures.append("recoveryCases '\(name)': the other process's step is \(heldPhase), not \(wanted)")
+                }
             }
             let offer: UndoOffer = fold.offer(now: Date())
             if testCase.keys.contains("head") && offer.head?.step.seq != int(testCase["head"]) {
@@ -897,6 +1032,43 @@ nonisolated enum UndoContractReplay {
         default:
             return .beforeRedone
         }
+    }
+
+    // MARK: - undo.deployedCases
+
+    static let deployedKeys: Set<String> = ["name", "moves", "changesMoreThanVisibility", "record", "answer", "why"]
+
+    /// Ruling 19's question, as data: does a website show what the move
+    /// takes back (`UndoWebsite.answer`)?
+    static func runDeployedCases() throws -> (cases: Int, failures: [String]) {
+        let cases: [[String: Any]] = try undoBlock()["deployedCases"] as? [[String: Any]] ?? []
+        var failures: [String] = []
+        for testCase in cases {
+            let name: String = string(testCase["name"]) ?? "?"
+            failures += unknownKeys(in: testCase, allowed: deployedKeys, list: "deployedCases", name: name)
+            var moves: [UndoWebsite.PageMove] = []
+            for move in testCase["moves"] as? [[String: Any]] ?? [] {
+                guard let path = string(move["path"]), let place = UndoWebsite.place(ofPath: path),
+                      let before = move["visibleBefore"] as? Bool, let after = move["visibleAfter"] as? Bool else {
+                    failures.append("deployedCases '\(name)': a move this replay cannot read")
+                    continue
+                }
+                moves.append(UndoWebsite.PageMove(place: place, visibleBeforeTheMove: before, visibleAfterTheMove: after))
+            }
+            var record: [UndoWebsite.Fragment] = []
+            for fragment in testCase["record"] as? [[String: Any]] ?? [] {
+                record.append(UndoWebsite.Fragment(name: string(fragment["name"]) ?? "", places: fragment["places"] as? [String]))
+            }
+            let answer: UndoWebsite.Answer = UndoWebsite.answer(
+                moves: moves,
+                changesMoreThanVisibility: testCase["changesMoreThanVisibility"] as? Bool == true,
+                record: record
+            )
+            if answer.rawValue != string(testCase["answer"]) {
+                failures.append("deployedCases '\(name)': \(answer.rawValue), not \(string(testCase["answer"]) ?? "?")")
+            }
+        }
+        return (cases: cases.count, failures: failures)
     }
 
     // MARK: - undo.stepCases

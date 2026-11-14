@@ -780,6 +780,10 @@ nonisolated enum UndoLineOps {
 /// costs one check.
 nonisolated enum UndoKillPoint: Equatable, Sendable {
     case afterBegin
+    /// An undo or redo has checked its ops and has written nothing yet: a
+    /// contract case begins another process's step here, to prove a
+    /// clearing takes a step in flight (`undo.rule.clearing`).
+    case afterTheCheck
     case beforeSwap(Int)
     case beforeApplied
     case afterUndoing

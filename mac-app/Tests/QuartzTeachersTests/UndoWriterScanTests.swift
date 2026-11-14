@@ -19,13 +19,18 @@ import XCTest
 ///   #899 that wires it. **The switch cannot flip (U7) while any
 ///   `waitsFor` remains**: `testTheSwitchStaysOffWhileWritersWait` says so.
 ///
-/// What counts as a writing call (widened after U1's reviews): Foundation's
-/// writes, moves, removals, copies, attribute changes and links; a
-/// `FileHandle` opened for writing; and the C calls that write (`rename`,
-/// `link`, `unlink`, `mkdir`, `chmod`, `truncate` and the like, and `open`
-/// with a flag that writes). The count is per file, so a file can swap one
-/// write for another and stay green: the list says WHO writes, and a new
-/// writer is what it catches.
+/// What counts as a writing call (widened after U1's reviews, and again
+/// after its second, the director's ruling 7): Foundation's writes, moves,
+/// removals, copies, attribute and resource-value changes, links and the
+/// Trash (`trashItem`, `NSWorkspace`'s `recycle`); a `FileHandle` opened for
+/// writing; the C calls that write (`rename`, `link`, `unlink`, `mkdir`,
+/// `chmod`, `truncate` and the like, and `open` with a flag that writes); and
+/// a tool that writes run as a process (`/usr/bin/ditto`, `/bin/mv`,
+/// `/bin/cp`, `/bin/rm` and the others in `writingTools`). A call split
+/// across lines counts too: a line that ends in `(` is read together with
+/// the next. The count is per file, so a file can swap one write for
+/// another and stay green: the list says WHO writes, and a new writer is
+/// what it catches.
 final class UndoWriterScanTests: XCTestCase {
 
     // MARK: - Stored properties
@@ -55,7 +60,18 @@ final class UndoWriterScanTests: XCTestCase {
         "Darwin.rename(",
         "Darwin.link(",
         "Darwin.unlink(",
+        "setResourceValues(",
+        "recycle(",
     ]
+
+    /// Tools that write, counted once on a line that names one by its path
+    /// (`"/usr/bin/ditto"`, or `/bin/rm ` inside a script the app writes).
+    static let writingTools: [String] = [
+        "ditto", "mv", "cp", "rm", "rsync", "unzip", "zip", "chmod", "chflags", "ln", "mkdir", "touch", "tar",
+    ]
+
+    /// Where those tools live.
+    static let toolFolders: [String] = ["/bin/", "/usr/bin/", "/sbin/", "/usr/sbin/"]
 
     /// C calls that write, counted only as a call of their own: not after a
     /// dot (`CourseRenamer.rename(`), not inside a longer name, and not where
@@ -102,11 +118,11 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/BuilderWarmUp.swift": (5, "notAStep: the builder cache of #836 (class D)"),
         "Models/ClassInsertionPlanner.swift": (7, "waitsFor: U3"),
         "Models/ClassesDatedLater.swift": (2, "waitsFor: U3"),
-        "Models/CourseArchiver.swift": (8, "waitsFor: U5"),
+        "Models/CourseArchiver.swift": (9, "waitsFor: U5"),
         "Models/CourseConfiguration.swift": (2, "waitsFor: U4"),
         "Models/CoursePageCopier.swift": (3, "waitsFor: U4"),
         "Models/CourseRenamer.swift": (3, "waitsFor: U4"),
-        "Models/CourseRestorer.swift": (22, "waitsFor: U5"),
+        "Models/CourseRestorer.swift": (23, "waitsFor: U5"),
         "Models/DeployCommand.swift": (2, "waitsFor: U6"),
         "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
         "Models/HowITeachPage.swift": (1, "waitsFor: U3"),
@@ -115,18 +131,18 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ObsidianFigureAddOns.swift": (14, "waitsFor: U4"),
         "Models/PlaceholderClassPlanner.swift": (2, "waitsFor: U3"),
         "Models/PlanSharing.swift": (9, "waitsFor: U6"),
-        "Models/PlantoirDefaults.swift": (1, "notAStep: the preferences store's own note file under a state folder"),
+        "Models/PlantoirDefaults.swift": (2, "notAStep: the preferences store's own note file under a state folder"),
         "Models/ReferenceCopier.swift": (4, "waitsFor: U4"),
         "Models/ReferenceCreation.swift": (2, "waitsFor: U4"),
         "Models/ReferenceImporter.swift": (5, "waitsFor: U4"),
         "Models/ReferenceLock.swift": (1, "waitsFor: U4 (a reference course's locks, lifted and put back inside the step that changes it, plan 2.6)"),
         "Models/ReferenceReadingView.swift": (2, "waitsFor: U4"),
-        "Models/ReferenceReplacer.swift": (2, "waitsFor: U5"),
+        "Models/ReferenceReplacer.swift": (3, "waitsFor: U5"),
         "Models/ReferenceShelfStore.swift": (3, "waitsFor: U4"),
         "Models/ReferenceStaging.swift": (9, "waitsFor: U4"),
         "Models/ReferenceTreeCopier.swift": (5, "waitsFor: U4"),
-        "Models/ReferenceZipSource.swift": (3, "waitsFor: U4"),
-        "Models/ScheduledDeploy.swift": (33, "waitsFor: U6"),
+        "Models/ReferenceZipSource.swift": (7, "waitsFor: U4"),
+        "Models/ScheduledDeploy.swift": (43, "waitsFor: U6"),
         "Models/ScheduledPublishOutcome.swift": (7, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/ScheduledPublishWatcher.swift": (1, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/SectionAdder.swift": (13, "waitsFor: U4"),
@@ -135,9 +151,9 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/SectionPublishState.swift": (2, "notAStep: deploy markers are world records (undo.worldRecords, U6)"),
         "Models/SectionReDatePlanner.swift": (1, "waitsFor: U3"),
         "Models/SectionTimetable.swift": (2, "waitsFor: U3"),
-        "Models/SetUp/AssistantSetUpCentre.swift": (7, "notAStep: setting up an outside assistant, outside every course (ruling 16: not on the list)"),
-        "Models/SetUp/SetUpRecord.swift": (11, "notAStep: the record of the assistants Plantoir set up, outside every course (ruling 16)"),
-        "Models/SetUp/SetUpRunner.swift": (4, "notAStep: a set-up's own work folder, outside every course (ruling 16)"),
+        "Models/SetUp/AssistantSetUpCentre.swift": (7, "notAStep: setting up an outside assistant, outside every course (it changes no course: not on the list; ruling 16's reason, asked again under ruling 17)"),
+        "Models/SetUp/SetUpRecord.swift": (11, "notAStep: the record of the assistants Plantoir set up, outside every course (as AssistantSetUpCentre)"),
+        "Models/SetUp/SetUpRunner.swift": (4, "notAStep: a set-up's own work folder, outside every course (as AssistantSetUpCentre)"),
         "Models/SiteHealthRepair.swift": (3, "waitsFor: U4"),
         "Models/SpecialFolderRenamer.swift": (6, "waitsFor: U4"),
         "Models/StartOfYear/StartOfYearPlanner.swift": (1, "waitsFor: U3"),
@@ -145,7 +161,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ToolchainCopyMarker.swift": (4, "notAStep: the toolchain mirror"),
         "Models/ToolchainFingerprints.swift": (9, "notAStep: the toolchain mirror's index"),
         "Models/Undo/UndoCheck.swift": (20, "door: the staged swaps of an undo, a redo and recovery"),
-        "Models/Undo/UndoJournal.swift": (20, "door: the list itself, outside every working folder"),
+        "Models/Undo/UndoJournal.swift": (23, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoRecovery.swift": (4, "door: pruning the list's own content and segments"),
         "Models/UnitWordRenamer.swift": (7, "waitsFor: U4"),
@@ -154,7 +170,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/WorkspaceModel.swift": (18, "waitsFor: U4 and U5 (Add Section, New Course, restore, remove, archive, delete)"),
         "Scripting/NewCourseCreator.swift": (2, "waitsFor: U4 (New Course from the command line: the course folder and its course_config.json)"),
         "Scripting/ProblemReport.swift": (7, "notAStep: problem reports and their records, outside every course"),
-        "Scripting/ProblemReportBuilder.swift": (5, "notAStep: a problem report's working folder, outside every course"),
+        "Scripting/ProblemReportBuilder.swift": (7, "notAStep: a problem report's working folder, outside every course"),
         "Views/CourseSettings/CourseSettingsView.swift": (2, "waitsFor: U4"),
         "Views/CourseSettings/StringListEditorView.swift": (6, "waitsFor: U4"),
         "Views/Helpers/FolderActions.swift": (5, "waitsFor: U5"),
@@ -201,6 +217,31 @@ final class UndoWriterScanTests: XCTestCase {
         )
     }
 
+    /// What the second core review found passed the scan. MUST FAIL on the
+    /// scan before the director's ruling 7 (56b2b23a9), which read one line
+    /// at a time and knew neither tools run as a process,
+    /// `setResourceValues` nor `recycle`: it counts 1 of these 7.
+    func testTheScanCountsSplitCallsToolsAndTheTrash() {
+        let samples: [(source: String, calls: Int)] = [
+            (source: "try data.write(\n    to: url, options: .atomic)", calls: 1),
+            (source: "let handle = try FileHandle(\n    forWritingTo: url)", calls: 1),
+            (source: "process.executableURL = URL(fileURLWithPath: \"/usr/bin/ditto\")", calls: 1),
+            (source: "lines.append(\"/bin/rm -f \\(quoted)\")", calls: 1),
+            (source: "try url.setResourceValues(values)", calls: 1),
+            (source: "NSWorkspace.shared.recycle([url]) { _, _ in }", calls: 1),
+            (source: "try FileManager.default.removeItem(at: url)", calls: 1),
+            (source: "// try data.write(\n// to: url)", calls: 0),
+            (source: "let listing = run(\"/usr/bin/zipinfo\", [path])", calls: 0),
+        ]
+        for sample in samples {
+            var count: Int = 0
+            for code in UndoWriterScanTests.codeLines(of: sample.source) {
+                count += UndoWriterScanTests.writingCallCount(inCode: code)
+            }
+            XCTAssertEqual(count, sample.calls, sample.source)
+        }
+    }
+
     func testEveryReasonIsOneOfTheThreeKinds() {
         for (path, entry) in UndoWriterScanTests.allowed {
             let kind: String = String(entry.reason.prefix(while: { character in character != ":" }))
@@ -227,15 +268,64 @@ final class UndoWriterScanTests: XCTestCase {
     static func writingCallCount(in fileURL: URL) throws -> Int {
         let contents: String = try String(contentsOf: fileURL, encoding: .utf8)
         var count: Int = 0
-        for rawLine in contents.components(separatedBy: "\n") {
-            count += UndoWriterScanTests.writingCallCount(inLine: rawLine)
+        for code in UndoWriterScanTests.codeLines(of: contents) {
+            count += UndoWriterScanTests.writingCallCount(inCode: code)
         }
         return count
     }
 
+    /// The code part of every line, a line that ends in `(` read together
+    /// with the next, so `.write(` on one line and `to:` on the next is the
+    /// one call it is (the core review's second I3).
+    static func codeLines(of contents: String) -> [String] {
+        var result: [String] = []
+        var pending: String? = nil
+        for rawLine in contents.components(separatedBy: "\n") {
+            var code: String = RealHomeTripwireTests.codePart(of: rawLine)
+            if let opened = pending {
+                code = opened + code.trimmingCharacters(in: .whitespaces)
+                pending = nil
+            }
+            let trimmedEnd: String = UndoWriterScanTests.trimmingTrailingSpace(code)
+            if trimmedEnd.hasSuffix("(") {
+                pending = trimmedEnd
+                continue
+            }
+            result.append(code)
+        }
+        if let opened = pending {
+            result.append(opened)
+        }
+        return result
+    }
+
+    static func trimmingTrailingSpace(_ text: String) -> String {
+        var characters: [Character] = Array(text)
+        while let last = characters.last, last == " " || last == "\t" {
+            characters.removeLast()
+        }
+        return String(characters)
+    }
+
     /// How many writing calls one line of source holds.
     static func writingCallCount(inLine rawLine: String) -> Int {
-        let code: String = RealHomeTripwireTests.codePart(of: rawLine)
+        return writingCallCount(inCode: RealHomeTripwireTests.codePart(of: rawLine))
+    }
+
+    /// Whether a line names a tool that writes by its path.
+    static func runsAWritingTool(_ code: String) -> Bool {
+        for tool in writingTools {
+            for folder in toolFolders {
+                if code.contains(folder + tool + "\"") || code.contains(folder + tool + " ") {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// How many writing calls one line's code holds.
+    static func writingCallCount(inCode code: String) -> Int {
         if code.isEmpty {
             return 0
         }
@@ -251,6 +341,9 @@ final class UndoWriterScanTests: XCTestCase {
                 count += 1
                 break
             }
+        }
+        if UndoWriterScanTests.runsAWritingTool(code) {
+            count += 1
         }
         return count
     }

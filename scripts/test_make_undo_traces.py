@@ -10,16 +10,20 @@ PythonToolchainTests like every other scripts/test_*.py. What it pins:
   committed contracts/undo-traces.json is exactly what it writes;
 - the traces are well formed (twenty, of five to forty generated calls,
   each with an expectation and the list's head and redo after it);
-- a trace with no hand edits and no clearing ends its undos exactly at the
-  fixture: undo-all is the identity;
+- a trace with no hand edits ends its undos exactly at the fixture: undo-all
+  is the identity;
+- a refused undo clears the list, a refused redo drops only the redo
+  (rulings 13 and 20), and no trace holds a deploy's clearing (ruling 17);
 - the reference model agrees with the contract's own checkCases and
-  stackCases, so the cases and the traces cannot drift apart.
+  stackCases, so the cases and the traces cannot drift apart;
+- a reference of the deployed-ness rule agrees with deployedCases.
 
 Run with:
 
     python3 -B scripts/test_make_undo_traces.py
 """
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -36,6 +40,39 @@ def shared_undo():
 def committed():
     with open(REPO / "contracts" / "undo-traces.json", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+FRAGMENT = re.compile(r"^(\d{8}T\d{6}Z)-(.+)\.json$")
+
+
+def deployed_answer(case):
+    """undo.rule.deployed: the newest fragment of each destination says what
+    that website shows; a move offers to deploy when a website shows a page
+    as the course has it before the move, for a page whose visibility the
+    move changes."""
+    newest = {}
+    for fragment in case["record"]:
+        found = FRAGMENT.match(fragment["name"])
+        if not found:
+            continue
+        stamp, destination = found.group(1), found.group(2)
+        if destination not in newest or stamp > newest[destination][0]:
+            newest[destination] = (stamp, fragment.get("places"))
+    if not newest:
+        return "noOffer"
+    cannot_tell = False
+    for _, places in newest.values():
+        if places is None:
+            cannot_tell = True
+            continue
+        for move in case["moves"]:
+            path = move["path"]
+            place = "/".join(path.split("/")[2:])[:-3]
+            if move["visibleBefore"] != move["visibleAfter"] and (place in places) == move["visibleBefore"]:
+                return "offerToDeploy"
+    if cannot_tell or case.get("changesMoreThanVisibility"):
+        return "cannotTell"
+    return "noOffer"
 
 
 class GeneratorTests(unittest.TestCase):
@@ -81,18 +118,26 @@ class GeneratorTests(unittest.TestCase):
             calls = trace["calls"]
             self.assertGreaterEqual(len(calls), traces.SHORTEST, trace["name"])
             for call in calls:
-                self.assertIn(call["call"], ("step", "undo", "redo", "handEdit", "clear"), call)
+                self.assertIn(call["call"], ("step", "undo", "redo", "handEdit", "note"), call)
                 self.assertIn("head", call)
                 self.assertIn("redo", call)
                 if call["call"] in ("step", "undo", "redo"):
                     self.assertIn("expect", call)
 
-    def test_no_trace_holds_a_refused_redo(self):
-        # What a refused Redo does to the list is not ruled.
+    def test_a_refused_redo_drops_only_the_redo(self):
+        # Ruling 20: refused once with its reason, then Redo has nothing and
+        # the head (what Undo acts on) is where it was.
+        found = 0
         for trace in committed()["traces"]:
+            previous = None
             for call in trace["calls"]:
-                if call["call"] == "redo":
-                    self.assertIn(call["expect"], ("redone", "nothingToRedo"), trace["name"])
+                if call["call"] == "redo" and call["expect"] == "changedSince":
+                    found += 1
+                    self.assertTrue(call["droppedTheRedo"])
+                    self.assertIsNone(call["redo"])
+                    self.assertEqual(call["head"], previous["head"], trace["name"])
+                previous = call
+        self.assertGreater(found, 0, "no trace holds a refused redo")
 
     def test_the_traces_reach_every_outcome_u1_rules_on(self):
         seen = set()
@@ -102,8 +147,10 @@ class GeneratorTests(unittest.TestCase):
         for wanted in [("step", "applied"), ("step", "changedNothing"), ("undo", "undone"),
                        ("undo", "changedSince"), ("undo", "nothingToUndo"), ("redo", "redone"),
                        ("redo", "nothingToRedo"), ("handEdit", "body"), ("handEdit", "sameLine"),
-                       ("handEdit", "otherKey"), ("clear", "deploy"), ("clear", "shareUnitPlans")]:
+                       ("handEdit", "otherKey"), ("note", None), ("redo", "changedSince")]:
             self.assertIn(wanted, seen)
+        for call, _ in seen:
+            self.assertNotEqual(call, "clear", "a deploy or a share of unit plans clears nothing (rulings 17 and 18)")
 
     def test_undoing_everything_without_hand_edits_is_the_identity(self):
         document = committed()
@@ -202,7 +249,7 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "pendingRuling"}
+                  "blobKept", "interrupted"}
 
     def test_stack_cases(self):
         folder_b = "@B/"
@@ -213,21 +260,33 @@ class ContractCaseTests(unittest.TestCase):
                 self.assertIn("head", case)
                 self.assertIn("redo", case)
                 p1 = traces.PATHS["p1"]
-                pages = {p1: traces.START["p1"], folder_b + p1: traces.START["p1"]}
+                p2 = traces.PATHS["p2"]
+                pages = {p1: traces.START["p1"], p2: traces.START["p2"], folder_b + p1: traces.START["p1"]}
                 model = traces.Model(pages)
                 last = None
                 cleared = []
-                held = None
-                lines_before = None
+                held = []
+                lines_written_by_the_deploy = None
 
                 def one_step(path, days_ago=0):
                     now = traces.reading("publish", model.pages[path])
                     line = "publish: false" if now == ("entry", "publish: true") else "publish: true"
                     return model.step([(path, "publish", line)], days_ago=days_ago)
 
+                def flipped(path):
+                    now = traces.reading("publish", model.pages[path])
+                    line = "publish: false" if now == ("entry", "publish: true") else "publish: true"
+                    return traces.setting_entry("publish", line, model.pages[path])
+
+                def begin_held():
+                    after = flipped(p1)
+                    held.append((model.begin(traces.ops_for_change(p1, model.pages[p1], after)), after))
+
                 for call in case["calls"]:
                     if call == "step":
                         last = one_step(p1)
+                    elif call == "stepOn:p2":
+                        last = one_step(p2)
                     elif call == "step@B":
                         last = one_step(folder_b + p1)
                     elif call.startswith("step:") and call.endswith("daysAgo"):
@@ -246,11 +305,25 @@ class ContractCaseTests(unittest.TestCase):
                         last = model.redo()
                     elif call == "editTheLineByHand":
                         self.assertTrue(model.hand_edit_path("sameLine", p1))
-                    elif call.startswith("clear:"):
-                        lines_before = len(cleared)
-                        if model.clear():
-                            cleared.append((call.split(":")[1], model.highest))
-                        model.prune()
+                    elif call == "undoWhileAStepBegins":
+                        # Another process begins a step after this undo has
+                        # checked its ops and before it answers the refusal.
+                        dry = model.undo(dry=True)
+                        begin_held()
+                        if dry[0] == "changedSince":
+                            if model.clear():
+                                cleared.append(("changedSince", model.highest))
+                            model.prune()
+                        last = dry
+                    elif call == "deploy":
+                        # Not on the list: the model is not told of it at all.
+                        lines_written_by_the_deploy = 0
+                    elif call == "note":
+                        model.note()
+                    elif call == "begin:dead@B":
+                        path = folder_b + p1
+                        after = flipped(path)
+                        model.begin(traces.ops_for_change(path, model.pages[path], after), dead=True)
                     elif call == "moveFolder:B":
                         model.unreachable.add("@B")
                     elif call == "restoreFolder:B":
@@ -266,13 +339,11 @@ class ContractCaseTests(unittest.TestCase):
                         seq = model.begin([{"kind": "move", "from": "a", "to": "b"}], readable=False)
                         model.find(seq)["phase"] = "done"
                     elif call == "begin:held":
-                        now = traces.reading("publish", model.pages[p1])
-                        line = "publish: false" if now == ("entry", "publish: true") else "publish: true"
-                        after = traces.setting_entry("publish", line, model.pages[p1])
-                        held = (model.begin(traces.ops_for_change(p1, model.pages[p1], after)), after)
+                        begin_held()
                     elif call == "finish:held":
-                        model.pages[p1] = held[1]
-                        model.finish(held[0])
+                        seq, after = held.pop()
+                        model.pages[p1] = after
+                        model.finish(seq)
                     else:
                         self.fail("unknown call " + call)
                 summary = model.summary()
@@ -295,17 +366,28 @@ class ContractCaseTests(unittest.TestCase):
                 if "clearedSeq" in case:
                     self.assertEqual(cleared[-1][1], case["clearedSeq"])
                 if "linesWritten" in case:
-                    self.assertEqual(len(cleared) - (lines_before or 0), case["linesWritten"])
+                    self.assertEqual(lines_written_by_the_deploy, case["linesWritten"])
+                if "interrupted" in case:
+                    self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "interrupted"], case["interrupted"])
 
-    def test_the_clear_reasons_are_the_four_ruled(self):
-        self.assertEqual(shared_undo()["clearReasons"], ["changedSince", "deploy", "shareUnitPlans", "interrupted"])
+    def test_the_clear_reasons_are_the_two_ruled(self):
+        # Rulings 17 and 18 took the deploy and the share of unit plans off.
+        self.assertEqual(shared_undo()["clearReasons"], ["changedSince", "interrupted"])
+
+    def test_deployed_cases(self):
+        # A reference of undo.rule.deployed, written from the words alone,
+        # against the contract's cases (UndoWebsite.answer on the mac).
+        for case in shared_undo()["deployedCases"]:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(set(case) - {"name", "moves", "changesMoreThanVisibility", "record", "answer", "why"}, set())
+                self.assertEqual(deployed_answer(case), case["answer"])
 
     def test_the_format_names_every_event_and_the_clearing(self):
         with open(REPO / "contracts" / "file-formats.json", encoding="utf-8") as handle:
             journal = json.load(handle)["undoJournal"]
         events = set(journal["events"])
         self.assertEqual(events, {"begin", "applied", "rolledBack", "interrupted", "undoing", "undone",
-                                  "redoing", "redone", "failed", "dropped", "pruned", "cleared"})
+                                  "redoing", "redone", "failed", "dropped", "pruned", "cleared", "note"})
 
 
 if __name__ == "__main__":

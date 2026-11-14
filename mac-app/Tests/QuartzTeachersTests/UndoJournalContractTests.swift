@@ -75,6 +75,15 @@ final class UndoJournalContractTests: XCTestCase {
         XCTAssertEqual(result.failures, [])
     }
 
+    /// Ruling 19's question (does a website show what an Undo or Redo takes
+    /// back?), read from the deploy markers. MUST FAIL on 56b2b23a9, which
+    /// had no `UndoWebsite` and no `deployedCases`.
+    func testDeployedCases() throws {
+        let result: (cases: Int, failures: [String]) = try UndoContractReplay.runDeployedCases()
+        XCTAssertGreaterThanOrEqual(result.cases, 10)
+        XCTAssertEqual(result.failures, [])
+    }
+
     func testStepCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runStepCases(under: scratchURL)
         XCTAssertEqual(result.cases, 3)
@@ -86,7 +95,7 @@ final class UndoJournalContractTests: XCTestCase {
     /// the same points with SIGKILL.)
     func testRecoveryCases() throws {
         let result: (cases: Int, failures: [String]) = try UndoContractReplay.runRecoveryCases(under: scratchURL)
-        XCTAssertEqual(result.cases, 15)
+        XCTAssertEqual(result.cases, 19)
         XCTAssertEqual(result.failures, [])
     }
 

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
 Writes contracts/undo-traces.json: sequences of steps, undos, redos, hand
-edits and clearings for Undo and Redo (#899, piece U1), with what each call
-must come to, replayed by BOTH apps' suites against their own journal.
+edits and neutral `note` lines for Undo and Redo (#899, piece U1), with what
+each call must come to, replayed by BOTH apps' suites against their own
+journal.
 
 The expected results are computed here by a reference model of the list:
 the front-matter line model (`editLine`), the whole-file fallback
 (`writeFile`), the all-or-nothing content check, the linear list (ruling 9),
-the redo branch cut by any new step, and the whole list cleared when Undo
-refuses a step whose line was changed by hand (ruling 13) or when a deploy
-or a share of unit plans happens (rulings 14 and 16). The Swift
+the redo branch cut by any new step, the whole list cleared when Undo
+refuses a step whose line was changed by hand (ruling 13), and only the redo
+branch dropped when Redo is refused the same way (ruling 20). A deploy and
+sharing unit plans are not on the list and clear nothing (rulings 17 and
+18), so no trace holds one. The Swift
 implementation in mac-app/QuartzTeachers/Models/Undo/ is written to the
 same rules; a trace both agree on is evidence that the rules, not one
 implementation's accidents, decide the outcome.
@@ -413,7 +416,6 @@ def plan(ops, backward, pages_by_path):
 
 GRACE_DAYS = 30
 CLOCK_TOLERANCE_DAYS = 1.0
-CLEARING_TAKES_STEPS_BEGUN_BEFORE_IT = True   # pending Russell: UndoFold.clearingTakesStepsBegunBeforeIt
 
 
 class Model:
@@ -424,7 +426,7 @@ class Model:
         if pages is None:
             pages = {PATHS[page_id]: START[page_id] for page_id in PAGE_IDS}
         self.pages = pages
-        self.steps = []        # dicts: seq, ops, phase, made, readable, clearedInFlight
+        self.steps = []        # dicts: seq, ops, phase, made, readable, clearedInFlight, dead
         self.barriers = []     # seq numbers of lines this version cannot read
         self.highest = 0
         self.last_clearing = 0
@@ -520,14 +522,18 @@ class Model:
 
     # -- writing --------------------------------------------------------
 
-    def begin(self, ops, readable=True, made=None):
+    def begin(self, ops, readable=True, made=None, dead=False):
         self.highest += 1
         seq = self.highest
         self.steps.append({"seq": seq, "ops": ops, "phase": "begun",
                            "made": self.clock if made is None else made,
-                           "readable": readable, "clearedInFlight": False})
+                           "readable": readable, "clearedInFlight": False, "dead": dead})
         self.write_line()
         return seq
+
+    def note(self):
+        """A neutral line: every reader passes over it."""
+        self.write_line()
 
     def finish(self, seq, phase="done"):
         step = self.find(seq)
@@ -576,33 +582,56 @@ class Model:
         return ("applied", seq)
 
     def prune(self):
-        """UndoPruning.prune: one oldest run, past 50 or past 30 + 30 days."""
+        """UndoPruning.prune: one oldest run, past 50 or past 30 + 30 days.
+        A dead process's step still in flight is closed `interrupted` there
+        rather than stopping the run; a running one stops it."""
         trust = self.newest_written is None or self.newest_written - self.clock <= CLOCK_TOLERANCE_DAYS
         times = self.effective_times()
         listed = self.on_list()
         remaining = len(listed)
         for step in listed:
-            if step["phase"] == "begun" or not step["readable"]:
-                break
             too_many = remaining > STEPS_KEPT
             too_old = trust and times[step["seq"]] < self.clock - (DAYS_KEPT + GRACE_DAYS)
+            if step["phase"] == "begun":
+                if not step["dead"] or (not too_many and not too_old):
+                    break
+                step["phase"] = "interrupted"
+                remaining -= 1
+                continue
             if not too_many and not too_old:
                 break
             step["phase"] = "pruned"
             remaining -= 1
 
     def clear(self):
-        if not any(step["phase"] in ("done", "undone") or
-                   (step["phase"] == "begun" and CLEARING_TAKES_STEPS_BEGUN_BEFORE_IT) for step in self.steps):
+        """A `cleared` line: done and undone steps leave the list, and a step
+        in flight leaves it when its work ends (one rule for every clearing)."""
+        if not any(step["phase"] in ("done", "undone", "begun") for step in self.steps):
             return False
         self.last_clearing = self.highest
         for step in self.steps:
             if step["phase"] in ("done", "undone"):
                 step["phase"] = "cleared"
-            elif step["phase"] == "begun" and CLEARING_TAKES_STEPS_BEGUN_BEFORE_IT:
+            elif step["phase"] == "begun":
                 step["clearedInFlight"] = True
         self.write_line()
         return True
+
+    def newest_in_flight(self):
+        found = None
+        for step in self.offer()[2]:
+            if step["phase"] != "undone":
+                found = step
+        return found
+
+    def busy(self):
+        """What a step in flight at the top makes of Undo and Redo: not
+        available when its process is gone and its folder cannot be
+        reached (ruling 10), otherwise under way."""
+        step = self.newest_in_flight()
+        if step is not None and step["dead"] and self.folder_of(step) in self.unreachable:
+            return ("notAvailable",)
+        return ("anotherChangeIsUnderWay",)
 
     def folder_of(self, step):
         for op in step["ops"]:
@@ -615,7 +644,7 @@ class Model:
         if undo == "nothing":
             return ("nothingToUndo",)
         if undo == "busy":
-            return ("anotherChangeIsUnderWay",)
+            return self.busy()
         if undo == "notReadable":
             return ("notAvailable",)
         if self.folder_of(undo) in self.unreachable:
@@ -638,13 +667,19 @@ class Model:
         if candidate == "nothing":
             return ("nothingToRedo",)
         if candidate == "busy":
-            return ("anotherChangeIsUnderWay",)
+            return self.busy()
         if candidate == "notReadable":
             return ("notAvailable",)
         if self.folder_of(candidate) in self.unreachable:
             return ("notAvailable",)
         result = plan(candidate["ops"], False, self.pages)
         if result[0] == "changedSince":
+            if not dry:
+                # Ruling 20: refused once, then only the redo branch goes.
+                for step in self.steps:
+                    if step["phase"] == "undone" and step["seq"] >= candidate["seq"]:
+                        step["phase"] = "dropped"
+                self.write_line()
             return result
         if not dry:
             self.write(result[1])
@@ -698,9 +733,13 @@ def one_trace(rng, number):
     calls = []
     length = rng.randint(SHORTEST, LONGEST)
     attempts = 0
+    redo_next = False
     while len(calls) < length and attempts < length * 20:
         attempts += 1
         roll = rng.random()
+        if redo_next:
+            roll = 0.70
+            redo_next = False
         if roll < 0.40:
             published = rng.random() < 0.6
             chosen = rng.sample(PAGE_IDS, rng.randint(1, 3))
@@ -722,27 +761,32 @@ def one_trace(rng, number):
                 call["others"] = outcome[2]
                 call["clearedTheList"] = True
         elif roll < 0.80:
-            dry = model.redo(dry=True)
-            if dry[0] == "changedSince":
-                # What a refused Redo does to the list is not ruled: no trace
-                # depends on it.
-                continue
             outcome = model.redo()
             call = {"call": "redo", "expect": outcome[0]}
             if outcome[0] == "redone":
                 call["seq"] = outcome[1]
+            if outcome[0] == "changedSince":
+                call["page"] = page_named(outcome[1])
+                call["others"] = outcome[2]
+                call["droppedTheRedo"] = True
         elif roll < 0.95:
             kind = rng.choice(["body", "body", "otherKey", "sameLine", "deletePage"] if rng.random() < 0.2
                               else ["body", "body", "otherKey", "sameLine"])
             page_id = rng.choice(PAGE_IDS)
+            candidate = model.offer()[1]
+            if isinstance(candidate, dict) and rng.random() < 0.5:
+                # Half the time, a page the next Redo would change, so the
+                # traces hold refused redos (ruling 20) as well as undos.
+                page_id = page_named(rng.choice([op["path"] for op in candidate["ops"]]))
+                kind = "sameLine"
+                redo_next = rng.random() < 0.5
             if not model.hand_edit(kind, page_id):
+                redo_next = False
                 continue
             call = {"call": "handEdit", "kind": kind, "page": page_id}
         else:
-            reason = rng.choice(["deploy", "shareUnitPlans"])
-            model.clear()
-            model.prune()
-            call = {"call": "clear", "reason": reason}
+            model.note()
+            call = {"call": "note"}
         call.update(model.summary())
         calls.append(call)
 
@@ -762,17 +806,19 @@ def one_trace(rng, number):
             break
     undone_to = final_hashes(model)
     while True:
-        if model.redo(dry=True)[0] == "changedSince":
-            break
         outcome = model.redo()
         call = {"call": "redo", "expect": outcome[0]}
         if outcome[0] == "redone":
             call["seq"] = outcome[1]
+        if outcome[0] == "changedSince":
+            call["page"] = page_named(outcome[1])
+            call["others"] = outcome[2]
+            call["droppedTheRedo"] = True
         call.update(model.summary())
         calls.append(call)
         if outcome[0] != "redone":
             break
-    hand_edited = any(call["call"] in ("handEdit", "clear") for call in calls)
+    hand_edited = any(call["call"] == "handEdit" for call in calls)
     return {"name": "trace-%03d" % number, "handEdits": hand_edited, "calls": calls,
             "afterUndoingAll": undone_to, "final": final_hashes(model)}
 
@@ -796,7 +842,7 @@ def generate(seed=SEED, count=TRACE_COUNT):
     rng = random.Random(seed)
     traces = [one_trace(rng, number + 1) for number in range(count)]
     return {
-        "note": "Generated by scripts/make_undo_traces.py (seed %d) - never edited by hand; run it again instead, and commit what it writes. Each trace starts from `fixture` in an empty working folder with an empty list; write each page from utf8Hex, its exact bytes (`text` is the same page for reading, but at least one JSON reader, Foundation's, drops a byte-order mark inside a string). A `step` sets each named page's top-level `key` to the exact `line` with JournaledWrite.settingEntry's rule (the entry replaced when the key is there once, inserted after the opening fence when it is not, a block made when the page has none, the page left alone when the key is there twice or the page is gone), and is recorded through the app's own door. `expect` is what the call must come to; `head` and `redo` are the step numbers the folded list must answer after it (null: none). `afterUndoingAll` is every page's SHA-256 (null: absent) once the closing run of undos has stopped; `final` the same after the closing run of redos. A trace with no hand edits and no clearings must end its undos exactly at the fixture. What a REFUSED redo does to the list is not ruled, so no trace contains one. Rules: contracts/shared-rules.json -> undo." % seed,
+        "note": "Generated by scripts/make_undo_traces.py (seed %d) - never edited by hand; run it again instead, and commit what it writes. Each trace starts from `fixture` in an empty working folder with an empty list; write each page from utf8Hex, its exact bytes (`text` is the same page for reading, but at least one JSON reader, Foundation's, drops a byte-order mark inside a string). A `step` sets each named page's top-level `key` to the exact `line` with JournaledWrite.settingEntry's rule (the entry replaced when the key is there once, inserted after the opening fence when it is not, a block made when the page has none, the page left alone when the key is there twice or the page is gone), and is recorded through the app's own door. `expect` is what the call must come to; `head` and `redo` are the step numbers the folded list must answer after it (null: none). `afterUndoingAll` is every page's SHA-256 (null: absent) once the closing run of undos has stopped; `final` the same after the closing run of redos. A `note` call appends one neutral note line (file-formats.json -> undoJournal.events.note: its seq the highest in the journal, with keys a reader does not know) and must change nothing. A refused undo clears the list (clearedTheList); a refused redo drops only the redo branch (droppedTheRedo, ruling 20). A trace with no hand edits must end its undos exactly at the fixture. Rules: contracts/shared-rules.json -> undo." % seed,
         "seed": seed,
         "fixture": [{"page": page_id, "path": path, "text": text, "utf8Hex": text.encode("utf-8").hex(), "shape": shape}
                     for page_id, path, text, shape in FIXTURE],

@@ -65,6 +65,13 @@ nonisolated struct UndoBarrier: Equatable, Sendable {
     let seq: Int?
 
     let position: UndoPosition
+
+    /// Every blob name its text holds: kept while its segment is.
+    var referencedBlobs: [String] = []
+
+    /// Counted in `UndoFold.unreadableLines` (a duplicate `begin`, or one
+    /// with no step, is a barrier that is not).
+    var isAnUnreadableLine: Bool = false
 }
 
 /// One step and where it stands.
@@ -86,8 +93,13 @@ nonisolated struct UndoStepRecord: Equatable, Sendable {
     let beginPosition: UndoPosition
 
     /// A clearing happened while it was in flight; when its work ends on the
-    /// list, it leaves it (`UndoFold.clearingTakesStepsBegunBeforeIt`).
+    /// list, it leaves it (`undo.rule.clearing`: the director's ruling 3 on
+    /// U1's second reviews, a fixed rule for every clearing).
     var clearedWhileInFlight: Bool = false
+
+    /// For a step this version cannot read: every blob name its `begin` line
+    /// holds, kept while the step is on the list.
+    var referencedBlobs: [String] = []
 
     /// The step's `madeAt`, read once when its `begin` is folded.
     let madeAt: Date?
@@ -161,14 +173,6 @@ nonisolated struct UndoFold: Equatable, Sendable {
 
     // MARK: - Stored properties
 
-    /// The rule that is with Russell (#899, the director's ruling 13 on U1's
-    /// review): a step that BEGAN before a clearing (a deploy, say) and
-    /// finished after it is cleared too, because "nothing before it can be
-    /// undone" means begun before it. True is the recommended answer; false
-    /// lets such a step stay on the list. The case is
-    /// `undo.stackCases` → "pending Russell: a step begun before a deploy".
-    static let clearingTakesStepsBegunBeforeIt: Bool = true
-
     /// How far a written time may be ahead of the clock and still be
     /// trusted: a day. A line further ahead was written by a clock set
     /// forward, or the clock is now set back.
@@ -206,6 +210,12 @@ nonisolated struct UndoFold: Equatable, Sendable {
 
     /// The newest written time on any line.
     var newestWrittenAt: Date? = nil
+
+    /// Each segment's own record: the newest written time on any line in
+    /// it. A segment holding a barrier is deleted only once this is past
+    /// the limits on the disk (the director's ruling 5 on U1's second
+    /// reviews).
+    var segmentNewestAt: [Int: Date] = [:]
 
     /// The most recent clearing: its `seq` and where it is.
     var lastClearingSeq: Int = 0
@@ -252,14 +262,22 @@ nonisolated struct UndoFold: Equatable, Sendable {
         return result
     }
 
-    /// Whether any line or step anywhere is one this version cannot read:
-    /// then nothing is deleted (the director's ruling 2).
+    /// The segments that hold a line this version cannot read.
+    var segmentsHoldingABarrier: Set<Int> {
+        var result: Set<Int> = []
+        for barrier in barriers {
+            result.insert(barrier.position.segment)
+        }
+        return result
+    }
+
+    /// Whether any line or step on the disk is one this version cannot read.
     var holdsAnythingUnreadable: Bool {
-        if !barriers.isEmpty || unreadableLines > 0 {
+        if !barriers.isEmpty {
             return true
         }
         for seq in orderedSeqs {
-            if let record = records[seq], !record.isReadable {
+            if let record = records[seq], !record.isReadable, record.phase.isOnTheList {
                 return true
             }
         }
@@ -283,10 +301,23 @@ nonisolated struct UndoFold: Equatable, Sendable {
             } else {
                 newestWrittenAt = at
             }
+            if let segmentNewest = segmentNewestAt[position.segment] {
+                if at > segmentNewest {
+                    segmentNewestAt[position.segment] = at
+                }
+            } else {
+                segmentNewestAt[position.segment] = at
+            }
         }
         guard let event = line.event, let kind = UndoEventKind(rawValue: event.event) else {
             unreadableLines += 1
-            barriers.append(UndoBarrier(seq: line.seq, position: position))
+            barriers.append(UndoBarrier(
+                seq: line.seq, position: position,
+                referencedBlobs: line.referencedBlobs, isAnUnreadableLine: true
+            ))
+            return
+        }
+        if kind == .note {
             return
         }
         if kind == .cleared {
@@ -295,18 +326,20 @@ nonisolated struct UndoFold: Equatable, Sendable {
         }
         if kind == .begin {
             guard let step = event.step else {
-                barriers.append(UndoBarrier(seq: event.seq, position: position))
+                barriers.append(UndoBarrier(seq: event.seq, position: position, referencedBlobs: line.referencedBlobs))
                 return
             }
             if records[event.seq] != nil {
                 // Two steps with one number: never a guess.
-                barriers.append(UndoBarrier(seq: event.seq, position: position))
+                barriers.append(UndoBarrier(seq: event.seq, position: position, referencedBlobs: line.referencedBlobs))
                 return
             }
-            records[event.seq] = UndoStepRecord(
+            var record: UndoStepRecord = UndoStepRecord(
                 step: step, phase: .begun, process: event.process,
                 segments: [position.segment], beginPosition: position
             )
+            record.referencedBlobs = line.referencedBlobs
+            records[event.seq] = record
             orderedSeqs.append(event.seq)
             return
         }
@@ -330,8 +363,11 @@ nonisolated struct UndoFold: Equatable, Sendable {
     }
 
     /// A `cleared` line: everything done or undone with a number up to its
-    /// own leaves the list; a step in flight leaves it when its work ends
-    /// (the pending rule above).
+    /// own leaves the list, and a step in flight then (another process's,
+    /// begun before the clearing was written) leaves it when its work ends:
+    /// its own `applied`, `undone` or `redone` records nothing undoable. One
+    /// fixed rule for every clearing (the director's ruling 3 on U1's second
+    /// reviews, replacing the constant that was held for Russell).
     mutating func takeClearing(seq: Int, at position: UndoPosition) {
         lastClearingSeq = max(lastClearingSeq, seq)
         lastClearingPosition = position
@@ -343,7 +379,7 @@ nonisolated struct UndoFold: Equatable, Sendable {
                 record.phase = .cleared
                 record.segments.insert(position.segment)
                 records[number] = record
-            } else if record.phase.isInFlight && UndoFold.clearingTakesStepsBegunBeforeIt {
+            } else if record.phase.isInFlight {
                 record.clearedWhileInFlight = true
                 record.segments.insert(position.segment)
                 records[number] = record
@@ -351,12 +387,32 @@ nonisolated struct UndoFold: Equatable, Sendable {
         }
     }
 
+    /// Forgets what a deleted segment held that only it could hold: its
+    /// barriers and its own record of time. Called when a segment is
+    /// deleted from the oldest end, so the fold kept by a process agrees
+    /// with a fold read whole afterwards.
+    mutating func forgetSegment(_ number: Int) {
+        var kept: [UndoBarrier] = []
+        for barrier in barriers {
+            if barrier.position.segment == number {
+                if barrier.isAnUnreadableLine {
+                    unreadableLines -= 1
+                }
+            } else {
+                kept.append(barrier)
+            }
+        }
+        barriers = kept
+        segmentNewestAt[number] = nil
+        segmentsSeen.remove(number)
+    }
+
     /// The table of moves (`undoJournal.folding.moves`): where a step goes
     /// from where it stands on each event, or nil when the event does not
     /// follow (and is ignored).
     static func phase(after current: UndoStepPhase, on kind: UndoEventKind, phase: String?) -> UndoStepPhase? {
         switch kind {
-        case .begin, .cleared:
+        case .begin, .cleared, .note:
             return nil
         case .applied:
             return current == .begun ? .done : nil
@@ -430,10 +486,10 @@ nonisolated struct UndoFold: Equatable, Sendable {
         return result
     }
 
-    /// The moment the list is judged at: the clock, or the newest step time
-    /// when the clock is behind it by no more than a day. A step time further
-    /// ahead of the clock is not trusted, so a clock set forward and put
-    /// right brings the list back.
+    /// The moment the list is judged at: the clock, or the latest step time
+    /// that is no more than a day ahead of the clock, when one is. A step
+    /// time further ahead of the clock is not trusted, so a clock set forward
+    /// and put right brings the list back.
     func referenceTime(now: Date) -> Date {
         var judged: Date = now
         let times: [Int: Date] = effectiveTimes()

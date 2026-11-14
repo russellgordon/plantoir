@@ -13183,14 +13183,16 @@ which is still open. The `windows` issue for #833 lists them.
 The mac's journal core is described in `documentation/09-mac-app.md` →
 "Undo and Redo: one list for the app (#899)", with what was measured and
 what was rejected. **Do not start it until U1's fix reviews have cleared**:
-the format changed once after U1's two reviews, before any Windows reader
-existed, so that it would not change again under one, and the issue says
-when that is settled.
+the format changed after U1's two reviews and again after its two fix
+reviews (Russell's rulings 17 to 20 and the director's rulings on them),
+before any Windows reader existed, so that it would not change again under
+one, and the issue says when that is settled.
 
 Windows inherits free: the format (`contracts/file-formats.json` →
 `undoJournal`, which a reader is meant to be built from alone), the rule and
 every case (`contracts/shared-rules.json` → `undo`: `rule`, `clearReasons`,
-`checkCases`, `stackCases`, `stepCases`, `recoveryCases`), the 20 traces in
+`checkCases`, `stackCases`, `stepCases`, `recoveryCases`, `deployedCases`,
+and `knownLimits`, which says what is deliberately not fixed), the 20 traces in
 `contracts/undo-traces.json`, and `scripts/test_make_undo_traces.py`, which
 `PythonToolchainTests` runs and which checks the traces and the cases
 against a reference model of the same rules. It reads the traces with CR LF
@@ -13203,11 +13205,31 @@ revised:
 - **Every object is open.** Only `kind` is required of an op, and only
   `seq`, `madeAt` and `ops` of a step. A line, step or op a reader cannot
   read is KEPT (`undoJournal.unknown`): its `seq` still counts for the next
-  number, nothing it might name is deleted (a fold holding anything
-  unreadable deletes no blob or segment), and while it stands at or above
-  the newest step Undo and Redo are not available. A typed reader that
-  throws on a field it does not expect, and skips the line, is the bug the
-  mac's first version had: it then undid the step BELOW a newer one.
+  number, every blob name its text holds (64 lower-case hex characters) is
+  kept, its segment is kept until the newest `at` written in that segment is
+  more than 60 days old, and while it stands at or above the newest step
+  Undo and Redo are not available. A typed reader that throws on a field it
+  does not expect, and skips the line, is the bug the mac's first version
+  had: it then undid the step BELOW a newer one. The one exception is the
+  `note` event: a reader passes over a note whatever else it carries (no
+  move, no barrier, nothing kept for it); it exists so a later version can
+  add a record an older reader skips.
+- **Two clearings only, and one rule for steps in flight.** A `cleared`
+  line is written for a refused Undo (`changedSince`, ruling 13) and for a
+  step recovery closes `interrupted`; never for a deploy or for sharing unit
+  plans (rulings 17 and 18). A step another process has in flight when a
+  clearing is written leaves the list when its own work ends. A refused
+  REDO writes `dropped` (reason `redoRefused`) for the undone steps from it
+  up, and clears nothing (ruling 20). A dead process's step that cannot be
+  settled is never left in flight for ever: recovery closes it
+  `interrupted` when its put-back cannot be planned, and pruning closes it
+  `interrupted` (reason `unsettled`, no clearing) once it is past the
+  limits.
+- **Whether a step was deployed is read from the deploy markers**, never
+  from the journal (`undo.rule.deployed`, `deployedCases`): the newest
+  fragment per destination of the section's published-pages record, which
+  `deploy.py` and `deploy.ps1` already write. Nothing on the Windows side
+  writes a deploy into the journal, and nothing should.
 - **The limits are judged when the list is read**, with the clock rules of
   `undo.rule.limits`, not only when the next step is written.
 - **`folder-id` is shared by both apps** on a synced folder: written lower
@@ -13230,17 +13252,21 @@ It owes, in this order (the contract review's recommendation):
    retries a refused rename and names the file still in use (W5).
 5. Write-ahead and recovery, and the `recoveryCases`, including
    `interrupted` (a file changed by hand stops recovery putting the whole
-   step back: what can be verified is put back and the list is cleared).
+   step back: what can be verified is put back and the list is cleared),
+   content missing (closed and cleared), a file in use during recovery
+   (left for the next lock: on Windows this is the everyday case, W5), and
+   a step in flight in another process when the clearing is written.
 6. The traces.
 7. `plantoir-mcp.exe` told the same folder as the window (W4).
+8. `deployedCases`: a pure function, for U6's offer to deploy.
 
 Until each is built it is a named gap. What goes red on that side the day
 U1 merges, measured by reading the tests rather than running them: the
 trail test that enumerates `activityTrail.mustRecord`, for the two events
 `undo could not record a step` and `undo rolled back`, which go in
-`NamedGapLedger` against #899. The six case lists and the traces are read
+`NamedGapLedger` against #899. The case lists and the traces are read
 by key, so nothing reads them yet and they go red nowhere: they are unrun,
-not failing. Ruling 2 puts #899 in v2.0.0 and the cut waits for it, so
+not failing (`deployedCases` included). Ruling 2 puts #899 in v2.0.0 and the cut waits for it, so
 these gaps hold the cut by design.
 
 Two details found on the mac matter there too: a JSON reader may drop a

@@ -25,8 +25,17 @@ import Foundation
 /// "never while a change is applied", so two processes cannot repair the
 /// same step at once. It is rare (a crash) and bounded by the step's size.
 ///
-/// A step whose working folder cannot be reached, or that this version
-/// cannot read, is left as it is.
+/// A put-back that cannot be planned (content it needs is missing, or a
+/// file it must move is in the way) can never succeed later either: the
+/// step is closed `interrupted` (reason `couldNotPutBack`, naming the files
+/// left part way) and the list cleared, exactly as for a hand edit. A swap
+/// that is refused (a file another program holds) is left to be tried again
+/// at the next lock. A step whose working folder cannot be reached, or that
+/// this version cannot read, is left as it is while it is on the list, and
+/// Undo is not available while it is the newest (ruling 10); pruning closes
+/// it once it is past the limits (`UndoPruning`), so nothing stays in flight
+/// for ever (the director's ruling 4 on U1's second reviews: measured
+/// before, 121 steps and none pruned behind one such step).
 nonisolated enum UndoRecovery {
 
     // MARK: - Functions
@@ -189,9 +198,23 @@ nonisolated enum UndoRecovery {
                 let back: UndoDirection = startedFromBefore ? .backward : .forward
                 let plan: UndoPlan = UndoCheck.plan(opsToPutBack, direction: back, root: root, journal: writer.journal)
                 guard case .ready(let targets, _) = plan else {
-                    return nil
+                    // It can never be put back: closed, never left in flight.
+                    var leftPartWay: [String] = Array(endPaths).sorted()
+                    for path in inTheWay where !leftPartWay.contains(path) {
+                        leftPartWay.append(path)
+                    }
+                    let closing: [UndoEventLine] = [
+                        UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "couldNotPutBack", paths: leftPartWay),
+                        UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue),
+                    ]
+                    if !UndoRecovery.write(closing, step: step, writer) {
+                        return nil
+                    }
+                    UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, 0, leftPartWay.count)
+                    return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
                 }
                 if UndoSwap.swap(targets, label: label + "-recover") != UndoSwapResult.swapped {
+                    // A file in use: tried again at the next lock.
                     return nil
                 }
                 putBack = targets.count
@@ -216,6 +239,15 @@ nonisolated enum UndoRecovery {
                 }
             }
         }
+        if !UndoRecovery.write(events, step: step, writer) {
+            return nil
+        }
+        return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: outcome)
+    }
+
+    /// Appends recovery's lines, a clearing's `seq` the highest in the
+    /// journal at that moment, and makes them durable.
+    static func write(_ events: [UndoEventLine], step: UndoStep, _ writer: UndoJournalWriter) -> Bool {
         do {
             for event in events {
                 var written: UndoEventLine = event
@@ -226,9 +258,23 @@ nonisolated enum UndoRecovery {
             }
             try writer.sync()
         } catch {
+            return false
+        }
+        return true
+    }
+
+    /// The phase an unfinished step's work ended in, for its closing line.
+    static func endedPhase(of record: UndoStepRecord) -> UndoPhase? {
+        switch record.phase {
+        case .begun:
+            return .begin
+        case .undoing:
+            return .undoing
+        case .redoing:
+            return .redoing
+        default:
             return nil
         }
-        return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: outcome)
     }
 }
 
@@ -262,10 +308,16 @@ nonisolated enum UndoPruning {
     /// Prunes one OLDEST run of the list: past the newest fifty, or made
     /// more than thirty days plus a grace of thirty before the clock (never
     /// while the clock is behind the journal). It stops at the first step
-    /// that stays, so no step newer than one kept is ever pruned. Then it
-    /// deletes content and old segments nothing kept can name, unless the
-    /// journal holds anything this version cannot read. Inside the lock
-    /// only, and never failing a caller.
+    /// that stays, so no step newer than one kept is ever pruned. A step a
+    /// DEAD process left in flight (its folder unreachable, a file in use,
+    /// or a step this version cannot read) is closed there as `interrupted`
+    /// with reason `unsettled`, naming every file it names, rather than
+    /// stopping the run for good; no clearing goes with it, because nothing
+    /// older than it is offered any more and a clearing would take every
+    /// newer step. A step a running process holds stops the run. A step this
+    /// version cannot read is pruned like any other once past the limits.
+    /// Then it deletes the content and old segments nothing kept can need.
+    /// Inside the lock only, and never failing a caller.
     static func prune(_ writer: UndoJournalWriter) {
         let fold: UndoFold = writer.fold
         let now: Date = writer.journal.now()
@@ -276,13 +328,34 @@ nonisolated enum UndoPruning {
         let list: [UndoStepRecord] = fold.stepsOnTheList
         var remaining: Int = list.count
         for record in list {
-            if record.phase.isInFlight || !record.isReadable {
-                break
-            }
             let tooMany: Bool = remaining > UndoSwitch.stepsKept
             var tooOld: Bool = false
             if trustTheClock, let time = times[record.step.seq], time < ageCutoff {
                 tooOld = true
+            }
+            if record.phase.isInFlight {
+                if let process = record.process, writer.journal.processIsAlive(process) {
+                    break
+                }
+                if !tooMany && !tooOld {
+                    break
+                }
+                guard let ended = UndoRecovery.endedPhase(of: record) else {
+                    break
+                }
+                var paths: [String] = []
+                for op in record.step.ops {
+                    if let path = op.path, !paths.contains(path) {
+                        paths.append(path)
+                    }
+                }
+                do {
+                    try writer.append(UndoEventLine(seq: record.step.seq, event: .interrupted, phase: ended, reason: "unsettled", paths: paths))
+                } catch {
+                    return
+                }
+                remaining -= 1
+                continue
             }
             if !tooMany && !tooOld {
                 break
@@ -294,11 +367,8 @@ nonisolated enum UndoPruning {
             }
             remaining -= 1
         }
-        if writer.fold.holdsAnythingUnreadable {
-            return
-        }
         deleteUnneededContent(writer)
-        deleteUnneededSegments(writer)
+        deleteUnneededSegments(writer, now: now, trustTheClock: trustTheClock)
     }
 
     /// Whether a step's content is still needed: while it is on the list.
@@ -306,7 +376,12 @@ nonisolated enum UndoPruning {
         return record.phase.isOnTheList
     }
 
-    /// Blobs no step still on the list names.
+    /// Blobs nothing kept can need: none a step on the list names (an op's
+    /// `blobs` and hashes, and for a step this version cannot read every
+    /// blob name its line holds), and none a line this version cannot read
+    /// holds, while that line's segment is kept (the director's ruling 5 on
+    /// U1's second reviews: an unreadable line stops the deletion only of
+    /// what it could reference).
     static func deleteUnneededContent(_ writer: UndoJournalWriter) {
         var needed: Set<String> = []
         for seq in writer.fold.orderedSeqs {
@@ -317,6 +392,14 @@ nonisolated enum UndoPruning {
                 for name in op.namedBlobs {
                     needed.insert(name)
                 }
+            }
+            for name in record.referencedBlobs {
+                needed.insert(name)
+            }
+        }
+        for barrier in writer.fold.barriers {
+            for name in barrier.referencedBlobs {
+                needed.insert(name)
             }
         }
         let content: URL = writer.journal.contentFolderURL
@@ -336,11 +419,17 @@ nonisolated enum UndoPruning {
 
     /// Old segments, from the oldest end only, while they hold no event of a
     /// step still on the list and are older than the segment holding the
-    /// highest step number (so a number is never used twice).
-    static func deleteUnneededSegments(_ writer: UndoJournalWriter) {
+    /// highest step number (so a number is never used twice). A segment
+    /// holding a line this version cannot read goes too, once its own record
+    /// (the newest time written in it) is past the limits on the disk and
+    /// the clock is trusted, like any other: never while it holds no time.
+    static func deleteUnneededSegments(_ writer: UndoJournalWriter, now: Date, trustTheClock: Bool) {
         guard let numbers = try? writer.journal.segmentNumbers(), numbers.count > 1 else {
             return
         }
+        let ageLimit: Double = Double(UndoSwitch.daysKept + UndoFold.deletionGraceDays) * 86_400
+        let ageCutoff: Date = now.addingTimeInterval(-ageLimit)
+        let barrierSegments: Set<Int> = writer.fold.segmentsHoldingABarrier
         var needed: Set<Int> = []
         for seq in writer.fold.orderedSeqs {
             guard let record = writer.fold.records[seq], stillNeeds(record) else {
@@ -356,7 +445,15 @@ nonisolated enum UndoPruning {
             if needed.contains(number) || number >= writer.fold.highestSeqSegment {
                 return
             }
-            try? FileManager.default.removeItem(at: writer.journal.segmentURL(number: number))
+            if barrierSegments.contains(number) {
+                guard trustTheClock, let newest = writer.fold.segmentNewestAt[number], newest < ageCutoff else {
+                    return
+                }
+            }
+            if (try? FileManager.default.removeItem(at: writer.journal.segmentURL(number: number))) == nil {
+                return
+            }
+            writer.forgetSegment(number)
             index += 1
         }
     }

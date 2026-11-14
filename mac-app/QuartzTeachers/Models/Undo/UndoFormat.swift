@@ -109,11 +109,18 @@ nonisolated struct UndoReadLine: Sendable {
     /// The event, or nil: the line is not one this version can read.
     let event: UndoEventLine?
 
+    /// For a line this version cannot read, and for a `begin` whose step it
+    /// cannot read: every blob name its text holds (64 lower-case hex
+    /// characters standing alone), so pruning keeps exactly what such a
+    /// line could need (the director's ruling 5 on U1's second reviews).
+    /// Empty for every line this version reads.
+    var referencedBlobs: [String] = []
+
     // MARK: - Functions
 
     static func read(_ line: Data) -> UndoReadLine {
         guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
-            return UndoReadLine(seq: nil, at: nil, event: nil)
+            return UndoReadLine(seq: nil, at: nil, event: nil, referencedBlobs: blobNames(in: line))
         }
         let seq: Int? = wholeNumber(object["seq"])
         var at: Date? = nil
@@ -124,20 +131,56 @@ nonisolated struct UndoReadLine: Sendable {
               let kindText = object["event"] as? String,
               let kind = UndoEventKind(rawValue: kindText),
               let seq else {
-            return UndoReadLine(seq: seq, at: at, event: nil)
+            return UndoReadLine(seq: seq, at: at, event: nil, referencedBlobs: blobNames(in: line))
+        }
+        if kind == .note {
+            // Neutral: whatever else it carries, every reader passes over it.
+            var note: UndoEventLine = UndoEventLine(seq: seq, event: .note)
+            note.at = object["at"] as? String
+            return UndoReadLine(seq: seq, at: at, event: note)
         }
         guard let event = try? JSONDecoder().decode(UndoEventLine.self, from: line) else {
-            return UndoReadLine(seq: seq, at: at, event: nil)
+            return UndoReadLine(seq: seq, at: at, event: nil, referencedBlobs: blobNames(in: line))
         }
         if kind == .begin {
             guard let step = event.step, step.seq == seq else {
-                return UndoReadLine(seq: seq, at: at, event: nil)
+                return UndoReadLine(seq: seq, at: at, event: nil, referencedBlobs: blobNames(in: line))
+            }
+            if !step.isReadable {
+                return UndoReadLine(seq: seq, at: at, event: event, referencedBlobs: blobNames(in: line))
             }
         }
         if let phase = event.phase, UndoPhase(rawValue: phase) == nil {
-            return UndoReadLine(seq: seq, at: at, event: nil)
+            return UndoReadLine(seq: seq, at: at, event: nil, referencedBlobs: blobNames(in: line))
         }
         return UndoReadLine(seq: seq, at: at, event: event)
+    }
+
+    /// Every run of exactly 64 lower-case hexadecimal characters in the
+    /// bytes, bounded by anything else: a blob name, wherever it sits.
+    static func blobNames(in line: Data) -> [String] {
+        var names: [String] = []
+        var run: [UInt8] = []
+        func endTheRun() {
+            if run.count == 64 {
+                let name: String = String(decoding: run, as: UTF8.self)
+                if !names.contains(name) {
+                    names.append(name)
+                }
+            }
+            run = []
+        }
+        for byte in line {
+            let isDigit: Bool = byte >= 0x30 && byte <= 0x39
+            let isLowerHex: Bool = byte >= 0x61 && byte <= 0x66
+            if isDigit || isLowerHex {
+                run.append(byte)
+            } else {
+                endTheRun()
+            }
+        }
+        endTheRun()
+        return names
     }
 
     /// A JSON number that is a whole number (never a Boolean), or nil.
@@ -169,9 +212,15 @@ nonisolated enum UndoEventKind: String, Sendable, CaseIterable {
     case failed
     case dropped
     case pruned
-    /// The whole list cleared: rulings 13, 14 and 16, and an interrupted
-    /// step (the director's ruling 7 on U1's review).
+    /// The whole list cleared: a refused Undo (ruling 13) and an interrupted
+    /// step (the director's ruling 7 on U1's first reviews).
     case cleared
+    /// A neutral line every reader passes over: it moves no step, is never a
+    /// barrier, never stops deletion and never clears. Known to every reader
+    /// from the first version, so a later version can record something an
+    /// older reader must simply skip (the director's ruling 2 on U1's second
+    /// reviews); U1 writes none outside the contract's cases and traces.
+    case note
 }
 
 /// What a `failed`, `rolledBack` or `interrupted` event ended.
