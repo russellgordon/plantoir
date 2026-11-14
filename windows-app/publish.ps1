@@ -88,9 +88,12 @@ function Get-FailedTests([string]$transcript) {
 }
 
 $enforceLedger = $Sign -or $CheckLedgerOnly
-$ledgerLog = Join-Path ([IO.Path]::GetTempPath()) 'plantoir-publish-ledger-check.txt'
+# One log per run (the process id in its name), so two runs never overwrite
+# each other's transcript (#862 fixes review L4).
+$ledgerLog = Join-Path ([IO.Path]::GetTempPath()) "plantoir-publish-ledger-check-$PID.txt"
 Write-Host "Checking the named-gap ledger against this build's <Version> (NamedGapLedgerTests)..." -ForegroundColor Green
-Write-Host "  This builds and runs the ledger's tests: about two minutes from a cold build, seconds when warm. Output: $ledgerLog"
+Write-Host "  This builds and runs the ledger's tests: about two minutes from a cold build, seconds when warm."
+Write-Host "  The whole output of this run is kept in $ledgerLog"
 $baselineBefore = $env:PLANTOIR_LEDGER_BASELINE
 $env:PLANTOIR_LEDGER_BASELINE = 'build'
 try {
@@ -107,23 +110,40 @@ if ($ledgerOutcome.Verdict -ne 'Passed') {
                    Where-Object { $_ -match ' is owed by #\d+ on | names the milestone ' } |
                    ForEach-Object { $_.Trim() })
     $failedTests = Get-FailedTests $ledgerRun.Output
-    $ledgerMessage = "The named-gap ledger is not clear for this build. $($ledgerOutcome.Summary)"
+    # The live output is not shown (Out-Null above), so "look further up" in
+    # the NoResult summary points at nothing: the build errors are inlined
+    # below instead, and the whole transcript is in the log.
+    $summary = $ledgerOutcome.Summary -replace 'Look further up for a build error',
+                                               'Its build errors are below; the whole output is in the log named above'
+    $ledgerMessage = "The named-gap ledger is not clear for this build. $summary"
     if ($failedTests.Count -gt 0) {
         $ledgerMessage += "`nFailing: " + (($failedTests | ForEach-Object { $_.Name }) -join ', ')
+    }
+    # Every failing test except the owed-entries fact, with its message: shown
+    # whether or not entries are owed too (#862 fixes review L5).
+    $otherFailures = @($failedTests | Where-Object { $_.Name -notlike '*.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease' })
+    foreach ($failure in $otherFailures) {
+        $ledgerMessage += "`n$($failure.Name):`n  " + (@($failure.Message | Select-Object -First 4) -join "`n  ")
+    }
+    $feedRemedy = ""
+    if (@($otherFailures | Where-Object { $_.Name -like '*.TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped' }).Count -gt 0) {
+        $feedRemedy = " The site-and-feed test means website/updates/windows.xml or site.json's version line has " +
+                      "moved ahead of the other. During a cut, a rebuild after the feed was generated: restore the " +
+                      "PREVIOUS release's feed (git checkout <previous release's commit> -- website/updates/windows.xml " +
+                      "website/updates/windows.xml.signature), run this again, and generate the feed afresh " +
+                      "(RELEASING.md -> `"The update feed (Windows)`"). If site.json moved first, put its line back " +
+                      "until the feed is made."
     }
     if ($owedLines.Count -gt 0) {
         $ledgerMessage += "`n$($owedLines.Count) ledger entries are owed by this release or an earlier one:`n  " +
                           ($owedLines -join "`n  ")
         $remedy = "A signed release cannot be cut over them: build each, or move its issue and entry to a " +
                   "later milestone with Russell's say-so (contracts/README.md -> `"Named gaps`")."
-    } elseif ($ledgerOutcome.Verdict -eq 'Failed') {
-        foreach ($failure in $failedTests) {
-            $ledgerMessage += "`n$($failure.Name):`n  " + (@($failure.Message | Select-Object -First 4) -join "`n  ")
+        if ($otherFailures.Count -gt 0) {
+            $remedy += " Another of the ledger's own tests failed as well: read its message above." + $feedRemedy
         }
-        $remedy = "No entry is owed: another of the ledger's own tests failed, so read its message above. " +
-                  "If it is TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped during a cut, website/updates/windows.xml " +
-                  "already carries an item site.json does not: the feed was generated before this rebuild. Restore " +
-                  "the committed feed first, then run this again (RELEASING.md -> `"The update feed (Windows)`")."
+    } elseif ($ledgerOutcome.Verdict -eq 'Failed') {
+        $remedy = "No entry is owed: another of the ledger's own tests failed, so read its message above." + $feedRemedy
     } else {
         $buildErrors = @($ledgerRun.Output -split "`r?`n" | Where-Object { $_ -match ': error [A-Z]+\d+' } |
                          ForEach-Object { $_.Trim() } | Select-Object -Unique -First 10)

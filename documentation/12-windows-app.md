@@ -2140,17 +2140,31 @@ two baselines, one fact:
   unsigned bundle is built anyway; `-CheckLedgerOnly` enforces the check and
   stops. The refusal names the failing tests and words its remedy by verdict
   (first review, M1): owed entries are listed with "build each, or move its
-  issue"; another of the ledger's tests failing is shown with its message
-  (for the site-and-feed fact, "restore the committed feed first"); a run with
-  no result shows its build errors. The whole transcript is kept in
-  `%TEMP%\plantoir-publish-ledger-check.txt`, and one line before the run says
-  what the wait is. Any other value of the switch is an error, so a
-  misspelling at the cut cannot quietly fall back to the lenient baseline.
+  issue"; every other failing ledger test is shown with its message, owed
+  entries or not (for the site-and-feed fact: the feed or `site.json`'s line
+  has moved ahead of the other, so restore the PREVIOUS release's feed, as
+  `RELEASING.md` → "The update feed (Windows)" says, or put the line back if
+  it moved first); a run with no result shows its build errors. The whole
+  transcript is kept in `%TEMP%\plantoir-publish-ledger-check-<pid>.txt`, one
+  per run, and two lines before the run say what the wait is and where that
+  file is. Any other value of the switch is an error, so a misspelling at the
+  cut cannot quietly fall back to the lenient baseline.
   `InstallerRunningWorkTests.PublishRefusesASignedCutWhileTheLedgerOwesThisRelease`
   reads the order and the enforcing branch out of the script, and that
   `$enforceLedger` is assigned once and the check sits inside no block (a
   wrapping `if (-not $Sign)` or a later `$enforceLedger = $false` turned it
-  red, measured).
+  red, measured). It catches the check DRIFTING out of reach, not deliberate
+  sabotage: the second review made it unreachable five other ways (a
+  `$script:` assignment, a `trap`, a forged verdict, a here-string,
+  `Set-Variable`) and it stayed green, which is the limit of reading a
+  script; the behavioural proof is `publish.ps1 -CheckLedgerOnly`, in no
+  suite.
+- **A `<Version>` the cut cannot compare is refused**: blank, `v2.0.0` or any
+  value whose first part is not a number would sort below every milestone, so
+  `NamedGapLedgerTests.BuildVersionIn` throws on it, with the same guard the
+  last-release reader has (second review, L1: before it, a blank `<Version>`
+  gave `-CheckLedgerOnly` exit 0 "nothing owed" with 116 entries owed;
+  measured after, exit 1, "cannot be compared with a milestone").
 - **An unsigned bundle is never installed over a real copy**: it carries the
   release-in-progress number, and the update check offers only a newer
   version, so that copy would never be offered the real release of the same

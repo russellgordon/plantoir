@@ -68,10 +68,23 @@ public class NamedGapLedgerTests
     /// <summary>The switch that makes the rule compare with the release being built (set by <c>publish.ps1</c>).</summary>
     internal const string BaselineSwitch = "PLANTOIR_LEDGER_BASELINE";
 
-    private static string ThisBuild()
+    private static string ThisBuild() =>
+        BuildVersionIn(File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj")));
+
+    /// <summary>
+    /// <c>&lt;Version&gt;</c> in a csproj's text, refused when its first part is
+    /// not a number (blank, "v2.0.0"): such a value sorts below every milestone,
+    /// so the cut's check would say nothing is owed. The same guard as
+    /// <see cref="LastWindowsRelease"/>'s.
+    /// </summary>
+    internal static string BuildVersionIn(string csprojXml)
     {
-        var project = XDocument.Load(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj"));
-        return project.Descendants("Version").Single().Value.Trim();
+        string version = XDocument.Parse(csprojXml).Descendants("Version").Single().Value.Trim();
+        if (VersionKey(version)[0] < 0)
+            throw new InvalidOperationException(
+                $"Plantoir.csproj's <Version> is \"{version}\", which cannot be compared with a milestone: " +
+                "write the release's number, \"2.0.0\".");
+        return version;
     }
 
     // ---- Versions compared the way website/windows_feed.py compares them -----
@@ -251,6 +264,14 @@ public class NamedGapLedgerTests
         Assert.True(CompareVersions("1.10", "1.9.9") > 0);
         Assert.Equal(0, CompareVersions("1.9.3.0", "1.9.3"));
         Assert.True(CompareVersions("1.9.3.1", "1.9.3") > 0);
+
+        // A <Version> the cut cannot compare is refused, never read as "nothing
+        // owed": blank or "v2.0.0" would sort below every milestone (#862 fixes review L1).
+        static string Csproj(string version) => $"<Project><PropertyGroup><Version>{version}</Version></PropertyGroup></Project>";
+        Assert.Equal("2.0.0", BuildVersionIn(Csproj(" 2.0.0 ")));
+        Assert.Throws<InvalidOperationException>(() => BuildVersionIn(Csproj("")));
+        Assert.Throws<InvalidOperationException>(() => BuildVersionIn(Csproj("v2.0.0")));
+        Assert.Throws<InvalidOperationException>(() => BuildVersionIn(Csproj("two")));
 
         Assert.Equal(ThisBuild(), Baseline("build").Version);
         Assert.Equal(LastWindowsRelease(), Baseline(null).Version);
