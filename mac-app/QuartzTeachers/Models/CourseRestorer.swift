@@ -29,8 +29,7 @@ enum CourseRestorer {
         /// and the course as it was is in Archived.
         case sectionRestoreStoppedPartWay(Int)
         /// The same, from a restore that made no archive first: the
-        /// assistant window's, once `assistantWindowRestoreIsStagedBeforeTheSwap`
-        /// is turned on. Unreachable while it is off.
+        /// assistant window's "Restore Section N…".
         case sectionRestoreStoppedPartWayWithNoArchive(Int)
 
         var errorDescription: String? {
@@ -240,7 +239,9 @@ enum CourseRestorer {
     /// * **The section's own folder.** Its CONTENTS are replaced in place, for
     ///   the reason `restoreBackup` gives above — Obsidian's file watcher is
     ///   anchored to a folder's identity, so the folder itself is never
-    ///   swapped, only emptied and refilled.
+    ///   swapped. Since #897 C the live contents move aside before the
+    ///   backup's move in, and a failure sends them back
+    ///   (`swapSectionInPlace`).
     ///
     /// * **This section's per-section keys in every course-level page.**
     ///   Publishing a shared page for one section writes
@@ -260,7 +261,8 @@ enum CourseRestorer {
     static func restoreSection(
         _ sectionNumber: Int,
         from item: BackupItem,
-        coursesDirectoryURL: URL
+        coursesDirectoryURL: URL,
+        hooks: SectionSwapHooks = SectionSwapHooks.real
     ) throws -> Int {
         let fileManager: FileManager = FileManager.default
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
@@ -278,7 +280,9 @@ enum CourseRestorer {
         unlockIfKeptForReference(courseAt: courseURL)
         defer { lockIfKeptForReference(courseAt: courseURL) }
 
-        let staging: URL = fileManager.temporaryDirectory.appendingPathComponent("restore-" + UUID().uuidString)
+        // Beside the courses, on their volume, so the swap below moves by
+        // renaming (#897 C).
+        let staging: URL = stagingFolderBesideTheCourses(coursesDirectoryURL)
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: staging) }
 
@@ -294,37 +298,36 @@ enum CourseRestorer {
         if !backedUpSectionExists || !backedUpSectionIsFolder.boolValue {
             throw Problem.sectionMissingFromBackup(item.courseCode, sectionNumber)
         }
+        try hooks.reached(.staged)
 
-        if assistantWindowRestoreIsStagedBeforeTheSwap {
-            // The folder only, so nothing but the failure behaviour changes.
-            // The aside folder is kept when the way back did not finish,
-            // because it then holds the only copy of what the section had.
-            let aside: URL = stagingFolderBesideTheCourses(coursesDirectoryURL)
-            do {
-                try swapSectionInPlace(
-                    sectionNumber,
-                    inCourseAt: courseURL,
-                    from: payload,
-                    outsideFiles: [],
-                    asideURL: aside,
-                    hooks: SectionSwapHooks.real,
-                    keepingWhatWasReplaced: nil
-                )
-            } catch Problem.sectionRestoreStoppedPartWay(let number) {
-                // The window makes no archive first, so it may not say one
-                // is in Archived.
-                throw Problem.sectionRestoreStoppedPartWayWithNoArchive(number)
-            } catch {
-                try? fileManager.removeItem(at: aside)
-                throw error
-            }
-            try? fileManager.removeItem(at: aside)
-        } else {
-            try replaceContents(
-                of: courseURL.appendingPathComponent(folderName),
-                with: backedUpSectionURL
+        // Staged, then swapped, with a way back: the same swap as the
+        // menu's restore, over the section folder only, so nothing but the
+        // failure behaviour changes (Russell's ruling on #897, 2026-11-13:
+        // the safer restore reaches the assistant's own too). Before it, the
+        // folder was emptied and then refilled, and a move that failed part
+        // way left it half empty. The aside folder is kept when the way back
+        // did not finish, because it then holds the only copy of what the
+        // section had.
+        let aside: URL = stagingFolderBesideTheCourses(coursesDirectoryURL)
+        do {
+            try swapSectionInPlace(
+                sectionNumber,
+                inCourseAt: courseURL,
+                from: payload,
+                outsideFiles: [],
+                asideURL: aside,
+                hooks: hooks,
+                keepingWhatWasReplaced: nil
             )
+        } catch Problem.sectionRestoreStoppedPartWay(let number) {
+            // The window makes no archive first, so it may not say one is in
+            // Archived.
+            throw Problem.sectionRestoreStoppedPartWayWithNoArchive(number)
+        } catch {
+            try? fileManager.removeItem(at: aside)
+            throw error
         }
+        try? fileManager.removeItem(at: aside)
         let notPutBack: Int = restorePerSectionKeys(
             sectionNumber, inCourseAt: courseURL, from: payload, fromTheMenu: false
         ).pagesNotPutBack
@@ -336,42 +339,7 @@ enum CourseRestorer {
         return notPutBack
     }
 
-    /// Empties a folder and refills it from another, leaving the folder itself
-    /// — and so its identity, which Obsidian's watcher holds on to — alone.
-    private static func replaceContents(of liveURL: URL, with backedUpURL: URL) throws {
-        let fileManager: FileManager = FileManager.default
-        try fileManager.createDirectory(at: liveURL, withIntermediateDirectories: true)
-
-        // Hidden files included: whatever the section had is what comes back.
-        let currentChildren: [URL] = try fileManager.contentsOfDirectory(
-            at: liveURL, includingPropertiesForKeys: nil, options: []
-        )
-        for child in currentChildren {
-            try fileManager.removeItem(at: child)
-        }
-        let restoredChildren: [URL] = try fileManager.contentsOfDirectory(
-            at: backedUpURL, includingPropertiesForKeys: nil, options: []
-        )
-        for child in restoredChildren {
-            try fileManager.moveItem(at: child, to: liveURL.appendingPathComponent(child.lastPathComponent))
-        }
-    }
-
     // MARK: - Putting ONE section back, from Restore from Backup… (#897 C)
-
-    /// Whether the built-in assistant window's "Restore Section N…" stages
-    /// the backup's files and swaps them in with a way back, as the menu's
-    /// restore does, instead of emptying the section folder first.
-    ///
-    /// **Not ruled, and OFF until it is.** Russell was asked (question 1 of
-    /// the #897 plan review) whether the crash-safety fix should reach the
-    /// assistant's own restore too; the assistant's behaviour is frozen
-    /// until he says so (#897, 2026-11-13). Turning this on is the whole
-    /// change: `restoreSection` then swaps the section folder through
-    /// `swapSectionInPlace` (the folder only: no file outside it, no
-    /// sentence and no result changes on success), and a restore that fails
-    /// part way leaves the section as it was instead of half empty.
-    static let assistantWindowRestoreIsStagedBeforeTheSwap: Bool = false
 
     /// Where a restore puts things while it works: `courses/.internal/
     /// restoring/<id>/`, on the SAME volume as the course, so every move is
@@ -428,12 +396,13 @@ enum CourseRestorer {
     /// Backup…'s "Restore Section N" (#897 C). The built-in assistant's
     /// window does not come here: it keeps `restoreSection` above.
     ///
-    /// What it adds to `restoreSection`, each a fault that reported success:
+    /// Like `restoreSection`, it is staged, then swapped, with a way back:
+    /// nothing in the course moves until the backup is unpacked, checked and
+    /// on the same volume; the live files move aside (not deleted), the
+    /// backup's move in, and a move that fails sends every moved file back
+    /// where it was. What it adds, each a fault that reported success, and
+    /// each for this route only (the assistant's window is frozen):
     ///
-    /// * **Staged, then swapped, with a way back.** Nothing in the course
-    ///   moves until the backup is unpacked, checked and on the same volume.
-    ///   The live files move aside (not deleted), the backup's move in, and a
-    ///   move that fails sends every moved file back where it was.
     /// * **The section's files outside its folder.** Its class dates, its
     ///   published record and three more come back from the backup
     ///   (`OneSectionRestore.filesOutsideTheSection`); a restore that brought
