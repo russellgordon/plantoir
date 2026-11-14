@@ -16812,3 +16812,211 @@ does not match, a canonicalised `..`), the excluded port ranges inside and
 below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
 whether an unelevated shell may listen on the block are to be measured
 there. The `windows` issue for #850 carries the list.
+
+## Undo and Redo: one list for the app (#899)
+
+Russell's rulings on #899 make Undo and Redo ONE list for the whole app:
+every change made through Plantoir (a menu, a sheet, the wizard, the
+built-in assistant's window, an outside assistant calling Plantoir's
+tools) is one step on it, strictly linear (ruling 9), kept across quits
+for the last 50 steps and 30 days, counted across the app (rulings 3 and
+5). The plan is the director's `plans/899-plan-final.md`; it is built in
+seven pieces, U1 to U7, each merged on its own behind one constant,
+`UndoSwitch.undoJournalIsLive`, which stays **off** until U7. While it is
+off the list is written in SHADOW: steps are recorded and never offered.
+Section ▸ Undo Last Change, Undo Getting Ready and the built-in assistant's
+own "undo that" work exactly as before, and no Edit ▸ Undo item exists.
+
+This section is U1, the journal core: the format, the lock, the
+write-ahead rule, recovery, the content check and the staged swap. The
+format is `contracts/file-formats.json` → `undoJournal`; the rule and its
+cases are `contracts/shared-rules.json` → `undo`; the traces are
+`contracts/undo-traces.json`. Code: `mac-app/QuartzTeachers/Models/Undo/`.
+
+### Where the list lives, and why not anywhere else
+
+`Library/Application Support/Plantoir/undo/` under the home
+`RealHome.forFiles` answers (`UndoJournalLocation`). So it follows
+`--state-dir`, and under the unit suite it is in the suite's throwaway home;
+`RealHomeTripwireTests` sees no new home lookup, because the location is
+built from `RealHome.forFiles` and nothing else. Tests that need a list of
+their own pass a folder (`UndoJournal(folderURL:)`) or set
+`UndoJournalLocation.folderOverride`.
+
+It is never in a working folder. One list spans every working folder, and
+a working folder may be synced between two computers: a journal there
+would merge two computers' lists. Each computer has its own list; the
+other computer's changes to a synced folder read as hand edits, and the
+content check refuses over them. Each working folder gets
+`courses/.internal/folder-id` (one UUID, made exclusively the first time a
+step is recorded there, `FolderIdentityFile`), because the folder's other
+identifier is a hash of its path and a step has to know its folder again
+after a move. U1 reaches a step's folder only at the path it was made at,
+when the folder there carries the step's id (`UndoReach`); Open Recent is
+the second place to look, added with the menu in U7.
+
+### The format: append-only, folded, never replaced
+
+`undo/` holds `.lock`, `computer-id`, `journal-000001.jsonl` and its
+successors (a new one past 4 MiB), and `content/<aa>/<sha256>` blobs. One
+event per line, keys sorted (`UndoEventLine.encoded`): `begin`, `applied`,
+`rolledBack`, `undoing`, `undone`, `redoing`, `redone`, `failed`, `dropped`,
+`pruned` and `cleared`. Nothing is ever replaced in place: events are
+appended, blobs are written under a temporary name and renamed with
+`RENAME_EXCL` onto a name that does not exist. The head is never stored;
+`UndoFold` folds the events every time the list is read. A reader counts
+only complete lines that parse; a torn last line (no line feed) is ignored,
+and the next writer cuts it off inside the lock.
+
+**Rejected:** a `head.json` beside the journal (a replaced file, which
+Windows refuses while any reader holds it: the Windows director measured
+1,136 of 2,000 replaces lost with one try, W2); one JSON file per step plus
+a head pointer (the plan review's shape, a replace on every move of the
+head); SQLite (a third library on Windows for something a log does, with
+its own locking trap on network and synced volumes); AppKit's
+`UndoManager` as the store (per window, in memory, unreadable by an
+`--mcp-stdio` process or by Windows).
+
+### The lock and the read rule
+
+Every change takes one exclusive lock, reads the journal fresh inside it,
+and holds it only for journal events, never while a change is applied.
+The mac's mechanism is `flock(LOCK_EX)` on `undo/.lock` (`UndoLock`): it
+belongs to the open file, so the app, an `--mcp-stdio` process, a
+scheduled run and two `UndoJournal` objects in one process all exclude
+each other, and the kernel releases it when the holder dies. The contract
+names the rule, not the mechanism; Windows uses an exclusive open of the
+same file (W3).
+
+It is taken without blocking and retried at a deliberate pace, for at most
+two seconds (a quarter of a second while the list is in shadow). **Measured
+in the U1 harness:** with the pause between tries growing to a tenth of a
+second, two writers making 200 steps each as fast as they could starved
+one another: two steps were refused after their two seconds and one was
+left begun (398 recorded of 400). With the pause capped at two milliseconds, 400 of 400, in one
+process and in two. A step's closing event waits up to ten seconds,
+because a step left unfinished holds Undo back until its process is gone.
+
+### Write-ahead, and recovery from the content
+
+A step runs in three phases (`JournaledWrite.perform`): under the lock,
+recovery, the redo branch dropped, the next number, the blobs, and a
+`begin` line naming every op's expected state, made durable with
+`F_FULLFSYNC`; the change, outside the lock; then `applied`, under the
+lock, with pruning. Undo and redo have the same shape (`undoing` then
+`undone`, `redoing` then `redone`), and an undo or redo first checks every
+op and writes nothing if any is in the way.
+
+Recovery (`UndoRecovery`) runs inside the lock before every new step, undo
+and redo. For an unfinished event whose process is gone (pid, then the
+process table's name and start time, the work leases' own
+`ProcessLiveness` rule), it reads what each op changed: none took effect,
+`failed`; all of it, completed; some of it, what took effect is put back
+and the step is `rolledBack`, with a trail line; something now neither,
+nothing written and the work ended. Leftover staged files for that step are
+deleted. The host name is recorded and never compared: a Mac's host name
+changes with its network, and the list is this computer's own. In shadow
+recovery never writes into a working folder. Recovery at every launch of
+the app is U7's (it needs the app's launch path); until then the first new
+step after a launch settles what a crash left.
+
+**Measured** (Apple M4 Pro, APFS, the U1 harness): `F_FULLFSYNC` of a 1 KB
+append 4.0 to 4.2 ms median against 0.03 ms for a plain `fsync`, so only
+the events recovery cannot do without (`begin`, `undoing`, `redoing`) are
+made durable that way, and every other release of the lock is a plain
+`fsync`: a closing line lost to a power cut is put back by recovery from
+the content. A one-page step costs 5 to 6 ms in all; a step publishing 233
+pages 34 ms to begin (26 ms of it working out the line ops and proving
+them both ways) and 36 ms in all, with a 19 KB line. The plan's earlier 1 ms
+for writing that step did not include the flush or the proof.
+
+### Ops and the content check
+
+U1 builds `writeFile` (a whole file, by SHA-256, with both copies as blobs)
+and `editLine` (one top-level front-matter key's entry: its line and the
+lines its value runs on to, carriage returns kept), and records
+`recompute` (a file kept true by a rule, such as the section's front page,
+re-derived after the other ops; run by U2). The rest of plan 3.1 arrives
+with U2 and U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
+only when applying its ops to the before text gives the after text byte for
+byte AND undoing them gives the before text back; otherwise the change is
+one `writeFile`. So a page the line model cannot describe exactly falls back
+to the whole file, never to a guess.
+
+The check (`UndoCheck.state`) compares the content of exactly what the op
+changed, never a time (ruling 4, W6): an entry byte for byte, not with
+Swift's `==` (which calls a precomposed and a decomposed é equal); a file
+by its hash. A missing page is never "already back" for a line op; the key
+written twice, a fence that never closes, a folder or a file that is not
+UTF-8 is changed since. The case list is `undo.checkCases`.
+
+**Measured, and the reason for one contract detail:** Foundation's
+`JSONSerialization` drops a byte-order mark inside a JSON string (a fixture
+page beginning with one came back without it), and `String(contentsOf:)`
+drops a leading one from a file. So the traces carry each fixture page's
+exact bytes as `utf8Hex`, the check cases give such a page as `bytesHex`,
+and the shadow record of a publish takes each page's `before` from the
+disk's own bytes rather than from the text the action read.
+
+### All or nothing, staged then swapped (ruling 4, W5)
+
+`UndoSwap` writes every new content beside its target as a dot file
+(`.<name>.plantoir-undo-<seq>-<apply|undo|redo>-new`), and only when all
+are written swaps them in with one rename each, re-reading each target
+first. The original is kept under a second name (a hard link, so its bytes,
+mode and owner are its own; a copy on a volume without links) until every
+swap is in. If one cannot go in, the swaps already made are reversed and
+the file is named (`undo.stepCases`). A rename happened or it did not, so
+a process killed part way leaves each file wholly old or wholly new.
+
+### Linear, cleared, pruned
+
+Undo acts on the newest step that is not undone and Redo on the most
+recently undone; a newer step still in flight refuses both. Any new step
+drops the redo branch. The whole list is CLEARED by one `cleared` line with
+its reason (`undo.clearReasons`): when Undo refuses a step because what it
+changed was changed by hand since (ruling 13, which replaced the plan's
+recommendation that the refused step stay), when a deploy happens
+(ruling 14, which replaced ruling 1: a deploy is never a step), and when
+unit plans are shared (ruling 16). Setting up an outside assistant is not
+on the list and clears nothing. What a refused Redo does to the list is
+not ruled, so nothing depends on it yet. Pruning keeps 50 steps and 30
+days; content no step on the list names is deleted, and old segments only
+from the oldest end, so a step can never come back to life because the
+line that ended it was deleted.
+
+### The one action recorded in U1
+
+Publishing and hiding pages (`AssistToolRunner.carryOut`, from the menu,
+the built-in window and an outside assistant) is recorded in shadow beside
+today's history by `UndoShadowPublish`: before `AssistPublishPlanner.apply`
+runs, it works out what apply will write with the same functions and
+records that; afterwards the step is kept (`applied`) only if what was
+written is exactly what was recorded, and is `failed` otherwise. Apply, its
+result, its sentences and its order of effects are unchanged, and a list
+that cannot be written leaves the action exactly as it was with one trail
+line (`UndoShadowPublishTests.testAListThatCannotBeWrittenChangesNothingAboutTheAction`).
+Ruling 15 as finally given makes the built-in window's "undo that" the same
+as Edit ▸ Undo; that routing is a later piece, behind the switch, and U1
+changes nothing the window does.
+
+`UndoWriterScanTests` lists every file under `Models` and `Views` that
+writes files, with its count and why: the door, not a step, or the piece of
+#899 that will wire it. U7 cannot flip the switch while any "waits for"
+remains.
+
+### The U1 harness
+
+Every core file in `Models/Undo/` except `UndoAppSeams.swift` and
+`UndoShadowPublish.swift` compiles without the app, beside copies of
+`ProcessLiveness`, `PageVisibilityReader`, `PageFrontmatter`,
+`CalendarDay` and `AssistPageVisibility`, and
+`Tests/QuartzTeachersTests/UndoContractReplay.swift` holds every contract
+replay without XCTest. The harness the director keeps under
+`measure/899-u1/` runs them for real: the 20 traces (524 calls), the
+check, stack, step and recovery cases, a torn last line, an unwritable
+list, two writers in one process, two PROCESSES appending 200 steps each to
+one list (interleaved, 400 distinct rising numbers, nothing lost), and a
+child process killed with `SIGKILL` at each of ten kill points, after which
+recovery left every file wholly before or after. The two-process test in
+the app (`Plantoir --mcp-stdio` beside the window's runner) is U7's.

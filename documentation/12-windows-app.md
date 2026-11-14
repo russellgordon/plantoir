@@ -12808,3 +12808,28 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## Undo and Redo: the journal Windows owes (#899, piece U1)
+
+The mac's journal core is described in `documentation/09-mac-app.md` →
+"Undo and Redo: one list for the app (#899)", with what was measured and
+what was rejected. Windows inherits free: the format
+(`contracts/file-formats.json` → `undoJournal`), the rule and every case
+(`contracts/shared-rules.json` → `undo`: `rule`, `checkCases`,
+`stackCases`, `stepCases`, `recoveryCases`, `clearReasons`), the 20 traces
+in `contracts/undo-traces.json`, and `scripts/test_make_undo_traces.py`,
+which `PythonToolchainTests` runs already and which checks the traces
+against a reference model of the same rules. It owes the journal in
+`Plantoir.Core` under `%LOCALAPPDATA%\Plantoir\undo\` (following
+`--state-dir`): an exclusive open of `undo\.lock` (`FileShare.None`,
+retried) for every change, readers that open with
+`FileShare.ReadWrite | FileShare.Delete` and retry a sharing violation for a
+bounded time and never call the list unreadable for it (W2, W3),
+`plantoir-mcp.exe` told the same folder as the window (W4), a staged swap
+that retries a refused rename and names the file still in use (W5), the two
+trail events (`undo could not record a step`, `undo rolled back`), and a
+replay of every case and trace through its own journal. Until then each is
+a named gap in `NamedGapLedger`, against #899 (W9). Two details found on
+the mac matter there too: a JSON reader may drop a byte-order mark inside a
+string (write the fixture pages from `utf8Hex`), and only `begin`,
+`undoing` and `redoing` need the expensive flush.
