@@ -2453,10 +2453,28 @@ nonisolated enum AssistWording {
         return "This section has no \(noun.singular) pages yet, so there is nothing to copy."
     }
 
-    static func menuAddClassGreyedRenameUnfinished(noun: ClassNoun = .class, unit: String = "unit") -> String {
+    /// The rename's line names only the ways the rename holds back
+    /// (`SubjectMenuRules.AddClassReasonLine`): a way greyed for another
+    /// reason is not promised back by finishing it (the fix review's
+    /// finding 1). In a numbered course the word renamed is the pages' own
+    /// name, so the line says that, and only a copy can be held back there.
+    static func menuAddClassGreyedRenameUnfinished(
+        noun: ClassNoun = .class, unit: String = "unit", newUnit: Bool = true, copy: Bool = true,
+        numbered: Bool = false
+    ) -> String {
+        var what: String = "a copy"
+        if newUnit && copy {
+            what = "a new \(unit) or a copy"
+        } else if newUnit {
+            what = "a new \(unit)"
+        }
+        if numbered {
+            return "A rename of what this course calls its \(noun.plural) stopped part way, so some are "
+                 + "named the old way and some the new. Finish the rename in the course's settings to add "
+                 + "\(what)."
+        }
         return "A rename of what this course calls a \(unit) stopped part way, so some \(noun.plural) "
-             + "are named the old way. Finish the rename in the course's settings to add a new \(unit) "
-             + "or a copy."
+             + "are named the old way. Finish the rename in the course's settings to add \(what)."
     }
 
     /// A copy asked for after the section's class dates went missing.

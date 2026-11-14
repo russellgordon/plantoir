@@ -4545,21 +4545,20 @@ final class AssistToolRunner {
         }
         let course: Course = located.course
         let noun: ClassNoun = course.configuration.classNoun
-        if UnitWordRenamer.interruptedRenameTarget(in: course) != nil {
+        if UnitWordRenamer.interruptedRenameTarget(in: course, clearingAStaleRecord: false) != nil {
             return .failure(AssistWording.menuUnitWordRenameUnfinished(noun: noun))
         }
 
-        // Both sides in the disk's own spelling, as the app compares folders
-        // everywhere (`FolderIdentity.canonicalPath`): the class folders are
-        // listed with links in their ancestors resolved, and a working folder
-        // opened through a link would otherwise never match (#897a review,
-        // finding 8).
-        let wanted: String = FolderIdentity.canonicalPath(
-            course.directoryURL.appendingPathComponent(path).standardizedFileURL.path
-        )
+        // Both sides with their FOLDER in the disk's own spelling, as the app
+        // compares folders (`FolderIdentity.canonicalPath`): the class folders
+        // are listed with links in their ancestors resolved, so a working
+        // folder opened through a link would otherwise never match (#897a
+        // review, finding 8); the file name is left as it is, so a page that
+        // is itself a link is still found (fix review, finding 3).
+        let wanted: String = SectionVerbs.canonicalPageSpelling(course.directoryURL.appendingPathComponent(path))
         let classPages: [ClassPageSummary] = ClassPages.list(forSection: located.sectionNumber, in: course)
         var source: ClassPageSummary? = nil
-        for page in classPages where FolderIdentity.canonicalPath(page.fileURL.standardizedFileURL.path) == wanted {
+        for page in classPages where SectionVerbs.canonicalPageSpelling(page.fileURL) == wanted {
             source = page
         }
         let shownName: String = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
@@ -4732,7 +4731,7 @@ final class AssistToolRunner {
             return nil
         }
         guard case .success(let located) = locate(arguments),
-              UnitWordRenamer.interruptedRenameTarget(in: located.course) != nil else {
+              UnitWordRenamer.interruptedRenameTarget(in: located.course, clearingAStaleRecord: false) != nil else {
             return nil
         }
         return AssistToolOutcome.refused(

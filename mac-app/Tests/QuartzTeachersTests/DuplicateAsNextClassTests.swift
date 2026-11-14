@@ -287,7 +287,10 @@ final class DuplicateAsNextClassTests: XCTestCase {
         let facts: SubjectMenuRules.AddClassFacts = SectionVerbs.addClassFacts(forSection: 1, in: made.course)
         XCTAssertFalse(facts.unitWordRenameUnfinished)
         XCTAssertEqual(SubjectMenuRules.addClassWays(facts), [.nextInThisUnit, .inANewUnit, .asACopyOfAClass])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: record.path), "the stale record was not cleared")
+        // Judged, not cleared: the rename sheet that owns the record clears
+        // it, and a rename running in another window is never cut off from
+        // its record by a sheet opening here (the fix review's finding 5).
+        XCTAssertTrue(FileManager.default.fileExists(atPath: record.path), "the sheet cleared the record")
     }
 
     /// The implementation review's finding 8: a working folder opened
@@ -339,26 +342,67 @@ final class DuplicateAsNextClassTests: XCTestCase {
         defer {
             try? FileManager.default.removeItem(at: made.root)
         }
+        // A real club on disk (the fix review's finding 2): forty meeting
+        // pages, so the facts, the rows and the lines all come from the course.
+        try AssistFixture.setClubNaming(.meeting, in: made.course)
+        for number in 1...40 {
+            try DuplicateAsNextClassTests.writeClass(
+                "Week \(number)", on: String(format: "2026-%02d-%02d", 9 + number / 28, 1 + number % 28), in: made.course
+            )
+        }
         let model: SectionVerbSheetModel = SectionVerbSheetModel(
             kind: .addClass, course: made.course, sectionNumber: 1,
-            title: AssistWording.menuAddClassTitle(course: "ICS3U", section: "1"), item: .addClass
+            title: AssistWording.menuAddClassTitle(course: "ICS3U", section: "1", noun: .meeting), item: .addClass
         )
-        model.addClassFacts = SubjectMenuRules.AddClassFacts(
+        model.addClassFacts = SectionVerbs.addClassFacts(forSection: 1, in: made.course)
+        XCTAssertEqual(model.addClassFacts, SubjectMenuRules.AddClassFacts(
             classPagesAreNumbered: true, unitWordRenameUnfinished: false, hasAClassPage: true
-        )
+        ))
+        model.sourceRows = SectionVerbSheetModel.sourceRows(course: made.course, sectionNumber: 1)
+        XCTAssertEqual(model.sourceRows.count, 40)
         model.way = .asACopyOfAClass
-        for number in 1...40 {
-            model.sourceRows.append(SectionVerbSheetModel.SourceRow(
-                path: "section1/All Classes/Week \(number).md", title: "Week \(number)",
-                date: CalendarDay(year: 2026, month: 9, day: 8)
-            ))
-        }
         XCTAssertEqual(model.greyedReasons.count, 1)
+
         let height: CGFloat = PageTablesSheetTests.fittingSize(
             of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {})
         ).height
         XCTAssertLessThanOrEqual(height, CopyPageChecklist.tallestSheet, "the tallest Add Class sheet is \(height) pt")
-        print("DuplicateAsNextClassTests: tallest Add Class sheet \(height) pt against \(CopyPageChecklist.tallestSheet)")
+        // The floor its neighbour has: a list or text that collapsed to
+        // nothing would pass the ceiling alone.
+        let table: CGFloat = ListTableMetrics.height(forRowCount: SectionVerbSheet.mostSourceRowsShown, showsHeader: true)
+        XCTAssertGreaterThanOrEqual(height, table + 120, "only \(height) pt: the list or the words around it collapsed")
+        // Twelve rows, as the picker shows: printed, so the cap of seven is a
+        // measured choice (the gate records both numbers).
+        let atTwelve: CGFloat = PageTablesSheetTests.fittingSize(
+            of: SectionVerbSheet(model: model, pressDefault: {}, cancel: {}, sourceRowsShown: 12)
+        ).height
+        XCTAssertGreaterThan(atTwelve, height, "twelve rows were not drawn taller than seven")
+        print("DuplicateAsNextClassTests: tallest Add Class sheet \(height) pt at seven rows, "
+              + "\(atTwelve) pt at twelve, against \(CopyPageChecklist.tallestSheet)")
+    }
+
+    /// The fix review's finding 3: a class page that is itself a link (to a
+    /// file elsewhere) is still the page in this folder, so it can be copied.
+    func testAClassPageThatIsALinkCanBeCopied() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try DuplicateAsNextClassTests.rememberTimetable(["2026-09-08", "2026-09-10"], in: made.course)
+        let elsewhere: URL = made.root.appendingPathComponent("elsewhere.md")
+        try "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nthe words of Unit 1, Day 1\n"
+            .write(to: elsewhere, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            at: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), withDestinationURL: elsewhere
+        )
+        let rows: [SectionVerbSheetModel.SourceRow] = SectionVerbSheetModel.sourceRows(course: made.course, sectionNumber: 1)
+        XCTAssertEqual(rows.first?.path, "section1/All Classes/Unit 1, Day 1.md")
+        let said: AssistToolOutcome = await made.runner.run(call: SectionVerbs.duplicateAsNextClass(
+            course: "ICS3U", section: 1, sourcePath: try XCTUnwrap(rows.first?.path), planning: false
+        ))
+        XCTAssertEqual(said.summary, AssistWording.duplicatedFromTheMenu(
+            page: "Unit 1, Day 1", as: "Unit 1, Day 2", on: "2026-09-10"
+        ))
     }
 
     /// The implementation review's finding 13: a chosen class the search
@@ -472,6 +516,18 @@ final class DuplicateAsNextClassTests: XCTestCase {
         let defaults: [String: Any] = try XCTUnwrap(sheet["factDefaults"] as? [String: Any])
         let keys: [String: Any] = try XCTUnwrap(sheet["factKeys"] as? [String: Any])
         XCTAssertEqual(Set(keys.keys), Set(defaults.keys))
+        let labelKeys: [String: String] = try XCTUnwrap(sheet["labels"] as? [String: String])
+        var appLabels: Set<String> = []
+        for label in SubjectMenuRules.AddClassLabel.allCases {
+            appLabels.insert(label.rawValue)
+        }
+        XCTAssertEqual(Set(labelKeys.keys), appLabels)
+        let lineKeys: [String: String] = try XCTUnwrap(sheet["reasonLines"] as? [String: String])
+        var appLines: Set<String> = []
+        for line in SubjectMenuRules.AddClassReasonLine.allCases {
+            appLines.insert(line.rawValue)
+        }
+        XCTAssertEqual(Set(lineKeys.keys), appLines)
         let reasons: [String: String] = try XCTUnwrap(sheet["greyedBecause"] as? [String: String])
         var appReasons: Set<String> = []
         for reason in SubjectMenuRules.AddClassGreyedBecause.allCases {
@@ -489,7 +545,7 @@ final class DuplicateAsNextClassTests: XCTestCase {
         }
         XCTAssertEqual(contractWays, appWays)
         let cases: [[String: Any]] = try XCTUnwrap(sheet["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "every combination of the three facts")
         for testCase in cases {
             let why: String = try XCTUnwrap(testCase["why"] as? String)
             var merged: [String: Any] = defaults
@@ -514,27 +570,63 @@ final class DuplicateAsNextClassTests: XCTestCase {
                 }
             }
             XCTAssertEqual(greyed, try XCTUnwrap(testCase["greyed"] as? [String: String]), why)
+            var labels: [String: String] = [:]
+            for way in SubjectMenuRules.AddClassWay.allCases {
+                labels[way.rawValue] = SubjectMenuRules.label(of: way, facts).rawValue
+            }
+            XCTAssertEqual(labels, try XCTUnwrap(testCase["labels"] as? [String: String]), why)
+            var lines: [String] = []
+            for line in SubjectMenuRules.reasonLines(facts) {
+                lines.append(line.rawValue)
+            }
+            XCTAssertEqual(lines, try XCTUnwrap(testCase["reasonLines"] as? [String]), why)
         }
     }
 
     /// Each way's line in the sheet, in the menu's voice, and a club's first
     /// way says no unit.
     func testEachWayHasItsLine() {
-        for way in SubjectMenuRules.AddClassWay.allCases {
-            for numbered in [false, true] {
-                let line: String = SectionVerbSheet.label(of: way, noun: .meeting, unit: "module", numbered: numbered)
-                XCTAssertFalse(line.isEmpty)
-                XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(line), line)
-                XCTAssertFalse(line.contains("unit"), "the course's word is module: \(line)")
+        for numbered in [false, true] {
+            for rename in [false, true] {
+                for has in [false, true] {
+                    let facts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts(
+                        classPagesAreNumbered: numbered, unitWordRenameUnfinished: rename, hasAClassPage: has
+                    )
+                    for way in SubjectMenuRules.AddClassWay.allCases {
+                        let line: String = SectionVerbSheet.sentence(
+                            for: SubjectMenuRules.label(of: way, facts), noun: .meeting, unit: numbered ? "unit" : "module"
+                        )
+                        XCTAssertFalse(line.isEmpty)
+                        XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(line), line)
+                        if !numbered {
+                            XCTAssertFalse(line.contains("unit"), "the course's word is module: \(line)")
+                        }
+                    }
+                    for reason in SubjectMenuRules.reasonLines(facts) {
+                        let sentence: String = SectionVerbSheet.sentence(for: reason, noun: .class, unit: "unit")
+                        XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(sentence), sentence)
+                        // Finishing the rename is promised only what it
+                        // holds back (the fix review's finding 1).
+                        if sentence.hasPrefix("A rename") {
+                            XCTAssertEqual(
+                                sentence.contains("a copy"),
+                                SubjectMenuRules.whyGreyed(.asACopyOfAClass, facts) == .aRenameIsUnfinished, sentence
+                            )
+                            XCTAssertEqual(
+                                sentence.contains("a new "),
+                                SubjectMenuRules.whyGreyed(.inANewUnit, facts) == .aRenameIsUnfinished, sentence
+                            )
+                        }
+                    }
+                }
             }
         }
-        XCTAssertFalse(
-            SectionVerbSheet.label(of: .nextInThisUnit, noun: .meeting, unit: "unit", numbered: true).contains("unit")
+        // A club's lines never call its word ("Week") a unit.
+        let club: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts(
+            classPagesAreNumbered: true, unitWordRenameUnfinished: false, hasAClassPage: true
         )
-        for reason in SubjectMenuRules.AddClassGreyedBecause.allCases {
-            let sentence: String = SectionVerbSheet.sentence(for: reason, noun: .class, unit: "unit")
-            XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(sentence), sentence)
-        }
+        XCTAssertEqual(SubjectMenuRules.label(of: .inANewUnit, club), .inANewUnitPlainly)
+        XCTAssertEqual(SubjectMenuRules.label(of: .nextInThisUnit, club), .nextInANumberedCourse)
     }
 
     // MARK: - The surface the local model is shown

@@ -212,23 +212,32 @@ final class SectionVerbSheetModel: Identifiable {
     }
 
     /// The course's word for a unit, as a sentence says it ("module").
+    /// "unit" in a numbered course, whose word is the pages' whole name
+    /// ("Week") and never a unit (the fix review's finding 1). A word in
+    /// capitals (an acronym) is left as it is.
     var unitWord: String {
-        return course.configuration.classPageNaming.word.lowercased()
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            return "unit"
+        }
+        if naming.word.count > 1 && naming.word == naming.word.uppercased() {
+            return naming.word
+        }
+        return naming.word.lowercased()
+    }
+
+    /// The line a way is drawn with (`SubjectMenuRules.label(of:_:)`).
+    func label(of way: SubjectMenuRules.AddClassWay) -> String {
+        return SectionVerbSheet.sentence(for: SubjectMenuRules.label(of: way, addClassFacts), noun: noun, unit: unitWord)
     }
 
     /// Why each greyed way is greyed, one sentence per reason, in the ways'
     /// order (#897a review, finding 1): a greyed radio button alone says
     /// "no" and not what to do about it.
-    var greyedReasons: [String] {
-        var reasons: [String] = []
-        for way in SubjectMenuRules.AddClassWay.allCases {
-            guard let reason = SubjectMenuRules.whyGreyed(way, addClassFacts) else {
-                continue
-            }
-            let sentence: String = SectionVerbSheet.sentence(for: reason, noun: noun, unit: unitWord)
-            if !reasons.contains(sentence) {
-                reasons.append(sentence)
-            }
+    var greyedReasons: [(line: SubjectMenuRules.AddClassReasonLine, sentence: String)] {
+        var reasons: [(line: SubjectMenuRules.AddClassReasonLine, sentence: String)] = []
+        for line in SubjectMenuRules.reasonLines(addClassFacts) {
+            reasons.append((line, SectionVerbSheet.sentence(for: line, noun: noun, unit: unitWord)))
         }
         return reasons
     }
@@ -604,6 +613,11 @@ struct SectionVerbSheet: View {
     /// the line follows it.
     var verbs: SectionVerbs?
 
+    /// How many rows Add Class…'s copy list shows before it scrolls
+    /// (`mostSourceRowsShown`); a test lays the sheet out at twelve too, so
+    /// the cap is a measured choice (the fix review's finding 2).
+    var sourceRowsShown: Int = SectionVerbSheet.mostSourceRowsShown
+
     /// The plan table's order: plan order to begin with; a column header
     /// sorts by that column (#524, the `AllBackupsView` precedent).
     @State var planSortOrder: [KeyPathComparator<AssistPlanTable.Row>] = [KeyPathComparator(\.position)]
@@ -725,19 +739,20 @@ struct SectionVerbSheet: View {
     /// How many classes Add Class…'s list shows before it scrolls inside
     /// itself (#897). Fewer than the picker's twelve: this sheet also carries
     /// the three ways, a line saying why one is greyed and the copy's own
-    /// instruction above the search, about 150 pt more than Publish Pages…'s
-    /// picker, whose forty-page case is measured against the 620 pt a
-    /// 13-inch screen allows (`CopyPageChecklist.tallestSheet`). Seven rows
-    /// give back 120 of them (`ListTableMetrics`: 24 pt a row);
+    /// instruction above the search, an ESTIMATED 150 pt more than Publish
+    /// Pages…'s picker, whose forty-page case is measured against the 620 pt
+    /// a 13-inch screen allows (`CopyPageChecklist.tallestSheet`). Seven rows
+    /// give back 120 of them (`ListTableMetrics`: 24 pt a row).
     /// `DuplicateAsNextClassTests.testTheTallestAddClassSheetStaysOnTheScreen`
-    /// measures it (the implementation review's finding 7).
+    /// lays it out at seven and at twelve and prints both, which is the
+    /// measurement this number waits on (deferred: it needs the test host).
     static let mostSourceRowsShown: Int = 7
 
     /// Add Class…'s list of classes to copy (#897), the same way.
     var sourceTableHeight: CGFloat {
         var shown: Int = model.sourceRows.count
-        if shown > SectionVerbSheet.mostSourceRowsShown {
-            shown = SectionVerbSheet.mostSourceRowsShown
+        if shown > sourceRowsShown {
+            shown = sourceRowsShown
         }
         return ListTableMetrics.height(forRowCount: shown, showsHeader: true)
     }
@@ -976,10 +991,7 @@ struct SectionVerbSheet: View {
                 set: { chosen in model.way = chosen }
             )) {
                 ForEach(SubjectMenuRules.AddClassWay.allCases, id: \.self) { (way: SubjectMenuRules.AddClassWay) in
-                    Text(SectionVerbSheet.label(
-                        of: way, noun: model.noun, unit: model.unitWord,
-                        numbered: model.course.configuration.classPageNaming.isNumbered
-                    ))
+                    Text(model.label(of: way))
                         .tag(Optional(way))
                         .disabled(!model.availableWays.contains(way))
                 }
@@ -987,11 +999,13 @@ struct SectionVerbSheet: View {
             .pickerStyle(.radioGroup)
             .labelsHidden()
             .accessibilityIdentifier("sectionVerbSheetAddClassWay")
-            ForEach(model.greyedReasons, id: \.self) { (reason: String) in
-                Text(reason)
+            // Each line its own identifier, by its reason (the fix review's
+            // finding 8), so a test can tell two apart.
+            ForEach(model.greyedReasons, id: \.line) { (reason: (line: SubjectMenuRules.AddClassReasonLine, sentence: String)) in
+                Text(reason.sentence)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("sectionVerbSheetAddClassGreyed")
+                    .accessibilityIdentifier("sectionVerbSheetAddClassGreyed-\(reason.line.rawValue)")
             }
             if model.way == .asACopyOfAClass && !model.sourceRows.isEmpty {
                 Text(AssistWording.menuPickClassToDuplicate(noun: model.noun))
@@ -1152,27 +1166,38 @@ struct SectionVerbSheet: View {
     }
 
     /// One way's line in Add Class…'s sheet (#897).
-    /// `unit` is the course's own word, as a sentence says it.
-    static func label(of way: SubjectMenuRules.AddClassWay, noun: ClassNoun, unit: String, numbered: Bool) -> String {
-        switch way {
-        case .nextInThisUnit:
-            return AssistWording.menuAddClassNextInThisUnit(noun: noun, unit: unit, numbered: numbered)
-        case .inANewUnit:
+    /// A way's line. `unit` is the course's own word, as a sentence says it.
+    static func sentence(for label: SubjectMenuRules.AddClassLabel, noun: ClassNoun, unit: String) -> String {
+        switch label {
+        case .nextInTheUnitUnderWay:
+            return AssistWording.menuAddClassNextInThisUnit(noun: noun, unit: unit)
+        case .nextInANumberedCourse:
+            return AssistWording.menuAddClassNextInThisUnit(noun: noun, numbered: true)
+        case .inANewUnitInTheCoursesWord:
             return AssistWording.menuAddClassInANewUnit(noun: noun, unit: unit)
-        case .asACopyOfAClass:
+        case .inANewUnitPlainly:
+            return AssistWording.menuAddClassInANewUnit(noun: noun)
+        case .asACopy:
             return AssistWording.menuAddClassAsACopy(noun: noun)
         }
     }
 
-    /// The sentence under the ways for one reason a way is greyed (#897).
-    static func sentence(for reason: SubjectMenuRules.AddClassGreyedBecause, noun: ClassNoun, unit: String) -> String {
-        switch reason {
+    /// One line under the ways (#897).
+    static func sentence(for line: SubjectMenuRules.AddClassReasonLine, noun: ClassNoun, unit: String) -> String {
+        switch line {
         case .theCourseHasNoUnits:
             return AssistWording.menuAddClassGreyedNoUnits(noun: noun)
         case .thereIsNoClassToCopy:
             return AssistWording.menuAddClassGreyedNothingToCopy(noun: noun)
-        case .aRenameIsUnfinished:
+        case .aRenameHoldsBackANewUnitAndACopy:
             return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, unit: unit)
+        case .aRenameHoldsBackANewUnit:
+            return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, unit: unit, copy: false)
+        case .aRenameHoldsBackACopy:
+            // Reached only in a numbered course: anywhere else the rename
+            // holds the new unit back too (`whyGreyed`'s order). There the
+            // renamed word is the pages' own name.
+            return AssistWording.menuAddClassGreyedRenameUnfinished(noun: noun, newUnit: false, numbered: true)
         }
     }
 

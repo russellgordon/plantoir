@@ -789,6 +789,12 @@ enum AssistContract {
             "menuAddClassGreyedRenameUnfinishedForAMeeting": AssistWording.menuAddClassGreyedRenameUnfinished(
                 noun: .meeting
             ),
+            "menuAddClassGreyedRenameHoldsANewUnit": AssistWording.menuAddClassGreyedRenameUnfinished(copy: false),
+            "menuAddClassGreyedRenameHoldsACopyInANumberedCourse": AssistWording.menuAddClassGreyedRenameUnfinished(
+                newUnit: false, numbered: true
+            ),
+            "menuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting":
+                AssistWording.menuAddClassGreyedRenameUnfinished(noun: .meeting, newUnit: false, numbered: true),
             "menuNeedsClassDatesFirst": AssistWording.menuNeedsClassDatesFirst(),
             "menuNeedsClassDatesFirstForAMeeting": AssistWording.menuNeedsClassDatesFirst(noun: .meeting),
             "menuAddClassAsACopy": AssistWording.menuAddClassAsACopy(),

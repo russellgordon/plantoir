@@ -212,7 +212,7 @@ nonisolated enum SubjectMenuRules {
         var classPagesAreNumbered: Bool = false
         /// A rename of the course's unit word stopped part way, as the
         /// rename itself judges it (`UnitWordRenamer.interruptedRenameTarget`,
-        /// which clears a stale record). Pages under the new word do not
+        /// which reads a stale record as stale). Pages under the new word do not
         /// read under the old one, so the highest unit would be read too low.
         var unitWordRenameUnfinished: Bool = false
         /// The section has at least one page in its class folders.
@@ -225,6 +225,36 @@ nonisolated enum SubjectMenuRules {
         case theCourseHasNoUnits
         case thereIsNoClassToCopy
         case aRenameIsUnfinished
+    }
+
+    /// Which line a way is drawn with (`subjectMenus.addClassSheet.labels`).
+    /// A numbered course (a club) has no "unit under way", and its word is
+    /// the whole page name ("Week"), never a unit, so its new-unit line says
+    /// "unit" plainly, beside the reason that it has none (the fix review's
+    /// finding 1).
+    enum AddClassLabel: String, CaseIterable, Sendable {
+        /// "As the next class in the <word> under way".
+        case nextInTheUnitUnderWay
+        /// "As the next meeting": a numbered course.
+        case nextInANumberedCourse
+        /// "In a new <word>, as its first class".
+        case inANewUnitInTheCoursesWord
+        /// "In a new unit, as its first meeting": a numbered course, where
+        /// the way is greyed and the word "Week" would make a false line.
+        case inANewUnitPlainly
+        case asACopy
+    }
+
+    /// One line under the ways (`subjectMenus.addClassSheet.reasonLines`).
+    /// The rename's line names ONLY the ways the rename holds back, so it
+    /// never promises a way that stays greyed for another reason after the
+    /// rename is finished (the fix review's finding 1).
+    enum AddClassReasonLine: String, CaseIterable, Sendable {
+        case theCourseHasNoUnits
+        case thereIsNoClassToCopy
+        case aRenameHoldsBackANewUnitAndACopy
+        case aRenameHoldsBackANewUnit
+        case aRenameHoldsBackACopy
     }
 
     // MARK: - Functions
@@ -441,6 +471,51 @@ nonisolated enum SubjectMenuRules {
             ways.append(way)
         }
         return ways
+    }
+
+    /// The line `way` is drawn with.
+    static func label(of way: AddClassWay, _ facts: AddClassFacts) -> AddClassLabel {
+        switch way {
+        case .nextInThisUnit:
+            return facts.classPagesAreNumbered ? .nextInANumberedCourse : .nextInTheUnitUnderWay
+        case .inANewUnit:
+            return facts.classPagesAreNumbered ? .inANewUnitPlainly : .inANewUnitInTheCoursesWord
+        case .asACopyOfAClass:
+            return .asACopy
+        }
+    }
+
+    /// The lines under the ways, in the ways' order: one per reason, and
+    /// the rename's one line naming exactly the ways it holds back.
+    static func reasonLines(_ facts: AddClassFacts) -> [AddClassReasonLine] {
+        var lines: [AddClassReasonLine] = []
+        var renameHoldsANewUnit: Bool = false
+        var renameHoldsACopy: Bool = false
+        for way in AddClassWay.allCases {
+            guard let reason = whyGreyed(way, facts) else {
+                continue
+            }
+            switch reason {
+            case .theCourseHasNoUnits:
+                lines.append(.theCourseHasNoUnits)
+            case .thereIsNoClassToCopy:
+                lines.append(.thereIsNoClassToCopy)
+            case .aRenameIsUnfinished:
+                if way == .inANewUnit {
+                    renameHoldsANewUnit = true
+                } else if way == .asACopyOfAClass {
+                    renameHoldsACopy = true
+                }
+            }
+        }
+        if renameHoldsANewUnit && renameHoldsACopy {
+            lines.append(.aRenameHoldsBackANewUnitAndACopy)
+        } else if renameHoldsANewUnit {
+            lines.append(.aRenameHoldsBackANewUnit)
+        } else if renameHoldsACopy {
+            lines.append(.aRenameHoldsBackACopy)
+        }
+        return lines
     }
 
     /// Why `way` cannot be chosen, or nil when it can. One reason per way,

@@ -332,7 +332,10 @@ final class SectionVerbs {
     /// otherwise shares no prefix with its pages (the implementation
     /// review's finding 8, measured).
     static func coursePath(ofPageAt fileURL: URL, in course: Course) -> String {
-        let page: String = FolderIdentity.canonicalPath(fileURL.standardizedFileURL.path)
+        // The page's FOLDER in the disk's spelling, and its own name as it is:
+        // canonicalising the whole path would resolve a page that is itself a
+        // link to wherever it points (the fix review's finding 3).
+        let page: String = SectionVerbs.canonicalPageSpelling(fileURL)
         let folder: String = FolderIdentity.canonicalPath(course.directoryURL.standardizedFileURL.path) + "/"
         if page.hasPrefix(folder) {
             return String(page.dropFirst(folder.count))
@@ -340,20 +343,33 @@ final class SectionVerbs {
         return fileURL.lastPathComponent
     }
 
+    /// A page's path with its FOLDER in the disk's own spelling
+    /// (`FolderIdentity.canonicalPath`) and its file name left as it is, so a
+    /// linked working folder matches and a page that is a link is still the
+    /// page in this folder (#897a).
+    static func canonicalPageSpelling(_ fileURL: URL) -> String {
+        let standard: URL = fileURL.standardizedFileURL
+        let folder: String = FolderIdentity.canonicalPath(standard.deletingLastPathComponent().path)
+        return folder + "/" + standard.lastPathComponent
+    }
+
     // MARK: - What Add Class… is greyed by (#897)
 
     /// The facts Add Class…'s sheet decides its ways from, read when it
     /// OPENS: one listing of the class folders' names and the rename's own
-    /// check. That check (`UnitWordRenamer.interruptedRenameTarget`) is the
-    /// one that clears a record left by a rename that finished, or by a word
-    /// edited by hand, so a stale record never greys a way for good (the
-    /// implementation review's finding 1). REJECTED: greying on the record
-    /// FILE alone, which a stale record held greyed with no way out from the
-    /// sheet, since a greyed way never reaches the runner.
+    /// judgement (`UnitWordRenamer.interruptedRenameTarget`), which reads a
+    /// record left by a rename that finished, or by a word edited by hand, as
+    /// stale, so a stale record never greys a way (the implementation
+    /// review's finding 1). It judges WITHOUT clearing: a rename running in
+    /// another window has a record and, for one frontmatter write, no page
+    /// moved yet, which reads as stale (the fix review's finding 5); the
+    /// rename sheet that owns the record still clears it. REJECTED: greying
+    /// on the record FILE alone, which a stale record held greyed with no way
+    /// out from the sheet, since a greyed way never reaches the runner.
     static func addClassFacts(forSection sectionNumber: Int, in course: Course) -> SubjectMenuRules.AddClassFacts {
         var facts: SubjectMenuRules.AddClassFacts = SubjectMenuRules.AddClassFacts()
         facts.classPagesAreNumbered = course.configuration.classPageNaming.isNumbered
-        facts.unitWordRenameUnfinished = UnitWordRenamer.interruptedRenameTarget(in: course) != nil
+        facts.unitWordRenameUnfinished = UnitWordRenamer.interruptedRenameTarget(in: course, clearingAStaleRecord: false) != nil
         facts.hasAClassPage = hasAClassPage(forSection: sectionNumber, in: course)
         return facts
     }

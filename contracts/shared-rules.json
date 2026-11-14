@@ -28088,7 +28088,23 @@
         "thereIsNoClassToCopy": "wording.menuAddClassGreyedNothingToCopy",
         "aRenameIsUnfinished": "wording.menuAddClassGreyedRenameUnfinished"
       },
-      "greyedRule": "One reason per greyed way, the first that applies in this order: for inANewUnit, theCourseHasNoUnits then aRenameIsUnfinished; for asACopyOfAClass, thereIsNoClassToCopy then aRenameIsUnfinished. nextInThisUnit is never greyed: it keeps Add Next Class's rule. The sheet says each distinct reason once, in the ways' order.",
+      "greyedRule": "One reason per greyed way, the first that applies in this order: for inANewUnit, theCourseHasNoUnits then aRenameIsUnfinished; for asACopyOfAClass, thereIsNoClassToCopy then aRenameIsUnfinished. nextInThisUnit is never greyed: it keeps Add Next Class's rule.",
+      "labels": {
+        "nextInTheUnitUnderWay": "wording.menuAddClassNextInThisUnit",
+        "nextInANumberedCourse": "wording.menuAddClassNextInANumberedCourse",
+        "inANewUnitInTheCoursesWord": "wording.menuAddClassInANewUnit",
+        "inANewUnitPlainly": "wording.menuAddClassInANewUnit",
+        "asACopy": "wording.menuAddClassAsACopy"
+      },
+      "labelRule": "nextInThisUnit is drawn nextInANumberedCourse in a numbered course and nextInTheUnitUnderWay otherwise; inANewUnit is drawn inANewUnitPlainly in a numbered course and inANewUnitInTheCoursesWord otherwise; asACopyOfAClass is always asACopy. The course's word fills {unit} in the CoursesWord lines, lower-cased unless it is written in capitals (an acronym). In a numbered course the word is the pages' whole name ('Week' in 'Week 3') and never a unit, so its line says 'unit' plainly: 'In a new week' beside 'there is no new unit' was the fix review's finding 1.",
+      "reasonLines": {
+        "theCourseHasNoUnits": "wording.menuAddClassGreyedNoUnits",
+        "thereIsNoClassToCopy": "wording.menuAddClassGreyedNothingToCopy",
+        "aRenameHoldsBackANewUnitAndACopy": "wording.menuAddClassGreyedRenameUnfinished",
+        "aRenameHoldsBackANewUnit": "wording.menuAddClassGreyedRenameHoldsANewUnit",
+        "aRenameHoldsBackACopy": "wording.menuAddClassGreyedRenameHoldsACopyInANumberedCourse"
+      },
+      "reasonLineRule": "Under the ways, one line per reason: theCourseHasNoUnits and thereIsNoClassToCopy where a way is greyed for them, in the ways' order, then ONE rename line naming exactly the ways greyed for aRenameIsUnfinished (both, the new unit only, or the copy only), so finishing the rename is never promised to bring back a way greyed for another reason. aRenameHoldsBackACopy arises only in a numbered course, whose rename line names the pages' word rather than a unit.",
       "cases": [
         {
           "why": "An ordinary section with class pages: every way.",
@@ -28100,10 +28116,16 @@
             "inANewUnit",
             "asACopyOfAClass"
           ],
-          "greyed": {}
+          "greyed": {},
+          "labels": {
+            "nextInThisUnit": "nextInTheUnitUnderWay",
+            "inANewUnit": "inANewUnitInTheCoursesWord",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": []
         },
         {
-          "why": "A section with no class page yet: nothing to copy. hasAClassPage alone decides it (the case above with it true).",
+          "why": "No class page yet: nothing to copy. hasAClassPage alone decides it (the first case with it true).",
           "facts": {},
           "ways": [
             "nextInThisUnit",
@@ -28111,10 +28133,18 @@
           ],
           "greyed": {
             "asACopyOfAClass": "thereIsNoClassToCopy"
-          }
+          },
+          "labels": {
+            "nextInThisUnit": "nextInTheUnitUnderWay",
+            "inANewUnit": "inANewUnitInTheCoursesWord",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "thereIsNoClassToCopy"
+          ]
         },
         {
-          "why": "A club (#267): no units. classPagesAreNumbered alone decides it (the first case with it false).",
+          "why": "A club (#267): no units, so its new-unit line says 'unit' plainly and the reason says why. classPagesAreNumbered alone decides it.",
           "facts": {
             "hasAClassPage": true,
             "classPagesAreNumbered": true
@@ -28125,10 +28155,18 @@
           ],
           "greyed": {
             "inANewUnit": "theCourseHasNoUnits"
-          }
+          },
+          "labels": {
+            "nextInThisUnit": "nextInANumberedCourse",
+            "inANewUnit": "inANewUnitPlainly",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "theCourseHasNoUnits"
+          ]
         },
         {
-          "why": "A unit-word rename stopped part way: the planner reads only the pages under the old word, so neither a new unit nor a copy (which takes the next class's name) is offered. unitWordRenameUnfinished alone decides it (the first case with it false). The next class in this unit keeps Add Next Class's rule, which never waited for one.",
+          "why": "A unit-word rename stopped part way: neither a new unit nor a copy, and the one rename line names both. unitWordRenameUnfinished alone decides it. The next class in this unit keeps Add Next Class's rule, which never waited for one.",
           "facts": {
             "hasAClassPage": true,
             "unitWordRenameUnfinished": true
@@ -28139,10 +28177,18 @@
           "greyed": {
             "inANewUnit": "aRenameIsUnfinished",
             "asACopyOfAClass": "aRenameIsUnfinished"
-          }
+          },
+          "labels": {
+            "nextInThisUnit": "nextInTheUnitUnderWay",
+            "inANewUnit": "inANewUnitInTheCoursesWord",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "aRenameHoldsBackANewUnitAndACopy"
+          ]
         },
         {
-          "why": "A club with no meeting page yet: only its first meeting, and two different reasons.",
+          "why": "A club with no meeting page yet: two lines, neither about a rename.",
           "facts": {
             "classPagesAreNumbered": true
           },
@@ -28152,10 +28198,19 @@
           "greyed": {
             "inANewUnit": "theCourseHasNoUnits",
             "asACopyOfAClass": "thereIsNoClassToCopy"
-          }
+          },
+          "labels": {
+            "nextInThisUnit": "nextInANumberedCourse",
+            "inANewUnit": "inANewUnitPlainly",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "theCourseHasNoUnits",
+            "thereIsNoClassToCopy"
+          ]
         },
         {
-          "why": "A club mid-rename: no units is the reason for the new unit (it comes first), the rename for the copy.",
+          "why": "A club mid-rename: no units is the new unit's reason (it comes first), and the rename line names the copy only, in the club's words.",
           "facts": {
             "hasAClassPage": true,
             "classPagesAreNumbered": true,
@@ -28167,7 +28222,61 @@
           "greyed": {
             "inANewUnit": "theCourseHasNoUnits",
             "asACopyOfAClass": "aRenameIsUnfinished"
-          }
+          },
+          "labels": {
+            "nextInThisUnit": "nextInANumberedCourse",
+            "inANewUnit": "inANewUnitPlainly",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "theCourseHasNoUnits",
+            "aRenameHoldsBackACopy"
+          ]
+        },
+        {
+          "why": "A rename stopped part way and no class page yet: the copy's reason is that there is nothing to copy (it comes first, so the swapped order fails here), and the rename line names the new unit only, never promising a copy.",
+          "facts": {
+            "unitWordRenameUnfinished": true
+          },
+          "ways": [
+            "nextInThisUnit"
+          ],
+          "greyed": {
+            "inANewUnit": "aRenameIsUnfinished",
+            "asACopyOfAClass": "thereIsNoClassToCopy"
+          },
+          "labels": {
+            "nextInThisUnit": "nextInTheUnitUnderWay",
+            "inANewUnit": "inANewUnitInTheCoursesWord",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "thereIsNoClassToCopy",
+            "aRenameHoldsBackANewUnit"
+          ]
+        },
+        {
+          "why": "A club mid-rename with no meeting page: neither held back way is the rename's, so there is no rename line at all.",
+          "facts": {
+            "classPagesAreNumbered": true,
+            "unitWordRenameUnfinished": true
+          },
+          "ways": [
+            "nextInThisUnit"
+          ],
+          "greyed": {
+            "inANewUnit": "theCourseHasNoUnits",
+            "asACopyOfAClass": "thereIsNoClassToCopy"
+          },
+          "labels": {
+            "nextInThisUnit": "nextInANumberedCourse",
+            "inANewUnit": "inANewUnitPlainly",
+            "asACopyOfAClass": "asACopy"
+          },
+          "reasonLines": [
+            "theCourseHasNoUnits",
+            "thereIsNoClassToCopy"
+          ]
         }
       ],
       "rejected": [

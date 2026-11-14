@@ -6776,12 +6776,22 @@ the ways says why, once per reason, in words a teacher can act on
 (`subjectMenus.addClassSheet.greyedBecause`: `menuAddClassGreyedNoUnits`,
 `menuAddClassGreyedNothingToCopy`, `menuAddClassGreyedRenameUnfinished`); the
 first way that can be used is chosen. The lines use the course's own word
-("in a new module"). The first two add at once (the button says Add), as Add
+("in a new module"), except in a numbered course (a club), whose word is the
+pages' whole name ("Week") and never a unit: there the greyed way reads "In a
+new unit", beside the line saying the course has none (the fix review's
+finding 1: "In a new week" was untrue). The rename's line names only the ways
+the rename holds back, so finishing it is never promised to bring back a way
+greyed for another reason; which line, for every one of the eight
+combinations of the three facts, is `addClassSheet.labels`, `reasonLines` and
+its eight cases, all checked in a standalone `swiftc` run against four course
+words and both nouns (40 renderings, 0 untrue; the previous wording, 22). The first two add at once (the button says Add), as Add
 Next Class did; the copy lists this section's class pages, numbered or not
 (`SectionVerbSheetModel.sourceRows`, from `ClassPages.list`), seven rows before
 the list scrolls inside itself (`mostSourceRowsShown`, so the tallest sheet
 stays inside the 620 pt a 13-inch screen allows, with the ways and their reason
-above it), then shows the plan, then Duplicate. A class chosen and then hidden
+above it; seven is an estimate until the test host lays the sheet out at seven
+and at twelve rows and prints both, `testTheTallestAddClassSheetStaysOnTheScreen`),
+then shows the plan, then Duplicate. A class chosen and then hidden
 by the search is let go. The item itself is live wherever Add Next Class was,
 since its first way always can be chosen; it carries no key equivalent,
 because Add Next Class had none. The facts the ways are decided from
@@ -6823,15 +6833,24 @@ testTheCommittedCasesMatchTheToolSurface` for every byte). The menu's copy
 home folder): the class folders are listed with links in their ancestors
 resolved, so a path compared in two spellings never matched and every copy was
 refused (the implementation review's finding 8, measured). Both the sheet
-(`SectionVerbs.coursePath`) and the runner compare `FolderIdentity.canonicalPath`
-spellings, as the rest of the app compares folders
+(`SectionVerbs.coursePath`) and the runner compare the page's FOLDER in its
+`FolderIdentity.canonicalPath` spelling, as the rest of the app compares
+folders, and its file name as it is, so a page that is itself a link is still
+the page in that folder (the fix review's finding 3;
+`testAClassPageThatIsALinkCanBeCopied`)
 (`DuplicateAsNextClassTests.testACourseReachedThroughALinkCanBeCopied`).
 
 **An unfinished unit-word rename** greys the second and third ways, decided by
-the rename's OWN check (`UnitWordRenamer.interruptedRenameTarget`) as the sheet
-opens, which also clears a record left by a rename that finished or by a word
-edited by hand; the runner checks again at the press, refusing on `.menu` only
-with `menuUnitWordRenameUnfinished`. REJECTED: greying on the record FILE
+the rename's OWN judgement (`UnitWordRenamer.interruptedRenameTarget`) as the
+sheet opens, which reads a record left by a rename that finished, or by a word
+edited by hand, as stale; the runner judges again at the press, refusing on
+`.menu` only with `menuUnitWordRenameUnfinished`. Both judge WITHOUT clearing
+(`clearingAStaleRecord: false`): a rename running in another window writes its
+record and then, for one frontmatter write, has moved no page, which reads as
+stale, and clearing there would leave it running without its record (the fix
+review's finding 5, measured on 11 shapes of a half-done rename, every one of
+which keeps its record). The rename sheet that owns the record still clears a
+stale one when it opens, as it always has. REJECTED: greying on the record FILE
 alone, which held both ways greyed for good behind a stale record, since a
 greyed way never reaches the runner that would clear it (the implementation
 review's finding 1). A rename to "Module" that
