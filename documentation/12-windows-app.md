@@ -7573,14 +7573,54 @@ does not apply, and the item opened section 1 without saying so. Not a
 teacher's only route: every section row offers it, and so does Section ▸
 Revise With ▸ Local AI Assistant….
 
-**Two deliberate disagreements with the contract's reasoning, both in the
-row, both in the `mac` issue:** the section row keeps **Change Deploy Time
-(…)…**, which `subjectMenus` has no item for (the menu bar follows the
-contract: Schedule Deploy… greyed while one is set, Cancel live), and a
-reference section's row keeps **Cancel Scheduled Deploy…**, which the menu bar
-greys, because Windows does not yet turn such a schedule off itself (the
-mac's `ScheduledDeployCleanup`) and the row is the teacher's only way to stop
-it.
+**One deliberate disagreement with the contract's reasoning, in the row, in
+the `mac` issue:** the section row keeps **Change Deploy Time (…)…**, which
+`subjectMenus` has no item for (the menu bar follows the contract: Schedule
+Deploy… greyed while one is set, Cancel live).
+
+**There were two until #527 (2026-11-13).** A reference section's row also
+kept **Cancel Scheduled Deploy…**, which the menu bar greys, on the reasoning
+(written for #488 on 2026-10-15) that Windows did not turn such a schedule off
+by itself and the row was the teacher's only way to stop it. That reasoning
+was already stale when #527 was opened: since #241 every read of the working
+folder runs `ReferenceCourseUpkeep.BringUpToDate`, which turns off every
+deploy this folder has for a course kept for reference
+(`ScheduledDeployRemoval.TurnOffFirst`, one `scheduled deploy turned off` line
+per section, "turned off: the course is kept for reference, and is never
+deployed") — the contract's case "a course kept for reference is met when the
+working folder is read", played by
+`ReferenceRefusalTests.ReadingTheFolderTurnsOffAReferenceCoursesDeploy`, which
+since #527 also asserts the trail line and that a second read writes nothing.
+So #527 removed the row's item and the row now agrees with the menu bar and
+with the mac, whose row has no Cancel either. `ReferenceInterfaceTests.
+AReferenceSectionsRowOffersNoCancelScheduledDeploy` scans
+`ReferenceSectionMenu` and `ReferenceCourseMenu` for the item, its handler and
+any `TaskScheduling` call (proved red against the old file), and checks
+`SubjectMenuRules` greys the item for a reference section and not a live one.
+
+**Why no teacher is left with a schedule and no way to stop it** — read from
+the code before the item went, every state checked:
+
+- *Set after the course became reference:* the app refuses
+  (`ScheduledDeploy.Problem` and `RefusalOf`, `keptForReference`, first), so
+  only a task made outside Plantoir can exist, and the next read removes it.
+- *Fired before a read removed it:* the run refuses itself
+  (`ScheduledRun`, `keptForReference`); tasks are one-shot
+  (`TaskScheduling.TaskXml`, one `TimeTrigger`), so nothing is left to fire
+  again.
+- *A cancel that failed:* `BringUpToDate` swallows it and the next read tries
+  again; the run's refusal is the backstop. The mac's arrangement is the same.
+- *A task whose course folder was moved or renamed by hand:* the old item found
+  tasks the same way the sweep does (`TaskScheduling.InFolder` + `SameCode`),
+  so it never found that task either; removing it took nothing away.
+- *Becoming reference:* only by Keep a Copy (`ReferenceCopier`) or Import
+  Courses for Reference… (`ReferenceImport`), each a NEW folder and code, so
+  no task is addressed to it, or by hand-editing the marker, which the next
+  read meets.
+
+REJECTED: keeping the item "to be safe" — it could only appear for a task the
+last read had not removed, it contradicted the menu bar beside it, and the
+contract's `subjectMenus` case leaves the item out for exactly this row.
 
 ### REJECTED, with the reason
 

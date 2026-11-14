@@ -368,17 +368,39 @@ public class ReferenceRefusalTests : IDisposable
 
     /// <summary>
     /// <c>scheduledDeployCancellation</c>: "a course kept for reference is met
-    /// when the working folder is read" — its alarm is turned off by the read.
+    /// when the working folder is read" — its alarm is turned off by the read,
+    /// and the trail says so once (<c>activityTrail.mustRecord</c> →
+    /// <c>scheduled deploy turned off</c>, carrying the course, the section and
+    /// why). A second read finds nothing to turn off and writes nothing more.
     /// </summary>
     [Fact]
     public void ReadingTheFolderTurnsOffAReferenceCoursesDeploy()
     {
-        string task = _scheduler.AddNew(_folder, "ICS3U-2025", 1);
-        string live = _scheduler.AddNew(_folder, "ICS3U", 1);
-        ReferenceCourseUpkeep.BringUpToDate(_folder, Workspace.DiscoverCourses(_folder));
-        Assert.Contains(task, _scheduler.Deleted);
-        Assert.DoesNotContain(live, _scheduler.Deleted);
-        Assert.True(ReferenceLock.IsLocked(Path.Combine(Kept.DirectoryPath, "section1", "index.md")));
+        string trail = Path.Combine(_folder + "-trail", "activity.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(trail)!);
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            string task = _scheduler.AddNew(_folder, "ICS3U-2025", 1);
+            string live = _scheduler.AddNew(_folder, "ICS3U", 1);
+            ReferenceCourseUpkeep.BringUpToDate(_folder, Workspace.DiscoverCourses(_folder));
+            Assert.Contains(task, _scheduler.Deleted);
+            Assert.DoesNotContain(live, _scheduler.Deleted);
+            Assert.True(ReferenceLock.IsLocked(Path.Combine(Kept.DirectoryPath, "section1", "index.md")));
+
+            Assert.Equal("scheduled deploy turned off", ActivityTrail.KeyFor(ActivityTrail.Event.ScheduledDeployTurnedOff));
+            string turnedOff = $"ICS3U-2025/1 · turned off: {ReferenceCourseUpkeep.TurnedOffBecause}";
+            Assert.Single(File.ReadAllLines(trail), line => line.EndsWith(turnedOff, StringComparison.Ordinal));
+            Assert.DoesNotContain(File.ReadAllLines(trail), line => line.Contains("ICS3U/1 ·", StringComparison.Ordinal));
+
+            ReferenceCourseUpkeep.BringUpToDate(_folder, Workspace.DiscoverCourses(_folder));
+            Assert.Single(File.ReadAllLines(trail), line => line.Contains("turned off:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+            try { Directory.Delete(Path.GetDirectoryName(trail)!, recursive: true); } catch { }
+        }
     }
 
     /// <summary>The refusal output, read back as the teacher's sentence (<c>app-rules.json → failureExplanations</c> cases 0-2).</summary>
