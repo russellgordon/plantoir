@@ -3572,8 +3572,11 @@ fails there.
   even with nothing changed: 1, 3 and 5 builds over three unchanged deploys
   of a Netlify course with a Cloudflare destination too, against 1, 2 and 3
   before #799, when the Cloudflare leg rebuilt for an address its rebuild
-  never got and the Cloudflare site carried the Netlify address. About 35 s
-  more per deploy on the Lenovo 20QES70500, and accepted. Since #799 a
+  never got and the Cloudflare site carried the Netlify address. Accepted.
+  The cost on the Lenovo 20QES70500 (i5-8365U, 16 GB): the one extra
+  Cloudflare rebuild measured at the director's gate (`verify-deploy.ps1`'s
+  log) took 69 s, and a section's rebuild there takes 12 to 74 s (05 →
+  "Known extra builds"). Since #799 a
   destination is also built for its own custom domain when the course records
   one (05 → "On Windows (#799)"). Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
   find carrying the preview's live-reload client — reachable in a scheduled run

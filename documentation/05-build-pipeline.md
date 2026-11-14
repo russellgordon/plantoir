@@ -2691,8 +2691,11 @@ from the image on every build.
   builds in all, against 1, 2 and 3 before #799, when the second leg rebuilt
   every time but for an address it never got, so the Cloudflare site
   carried the Netlify address. So it is one build more than before per
-  unchanged deploy, about 35 s on the Lenovo 20QES70500 (a section's
-  rebuild here takes 12 to 74 s), scheduled nights included.
+  unchanged deploy, scheduled nights included. What that costs, on the
+  Lenovo 20QES70500 (i5-8365U, 16 GB): the one extra Cloudflare rebuild
+  measured at the director's gate (`verify-deploy.ps1`'s log) took 69 s, and
+  a section's rebuild here takes 12 to 74 s (the measurement below: 74 s the
+  first time, 12 s the second). No other figure was measured.
   `verify-deploy.ps1` asserts "a second deploy builds nothing" only for a
   course with one web destination.
 - **Measured on Windows (#799):** a real native build (`preview.ps1
@@ -2850,10 +2853,23 @@ see the reason for.
       Netlify course was mostly spared, but a recorded domain that differs
       from Netlify's primary one (apex against `www`) now wins, because it
       is what Plantoir links to. The same address names the Netlify site's
-      own links on the way up (`own_host`). The variable is used as given
-      because it is already the leg's right address; a value that is not a
-      host name (letters, digits, dots, hyphens, an optional port) is ignored
-      as if unset, so nothing else can reach `quartz.config.ts` (L2).
+      own links on the way up (`own_host`). The variable is used as given,
+      whatever its shape, because it is already the leg's right address.
+      It cannot break `quartz.config.ts`: `patch_quartz_base_url` writes it
+      through `typescript_string` (#871), which escapes a quote, a backslash
+      and a line break (`test_typescript_strings.py` →
+      `test_the_base_url_reads_back_and_is_replaced_whole`). **Rejected: a
+      host-name shape check** (letters, digits, dots, hyphens, an optional
+      port; the third review's L2), which resolved a value it refused as if
+      the variable were unset. The fourth review measured what that did
+      (M1): for the SECOND destination of a two-host course, a Cloudflare
+      domain of `cours.école.ca` (a Unicode domain, as a French-language
+      school types it) or `c.school.ca.` (a trailing dot) fell through to the
+      records, which follow the primary, so the Cloudflare site went out
+      carrying the NETLIFY address and rebuilt on every deploy. A value with
+      a path (`school.ca/cs`) was refused the same way. Punycoding the
+      domain was not taken either: Quartz would then write the `xn--` host
+      in `og:image`, valid but not the address the app links to.
   - **Measured after the fix,** with the same reproduction: the build sets
     `pages.dev` and `deploy.py` reuses, and a Netlify course still builds
     with, and reuses, its `netlify.app` address.
@@ -2861,7 +2877,18 @@ see the reason for.
     and `test_build_freshness_reuse.py` fail on the old code. The first file
     imports nothing new: it reads `deploy.py` as text. `verify-deploy.ps1`
     now also reads each live site's `og:image` host and requires it to be
-    the site's own.
+    the site's own. Since the fourth review, `test_build_freshness_reuse.py`
+    → `EachLegCarriesItsOwnAddressOverRepeatedDeploys` drives the real
+    `publish_to_cloudflare` and `ensure_base_url_and_rebuild` over three
+    unchanged deploys, the services stubbed and the rebuild stood in for by
+    `build_site.resolve_section_domain` with the variable set: a Cloudflare
+    course with its own domain builds nothing and keeps it (red on
+    66dec8fc2's `deploy.py`: one rebuild, for `pages.dev`), and a second
+    destination with `cours.école.ca`, `c.school.ca.` or a path builds once
+    for its own address and reuses it (red with the shape check: three
+    builds, each for the primary's address). That file already imported
+    `deploy`; it now imports `build_site` too, which the image carries and
+    `test_build_site_domain_resolution.py` imports inside it.
   - **The mac, by reading only (not measured on a Mac):** it has the same
     fault, because it runs the same `resolve_section_domain` and the same
     `ensure_base_url_and_rebuild` inside the website builder. So a mac course

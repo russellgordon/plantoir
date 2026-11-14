@@ -145,7 +145,6 @@ def clean_base_url(val: str | None) -> str:
 # got (measured on Windows, #799). Read only here, and only from the
 # environment of the one build deploy.py runs.
 DEPLOY_BASE_URL_VARIABLE = "PLANTOIR_DEPLOY_BASE_URL"
-DEPLOY_BASE_URL_SHAPE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?")
 
 
 def resolve_section_domain(course_dir: Path, config: dict, section_number: int) -> str:
@@ -165,11 +164,20 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
     # 0. A deploy's own rebuild, for the destination it is deploying to. It is
     # the address deploy.py chose for THIS leg: the leg's own custom domain
     # when the course records one (custom_domains, by destination type), else
-    # the service's host - so it is used as given. Only a host name is taken
-    # (letters, digits, dots, hyphens, an optional port): anything else could
-    # break quartz.config.ts, and is ignored as if unset (#799's third review, L2).
+    # the service's host - so it is used as given, whatever its shape: a
+    # Unicode domain, a trailing dot and a path all stay what deploy.py asked
+    # for. It cannot break quartz.config.ts, because patch_quartz_base_url
+    # writes it through typescript_string (#871), which escapes a quote, a
+    # backslash and a line break (test_typescript_strings.py ->
+    # test_the_base_url_reads_back_and_is_replaced_whole).
+    # REJECTED: a host-name shape check (#799's third review, L2), which
+    # resolved a value it refused as if the variable were unset. Measured
+    # (#799's fourth review, M1): for the second destination of a two-host
+    # course, a Cloudflare domain of `cours.école.ca` or `c.school.ca.` then
+    # fell through to the records, which follow the PRIMARY, so the Cloudflare
+    # site went out carrying the Netlify address and rebuilt on every deploy.
     asked_for = clean_base_url(os.environ.get(DEPLOY_BASE_URL_VARIABLE, ""))
-    if asked_for and DEPLOY_BASE_URL_SHAPE.fullmatch(asked_for):
+    if asked_for:
         return asked_for
 
     # 1. Custom domain from course_config.json — keyed by destination type
