@@ -195,6 +195,8 @@ final class DeployTokenTests: XCTestCase {
     func testKeepMyOldTokenChangesNothing() async throws {
         let trail: () -> String = try useATrailOfItsOwn()
         let panel: DeployTokenPanel = DeployTokenPanel(destination: .cloudflare)
+        panel.settings = AppSettings(defaults: TestDefaults.make())
+        panel.status = .answered(DeployTokenAnswer(saved: true, answer: "accepted", endsOn: nil, problem: nil, unreachable: []))
         var calls: Int = 0
         panel.findWorkingFolder = {
             return URL(fileURLWithPath: "/nonexistent-working-folder")
@@ -215,6 +217,7 @@ final class DeployTokenTests: XCTestCase {
     func testARefusedTokenKeepsTheSheetOpenWithItsReason() async throws {
         let trail: () -> String = try useATrailOfItsOwn()
         let panel: DeployTokenPanel = DeployTokenPanel(destination: .cloudflare)
+        panel.settings = AppSettings(defaults: TestDefaults.make())
         panel.findWorkingFolder = {
             return URL(fileURLWithPath: "/nonexistent-working-folder")
         }
@@ -228,7 +231,9 @@ final class DeployTokenTests: XCTestCase {
         XCTAssertTrue(trail().contains("a new Cloudflare token was not saved: tokenCannotUseAccount"), trail())
     }
 
-    func testALauncherThatDoesNotAnswerIsReadAsCouldNotBeChecked() async throws {
+    /// Review M2: a launcher that gave no answer says nothing about whether a
+    /// token is saved. MUST-FAIL on ee9007303, which said "It is still saved."
+    func testALauncherThatDoesNotAnswerHasItsOwnSentences() async throws {
         let panel: DeployTokenPanel = DeployTokenPanel(destination: .netlify)
         panel.findWorkingFolder = {
             return URL(fileURLWithPath: "/nonexistent-working-folder")
@@ -237,8 +242,168 @@ final class DeployTokenTests: XCTestCase {
             return nil
         }
         await panel.check()
-        XCTAssertEqual(panel.status, .answered(DeployTokenPanel.notAnswered))
+        XCTAssertEqual(panel.status, .answered(DeployTokenAnswer.notAnswered))
         XCTAssertFalse(panel.hasSavedToken)
+        XCTAssertEqual(panel.statusLine(), DeployTokenWording.filled(DeployTokenWording.statusNotAnswered, ["service": "Netlify"]))
+        XCTAssertEqual(
+            DeployTokenWording.sheetProblem(for: DeployTokenAnswer.notAnswered, destination: .netlify),
+            DeployTokenWording.problemNotAnswered
+        )
+    }
+
+    /// Review W2: Cancel waits while a save is under way, so a save never
+    /// lands behind a closed sheet. MUST-FAIL on ee9007303, whose Cancel
+    /// closed the sheet at once.
+    func testCancelWaitsWhileASaveIsUnderWay() async throws {
+        let trail: () -> String = try useATrailOfItsOwn()
+        let panel: DeployTokenPanel = DeployTokenPanel(destination: .netlify)
+        panel.settings = AppSettings(defaults: TestDefaults.make())
+        panel.findWorkingFolder = {
+            return URL(fileURLWithPath: "/nonexistent-working-folder")
+        }
+        var release: CheckedContinuation<Void, Never>? = nil
+        panel.runLauncher = { _, _, _ in
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                release = continuation
+            }
+            return DeployTokenAnswer(saved: true, answer: "accepted", endsOn: nil, problem: nil, unreachable: [])
+        }
+        panel.isShowingChange = true
+        let saving: Task<Void, Never> = Task { @MainActor in
+            await panel.save(pasted: "invented-token")
+        }
+        while release == nil {
+            await Task.yield()
+        }
+        XCTAssertTrue(panel.isSaving)
+        panel.cancelChange()
+        XCTAssertTrue(panel.isShowingChange, "Cancel waits while the token is being checked")
+        release?.resume()
+        await saving.value
+        XCTAssertFalse(panel.isShowingChange, "the sheet closes on the save it showed")
+        XCTAssertEqual(panel.statusLine(), DeployTokenWording.filled(DeployTokenWording.statusConnected, ["service": "Netlify"]))
+        XCTAssertTrue(trail().contains("changed the Netlify token"), trail())
+    }
+
+    /// Review M7: with no token saved before the change there is no old one
+    /// to keep. MUST-FAIL on ee9007303, which offered Keep My Old Token and
+    /// wrote "kept the old token".
+    func testDontSaveItWhenNoTokenWasSavedBefore() async throws {
+        let trail: () -> String = try useATrailOfItsOwn()
+        let panel: DeployTokenPanel = DeployTokenPanel(destination: .netlify)
+        panel.settings = AppSettings(defaults: TestDefaults.make())
+        panel.findWorkingFolder = {
+            return URL(fileURLWithPath: "/nonexistent-working-folder")
+        }
+        panel.status = .answered(DeployTokenAnswer(saved: false, answer: "notSaved", endsOn: nil, problem: nil, unreachable: []))
+        panel.runLauncher = { _, _, _ in
+            return DeployTokenAnswer(saved: false, answer: "accepted", endsOn: nil, problem: "tokenCannotReachSites", unreachable: ["ICS3U/2"])
+        }
+        panel.isShowingChange = true
+        await panel.save(pasted: "invented-token")
+        XCTAssertEqual(panel.keepButtonTitle, DeployTokenWording.dontSaveNewToken)
+        panel.keepTheOldToken()
+        XCTAssertFalse(trail().contains("kept the old"), trail())
+        XCTAssertTrue(trail().contains("a new Netlify token was not saved: tokenCannotReachSites"), trail())
+
+        panel.status = .answered(DeployTokenAnswer(saved: true, answer: "accepted", endsOn: nil, problem: nil, unreachable: []))
+        panel.isShowingChange = true
+        await panel.save(pasted: "invented-token")
+        XCTAssertEqual(panel.keepButtonTitle, DeployTokenWording.keepOldToken)
+    }
+
+    /// Review I4: the end date the Deploy screen warns from goes on the trail
+    /// when it changes, with what read it, and only then. MUST-FAIL on
+    /// ee9007303, which kept it silently.
+    func testANewEndDateIsKeptAndWrittenOnTheTrailOnce() throws {
+        let trail: () -> String = try useATrailOfItsOwn()
+        let settings: AppSettings = AppSettings(defaults: TestDefaults.make())
+        DeployTokenEndReport.keep(endsOn: "2027-07-01T00:00:00Z", source: .deploy, in: settings)
+        XCTAssertEqual(settings.cloudflareTokenEndsOn, "2027-07-01T00:00:00Z")
+        let learned: String = DeployTokenEndReport.trailLine(endsOn: "2027-07-01T00:00:00Z", source: .deploy)
+        XCTAssertEqual(learned, "The Cloudflare token's end date is now 2027-07-01T00:00:00Z, as a deploy read it")
+        XCTAssertTrue(trail().contains(learned), trail())
+        let before: String = trail()
+        DeployTokenEndReport.keep(endsOn: "2027-07-01T00:00:00Z", source: .scheduledDeploy, in: settings)
+        XCTAssertEqual(trail(), before, "the same date read again writes nothing")
+        DeployTokenEndReport.keep(endsOn: nil, source: .settings, in: settings)
+        XCTAssertEqual(settings.cloudflareTokenEndsOn, "")
+        XCTAssertTrue(trail().contains("The Cloudflare token has no end date, as Settings ▸ Deploying read it"), trail())
+    }
+
+    /// Review I5: both runners hand a deploy's output to the end-date
+    /// report, each naming what read it.
+    func testBothRunnersHandTheirOutputToTheEndDateReport() throws {
+        let app: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers")
+        let runner: String = try String(contentsOf: app.appendingPathComponent("Scripting/ScriptRunner.swift"), encoding: .utf8)
+        XCTAssertTrue(runner.contains("DeployTokenEndReport.remember(from: text, source: .deploy)"))
+        let scheduled: String = try String(contentsOf: app.appendingPathComponent("Models/ScheduledDeploy.swift"), encoding: .utf8)
+        XCTAssertTrue(scheduled.contains("DeployTokenEndReport.remember(from: text, source: .scheduledDeploy)"))
+    }
+
+    /// Review I5: the Deploy screen's warning is only for a course that
+    /// deploys to Cloudflare Pages.
+    func testTheDeployScreenWarnsOnlyForACourseThatDeploysToCloudflare() throws {
+        let toronto: TimeZone = TimeZone(identifier: "America/Toronto")!
+        let soon: Date = try DeployTokenTests.instant("2027-06-01T16:00:00Z")
+        let netlifyOnly: [CourseConfiguration.DeployDestination] = [
+            CourseConfiguration.DeployDestination(type: "netlify", path: ""),
+        ]
+        let both: [CourseConfiguration.DeployDestination] = [
+            CourseConfiguration.DeployDestination(type: "netlify", path: ""),
+            CourseConfiguration.DeployDestination(type: "cloudflare_pages", path: ""),
+        ]
+        XCTAssertNil(SectionDetailView.deployTokenEndWarning(
+            destinations: netlifyOnly, rememberedEndsOn: "2027-07-01T00:00:00Z", now: soon, timeZone: toronto))
+        let warning: String = try XCTUnwrap(SectionDetailView.deployTokenEndWarning(
+            destinations: both, rememberedEndsOn: "2027-07-01T00:00:00Z", now: soon, timeZone: toronto))
+        XCTAssertTrue(warning.contains(DeployTokenWording.deployingSettingsOnThisPlatform), warning)
+    }
+
+    /// Review W5: the shared words carry the platform placeholders, and the
+    /// mac fills them with its own. MUST-FAIL on ee9007303, whose words said
+    /// "this Mac" and the Mac's menu path in the shared contract.
+    func testThePlatformPlaceholdersAreTheContractsAndAreFilled() throws {
+        let placeholders: [String: Any] = try XCTUnwrap(try DeployTokenTests.section()["placeholders"] as? [String: Any])
+        let settingsPath: [String: String] = try XCTUnwrap(placeholders["deployingSettings"] as? [String: String])
+        XCTAssertEqual(settingsPath["mac"], DeployTokenWording.deployingSettingsOnThisPlatform)
+        XCTAssertTrue(DeployTokenWording.problemCouldNotSave.contains(MachineWord.placeholder))
+        XCTAssertTrue(DeployTokenWording.deployScreenEnded.contains(DeployTokenWording.deployingSettingsPlaceholder))
+        for (key, sentence) in DeployTokenWording.everyKey {
+            XCTAssertFalse(sentence.contains("Mac"), "\(key) names the Mac in a shared sentence")
+            XCTAssertFalse(sentence.contains("Plantoir ▸ Settings"), "\(key) names the Mac's menu path in a shared sentence")
+            let filled: String = DeployTokenWording.filled(sentence, [:])
+            XCTAssertFalse(filled.contains(MachineWord.placeholder), key)
+            XCTAssertFalse(filled.contains(DeployTokenWording.deployingSettingsPlaceholder), key)
+        }
+        let couldNotSave: String = try XCTUnwrap(DeployTokenWording.sheetProblem(
+            for: DeployTokenAnswer(saved: false, answer: "accepted", endsOn: nil, problem: "couldNotSave", unreachable: []),
+            destination: .netlify))
+        XCTAssertTrue(couldNotSave.hasSuffix("could not be saved on this Mac. Nothing was changed."), couldNotSave)
+    }
+
+    /// The question names a course's unit plans as unit plans, not as a
+    /// section called "plans-2026".
+    func testThePlacesAreNamedForATeacher() {
+        XCTAssertEqual(DeployTokenWording.place("ICS3U/2"),
+                       DeployTokenWording.filled(DeployTokenWording.placeSection, ["course": "ICS3U", "section": "2"]))
+        XCTAssertEqual(DeployTokenWording.place("MPM2D/plans-2026"),
+                       DeployTokenWording.filled(DeployTokenWording.placeUnitPlans, ["course": "MPM2D", "year": "2026"]))
+    }
+
+    /// Review M1: a token Cloudflare still accepts after its end date says
+    /// so, not "less than 30 days from now".
+    func testAnAcceptedTokenPastItsEndDateSaysItHasPassed() throws {
+        let utc: TimeZone = TimeZone(identifier: "UTC")!
+        let english: Locale = Locale(identifier: "en_CA")
+        let line: String = DeployTokenWording.statusLine(
+            for: DeployTokenAnswer(saved: true, answer: "accepted", endsOn: "2027-07-01T00:00:00Z", problem: nil, unreachable: []),
+            destination: .cloudflare, now: try DeployTokenTests.instant("2027-07-05T00:00:00Z"), timeZone: utc, locale: english
+        )
+        let date: String = DeployTokenWording.shownDate(try DeployTokenTests.instant("2027-07-01T00:00:00Z"), in: utc, locale: english)
+        XCTAssertEqual(line, DeployTokenWording.filled(DeployTokenWording.statusConnectedEnded, ["service": "Cloudflare", "date": date]))
     }
 
     func testNoWorkingFolderSaysSo() async throws {
@@ -283,32 +448,19 @@ final class DeployTokenTests: XCTestCase {
 
     // MARK: - Tests: the scan
 
-    /// The pane and the Deploy screen say nothing about tokens that is not a
-    /// `DeployTokenWording` sentence, and nothing names the machinery.
+    /// No sentence the pane, the sheet or the Deploy screen shows names the
+    /// machinery, by the contract's own list (`userFacingLabelWords.forbidden`,
+    /// review I5), and the token store is never named either.
     func testThePaneNamesNoMachinery() throws {
-        let views: URL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("QuartzTeachers")
-        let files: [String] = [
-            "Views/Settings/DeployTokenRows.swift",
-            "Views/Section/DeployTokenEndNoticeView.swift",
-            "Models/DeployTokens/DeployTokenWording.swift",
-        ]
-        var sentences: [String] = []
-        for value in DeployTokenWording.everyKey.values {
-            sentences.append(value)
+        let forbidden: [String] = try UserFacingLabelWordsTests.forbiddenWords()
+        XCTAssertFalse(forbidden.isEmpty)
+        for (key, sentence) in DeployTokenWording.everyKey {
+            let said: String = DeployTokenWording.filled(sentence, [:])
+            XCTAssertEqual(UserFacingLabelWordsTests.forbiddenWords(in: said, from: forbidden), [], key)
+            XCTAssertFalse(said.lowercased().contains("keychain"), key)
         }
-        for value in DeployTokenPanel.trailLines.values {
-            sentences.append(value)
-        }
-        for sentence in sentences {
-            for word in ["Keychain", "keychain", "launcher", "script", "deploy.sh", "JSON"] {
-                XCTAssertFalse(sentence.contains(word), "\(word) in \(sentence)")
-            }
-        }
-        for file in files {
-            let text: String = try String(contentsOf: views.appendingPathComponent(file), encoding: .utf8)
-            XCTAssertFalse(text.contains("Text(\"Connected"), "\(file) spells a status line itself")
+        for (key, sentence) in DeployTokenPanel.trailLines {
+            XCTAssertFalse(sentence.lowercased().contains("keychain"), key)
         }
     }
 }

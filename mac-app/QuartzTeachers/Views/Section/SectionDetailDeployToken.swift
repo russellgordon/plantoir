@@ -7,22 +7,10 @@ extension SectionDetailView {
 
     // MARK: - Computed properties
 
-    /// Whether any of the course's destinations is Cloudflare Pages.
-    var deploysToCloudflare: Bool {
-        for destination in course.configuration.allDeployDestinations {
-            if destination.type == "cloudflare_pages" {
-                return true
-            }
-        }
-        return false
-    }
-
     /// The warning's sentence, or nil when there is nothing to warn about.
     var deployTokenEndWarning: String? {
-        if !deploysToCloudflare {
-            return nil
-        }
-        return DeployTokenWording.deployScreenWarning(
+        return SectionDetailView.deployTokenEndWarning(
+            destinations: course.configuration.allDeployDestinations,
             rememberedEndsOn: AppSettings.shared.cloudflareTokenEndsOn,
             now: Date(),
             timeZone: TimeZone.current
@@ -38,5 +26,34 @@ extension SectionDetailView {
                 openSettings()
             }
         }
+    }
+
+    // MARK: - Functions
+
+    /// Whether any of a course's destinations is Cloudflare Pages.
+    static func deploysToCloudflare(_ destinations: [CourseConfiguration.DeployDestination]) -> Bool {
+        for destination in destinations {
+            if destination.type == "cloudflare_pages" {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// The warning for a course with these destinations: only when one of
+    /// them is Cloudflare Pages, and only when the remembered end date is
+    /// under 30 days away or past.
+    static func deployTokenEndWarning(
+        destinations: [CourseConfiguration.DeployDestination],
+        rememberedEndsOn: String,
+        now: Date,
+        timeZone: TimeZone
+    ) -> String? {
+        if !deploysToCloudflare(destinations) {
+            return nil
+        }
+        return DeployTokenWording.deployScreenWarning(
+            rememberedEndsOn: rememberedEndsOn, now: now, timeZone: timeZone
+        )
     }
 }

@@ -1511,8 +1511,17 @@ builder. It answers with one line of JSON (`deployTokens.answerShape`):
 `problem` and `unreachable`. `save` reads the token from standard input, all
 of it, so a paste with a line break inside is refused by the paste rule rather
 than cut at the break. The token is never printed, logged or put in an
-argument by the app; it does reach `curl`'s `Authorization` header argument,
-exactly as every deploy's check has always done.
+argument by the app, and since the implementation review (W3) it is never on
+`curl`'s command line either: `http_answer` writes the `Authorization` header
+with the shell's own `printf` into `curl -H @-`, so it reaches the request on
+standard input. Measured by the reviewer before the fix: `ps -axo command`
+showed `curl … -H Authorization: Bearer <the token> …` for the whole of a
+request's 20-second wait, readable by any program on the Mac.
+`validate_token` and `validate_cf_token`, the deploy's own paste checks, go
+through `http_answer` too. Older calls that still put a token in an argument
+(the store tool's `-w`, `discover_cf_account`) are listed in a follow-up
+issue; `scripts/test_deploy_tokens.py` fails any case whose token reaches
+`curl`'s arguments.
 
 To make that possible the token store's functions (`get_token_keychain` and
 the rest), the check addresses and `token_check_answer` moved from beside the
@@ -1567,20 +1576,38 @@ fails "exactly 30 days"; the calendar left in UTC fails 11).
 
 **The Deploy screen warns from a remembered date (review MUST 2).** A
 deploy to Cloudflare prints `PLANTOIR_TOKEN_ENDS: cloudflare <date>` (or
-`none`) after its token check is accepted, which costs one more small request
-to verify per Cloudflare deploy. The app keeps it in its settings
+`none`) after its token check is accepted. It costs no request of its own
+(review M4): the saved token's check asks `token_check_answer` with
+`TOKEN_CHECK_SAYS_THE_END=true`, which answers `accepted <date>` (or
+`accepted none`) from the same verify answer, and a pasted token's
+`validate_cf_token` leaves the date in `PASTED_TOKEN_ENDS`. A test that stubs
+those checks therefore prints no line and reaches no host. The app keeps it in its settings
 (`cloudflareTokenEndsOn`, not a secret), as does every Settings check, and a
 section whose course deploys to Cloudflare shows the warning and Open
 Settings… above its site; Course Settings' Cloudflare part shows the same
 sentence. Nothing is asked of Cloudflare when the screen opens. Nothing is
 printed when Cloudflare could not be asked, so a dropped connection never
-erases a date. Netlify gives no date, so it gets no warning.
+erases a date. Netlify gives no date, so it gets no warning. When the kept
+date changes the app writes one trail line, "Cloudflare token end date
+learned", carrying the date and what read it (Settings, a deploy or a
+scheduled deploy), so "it says my token ended" can be answered (review I4).
 
 **Checked against the class websites before it is saved (second ruling).**
-`save` tries the new token against every section marker in the working folder
-(`courses/<CODE>/.netlify_sites/section<N>.json`'s top-level `id`, or
-`.cloudflare_sites/…`'s `name` in the Account ID's account). The service's own
-401, 403 or 404 is unreachable, anything else unheard. Any unreachable stops
+`save` tries the new token against every LIVE marker in the working folder:
+`courses/<CODE>/.netlify_sites/section<N>.json`'s top-level `id`, or for a
+section with none there the old place `deploy.py` still reads and moves,
+`.merged_output/section<N>/.netlify_site.json`; for Cloudflare,
+`.cloudflare_sites/section<N>.json`'s `name` in the Account ID's account, and
+a course's shared unit plans, `.cloudflare_sites/plans-<year>.json`. Only the
+names `section<N>.json` and `plans-<year>.json` count: a section cut loose for
+a new year keeps last year's marker as `section<N>.previous-<stamp>.json`
+(`DeployCommand.releasedMarkerName`), which no deploy reads. The first
+version globbed `section*.json`, and the review measured what that did after
+a rollover: last year's deleted site answered 404, and every Change Token… was
+stopped with a garbled place, "ICS3U section 1.previous-2026-09-08_071500"
+(W1). The service's own 401, 403 or 404 is unreachable; a live marker that
+cannot be read is unheard, so the save stops rather than passing it over
+(I2); anything else is unheard. Any unreachable stops
 the save with the list; the app asks "That token cannot reach N of your class
 websites", naming them, with Keep My Old Token (the default) and Use the New
 Token (`--use-anyway`). Any unheard stops it with `sitesNotChecked`. Without
@@ -1597,19 +1624,28 @@ whose window is open.
 **The deploy's own paste is checked too (review MUST 1).** The likelier path
 to the fault was never Settings: a saved token is refused and cleared (#716),
 the next deploy asks, and the teacher pastes another account's token. A pasted
-token is now tidied by the paste rule, and for a section with a marker it is
-tried against that section's site before it is saved; a Cloudflare paste waits
-until the account is known to be tried. Unreachable and unheard each stop the
+token is now tidied by the paste rule, and for a deploy with a marker it is
+tried against that deploy's own sites before it is saved
+(`check_the_pasted_token_for_this_deploy`, the same marker list filtered to
+the section, or to the course's plans for a share of unit plans); a
+Cloudflare paste waits until the account is known to be tried. The
+`tokenCannotReachSite` refusal's second line says what to do when the site
+was deleted on purpose: save the token with Change Token… in Settings, where
+Use the New Token exists (review I1). Before that line the only way forward
+was not named anywhere a teacher would see it. Unreachable and unheard each stop the
 deploy with two lines ending "saved as your token"
 (`deployTokens.deployTimeRefusals`), which `FailureExplainer.tokenNotSavedMarker`
 lifts and joins (two new `failureExplanations` cases). A section with no
 marker has nothing to try, and the token is saved at once as before.
 
-**The paste rule** (`deployTokens.paste`, 17 cases): trim every kind of
+**The paste rule** (`deployTokens.paste`, 22 cases): trim every kind of
 whitespace from both ends (a no-break space, a zero-width space and a
 byte-order mark included), take off one leading `Bearer `, then refuse an
-empty paste, whitespace inside, or anything that is not printable ASCII (a
-curly quote). Refused, never repaired. Before it, a no-break space copied off a
+empty paste or the word Bearer alone, whitespace inside, or anything that is
+not printable ASCII (a curly quote) or is a straight quote mark or backtick.
+Refused, never repaired. The review measured that a paste of only "Bearer "
+was kept as the token `Bearer`, and a token in straight quotes was sent with
+them (M8). Before it, a no-break space copied off a
 page was sent with the token and the teacher was told the token was invalid.
 
 **Remove** deletes the token (and for Netlify prunes the old tokens file's
@@ -1617,6 +1653,27 @@ entry, as `--reset-token` does) and leaves the Cloudflare account entry,
 because the Account ID belongs to Settings (#457). Its question says a deploy
 set for later will not run; such a deploy stops at the token question with
 exit 3, as it always has.
+
+**An Account ID that is not whole is refused by a Cloudflare save** (review
+I2): `--token save --account <not 32 letters and digits>` answers `notSent`,
+`accountNotValid`, and sends nothing. The first version dropped it and saved
+the token as Connected with neither the account nor its projects asked about.
+A status check still makes the checks it can without it. A Cloudflare save
+with NO Account ID still saves without trying the projects (the contract case
+"without an Account ID the projects are not tried"): every Cloudflare deploy
+from Plantoir refuses without one (#668), and the field saying so sits just
+above the token.
+
+**No test reaches a real host (review W4).** Before the fix
+`test_deploy_sh_plans.py` made 24 requests to Cloudflare's verify address and
+`test_deploy_sh_questions.py` one, because the end-date line made a request
+none of their stubs replaced (measured by the reviewer with a `curl` shim).
+Both harnesses now put a `curl` first on `PATH` that refuses and writes one
+line, never its arguments, and every run fails if it was used
+(`the_network_refused`, `no_request_was_made` in `test_deploy_sh_questions.py`).
+Measured: against `ee9007303`'s `deploy.sh` copied in and restored, 21 of the
+plans file's 30 tests and one of the questions file's fail on that guard;
+against this one, none.
 
 **Tested.** `scripts/test_deploy_tokens.py` runs every case through the real
 `deploy.sh`: the paste, end-date reading and refusal-line functions cut from
@@ -1634,21 +1691,33 @@ standard input).
 
 **Rejected.** The app reading and writing the token store itself (a system
 access prompt on the teacher's Mac, toolchain logic in the app, a second copy
-on Windows). "Accepted by Cloudflare" instead of "Connected" (the plan's
+on Windows). Cancelling a save that is under way (review W2): the launcher
+cannot be stopped once it may have written to the store, so the sheet's Cancel
+waits while the token is checked, and Escape does too
+(`interactiveDismissDisabled`); a flag that discarded the answer would have
+hidden a save that landed. "Accepted by Cloudflare" instead of "Connected" (the plan's
 wording; the ruling names "Connected", and the line only says it after the
 check accepted the token). A network check each time the Deploy screen opens.
 A line saying the account was not checked when Settings has no Account ID
 (every Cloudflare deploy from Plantoir already refuses without one, #668).
 A count of scheduled deploys in Remove's question (the question says it in
 words, true for one or none). Keeping the token off the store tool's own
-command line while saving (`security -i`): unchanged, as for every deploy; it
-needs its own issue. GitHub Pages: #669.
+command line while saving (`security -i`): unchanged, as for every deploy,
+because it cannot be measured here without writing to the teacher's Keychain;
+it is in the follow-up issue with the other older calls. GitHub Pages: #669.
 
 **Windows.** `deploy.ps1` was not edited: this Mac has no PowerShell, and the
 plan review ruled the Mac piece does not edit it blind. The `windows` issue
 asks for the same `--token` mode on Credential Manager, the paste rule, the
-deploy-time check and lines, the end-date line, the pane and the four trail
-events, all against `deployTokens`.
+deploy-time check and lines, the end-date line, the pane and the five trail
+events, all against `deployTokens`. The shared words carry two placeholders
+each app fills (`deployTokens.placeholders`, review W5): the contract's
+machine word, and `{deployingSettings}`, the Mac's "Plantoir ▸ Settings ▸
+Deploying" and Windows' "File ▸ Settings ▸ Deploying". Unmeasured, and said
+in the Windows issue so a red result there is read as a platform question:
+the three Python classes that cut functions out of `deploy.sh` pass NBSP, a
+byte-order mark, a zero-width space, curly quotes and "❌" through Git Bash's
+argv (review I6).
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 

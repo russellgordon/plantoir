@@ -46,6 +46,17 @@ nonisolated struct DeployTokenAnswer: Equatable, Decodable {
     var problem: String?
     var unreachable: [String]
 
+    /// The answer word the app gives a launcher that could not be run, or
+    /// answered in another shape (`answerShape.fields.answer`). The launcher
+    /// never prints it; it has its own sentences, because nothing is known
+    /// about the token then (review M2).
+    nonisolated static let notAnsweredWord: String = "notAnswered"
+
+    /// What such a launcher is read as: not answered, nothing saved.
+    nonisolated static let notAnswered: DeployTokenAnswer = DeployTokenAnswer(
+        saved: false, answer: notAnsweredWord, endsOn: nil, problem: nil, unreachable: []
+    )
+
     // MARK: - Functions
 
     /// The answer in a launcher's output, or nil when there is none: the last
@@ -147,6 +158,13 @@ nonisolated enum DeployTokenEndReport {
 
     nonisolated static let markerPrefix: String = "PLANTOIR_TOKEN_ENDS:"
 
+    /// What read the end date, for the trail line (`deployTokens.trail.lines`).
+    enum Source: String {
+        case settings = "sourceSettings"
+        case deploy = "sourceDeploy"
+        case scheduledDeploy = "sourceScheduledDeploy"
+    }
+
     // MARK: - Functions
 
     /// The last report in a stretch of output: `.some(nil)` for a token with
@@ -177,13 +195,38 @@ nonisolated enum DeployTokenEndReport {
     }
 
     /// Keeps what a stretch of a deploy's output said, if it said anything.
-    nonisolated static func remember(from text: String) {
+    /// `source` says which kind of deploy, for the trail.
+    nonisolated static func remember(from text: String, source: Source) {
         guard let said = endsOn(in: text) else {
             return
         }
-        let kept: String = said ?? ""
         Task { @MainActor in
-            AppSettings.shared.cloudflareTokenEndsOn = kept
+            keep(endsOn: said, source: source, in: AppSettings.shared)
         }
+    }
+
+    /// Keeps an end date the app read (nil for a token with none), and
+    /// writes one trail line when the kept date CHANGES (review I4), so a
+    /// report about a warning or a stopped deploy can say what date Plantoir
+    /// held, when it learned it and from where. Never the token.
+    @MainActor
+    static func keep(endsOn: String?, source: Source, in settings: AppSettings) {
+        let kept: String = endsOn ?? ""
+        if settings.cloudflareTokenEndsOn == kept {
+            return
+        }
+        settings.cloudflareTokenEndsOn = kept
+        ActivityTrail.note(.deployTokenEndDateLearned, trailLine(endsOn: endsOn, source: source))
+    }
+
+    /// The trail line for a newly kept end date.
+    nonisolated static func trailLine(endsOn: String?, source: Source) -> String {
+        let sourceWords: String = DeployTokenPanel.trailLines[source.rawValue] ?? ""
+        if let endsOn, !endsOn.isEmpty {
+            let sentence: String = DeployTokenPanel.trailLines["endDateLearned"] ?? ""
+            return DeployTokenWording.filled(sentence, ["date": endsOn, "source": sourceWords])
+        }
+        let sentence: String = DeployTokenPanel.trailLines["endDateNone"] ?? ""
+        return DeployTokenWording.filled(sentence, ["source": sourceWords])
     }
 }

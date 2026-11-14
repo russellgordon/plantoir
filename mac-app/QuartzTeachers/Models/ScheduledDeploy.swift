@@ -3017,7 +3017,7 @@ enum ScheduledDeploy {
         CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
         // The Cloudflare token's end date this run's deploy read (#696), so
         // the section's Deploy screen can warn before it ends.
-        DeployTokenEndReport.remember(from: text)
+        DeployTokenEndReport.remember(from: text, source: .scheduledDeploy)
         // A scheduled run is started by Plantoir itself, so it carries the
         // app's helpers folder and can install from it, or create the
         // website builder, while nobody is watching (#312).

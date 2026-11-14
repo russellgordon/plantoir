@@ -786,8 +786,15 @@ set_token_keychain() {
 delete_token_keychain() {
   /usr/bin/security delete-generic-password -s "$KEYCHAIN_SERVICE" -a "$USER" >/dev/null 2>&1 || true
 }
+# Does Netlify take this pasted token? Through http_answer (below), so the
+# token reaches curl on its standard input, never in its arguments, where
+# `ps` shows it to every program on the Mac (#696, review W3). A yes is any
+# 2xx, as curl -f's was.
 validate_token() {
-  curl -fsS -H "Authorization: Bearer $1" https://api.netlify.com/api/v1/user >/dev/null
+  local answer code
+  answer="$(http_answer "https://api.netlify.com/api/v1/user" "${1:-}")"
+  code="${answer##*$'\n'}"
+  [[ "$code" =~ ^2[0-9][0-9]$ ]]
 }
 
 # ---- Cloudflare credentials ------------------------------------------
@@ -819,12 +826,25 @@ delete_cf_account_keychain() {
 
 # Does Cloudflare still recognise this token at all? Kept separate from the
 # account lookup below, because the two can disagree: a token can be
-# perfectly valid and still list no accounts.
+# perfectly valid and still list no accounts. Through http_answer, so the
+# token is on no command line (#696, review W3). A yes also leaves the
+# token's end date in PASTED_TOKEN_ENDS ("none" for a token with none), so a
+# deploy that was just given a token can say its end date without asking
+# Cloudflare a second time (say_token_end, review M4). Not a subshell at its
+# call sites, so the variable survives.
+PASTED_TOKEN_ENDS=""
 validate_cf_token() {
+  local answer code body ends
+  PASTED_TOKEN_ENDS=""
   [[ -n "${1:-}" ]] || return 1
-  curl -fsS --max-time 20 -H "Authorization: Bearer $1" \
-    https://api.cloudflare.com/client/v4/user/tokens/verify 2>/dev/null \
-    | grep -q '"success":[[:space:]]*true'
+  answer="$(http_answer "https://api.cloudflare.com/client/v4/user/tokens/verify" "$1")"
+  code="${answer##*$'\n'}"
+  body="${answer%$'\n'*}"
+  [[ "$code" =~ ^2[0-9][0-9]$ ]] || return 1
+  printf '%s' "$body" | grep -q '"success":[[:space:]]*true' || return 1
+  ends="$(cloudflare_token_end "$body")"
+  PASTED_TOKEN_ENDS="${ends:-none}"
+  return 0
 }
 
 # What a SAVED token's check heard back, as one word (GitHub #716):
@@ -1307,8 +1327,14 @@ run_token_mode() {
     exit 1
   fi
   account="$(printf '%s' "$account" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  # An Account ID that is not 32 letters and digits cannot name an account.
+  # A Cloudflare SAVE refuses it, rather than saving the token unchecked
+  # against the account and its projects (review I2); the status check makes
+  # the checks it can without it, as Settings already says the ID is wrong.
+  local account_is_whole="true"
   if [[ -n "$account" && ! "$account" =~ ^[0-9a-f]{32}$ ]]; then
     account=""
+    account_is_whole="false"
   fi
 
   local saved_token="" checked answer problem ends
@@ -1342,6 +1368,10 @@ run_token_mode() {
 
   # save
   local pasted=""
+  if [[ "$target" == "cloudflare" && "$account_is_whole" == "false" ]]; then
+    token_mode_answer false notSent accountNotValid - ""
+    exit 0
+  fi
   if [[ -t 0 ]]; then
     read -rsp "Paste the token: " pasted; echo >&2
   else
@@ -1373,6 +1403,10 @@ run_token_mode() {
     while IFS= read -r marker; do
       [[ -n "$marker" ]] || continue
       reach="$(site_reachability "$target" "$pasted" "$account" "$marker")"
+      # "unchecked" (a Cloudflare project with no Account ID to look it up
+      # in) does not stop the save: every deploy to Cloudflare from Plantoir
+      # refuses without an Account ID (#668), and the field saying so is
+      # just above the token (deployTokens.rejected).
       if [[ "$reach" == "unreachable" ]]; then
         if [[ -n "$unreachable" ]]; then unreachable="${unreachable},"; fi
         unreachable="${unreachable}\"$(marker_place "$marker")\""
@@ -1425,7 +1459,7 @@ say_token_not_saved() {
       ;;
     tokenCannotReachSite)
       echo "❌ That token cannot reach this section's existing ${service} website, so it was not saved as your token."
-      echo "   It may belong to another ${service} account. Paste a token from the account this section was deployed with."
+      echo "   It may belong to another ${service} account: paste one from the account this section was deployed with. If the website was deleted on purpose, save the token with Change Token… in Plantoir ▸ Settings ▸ Deploying."
       ;;
     siteNotChecked)
       echo "❌ Plantoir could not reach ${service} to check that token against this section's website, so it was not saved as your token."
@@ -1439,17 +1473,19 @@ say_token_not_saved() {
 # keep and show (#696, first ruling: the course's Deploy screen warns when it
 # is under 30 days away). One machinery line, which both apps keep out of the
 # console: `PLANTOIR_TOKEN_ENDS: cloudflare <date-time>`, or `none` for a
-# token with no end date. Nothing at all when Cloudflare could not be asked,
-# so a dropped connection never erases a date the app already has. Never the
+# token with no end date. Nothing at all when the date was not read, so a
+# dropped connection never erases a date the app already has. Never the
 # token. Netlify's answers carry no end date, so nothing is said for it.
+#
+# $1 is what the token's own check already read ("none", a date, or empty):
+# the saved token's check (TOKEN_CHECK_SAYS_THE_END) or the paste's
+# (validate_cf_token's PASTED_TOKEN_ENDS). No request of its own (review M4),
+# so a test that stubs those checks reaches no host through this either
+# (review W4).
 say_token_end() {
-  local target="${1:-}" token="${2:-}" answer code body ends
-  [[ "$target" == "cloudflare" && -n "$token" ]] || return 0
-  answer="$(http_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$token")"
-  code="${answer##*$'\n'}"; body="${answer%$'\n'*}"
-  [[ "$(token_answer_word "$code" "$body" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")" == "accepted" ]] || return 0
-  ends="$(cloudflare_token_end "$body")"
-  echo "PLANTOIR_TOKEN_ENDS: cloudflare ${ends:-none}"
+  local ends="${1:-}"
+  [[ -n "$ends" ]] || return 0
+  echo "PLANTOIR_TOKEN_ENDS: cloudflare ${ends}"
 }
 
 # >>> TOKEN MODE DISPATCH >>>
@@ -2870,15 +2906,22 @@ fi
 CF_TOKEN=""
 CF_ACCOUNT=""
 CF_TOKEN_TO_SAVE_AFTER_THE_CHECK="false"
+# The token's end date this run read, for say_token_end: "none", a date, or
+# empty when it was not read (#696).
+CF_TOKEN_ENDS=""
 if [[ "$TARGET" == "cloudflare" ]]; then
   CF_TOKEN="$(get_cf_token_keychain)"
   if [[ -n "$CF_TOKEN" ]]; then
     # Cleared only when Cloudflare SAYS no; kept when it could not be asked
     # (GitHub #716, above token_check_answer). The run stops there rather than
     # carrying on, because the upload needs the same connection and would only
-    # fail later with a less useful message.
-    case "$(token_check_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$CF_TOKEN" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")" in
+    # fail later with a less useful message. The same answer carries the
+    # token's end date (TOKEN_CHECK_SAYS_THE_END, #696 review M4), so the
+    # deploy asks Cloudflare once.
+    _saved_check="$(TOKEN_CHECK_SAYS_THE_END=true token_check_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$CF_TOKEN" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")"
+    case "${_saved_check%% *}" in
       accepted)
+        if [[ "$_saved_check" == "accepted "* ]]; then CF_TOKEN_ENDS="${_saved_check#accepted }"; fi
         ;;
       refused)
         echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
@@ -2932,18 +2975,21 @@ MSG
     cf_pasted="$TIDIED_TOKEN"
     TIDIED_TOKEN=""
     if ! validate_cf_token "$cf_pasted"; then
+      cf_pasted=""
       echo "❌ Cloudflare did not accept that token."
       echo "   Check that it has the 'Cloudflare Pages - Edit' permission, then try again."
       exit 1
     fi
     CF_TOKEN="$cf_pasted"
+    CF_TOKEN_ENDS="$PASTED_TOKEN_ENDS"
     cf_pasted=""
-    # A section that has deployed to Cloudflare before is checked against
-    # its own project BEFORE the token is saved (#696, second ruling): the
-    # project is looked up in the account, which is only known below, so
-    # saving waits until then. A section with no project yet has nothing to
-    # check, and the token is saved at once, as it always was.
-    if [[ "$PLANS_MODE" != "true" && -f "courses/${COURSE_CODE}/.cloudflare_sites/section${SECTION_NUM}.json" ]]; then
+    # A section (or a course's shared unit plans) that has deployed to
+    # Cloudflare before is checked against its own project BEFORE the token
+    # is saved (#696, second ruling; review I2 for the plans): the project is
+    # looked up in the account, which is only known below, so saving waits
+    # until then. Nothing deployed yet means nothing to check, and the token
+    # is saved at once, as it always was.
+    if this_deploy_has_a_marker cloudflare; then
       CF_TOKEN_TO_SAVE_AFTER_THE_CHECK="true"
     else
       set_cf_token_keychain "$CF_TOKEN"
@@ -2998,17 +3044,14 @@ MSG
     set_cf_account_keychain "$CF_ACCOUNT"
   fi
 
-  # The token pasted above, checked against this section's own project
-  # now that the account is known, and saved only if it can reach it.
+  # The token pasted above, checked against this deploy's own project now
+  # that the account is known, and saved only if it can reach it.
   if [[ "$CF_TOKEN_TO_SAVE_AFTER_THE_CHECK" == "true" ]]; then
-    case "$(site_reachability cloudflare "$CF_TOKEN" "$CF_ACCOUNT" "courses/${COURSE_CODE}/.cloudflare_sites/section${SECTION_NUM}.json")" in
-      unreachable) say_token_not_saved tokenCannotReachSite "Cloudflare"; exit 1 ;;
-      unheard) say_token_not_saved siteNotChecked "Cloudflare"; exit 1 ;;
-    esac
+    check_the_pasted_token_for_this_deploy cloudflare "$CF_TOKEN" "$CF_ACCOUNT"
     set_cf_token_keychain "$CF_TOKEN"
     echo "✅ Saved token to macOS Keychain (service: ${CF_KEYCHAIN_SERVICE})."
   fi
-  say_token_end cloudflare "$CF_TOKEN"
+  say_token_end "$CF_TOKEN_ENDS"
 fi
 
 # -------------------- Netlify token ------------------------------------
@@ -3106,19 +3149,16 @@ MSG
   pasted="$TIDIED_TOKEN"
   TIDIED_TOKEN=""
   if ! validate_token "$pasted"; then
+    pasted=""
     echo "❌ Token invalid (Netlify rejected it). Please try again."
     exit 1
   fi
   # A section that has deployed to Netlify before is checked against its
   # own site BEFORE the token is saved (#696, second ruling): a token from
   # another account cannot see it, and deploy.py would make a new site at
-  # a new address and report success.
-  if [[ -f "courses/${COURSE_CODE}/.netlify_sites/section${SECTION_NUM}.json" ]]; then
-    case "$(site_reachability netlify "$pasted" "" "courses/${COURSE_CODE}/.netlify_sites/section${SECTION_NUM}.json")" in
-      unreachable) pasted=""; say_token_not_saved tokenCannotReachSite "Netlify"; exit 1 ;;
-      unheard) pasted=""; say_token_not_saved siteNotChecked "Netlify"; exit 1 ;;
-    esac
-  fi
+  # a new address and report success. Its marker is the one deploy.py
+  # reads, the old place in the built site included (review I2).
+  check_the_pasted_token_for_this_deploy netlify "$pasted" ""
   set_token_keychain "$pasted"
   TOKEN="$pasted"
   echo "✅ Saved token to macOS Keychain (service: ${KEYCHAIN_SERVICE})."

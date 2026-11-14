@@ -2814,7 +2814,9 @@ all XNU compares).
     course-shaped step, answers with one line of JSON, and checks a pasted
     token (read from standard input) against the folder's class websites
     before saving it. A deploy's own paste is tidied and checked against its
-    section's website the same way. The store's functions and
+    section's website the same way. Every request the mode and the paste
+    checks make hands the token to `curl` on standard input (`http_answer`,
+    `-H @-`), never in an argument `ps` can show. The store's functions and
     `token_check_answer` now sit above the course code for it —
     `07-deployment.md` → "Deploy tokens in Settings". `deploy.ps1` has no
     `--token` mode yet; the `windows` issue for #696 owes it.

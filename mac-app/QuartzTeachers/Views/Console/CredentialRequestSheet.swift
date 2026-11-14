@@ -40,6 +40,10 @@ struct CredentialRequestSheet: View {
     var isBusy: Bool = false
     var busyMessage: String = ""
 
+    /// The Help page a Help button at the foot of the sheet opens, or nil
+    /// for none (#696, the plan's #839 P5 button on the settings sheet).
+    var helpAnchor: String? = nil
+
     /// What to do with the finished answer, and with a change of mind.
     let onSend: (String) -> Void
     let onCancel: () -> Void
@@ -132,11 +136,22 @@ struct CredentialRequestSheet: View {
             }
 
             HStack {
+                if let helpAnchor {
+                    HelpLink {
+                        PlantoirHelpPage.open(anchor: helpAnchor)
+                    }
+                    .accessibilityIdentifier("credentialHelpButton")
+                }
                 Spacer()
+                // Waits while the answer is being checked (#696, review W2):
+                // Settings' check may already have saved the token by the
+                // time Cancel is pressed, and closing the sheet then would
+                // hide a save that landed.
                 Button("Cancel", role: .cancel) {
                     onCancel()
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(isBusy)
                 Button(confirmTitle) {
                     sendAnswer()
                 }
@@ -157,6 +172,7 @@ struct CredentialRequestSheet: View {
         // read off the real tree as "credentialSheet" and could not be found.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("credentialSheet")
+        .interactiveDismissDisabled(isBusy)
         .onAppear {
             answer = initialAnswer
         }

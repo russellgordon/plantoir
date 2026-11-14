@@ -126,6 +126,46 @@ NEEDS_AN_ANSWER = 3
 REFUSAL_HEADLINE = "nobody is here to answer"
 
 
+# No test reaches a real host (#696, review W4). The launcher calls `curl` by
+# name, so a `curl` first on PATH that writes one line and fails stands in for
+# every request a test did not stub. It records THAT a request was made,
+# never its arguments, which may hold a token; `with_the_network_refused`
+# raises when it was used, so a test that reaches for the network fails
+# rather than quietly asking Cloudflare. Before #696's review, 25 requests a
+# run went out to api.cloudflare.com from this file and test_deploy_sh_plans.
+NO_NETWORK_FOLDER = "no-network"
+NO_NETWORK_LOG = "requests-refused.log"
+
+
+def the_network_refused(folder: Path, environment: dict) -> dict:
+    """`environment` with a `curl` first on PATH that refuses and says so."""
+    shim = folder / NO_NETWORK_FOLDER
+    shim.mkdir(exist_ok=True)
+    log = shim / NO_NETWORK_LOG
+    curl = shim / "curl"
+    curl.write_text(
+        "#!/bin/sh\n"
+        f"printf 'a request was made\\n' >> '{log}'\n"
+        "exit 7\n",
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    refused = dict(environment)
+    refused["PATH"] = str(shim) + os.pathsep + environment.get("PATH", "")
+    return refused
+
+
+def no_request_was_made(folder: Path) -> None:
+    """Raises when the launcher tried the network during the run."""
+    log = folder / NO_NETWORK_FOLDER / NO_NETWORK_LOG
+    if log.exists():
+        count = len(log.read_text(encoding="utf-8").splitlines())
+        raise AssertionError(
+            f"The launcher made {count} request(s) to a real host during a test. "
+            "Stub the check that made it (review W4 on #696)."
+        )
+
+
 def a_working_folder(tmp: str, course: str = "ICS3U", section: int = 1) -> Path:
     """A scratch folder holding just enough for `deploy.sh` to reach its
     questions: the launcher itself, and a built site to publish."""
@@ -160,13 +200,13 @@ def run_launcher(folder: Path, arguments: list, answer: str = "",
     does not. Sending bytes means the test asks the same question on every
     platform.
     """
-    import os
-    environment = dict(os.environ, USER=NOBODY)
+    environment = the_network_refused(folder, dict(os.environ, USER=NOBODY))
     result = subprocess.run(
         ["bash", str(folder / launcher)] + arguments,
         capture_output=True, timeout=180, cwd=str(folder),
         input=answer.encode("utf-8"), env=environment,
     )
+    no_request_was_made(folder)
     return subprocess.CompletedProcess(
         result.args, result.returncode,
         result.stdout.decode("utf-8", "replace"),

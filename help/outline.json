@@ -2156,10 +2156,12 @@
      "question": "How do I change the token Plantoir uses for Netlify or Cloudflare?",
      "about": "Seeing, changing or removing a saved Netlify or Cloudflare token in Settings > Deploying (#696).",
      "steps": [
-      "Plantoir > Settings > Deploying",
-      "Connected or Not connected",
-      "Change Token...: the same steps a first deploy shows, checked before it is saved",
-      "Remove Token"
+      "Plantoir > Settings > Deploying: a Netlify part and a Cloudflare Pages part",
+      "The status line: Connected, the end date where Cloudflare gives one, or what is wrong; Check Again",
+      "Change Token...: the same steps a first deploy shows, then Check and Save; Cancel waits while the token is checked",
+      "A new token that cannot reach your class websites: Keep My Old Token (or Don't Save It), or Use the New Token",
+      "Remove Token, and what it means for a deploy set for later",
+      "The Deploy screen's warning when a Cloudflare token ends in under 30 days, with Open Settings..."
      ],
      "scenes": 2,
      "readMinutes": 2,
@@ -2176,7 +2178,8 @@
      ],
      "revisitAfter": [],
      "opensFrom": [
-      "settings: Settings > Deploying pane (after #696)"
+      "settings: Settings > Deploying pane (after #696)",
+      "sheet: the Change Token sheet's Help button (DeployTokenWording.helpAnchor)"
      ],
      "assistant": false,
      "needsPictures": true,

@@ -146,6 +146,12 @@
         "why": "GitHub #696, the second ruling (Russell, 2026-11-13): a pasted token that cannot reach the course's existing sites is checked before saving and the teacher is offered to keep the old one. This line says they did, so a later 'my new token never took' is not read as a fault."
       },
       {
+        "carries": "the end date the app now keeps for the Cloudflare token (an ISO 8601 date and time, which is not a secret), or that it has none, and what read it: Settings, a deploy, or a scheduled deploy. Written only when the kept date changes. Never the token.",
+        "event": "Cloudflare token end date learned",
+        "line": "The Cloudflare token's end date is now 2027-07-01T00:00:00Z, as a deploy read it",
+        "why": "GitHub #696, review I4. The section's Deploy screen and Course Settings warn from this date for the last 30 days and after it. A report such as 'it says my token ended' or 'my scheduled deploys stopped' is answered by this line: what date Plantoir held, when it learned it, and from where. The words are deployTokens.trail.lines.endDateLearned and .endDateNone."
+      },
+      {
         "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…', 'GitHub Copilot…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report. Since #707 a REVISE door's line also says what its greeting said about unit planning, after the door's own words: ' · told about unit planning' for a course with no plan, ' · reminded of 1 unit plan' or ' · reminded of N unit plans' when it named some, and ' · N plan.json could not be read' when plan files were left out (app-rules.json -> outsideAgents.greetingUnitPlans.trail). Fix with Claude… / Fix with Codex… / Fix with GitHub Copilot… add nothing: their message replaces the greeting.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
@@ -12833,6 +12839,7 @@
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
           "shared-rules.json:appUpdates.wording.elsewhereWork",
           "shared-rules.json:coverageTab.tab.words.cannotShowDescription",
+          "shared-rules.json:deployTokens.words.problemCouldNotSave",
           "shared-rules.json:coverageTab.tab.words.noObsidian",
           "shared-rules.json:unitPlanning.tab.words.cannotShowDescription",
           "shared-rules.json:unitPlanning.tab.words.openInBrowserCouldNotOpen",
@@ -26292,17 +26299,17 @@
     "tests": "scripts/test_two_previews_one_address.py runs the real claim from build_site.py in two processes at once, many times; the mac's PreviewWhileDeployingTests run failureExplanationCases."
   },
   "deployTokens": {
-    "note": "GitHub #696 (Russell, 2026-10-27 and two rulings on 2026-11-13). Plantoir > Settings > Deploying shows the teacher's Netlify and Cloudflare Pages tokens: whether one is saved and accepted, when it ends where the service says, a Change Token... that checks the new one BEFORE saving it, and a Remove Token. First ruling: a token's end date shows beside 'Connected' in Settings where the service gives one (Cloudflare; Netlify gives none; GitHub is #669's to measure), and when it is under 30 days away the course's Deploy screen says so too. Second ruling: a pasted token that cannot reach the course's existing sites is checked before saving, the teacher is told, and offered to keep the old token. The plan is S/plans/696-plan.md as amended by its Opus review (the review won where they differed: the deploy's own paste is checked too, the warning is on the section's Deploy screen from a remembered date, deploy.ps1 is Windows' to write). documentation/07-deployment.md -> 'Deploy tokens (#696)' says why, what was measured and what was rejected; documentation/09-mac-app.md -> 'Settings > Deploying: the tokens (#696)' says what the pane does. The mac runs the launcher half in scripts/test_deploy_tokens.py (the real deploy.sh, with the Keychain and the network stubbed) and the app half in DeployTokenTests.",
+    "note": "GitHub #696 (Russell, 2026-10-27 and two rulings on 2026-11-13). Plantoir > Settings > Deploying shows the teacher's Netlify and Cloudflare Pages tokens: whether one is saved and accepted, when it ends where the service says, a Change Token... that checks the new one BEFORE saving it, and a Remove Token. First ruling: a token's end date shows beside 'Connected' in Settings where the service gives one (Cloudflare; Netlify gives none; GitHub is #669's to measure), and when it is under 30 days away the course's Deploy screen says so too. Second ruling: a pasted token that cannot reach the course's existing sites is checked before saving, the teacher is told, and offered to keep the old token. The plan was amended by its Opus review (the review won where they differed: the deploy's own paste is checked too, the warning is on the section's Deploy screen from a remembered date, deploy.ps1 is Windows' to write). documentation/07-deployment.md -> 'Deploy tokens in Settings, and a token checked before it is saved (#696)' says why, what was measured and what was rejected; documentation/09-mac-app.md -> 'Settings > Deploying: the tokens (#696)' says what the pane does. The mac runs the launcher half in scripts/test_deploy_tokens.py (the real deploy.sh, with the Keychain and the network stubbed) and the app half in DeployTokenTests.",
     "launcherMode": {
       "arguments": "deploy.sh --token <status|save|remove> --target <netlify|cloudflare> [--account <ACCOUNT_ID>] [--use-anyway]",
-      "rule": "A mode of its own, with no course and no section: the token belongs to the teacher. It runs before every course-shaped step, so it never starts the website builder. save reads the token from standard input (all of it, one token), never from an argument or the environment. It answers with exactly ONE line of JSON on standard output, in answerShape, and nothing else; it never prints, logs or passes on the token, and status never clears a token, refused or not. --account is the Account ID from Settings (32 letters and digits; anything else is ignored); with it a Cloudflare check also asks whether the token can see that account's Pages projects. --use-anyway is the teacher's 'Use the New Token' after a save answered tokenCannotReachSites: the reachability check is skipped and the token saved. remove deletes the saved token (for Netlify it also prunes the old tokens file's entry, as --reset-token does) and leaves the Cloudflare account entry alone, because the Account ID belongs to Settings (#457). --reset-token keeps its meaning at the command line.",
+      "rule": "A mode of its own, with no course and no section: the token belongs to the teacher. It runs before every course-shaped step, so it never starts the website builder. save reads the token from standard input (all of it, one token), never from an argument or the environment. It answers with exactly ONE line of JSON on standard output, in answerShape, and nothing else; it never prints, logs or passes on the token, and status never clears a token, refused or not. --account is the Account ID from Settings (32 letters and digits); with it a Cloudflare check also asks whether the token can see that account's Pages projects. An --account that is not 32 letters and digits is refused by a Cloudflare save (notSent, accountNotValid: nothing is sent and nothing saved), because saving would skip the account and project checks without saying so; status makes the checks it can without it, since Settings already says the ID is not whole. Every request the mode makes hands the token to the request tool on its standard input, never in its arguments, where other programs on the computer can read it while the request runs. --use-anyway is the teacher's 'Use the New Token' after a save answered tokenCannotReachSites: the reachability check is skipped and the token saved. remove deletes the saved token (for Netlify it also prunes the old tokens file's entry, as --reset-token does) and leaves the Cloudflare account entry alone, because the Account ID belongs to Settings (#457). --reset-token keeps its meaning at the command line.",
       "why": "The app never reads or writes the token store itself. The entries were made by the launcher's own store tool, whose access list names that tool, so an app reading the secret can raise the system's 'wants to use your confidential information' prompt; reading it would also put toolchain logic in the app, and Windows would write a second copy of it. One launcher mode gives both platforms one behaviour and one set of cases."
     },
     "answerShape": {
       "example": "{\"saved\":true,\"answer\":\"accepted\",\"endsOn\":\"2027-07-01T00:00:00Z\",\"problem\":null,\"unreachable\":[]}",
       "fields": {
         "saved": "true when a token is saved once this has run",
-        "answer": "accepted | refused | unheard | notSaved (no token is saved) | notSent (save: the paste rule refused it before anything was sent)",
+        "answer": "accepted | refused | unheard | notSaved (no token is saved) | notSent (save: the paste rule, or a malformed --account, refused it before anything was sent). The apps add one value of their own, notAnswered, for a launcher that gave no answer in this shape; the launcher never prints it.",
         "endsOn": "the token's end date as the service wrote it (an ISO 8601 date and time), or null: no end date, or the service gives none (Netlify)",
         "problem": "null, or one of the problem keys below",
         "unreachable": "save only: the sections the new token cannot reach, each as \"COURSE/SECTION\""
@@ -26317,11 +26324,12 @@
         "tokenCannotUseAccount": "Cloudflare: the token cannot see the Pages projects of the Account ID in Settings",
         "tokenCannotReachSites": "save: the token cannot reach one or more of this folder's class websites (unreachable lists them); nothing was saved",
         "sitesNotChecked": "save: a class website could not be checked (no answer, or not the service's own); nothing was saved",
-        "couldNotSave": "save: accepted, and the store refused to keep it"
+        "couldNotSave": "save: accepted, and the store refused to keep it",
+        "accountNotValid": "save, Cloudflare: the --account given is not 32 letters and digits; nothing was sent"
       }
     },
     "paste": {
-      "rule": "What is kept of what was pasted, before anything is sent, at the deploy's own prompt and in Settings alike: trim whitespace of every kind from both ends (spaces, tabs, line breaks, U+00A0 no-break space, U+200B zero-width space, U+FEFF byte-order mark), and strip ONE leading 'Bearer ' in any case (with whatever whitespace follows it). Then refuse: an empty result (tokenEmpty); any whitespace left inside, those three included (tokenHasSpaces); any character that is not printable ASCII, U+0021 to U+007E (tokenNotPlainText). Refused, never repaired: a token never has a space, and a paste with one is two things pasted.",
+      "rule": "What is kept of what was pasted, before anything is sent, at the deploy's own prompt and in Settings alike: trim whitespace of every kind from both ends (spaces, tabs, line breaks, U+00A0 no-break space, U+200B zero-width space, U+FEFF byte-order mark), and strip ONE leading 'Bearer ' in any case (with whatever whitespace follows it). Then refuse: an empty result, or the word Bearer alone (tokenEmpty); any whitespace left inside, those three included (tokenHasSpaces); any character that is not printable ASCII, U+0021 to U+007E, and any straight quote mark or backtick (tokenNotPlainText). Refused, never repaired: a token never has a space, and a paste with one is two things pasted. No host's token has a quote mark, and one copied out of a document arrives inside them (review M8, measured: before this rule a token in straight quotes was sent with its quotes, and the word Bearer alone was sent as a token).",
       "cases": [
         {"name": "a plain token is kept as it is", "pasted": "nfp_AbC123-def_456", "expect": {"token": "nfp_AbC123-def_456"}},
         {"name": "a line break after it is trimmed", "pasted": "AbC123\n", "expect": {"token": "AbC123"}},
@@ -26339,7 +26347,12 @@
         {"name": "a line break inside", "pasted": "AbC\n123", "expect": {"problem": "tokenHasSpaces"}},
         {"name": "a no-break space inside", "pasted": "AbC 123", "expect": {"problem": "tokenHasSpaces"}},
         {"name": "curly quotes around it", "pasted": "“AbC123”", "why": "A token copied out of a document or an email arrives in curly quotes.", "expect": {"problem": "tokenNotPlainText"}},
-        {"name": "a letter with an accent", "pasted": "AbCé123", "expect": {"problem": "tokenNotPlainText"}}
+        {"name": "a letter with an accent", "pasted": "AbCé123", "expect": {"problem": "tokenNotPlainText"}},
+        {"name": "straight double quotes around it", "pasted": "\"AbC123\"", "expect": {"problem": "tokenNotPlainText"}},
+        {"name": "straight single quotes around it", "pasted": "'AbC123'", "expect": {"problem": "tokenNotPlainText"}},
+        {"name": "a backtick in it", "pasted": "AbC`123", "expect": {"problem": "tokenNotPlainText"}},
+        {"name": "Bearer and nothing after it", "pasted": "Bearer ", "expect": {"problem": "tokenEmpty"}},
+        {"name": "bearer alone in any case", "pasted": "  BEARER\n", "expect": {"problem": "tokenEmpty"}}
       ]
     },
     "check": {
@@ -26369,7 +26382,7 @@
       ]
     },
     "reachability": {
-      "rule": "Before a pasted token is saved, it is tried against every class website this working folder has deployed to that destination: each section's marker (courses/<COURSE>/.netlify_sites/section<N>.json, whose top-level id is the site; courses/<COURSE>/.cloudflare_sites/section<N>.json, whose top-level name is the project in the Account ID's account). Netlify: GET /sites/{id}. Cloudflare: GET /accounts/{account}/pages/projects/{name}, and not asked without an Account ID. 2xx is reachable; the service's own 401, 403 or 404 (its refusal pattern in the body) is unreachable; anything else is unheard. In Settings, any unreachable stops the save with tokenCannotReachSites and the list, and the teacher chooses Keep My Old Token (the default, nothing changed) or Use the New Token (--use-anyway); any unheard stops it with sitesNotChecked. At a deploy's own paste only THAT section's marker is tried, and a section with no marker has nothing to try: unreachable and unheard each stop the deploy with their two lines (deployTimeRefusals) and nothing is saved.",
+      "rule": "Before a pasted token is saved, it is tried against every class website this working folder has deployed to that destination, by the LIVE markers only: Netlify, courses/<COURSE>/.netlify_sites/section<N>.json, or for a section with none there the old place deploy.py still reads and moves, courses/<COURSE>/.merged_output/section<N>/.netlify_site.json (top-level id is the site); Cloudflare, courses/<COURSE>/.cloudflare_sites/section<N>.json and a course's shared unit plans, courses/<COURSE>/.cloudflare_sites/plans-<year>.json (top-level name is the project in the Account ID's account). A name in any other shape is not a live marker and is never tried: section<N>.previous-<stamp>.json is last year's, kept when a section is cut loose for a new year (file-formats.json -> firstDeployMarkers), and no deploy reads it (review W1: before this rule one deleted site from last year stopped every save after a rollover). A place is COURSE/SECTION, or COURSE/plans-<year> for unit plans. Netlify: GET /sites/{id}. Cloudflare: GET /accounts/{account}/pages/projects/{name}, and not asked without an Account ID. 2xx is reachable; the service's own 401, 403 or 404 (its refusal pattern in the body) is unreachable; a live marker that cannot be read, or names its site in a shape no host gives, is unheard rather than passed over (review I2); anything else is unheard. In Settings, any unreachable stops the save with tokenCannotReachSites and the list, and the teacher chooses Keep My Old Token (the default, nothing changed) or Use the New Token (--use-anyway); any unheard stops it with sitesNotChecked. At a deploy's own paste only THAT deploy's markers are tried (the section's, or for a share of unit plans the course's plans markers), and a deploy with no marker has nothing to try: unreachable and unheard each stop the deploy with their two lines (deployTimeRefusals) and nothing is saved. A case's releasedMarkers, legacyMarkers, planMarkers and unreadableMarkers are written beside its markers: section<N>.previous-<stamp>.json, the old Netlify place, plans-<year>.json, and a section<N>.json that is not JSON.",
       "why": "Without it a token from another account makes the next deploy build a NEW site at a NEW address and report success (deploy.py: a 404 on the saved Netlify site prints 'Creating a fresh Netlify site for this section', and remake_pages_project_if_gone makes a Cloudflare project again under the same name), and the students' bookmarks stop working with nothing said. A 404 can also mean the teacher deleted the site on purpose; the list and the choice let them say so. Whether Netlify answers another account's site with 404 or with 401 is to be measured with two test accounts; both are read as unreachable.",
       "cases": [
         {"name": "Settings: no class websites yet, so nothing to try", "action": "save", "service": "netlify", "markers": [], "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}}, "expect": {"saved": true, "answer": "accepted", "endsOn": null, "problem": null, "unreachable": []}, "stored": true},
@@ -26382,23 +26395,29 @@
         {"name": "Settings: a paste with a space is refused before anything is sent", "action": "save", "service": "netlify", "pasted": "AbC 123", "markers": [], "answers": {}, "expect": {"saved": false, "answer": "notSent", "endsOn": null, "problem": "tokenHasSpaces", "unreachable": []}, "stored": false, "requests": 0},
         {"name": "Settings: status with nothing saved asks nothing", "action": "status", "service": "cloudflare", "saved": false, "markers": [], "answers": {}, "expect": {"saved": false, "answer": "notSaved", "endsOn": null, "problem": null, "unreachable": []}, "requests": 0},
         {"name": "Settings: status never clears a refused token", "action": "status", "service": "netlify", "saved": true, "markers": [], "answers": {"netlifyUser": {"status": 401, "body": "{\"code\":401,\"message\":\"Access Denied\"}"}}, "expect": {"saved": true, "answer": "refused", "endsOn": null, "problem": "tokenRefused", "unreachable": []}, "stored": true},
-        {"name": "Settings: remove the Cloudflare token, and keep the account", "action": "remove", "service": "cloudflare", "saved": true, "markers": [], "answers": {}, "expect": {"saved": false, "answer": "notSaved", "endsOn": null, "problem": null, "unreachable": []}, "stored": false, "accountKept": true, "requests": 0}
+        {"name": "Settings: remove the Cloudflare token, and keep the account", "action": "remove", "service": "cloudflare", "saved": true, "markers": [], "answers": {}, "expect": {"saved": false, "answer": "notSaved", "endsOn": null, "problem": null, "unreachable": []}, "stored": false, "accountKept": true, "requests": 0},
+        {"name": "Settings: last year's marker beside the live one is not tried", "action": "save", "service": "netlify", "markers": [{"place": "ICS3U/1", "value": "site-one"}], "releasedMarkers": [{"place": "ICS3U/1", "value": "last-years-site", "stamp": "2026-09-08_071500"}], "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}, "netlifySite:site-one": {"status": 200, "body": "{\"id\":\"site-one\"}"}, "netlifySite:last-years-site": {"status": 404, "body": "{\"code\":404,\"message\":\"Not Found\"}"}}, "expect": {"saved": true, "answer": "accepted", "endsOn": null, "problem": null, "unreachable": []}, "stored": true, "requests": 2, "why": "Review W1: the released marker's site was deleted on purpose after the rollover, and before this rule it stopped every save."},
+        {"name": "Settings: a marker that cannot be read saves nothing", "action": "save", "service": "netlify", "markers": [], "unreadableMarkers": [{"place": "ICS3U/1"}], "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}}, "expect": {"saved": false, "answer": "unheard", "endsOn": null, "problem": "sitesNotChecked", "unreachable": []}, "stored": false, "requests": 1, "why": "Review I2: before this rule it was passed over, and the token saved as Connected with that website never tried."},
+        {"name": "Settings: a section's site in the old marker place is tried", "action": "save", "service": "netlify", "markers": [], "legacyMarkers": [{"place": "ICS3U/4", "value": "old-place-site"}], "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}, "netlifySite:old-place-site": {"status": 404, "body": "{\"code\":404,\"message\":\"Not Found\"}"}}, "expect": {"saved": false, "answer": "accepted", "endsOn": null, "problem": "tokenCannotReachSites", "unreachable": ["ICS3U/4"]}, "stored": false},
+        {"name": "Settings: a course's shared unit plans are tried", "action": "save", "service": "cloudflare", "account": "0123456789abcdef0123456789abcdef", "markers": [], "planMarkers": [{"course": "MPM2D", "year": 2026, "value": "mpm2d-plans-2026"}], "answers": {"cloudflareVerify": {"status": 200, "body": "{\"result\":{\"status\":\"active\"},\"success\":true}"}, "cloudflareAccountProjects": {"status": 200, "body": "{\"result\":[],\"success\":true}"}, "cloudflareProject:mpm2d-plans-2026": {"status": 404, "body": "{\"success\":false,\"errors\":[{\"code\":8000007,\"message\":\"Project not found.\"}]}"}}, "expect": {"saved": false, "answer": "accepted", "endsOn": null, "problem": "tokenCannotReachSites", "unreachable": ["MPM2D/plans-2026"]}, "stored": false},
+        {"name": "Settings: an Account ID that is not whole is refused before anything is sent", "action": "save", "service": "cloudflare", "account": "0123456789abcdef", "markers": [{"place": "MPM2D/3", "value": "mpm2d-s3-2026"}], "answers": {}, "expect": {"saved": false, "answer": "notSent", "endsOn": null, "problem": "accountNotValid", "unreachable": []}, "stored": false, "requests": 0, "why": "Review I2: before this rule the ID was dropped and the token saved as Connected, the account and the project never asked about."}
       ],
       "deployCases": [
         {"name": "a deploy's paste that cannot reach this section's Netlify site is not saved", "service": "netlify", "section": "ICS3U/1", "marker": "site-one", "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}, "netlifySite:site-one": {"status": 404, "body": "{\"code\":404,\"message\":\"Not Found\"}"}}, "expect": {"refusal": "tokenCannotReachSite", "stored": false, "exit": 1}, "why": "Review MUST 1: the likelier path to the fault is the deploy's own paste after a saved token was refused and cleared (#716). Before #696 this deploy went on, and deploy.py made a new site at a new address."},
         {"name": "a deploy's paste that reaches this section's Netlify site is saved and the deploy goes on", "service": "netlify", "section": "ICS3U/1", "marker": "site-one", "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}, "netlifySite:site-one": {"status": 200, "body": "{\"id\":\"site-one\"}"}}, "expect": {"refusal": null, "stored": true, "exit": 0}},
         {"name": "a deploy's paste that cannot reach this section's Cloudflare project is not saved", "service": "cloudflare", "section": "MPM2D/3", "marker": "mpm2d-s3-2026", "account": "0123456789abcdef0123456789abcdef", "answers": {"cloudflareVerify": {"status": 200, "body": "{\"result\":{\"status\":\"active\"},\"success\":true}"}, "cloudflareProject:mpm2d-s3-2026": {"status": 404, "body": "{\"success\":false,\"errors\":[{\"code\":8000007,\"message\":\"Project not found.\"}]}"}}, "expect": {"refusal": "tokenCannotReachSite", "stored": false, "exit": 1}},
         {"name": "a deploy's paste with a no-break space after it is tidied and saved", "service": "netlify", "section": "ICS3U/1", "pasted": "good-token ", "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}}, "expect": {"refusal": null, "stored": true, "exit": 0}, "why": "Before #696 the no-break space was sent with the token, the service refused it, and the teacher was told the token was invalid."},
-        {"name": "a deploy's paste with a space inside is refused before anything is sent", "service": "cloudflare", "section": "MPM2D/3", "pasted": "good token", "account": "0123456789abcdef0123456789abcdef", "answers": {}, "expect": {"refusal": "tokenHasSpaces", "stored": false, "exit": 1}}
+        {"name": "a deploy's paste with a space inside is refused before anything is sent", "service": "cloudflare", "section": "MPM2D/3", "pasted": "good token", "account": "0123456789abcdef0123456789abcdef", "answers": {}, "expect": {"refusal": "tokenHasSpaces", "stored": false, "exit": 1}},
+        {"name": "a deploy's paste is checked against the old marker place too", "service": "netlify", "section": "ICS3U/1", "marker": "old-place-site", "legacyMarker": true, "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}, "netlifySite:old-place-site": {"status": 404, "body": "{\"code\":404,\"message\":\"Not Found\"}"}}, "expect": {"refusal": "tokenCannotReachSite", "stored": false, "exit": 1}, "why": "Review I2: deploy.py still reads this place and moves it on the next deploy, and before this rule the paste was saved without trying it."}
       ]
     },
     "deployTimeRefusals": {
-      "rule": "The two lines a deploy prints when it does not save a token it was just given, {service} being Netlify or Cloudflare. The first line of each ends in 'saved as your token', the words the apps find it by (FailureExplainer.tokenNotSavedMarker on the mac); the two are lifted and joined into the sentence the teacher reads, as #695's refusal is. deploy.sh prints a cross and three spaces of indent; deploy.ps1 prints neither.",
+      "rule": "The two lines a deploy prints when it does not save a token it was just given, {service} being Netlify or Cloudflare and {deployingSettings} the platform's path to the Deploying settings (placeholders). The first line of each ends in 'saved as your token', the words the apps find it by (FailureExplainer.tokenNotSavedMarker on the mac); the two are lifted and joined into the sentence the teacher reads, as #695's refusal is. deploy.sh prints a cross and three spaces of indent; deploy.ps1 prints neither.",
       "lines": {
         "tokenEmpty": ["Nothing was pasted, so nothing was saved as your token.", "Copy the token from {service}'s page, then deploy again and paste it."],
         "tokenHasSpaces": ["What was pasted has a space or a line break inside it, so it was not saved as your token.", "Copy the token again from {service}'s page, and paste only the token itself."],
         "tokenNotPlainText": ["What was pasted has a character no token has, such as a curly quote, so it was not saved as your token.", "Copy the token again from {service}'s page, and paste only the token itself."],
-        "tokenCannotReachSite": ["That token cannot reach this section's existing {service} website, so it was not saved as your token.", "It may belong to another {service} account. Paste a token from the account this section was deployed with."],
+        "tokenCannotReachSite": ["That token cannot reach this section's existing {service} website, so it was not saved as your token.", "It may belong to another {service} account: paste one from the account this section was deployed with. If the website was deleted on purpose, save the token with Change Token… in {deployingSettings}."],
         "siteNotChecked": ["Plantoir could not reach {service} to check that token against this section's website, so it was not saved as your token.", "Check that this computer is online, then try again in a few minutes."]
       }
     },
@@ -26434,7 +26453,7 @@
       ],
       "marker": {
         "prefix": "PLANTOIR_TOKEN_ENDS:",
-        "rule": "Printed by a deploy to Cloudflare after its token check has been accepted: 'PLANTOIR_TOKEN_ENDS: cloudflare <endsOn>' or 'PLANTOIR_TOKEN_ENDS: cloudflare none'. Nothing when Cloudflare could not be asked, so a dropped connection never erases a date the app already has. The app keeps it as the date the Deploy screen warns from. Machinery, kept out of the console by transcriptStripping.machineLines. It costs one more small request to the token check per deploy to Cloudflare.",
+        "rule": "Printed by a deploy to Cloudflare after its token check has been accepted: 'PLANTOIR_TOKEN_ENDS: cloudflare <endsOn>' or 'PLANTOIR_TOKEN_ENDS: cloudflare none'. Nothing when Cloudflare could not be asked, so a dropped connection never erases a date the app already has. The app keeps it as the date the Deploy screen warns from, and writes the trail line endDateLearned when the date it keeps changes. Machinery, kept out of the console by transcriptStripping.machineLines. It costs no request of its own: the date is read from the answer the deploy's own token check already had (the saved token's check, or the pasted token's), so a test that stands in for those checks reaches no host through it (review M4, W4).",
         "cases": [
           {"line": "PLANTOIR_TOKEN_ENDS: cloudflare 2027-07-01T00:00:00Z", "expect": {"service": "cloudflare", "endsOn": "2027-07-01T00:00:00Z"}},
           {"line": "PLANTOIR_TOKEN_ENDS: cloudflare none", "expect": {"service": "cloudflare", "endsOn": null}},
@@ -26450,13 +26469,15 @@
       "statusConnected": "Connected to {service}.",
       "statusConnectedEndsOn": "Connected to {service}. The token ends on {date}.",
       "statusConnectedEndsSoon": "Connected to {service}. The token ends on {date}, less than 30 days from now. Make a new one before then.",
+      "statusConnectedEnded": "Connected to {service}, though the token's end date, {date}, has passed. Make a new one now.",
       "statusNotConnected": "Not connected. The next deploy to {service} asks for a token.",
       "statusRefused": "{service} no longer accepts the saved token. Change it before the next deploy.",
       "statusExpired": "The saved token has expired. Change it before the next deploy.",
       "statusDisabled": "{service} says the saved token is turned off. Change it before the next deploy.",
       "statusCannotUseAccount": "The saved token cannot deploy to the Cloudflare account above. Check its permission and its account, or change it.",
-      "statusUnheard": "Plantoir could not reach {service} to check the token. It is still saved.",
+      "statusUnheard": "Plantoir could not reach {service} just now to check the token. It is still saved.",
       "statusNoWorkingFolder": "Open a working folder to check the token.",
+      "statusNotAnswered": "Plantoir could not check the {service} token just now. Choose Check Again.",
       "changeButton": "Change Token…",
       "removeButton": "Remove Token",
       "checkAgainButton": "Check Again",
@@ -26476,25 +26497,39 @@
       "problemTokenCannotUseAccount": "That token cannot deploy to the Cloudflare account in Settings. Check that it has the 'Cloudflare Pages - Edit' permission and names that account.",
       "problemUnheard": "Plantoir could not reach {service} to check that token, so nothing was changed. Check that this computer is online, then try again.",
       "problemSitesNotChecked": "Plantoir could not check that token against your class websites, so nothing was changed. Check that this computer is online, then try again.",
-      "problemCouldNotSave": "{service} accepted that token, but it could not be saved on this Mac. Nothing was changed.",
+      "problemCouldNotSave": "{service} accepted that token, but it could not be saved on this {machine}. Nothing was changed.",
+      "problemAccountNotValid": "The Cloudflare Account ID above is not a whole ID, so the token was not checked or saved. Correct the Account ID first.",
+      "problemNotAnswered": "Plantoir could not check that token just now, so nothing was changed. Try again.",
       "unreachableTitle": "That token cannot reach {count} of your class websites",
       "unreachableTitleOne": "That token cannot reach one of your class websites",
       "unreachableMessage": "Deployed with your old token: {sections}. A deploy with this one would make a new website at a new address, so students' links would stop working. The token may belong to another {service} account.",
       "keepOldToken": "Keep My Old Token",
       "useNewToken": "Use the New Token",
+      "dontSaveNewToken": "Don't Save It",
       "placeSection": "{course} section {section}",
-      "deployScreenEndsSoon": "The Cloudflare token ends on {date}. Make a new one and change it in Plantoir ▸ Settings ▸ Deploying before then.",
-      "deployScreenEnded": "The Cloudflare token ended on {date}, so deploys to Cloudflare will stop. Change it in Plantoir ▸ Settings ▸ Deploying.",
+      "placeUnitPlans": "{course} unit plans for {year}",
+      "deployScreenEndsSoon": "The Cloudflare token ends on {date}. Make a new one and change it in {deployingSettings} before then.",
+      "deployScreenEnded": "The Cloudflare token ended on {date}, so deploys to Cloudflare will stop. Change it in {deployingSettings}.",
       "openSettingsButton": "Open Settings…"
     },
+    "placeholders": {
+      "rule": "Two placeholders the words and the deploy-time lines carry besides {service}, {date}, {count}, {sections}, {course}, {section} and {year}. The computer's name is the contract's own machine placeholder (specialNames.platformWording.machine). {deployingSettings} is the path to the Deploying settings, which differs by platform; each app puts in its own (review W5).",
+      "deployingSettings": {"mac": "Plantoir ▸ Settings ▸ Deploying", "windows": "File ▸ Settings ▸ Deploying"},
+      "apps": "dontSaveNewToken replaces keepOldToken on the question when no token was saved before the change (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
+    },
     "trail": {
-      "rule": "Four events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings. Each carries the destination and, where it applies, the problem key or how many sections could not be reached. Never the token, the Account ID, a site's name or an address.",
+      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Don't Save It writes the refused line with tokenCannotReachSites rather than keptOld.",
       "lines": {
         "changed": "Settings ▸ Deploying — changed the {service} token",
         "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
         "removed": "Settings ▸ Deploying — removed the {service} token",
         "refused": "Settings ▸ Deploying — a new {service} token was not saved: {problem}",
-        "keptOld": "Settings ▸ Deploying — kept the old {service} token: the new one cannot reach {count} class website(s)"
+        "keptOld": "Settings ▸ Deploying — kept the old {service} token: the new one cannot reach {count} class website(s)",
+        "endDateLearned": "The Cloudflare token's end date is now {date}, as {source} read it",
+        "endDateNone": "The Cloudflare token has no end date, as {source} read it",
+        "sourceSettings": "Settings ▸ Deploying",
+        "sourceDeploy": "a deploy",
+        "sourceScheduledDeploy": "a scheduled deploy"
       }
     },
     "rejected": [
@@ -26504,7 +26539,7 @@
       "Saying 'the Account ID was not checked' when Settings has no Account ID: every deploy to Cloudflare from Plantoir already refuses without one (#668), so the line would only repeat what the field above it shows.",
       "Clearing a refused token from Settings' status check, as a deploy's saved-token check does (#716): Settings shows it refused and leaves the change to the teacher.",
       "A GitHub Pages section and its end date in this piece: that GitHub returns an end date must be measured with a real token first (first ruling); it is #669's, and 669b adds GitHub to the reachability check.",
-      "Reading the token from the store tool's interactive mode to keep it off the store tool's command line while it is saved: unchanged here, its own small issue (plan section 9; review CONSIDER 6).",
+      "Reading the token from the store tool's interactive mode to keep it off the store tool's command line while it is saved: unchanged here, its own small issue (plan section 9; review CONSIDER 6), with the older requests that still put a token on a command line (review W3). Every request this piece adds or touches hands the token over on standard input instead.",
       "A count of scheduled deploys in Remove's question (the plan's tokenRemoveScheduledCount): the question says in words that a deploy set for later will not run, which is true whether there is one or none, and needs no reading of every course's schedule."
     ]
   },

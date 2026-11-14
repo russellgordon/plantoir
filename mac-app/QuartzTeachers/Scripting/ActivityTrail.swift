@@ -114,6 +114,11 @@ nonisolated enum ActivityTrail {
         /// class websites (#696, the second ruling): the destination and how
         /// many websites, never which.
         case deployTokenKeptOld = "old deploy token kept in Settings"
+        /// The Cloudflare token's end date the app keeps changed (#696,
+        /// review I4): the date (not a secret) or that there is none, and
+        /// what read it (Settings, a deploy, a scheduled deploy). Written
+        /// only on a change. NEVER the token.
+        case deployTokenEndDateLearned = "Cloudflare token end date learned"
         case assistantOpened = "assistant opened"
         /// A Claude, Codex or GitHub Copilot session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when

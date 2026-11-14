@@ -88,10 +88,17 @@ delete_cf_account_keychain() { rm -f "$FAKE_DIR/store-cloudflare-account"; }
 discover_cf_account() { :; }
 prune_legacy_netlify_entry() { :; }
 curl() {
-  local url="" token="" fail="false" write="false" previous=""
+  local url="" token="" fail="false" write="false" previous="" header=""
+  # Every argument, for the test that the token is never among them.
+  printf '%s\n' "$*" >> "$FAKE_DIR/arguments"
   for argument in "$@"; do
     if [[ "$previous" == "-H" && "$argument" == "Authorization: Bearer "* ]]; then
       token="${argument#Authorization: Bearer }"
+    fi
+    # The header on standard input (`-H @-`), as http_answer hands it over.
+    if [[ "$previous" == "-H" && "$argument" == "@-" ]]; then
+      IFS= read -r header || true
+      token="${header#Authorization: Bearer }"
     fi
     case "$argument" in
       -f|-fsS) fail="true" ;;
@@ -178,6 +185,39 @@ class AWorkingFolder:
     def save(self, name: str, value: str):
         (self.fake / f"store-{name}").write_text(value, encoding="utf-8")
 
+    def released_marker(self, service: str, place: str, value: str, stamp: str):
+        """Last year's marker, as DeployCommand.releasedMarkerName names it."""
+        course, section = place.split("/")
+        folder = ".netlify_sites" if service == "netlify" else ".cloudflare_sites"
+        key = "id" if service == "netlify" else "name"
+        path = self.folder / "courses" / course / folder / f"section{section}.previous-{stamp}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({key: value}, indent=2), encoding="utf-8")
+
+    def legacy_marker(self, place: str, value: str):
+        """The old Netlify place inside the built site, which deploy.py still reads."""
+        course, section = place.split("/")
+        path = self.folder / "courses" / course / ".merged_output" / f"section{section}" / ".netlify_site.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"id": value}, indent=2), encoding="utf-8")
+
+    def plan_marker(self, course: str, year: int, value: str):
+        """A course's shared unit plans (unit_plan_site.marker_name)."""
+        path = self.folder / "courses" / course / ".cloudflare_sites" / f"plans-{year}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"name": value, "year": year}, indent=2), encoding="utf-8")
+
+    def unreadable_marker(self, service: str, place: str):
+        course, section = place.split("/")
+        folder = ".netlify_sites" if service == "netlify" else ".cloudflare_sites"
+        path = self.folder / "courses" / course / folder / f"section{section}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("not json {", encoding="utf-8")
+
+    def arguments_given_to_curl(self) -> str:
+        path = self.fake / "arguments"
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+
     def requests(self) -> list:
         path = self.fake / "requests"
         if not path.exists():
@@ -252,8 +292,9 @@ class TheDeployTimeRefusals(unittest.TestCase):
                         self.shell + ["-c", function + '\nsay_token_not_saved "$1" "$2"\n', "_", key, service],
                         capture_output=True, timeout=30)
                     said = result.stdout.decode("utf-8")
-                    expected = ("❌ " + first.replace("{service}", service) + "\n"
-                                + "   " + second.replace("{service}", service) + "\n")
+                    settings_path = _section("placeholders", "deployingSettings", "mac")
+                    expected = ("❌ " + _filled(first, service, settings_path) + "\n"
+                                + "   " + _filled(second, service, settings_path) + "\n")
                     self.assertEqual(said, expected)
                     self.assertIn("saved as your token", first)
 
@@ -262,6 +303,10 @@ class TheDeployTimeRefusals(unittest.TestCase):
         for problem in ("tokenEmpty", "tokenHasSpaces", "tokenNotPlainText"):
             self.assertIn(problem, lines)
             self.assertIn(problem, _section("answerShape", "problems"))
+
+
+def _filled(line: str, service: str, settings_path: str) -> str:
+    return line.replace("{service}", service).replace("{deployingSettings}", settings_path)
 
 
 def _expected_answer(word_problem_ends: str) -> tuple:
@@ -298,6 +343,14 @@ class TheTokenMode(unittest.TestCase):
                 folder.answer(case["answers"])
                 for marker in case["markers"]:
                     folder.marker(case["service"], marker["place"], marker["value"])
+                for marker in case.get("releasedMarkers", []):
+                    folder.released_marker(case["service"], marker["place"], marker["value"], marker["stamp"])
+                for marker in case.get("legacyMarkers", []):
+                    folder.legacy_marker(marker["place"], marker["value"])
+                for marker in case.get("planMarkers", []):
+                    folder.plan_marker(marker["course"], marker["year"], marker["value"])
+                for marker in case.get("unreadableMarkers", []):
+                    folder.unreadable_marker(case["service"], marker["place"])
                 if case.get("saved"):
                     folder.save(case["service"], GOOD_TOKEN)
                 if case["service"] == "cloudflare":
@@ -319,6 +372,42 @@ class TheTokenMode(unittest.TestCase):
                 if "requests" in case:
                     self.assertEqual(len(folder.requests()), case["requests"], folder.requests())
                 self.assertNotIn(GOOD_TOKEN, out + err, "the token is never printed")
+                self.assertNotIn(GOOD_TOKEN, folder.arguments_given_to_curl(),
+                                 "the token is never on a request's command line")
+
+    def test_the_token_is_never_on_a_requests_command_line(self):
+        """Review W3. MUST-FAIL on ee9007303, whose http_answer passed the
+        header as an argument, where `ps` shows it while the request runs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = AWorkingFolder(tmp)
+            folder.answer({
+                "cloudflareVerify": {"status": 200, "body": '{"result":{"status":"active"},"success":true}'},
+                "cloudflareAccountProjects": {"status": 200, "body": '{"result":[],"success":true}'},
+                "cloudflareProject:mpm2d-s3-2026": {"status": 200, "body": '{"success":true}'},
+            })
+            folder.marker("cloudflare", "MPM2D/3", "mpm2d-s3-2026")
+            code, out, err = folder.run(["--token", "save", "--target", "cloudflare",
+                                         "--account", "0123456789abcdef0123456789abcdef"],
+                                        pasted=GOOD_TOKEN + "\n")
+            self.assertEqual(json.loads(out)["saved"], True, out + err)
+            self.assertEqual(len(folder.requests()), 3, folder.requests())
+            self.assertNotIn(GOOD_TOKEN, folder.arguments_given_to_curl())
+
+    def test_the_contract_carries_the_cases_the_review_asked_for(self):
+        """Reviews W1 and I2: a released marker beside a live one, an
+        unreadable marker, the old Netlify place, unit plans, and an Account
+        ID that is not whole. Each runs in test_every_reachability_case."""
+        cases = _section("reachability", "cases")
+        for field in ("releasedMarkers", "unreadableMarkers", "legacyMarkers", "planMarkers"):
+            found = False
+            for case in cases:
+                if case.get(field):
+                    found = True
+            self.assertTrue(found, f"no reachability case carries {field}")
+        problems = []
+        for case in cases:
+            problems.append(case["expect"]["problem"])
+        self.assertIn("accountNotValid", problems)
 
     def test_a_refused_check_asks_about_no_site(self):
         """MUST-FAIL before #696: there was no --token mode at all."""
@@ -362,7 +451,9 @@ class TheDeploysOwnPaste(unittest.TestCase):
                 folder.answer(case["answers"])
                 # The marker first: written after the build, it would make the
                 # course look changed since it was built (#768).
-                if case.get("marker"):
+                if case.get("marker") and case.get("legacyMarker"):
+                    folder.legacy_marker(case["section"], case["marker"])
+                elif case.get("marker"):
                     folder.marker(case["service"], case["section"], case["marker"])
                 self._a_built_section(folder, case["section"])
                 course, section = case["section"].split("/")
@@ -383,6 +474,8 @@ class TheDeploysOwnPaste(unittest.TestCase):
                     self.assertIn("❌ " + first, said)
                     self.assertNotIn("REACHED-THE-WEBSITE-BUILDER", said)
                 self.assertNotIn(GOOD_TOKEN + "\n", said.replace(" ", ""))
+                self.assertNotIn(GOOD_TOKEN, folder.arguments_given_to_curl(),
+                                 "the token is never on a request's command line")
 
     def test_a_cloudflare_deploy_says_the_tokens_end_date(self):
         marker_rule = _section("endDate", "marker")
@@ -397,7 +490,7 @@ class TheDeploysOwnPaste(unittest.TestCase):
             self.assertIn(marker_rule["prefix"] + " cloudflare 2027-07-01T00:00:00Z\n", out)
             self.assertEqual(marker_rule["cases"][0]["line"], marker_rule["prefix"] + " cloudflare 2027-07-01T00:00:00Z")
 
-    def test_a_cloudflare_deploy_that_cannot_ask_says_no_date(self):
+    def test_a_cloudflare_token_with_no_end_date_says_none(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = AWorkingFolder(tmp, stop_before_the_builder=True)
             folder.answer({"cloudflareVerify": {"status": 200, "body": '{"result":{"status":"active"},"success":true}'}})
@@ -407,6 +500,33 @@ class TheDeploysOwnPaste(unittest.TestCase):
                                          "--account", "0123456789abcdef0123456789abcdef", "--non-interactive"])
             self.assertEqual(code, 0, out + err)
             self.assertIn("PLANTOIR_TOKEN_ENDS: cloudflare none\n", out)
+
+    def test_a_cloudflare_deploy_asks_cloudflare_about_its_token_once(self):
+        """Review M4. MUST-FAIL on ee9007303, which asked the token check a
+        second time for the end date."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = AWorkingFolder(tmp, stop_before_the_builder=True)
+            folder.answer({"cloudflareVerify": {"status": 200, "body": '{"result":{"status":"active","expires_on":"2027-07-01T00:00:00Z"},"success":true}'}})
+            self._a_built_section(folder, "MPM2D/3")
+            folder.save("cloudflare", GOOD_TOKEN)
+            code, out, err = folder.run(["MPM2D", "3", "--image", "unused:tag", "--target", "cloudflare",
+                                         "--account", "0123456789abcdef0123456789abcdef", "--non-interactive"])
+            self.assertEqual(code, 0, out + err)
+            self.assertEqual(folder.requests(), ["cloudflareVerify"])
+            self.assertIn("PLANTOIR_TOKEN_ENDS: cloudflare 2027-07-01T00:00:00Z\n", out)
+
+    def test_a_pasted_cloudflare_token_says_its_end_date_with_one_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = AWorkingFolder(tmp, stop_before_the_builder=True)
+            folder.answer({"cloudflareVerify": {"status": 200, "body": '{"result":{"status":"active","expires_on":"2027-07-01T00:00:00Z"},"success":true}'}})
+            self._a_built_section(folder, "MPM2D/3")
+            code, out, err = folder.run(["MPM2D", "3", "--image", "unused:tag", "--target", "cloudflare",
+                                         "--account", "0123456789abcdef0123456789abcdef"],
+                                        pasted=GOOD_TOKEN + "\n")
+            self.assertEqual(code, 0, out + err)
+            self.assertEqual(folder.requests(), ["cloudflareVerify"])
+            self.assertIn("PLANTOIR_TOKEN_ENDS: cloudflare 2027-07-01T00:00:00Z\n", out)
+            self.assertEqual(folder.store("cloudflare"), GOOD_TOKEN)
 
 
 if __name__ == "__main__":

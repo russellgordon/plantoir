@@ -91,14 +91,36 @@ final class DeployTokenPanel {
 
     // MARK: - Stored properties
 
-    let destination: DeployTokenDestination
-
     /// What the status line shows.
     enum Status: Equatable {
         case checking
         case answered(DeployTokenAnswer)
         case noWorkingFolder
     }
+
+    /// The trail's lines (`deployTokens.trail.lines`).
+    enum TrailLine: String {
+        case changed
+        case changedAnyway
+        case removed
+        case refused
+        case keptOld
+    }
+
+    nonisolated static let trailLines: [String: String] = [
+        "changed": "Settings ▸ Deploying — changed the {service} token",
+        "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
+        "removed": "Settings ▸ Deploying — removed the {service} token",
+        "refused": "Settings ▸ Deploying — a new {service} token was not saved: {problem}",
+        "keptOld": "Settings ▸ Deploying — kept the old {service} token: the new one cannot reach {count} class website(s)",
+        "endDateLearned": "The Cloudflare token's end date is now {date}, as {source} read it",
+        "endDateNone": "The Cloudflare token has no end date, as {source} read it",
+        "sourceSettings": "Settings ▸ Deploying",
+        "sourceDeploy": "a deploy",
+        "sourceScheduledDeploy": "a scheduled deploy",
+    ]
+
+    let destination: DeployTokenDestination
 
     var status: Status = .checking
 
@@ -108,12 +130,20 @@ final class DeployTokenPanel {
     /// What the sheet says under its field after a save that kept nothing.
     var sheetProblem: String? = nil
 
-    /// True while a pasted token is being checked.
+    /// True while a pasted token is being checked. Cancel waits while it is
+    /// (review W2): the launcher cannot be stopped once it may have written
+    /// to the store, so a Cancel pressed then would close the sheet on a
+    /// save that still lands.
     var isSaving: Bool = false
 
     /// The websites a new token could not reach, while the question about
     /// them is open; empty otherwise.
     var unreachablePlaces: [String] = []
+
+    /// Whether a token was saved when the question opened, so its first
+    /// button can say Keep My Old Token only when there is one to keep
+    /// (review M7).
+    var hadATokenBeforeTheChange: Bool = false
 
     /// The pasted token, held only while that question is open, so Use the
     /// New Token can hand it over again. Cleared by either answer.
@@ -137,6 +167,9 @@ final class DeployTokenPanel {
         return DeployTokenLauncher.workingFolder()
     }
 
+    /// Where the end date is kept; a test gives its own.
+    @ObservationIgnored var settings: AppSettings = AppSettings.shared
+
     // MARK: - Computed properties
 
     var isAskingAboutUnreachable: Bool {
@@ -149,6 +182,15 @@ final class DeployTokenPanel {
             return answer.saved
         }
         return false
+    }
+
+    /// The question's first button: Keep My Old Token, or Don't Save It
+    /// when no token was saved before the change.
+    var keepButtonTitle: String {
+        if hadATokenBeforeTheChange {
+            return DeployTokenWording.keepOldToken
+        }
+        return DeployTokenWording.dontSaveNewToken
     }
 
     // MARK: - Initializer
@@ -179,9 +221,9 @@ final class DeployTokenPanel {
         }
         status = .checking
         let arguments: [String] = DeployTokenLauncher.arguments(
-            action: "status", destination: destination, accountID: AppSettings.shared.cloudflareAccountID
+            action: "status", destination: destination, accountID: settings.cloudflareAccountID
         )
-        let answer: DeployTokenAnswer = await runLauncher(folder, arguments, nil) ?? DeployTokenPanel.notAnswered
+        let answer: DeployTokenAnswer = await runLauncher(folder, arguments, nil) ?? DeployTokenAnswer.notAnswered
         status = .answered(answer)
         rememberTheEndDate(from: answer)
     }
@@ -193,13 +235,16 @@ final class DeployTokenPanel {
             sheetProblem = DeployTokenWording.statusNoWorkingFolder
             return
         }
+        if !useAnyway {
+            hadATokenBeforeTheChange = hasSavedToken
+        }
         isSaving = true
         sheetProblem = nil
         let arguments: [String] = DeployTokenLauncher.arguments(
             action: "save", destination: destination,
-            accountID: AppSettings.shared.cloudflareAccountID, useAnyway: useAnyway
+            accountID: settings.cloudflareAccountID, useAnyway: useAnyway
         )
-        let answer: DeployTokenAnswer = await runLauncher(folder, arguments, pasted) ?? DeployTokenPanel.notAnswered
+        let answer: DeployTokenAnswer = await runLauncher(folder, arguments, pasted) ?? DeployTokenAnswer.notAnswered
         isSaving = false
         if answer.saved {
             heldPaste = nil
@@ -240,17 +285,25 @@ final class DeployTokenPanel {
         }
     }
 
-    /// Keep My Old Token: nothing changes, and the sheet closes.
+    /// Keep My Old Token (or Don't Save It, when there was none): nothing
+    /// changes, and the sheet closes.
     func keepTheOldToken() {
         let count: Int = unreachablePlaces.count
         heldPaste = nil
         unreachablePlaces = []
         pendingUnreachableCount = 0
         isShowingChange = false
-        ActivityTrail.note(
-            .deployTokenKeptOld,
-            DeployTokenPanel.trailLine(.keptOld, destination: destination, count: count)
-        )
+        if hadATokenBeforeTheChange {
+            ActivityTrail.note(
+                .deployTokenKeptOld,
+                DeployTokenPanel.trailLine(.keptOld, destination: destination, count: count)
+            )
+        } else {
+            ActivityTrail.note(
+                .deployTokenChangeRefused,
+                DeployTokenPanel.trailLine(.refused, destination: destination, problem: "tokenCannotReachSites")
+            )
+        }
     }
 
     /// Removes the saved token, after the teacher said yes.
@@ -262,7 +315,7 @@ final class DeployTokenPanel {
         let arguments: [String] = DeployTokenLauncher.arguments(
             action: "remove", destination: destination, accountID: ""
         )
-        let answer: DeployTokenAnswer = await runLauncher(folder, arguments, nil) ?? DeployTokenPanel.notAnswered
+        let answer: DeployTokenAnswer = await runLauncher(folder, arguments, nil) ?? DeployTokenAnswer.notAnswered
         if answer.answer == "notSaved" {
             status = .answered(answer)
             rememberTheEndDate(from: answer)
@@ -272,8 +325,14 @@ final class DeployTokenPanel {
         }
     }
 
-    /// Cancel in the sheet: nothing held, nothing said.
+    /// Cancel in the sheet: nothing held, nothing said. Ignored while a
+    /// pasted token is being checked (review W2), as the sheet's Cancel
+    /// button is then disabled: a save under way may already have reached
+    /// the store, and closing the sheet would hide that it landed.
     func cancelChange() {
+        if isSaving {
+            return
+        }
         heldPaste = nil
         unreachablePlaces = []
         sheetProblem = nil
@@ -281,13 +340,16 @@ final class DeployTokenPanel {
     }
 
     /// The end date the Deploy screen warns from, kept when a check read
-    /// one for Cloudflare, and cleared when there is no token.
+    /// one for Cloudflare, and cleared when there is no token. A removal
+    /// clears it without a trail line of its own: the removal has one.
     func rememberTheEndDate(from answer: DeployTokenAnswer) {
         if destination != .cloudflare {
             return
         }
-        if answer.answer == "accepted" || answer.answer == "notSaved" {
-            AppSettings.shared.cloudflareTokenEndsOn = answer.endsOn ?? ""
+        if answer.answer == "accepted" {
+            DeployTokenEndReport.keep(endsOn: answer.endsOn, source: .settings, in: settings)
+        } else if answer.answer == "notSaved" {
+            settings.cloudflareTokenEndsOn = ""
         }
     }
 
@@ -301,29 +363,6 @@ final class DeployTokenPanel {
             ActivityTrail.note(.deployTokenChanged, DeployTokenPanel.trailLine(.changed, destination: destination))
         }
     }
-
-    /// What a launcher that could not be run, or answered in another shape,
-    /// is read as: could not be checked, nothing saved.
-    nonisolated static let notAnswered: DeployTokenAnswer = DeployTokenAnswer(
-        saved: false, answer: "unheard", endsOn: nil, problem: nil, unreachable: []
-    )
-
-    /// The trail's lines (`deployTokens.trail.lines`).
-    enum TrailLine: String {
-        case changed
-        case changedAnyway
-        case removed
-        case refused
-        case keptOld
-    }
-
-    nonisolated static let trailLines: [String: String] = [
-        "changed": "Settings ▸ Deploying — changed the {service} token",
-        "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
-        "removed": "Settings ▸ Deploying — removed the {service} token",
-        "refused": "Settings ▸ Deploying — a new {service} token was not saved: {problem}",
-        "keptOld": "Settings ▸ Deploying — kept the old {service} token: the new one cannot reach {count} class website(s)",
-    ]
 
     /// One trail line. Never the token, the account, a site or an address:
     /// only the service, a problem KEY and a count.

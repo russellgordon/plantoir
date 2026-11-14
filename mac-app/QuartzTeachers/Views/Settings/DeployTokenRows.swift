@@ -81,6 +81,7 @@ struct DeployTokenRows: View {
                 problem: panel.sheetProblem,
                 isBusy: panel.isSaving,
                 busyMessage: DeployTokenWording.filled(DeployTokenWording.checkingNewToken, ["service": service]),
+                helpAnchor: DeployTokenWording.helpAnchor,
                 onSend: { pasted in
                     Task { @MainActor in
                         await panel.save(pasted: pasted)
@@ -100,7 +101,7 @@ struct DeployTokenRows: View {
                     set: { _ in }
                 )
             ) {
-                Button(DeployTokenWording.keepOldToken, role: .cancel) {
+                Button(panel.keepButtonTitle, role: .cancel) {
                     panel.keepTheOldToken()
                 }
                 .keyboardShortcut(.defaultAction)
