@@ -532,7 +532,7 @@
       "Each section's All Classes folder holds one page per class, named Unit 1, Day 1, Unit 1, Day 2 and so on",
       "The first word is the course's word for a unit, chosen in New Course (What do you call a unit?): Unit, or Module, or Thread",
       "Each section has its own copy of each class, dated for that section: in the example, Unit 1, Day 13 is 24 September in Section 1 and 25 September in Section 2",
-      "Section ▸ Add Next Class makes the next one, numbered and dated",
+      "Section ▸ Add Class… makes the next one, numbered and dated",
       "The front page shows Most Recent Class: the newest class students can see",
       "A page named another way (Field Trip, Exam Review) is kept as it is and never renumbered"
      ],
@@ -592,7 +592,7 @@
       "Its agenda links to shared pages: concepts, exercises, tasks",
       "Open a linked concept page: its backlinks list every class that used it (class pages show no backlinks)",
       "Fix a mistake on the concept page once and every section's site has the fix at its next deploy",
-      "To start a new reference page (a concept, an exercise, a task), duplicate the _DUPLICATE ME page in that folder; new class pages come from Section > Add Next Class"
+      "To start a new reference page (a concept, an exercise, a task), duplicate the _DUPLICATE ME page in that folder; new class pages come from Section > Add Class…"
      ],
      "pictures": [
       {
@@ -743,19 +743,19 @@
      "anchor": "add-next-class",
      "title": "Add the next class",
      "question": "How do I make the page for the next class, numbered and dated?",
-     "about": "Section > Add Next Class: the page made, numbered and dated, unpublished, backed up first, undoable.",
+     "about": "Section > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
      "steps": [
       "Select the section (it needs class dates on file: link class-dates)",
-      "Section > Add Next Class",
+      "Section > Add Class…",
       "Plantoir saves a copy of the course to Backups, then makes the page, numbered and dated from the class dates",
       "The new page arrives unpublished: open it in Obsidian and write it",
       "Publish it when it is written (Publish Pages… or Publish Class for a Date…); Section > Undo Last Change takes the new page away again"
      ],
      "pictures": [
       {
-       "shows": "The Section menu open on Add Next Class",
+       "shows": "The Section menu open on Add Class…",
        "labels": [
-        "Add Next Class"
+        "Add Class…"
        ],
        "scene": "add-next-class-1"
       },
@@ -781,7 +781,7 @@
      "waitsOn": [],
      "revisitAfter": [],
      "opensFrom": [
-      "sheet: SectionVerbSheet (.result after Add Next Class)"
+      "sheet: SectionVerbSheet (.addClass: the ways, then the answer or the copy's plan)"
      ],
      "assistant": false,
      "needsPictures": true,
