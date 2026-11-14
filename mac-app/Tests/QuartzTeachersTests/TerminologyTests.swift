@@ -44,7 +44,9 @@ final class TerminologyTests: XCTestCase {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("QuartzTeachers/Views/Wizard/NewCourseWizardView.swift")
         let text: String = try String(contentsOf: source, encoding: .utf8)
-        XCTAssertFalse(text.contains("Terminology"), "NewCourseWizardView still names a terminology switch")
+        XCTAssertFalse(text.contains("usesLCSTerminology"), "NewCourseWizardView still holds the switch's state")
+        XCTAssertFalse(text.contains("LCS-specific terminology"), "NewCourseWizardView still shows the switch")
+        XCTAssertFalse(text.contains("lcsTerminologyToggle"), "NewCourseWizardView still names the switch's control")
         XCTAssertFalse(text.contains("use_lcs_terminology"), "NewCourseWizardView still writes the key")
     }
 

@@ -14,7 +14,7 @@ final class ColourSchemePickerTests: XCTestCase {
 
     private let groveID: String = "grove-colours"
 
-    // MARK: - Tests
+    // MARK: - Functions
 
     func testTheBundledListHoldsGroveColoursTwiceAndOffersItOnce() throws {
         let schemes: [ColourScheme] = ColourSchemeCatalog.schemes
@@ -94,8 +94,6 @@ final class ColourSchemePickerTests: XCTestCase {
             }
         }
     }
-
-    // MARK: - Functions
 
     private func unlistedTwin(of listedID: String, in schemes: [ColourScheme]) -> ColourScheme? {
         for scheme in schemes {

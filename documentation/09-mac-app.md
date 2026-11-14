@@ -10050,6 +10050,8 @@ refusals and the lock all apply unchanged. The rule itself is data:
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses.importing.olderLayout`, run by `OlderLayoutImportTests`.
 
+(The paths in this section are the real ones measured on this Mac and are kept as a record. Since #891 the contract's cases use invented names for the same shapes: `JHC/2024-25` and `ICD2O-JHC-MWPS-Collaboration`.)
+
 **What the real folders are**, measured read-only under
 `~/Library/Mobile Documents/com~apple~CloudDocs/Documents/LCS/2023-24/`:
 ICS3U has two class folders and one Shared folder, **all 18 of each class's
