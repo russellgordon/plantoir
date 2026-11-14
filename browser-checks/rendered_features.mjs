@@ -72,6 +72,7 @@ const QUIZ_WORDS = CONTRACT.quizCallouts.words.site
 const PROGRESS_WORDS = CONTRACT.myProgress.words
 const RESET_ICON = CONTRACT.geogebraFences.reset.icon
 const PHET = CONTRACT.phetFences
+const MUSIC = CONTRACT.musicFences
 // The runner's words for a run that ended without its output, as patterns
 // (a {placeholder} matches anything).
 const RUNNER_ENDS = ["needsWebAddress", "engineMissing", "couldNotLoad", "notReady", "crashed", "finishedWithError", "exitCode"].map((key) =>
@@ -437,7 +438,14 @@ async function openContext(browser, engine, origin, pageName) {
       record.offSite.push({ host: told.host, path: told.pathname, kind: url.searchParams.get("kind") ?? "asked" })
       return route.fulfill({ status: 204 })
     }
-    if (request.resourceType() === "media" || MEDIA.test(url.pathname)) {
+    // A tune's sounds (#679) are the one exception, and a narrow one: the
+    // site's OWN static/abcjs/sounds/ files, asked by abcjs's player as data
+    // (XMLHttpRequest), never as media. They are decoded into a suspended
+    // audio context (SILENT_AUDIO), so nothing plays, and the music play row
+    // must see them arrive or it proves nothing about Play.
+    const soundAsData = url.host === siteHost && url.pathname.includes("/static/abcjs/sounds/")
+      && ["xhr", "fetch"].includes(request.resourceType())
+    if ((request.resourceType() === "media" || MEDIA.test(url.pathname)) && !soundAsData) {
       // Nothing plays, but a sound or a film asked of another host is still
       // the site asking another host (fixes review F4), so it is recorded
       // first, a teacher's embed's included as one.
@@ -944,6 +952,110 @@ ROW_CHECKS.progress = async ({ page, base, record }) => {
 // copy, its frame's address is the contract's (phetFences.address), it is
 // never cropped, and PhET's credit line is under it. The own-host row on
 // the same page judges every request the simulation's frame made.
+// Music (#679): every tune is the build's own drawing, there before any
+// script runs, in the page's text colour; Play only where the contract puts
+// it (not with play: no, not in a quiz's choice), and the sounds' credit
+// under it; nothing of the player fetched before a press.
+ROW_CHECKS.music = async ({ page, record }) => {
+  const absent = process.env.PLANTOIR_RENDERED_NO_SOUNDS
+  if (absent) return { skip: `no copy of the sounds on this Mac - ${absent}` }
+  const fixture = ROWS.soundsFixture
+  const served = await page.evaluate(() => fetch(location.href).then((answer) => answer.text()))
+  const servedNotes = (served.match(/class="abcjs-note /g) ?? []).length
+  if (servedNotes === 0) return { fail: "not drawn: the page as the site serves it holds no drawn note (the tunes stayed as source text)" }
+  const seen = await page.evaluate(() => {
+    const figures = Array.from(document.querySelectorAll("figure.pl-music"))
+    const probe = document.createElement("span")
+    probe.style.color = "var(--dark)"
+    document.body.append(probe)
+    const dark = getComputedStyle(probe).color
+    probe.remove()
+    return figures.map((figure) => {
+      const svg = figure.querySelector(":scope > .pl-music-drawing svg")
+      const credit = figure.querySelector(".pl-music-credit")
+      return {
+        drawn: svg !== null,
+        notes: svg ? svg.querySelectorAll(".abcjs-note").length : 0,
+        fill: svg ? svg.getAttribute("fill") : null,
+        colour: svg ? getComputedStyle(svg).color : null,
+        dark,
+        play: figure.querySelector(".pl-music-play") !== null,
+        inChoice: figure.closest(".plantoir-quiz-choice") !== null,
+        credit: credit ? { text: credit.textContent.replace(/\s+/g, " ").trim(), links: Array.from(credit.querySelectorAll("a")).map((a) => ({ href: a.getAttribute("href"), rel: a.getAttribute("rel") ?? "" })) } : null,
+      }
+    })
+  })
+  if (seen.length !== 4) return { fail: `not drawn: the Music page has ${seen.length} tunes, not its 4` }
+  for (const [index, tune] of seen.entries()) {
+    if (!tune.drawn) return { fail: `not drawn: tune ${index + 1} has no drawing` }
+    if (tune.fill !== "currentColor" || tune.colour !== tune.dark) return { fail: `tune ${index + 1} is not in the page's text colour (fill ${tune.fill}, ${tune.colour} against ${tune.dark})` }
+  }
+  if (seen[0].notes !== fixture.notes) return { fail: `the first tune shows ${seen[0].notes} notes, not its ${fixture.notes}` }
+  if (!seen[0].play) return { fail: "the tune with Play has no Play button" }
+  if (seen[1].play) return { fail: "the tune with play: no has a Play button" }
+  if (seen.filter((tune) => tune.inChoice).length !== 2 || seen.some((tune) => tune.inChoice && tune.play)) return { fail: "a tune in the quiz's choices has a Play button, or the choices hold no tune" }
+  const credit = seen[0].credit
+  if (!credit) return { fail: "credit line: the sounds' credit is not under the tune with Play" }
+  if (credit.text !== MUSIC.credit.sentence || !credit.links.some((link) => link.href === MUSIC.credit.licenceUrl && /\blicense\b/.test(link.rel))) {
+    return { fail: `credit line: not the contract's sentence with its licence linked: "${credit.text}"` }
+  }
+  const early = record.sitePaths.filter((path) => path.startsWith("/static/abcjs/"))
+  if (early.length > 0) return { fail: `the player was fetched before any press: ${early[0]}` }
+  return { ok: `${seen.length} tunes drawn by the build (${servedNotes} notes in the page as served), Play on the one that has it, none in the quiz's choices, the sounds' credit under it, nothing of the player fetched` }
+}
+
+// A real press of Play: the player and the sounds from the site's own copy,
+// the drawing drawn again in place, a note lit, and Stop.
+ROW_CHECKS["music play"] = async ({ page, record }) => {
+  const absent = process.env.PLANTOIR_RENDERED_NO_SOUNDS
+  if (absent) return { skip: `no copy of the sounds on this Mac - ${absent}` }
+  const fixture = ROWS.soundsFixture
+  const isolated = await page.evaluate(() => self.crossOriginIsolated === true)
+  if (expectsIsolation() && !isolated) return { fail: `could not play where it must: the Music page is not cross-origin isolated on ${options.host}` }
+  const answered = []
+  const listen = (response) => {
+    const path = new URL(response.url()).pathname
+    if (path.startsWith("/static/abcjs/")) answered.push({ path, status: response.status() })
+  }
+  page.on("response", listen)
+  const shape = () => {
+    const svg = document.querySelector("figure.pl-music .pl-music-drawing svg")
+    if (!svg) return null
+    return JSON.stringify([svg.getAttribute("viewBox"), Array.from(svg.querySelectorAll("path")).map((one) => one.getAttribute("d")), Array.from(svg.querySelectorAll("text")).map((one) => [one.getAttribute("x"), one.getAttribute("y"), one.textContent])])
+  }
+  const before = await page.evaluate(shape)
+  const figure = page.locator("figure.pl-music[data-music]").first()
+  await figure.locator(".pl-music-play").click({ timeout: 15000 })
+  const started = Date.now()
+  const outcome = await waitInPage(page, () => {
+    const f = document.querySelector("figure.pl-music[data-music]")
+    if (!f) return null
+    if (f.dataset.musicState === "failed") return { playing: false, said: f.querySelector(".pl-music-status")?.textContent ?? "" }
+    if (f.dataset.musicState === "playing" && f.querySelectorAll(".pl-music-now").length > 0) return { playing: true, button: f.querySelector(".pl-music-play").textContent }
+    return null
+  }, 60000)
+  page.off("response", listen)
+  if (!outcome?.playing) return { fail: `could not play on a real press (the page said: ${outcome?.said || "nothing within 60 s"})` }
+  const seconds = ((Date.now() - started) / 1000).toFixed(1)
+  if (outcome.button !== MUSIC.words.site.stop) return { fail: `while it plays the button reads "${outcome.button}", not "${MUSIC.words.site.stop}"` }
+  const after = await page.evaluate(shape)
+  if (after !== before) return { fail: "the drawing moved when it was drawn again on the press: the notes lit are not the notes the page showed" }
+  const engine = answered.find((one) => one.path.endsWith("/abcjs-basic-min.js"))
+  if (!engine || engine.status !== 200) return { fail: "could not play: the player did not come from the site's own static/abcjs/" }
+  const sounds = answered.filter((one) => one.path.includes("/static/abcjs/sounds/"))
+  const folders = [...new Set(sounds.map((one) => one.path.split("/static/abcjs/sounds/")[1].split("/")[0]))].sort()
+  if (JSON.stringify(folders) !== JSON.stringify(fixture.playFolders)) return { fail: `the press fetched the sounds ${folders.join(", ") || "none"}, not ${fixture.playFolders.join(", ")}` }
+  const bad = sounds.find((one) => one.status !== 200)
+  if (bad) return { fail: `could not play: ${bad.path} answered ${bad.status}` }
+  await figure.locator(".pl-music-play").click({ timeout: 15000 })
+  const stopped = await waitInPage(page, () => {
+    const f = document.querySelector("figure.pl-music[data-music]")
+    return f && f.dataset.musicState === "stopped" ? { button: f.querySelector(".pl-music-play").textContent, lit: f.querySelectorAll(".pl-music-now").length } : null
+  }, 10000)
+  if (!stopped || stopped.button !== MUSIC.words.site.play || stopped.lit !== 0) return { fail: "a second press did not stop the tune" }
+  return { ok: `played on a real press in ${seconds} s from the site's own copy (${sounds.length} sound files from ${folders.join(" and ")}, each 200), a note lit, the drawing where it was, ${isolated ? "on an isolated page" : "on a page that is not isolated"}; a second press stopped it` }
+}
+
 ROW_CHECKS.phet = async ({ page, record }) => {
   const absent = process.env.PLANTOIR_RENDERED_NO_PHET
   if (absent) return { skip: `no copy of the simulation on this Mac - ${absent}` }
@@ -1855,9 +1967,12 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
   // carries are SKIPS by name for it, never a failure for the server's 404
   // (measured 2026-11-13: both engines log "Failed to load resource" for the
   // missing page, which the clean-page row would report).
-  const absentCopy = process.env.PLANTOIR_RENDERED_NO_PHET
-  if (absentCopy && pageRows.some((row) => row.needsCopy === "phet")) {
-    const why = `no copy of the simulation on this Mac, so the ${pageName} page is not in the site - ${absentCopy}`
+  // The Music page's sounds (#679) the same way: PLANTOIR_RENDERED_NO_SOUNDS.
+  const absentCopy = pageRows.some((row) => row.needsCopy === "phet") ? process.env.PLANTOIR_RENDERED_NO_PHET
+    : pageRows.some((row) => row.needsCopy === "sounds") ? process.env.PLANTOIR_RENDERED_NO_SOUNDS : ""
+  if (absentCopy) {
+    const what = pageRows.some((row) => row.needsCopy === "phet") ? "the simulation" : "the sounds"
+    const why = `no copy of ${what} on this Mac, so the ${pageName} page is not in the site - ${absentCopy}`
     for (const row of pageRows) outcomes.push({ row: row.name, state: "SKIPPED", detail: why })
     for (const row of rows) {
       if (row.page === "*" && !(row.except ?? []).includes(pageName)) outcomes.push({ row: row.name, state: "SKIPPED", detail: why })
@@ -1869,7 +1984,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
     if (pageRows.some((row) => row.name === "print")) await context.addInitScript(PRINT_PROBE)
     if (pageRows.some((row) => row.name === "copy")) await context.addInitScript(CLIPBOARD_SPY)
     if (engine === "chromium" && pageRows.some((row) => row.name === "heading anchor")) await context.addInitScript(NO_ANCHORING)
-    if (pageRows.some((row) => row.name === "phet")) await context.addInitScript(SILENT_AUDIO)
+    if (pageRows.some((row) => row.name === "phet" || row.name === "music play")) await context.addInitScript(SILENT_AUDIO)
     let page
     try {
       page = await openPage(context, record, pageUrl(base, pageName))
@@ -2147,6 +2262,10 @@ async function redRun(engines, network) {
           }
           if (aimed.needsCopy === "phet" && process.env.PLANTOIR_RENDERED_NO_PHET) {
             say("SKIPPED", `sabotage ${sabotage.name}`, name, `no copy of the simulation on this Mac - ${process.env.PLANTOIR_RENDERED_NO_PHET}`)
+            return
+          }
+          if (aimed.needsCopy === "sounds" && process.env.PLANTOIR_RENDERED_NO_SOUNDS) {
+            say("SKIPPED", `sabotage ${sabotage.name}`, name, `no copy of the sounds on this Mac - ${process.env.PLANTOIR_RENDERED_NO_SOUNDS}`)
             return
           }
           if ((aimed.needsNetwork === "cdnjs" && network.cdnjs) || (aimed.needsNetwork === "google" && network.google)) {

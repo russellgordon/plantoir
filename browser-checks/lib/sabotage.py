@@ -532,6 +532,43 @@ def phet_credit(site: Path) -> str:
     return f"{count} credit line(s) taken out"
 
 
+def music_drawing_gone(site: Path) -> str:
+    path = page_file(site, "Music")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'<div[^>]*class="abcjs-container pl-music-drawing"[^>]*>.*?</svg></div>', "", text,
+                             flags=re.DOTALL)
+    if count == 0:
+        raise SystemExit("sabotage: the Music page has no drawn tune")
+    path.write_text(changed, encoding="utf-8")
+    return f"{count} tune drawing(s) taken out"
+
+
+def music_credit(site: Path) -> str:
+    path = page_file(site, "Music")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'<p class="pl-music-credit">.*?</p>', "", text, flags=re.DOTALL)
+    if count == 0:
+        raise SystemExit("sabotage: the Music page has no credit line")
+    path.write_text(changed, encoding="utf-8")
+    return f"{count} credit line(s) taken out"
+
+
+def music_engine(site: Path) -> str:
+    engine = site / "static" / "abcjs" / "abcjs-basic-min.js"
+    if not engine.is_file():
+        raise SystemExit("sabotage: the site carries no static/abcjs/abcjs-basic-min.js")
+    engine.unlink()
+    return "static/abcjs/abcjs-basic-min.js taken out"
+
+
+def music_sound_missing(site: Path) -> str:
+    folder = site / "static" / "abcjs" / "sounds" / "flute-mp3"
+    if not folder.is_dir():
+        raise SystemExit("sabotage: the site carries no static/abcjs/sounds/flute-mp3/")
+    shutil.rmtree(folder)
+    return "static/abcjs/sounds/flute-mp3/ taken out"
+
+
 def cold_visit(site: Path) -> str:
     if not (site / "index.css").is_file():
         raise SystemExit("sabotage: the site has no index.css")
@@ -584,6 +621,10 @@ DOERS = {
     "phet isolation": phet_isolation,
     "phet cropped": phet_cropped,
     "phet credit": phet_credit,
+    "music drawing gone": music_drawing_gone,
+    "music credit": music_credit,
+    "music engine": music_engine,
+    "music sound missing": music_sound_missing,
     "cold visit": cold_visit,
     "embeds refused": embeds_refused,
     "own host off its pin": own_host_off_its_pin,
