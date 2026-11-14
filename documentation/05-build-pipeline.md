@@ -4072,7 +4072,7 @@ and `scripts/test_phet.py` runs every case.
    downloaded` and `files for the site could not be downloaded`
    (`KeptDownloadsReport` on the Mac). It is one of
    `machineLineLength.bounded`.
-8. **What #679 calls, unchanged** (`keptDownloads.forTheMusicPiece`): a
+8. **What #679 calls, unchanged** (`keptDownloads.forTheMusicPiece`; done, as written, in `scripts/music.py`, "Music notation: what the build does" below): a
    kind `sounds` in `keptDownloads.kinds`;
    `kept_downloads.Fetcher(<its hosts>)` to download;
    `kept_downloads.Store(kept_downloads.root_for(course_dir), "sounds")`,
@@ -4233,6 +4233,130 @@ already fetches geogebra.org sketches). It owes the sweep exception, the
 trail lines from the marker, the failure explanation cases, the Problems
 tab's label, and one real first download measured on the PC (its `windows`
 issue).
+
+## Music notation: what the build does (#679, v2.0.0)
+
+A teacher writes a tune in ABC notation in a ` ```abc ` (or ` ```music-abc `)
+fence; students see the notation and press Play to hear it, each note lit as
+it sounds. Russell's rulings on #679 (2026-11-13): a Play button; every one of
+the 128 General MIDI sounds of the sound set abcjs plays, the one named
+"gunshot" included (an entry in a standard list; Plantoir's own Help,
+guidance and examples never use or feature it); a site carries only the
+sounds its tunes need, downloaded at build and kept; and a build that cannot
+download one stops, by #674's pattern. The contract is
+`contracts/shared-rules.json` → `musicFences` (and `keptDownloads`, kind
+`sounds`); `scripts/test_music.py` runs every case, and
+`scripts/check_music_rules_against_the_site.py` runs what needs the image.
+
+**Python prepares and Quartz places**, as for figures and PhET:
+
+1. **Finding the tunes.** `music.tunes_on_page` reads the fences with
+   `markdown_code.fenced_blocks` (backticks or tildes, any quote depth, list
+   items, a space before the language), after `%%` comments are removed as
+   Quartz removes them, so the count agrees with the site's. A page is
+   scanned when its text holds `abc` at all (#674's lesson: an opener-shaped
+   scan missed ``` abc).
+2. **Settings** are `%` lines (one `%`) at the top: `% alt:`, `% play: no`,
+   `% sound:`, `% sound V:<voice>:`, `% chords:` (`musicFences.settings`).
+   ABC and the Obsidian plugin read them as comments, so a page means the
+   same in Obsidian. A known setting after the tune has begun is a note.
+3. **Sounds.** abcjs takes a sound only from a `%%MIDI` line (measured:
+   `%%MIDI program 73` sets it, `I:MIDI program 73` sets nothing), and Quartz
+   removes the text between any two `%%` on a page. So the BUILD writes the
+   directive: `%%MIDI program N` after the K: line and after each body V:
+   line, `chordprog` and `bassprog` after K: in the chords' sound
+   (`musicFences.sounds.directiveRule`). The emitted text reaches the site in
+   the manifest, after Quartz has read the page, so the directive survives.
+4. **Drawing.** `support/music/plantoir-music.mjs` (abcjs 6.7.2 under
+   linkedom 0.18.15, `/opt/vendor/music-engine` from support/music's
+   lockfile) draws each tune and answers its SVG, its warnings by line and
+   column, its note count and **the set of programs abcjs itself would play**
+   (`setUpAudio`), which decides what is downloaded: chord symbols play on
+   their own program, so a reading of the settings alone would miss piano
+   for a flute tune's chords (plan review M2; measured `[0, 73]` without
+   chordprog, `[73]` with it).
+5. **Kept sounds.** Each sound is one file, `<name>-mp3.js` (every note as
+   base64), fetched from the pinned commit through `kept_downloads.Fetcher`,
+   refused unless its SHA-256 is the pin's, kept as it arrived in
+   `.downloaded/sounds/<name>/<commit>/`, checked against the pin at every
+   use, and decoded into `static/abcjs/sounds/<name>-mp3/<note>.mp3` as the
+   site is written. A sound not kept that cannot be downloaded STOPS the
+   build before Quartz runs (`keptDownloads.stop`, kind `sounds`, the sound
+   in plain words on each page), and a fault in the pass itself stops it
+   when a page has a tune with Play (`musicFences.stop.passFails`), so no
+   site says it built with a Play button that plays nothing.
+6. **Folder problems** (`siteHealth` → `musicTunesNotRight`, the Problems
+   tab's Music row): a misspelt sound (the closest names offered; the tune
+   plays in piano), what abcjs said (its first problem mapped back through
+   the added directive lines to the teacher's line, and how many more), a
+   `%%` line (read from the RAW file, so a pair the site removed whole is
+   still named; the sentence points at `% sound:`), no K: line, an empty
+   tune (left as code), a missing engine. A tune abcjs reads with a problem
+   is still drawn, as the Obsidian plugin shows it.
+
+**What a site carries.** `static/abcjs/` (abcjs-basic-min.js 511,968 bytes,
+147,981 gzipped; LICENSE.md; README.txt) and the sounds its tunes with Play
+need, only when a page students can see has one; a site whose tunes all say
+`% play: no` carries the drawings alone; a site with no tune carries nothing
+and its pages are as before. A sound adds 0.62 to 2.25 MB decoded (median
+1.97 MB; piano 1,971,564 bytes in 88 notes). The image gains one layer after
+wrangler's: 14 MB, 1,285 files, 21 packages (`npm audit`: 0 vulnerabilities,
+2026-11-14). The sounds are never in the image.
+
+**Measured (2026-11-14, M4 Pro, Node 22.6.0, headless Chromium 155 and
+WebKit 2359; nothing played).**
+
+- The build's drawing and the browser's redraw on a press are identical once
+  attribute order and inline-style spelling are set aside (canonical XML),
+  for four tunes in both engines, ONLY because getBBox answers no size in
+  both: linkedom has none, and the loader sets it for the length of its
+  call. Without that the browser measures text, abcjs lays it out
+  differently, and the drawing moves on the press.
+- All 129 sound files: 319,286,148 bytes, fetched sequentially in 15.7 s on
+  this line; decoded in 0.85 s into 11,352 notes, 239,159,247 bytes. Every
+  note of piano and flute is byte for byte the sound set's own per-note file.
+- abcjs asks for `lead_8_bass_lead`; the sound set spells it
+  `lead_8_bass__lead` (the single-underscore address answers 404). The pin
+  carries both spellings, so that sound plays from a class site.
+- A press on a standalone page, in both engines, on a page isolated for live
+  input: 17 requests, all to the site's own host (the page, the loader,
+  abcjs, 14 notes from flute-mp3 and acoustic_grand_piano-mp3), a note lit
+  within 0.2 s (Chromium) and 0.9 s (WebKit), Stop and Play again. With
+  flute-mp3 taken away, or abcjs-basic-min.js, both engines say
+  `words.site.couldNotPlay`. The rendered check's own suspended audio
+  context (SILENT_AUDIO) is enough: the context stayed suspended throughout.
+- abcjs-basic-min.js holds no `eval` or `new Function`, so a Netlify
+  publish's script policy (`'self' 'unsafe-eval'` and hashes) needs nothing
+  new; it names paulrosen.github.io as its default sound address, which the
+  loader never uses (it always names the site's own folder).
+- Drawing takes 2 to 17 ms a tune once the helper is up.
+
+**Rejected.**
+
+- Reading the raw page before Quartz and placing by fence number: two `%%`
+  lines can join across a fence boundary, so the counts could differ.
+- Asking teachers to write `I:MIDI`: abcjs ignores it.
+- Drawing in the browser only (the functionplot pattern): every student
+  downloads 512 KB to see a still picture, and nothing is checked.
+- A drawing cache like `.figure-cache`: milliseconds saved, a folder and its
+  failure modes added.
+- jsdom: 4.4 MB to linkedom's 2.8 MB, and jsdom 27 cannot be required from
+  Node 22.6 (ERR_REQUIRE_ESM).
+- One pin per note (11,352 hashes) instead of one per sound (129).
+- Carrying piano in the image so the everyday tune never needs the network
+  (plan review item 5, a SHOULD): one path for every sound is what the
+  brief named, so the first build that plays any tune needs the internet,
+  piano included, and says so. Question 1 in the closing note offers the
+  other way, which is a pin and a layer.
+- Inventing `% drums:` now: abcjs reaches the drum kit only through
+  `%%MIDI drum`, which Quartz removes (a known limit).
+- Carrying the Obsidian plugin as #495 carries TikZJax: it is AGPL-3.0.
+- VexFlow, OpenSheetMusicDisplay, Verovio, LilyPond, abc2svg: measured in
+  the plan (`contracts/toolchain.json` → pins → abcjs → why).
+
+**Known limits** are `musicFences.knownLimits`; among them, the kept sounds
+belong to one working folder on one computer, so a moved folder or a new
+computer fetches again (keptDownloads' limit, said in Help).
 
 ## Self-check quizzes: what the build does (#563, v1.8.0)
 

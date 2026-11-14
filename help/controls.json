@@ -2283,10 +2283,17 @@
    },
    "windows": null
   },
+  "problemsTabKindMusic": {
+   "label": "Music",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[16].label"
+   },
+   "windows": null
+  },
   "problemsTabKindFileTooLarge": {
    "label": "File too large",
    "mac": {
-    "say": "shared-rules#sectionProblems.kinds[16].label"
+    "say": "shared-rules#sectionProblems.kinds[17].label"
    },
    "windows": null
   },

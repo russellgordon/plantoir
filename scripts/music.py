@@ -75,6 +75,13 @@ SOUNDS_FOLDER = "sounds"
 # support/music's lockfile. Its abcjs file is what a site carries.
 ENGINE_FOLDER = "music-engine"
 ENGINE_FILE = "abcjs-basic-min.js"
+# Chord symbols play in the tune's own sound unless `% chords:` names
+# another (plan review item 3, built as recommended; a question for Russell
+# in the closing note). False gives abcjs's own default, piano for every
+# chord, which is a second download for most tunes and a sound the teacher
+# did not name. One constant, so the choice is cheap to turn; the contract's
+# musicFences.sounds.emitted cases pin the True behaviour.
+CHORDS_FOLLOW_THE_TUNE = True
 # Seconds a tune may take once the helper is up (the slowest measured was
 # 17 ms, the first tune of a run), and seconds the helper may take to start.
 JOB_SECONDS = 20
@@ -238,7 +245,7 @@ def tune_as_played(body: str, settings: dict) -> dict:
         program = resolved(value, f"sound V:{voice}")
         if program is not None:
             voice_programs[voice] = program
-    if chords_program is None:
+    if chords_program is None and CHORDS_FOLLOW_THE_TUNE:
         chords_program = tune_program
     lines = body.split("\n")
     out = []

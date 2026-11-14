@@ -680,6 +680,14 @@ runs it itself when the copy is missing, so it needs the network once.
 Without a copy, those rows are SKIPS by name; with `PLANTOIR_REQUIRE_ENGINES`
 set, a missing copy is a FAILURE.
 
+`python3 browser-checks/lib/plant_sounds.py fetch` is the same for the two
+sounds (piano and flute, 2.6 and 3.0 MB as kept) the rendered check's Music
+page and the skill's music example play (#679): pinned by the SHA-256s in
+`contracts/toolchain.json` → `fluidR3Sounds`, into
+`${PLANTOIR_SOUNDS_CACHE:-~/Library/Caches/Plantoir-dev/sounds}`, and run by
+`verify.sh` itself when a copy is missing. Without one, those rows are SKIPS
+by name, a FAILURE with `PLANTOIR_REQUIRE_ENGINES` set.
+
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
 changes every rebuild, so macOS forgets permission grants (like Desktop access)
