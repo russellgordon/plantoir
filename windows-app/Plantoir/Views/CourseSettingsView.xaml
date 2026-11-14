@@ -3,14 +3,20 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <!-- The course page. Since #801 (the mac's #708) it has two tabs,
+         Settings and Planning, while an outside assistant is installed
+         (unitPlanning.tab.tabCases); with none, the bar is collapsed and the
+         page is exactly the settings form it always was. Only the chosen
+         tab is drawn: the other is COLLAPSED, so none of its controls can
+         take a key or be reached by Tab (measured: PlanningTabUiTests). -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- The header is the page's, on both tabs, as on the mac. -->
         <Grid Grid.Row="0" Padding="16,10" ColumnSpacing="8"
               BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
             <Grid.ColumnDefinitions>
@@ -30,42 +36,77 @@
             </Button>
         </Grid>
 
-        <!-- What a folder change did — Add made the folder, Remove left it on
-             disk, a rename finished — said once, here, where the list is. -->
-        <InfoBar x:Name="FolderNotice" Grid.Row="1" Margin="16,8,16,0"
-                 IsOpen="False" Severity="Informational" IsClosable="True"
-                 AutomationProperties.AutomationId="folderNotice" />
-
-        <ScrollViewer x:Name="FormScroll" Grid.Row="2" Padding="16,0,16,16"
-                      AutomationProperties.AutomationId="courseSettingsForm">
-            <StackPanel x:Name="Form" Spacing="8" MaxWidth="720" HorizontalAlignment="Left" />
-        </ScrollViewer>
-
-        <Grid Grid.Row="3" Padding="12" ColumnSpacing="10"
-              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+        <!-- Settings | Planning: the section page's thin SelectorBar for the
+             same job (unitPlanning.tab.rejected: not a TabView). Its words
+             are set in code from the contract. "Saved ✓" beside it after a
+             Course > Save on Planning (saveOnPlanning). -->
+        <Grid x:Name="TabsRow" Grid.Row="1" Margin="8,4,8,0" ColumnSpacing="8" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <!-- Revert, not Cancel: a settings form is not a dialog — the
-                 values simply go back to the last save. -->
-            <Button x:Name="RevertButton" Content="Revert" IsEnabled="False" Click="Revert_Click"
-                    AutomationProperties.AutomationId="revertButton" />
-            <TextBlock x:Name="SaveStatus" Grid.Column="1" VerticalAlignment="Center" FontSize="13" TextWrapping="Wrap"
-                       AutomationProperties.AutomationId="savedConfirmation" />
-            <!-- #272: rebuilds every open preview of this course after a Save.
-                 Shown beside settingsSavedWhilePreviewing; disabled with
-                 settingsPreviewAgainNothingOpen once those previews stopped. -->
-            <Button x:Name="PreviewAgainButton" Grid.Column="2" Content="Preview Again" Visibility="Collapsed"
-                    Click="PreviewAgain_Click" AutomationProperties.AutomationId="previewAgainButton" />
-            <Button x:Name="SaveButton" Grid.Column="3" Content="Save" IsEnabled="False" Click="Save_Click"
-                    Style="{StaticResource AccentButtonStyle}"
-                    AutomationProperties.AutomationId="saveButton" />
-            <!-- No Ctrl+S here since #488: the key is Course > Save Course
-                 Settings' in the menu bar, which calls this button's own
-                 handler on its own predicate (shortcuts on menu items only). -->
+            <SelectorBar x:Name="CourseTabs" SelectionChanged="CourseTabs_SelectionChanged"
+                         AutomationProperties.AutomationId="courseTabs">
+                <SelectorBarItem x:Name="SettingsTabItem" IsSelected="True"
+                                 AutomationProperties.AutomationId="courseTabSettings" />
+                <SelectorBarItem x:Name="PlanningTabItem"
+                                 AutomationProperties.AutomationId="courseTabPlanning" />
+            </SelectorBar>
+            <TextBlock x:Name="PlanningSaveStatus" Grid.Column="1" VerticalAlignment="Center" FontSize="13"
+                       TextTrimming="CharacterEllipsis"
+                       AutomationProperties.AutomationId="planningSaveStatus" />
+        </Grid>
+
+        <!-- The tab area: the settings form, or the Planning tab (added in
+             code, the last child), never both. MinHeight 0 so a tall page
+             scrolls inside its own view instead of pushing the bar out of
+             the window (#838). -->
+        <Grid x:Name="TabArea" Grid.Row="2" MinHeight="0">
+            <Grid x:Name="SettingsArea">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- What a folder change did — Add made the folder, Remove left it on
+                     disk, a rename finished — said once, here, where the list is. -->
+                <InfoBar x:Name="FolderNotice" Grid.Row="0" Margin="16,8,16,0"
+                         IsOpen="False" Severity="Informational" IsClosable="True"
+                         AutomationProperties.AutomationId="folderNotice" />
+
+                <ScrollViewer x:Name="FormScroll" Grid.Row="1" Padding="16,0,16,16"
+                              AutomationProperties.AutomationId="courseSettingsForm">
+                    <StackPanel x:Name="Form" Spacing="8" MaxWidth="720" HorizontalAlignment="Left" />
+                </ScrollViewer>
+
+                <Grid Grid.Row="2" Padding="12" ColumnSpacing="10"
+                      BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Revert, not Cancel: a settings form is not a dialog — the
+                         values simply go back to the last save. -->
+                    <Button x:Name="RevertButton" Content="Revert" IsEnabled="False" Click="Revert_Click"
+                            AutomationProperties.AutomationId="revertButton" />
+                    <TextBlock x:Name="SaveStatus" Grid.Column="1" VerticalAlignment="Center" FontSize="13" TextWrapping="Wrap"
+                               AutomationProperties.AutomationId="savedConfirmation" />
+                    <!-- #272: rebuilds every open preview of this course after a Save.
+                         Shown beside settingsSavedWhilePreviewing; disabled with
+                         settingsPreviewAgainNothingOpen once those previews stopped. -->
+                    <Button x:Name="PreviewAgainButton" Grid.Column="2" Content="Preview Again" Visibility="Collapsed"
+                            Click="PreviewAgain_Click" AutomationProperties.AutomationId="previewAgainButton" />
+                    <Button x:Name="SaveButton" Grid.Column="3" Content="Save" IsEnabled="False" Click="Save_Click"
+                            Style="{StaticResource AccentButtonStyle}"
+                            AutomationProperties.AutomationId="saveButton" />
+                    <!-- No Ctrl+S here since #488: the key is Course > Save Course
+                         Settings' in the menu bar, which calls this button's own
+                         handler on its own predicate (shortcuts on menu items only). -->
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

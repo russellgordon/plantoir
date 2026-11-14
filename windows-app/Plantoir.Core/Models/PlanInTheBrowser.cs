@@ -9,10 +9,10 @@ namespace Plantoir.Core.Models;
 /// anything else is refused here, before a browser is asked.
 /// </summary>
 /// <remarks>
-/// <para>This is the RULE and its words. Asking the default browser by name and
-/// starting it, and the trail line once it has answered, are 790b (#820 items
-/// 3 and 4): the event "opened a unit plan in the browser" is first written
-/// there, and stays ledgered until then.</para>
+/// <para>The RULE and its words, and the press (<see cref="Press"/>): the rule
+/// asked again at the click, the browser asked by name
+/// (<see cref="WindowsDefaultBrowser"/>), and the trail line once it has
+/// answered (#820 items 2 to 5).</para>
 ///
 /// <para>On Windows the page on screen is a SERVED address
 /// (<see cref="LocalSiteGuard"/>); a <c>file:</c> address is read too, as the
@@ -152,4 +152,55 @@ public static class PlanInTheBrowser
     /// <summary>The line when the PC could not open it.</summary>
     public static string CouldNotOpenTrailText(string courseCode, Kind kind) =>
         courseCode + UnitPlans.TrailSeparator + CouldNotOpenTrailLine.Replace("{what}", What(kind));
+
+    // ---- The press (#820 items 2 to 5) ------------------------------------------
+
+    /// <summary>What the browser said when it was handed a page.</summary>
+    public enum Opening { Opened, NoBrowser, CouldNotOpen }
+
+    /// <summary>What hands a page to the teacher's default web browser: <see cref="WindowsDefaultBrowser"/>, or a test's recorder.</summary>
+    public interface IBrowser
+    {
+        /// <summary>Opens <paramref name="fileUri"/> (a <c>file:</c> address) in the browser asked BY NAME, never the file type's own app.</summary>
+        Opening Open(string fileUri);
+    }
+
+    /// <summary>A press of Open in Browser: the rule's answer at the click, and what the browser said, when it was asked.</summary>
+    public sealed record Pressed(Answer Answer, Opening? Opening)
+    {
+        /// <summary>
+        /// What the alert says, or null when the page opened: the refusal's
+        /// sentence, or <c>openInBrowserNoBrowser</c> / <c>openInBrowserCouldNotOpen</c>,
+        /// under <c>openInBrowserCouldNotOpenTitle</c> (never a click that does nothing).
+        /// </summary>
+        public string? Alert => Answer.Refusal is { } refusal
+            ? Sentence(refusal)
+            : Opening switch
+            {
+                PlanInTheBrowser.Opening.Opened => null,
+                PlanInTheBrowser.Opening.NoBrowser => PlanningTabWording.OpenInBrowserNoBrowser,
+                _ => PlanningTabWording.OpenInBrowserCouldNotOpen,
+            };
+    }
+
+    /// <summary>
+    /// The button pressed (#820): the rule asked AGAIN with the web view's
+    /// address at this moment, so a page deleted since the button was drawn is
+    /// refused; a refusal asks no browser and writes nothing (the button is
+    /// dimmed and the alert says why). Otherwise the browser is handed the
+    /// page's <c>file:</c> address, and the trail says once it has answered
+    /// (<c>activityTrail.mustRecord</c> "opened a unit plan in the browser"):
+    /// the course and the kind of page, never its name.
+    /// </summary>
+    public static Pressed Press(string? onScreen, string? chosen, LocalSiteGuard guard, IBrowser browser, string courseCode)
+    {
+        var answer = PageToOpen(onScreen, chosen, guard);
+        if (answer.Refusal is not null || answer.FileUri is not { } fileUri) return new Pressed(answer, null);
+        Opening opening;
+        try { opening = browser.Open(fileUri); }
+        catch { opening = Opening.CouldNotOpen; }
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.UnitPlanOpenedInBrowser,
+            opening == Opening.Opened ? TrailText(courseCode, answer.Kind!.Value) : CouldNotOpenTrailText(courseCode, answer.Kind!.Value));
+        return new Pressed(answer, opening);
+    }
 }

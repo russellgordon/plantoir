@@ -57,6 +57,7 @@ public sealed partial class MainWindow
 
     private MenuFlyoutSubItem _openRecentMenu = null!;
     private MenuFlyoutItem _renameReason = null!;
+    private MenuFlyoutItem _revertOnPlanning = null!;
     private MenuFlyoutItem _checkForUpdatesItem = null!;
     private KeyboardAccelerator _courseObsidianKey = null!;
     private KeyboardAccelerator _sectionObsidianKey = null!;
@@ -94,6 +95,11 @@ public sealed partial class MainWindow
         course.Add(new MenuFlyoutSeparator());
         Add(course, "Save Course Settings", "courseSaveSettings", Item.SaveCourseSettings, Key(VirtualKey.S, VirtualKeyModifiers.Control, "Ctrl+S"));
         Add(course, "Revert Course Settings", "courseRevertSettings", Item.RevertCourseSettings);
+        // #801 (saveOnPlanning): Revert is dimmed on the Planning tab, and this
+        // greyed line under it says why — the Rename reason's pattern.
+        _revertOnPlanning = new MenuFlyoutItem { Text = PlanningTabWording.RevertOnPlanning, IsEnabled = false, Visibility = Visibility.Collapsed };
+        AutomationProperties.SetAutomationId(_revertOnPlanning, "courseRevertOnPlanning");
+        course.Add(_revertOnPlanning);
         course.Add(new MenuFlyoutSeparator());
         // "Rename": no "Course", no ellipsis (mac #491 item 8). It opens a
         // dialog here, but the name is the command's, and a second word for it
@@ -485,6 +491,10 @@ public sealed partial class MainWindow
             ? CourseActivity.BusyReason(folder, course.Code) : null;
         _renameReason.Text = reason ?? "";
         _renameReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
+
+        // Under Revert, while the Planning tab is the one drawn (#801).
+        bool onPlanning = situation.Row == Row.Course && (DetailHost.Content as CourseSettingsView)?.PlanningIsShowing == true;
+        _revertOnPlanning.Visibility = onPlanning ? Visibility.Visible : Visibility.Collapsed;
 
         _openRecentMenu.IsEnabled = enabled.Contains(Item.OpenRecent);
     }

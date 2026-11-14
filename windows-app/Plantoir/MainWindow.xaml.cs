@@ -180,6 +180,10 @@ public sealed partial class MainWindow : Window
                 // Problems tab's Fix with… buttons — asked here and at launch,
                 // off this thread, never while the tab draws.
                 _ = System.Threading.Tasks.Task.Run(OutsideAssistantPresence.Refresh);
+                // #801: the Planning tab looks again when the window comes
+                // back (the teacher may have been building a plan in a
+                // terminal: unitPlanning.tab.whenItLooksAgain).
+                (DetailHost.Content as Views.CourseSettingsView)?.WindowBecameActive();
             }
         };
         _ = System.Threading.Tasks.Task.Run(OutsideAssistantPresence.Refresh);

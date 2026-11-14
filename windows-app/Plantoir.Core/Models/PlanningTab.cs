@@ -162,8 +162,7 @@ public static class PlanningTab
 
     /// <summary>
     /// The line when the tab appears: the course and how many plans it could
-    /// choose from, never a plan's title. Written by 790b's tab; the event is
-    /// ledgered until then.
+    /// choose from, never a plan's title.
     /// </summary>
     public static string OpenedTrailText(string courseCode, IReadOnlyList<Choice> choices)
     {
@@ -176,6 +175,19 @@ public static class PlanningTab
         };
         return courseCode + UnitPlans.TrailSeparator + PlanningTrail.Opened.Replace("{what}", what);
     }
+
+    /// <summary>
+    /// The one line an appearance of the tab writes (<c>unitPlanning.tab.trail</c>):
+    /// what it offered, or, when a plan was there to show and could not be
+    /// shown, the could-not-show line in place of the count (708 fix review L3).
+    /// </summary>
+    public static string AppearanceTrailText(string courseCode, IReadOnlyList<Choice> choices, bool couldShow) =>
+        choices.Count > 0 && !couldShow ? CouldNotShowTrailText(courseCode) : OpenedTrailText(courseCode, choices);
+
+    /// <summary>Writes <see cref="AppearanceTrailText"/> on the trail ("looked at a course's unit plans").</summary>
+    public static void NoteAppearance(string courseCode, IReadOnlyList<Choice> choices, bool couldShow) =>
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.UnitPlansLookedAt,
+            AppearanceTrailText(courseCode, choices, couldShow));
 
     /// <summary>The line when no page can be shown at all (the guard could not be put in place).</summary>
     public static string CouldNotShowTrailText(string courseCode) =>

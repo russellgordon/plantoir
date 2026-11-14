@@ -253,9 +253,7 @@ internal static class NamedGapLedger
     // the same run. Each piece deletes its own entries as it lands, and the
     // ledger fails, naming the entry, the moment a held thing exists here.
     private const string Reason799 = "a deploy that builds the site again only when something changed is #799's piece of v2.0.0, not built here yet";
-    private const string Reason801 = "the course's Planning tab, its unit plans and Plan a Unit are #801's piece of v2.0.0, not built here yet";
     private const string Reason811 = "a section's Coverage tab is #811's piece of v2.0.0, not built here yet";
-    private const string Reason820 = "Open in Browser on a unit plan is #820's piece of v2.0.0, not built here yet";
     private const string Reason823 = "making a course straight onto the reference shelf and importing a backup or archive zip are #823's piece of v2.0.0; until it lands Windows cannot import a zip, so its own import sentence is the true one";
     private const string Reason824 = "sharing a course's unit plans (with #848's look before a share) is #824's piece of v2.0.0, not built here yet";
     private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
@@ -305,8 +303,6 @@ internal static class NamedGapLedger
              "reference group made", "reference group renamed", "reference group removed", "reference course moved to a group",
              "reference groups not changed", "reference groups started again"),
         Owed(ActivityTrailEvents, 799, V200, Reason799, "site built again before deploying"),
-        Owed(ActivityTrailEvents, 801, V200, Reason801, "looked at a course's unit plans", "asked an assistant to plan a unit"),
-        Owed(ActivityTrailEvents, 820, V200, Reason820, "opened a unit plan in the browser"),
         // 790a (2026-11-13): Plan a Unit's third button arrived with the mac's #783.
         Owed(PlanAUnitButtons, 884, V200, Reason884, "copilot"),
         Owed(ActivityTrailEvents, 811, V200, Reason811,

@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Catalogs;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
@@ -32,8 +33,11 @@ public sealed partial class CourseSettingsView : UserControl
         HeaderCode.Text = course.Code;
         HeaderName.Text = course.Configuration.CourseName;
         ObsidianButton.IsEnabled = FolderActions.ObsidianIsInstalled;
+        SettingsTabItem.Text = PlanningTabWording.TabSettings;
+        PlanningTabItem.Text = PlanningTabWording.TabPlanning;
         BuildForm();
         RefreshDirtyState();
+        RefreshTheTabs();
 
         // An Account ID changed in Settings can free a held-back Save, or hold
         // one back (#491). Re-read the buttons only: it is not an unsaved edit
@@ -41,13 +45,98 @@ public sealed partial class CourseSettingsView : UserControl
         // when the view leaves the screen.
         // (An Unloaded that finds the view still loaded is WinUI's late one
         // after a re-host — measured in the wizard; see PublishingChoiceView.)
-        Loaded += (_, _) => ListenForTheAccount(true);
+        // The same for whether an outside assistant is installed (#801: the
+        // tabs are there only while one is).
+        Loaded += (_, _) => { ListenForTheAccount(true); ListenForTheAssistants(true); RefreshTheTabs(); };
         Unloaded += (_, _) =>
         {
-            if (!IsLoaded) ListenForTheAccount(false);
+            if (!IsLoaded) { ListenForTheAccount(false); ListenForTheAssistants(false); }
             else App.LogDiagnostic("Course Settings: a late Unloaded while still loaded was ignored (still listening for the Account ID)");
         };
     }
+
+    // ---- Settings | Planning (#801, the mac's #708) ---------------------------
+
+    /// <summary>The Planning tab, made the first time it is chosen and kept (collapsed) for the life of this page.</summary>
+    private PlanningTabView? _planning;
+
+    /// <summary>Whether the Planning tab is the one drawn (Course ▸ Save and Revert read it: saveOnPlanning).</summary>
+    internal bool PlanningIsShowing => _planning is { Visibility: Visibility.Visible };
+
+    /// <summary>Whether this copy of the course's settings differs from the last save (Revert's own predicate).</summary>
+    internal bool HasUnsavedChanges => RevertButton.IsEnabled;
+
+    /// <summary>The Planning tab, for #824's share bar and the tests' census; null until first chosen.</summary>
+    internal PlanningTabView? Planning => _planning;
+
+    private bool _listeningForTheAssistants;
+
+    private void ListenForTheAssistants(bool listen)
+    {
+        if (listen == _listeningForTheAssistants) return;
+        _listeningForTheAssistants = listen;
+        if (listen) OutsideAssistantPresence.Changed += OnAssistantsChanged;
+        else OutsideAssistantPresence.Changed -= OnAssistantsChanged;
+    }
+
+    private void OnAssistantsChanged() => DispatcherQueue?.TryEnqueue(RefreshTheTabs);
+
+    /// <summary>
+    /// <c>tabCases</c>: the bar is there while Claude Code or Codex is
+    /// installed (GitHub Copilot is false here until #884 gives Windows its
+    /// door), never on a course kept for reference (which never reaches this
+    /// page: <c>ReferenceSummaryView</c>). Absent, never disabled. When the bar
+    /// goes while Planning shows, the page shows Settings.
+    /// </summary>
+    private void RefreshTheTabs()
+    {
+        bool shown = Plantoir.Core.Models.PlanningTab.IsShown(OutsideAssistantPresence.ClaudeIsInstalled,
+            OutsideAssistantPresence.CodexIsInstalled, ReferenceCourse.IsKeptForReference(_course));
+        TabsRow.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        if (!shown && PlanningIsShowing) _ = ShowTheTabAsync(planning: false);
+    }
+
+    private void CourseTabs_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) =>
+        _ = ShowTheTabAsync(planning: sender.SelectedItem == PlanningTabItem);
+
+    /// <summary>
+    /// Draws one tab and COLLAPSES the other. A collapsed WinUI element takes
+    /// no focus and is out of the Tab order, so on Planning no setting can
+    /// take a key; what was typed lives in the course's settings model
+    /// (<c>Config</c>), so it is there, unchanged, on return. The keyboard is
+    /// moved on purpose at once (790 plan review M3), so it is never left in
+    /// a box that is no longer drawn.
+    /// </summary>
+    private async Task ShowTheTabAsync(bool planning)
+    {
+        if (planning == PlanningIsShowing) return;
+        if (planning)
+        {
+            if (_planning is null)
+            {
+                _planning = new PlanningTabView(_window, _course) { Visibility = Visibility.Collapsed };
+                AutomationProperties.SetAutomationId(_planning, "planningTab");
+                TabArea.Children.Add(_planning);
+            }
+            PlanningTabItem.Focus(FocusState.Programmatic);
+            SettingsArea.Visibility = Visibility.Collapsed;
+            _planning.Visibility = Visibility.Visible;
+            SaveStateChanged?.Invoke(this, EventArgs.Empty);
+            await _planning.AppearAsync();
+            if (PlanningIsShowing) _planning.TakeTheKeyboard();
+        }
+        else
+        {
+            if (_planning is not null) _planning.Visibility = Visibility.Collapsed;
+            SettingsArea.Visibility = Visibility.Visible;
+            PlanningSaveStatus.Text = "";
+            if (!SettingsTabItem.IsSelected) SettingsTabItem.IsSelected = true;
+            SaveStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>The window came to the front: the Planning tab looks again (<c>whenItLooksAgain</c>).</summary>
+    internal void WindowBecameActive() => _planning?.WindowBecameActive();
 
     private bool _listeningForTheAccount;
 
@@ -627,23 +716,59 @@ public sealed partial class CourseSettingsView : UserControl
     /// <summary>Save or Revert may have changed whether it can be pressed: the menu bar re-reads them.</summary>
     public event EventHandler? SaveStateChanged;
 
-    /// <summary>Course > Save Course Settings is live exactly when this Save button is (subjectMenus.settingsMaySave).</summary>
-    internal bool SaveIsEnabled => SaveButton.IsEnabled;
+    /// <summary>
+    /// Course > Save Course Settings is live exactly when this Save button is
+    /// (subjectMenus.settingsMaySave); on the Planning tab, whenever the course
+    /// has unsaved changes, held back or not (saveOnPlanning: "never silent").
+    /// </summary>
+    internal bool SaveIsEnabled => PlanningIsShowing ? RevertButton.IsEnabled : SaveButton.IsEnabled;
 
-    /// <summary>Course > Revert Course Settings is live exactly when this Revert button is.</summary>
-    internal bool RevertIsEnabled => RevertButton.IsEnabled;
+    /// <summary>Course > Revert Course Settings is live exactly when this Revert button is, and never on Planning (words.revertOnPlanning says why).</summary>
+    internal bool RevertIsEnabled => RevertButton.IsEnabled && !PlanningIsShowing;
 
-    /// <summary>The menu item (and its Ctrl+S) presses Save itself, on the button's own predicate, asked again now.</summary>
-    internal void SaveFromTheMenu()
+    /// <summary>
+    /// The menu item (and its Ctrl+S) presses Save itself, on the button's own
+    /// predicate, asked again now. On the Planning tab (<c>saveOnPlanning</c>):
+    /// saved with nothing more to say stays there with the form's own "Saved ✓"
+    /// beside the tabs for as long as the form would show it; held back,
+    /// failed, or saved with a notice to read shows Settings, where the form
+    /// says its own sentence beside the field.
+    /// </summary>
+    internal async void SaveFromTheMenu()
     {
-        if (SaveButton.IsEnabled) Save_Click(SaveButton, new RoutedEventArgs());
+        if (!PlanningIsShowing)
+        {
+            if (SaveButton.IsEnabled) Save_Click(SaveButton, new RoutedEventArgs());
+            return;
+        }
+        if (!RevertButton.IsEnabled) return;
+        if (!SaveButton.IsEnabled)
+        {
+            await ShowTheTabAsync(planning: false);
+            return;
+        }
+        var (problem, notice) = Save();
+        if (Plantoir.Core.Models.PlanningTab.AfterASave(problem, notice) == Plantoir.Core.Models.PlanningTab.AfterSave.ShowsSettings)
+        {
+            await ShowTheTabAsync(planning: false);
+            return;
+        }
+        PlanningSaveStatus.Text = SavedConfirmation;
+        await Task.Delay(ConfirmationShowsFor);
+        if (PlanningSaveStatus.Text == SavedConfirmation) PlanningSaveStatus.Text = "";
     }
 
-    /// <summary>The menu item presses Revert itself, on the button's own predicate, asked again now.</summary>
+    /// <summary>The menu item presses Revert itself, on the button's own predicate, asked again now; never on Planning.</summary>
     internal void RevertFromTheMenu()
     {
-        if (RevertButton.IsEnabled) Revert_Click(RevertButton, new RoutedEventArgs());
+        if (RevertIsEnabled) Revert_Click(RevertButton, new RoutedEventArgs());
     }
+
+    /// <summary>The form's own confirmation, said the same on Planning.</summary>
+    internal const string SavedConfirmation = "Saved ✓";
+
+    /// <summary>How long "Saved ✓" shows when nothing more is said.</summary>
+    private const int ConfirmationShowsFor = 3000;
 
     /// <summary>The trail line: the course and WHICH check — never the path or the ID. Worded as a hold, not a failure.</summary>
     internal static string SettingsSaveHeldBackLine(string code, string check) => check switch
@@ -1300,7 +1425,14 @@ public sealed partial class CourseSettingsView : UserControl
         Form.Children.Add(FormBuilders.ExampleCaption(CourseSettingsWording.PrintingCaption));
     }
 
-    private async void Save_Click(object sender, RoutedEventArgs e)
+    private void Save_Click(object sender, RoutedEventArgs e) => Save();
+
+    /// <summary>
+    /// Writes the settings, and returns whether it failed (<c>Problem</c>) or
+    /// said something more after "Saved ✓" (<c>Notice</c>), the two facts
+    /// <c>saveOnPlanning</c> decides by. Returns before the confirmation fades.
+    /// </summary>
+    private (bool Problem, bool Notice) Save()
     {
         try
         {
@@ -1369,11 +1501,11 @@ public sealed partial class CourseSettingsView : UserControl
                 PreviewAgainButton.Visibility = Visibility.Visible;
             }
             afterSave.AddRange(aboutScheduled);
-            SaveStatus.Text = afterSave.Count == 0 ? "Saved ✓" : "Saved ✓ " + string.Join(" ", afterSave);
+            SaveStatus.Text = afterSave.Count == 0 ? SavedConfirmation : SavedConfirmation + " " + string.Join(" ", afterSave);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-            if (afterSave.Count > 0) return;   // none of these sentences fades; they stay until the next Save
-            await Task.Delay(3000);
-            SaveStatus.Text = "";
+            if (afterSave.Count > 0) return (false, true);   // none of these sentences fades; they stay until the next Save
+            _ = FadeTheConfirmationAsync();
+            return (false, false);
         }
         catch (Exception error)
         {
@@ -1387,7 +1519,15 @@ public sealed partial class CourseSettingsView : UserControl
                 "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            return (true, false);
         }
+    }
+
+    /// <summary>"Saved ✓" with nothing more to say goes after a while, as it always has; anything said since stays.</summary>
+    private async Task FadeTheConfirmationAsync()
+    {
+        await Task.Delay(ConfirmationShowsFor);
+        if (SaveStatus.Text == SavedConfirmation) SaveStatus.Text = "";
     }
 
     /// <summary>This course's previews open anywhere in this app, for this working folder.</summary>

@@ -791,6 +791,28 @@ public static class ActivityTrail
         /// did not open writes nothing here.
         /// </summary>
         AskedAnAssistantToFixProblems,
+        /// <summary>
+        /// The course page's Planning tab appeared (#801, the mac's #708): once
+        /// per appearance, the course and how many unit plans it offered, or the
+        /// list only, or nothing to show; in its place the could-not-show line
+        /// when the guarded view could not be put in place; and, once per
+        /// appearance, the could-not-refresh-the-look line with a count. Never a
+        /// plan's title (<see cref="Plantoir.Core.Models.PlanningTab.OpenedTrailText"/>).
+        /// </summary>
+        UnitPlansLookedAt,
+        /// <summary>
+        /// Plan a Unit with Claude… or Plan a Unit with Codex… on an empty
+        /// Planning tab opened its door (#801): the course and which assistant,
+        /// after the door's own "assistant opened" line; a door that did not
+        /// open writes nothing here (<see cref="Plantoir.Core.Assist.PlanAUnit.TrailText"/>).
+        /// </summary>
+        AskedAnAssistantToPlanAUnit,
+        /// <summary>
+        /// Open in Browser on the Planning tab handed a page to the default
+        /// browser, or the PC could not (#820): the course and the KIND of page,
+        /// never its name. A refusal writes nothing (<see cref="Plantoir.Core.Models.PlanInTheBrowser.Press"/>).
+        /// </summary>
+        UnitPlanOpenedInBrowser,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -931,6 +953,9 @@ public static class ActivityTrail
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         Event.ProblemsChanged => "problems changed",
         Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
+        Event.UnitPlansLookedAt => "looked at a course's unit plans",
+        Event.AskedAnAssistantToPlanAUnit => "asked an assistant to plan a unit",
+        Event.UnitPlanOpenedInBrowser => "opened a unit plan in the browser",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

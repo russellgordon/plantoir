@@ -63,4 +63,9 @@ public static class PlanAUnit
     public static string TrailText(string courseCode, FixWithAssistant.Assistant assistant) =>
         courseCode + UnitPlans.TrailSeparator
         + FixWithAssistant.Fill(TrailLine, new() { ["{assistant}"] = FixWithAssistant.NameOf(assistant) });
+
+    /// <summary>"asked an assistant to plan a unit", written once the door has opened (after its own "assistant opened" line).</summary>
+    public static void NoteOnTheTrail(string courseCode, FixWithAssistant.Assistant assistant) =>
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AskedAnAssistantToPlanAUnit,
+            TrailText(courseCode, assistant));
 }

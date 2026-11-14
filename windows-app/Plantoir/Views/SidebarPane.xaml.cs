@@ -1102,7 +1102,7 @@ public sealed partial class SidebarPane : UserControl
     {
         if (Workspace.WorkspacePath is not { } folder) return;
         if (RefusedWhileRevised(folder, course)) return;
-        if (ClaudeCodeLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
+        if (ClaudeCodeLauncher.Open(folder, course.Code, course.Configuration.CourseName, unitPlans: UnitPlansToMention(course))) return;
 
         _ = ShowError(OutsideDoorWording.ClaudeDidNotOpenTitle, OutsideDoorWording.ClaudeCouldNotStart(course.Code));
     }
@@ -1112,10 +1112,20 @@ public sealed partial class SidebarPane : UserControl
     {
         if (Workspace.WorkspacePath is not { } folder) return;
         if (RefusedWhileRevised(folder, course)) return;
-        if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
+        if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName, unitPlans: UnitPlansToMention(course))) return;
 
         _ = ShowError(OutsideDoorWording.CodexDidNotOpenTitle, OutsideDoorWording.CodexCouldNotStart(course.Code));
     }
+
+    /// <summary>
+    /// What a Revise door's greeting says about unit planning (#790,
+    /// <c>outsideAgents.greetingUnitPlans</c>): the course's plans read at the
+    /// click, in the greeting's order for today; nothing for a course kept for
+    /// reference. Turned on with the Planning tab the sentence names (790b).
+    /// </summary>
+    private static Plantoir.Core.Models.UnitPlans.Reading? UnitPlansToMention(Course course) =>
+        Plantoir.Core.Models.UnitPlans.ToMention(course.DirectoryPath, ReferenceCourse.IsKeptForReference(course),
+                                                 DateOnly.FromDateTime(DateTime.Now));
 
     private MenuFlyout BackupMenu(BackupItem item)
     {
