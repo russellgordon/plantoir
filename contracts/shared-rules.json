@@ -695,8 +695,8 @@
           "prefix": "PLANTOIR_CLOUDFLARE_REMADE:",
           "shape": "PLANTOIR_CLOUDFLARE_REMADE: <course>/<section> <project name> <address>, the course's one permitted space written +",
           "examples": [
-            "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
-            "PLANTOIR_CLOUDFLARE_REMADE: AP+CALC/2 ap-calc-s2-2026-gordon ap-calc-s2-2026-gordon-7x2.pages.dev"
+            "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-quillfeather ics4u-s1-2026-quillfeather.pages.dev",
+            "PLANTOIR_CLOUDFLARE_REMADE: AP+CALC/2 ap-calc-s2-2026-quillfeather ap-calc-s2-2026-quillfeather-7x2.pages.dev"
           ],
           "why": "Printed by the shared scripts/deploy.py (remake_pages_project_if_gone's caller), which runs inside the website builder on the mac and natively on Windows, so neither can write the host's trail itself. Read by the app the same way as PLANTOIR_LEFTOVER_STOPPED and in the same two places on the mac: ScriptRunner from a run it started (the Deploy button, the assistant's deploy), ScheduledDeploy from a publish launchd ran. Machinery, so the console leaves it out (transcriptStripping.machineLines); the console says it in words on the line before. A marker that is not this shape — a path, anything with a space where a name should be — records nothing."
         },
@@ -11288,7 +11288,7 @@
           "why": "#378: work ended because its owner had gone, for the trail's 'left-over work stopped'."
         },
         {
-          "line": "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
+          "line": "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-quillfeather ics4u-s1-2026-quillfeather.pages.dev",
           "hidden": true,
           "why": "2026-09-30: a section's Cloudflare project made again, for the trail's 'cloudflare project made again'. Printed by the shared deploy.py, so on both platforms."
         },
@@ -40870,16 +40870,16 @@
           {
             "code": "MPM2D",
             "year": 2026,
-            "surname": "gordon",
+            "surname": "quillfeather",
             "suffix": "k3x9qa8m",
-            "name": "mpm2d-plans-2026-27-gordon-k3x9qa8m"
+            "name": "mpm2d-plans-2026-27-quillfeather-k3x9qa8m"
           },
           {
             "code": "AP CALC",
             "year": 2026,
-            "surname": "gordon",
+            "surname": "quillfeather",
             "suffix": "abcd1234",
-            "name": "ap-calc-plans-2026-27-gordon-abcd1234"
+            "name": "ap-calc-plans-2026-27-quillfeather-abcd1234"
           },
           {
             "code": "ICS3U",
@@ -40898,7 +40898,7 @@
           {
             "code": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP",
             "year": 2026,
-            "surname": "gordon",
+            "surname": "quillfeather",
             "suffix": "q1w2e3r4",
             "name": "abcdefghijklmnopqrstuvwxyzabcdefghi-plans-2026-27-q1w2e3r4"
           },
