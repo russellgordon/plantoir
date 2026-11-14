@@ -32,6 +32,8 @@ import page_visibility
 import page_features
 import figures
 import geogebra
+import kept_downloads
+import phet
 import swift_blocks
 import section_problems
 import site_said
@@ -1794,13 +1796,15 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
     the self-check quizzes' (#563), the task boxes' (#519), the picture
-    sizes' (#612) and the GeoGebra sketches' (#578) beside Quartz's own."""
+    sizes' (#612), the GeoGebra sketches' (#578) and the PhET
+    simulations' (#674) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
                          ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
                          ("PlantoirPictureSizes", "./plantoirPictureSizes"),
-                         ("PlantoirGeoGebra", "./plantoirGeoGebra")):
+                         ("PlantoirGeoGebra", "./plantoirGeoGebra"),
+                         ("PlantoirPhet", "./plantoirPhet")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1916,6 +1920,31 @@ def _wire_geogebra_transformer(config_ts: Path) -> None:
         print("⚠️ Could not add the GeoGebra sketches: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirGeoGebra()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_phet_transformer(config_ts: Path) -> None:
+    """Put the PhET simulations' transformer (#674) straight AFTER the
+    GeoGebra sketches' and so before the self-check quizzes', as GeoGebra's
+    is placed and for its reason (a simulation in a question is a finished
+    figure when the quiz transformer packages the question). Anchored on
+    PlantoirGeoGebra, which every site wired since #578 has, and wired after
+    it in wire_quartz_additions, so the order is Figures, GeoGebra, PhET,
+    Quizzes on a fresh site and an old one alike. Idempotent."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirPhet(" in text:
+        return
+    anchor = "Plugin.PlantoirGeoGebra(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirPhet()," + text[at:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2309,7 +2338,9 @@ def wire_quartz_additions(output_dir: Path) -> None:
     the transformers index, and its script and styles ride the Print
     button's component), the GeoGebra sketches' one (#578: its transformer
     straight after the figures' and so before the quizzes'; export, script
-    and styles ride as the quizzes' do), the task boxes' one (#519: its transformer after
+    and styles ride as the quizzes' do), the PhET simulations' one (#674:
+    its transformer straight after GeoGebra's; export, script and styles
+    ride the same way), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
@@ -2337,6 +2368,7 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_geogebra_transformer),
+        (output_dir / "quartz.config.ts", _wire_phet_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
@@ -2507,6 +2539,50 @@ def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, fu
         shutil.rmtree(output_dir / "quartz" / geogebra.WORKSPACE, ignore_errors=True)
         shutil.rmtree(output_dir / "quartz" / "static" / geogebra.THUMBNAILS, ignore_errors=True)
         return {"counts": {geogebra.ENGINE: 0}, "problems": [], "notes": [], "sketches": 0, "shown": 0}
+
+
+def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config: dict,
+                  course_code: str, section_number) -> dict:
+    """
+    PhET simulations (#674; scripts/phet.py), ALWAYS: every ```phet and
+    ~~~phet fence on the pages students can see, by the gate's own
+    visibility rule, read, its simulation found among the copies this
+    computer keeps (keptDownloads: the working folder's builds folder,
+    .downloaded/phet) or downloaded from PhET now and kept, and handed to the
+    site's transformer. Answers phet.prepare's outcome; when that says
+    `stop`, the caller STOPS the build before Quartz runs (phetFences.stop,
+    Russell's ruling of 2026-11-13). A fault in this pass itself never stops
+    a build: every fence stays a plain code block and the build says so.
+    """
+    try:
+        pages = phet.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name)
+        kept_root = kept_downloads.root_for(course_dir)
+        return phet.prepare(pages, output_dir, kept_root,
+                            course_locale=(config.get("locale") or "en-US"),
+                            course=course_code, section=section_number)
+    except Exception as error:
+        print(f"⚠️ Could not prepare the science simulations: {error}")
+        shutil.rmtree(output_dir / "quartz" / phet.WORKSPACE, ignore_errors=True)
+        shutil.rmtree(output_dir / "quartz" / "static" / phet.SITE_FOLDER, ignore_errors=True)
+        return {"counts": {phet.KIND: 0}, "problems": [], "notes": [], "simulations": 0, "shown": 0,
+                "downloaded": [], "fromBefore": [], "bytes": 0, "seconds": 0.0, "stop": None}
+
+
+def _stop_for_phet(outcome: dict, course_code: str, section_number) -> None:
+    """
+    The stop phetFences.stop rules (#674): a simulation a page shows is not
+    on this computer and could not be downloaded. Says which, on which page,
+    in the words the apps lift (keptDownloads.stop), prints the marker the
+    trail reads, and exits 1 before Quartz runs, so the site built last
+    stays as it was and no site is made without the simulation.
+    """
+    print()
+    for line in phet.stop_lines(outcome, course_code, section_number):
+        print(line)
+    sys.exit(1)
 
 
 def _count_runner_pages(content_root: Path) -> dict:
@@ -10529,6 +10605,16 @@ def build_section_site(
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
     # GeoGebra sketches (#578), ALWAYS, for the same reason.
     geogebra_here = _prepare_geogebra(content_root, output_dir, course_dir, full_rebuild)
+    # PhET simulations (#674), ALWAYS. The one pass here that can STOP a
+    # build: a simulation a page shows that is neither kept nor downloadable
+    # now (phetFences.stop). Before any check is said and before Quartz, so a
+    # stopped build changes nothing.
+    phet_here = _prepare_phet(content_root, output_dir, course_dir, config, course_code, section_number)
+    if phet_here.get("stop"):
+        _stop_for_phet(phet_here, course_code, section_number)
+    downloaded_marker = phet.downloaded_line(phet_here, course_code, section_number)
+    if downloaded_marker is not None:
+        print(downloaded_marker)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
@@ -10578,6 +10664,8 @@ def build_section_site(
         "quiz_problems": quiz_problems_here,
         # GeoGebra sketches that cannot be shown (#578).
         "geogebra_problems": geogebra.health_finding_facts(geogebra_here),
+        # PhET simulations that cannot be shown (#674).
+        "phet_problems": phet.health_finding_facts(phet_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)

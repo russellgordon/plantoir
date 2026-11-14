@@ -515,6 +515,31 @@ class PrepareTests(Scratch):
         self.assertEqual(printed[-1], kept_downloads.marker_line("phet", "SCH3U", 1, failed={"count": 1, "reason": "offline"}))
 
 
+# ---- The build stops (build_site.py) ---------------------------------------------------
+
+class BuildStopTests(Scratch):
+    def test_the_build_stops_with_the_lines_and_the_marker_before_quartz_runs(self):
+        import contextlib
+        import io
+        import inspect
+        import build_site
+        outcome, _ = self.prepare([page(GAS)], DownServer().site())
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit) as stopped:
+            build_site._stop_for_phet(outcome, "SCH3U", 1)
+        self.assertEqual(stopped.exception.code, 1)
+        lines = [line for line in printed.getvalue().split("\n") if line.strip()]
+        self.assertEqual(lines, phet.stop_lines(outcome, "SCH3U", 1))
+        self.assertTrue(lines[0].startswith("❌ SCH3U Section 1 was not built: "))
+        self.assertTrue(lines[-1].startswith(kept_downloads.MARKER))
+        # The stop comes before anything is said about the site's health,
+        # before Quartz's files are wired and before Quartz is run.
+        source = inspect.getsource(build_site.build_section_site)
+        stop_at = source.index("_stop_for_phet(phet_here")
+        for later in ("site_health.announce_or_stay_quiet(", "wire_quartz_additions(output_dir)", '"bootstrap-cli.mjs"'):
+            self.assertLess(stop_at, source.index(later), later)
+
+
 # ---- The folder problem --------------------------------------------------------------
 
 class ProblemTests(unittest.TestCase):
