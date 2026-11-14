@@ -28196,7 +28196,7 @@
       }
     ],
     "addClassSheet": {
-      "note": "GitHub #897 (Russell, 2026-11-13 night, by dialog): ONE Section menu item, Add Class..., replacing Add Next Class, whose sheet asks how the new class is added. The ways are listed in this order, one line each; a way the section cannot use is drawn greyed, never left out, and a sentence under the ways says why (greyedBecause -> wording). The first way that can be used is chosen when the sheet opens. The FACTS are read when the sheet opens, not when the menu is drawn, and are not keys of the menu's situation: the item is live wherever Add Next Class was, since its first way always can be chosen, so the facts decide the sheet and nothing in subjectMenus.cases. unitWordRenameUnfinished is the rename's OWN judgement (the mac's UnitWordRenamer.interruptedRenameTarget), which clears a stale record: a record whose 'from' is no longer the course's word, or whose rename moved no page, is not an unfinished rename. A third or fourth way joins as data: a name here, its cases, its wording, and the call it makes. Each way is ONE change, which Undo Last Change takes away whole. The mac runs these cases in DuplicateAsNextClassTests.testTheAddClassWaysAreTheContracts and testAStaleRenameRecordGreysNothing.",
+      "note": "GitHub #897 (Russell, 2026-11-13 night, by dialog): ONE Section menu item, Add Class..., replacing Add Next Class, whose sheet asks how the new class is added. The ways are listed in this order, one line each; a way the section cannot use is drawn greyed, never left out, and a sentence under the ways says why (greyedBecause -> wording). The first way that can be used is chosen when the sheet opens. The FACTS are read when the sheet opens, not when the menu is drawn, and are not keys of the menu's situation: the item is live wherever Add Next Class was, since its first way always can be chosen, so the facts decide the sheet and nothing in subjectMenus.cases. unitWordRenameUnfinished is the rename's OWN judgement (the mac's UnitWordRenamer.interruptedRenameTarget), made WITHOUT clearing the record (clearingAStaleRecord: false): a record whose 'from' is no longer the course's word, or whose rename moved no page, is read as stale and is not an unfinished rename, and it is LEFT where it is. Only the rename that owns a record clears it: a rename running in another window has, for one write, a record and no moved page, and a sheet that cleared it would cut that rename off from its record. A third or fourth way joins as data: a name here, its cases, its wording, and the call it makes. Each way is ONE change, which Undo Last Change takes away whole. The mac runs these cases in DuplicateAsNextClassTests.testTheAddClassWaysAreTheContracts and testAStaleRenameRecordGreysNothing.",
       "ways": [
         {
           "way": "nextInThisUnit",
@@ -28225,7 +28225,7 @@
       },
       "factKeys": {
         "classPagesAreNumbered": "The course names its class pages with one number, a club's Week 3 (#267): it has no units.",
-        "unitWordRenameUnfinished": "A rename of the course's unit word stopped part way, as the rename itself judges it (a stale record is cleared, and is not this).",
+        "unitWordRenameUnfinished": "A rename of the course's unit word stopped part way, as the rename itself judges it (a stale record is read as stale and left where it is, and is not this).",
         "hasAClassPage": "The section has at least one page in its class folders, numbered or not."
       },
       "greyedBecause": {

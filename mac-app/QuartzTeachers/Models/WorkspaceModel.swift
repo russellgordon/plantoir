@@ -603,7 +603,8 @@ class WorkspaceModel {
     /// One of the assistant's functions asked for from a section row's
     /// context menu (#457 batch B) — Publish Pages…, Hide Pages…, Publish
     /// Class for a Date… (and Add Next Class until #897 replaced it with
-    /// Section ▸ Add Class…, which the row's menu does not carry). The row is
+    /// Section ▸ Add Class…, which the row's menu does not carry today;
+    /// whether it should is held for Russell, M2 on #897). The row is
     /// selected first, so the
     /// section window that answers it is the one for that section: it takes
     /// the request only when it names its own course and section

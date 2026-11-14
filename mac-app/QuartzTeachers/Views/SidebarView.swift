@@ -1771,9 +1771,10 @@ struct SidebarView: View {
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
             // Add Next Class was the fourth item here until #897 replaced it
-            // with Section ▸ Add Class…, which is in the menu bar only
-            // (Russell, 2026-11-13 night). Putting it here would be one
-            // `sectionVerbItem` line: the request reaches `performVerb`.
+            // with Section ▸ Add Class…, which is in the menu bar only for
+            // now: whether it goes here too is held for Russell (M2 on
+            // #897). Putting it here would be one `sectionVerbItem` line:
+            // the request reaches `performVerb`.
             Divider()
         }
         // One item or the other, never a

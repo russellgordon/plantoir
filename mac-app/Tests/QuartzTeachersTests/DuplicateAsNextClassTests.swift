@@ -605,19 +605,25 @@ final class DuplicateAsNextClassTests: XCTestCase {
                     for reason in SubjectMenuRules.reasonLines(facts) {
                         let sentence: String = SectionVerbSheet.sentence(for: reason, noun: .class, unit: "unit")
                         XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(sentence), sentence)
-                        // Finishing the rename is promised only what it
-                        // holds back (the fix review's finding 1).
-                        if sentence.hasPrefix("A rename") {
-                            XCTAssertEqual(
-                                sentence.contains("a copy"),
-                                SubjectMenuRules.whyGreyed(.asACopyOfAClass, facts) == .aRenameIsUnfinished, sentence
-                            )
-                            XCTAssertEqual(
-                                sentence.contains("a new "),
-                                SubjectMenuRules.whyGreyed(.inANewUnit, facts) == .aRenameIsUnfinished, sentence
-                            )
-                        }
                     }
+                    // Finishing the rename is promised only what it holds
+                    // back (the fix review's finding 1). Asserted on the
+                    // line's case, which names its sentence, so no sentence
+                    // is quoted here (the Fable sweep's finding 7).
+                    let lines: [SubjectMenuRules.AddClassReasonLine] = SubjectMenuRules.reasonLines(facts)
+                    let renameHoldsACopy: Bool =
+                        SubjectMenuRules.whyGreyed(.asACopyOfAClass, facts) == .aRenameIsUnfinished
+                    let renameHoldsANewUnit: Bool =
+                        SubjectMenuRules.whyGreyed(.inANewUnit, facts) == .aRenameIsUnfinished
+                    XCTAssertEqual(
+                        lines.contains(.aRenameHoldsBackANewUnitAndACopy), renameHoldsACopy && renameHoldsANewUnit
+                    )
+                    XCTAssertEqual(
+                        lines.contains(.aRenameHoldsBackANewUnit), renameHoldsANewUnit && !renameHoldsACopy
+                    )
+                    XCTAssertEqual(
+                        lines.contains(.aRenameHoldsBackACopy), renameHoldsACopy && !renameHoldsANewUnit
+                    )
                 }
             }
         }

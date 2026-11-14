@@ -2535,9 +2535,12 @@ nonisolated enum AssistWording {
              + "A page is never written over."
     }
 
-    /// A unit-word rename stopped part way: Add Class… waits for it.
+    /// A unit-word rename stopped part way: Add Class… waits for it. Said
+    /// the same way in every course, a numbered one (a club) included, whose
+    /// renamed word is the pages' own name and never a unit (the Fable
+    /// sweep's finding 5): the names given to the pages is true of both.
     static func menuUnitWordRenameUnfinished(noun: ClassNoun = .class) -> String {
-        return "A rename of what this course calls a unit stopped part way, so some \(noun.plural) are "
+        return "A rename of the names this course gives its \(noun.plural) stopped part way, so some are "
              + "named the old way and some the new. Nothing was changed. Finish the rename in the "
              + "course's settings, then choose this again."
     }
