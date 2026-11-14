@@ -32,6 +32,18 @@
       "why": "Netlify injects its ad badge into every page; the site's policy refuses its script inside an about:srcdoc frame, by design, 700 to 850 ms after first paint, in both engines (settled on #625; documentation/07, Suppressing Netlify's own ad badge)."
     }
   ],
+  "refusedByDesign": [
+    {
+      "name": "Netlify's own badge script",
+      "hosts": ["netlify"],
+      "lines": [
+        "^Executing inline script violates the following Content Security Policy directive 'script-src ",
+        "^Refused to execute a script because its hash, its nonce, or 'unsafe-inline' does not appear in the script-src directive of the Content Security Policy\\."
+      ],
+      "expectedLinesPerEngine": 1,
+      "why": "Netlify adds an inline script to every page on its way to a browser, and the policy scripts/netlify_badge.py writes leaves 'unsafe-inline' out so that the script is refused (documentation/07, Suppressing Netlify's own ad badge). Measured on the first deployed run, 2026-11-13: one refusal on each of the 11 pages in both engines, in the two wordings in `lines` (Chromium's console line, WebKit's Refused to line), while the live policy listed exactly the site's own five inline scripts. Set aside only on a page holding a refused inline script that is in the page as the browser received it and not in the page as the host serves it to a client that is not a browser (lib/refused_by_design.mjs); a refused script of the site's own, or one its scripts made, fails the row, so a policy that lost one of the site's hashes is still red. Each engine says it in one EXPECTED line of the clean-page row, which verify-deploy.sh counts apart from thirdPartyHostsToday's: at most expectedLinesPerEngine an engine, on these hosts only (none when Netlify sent no badge)."
+    }
+  ],
   "engines": {
     "chromium": "Chrome for Testing, the copy documentation/06 F7 installs (PLANTOIR_CHROME or --chrome), driven through Playwright's executablePath so it is the same binary as every other browser check.",
     "webkit": "Playwright's WebKit build, the one playwright-core 1.63.0 pins (webkit-2359, WebKit 26.6 on this Mac), from browser-checks/fetch-browsers.sh's cache."

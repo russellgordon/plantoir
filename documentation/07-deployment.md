@@ -2788,7 +2788,9 @@ section "Rendered in Chrome and in Safari's engine, on every host":
   first is a pass: `checked` (its leg had no failure and the rendered check
   passed), `FAILED` (the check did not pass, or the host's leg failed before
   the browser check, which is said even when the browsers then passed), and
-  `NOT REACHED`. Below them, the expected failures, counted.
+  `NOT REACHED`. Below them, the expected failures, counted, and then what
+  a host's policy refuses on purpose (`refusedByDesign`, below), counted
+  apart.
 
 **No request leaves the site's own host, on a deployed site.** On this Mac
 the own-host row allows `thirdPartyHostsToday` (Google's fonts stylesheet
@@ -2809,7 +2811,8 @@ FAILURE too ("an expected failure that moved"; proved with Handout's
 diagram taken out of a copy, both engines), and `verify-deploy.sh`
 compares each host's EXPECTED count with the pinned number
 (`expectedLinesPerEngine`, 3, so 6 a host), failing a total that moved
-without the pin. A listed host that no page asked for in an engine's
+without the pin. The clean-page row's EXPECTED lines (Netlify's badge,
+`refusedByDesign`) are not in that count; they have their own limit. A listed host that no page asked for in an engine's
 whole run is a FAILURE ("an expected failure that stopped … take it off
 `thirdPartyHostsToday`"), so when #566 moves Mermaid and then the fonts onto
 the site, the list has to shrink with it and the gate tightens without
@@ -2828,6 +2831,107 @@ failures as they stand today:
 | `fonts.googleapis.com` | every page | the theme's fonts stylesheet | #566 (fonts from the site) |
 | `fonts.gstatic.com` | every page | the faces that stylesheet names | #566 |
 | `cdnjs.cloudflare.com` | Diagrams, Handout | Quartz's Mermaid engine, imported when a page has a diagram | #566 (Mermaid from the site) |
+
+**What the first real run showed, and the five corrections (2026-11-13).**
+The first credentialed `--first-publish` run of this section went red on 13
+rows where four were predicted (the four Cloudflare rows of #892, below).
+The investigation (Opus, the same night, from the run's own logs and one
+launcher reproduction on `dev`) found the other nine were the harness's,
+and each is now corrected, with a self-test case that fails on the old
+script:
+
+- **The folder check looked for the bare text `ws://localhost` in every
+  file**, and GeoGebra's engine carries a default address of that shape
+  (`collabUrl:"ws://localhost:3001"` in its deferred bundle
+  `static/geogebra/…/deferredjs/…/11.cache.js`), shipped because the fixture
+  has a sketch: four false reds. Measured: the run's build had 313 pages and
+  0 carrying the client, and a launcher reproduction (preview, stop, folder
+  deploy) published 312 pages, 0 carrying it. `check_folder` and `check_url`
+  now ask the product's own question, `contracts/app-rules.json` →
+  `buildFreshness.previewBuild.signature.asABasicRegex` (#291), read from the
+  contract (`live_reload_rule`), over `.html` pages only, each read as one
+  record in the C locale, the way `deploy.sh`'s `site_carries_preview_client`
+  reads it. Proved both ways: the real serve-mode page the run saved
+  (`preview.html`) is seen, alone and behind a clean front page with the
+  GeoGebra file beside it; the build with the engine inside, and the engine
+  file itself, are not. A rule that cannot be read is a failure that says
+  so, never a clean folder. Rejected: excluding `static/geogebra/` from the
+  old grep (the next engine with a default address goes red again, and a
+  page that only mentions the address, #291's networking lesson, still
+  would).
+- **`expect`'s `last name.*: ` also matched deploy.py's confirmation line**
+  "Saved teacher last name for future deploys: …", so the surname was typed
+  as the Netlify site's name: the run's site was created as `Testingqznxlc`.
+  Every pattern is now one of deploy.py's questions, read from
+  `contracts/app-rules.json` → `credentialPrompts` (`launcher_answers`): the
+  prompt up to its colon, then prompt()'s ` [<default>]` if any, then `: `,
+  never past the end of a line (Tcl's `.` takes a newline). The `(y/n): `
+  pattern answered "y" went too: no deploy question is worded that way, and
+  an unanticipated question now stops the run at its timeout. The self-test
+  drives the patterns against deploy.py's own two functions (imported, the
+  profile and Netlify's answer stood in for): the old patterns sent
+  `Testingselftest` as the site name, exactly the run's fault.
+- **`judge_og_image` compared host names with case**: Netlify answers its
+  later GET in lower case while the build baked the created spelling. Host
+  names now compare without case (RFC 4343), custom domains included. The
+  build's capital is a product quirk, not a fault of the harness: deploy.py
+  does not tidy the FIRST site name a teacher types (the retry answer is
+  tidied), so a capital makes every later Netlify deploy rebuild, because
+  `ensure_base_url_and_rebuild` compares the two spellings exactly. That is
+  its own issue (drafted as the 597b follow-up), for both platforms.
+- **Netlify's own badge script is refused by our policy on purpose**, and
+  the clean-page row counted that refusal as a failure of all 11 pages in
+  both engines. What identifies it, measured from the run: one refusal a
+  page, worded `Executing inline script violates the following Content
+  Security Policy directive 'script-src …` in Chromium and `Refused to
+  execute a script because its hash, its nonce, or 'unsafe-inline' does not
+  appear in the script-src directive of the Content Security Policy.` in
+  WebKit, while the live policy listed exactly the site's own five inline
+  scripts. The wording alone is not enough, because a policy that lost one
+  of the site's hashes (the drift `netlify_badge.py` exists to prevent) is
+  refused in the same words. So `rendered_rows.json` → `refusedByDesign`
+  names the two wordings, and `browser-checks/lib/refused_by_design.mjs` sets
+  a line aside only on a page holding a refused inline script that is in the
+  page as the browser received it and NOT in the page as the host serves it
+  to a client that is not a browser (the injection is made for browsers; the
+  run's pages fetched with curl carried none). A refused script that is in
+  the site's own page, or that is in neither (made at run time by the page's
+  scripts), fails the row. What is set aside is an `EXPECTED: clean page`
+  line in each engine, counted in the DONE line, named in its own Result
+  block line ("Refused by the site's own policy by design …"), and allowed
+  on Netlify only, at most `expectedLinesPerEngine` (1) an engine; the
+  six-a-host pin of `thirdPartyHostsToday` counts the other EXPECTED lines
+  only. Measured on a local stand-in for Netlify's edge (the run's build
+  with its real `_headers`, a script added to every page for a browser's
+  User-Agent only): the 597b checker gave `39 OK, 2 FAIL, 0 SKIPPED, 6
+  EXPECTED`, the first run's line exactly; the new one `39 OK, 0 FAIL, 0
+  SKIPPED, 8 EXPECTED`. Proved still red: the same script sent to every
+  client, and the run's policy with one of the site's hashes dropped (badge
+  still added), each failed the row in both engines, naming the site's own
+  script. Rejected: ignoring CSP refusals on Netlify (that hides the hash
+  drift), and matching the badge by its content (never read; the sites were
+  deleted).
+- **The tasks row reloaded while the page was still fetching
+  `static/contentIndex.json`**, and WebKit throws "TypeError: Load failed"
+  into the page when a navigation cancels that fetch (Quartz's `fetchData`,
+  which nothing catches). Over a real network it is still in flight, so it
+  showed on Cloudflare (cold first paint about 327 ms there, 142 ms on
+  Netlify). Every row that takes the page elsewhere (the tasks reload, the
+  progress row's next page, the embeds reload) now waits first on the
+  page's own `fetchData` promise, with a 30 s ceiling
+  (`untilTheIndexHasArrived`), never a fixed sleep; the self-test checks
+  that every reload and next page inside a row is preceded by that wait.
+  Measured with 0.5 s added to every answer but the page itself, headless
+  WebKit: the 597b checker failed the clean-page row on Tasks twice of two;
+  the new one passed three runs of three, both engines. Rejected:
+  `waitForLoadState("networkidle")` (a timed quiet period, the guess this
+  repository's rule forbids) and setting aside a "Load failed" whose request
+  the row cancelled (it would hide the same error raised by anything else).
+
+So a run on `dev` without #799 should show exactly the four Cloudflare rows
+of #892 and nothing else, with Netlify's rendered line reading `39 OK, 0
+FAIL, 0 SKIPPED, 8 EXPECTED` and the badge's two lines under their own
+Result heading. The self-test went from 62 cases to 77.
 
 **What a teacher's embed says is set aside, and counted.** The first
 deployed-mode run (the fixture site served under `--base … --host netlify`,

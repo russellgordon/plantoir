@@ -4954,10 +4954,11 @@ browsers, on the deployed sites (#597)").
 | File | What it is |
 |---|---|
 | `browser-checks/rendered_features.mjs` | the checker: `--site <folder>` serves a built site itself, `--base <url/> --host <name>` reads a deployed one; `--expect-red <sabotage>\|all` proves the rows see |
-| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host. Data both platforms run |
+| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host, `refusedByDesign`. Data both platforms run |
 | `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
+| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, sent to browsers only) from the site's own script refused; `test_refused_by_design.mjs` beside it |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
@@ -5002,6 +5003,28 @@ Waits are on the state asked about, with a ceiling.
   not judged; the embeds row judges the frames themselves. Without it the
   row failed both engines on YouTube's advert requests, Vimeo's and PhET's
   fullscreen checks and GeoGebra reaching for the page.
+- **A refusal the site's policy makes on purpose is set aside, by what it
+  is, never by its words alone** (#597's second half, the first deployed
+  run, 2026-11-13). Netlify adds its badge as an inline script on a page's
+  way to a browser, and the policy `netlify_badge.py` writes refuses it by
+  design, one refusal a page in both engines. `rendered_rows.json` →
+  `refusedByDesign` names the host and the two engines' wordings, and
+  `browser-checks/lib/refused_by_design.mjs` sets a line aside only on a page
+  holding a refused inline script that is in every document the page was
+  sent as the browser received it, and not in the same address fetched
+  without a browser's User-Agent; the site's own refused script, or one its
+  scripts made, fails the row, so a policy that lost a hash is still red.
+  What is set aside is an EXPECTED line of the clean-page row, counted and
+  named, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
+  documentation/07-deployment.md has the measurements.
+- **A row that takes the page elsewhere waits for the page's own index
+  request first.** Quartz fetches `static/contentIndex.json` as a page loads
+  and nothing catches it, so a reload that cancels it makes WebKit throw
+  "TypeError: Load failed" into the page (measured with 0.5 s of latency;
+  the first deployed run's Cloudflare red). The tasks reload, the progress
+  row's next page and the embeds reload each wait on the page's `fetchData`
+  promise first (`untilTheIndexHasArrived`, 30 s ceiling), the real
+  dependency rather than a fixed sleep or a network-idle guess.
 - **Until the page is quiet.** Before a page is judged it is scrolled to its
   end a window at a time, so what loads only below the fold is asked for,
   then held until it has asked for nothing for a second and at least 5 s

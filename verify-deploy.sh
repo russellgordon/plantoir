@@ -131,6 +131,7 @@ RENDER_HOSTS=(netlify cloudflare)
 RENDER_TARGETS=()   # "host|address ending in /|failures in its leg before the browser check"
 RENDER_RESULTS=()   # one line per host for the Result block: checked, FAILED or NOT REACHED
 RENDER_EXPECTED=()  # the expected failures, by host and engine (thirdPartyHostsToday, #566)
+RENDER_BY_DESIGN=()  # what a site's policy refuses on purpose, by host and engine (refusedByDesign)
 # The checker itself; the self-test puts a stub in its place.
 RENDERED_CHECKER=(node "$SCRIPT_REPO/browser-checks/rendered_features.mjs")
 # The Node the checker needs (22 or later); the self-test puts a stub in its
@@ -774,18 +775,35 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
   fi
   # What the checker said, under its line here: every failure and skip, and
   # the expected failures (counted for the Result block).
+  # The clean-page row's EXPECTED lines are a refusal the site's policy makes
+  # on purpose (rendered_rows.json -> refusedByDesign: Netlify's badge,
+  # measured on the first deployed run), counted apart; every other EXPECTED
+  # line is an expected failure of thirdPartyHostsToday's.
   while IFS= read -r line; do
-    [ -n "$line" ] && RENDER_EXPECTED+=("$label ${line#EXPECTED: }")
+    case "$line" in
+      "EXPECTED: clean page "*) RENDER_BY_DESIGN+=("$label ${line#EXPECTED: }") ;;
+      ?*) RENDER_EXPECTED+=("$label ${line#EXPECTED: }") ;;
+    esac
   done < <(grep '^EXPECTED: ' "$log")
   line=$(grep '^DONE: ' "$log" | tail -1 | sed 's/^DONE: //')
   # The expected failures are compared with the pinned number (597b review
   # finding 2): one line per listed host in each engine. A count that moved
   # without the pin moving is a failure, never a quiet change of total.
-  local expected_here pinned
-  expected_here=$(grep -c '^EXPECTED: ' "$log")
+  local expected_here pinned by_design_here by_design_allowed
+  by_design_here=$(grep -c '^EXPECTED: clean page ' "$log")
+  expected_here=$(( $(grep -c '^EXPECTED: ' "$log") - by_design_here ))
   pinned=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["thirdPartyHostsToday"]["expectedLinesPerEngine"] * 2)' "$SCRIPT_REPO/browser-checks/rendered_rows.json" 2>/dev/null)
   if [ "$status" -eq 0 ] && [ "$expected_here" != "${pinned:-?}" ]; then
     no "$label, rendered: $expected_here expected failure(s), where rendered_rows.json -> thirdPartyHostsToday pins ${pinned:-?} (one a listed host in each engine)"
+    status=1
+  fi
+  # At most expectedLinesPerEngine in each engine of the refusals set aside
+  # on this host, and none on a host refusedByDesign does not name: none
+  # when Netlify sent no badge, which hides nothing, since nothing is set
+  # aside on a page holding no such script.
+  by_design_allowed=$(python3 -c 'import json,sys; print(sum(entry["expectedLinesPerEngine"] * 2 for entry in json.load(open(sys.argv[1])).get("refusedByDesign", []) if sys.argv[2] in entry["hosts"]))' "$SCRIPT_REPO/browser-checks/rendered_rows.json" "$host" 2>/dev/null)
+  if [ "$status" -eq 0 ] && [ "$by_design_here" -gt "${by_design_allowed:-0}" ]; then
+    no "$label, rendered: $by_design_here refusal line(s) set aside as by design, where rendered_rows.json -> refusedByDesign allows ${by_design_allowed:-0} on this host"
     status=1
   fi
   if [ "$status" -eq 0 ]; then
@@ -839,6 +857,10 @@ print_rendered_result() {
   for line in ${RENDER_RESULTS[@]+"${RENDER_RESULTS[@]}"}; do echo "    $line"; done
   echo "  Expected failures, which #566 removes (browser-checks/rendered_rows.json -> thirdPartyHostsToday): ${#RENDER_EXPECTED[@]}, pinned at $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["thirdPartyHostsToday"]["expectedLinesPerEngine"] * 2)' "$SCRIPT_REPO/browser-checks/rendered_rows.json" 2>/dev/null || echo '?') a host reached"
   for line in ${RENDER_EXPECTED[@]+"${RENDER_EXPECTED[@]}"}; do echo "    $line"; done
+  if [ "${#RENDER_BY_DESIGN[@]}" -gt 0 ]; then
+    echo "  Refused by the site's own policy by design, set aside and counted (browser-checks/rendered_rows.json -> refusedByDesign): ${#RENDER_BY_DESIGN[@]}"
+    for line in "${RENDER_BY_DESIGN[@]}"; do echo "    $line"; done
+  fi
   if [ "${#SECOND_DEPLOY_RESULTS[@]}" -gt 0 ]; then
     echo "  A second deploy with nothing changed, per host (#892):"
     for line in "${SECOND_DEPLOY_RESULTS[@]}"; do echo "    $line"; done
@@ -982,6 +1004,129 @@ if isinstance(value, str):
     print(value.split("/")[0])
 LEGDOMAIN
 }
+# Does a published site carry a preview's live-reload client? The question is
+# the product's own, contracts/app-rules.json ->
+# buildFreshness.previewBuild.signature.asABasicRegex (#291), read from the
+# contract and never retyped: the client's script tag, then its first
+# statement, in an .html page read as ONE record in the C locale, as
+# deploy.sh's site_carries_preview_client reads it. The bare text
+# ws://localhost was looked for in EVERY file until 2026-11-13, and GeoGebra's
+# engine carries a default address of that shape (collabUrl
+# "ws://localhost:3001" in static/geogebra/…/deferredjs/…/11.cache.js), so
+# the first deployed run, whose fixture has a sketch, went red four times for
+# a folder that held no preview page at all (597b first-run investigation,
+# (a)); a page that only MENTIONS the address would have gone red the same
+# way (#291). The working folder's copy of the contract first, the one its
+# launchers were given, then this checkout's.
+# live_reload_client_in <file or folder>: 0 it does, 1 it does not, 2 the
+# rule could not be read (said by the caller as a failure, never as clean).
+live_reload_rule() {
+  local file="${WORKING_FOLDER:-}/.toolchain/contracts/app-rules.json"
+  [ -f "$file" ] || file="$SCRIPT_REPO/contracts/app-rules.json"
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["buildFreshness"]["previewBuild"]["signature"]["asABasicRegex"], end="")' "$file" 2>/dev/null
+}
+live_reload_client_in() {
+  local rule
+  rule=$(live_reload_rule)
+  [ -n "$rule" ] || return 2
+  if [ -d "$1" ]; then
+    LC_ALL=C grep -rzqs --include='*.html' -- "$rule" "$1"
+  else
+    LC_ALL=C grep -zqs -- "$rule" "$1"
+  fi
+}
+# Says the live-reload judgement for <label> about <file or folder>, in the
+# words of a site that was published (folder) or fetched (url).
+judge_live_reload() {  # judge_live_reload <label> <file or folder> <what it would mean>
+  live_reload_client_in "$2"
+  case $? in
+    0) no "$1 $3" ;;
+    1) ok "$1 carries no live-reload client" ;;
+    *) no "$1: the rule for a preview's page could not be read from contracts/app-rules.json -> buildFreshness.previewBuild.signature, so whether it carries the live-reload client is not known" ;;
+  esac
+}
+
+# A folder publish is verified by reading the folder it wrote (defined here,
+# ahead of the self-test, which runs it).
+check_folder() {  # check_folder <label> <dir>
+  local n
+  n=$(find "$2" -type f 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$n" -gt 0 ] && [ -f "$2/index.html" ]; then
+    ok "$1 received $n files including a front page"
+  else
+    no "$1 received $n files (front page present: $([ -f "$2/index.html" ] && echo yes || echo no))"
+  fi
+  judge_live_reload "$1" "$2" "CONTAINS THE LIVE-RELOAD CLIENT — a preview build was published"
+}
+
+# Every deploy is driven through expect, because a first publish to Netlify
+# asks for a surname and a site name. Answering by prompt TEXT is what the app
+# does; a blind feed of newlines cannot tell one prompt from another and was
+# tried first, and failed.
+#
+# Each pattern is a QUESTION deploy.py asks, read from the contract that
+# names them, contracts/app-rules.json -> credentialPrompts (the working
+# folder's copy first, as live_reload_rule reads it): its `prompt` up to the
+# colon, then prompt()'s " [<default>]" if there is one, then ": ". The
+# surname questions (expectRequest teacherSurname) are answered with the
+# surname, the site-name questions (siteName, siteNameConflict) with Enter,
+# which takes the suggested name; no other question is answered. So no line
+# but the question itself can answer to a pattern, and none reaches past the
+# end of a line (Tcl's "." takes a newline). The first deployed run
+# (2026-11-13) used "last name.*: ", which deploy.py's own next line, "Saved
+# teacher last name for future deploys: …", matched too, so the surname was
+# typed as the Netlify site's name and the run's site was created as
+# "Testingqznxlc" instead of the default (597b first-run investigation, (b)).
+# A "(y/n): " pattern, answered "y", went at the same time: no question on
+# the deploy path is worded that way (none has been since this script was
+# written), Windows' harness never had one, and a question nobody anticipated
+# should stop the run at its timeout rather than be answered yes. The
+# self-test drives these patterns against deploy.py's real questions.
+launcher_answers() {  # the expect clauses, one a line; nothing when the contract cannot be read
+  local file="${WORKING_FOLDER:-}/.toolchain/contracts/app-rules.json"
+  [ -f "$file" ] || file="$SCRIPT_REPO/contracts/app-rules.json"
+  python3 -I - "$file" "$SURNAME" 2>/dev/null <<'ANSWERS'
+import json, sys
+path, surname = sys.argv[1:3]
+answers = {"teacherSurname": surname, "siteName": "", "siteNameConflict": ""}
+def literal(text):
+    out = ""
+    for character in text:
+        out += "\\" + character if character in "\\.^$|?*+()[]{}" else character
+    return out
+for case in json.load(open(path, encoding="utf-8"))["credentialPrompts"]["cases"]:
+    if case["expectRequest"] not in answers:
+        continue
+    question = case["prompt"].rstrip()
+    if not question.endswith(":"):
+        continue
+    pattern = literal(question[:-1]) + "( \\[[^\\r\\n]*\\])?: "
+    print("-re {" + pattern + "} { send \"" + answers[case["expectRequest"]] + "\\r\"; exp_continue }")
+ANSWERS
+}
+drive_launcher() {  # drive_launcher <folder> <logfile> <command words...>
+  local folder="$1" log="$2" answers; shift 2
+  answers=$(launcher_answers)
+  if [ "$(printf '%s\n' "$answers" | grep -c '^-re ')" -lt 4 ]; then
+    echo "  the launcher's questions could not be read from contracts/app-rules.json -> credentialPrompts, so nothing was run" >>"$log"
+    return 125
+  fi
+  expect -c "
+    set timeout ${DRIVE_TIMEOUT:-900}
+    cd {$folder}
+    log_file -a {$log}
+    spawn $*
+    expect {
+      $answers
+      timeout { puts \"\nTIMED OUT waiting on the launcher\"; catch {close}; exit 124 }
+      eof {}
+    }
+    catch wait result
+    exit [lindex \$result 3]
+  " >>"$log" 2>&1
+  return $?
+}
+
 judge_og_image() {  # judge_og_image <label> <site address> <front page file> [<netlify|cloudflare_pages> [<course_config.json> <section>]]
   local label="$1" site_host og og_host custom=""
   site_host="${2#*://}"; site_host="${site_host%%/*}"
@@ -996,6 +1141,13 @@ judge_og_image() {  # judge_og_image <label> <site address> <front page file> [<
     *) no "$label's og:image is not an absolute address ($og), so a sharing card cannot find it"; return ;;
   esac
   og_host="${og#*://}"; og_host="${og_host%%/*}"
+  # Host names compare without regard to case (RFC 4343). The first deployed
+  # run's Netlify site was created as "Testingqznxlc" and is answered for in
+  # lower case by Netlify's later GET, while the build baked the created
+  # spelling (597b first-run investigation, (b)).
+  og_host=$(printf '%s' "$og_host" | tr '[:upper:]' '[:lower:]')
+  site_host=$(printf '%s' "$site_host" | tr '[:upper:]' '[:lower:]')
+  custom=$(printf '%s' "$custom" | tr '[:upper:]' '[:lower:]')
   if [ -n "$custom" ]; then
     if [ "$og_host" = "$custom" ]; then
       ok "$label's og:image is on the custom domain course_config.json records for this destination ($og_host)"
@@ -1592,7 +1744,7 @@ STUB
     "DONE: 41 OK, 0 FAIL, 0 SKIPPED, 6 EXPECTED in 70 s (stub; ran in chromium and webkit)")
   # rs_run: the real rendered section over RS_TARGETS, then its Result lines.
   rs_run() {
-    ( MEASURED=(); NS_LEG=0; RENDER_RESULTS=(); RENDER_EXPECTED=()
+    ( MEASURED=(); NS_LEG=0; RENDER_RESULTS=(); RENDER_EXPECTED=(); RENDER_BY_DESIGN=()
       RENDER_TARGETS=(${RS_TARGETS[@]+"${RS_TARGETS[@]}"})
       RENDERED_CHECKER=(python3 -I "$ST_DIR/checker.py" "$ST_DIR/plan")
       [ -n "${RS_WHY:-}" ] && RENDER_WHY_cloudflare="$RS_WHY"
@@ -1675,6 +1827,48 @@ STUB
     ok "an expected failure that stopped failing is a failure, said under the host with the list to shorten"
   else
     no "an expected failure that stopped: $(printf '%s\n' "$out" | grep -E '❌|stopped|Netlify:' | head -3)"
+  fi
+
+  # Netlify's badge, refused by the site's policy on purpose (597b first-run
+  # investigation, (d)): the clean-page row's EXPECTED line in each engine is
+  # counted apart from thirdPartyHostsToday's pin, named in the Result block,
+  # and allowed on Netlify only, at most one an engine.
+  BADGE_LINE="refused by the site's policy on 11 of 11 pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor): by design, set aside only where the page holds a refused inline script the host sent the browser alone (rendered_rows.json -> refusedByDesign)"
+  BADGE_LINES=()
+  for st_line in "${GOOD_LINES[@]}"; do
+    case "$st_line" in "DONE: "*) ;; *) BADGE_LINES+=("$st_line") ;; esac
+  done
+  BADGE_LINES+=("EXPECTED: clean page [chromium]: Netlify's own badge script $BADGE_LINE" "EXPECTED: clean page [webkit]: Netlify's own badge script $BADGE_LINE"
+    "DONE: 39 OK, 0 FAIL, 0 SKIPPED, 8 EXPECTED in 72 s (stub; ran in chromium and webkit)")
+  plan_reset; plan_step 1 0 "${BADGE_LINES[@]}"; plan_step 2 0 "${GOOD_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0" "cloudflare|$PS_URL|0")
+  out=$(rs_run)
+  if [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 0 ] \
+     && printf '%s\n' "$out" | grep -q '^    Netlify: checked - 39 OK, 0 FAIL, 0 SKIPPED, 8 EXPECTED' \
+     && printf '%s\n' "$out" | grep -q '^    Cloudflare Pages: checked - 41 OK' \
+     && printf '%s\n' "$out" | grep -q 'Expected failures, which #566 removes .*: 12, pinned at 6 a host reached$' \
+     && printf '%s\n' "$out" | grep -q "^  Refused by the site's own policy by design, set aside and counted (browser-checks/rendered_rows.json -> refusedByDesign): 2$" \
+     && printf '%s\n' "$out" | grep -q "^    Netlify clean page \[webkit\]: Netlify's own badge script refused"; then
+    ok "Netlify's badge refused by design in each engine: checked, counted apart from the six expected failures' pin, and named in the Result block"
+  else
+    no "Netlify's badge refused by design: $(printf '%s\n' "$out" | grep -E '❌|checked|Expected|Refused' | head -4)"
+  fi
+  plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"; plan_step 2 0 "${BADGE_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0" "cloudflare|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Cloudflare Pages, rendered: 2 refusal line(s) set aside as by design, where rendered_rows.json -> refusedByDesign allows 0 on this host" \
+     && ! printf '%s\n' "$out" | grep -q 'Cloudflare Pages: checked'; then
+    ok "a refusal set aside as by design on a host refusedByDesign does not name fails"
+  else
+    no "by design on Cloudflare: $(printf '%s\n' "$out" | grep -E '❌|checked' | head -3)"
+  fi
+  plan_reset; plan_step 1 0 "${BADGE_LINES[@]}" "EXPECTED: clean page [webkit]: Netlify's own badge script $BADGE_LINE"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "❌ Netlify, rendered: 3 refusal line(s) set aside as by design, where rendered_rows.json -> refusedByDesign allows 2 on this host"; then
+    ok "more refusals set aside than refusedByDesign allows a host fails"
+  else
+    no "too many set aside: $(printf '%s\n' "$out" | grep -E '❌|checked' | head -3)"
   fi
   st_stop
 
@@ -1827,6 +2021,7 @@ STUB
   printf '%s\n' '{"deploy_target": "cloudflare_pages", "custom_domains": {"sections": {"section1": "class.example.org"}}}' >"$ST_DIR/og-bare-primary.json"
   printf '%s\n' '{"deploy_target": "netlify", "custom_domains": {"sections": {"section1": "class.example.org"}}}' >"$ST_DIR/og-bare-other.json"
   printf '%s\n' '{"deploy_target": "cloudflare_pages"}' >"$ST_DIR/og-none.json"
+  printf '%s\n' '{"deploy_target": "netlify", "custom_domains": {"sections": {"section1": {"cloudflare_pages": "https://Class.Example.ORG/"}}}}' >"$ST_DIR/og-domain-capitals.json"
   og_case pass "on the custom domain" "a site with a custom domain recorded for its destination passes when its og:image names that domain" \
     "https://ada1o-s1.pages.dev" "https://class.example.org/static/og-image.png" cloudflare_pages "$ST_DIR/og-domain.json"
   og_case fail "names the service's own host" "a site with a custom domain recorded fails when its og:image names the service's own host" \
@@ -1839,6 +2034,127 @@ STUB
     "https://ada1o-s1.netlify.app" "https://ada1o-s1.netlify.app/static/og-image.png" netlify "$ST_DIR/og-domain.json"
   og_case fail "on another host" "with no custom domain recorded, an og:image naming another site's host fails" \
     "https://ada1o-s1.pages.dev" "https://ada1o-other.pages.dev/static/og-image.png" cloudflare_pages "$ST_DIR/og-none.json"
+
+  # Host names compare without regard to case (597b first-run investigation, (b)).
+  og_case pass "on its own host" "an og:image whose host differs from the site's only in case is on its own host" \
+    "https://testingqznxlc.netlify.app" "https://Testingqznxlc.netlify.app/static/og-image.png"
+  og_case pass "on the custom domain" "a custom domain recorded in capitals matches the og:image's host in lower case" \
+    "https://ada1o-s1.pages.dev" "https://class.example.org/static/og-image.png" cloudflare_pages "$ST_DIR/og-domain-capitals.json"
+
+  hdr "Self-test — a preview's live-reload client, by the contract's rule (#291)"
+  # The rule is the product's (contracts/app-rules.json ->
+  # buildFreshness.previewBuild.signature); its sample page is the contract's
+  # own asQuartzWritesIt, never retyped here.
+  lr_site() {  # lr_site <folder>: a published folder with a clean front page
+    rm -rf "$1"; mkdir -p "$1/notes" "$1/static/geogebra/HTML5/5.0/web3d/deferredjs/X"
+    printf '<html><body>Welcome</body></html>\n' >"$1/index.html"
+    printf '<html><body>Day 1</body></html>\n' >"$1/notes/day-1.html"
+  }
+  lr_said() { ( WORKING_FOLDER="${LR_FOLDER:-$ST_DIR/no-working-folder}"; check_folder "case" "$1" ) | grep -iE 'live-reload|rule for a preview' ; }
+  lr_site "$ST_DIR/lr-engine"
+  printf 'const i=Object.assign({collabUrl:"ws://localhost:3001"},s)\n' >"$ST_DIR/lr-engine/static/geogebra/HTML5/5.0/web3d/deferredjs/X/11.cache.js"
+  said=$(lr_said "$ST_DIR/lr-engine")
+  case "$said" in *"✅ case carries no live-reload client"*) ok "a published folder whose GeoGebra engine carries a default ws://localhost address is not a preview's (the first deployed run's four false reds)" ;; *) no "GeoGebra's engine read as a preview's client: $said" ;; esac
+  lr_site "$ST_DIR/lr-prose"
+  printf '<html><head><meta name="description" content="new WebSocket(&#39;ws://localhost:8080&#39;)"/></head><body><p>Connect to ws://localhost:8080 with <code>new WebSocket(%s)</code>.</p><p>&lt;script type="application/javascript"&gt;</p></body></html>\n' "'ws://localhost:8080'" >"$ST_DIR/lr-prose/notes/day-1.html"
+  said=$(lr_said "$ST_DIR/lr-prose")
+  case "$said" in *"✅ case carries no live-reload client"*) ok "a page that only mentions ws://localhost, in prose, code and a meta tag, is not a preview's (#291)" ;; *) no "a page mentioning the address read as a preview's: $said" ;; esac
+  lr_site "$ST_DIR/lr-preview"
+  python3 -c 'import json,sys; page = json.load(open(sys.argv[1]))["buildFreshness"]["previewBuild"]["signature"]["asQuartzWritesIt"]; open(sys.argv[2], "w").write("<html><body>Day 1" + page + "</body></html>\n")' "$SCRIPT_REPO/contracts/app-rules.json" "$ST_DIR/lr-preview/notes/day-1.html"
+  said=$(lr_said "$ST_DIR/lr-preview")
+  case "$said" in *"❌ case CONTAINS THE LIVE-RELOAD CLIENT"*) ok "a page holding the client as Quartz writes it (the contract's asQuartzWritesIt), behind a clean front page, is a preview's" ;; *) no "a preview's page was not seen: $said" ;; esac
+  if live_reload_client_in "$ST_DIR/lr-preview/notes/day-1.html" && ! live_reload_client_in "$ST_DIR/lr-prose/notes/day-1.html"; then
+    ok "a fetched page is judged by the same rule: the client as Quartz writes it is seen, a mention of the address is not"
+  else
+    no "a single fetched page was judged otherwise than its folder"
+  fi
+  mkdir -p "$ST_DIR/lr-broken/.toolchain/contracts"; printf '{}\n' >"$ST_DIR/lr-broken/.toolchain/contracts/app-rules.json"
+  said=$(LR_FOLDER="$ST_DIR/lr-broken" lr_said "$ST_DIR/lr-preview")
+  case "$said" in *"❌ case: the rule for a preview's page could not be read"*) ok "a working folder whose contract has no rule is a failure that says so, never a clean folder" ;; *) no "an unreadable rule: $said" ;; esac
+
+  hdr "Self-test — the deploy's questions, answered by question (597b first-run investigation, (b))"
+  # deploy.py's own two first-publish questions, asked by deploy.py's own
+  # functions (imported, with the profile and Netlify's answer stood in for
+  # inside ST_DIR), driven by the same expect patterns a real run uses.
+  cat >"$ST_DIR/questions.py" <<'STUB'
+import json, pathlib, sys
+scripts, home, conflicts = sys.argv[1], pathlib.Path(sys.argv[2]), int(sys.argv[3])
+sys.path.insert(0, scripts)
+import deploy
+deploy._profile_path = lambda: home / "profile.json"
+deploy._ensure_global_secrets_dir = lambda: home.mkdir(parents=True, exist_ok=True)
+asked = []
+def netlify_api(method, path, token, payload=None, headers=None, data=None):
+    asked.append(payload["name"])
+    if len(asked) <= conflicts:
+        raise RuntimeError('HTTP 422: {"errors": {"subdomain": ["must be unique"]}}')
+    return {"name": payload["name"], "ssl_url": "https://" + payload["name"] + ".netlify.app"}
+deploy.netlify_api = netlify_api
+surname = deploy.get_or_prompt_teacher_last_name()
+deploy.maybe_create_netlify_site_simple("token", None, "ADA1O", "1", surname)
+print("ASKED " + json.dumps({"surname": surname, "names": asked, "year": deploy.NOW.year}))
+STUB
+  questions_case() {  # questions_case <conflicts> <what> <expected names, as JSON, with YEAR for the year>
+    local log="$ST_DIR/questions-$1.log" got
+    rm -rf "$ST_DIR/questions-home"; : >"$log"
+    ( SURNAME="Testingselftest"; DRIVE_TIMEOUT=20; HOME="$ST_DIR/questions-home"
+      drive_launcher "$ST_DIR" "$log" python3 -I "$ST_DIR/questions.py" "$SCRIPT_REPO/scripts" "$ST_DIR/questions-home" "$1" )
+    got=$(sed -n 's/.*ASKED //p' "$log" | tr -d '\r' | tail -1)
+    if [ -n "$got" ] && python3 -c 'import json,sys; got=json.loads(sys.argv[1]); want=json.loads(sys.argv[2].replace("YEAR", str(got["year"]))); sys.exit(0 if got["surname"] == "testingselftest" and got["names"] == want else 1)' "$got" "$3"; then
+      ok "$2"
+    else
+      no "$2: deploy.py asked for ${got:-nothing} ($(tr -d '\r' <"$log" | grep -E 'last name|site name|TIMED' | head -3 | paste -sd '|' -))"
+    fi
+  }
+  questions_case 0 "the surname is typed at its question only, and the site name takes its default (the first deployed run typed the surname there)" '["ada1o-s1-YEAR-testingselftest"]'
+  questions_case 1 "a site name already taken: the next question takes its suggested name" '["ada1o-s1-YEAR-testingselftest", "ada1o-s1-YEAR-testingselftest-01"]'
+  : >"$ST_DIR/questions-broken.log"
+  ( WORKING_FOLDER="$ST_DIR/lr-broken"; drive_launcher "$ST_DIR" "$ST_DIR/questions-broken.log" touch "$ST_DIR/questions-ran" ); rc=$?
+  if [ "$rc" -eq 125 ] && [ ! -e "$ST_DIR/questions-ran" ] && grep -q "could not be read from contracts/app-rules.json -> credentialPrompts" "$ST_DIR/questions-broken.log"; then
+    ok "a working folder whose contract names no questions runs nothing (exit 125), rather than a launcher nobody can answer"
+  else
+    no "a contract with no questions: exit $rc, ran: $([ -e "$ST_DIR/questions-ran" ] && echo yes || echo no)"
+  fi
+
+  hdr "Self-test — the rendered check's rows, offline (597b first-run investigation, (d))"
+  if node "$SCRIPT_REPO/browser-checks/lib/test_refused_by_design.mjs" >"$ST_DIR/by-design.txt" 2>&1; then
+    ok "a refusal the site's policy makes on purpose: $(grep -c '^OK: ' "$ST_DIR/by-design.txt") cases, Netlify's badge set aside only where the browser alone was sent it, the site's own refused script still a failure (browser-checks/lib/test_refused_by_design.mjs)"
+  else
+    no "a refusal the site's policy makes on purpose: $(grep -v '^OK: ' "$ST_DIR/by-design.txt" | head -3)"
+  fi
+  # A row that takes the page elsewhere waits first for the page's own
+  # request for the search index (WebKit's "Load failed" when a reload
+  # cancels it: measured with 0.5 s of latency). Every reload and every goto
+  # inside a row is preceded by that wait.
+  said=$(python3 - "$SCRIPT_REPO/browser-checks/rendered_features.mjs" <<'SCAN'
+import re, sys
+source = open(sys.argv[1], encoding="utf-8").read().splitlines()
+inside, row, found, unwaited = False, "", 0, []
+for number, line in enumerate(source, 1):
+    start = re.match(r"ROW_CHECKS\.(\w+) = async", line)
+    if start:
+        inside, row = True, start.group(1)
+        continue
+    if inside and line.startswith("}"):
+        inside = False
+        continue
+    if inside and re.search(r"\bpage\.(reload|goto)\(", line):
+        found += 1
+        before = ""
+        for back in range(number - 2, -1, -1):
+            if source[back].strip():
+                before = source[back].strip()
+                break
+        if before != "await untilTheIndexHasArrived(page)":
+            unwaited.append(f"{row} (line {number})")
+print(f"{found} {' '.join(unwaited) if unwaited else '-'}")
+SCAN
+)
+  if [ "${said%% *}" -ge 3 ] && [ "${said#* }" = "-" ]; then
+    ok "every one of the ${said%% *} reloads and next pages inside a row waits for the page's own index request first"
+  else
+    no "a row takes the page elsewhere without waiting for its index request: ${said#* } (of ${said%% *})"
+  fi
 
   NS_PLAIN_FIRST=10
 
@@ -2169,30 +2485,9 @@ if pgrep -x Plantoir >/dev/null 2>&1; then
 fi
 
 # --------------------------------------------------------------- helpers
-# Every deploy is driven through expect, because a first publish to Netlify
-# asks for a surname and a site name. Answering by prompt TEXT is what the app
-# does; a blind feed of newlines cannot tell one prompt from another and was
-# tried first, and failed.
 run_deploy() {  # run_deploy <logfile> <args...>
   local log="$1"; shift
-  expect -c "
-    set timeout 900
-    cd {$WORKING_FOLDER}
-    log_file -a {$log}
-    spawn ./deploy.sh $*
-    expect {
-      -re {last name.*: }        { send \"$SURNAME\r\"; exp_continue }
-      -re {Netlify site name.*]} { send \"\r\"; exp_continue }
-      -re {Enter Netlify site name} { send \"\r\"; exp_continue }
-      -re {different Netlify site name} { send \"\r\"; exp_continue }
-      -re {\\(y/n\\): }          { send \"y\r\"; exp_continue }
-      timeout { puts \"\nTIMED OUT waiting on the launcher\"; catch {close}; exit 124 }
-      eof {}
-    }
-    catch wait result
-    exit [lindex \$result 3]
-  " >>"$log" 2>&1
-  return $?
+  drive_launcher "$WORKING_FOLDER" "$log" ./deploy.sh "$@"
 }
 
 set_destination() {  # set_destination <primary> [folderpath] [additional-json]
@@ -2232,31 +2527,13 @@ check_url() {  # check_url <label> <url> <netlify|cloudflare_pages>
     else
       ok "$1 is live and answering ($2)"
     fi
-    if grep -q "ws://localhost" "$WORK/fetched.html"; then
-      no "$1 SERVED THE LIVE-RELOAD CLIENT — a preview build reached students"
-    else
-      ok "$1 carries no live-reload client"
-    fi
+    judge_live_reload "$1" "$WORK/fetched.html" "SERVED THE LIVE-RELOAD CLIENT — a preview build reached students"
     judge_og_image "$1" "$2" "$WORK/fetched.html" "$3"
   else
     no "$1 answered HTTP $code ($2)"
   fi
 }
 
-check_folder() {  # check_folder <label> <dir>
-  local n
-  n=$(find "$2" -type f 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$n" -gt 0 ] && [ -f "$2/index.html" ]; then
-    ok "$1 received $n files including a front page"
-  else
-    no "$1 received $n files (front page present: $([ -f "$2/index.html" ] && echo yes || echo no))"
-  fi
-  if grep -rl "ws://localhost" "$2" >/dev/null 2>&1; then
-    no "$1 CONTAINS THE LIVE-RELOAD CLIENT — a preview build was published"
-  else
-    ok "$1 carries no live-reload client"
-  fi
-}
 
 # wrangler 4.108 and later sends a NEW static project to Workers instead of
 # Pages when it believes an AI agent is driving it (CLAUDECODE, AI_AGENT, ...
@@ -2411,11 +2688,8 @@ if [ -n "$PREVIEW_PORT" ]; then
     # looks for (its tag, then its first statement, #291), or every check
     # would read a preview's site as production and publish it. Read as one
     # record in the C locale, exactly as deploy.sh reads it.
-    # The working folder's own copy, the one its launchers were given.
-    PREVIEW_RULE_FILE="$WORKING_FOLDER/.toolchain/contracts/app-rules.json"
-    [ -f "$PREVIEW_RULE_FILE" ] || PREVIEW_RULE_FILE="$(cd "$(dirname "$0")" && pwd)/contracts/app-rules.json"
-    PREVIEW_RULE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["buildFreshness"]["previewBuild"]["signature"]["asABasicRegex"], end="")' "$PREVIEW_RULE_FILE" 2>/dev/null)
-    if [ -n "$PREVIEW_RULE" ] && LC_ALL=C grep -zq -- "$PREVIEW_RULE" "$WORK/preview.html"; then
+    # The same reading every check of a published site makes (live_reload_client_in).
+    if live_reload_client_in "$WORK/preview.html"; then
       ok "the preview's live-reload client matches the rule in contracts/app-rules.json"
     else
       no "the preview's live-reload client no longer matches the rule in contracts/app-rules.json — re-measure it (#291)"
@@ -2437,7 +2711,7 @@ pkill -f "preview.sh $COURSE" 2>/dev/null; sleep 3
 # on 2026-09-05 and was losing the race every time: the rebuild landed and the
 # preview overwrote it within a second.
 hdr "Publishing straight after a preview must not ship the live-reload client"
-if grep -q "ws://localhost" "$PUBLIC_DIR/index.html" 2>/dev/null; then
+if live_reload_client_in "$PUBLIC_DIR/index.html"; then
   ok "the built site is a preview build, which is the state being tested"
 else
   skip "the built site is not a preview build; this case is not being exercised"

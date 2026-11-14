@@ -61,6 +61,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { outsidePins, pinnedButNotAsked, sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
 import { whoseRefusal } from "./lib/frame_refusals.mjs"
+import { byDesignFor, judgeRefusals, runsAsScript, sortRefusedScripts } from "./lib/refused_by_design.mjs"
 import { startSiteServer } from "./lib/site_server.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -351,7 +352,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [] }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [] }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -494,6 +495,15 @@ async function openContext(browser, engine, origin, pageName) {
 }
 
 function watchPage(page, record) {
+  // Each document the page was sent (its first load, a row's reload or its
+  // next page), as the browser received it with its policy, for the refusals
+  // the site's policy makes on purpose (rendered_rows.json -> refusedByDesign).
+  page.on("response", (response) => {
+    const request = response.request()
+    if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) return
+    record.documents.push(Promise.all([response.text(), response.headerValue("content-security-policy")])
+      .then(([body, policy]) => ({ url: response.url(), body, policy: policy ?? "" }), () => null))
+  })
   // Said by, or about, something a teacher's embed asked for (a provider's
   // own script, an advert it could not reach, its own document): the
   // embed's console, not the site's (measured 2026-11-13 on the Embeds
@@ -600,6 +610,25 @@ async function openPage(context, record, url) {
   await page.goto(url, { waitUntil: "load", timeout: 60000 })
   record.loadedAt = Date.now()
   return page
+}
+
+// Before a row takes the page somewhere else (a reload, the next page): until
+// the page's own request for the site's search index has answered. Quartz
+// asks for static/contentIndex.json as the page loads (its inline script's
+// `fetchData`, which nothing catches), and a navigation that cancels it makes
+// WebKit throw "TypeError: Load failed" into the page, which the clean-page
+// row counts as the row's own fault. Measured 2026-11-13 on the first
+// deployed run's build in headless WebKit: no page error with no delay, two
+// with 0.5 s on every request but the page's own (597b first-run
+// investigation, (d)). A wait on the page's own promise, the real dependency,
+// with a ceiling; never a fixed sleep. A page with no `fetchData` has nothing
+// in flight to cancel.
+async function untilTheIndexHasArrived(page) {
+  await page.evaluate(() => {
+    const pending = typeof fetchData === "undefined" ? null : fetchData
+    if (!pending || typeof pending.then !== "function") return null
+    return Promise.race([pending.then(() => null, () => null), new Promise((resolve) => setTimeout(resolve, 30000))])
+  }).catch(() => null)
 }
 
 const ROW_CHECKS = {}
@@ -844,6 +873,7 @@ ROW_CHECKS.tasks = async ({ page, context, record, base }) => {
   if (await box.isChecked()) return { fail: "the first box was ticked before anyone pressed it" }
   await box.click({ timeout: 10000 })
   if (!(await box.isChecked())) return { fail: "the box did not tick when pressed" }
+  await untilTheIndexHasArrived(page)
   await page.reload({ waitUntil: "load" })
   const kept = await waitInPage(page, () => document.querySelector("input.plantoir-task")?.checked === true, 5000)
   if (!kept) return { fail: "a tick did not survive a reload" }
@@ -851,6 +881,7 @@ ROW_CHECKS.tasks = async ({ page, context, record, base }) => {
 }
 
 ROW_CHECKS.progress = async ({ page, base }) => {
+  await untilTheIndexHasArrived(page)
   await page.goto(base + "My-Progress", { waitUntil: "load", timeout: 60000 })
   const row = await waitInPage(page, () => {
     const holder = document.querySelector("[data-plantoir-progress]")
@@ -1098,6 +1129,7 @@ ROW_CHECKS.embeds = async ({ page, record }) => {
     const request = response.request()
     if (request.isNavigationRequest() && request.frame() !== page.mainFrame()) answered.set(request.url(), response.status())
   })
+  await untilTheIndexHasArrived(page)
   await page.reload({ waitUntil: "load", timeout: 60000 })
   // Until every frame's document has answered, with a ceiling, never a fixed wait.
   const answeredFor = (src) => { for (const url of answered.keys()) if (url.split("?")[0] === src.split("?")[0] || url.startsWith(src)) return true; return false }
@@ -1393,12 +1425,54 @@ const OFFLINE_LINES = {
   cdnjs: /cdnjs\.cloudflare\.com|dynamically imported module|Importing a module script failed/i,
 }
 
-function judgeClean(record, network) {
+// The refusals the site's policy makes on purpose, on hosts that have one
+// (rendered_rows.json -> refusedByDesign, lib/refused_by_design.mjs): every
+// document the page was sent, each fetched again as the host serves it to a
+// client that is not a browser, and the inline scripts the page holds now.
+// Answers null on a host with none, so nothing is looked at there.
+async function readRefusals(page, record) {
+  const entries = byDesignFor(ROWS.refusedByDesign, options.host)
+  if (entries.length === 0) return null
+  const documents = []
+  for (const pending of record.documents) {
+    const received = await pending
+    let served = null
+    if (received) {
+      try {
+        const answer = await fetch(received.url, { headers: { "User-Agent": "plantoir-verify-deploy", Accept: "*/*" }, signal: AbortSignal.timeout(20000) })
+        if (answer.ok) served = await answer.text()
+      } catch {
+        served = null
+      }
+    }
+    documents.push(received ? { policy: received.policy, received: received.body, served } : null)
+  }
+  let inTheDom = []
+  try {
+    const scripts = await page.evaluate(() => Array.from(document.querySelectorAll("script:not([src])")).map((script) => ({ type: script.getAttribute("type") ?? "", text: script.text })))
+    for (const script of scripts) if (runsAsScript(script.type)) inTheDom.push(script.text)
+  } catch {
+    inTheDom = []
+  }
+  return { entries, sorted: sortRefusedScripts({ documents, inTheDom }) }
+}
+
+function judgeClean(record, network, refusals = null) {
   const said = []
   let setAside = 0
   const offline = Object.keys(OFFLINE_LINES).filter((host) => network[host])
   const forTheNetwork = (text) => offline.some((host) => OFFLINE_LINES[host].test(text))
+  // What the site's policy refuses on purpose: set aside by line, only on a
+  // page that holds such a script and none of its own refused.
+  const judged = refusals ? judgeRefusals(refusals.entries, refusals.sorted, [...record.console, ...record.refused]) : { setAside: [], entry: null, failures: [] }
+  for (const failure of judged.failures) said.push("refused: " + failure)
+  const byDesign = new Set(judged.setAside)
+  let refusedByDesign = 0
   const consider = (label, text) => {
+    if (byDesign.has(text)) {
+      refusedByDesign += 1
+      return
+    }
     if (expectedLine(text)) return
     if (forTheNetwork(text)) {
       setAside += 1
@@ -1412,7 +1486,9 @@ function judgeClean(record, network) {
   for (const text of record.mixed) said.push("mixed content: " + text.slice(0, 200))
   const aside = (setAside > 0 ? `; ${setAside} line(s) set aside that only say ${offline.join(" and ")} could not be reached (no network)` : "")
     + (record.embedLines > 0 ? `; ${record.embedLines} line(s) from inside a teacher's embeds set aside (the embeds row judges the frames)` : "")
-  if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}` }
+  const designed = refusedByDesign > 0 ? `; ${refusedByDesign} refusal line(s) of ${judged.entry.name} set aside (refused by the site's policy by design, rendered_rows.json -> refusedByDesign)` : ""
+  if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}${designed}` }
+  if (refusedByDesign > 0) return { expected: `${refusedByDesign} refusal line(s) of ${judged.entry.name}, and nothing else${aside}`, byDesign: judged.entry.name }
   return { ok: `nothing reported to the console, no page error, nothing refused${aside}` }
 }
 
@@ -1618,6 +1694,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
     // the rows were done).
     record.quiet = await quietPage(page, record, fullQuiet)
     const common = rows.filter((row) => row.page === "*" && !(row.except ?? []).includes(pageName))
+    const refusals = common.some((row) => row.name === "clean page") ? await readRefusals(page, record) : null
     for (const row of common) {
       let outcome
       if (row.name === "fonts") {
@@ -1626,7 +1703,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
         } catch (error) {
           outcome = { fail: String(error.message ?? error).split("\n")[0] }
         }
-      } else if (row.name === "clean page") outcome = judgeClean(record, network)
+      } else if (row.name === "clean page") outcome = judgeClean(record, network, refusals)
       else if (row.name === "own host") outcome = judgeOwnHost(record, new URL(base).host, pageName)
       outcomes.push(toOutcome(row.name, outcome))
     }
@@ -1647,7 +1724,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
 
 function toOutcome(row, outcome) {
   if (outcome?.skip) return { row, state: "SKIPPED", detail: outcome.skip }
-  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts, asked: outcome.asked }
+  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts ?? [], asked: outcome.asked, byDesign: outcome.byDesign }
   if (outcome?.fail && outcome.asked) return { row, state: "FAIL", detail: outcome.fail, asked: outcome.asked }
   if (outcome?.ok && outcome.asked) return { row, state: "OK", detail: outcome.ok, asked: outcome.asked }
   if (outcome?.ok && outcome.partSkipped) return { row, state: "OK", detail: outcome.ok, partSkipped: outcome.partSkipped }
@@ -1708,6 +1785,17 @@ async function plainRun(engines, network) {
         say("FAIL", row.name, engineName, failed.map((one) => `${one.page}: ${one.detail}`).join(" || "))
       } else if (skipped.length === mine.length) {
         say("SKIPPED", row.name, engineName, skipped[0].detail)
+      } else if (expected.length > 0 && row.name === "clean page") {
+        // Never a pass and never a failure: a refusal the site's policy makes
+        // on purpose, by name, with the pages it was seen on
+        // (rendered_rows.json -> refusedByDesign).
+        const byName = new Map()
+        for (const one of expected) byName.set(one.byDesign, [...(byName.get(one.byDesign) ?? []), one.page])
+        for (const [name, pages] of [...byName].sort()) {
+          say("EXPECTED", row.name, engineName, `${name} refused by the site's policy on ${pages.length} of ${mine.length} pages (${pages.join(", ")}): by design, set aside only where the page holds a refused inline script the host sent the browser alone (rendered_rows.json -> refusedByDesign)`)
+        }
+        const clean = mine.filter((one) => one.state === "OK")
+        if (clean.length > 0) say("OK", `${row.name}, the other pages`, engineName, `${clean.length} pages - ${clean.map((one) => one.page).join(", ")}`)
       } else if (expected.length > 0) {
         // Never a pass: what the site still asks of other hosts, by host, with
         // the pages that asked it (#597's second half; #566 removes them).
