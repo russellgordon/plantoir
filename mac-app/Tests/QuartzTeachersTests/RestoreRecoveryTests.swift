@@ -97,7 +97,16 @@ final class RestoreRecoveryTests: XCTestCase {
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), before, "nothing moved back")
         XCTAssertEqual(said.count, 1)
         XCTAssertTrue(said[0].hasPrefix("The restore of ICS3U stopped part way"), said[0])
-        XCTAssertTrue(said[0].hasSuffix(RestoreWholeCourseWording.notInTheSidebar(course: "ICS3U")), said[0])
+        // As wording.joins says since round two: notInTheSidebar, then
+        // restoreAgainToPutItRight (this read the first alone, written before
+        // the second was joined; the bench found it on db38ed112).
+        XCTAssertTrue(
+            said[0].hasSuffix(
+                RestoreWholeCourseWording.notInTheSidebar(course: "ICS3U") + " "
+                + RestoreWholeCourseWording.restoreAgainToPutItRight(course: "ICS3U")
+            ),
+            said[0]
+        )
         let kept: [String: Data] = try fixture.everythingKept()
         XCTAssertNotNil(kept["course_config.json"], "the set-aside originals are kept where a teacher can open them")
         XCTAssertNotNil(kept["Concepts/Unit 1/Concept 1.md"])

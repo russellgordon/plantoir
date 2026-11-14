@@ -144,10 +144,11 @@ final class CourseRestorerStagedTests: XCTestCase {
         let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
 
         // As the door runs it, with the course archived first (the zip stands
-        // in for the archive) and the archive begun after every file above.
+        // in for the archive) and the archive begun well after every file
+        // above, so only their names can make them kept.
         try CourseRestorer.restoreBackup(
             try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL,
-            archiveBegan: Date()
+            archiveBegan: Date().addingTimeInterval(5)
         )
 
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))

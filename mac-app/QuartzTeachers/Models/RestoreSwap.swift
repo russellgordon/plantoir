@@ -1016,6 +1016,11 @@ nonisolated enum RestoreSwap {
             guard let archiveBegan, values?.isRegularFile == true, !isHidden(inside) else {
                 continue
             }
+            // Compared exactly. A volume stores times coarser than the clock
+            // and truncates (exFAT about 10 ms, measured 2026-11-14), so a
+            // page saved in the archive's first 10 ms reads as older; a
+            // margin was rejected because it also keeps every page saved
+            // just before the restore was asked for, which the archive holds.
             let made: Date = values?.creationDate ?? Date.distantPast
             let changed: Date = values?.contentModificationDate ?? Date.distantPast
             if made >= archiveBegan || changed >= archiveBegan {

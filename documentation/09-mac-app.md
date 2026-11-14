@@ -13256,7 +13256,46 @@ Every removal in the restore code, and where what it removes exists first:
 | `releaseClaim`, a settle's `keep` of another computer's record | the settler's own lease file | nothing of a course |
 | `CourseRestorer.restore` of an Archived item, `removeItem(at: item.fileURL)` | the archive zip, after the restore worked | the course, every file of the zip moved in |
 
-MEASURED_TABLE
+Measured on the final engine (`909/round3/harness/`, `RestoreSwap.swift` and
+`RestoreSettle.swift` copied verbatim; Apple M4 Pro, one core, `nice -n 19`;
+fixture 46 files, 19 moves, now 25 steps; the backup zipped from files an hour
+old, as a real one is). Every row is the same on APFS and on an exFAT image,
+except where it says.
+
+| What | db38ed112 | Now |
+|---|---|---|
+| restoring again over a folder with no settings | 0 of 46 lost | 0 of 46 lost, kept in `ICS3U as it was before restoring again …` |
+| a crash between `done` and the keep, then the next reading | 45 of 46 lost | 0 lost, kept by the settle |
+| the backups folder refuses the keep, then is writable at the next reading (APFS; exFAT ignores `chmod`, so the keep simply works there) | 45 of 46 lost | 0 lost: the copy waited in staging and was kept at the next reading |
+| `.git`, `build` and `out` below the top, restored with an archive | all removed | kept in `ICS3U not in the archive …`; `.DS_Store` removed as made again |
+| a crash with `section1` the backup's, a page added there and one edited, then the next reading | 3 and 3 of 5 lost | 0 and 0 of 6 lost, kept with the newcomers |
+| a page saved after the archive began | removed | kept |
+| a plain restore, nothing changed after the archive began | nothing kept | nothing kept |
+| two restores of one course at once, 4 shapes × 10 | 2 or 3 in 10 both refused on APFS, 10 in 10 on exFAT | 40 of 40 exactly one went ahead, the other "another restore holds the course; nothing written", on both |
+| SIGKILL before each of 25 steps, then a settle | | 22 as they were, 3 the backup's |
+| a failure at each of 19 forward moves | | 19 of 19 byte for byte, nothing staged |
+| 171 double faults | | 0 lost, 0 mixes holding settings |
+| a kill at k, a kill in the settle at j, a second settle | | 190 runs, 0 not as they were |
+| the settle killed at each of its moves back | | 39 of 39 as they were |
+| two settlers at once | | 60 of 60 as they were, no false sentence, no kept folder |
+
+Each XCTest added for this round is proven red on a mutant of the final file
+that puts back db38ed112's behaviour, and the same mutants compiled into the
+harness lose exactly what the table's middle column says (`909/round3/mustfail/`,
+`909/round3/harness/mutants.txt`). Two more known limits: an exFAT volume
+stores times to about 10 ms, so a page saved in the archive's first 10 ms reads
+as older and is not kept (a margin was rejected, because it also keeps every
+page saved just before the restore, which the archive holds; FAT's two seconds
+would widen the gap); and a zip's times are local, so a backup made in another
+time zone within hours of the restore can make its own files read as written
+after `writtenAfter`, which keeps a copy too many and loses nothing.
+
+The bench's run of the branch at db38ed112 failed one test of this piece,
+`RestoreRecoveryTests.testAnOriginalAtNeitherEndMovesNothingAndKeepsEverything`
+at its suffix check: the settle is right (nothing moved, everything kept,
+`stoppedPartWay`, as the plan review's R7 asks), and the test still expected
+the sentence to end at `notInTheSidebar`, written before round two joined
+`restoreAgainToPutItRight` after it. The test now checks the join.
 
 **For Undo (#899, U5).** U5 must land after this. An undo of a whole-course
 restore is a staged restore of the archive made first, a redo one of the
