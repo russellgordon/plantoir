@@ -2966,10 +2966,10 @@ could not be judged. A second deploy that exited other than 0 is a failure
 whatever its log said (597b fix review MINOR 1: a log can say "Netlify
 requires 0 file(s)" and then fail), and a settling deploy that exited other
 than 0 is a failure that leaves the second one unrun. A second deploy that
-printed "Updating Quartz baseUrl to …" is named as #892's shape. **On today's `dev` this is RED for
-Cloudflare** on the test course, which carries both records, until
-`origin/issue/799-reuse-the-last-build` merges; it is reported by name and
-not weakened. Cost: two more deploys a host, a minute or two each.
+printed "Updating Quartz baseUrl to …" is named as #892's shape. **Without #799 this is RED for
+Cloudflare** on the test course, which carries both records: #799 is what
+makes a Cloudflare course that also has a Netlify record build for its own
+address. The red is reported by name and not weakened. Cost: two more deploys a host, a minute or two each.
 Rejected: judging the settle deploy (its build is the accepted one).
 
 **The sharing card names its own site (#799).** In every leg that fetches
@@ -2977,11 +2977,11 @@ a live front page (`check_url`), the page's `og:image` must be an absolute
 address on that site's own host, judged per site (ruled on #799: with two
 web hosts each site carries its own address). Missing or relative is a
 failure; a Cloudflare site whose `og:image` names a Netlify one is named as
-#892's shape, red today for the same course until the #799 branch merges.
+#892's shape, red for the same course without #799.
 
 The host expected is the leg's custom domain when `course_config.json`
-records one for that destination (597b fix review INCOMPLETE 1). On the #799
-branch, `deploy.py` builds each leg for `leg_custom_domain(…)` or else the
+records one for that destination (597b fix review INCOMPLETE 1). Since #799,
+`deploy.py` builds each leg for `leg_custom_domain(…)` or else the
 service's own host, while the Cloudflare leg still prints its `pages.dev`
 address, so judging against the fetched host alone was a false red for every
 section with a custom domain. The rule is the contract's,
@@ -3003,7 +3003,7 @@ it is left for a piece that can start it. GitHub Pages: #669.
 
 **The self-test** judges the section against a stub in the checker's place
 and a stub site on 127.0.0.1, offline: both hosts checked (both engines
-required, four expected failures counted, the cold visits measured); a
+required, six expected failures a host counted, the cold visits measured); a
 Netlify leg with two failures reads "FAILED before the browser check" though
 the browsers passed; a host with no address is NOT REACHED and the checker
 runs for the other only; a SKIPPED engine fails each host, asked twice; a

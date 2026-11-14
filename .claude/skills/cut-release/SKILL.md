@@ -39,7 +39,8 @@ picture cannot show.
    runs (both the `--first-publish` and the plain run, `RELEASING.md` step 2)
    end with "Rendered in Chrome and in Safari's engine, per host": both lines
    must say `checked`, never `FAILED` or `NOT REACHED`. Paste those lines,
-   the expected-failure count (what #566 removes) and any "answered on
+   the expected-failure count (what #566 removes), the "A second deploy
+   with nothing changed, per host" lines (#892) and any "answered on
    retry" lines into the release's record, beside the gate's totals.
 3. The bundle(s) to attach:
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer mac-app/publish.sh -Sign`

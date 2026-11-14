@@ -849,8 +849,9 @@ print_rendered_result() {
 # Asked by Windows' director on #892: a course with both a Netlify and a
 # Cloudflare record built every Cloudflare deploy again, for ever, because
 # the build read the Netlify record whatever the destination was, and
-# deploy.py's rebuild for the right address read it again (fixed on
-# origin/issue/799-reuse-the-last-build, not on dev when this was written).
+# deploy.py's rebuild for the right address read it again (#892's shape,
+# fixed by #799: a Cloudflare course that also has a Netlify record builds
+# for its own address).
 # So right after the rendered section, per host: the course's destination set
 # to that host, one deploy to settle (it may build: the destination changed,
 # and each site carries its own address, ruled on #799), then a SECOND with
@@ -882,7 +883,7 @@ judge_second_deploy() {  # judge_second_deploy <label> <netlify|cloudflare> <log
       elif printf '%s\n' "$text" | grep -aqE 'Uploaded [0-9]+ files'; then uploaded=$(printf '%s\n' "$text" | grep -aoE 'Uploaded [0-9]+ files' | tail -1); fi ;;
   esac
   if printf '%s\n' "$text" | grep -aq 'Updating Quartz baseUrl to'; then
-    no "$label: a second deploy with nothing changed BUILT AGAIN for its own address, so the build had been made for another host's (#892: a course with both records builds for the Netlify address; fixed on origin/issue/799-reuse-the-last-build)"
+    no "$label: a second deploy with nothing changed BUILT AGAIN for its own address, so the build had been made for another host's (#892's shape, fixed by #799: a Cloudflare course that also has a Netlify record builds for its own address)"
     SECOND_DEPLOY_RESULTS+=("$label: BUILT AGAIN - the #892 shape (the build carried another host's address)${uploaded:+; uploaded: $uploaded}")
   elif [ -n "$built" ]; then
     no "$label: a second deploy with nothing changed built again ($built)"
@@ -946,7 +947,7 @@ run_second_deploys() {
 #
 # The host expected is the leg's CUSTOM DOMAIN when course_config.json
 # records one for that destination, since deploy.py builds each leg for
-# its custom domain when one is set (origin/issue/799-reuse-the-last-build,
+# its custom domain when one is set (#799,
 # scripts/deploy.py -> leg_custom_domain; #799's third review). The rule is
 # contracts/file-formats.json -> custom_domains: custom_domains.sections.
 # section<N>.<leg's type> (netlify, cloudflare_pages), and the OLDER bare
@@ -1006,7 +1007,7 @@ judge_og_image() {  # judge_og_image <label> <site address> <front page file> [<
   elif [ "$og_host" = "$site_host" ]; then
     ok "$label's og:image is on its own host ($og_host)"
   elif [ "${og_host%.netlify.app}" != "$og_host" ] && [ "${site_host%.pages.dev}" != "$site_host" ]; then
-    no "$label's og:image names the Netlify site ($og_host), not its own ($site_host): #892's shape, fixed on origin/issue/799-reuse-the-last-build"
+    no "$label's og:image names the Netlify site ($og_host), not its own ($site_host): #892's shape, fixed by #799: a Cloudflare course that also has a Netlify record builds for its own address"
   else
     no "$label's og:image is on another host ($og_host), not its own ($site_host)"
   fi

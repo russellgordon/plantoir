@@ -620,9 +620,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > host", #892; a deploy that exits other than 0 fails it), and each leg's
    > live front page must name its own host in `og:image` (#799), or the
    > custom domain `course_config.json` records for that destination when
-   > there is one. Until `origin/issue/799-reuse-the-last-build` merges,
-   > Cloudflare is red on both for a course carrying both records, and the
-   > line says so by name (#892): that red is real. The cold
+   > there is one. A Cloudflare course that also has a Netlify record must
+   > build for its own address (#892's shape, fixed by #799); where it does
+   > not, Cloudflare is red on both and the line says so by name: that red
+   > is real. The cold
    > visits in Safari's engine (#625: typed cold, from the front page, Python
    > to Swift) are in the measured lines on every run. Paste the per-host
    > lines and the expected-failure count into the release's record.
@@ -631,7 +632,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    >
    > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
    > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline, no
-   > credentials, about 75 s on the mac and about 30 s on Windows: it proves
+   > credentials, about 2 minutes on the mac and about 30 s on Windows: it proves
    > the wait for Cloudflare's production address against a stub, so a real
    > run's Cloudflare lines can be trusted, and (since #740 on the mac, #743
    > on Windows) that a first-publish run retries a brand-new site's files
