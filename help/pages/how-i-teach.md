@@ -13,6 +13,7 @@ keywords:
 - Claude
 - Claude Code
 - Codex
+- GitHub Copilot
 - private page
 - never on the website
 - notes for an assistant
