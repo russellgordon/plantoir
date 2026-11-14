@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Assist;
@@ -79,26 +80,50 @@ public static class CodexLauncher
     /// Open a session for one course. False when it could not be started, so
     /// the caller can say <c>couldNotStart</c> rather than show nothing.
     /// <paramref name="greeting"/> is Fix with Codex…'s message (#736); null
-    /// is Revise With ▸'s plain greeting.
+    /// is Revise With ▸'s plain greeting, told about
+    /// <paramref name="unitPlans"/> (#790; <see cref="Prepare"/>).
     /// </summary>
-    public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null)
+    public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null,
+                            UnitPlans.Reading? unitPlans = null)
     {
         string? codex = FindCodex();
         string? server = ClaudeCodeLauncher.FindServer();
         if (codex is null || server is null) return false;
 
-        var arguments = Arguments(server, workspacePath, courseCode,
-                                  greeting ?? ClaudeCodeLauncher.Greeting(courseCode, courseName));
+        var session = Prepare(server, workspacePath, courseCode, courseName, unitPlans, greeting, codex);
         // Refuse rather than start into a command line cmd rejects as too long
         // and leaves at a silent prompt. No "assistant opened" line then.
-        if (!OutsideDoor.WithinCommandLineLimit(codex, arguments)) return false;
-        if (!OutsideDoor.Start(OutsideDoor.StartInfo(codex, arguments, workspacePath))) return false;
+        if (!OutsideDoor.WithinCommandLineLimit(codex, session.Arguments)) return false;
+        if (!OutsideDoor.Start(OutsideDoor.StartInfo(codex, session.Arguments, workspacePath))) return false;
 
         // outsideAgents.agents[codex].trailLine. A course-wide door carries
         // no section.
-        ActivityTrail.Note(ActivityTrail.Event.AssistantOpened, $"started Codex for {courseCode}");
+        ActivityTrail.Note(ActivityTrail.Event.AssistantOpened, session.TrailText);
         return true;
     }
+
+    /// <summary>
+    /// What <see cref="Open"/> hands to <c>codex</c> and writes on the trail,
+    /// with nothing started — the same rule as
+    /// <see cref="ClaudeCodeLauncher.Prepare"/>: the plain greeting told about
+    /// <paramref name="unitPlans"/> and the trail clause with it, or an
+    /// opening message that replaces both.
+    /// </summary>
+    /// <remarks><paramref name="program"/>: as <see cref="ClaudeCodeLauncher.Prepare"/>'s (790a review M2).</remarks>
+    public static OutsideDoor.Session Prepare(string server, string workspacePath, string courseCode, string courseName,
+                                              UnitPlans.Reading? unitPlans, string? openingMessage, string? program = null)
+    {
+        string trail = TrailLinePrefix + courseCode;
+        if (openingMessage is not null)
+            return new OutsideDoor.Session(Arguments(server, workspacePath, courseCode, openingMessage), trail);
+        if (unitPlans is not null) trail += UnitPlans.TrailClause(unitPlans);
+        var arguments = OutsideDoor.GreetingThatFits(program, unitPlans,
+            named => Arguments(server, workspacePath, courseCode, ClaudeCodeLauncher.Greeting(courseCode, courseName, unitPlans, named)));
+        return new OutsideDoor.Session(arguments, trail);
+    }
+
+    /// <summary><c>outsideAgents.agents[codex].trailLine</c>, before the course.</summary>
+    internal const string TrailLinePrefix = "started Codex for ";
 
     /// <summary>
     /// Whether a message would keep this door's whole command line under
@@ -112,7 +137,8 @@ public static class CodexLauncher
     }
 
     /// <summary>
-    /// The argv the contract states, in order: five dotted overrides and the
+    /// The argv the contract states, in order: six dotted overrides (the sixth,
+    /// <c>PLANTOIR_DOOR_ASSISTANT</c>, since #884) and the
     /// greeting as the first message. No sandbox, approval or cd flag — Codex
     /// asks the teacher itself before a change, and a flag would quietly widen
     /// what they set for themselves.
@@ -136,8 +162,12 @@ public static class CodexLauncher
         "-c", "mcp_servers.plantoir.startup_timeout_sec=60",
         "-c", "mcp_servers.plantoir.tool_timeout_sec=1800",
         "-c", "mcp_servers.plantoir.env." + AssistWorkspace.DoorCourseVariable + "=" + TomlBasicString(courseCode),
+        "-c", "mcp_servers.plantoir.env." + AssistWorkspace.DoorAssistantVariable + "=" + TomlBasicString(DoorKey),
         greeting.Replace("\"", "'"),
     };
+
+    /// <summary>This door's agent key, <c>outsideAgents.agents[codex].key</c>, written as <see cref="AssistWorkspace.DoorAssistantVariable"/> (#884).</summary>
+    internal const string DoorKey = "codex";
 
     /// <summary>
     /// A TOML basic string: backslash, double quote and control characters

@@ -1246,11 +1246,15 @@ struct SidebarView: View {
     /// row's Claude…, Codex… and (on a section) Local AI Assistant… items in
     /// one submenu, with the reasons any is greyed under them. Until the
     /// sweep the row's menu called the same commands "Revise with Claude…"
-    /// and so on at the top level — one command, two names. Left out when
-    /// there is nothing to put in it, as the menu bar leaves it out.
+    /// and so on at the top level — one command, two names.
+    ///
+    /// Always drawn on a live course's rows since #855, as the menu bar draws
+    /// it, ending with Set Up an Assistant… (the same view the menu bar
+    /// uses). Still left out on a course kept for reference, where no door
+    /// opens (decision s), and with no working folder.
     @ViewBuilder
     func reviseWithSubmenu(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
-        if reviseWithHasAnItem(course: course, sectionNumber: sectionNumber) {
+        if !course.isKeptForReference && workspace.workspaceURL != nil {
             Menu("Revise With") {
                 reviseWithClaudeItem(course: course, row: row)
                 reviseWithCodexItem(course: course, row: row)
@@ -1259,6 +1263,10 @@ struct SidebarView: View {
                     reviseWithAIItem(course: course, sectionNumber: sectionNumber)
                 }
                 reviseNotes(course: course, sectionNumber: sectionNumber)
+                if reviseWithHasAnItem(course: course, sectionNumber: sectionNumber) {
+                    Divider()
+                }
+                SetUpAnotherAssistantButton(title: AssistantSetUpWording.menuItem, from: .reviseWith)
             }
         }
     }
@@ -1628,10 +1636,10 @@ struct SidebarView: View {
     ///
     /// Hidden when Codex is not installed, and hidden INDEPENDENTLY of the
     /// Claude item: a teacher with one of the two sees one item, a teacher
-    /// with both sees both, and a teacher with neither sees no sign that
-    /// either exists. Plantoir never installs an assistant, and never offers
-    /// to — this is a door onto something the teacher chose to put on their
-    /// own Mac.
+    /// with both sees both, and a teacher with neither sees neither item,
+    /// only Set Up an Assistant…. Plantoir sets one up only when the teacher asks, from
+    /// Set Up an Assistant… (#855); the door itself opens onto whatever
+    /// copy the search finds.
     @ViewBuilder
     func reviseWithCodexItem(course: Course, row: SidebarSelection) -> some View {
         if CodexLauncher.isAvailable,

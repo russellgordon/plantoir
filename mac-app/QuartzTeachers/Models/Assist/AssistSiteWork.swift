@@ -176,8 +176,9 @@ final class AssistToolchainWork: AssistSiteWork {
         // line above, and only a lease another program took before it counts,
         // so two that ask at once cannot both go ahead or both back off. The
         // backstop on this path, whatever the caller checked first.
+        // Its own section only, since #835: the claim is this section's entry.
         if let holding = WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true, section: sectionNumber
         ) {
             WorkLeaseRegistry.noteDeclined(
                 act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
@@ -313,7 +314,8 @@ final class AssistToolchainWork: AssistSiteWork {
             asker = .anOutsideDeploy
         }
         if let holding = WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true, asker: asker
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true, asker: asker,
+            section: sectionNumber
         ) {
             WorkLeaseRegistry.noteDeclined(
                 act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: course.code,
