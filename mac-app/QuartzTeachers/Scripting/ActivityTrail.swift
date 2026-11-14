@@ -99,7 +99,16 @@ nonisolated enum ActivityTrail {
         /// sentence (#812's review). Until then the window waited ten
         /// minutes in silence and every later Preview in it did nothing.
         case previewCouldNotStart = "preview could not start"
+        /// A launcher started, with its arguments (redacted). deploy.sh also
+        /// writes a line of this event itself when a deploy running outside
+        /// Plantoir takes its section's work leases (#829): the contract's
+        /// `launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection`. A
+        /// deploy this app started takes no lease, so it never writes that
+        /// line beside this app's own.
         case taskStarted = "task started"
+        /// A launcher finished: its outcome and how long it took. deploy.sh
+        /// also writes `launcherLineWhenItLetsItsSectionGo` under this event
+        /// when a deploy running outside Plantoir gives its leases back (#829).
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
         /// Help ▸ Plantoir Help opened plantoir.app's support page (#457,
@@ -1571,7 +1580,9 @@ nonisolated enum ActivityTrail {
         /// Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
         /// Change, Add Class… (#897, which replaced Add Next Class; the
         /// counts say which way), Re-date Classes…, Make Room for Classes…,
-        /// Class Dates… — and Help ▸ Publishing and Deploying…. Carries where
+        /// Class Dates…, Roll Over to a New Year… (#897 piece B; the counts
+        /// say which way the website went) — and Help ▸ Publishing and
+        /// Deploying…. Carries where
         /// it is in the menus, how it ended (carried out, changed nothing,
         /// cancelled at the plan, rebuilt or not) and counts — never a page's
         /// title. Not "section menu item": Help is not in the Section menu

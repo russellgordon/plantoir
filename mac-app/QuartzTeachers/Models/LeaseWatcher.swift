@@ -39,10 +39,14 @@ import Observation
 ///   failure, because a disabled button cannot be pressed, and those are the
 ///   moments the teacher reaches for it.
 ///
-/// **What it cannot see.** A program that holds no lease (a `deploy.sh` typed
-/// in Terminal). The press reaches the launcher's guard, which refuses in
-/// words (`deployWhileItsSectionDeploys`). Not polled for: no event says a
-/// process started.
+/// **What it cannot see.** A program that holds no lease: a build typed in
+/// Terminal (`preview.sh --build-only`), a `deploy.sh` from before #829, or a
+/// leftover run of a deploy set for later that was already inside `deploy.sh`
+/// when its app was ended. Since #829 a `deploy.sh` typed in Terminal takes
+/// its own leases, so this does see that one. A press while one of the others
+/// runs reaches the launcher's guard, which refuses in words
+/// (`deployWhileItsSectionDeploys`). Not polled for: no event says a process
+/// started.
 ///
 /// `init` is inert, as `ScheduledPublishWatcher`'s is: a test that builds a
 /// window touches no disk. `start()` is called by `LeaseWatchers` for the

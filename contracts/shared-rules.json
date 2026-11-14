@@ -111,9 +111,11 @@
         "why": "Issue #812's review: when a section window's preview never starts (the runner records why and is not running, sometimes with no exit code), the window ends its wait, hands back its record and its lease, and shows that sentence as a refusal (quittingWhileWorkIsUnderWay.previewBuildRecord.pressCases, \"a run that could not start, then a press\"). It used to wait ten minutes in silence, and every later Preview in the window did nothing, so this line is the record of what the teacher was told."
       },
       {
-        "carries": "the launcher and its arguments, redacted",
+        "carries": "the launcher and its arguments, redacted; and, written by deploy.sh itself (launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection), the course and section a deploy running outside Plantoir holds, and nothing else",
         "event": "task started",
-        "why": "What was actually asked for, as against what the teacher believes they asked for."
+        "why": "What was actually asked for, as against what the teacher believes they asked for.",
+        "launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection": "{course}/{section} · a deploy running outside Plantoir is holding this section while it works",
+        "launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSectionWhy": "GitHub #829 (implementation review I2, CLAUDE.md rule 5). Written by deploy.sh through note_on_the_trail at the moment it takes its build and publish leases (workLeases.launcherLeases): a deploy typed in Terminal, an outside assistant's own ./deploy.sh, or a leg of a leftover scheduled run that started after its app had gone. Since #829 such a deploy greys that section's Deploy in the app, and a forgotten Terminal window sitting at one of deploy.sh's questions greys it until the window is closed, so 'Deploy was grey all afternoon' needs a line to start from. Under this event because it is a task starting, the one this event records when the app starts it. A deploy the APP started takes no lease (PLANTOIR_LEASES_HELD_BY names the app), so it never writes this line: the app's own 'started deploy.sh' line is that deploy's record, and nothing is written twice. Course code and section number only, fixed words, no path or argument, so there is nothing for LogRedactor to take out."
       },
       {
         "carries": "the course code, and WHICH of the three starting points the course began from: the ready-made pages written for its code, the subject's skeleton (named — \"from the computer studies skeleton\"), or empty folders. A skeleton course also says whether the curriculum pages written for its code came with it — \"from the computer studies skeleton with the ICS4U curriculum pages\" — and only when they did. A club (#267: `class_page_scheme` \"numbered\" in the file just written) says so instead, with its page word and class folder — \"created CODING as a club, with pages named “Week 1” in “All Meetings”\" — and every other course's line is byte-identical to before. Nothing else: not the course name the teacher typed, not where it publishes, not its folder lists.",
@@ -121,8 +123,10 @@
         "why": "\"My new course came out empty\" is the report this event exists to answer, and until 2026-09-21 the trail could not answer it at all. Creating a course recorded ONE line — \"started setup.sh\" — whose arguments are empty for a creation, so the trail carried neither the code nor what the course was meant to start as. Adding a single folder to a list recorded more (\"folder created\" carries the course and the list). That asymmetry is how GitHub issue #248 stayed invisible for five weeks: a teacher declined the ready-made pages for a code that had some, got empty folders instead of the subject's skeleton, and nothing written down said which of those two things the app had done.\n\nThe skeleton clause was added for GitHub issue #251 (2026-09-22), and it is rule 5's \"a changed behaviour changes its line too\" rather than noise: a skeleton course now comes out TWO ways, and they differ by fifty-nine pages and by whether the curriculum coverage map works at all. A line that could not tell them apart could not answer the report it was added for. Read from include_curriculum_pages in the file the wizard has just written, so it says what was actually asked for. The other two sentences are untouched — the ready-made pages have always carried their own curriculum, and an empty course has none to speak of.\n\nIt is one line per creation, written BEFORE the launcher starts, so a creation that fails part-way still says what was asked for. Both platforms create courses, so this carries no appliesOn — a course made on Windows leaves the same line.\n\nWHICH creators write THIS event, so nobody adds a duplicate: the New Course wizard, and the \"Add Example Course\" button — which writes it AFTER the run and from the run's own output, because the example installs under another code when EXC2O is taken, so its code is not known until the script says it. Three other things that produce a course folder deliberately write their OWN event instead, each answering a different question: \"course kept for reference\" and \"course imported for reference\" (a frozen copy of a course that already exists, carrying the school year and the folder it was given), and \"section started a new website\" (a rollover, which re-points a course rather than starting one). A teacher reading the trail should see one line per thing they did, not two for the same act.\n\nThe club clause was added for #267 (2026-09-24), rule 5's \"a changed behaviour changes its line too\": a club starts from none of the three starting points — empty folders plus one first page, its pages named with ONE number in a folder it names itself — and the report it will be looked up for is \"my club's pages are not being seen\", which only the word and the folder can answer. Read from the configuration the wizard has just written, never from the interface, so it says what was actually asked for. The page word and folder are settings the teacher chose, not page content."
       },
       {
-        "carries": "the launcher, the outcome, and how long it took",
+        "carries": "the launcher, the outcome, and how long it took; and, written by deploy.sh itself (launcherLineWhenItLetsItsSectionGo), the course and section a deploy running outside Plantoir has stopped holding",
         "event": "task finished",
+        "launcherLineWhenItLetsItsSectionGo": "{course}/{section} · the deploy running outside Plantoir has ended, and this section is free again",
+        "launcherLineWhenItLetsItsSectionGoWhy": "GitHub #829, the other half of task started's launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection: written by deploy.sh when it gives its leases back, on every way out a trap sees (a normal end, a failure, ^C, SIGTERM, SIGHUP), once, and only by a run that wrote the first line. kill -9 runs no trap and writes nothing, and its lease reads as gone at once (workLeases.liveness), so a first line with no second one means the deploy is still running or was killed. Course code and section number only.",
         "why": "The outcome distinguishes a failure from a task stopped on purpose and from one backed out of at a question - all three exit non-zero, and only one is a fault. Since #378 a fourth: exit 3, a launcher run with --non-interactive that reached a question and refused rather than wait for an answer nobody could give ('stopped at a question nobody was there to answer (exit 3)'). The headless assistant path (an assistant working from another app, or the in-app assistant with no section window) runs its launchers that way, so a deploy that needs a site name, a surname or a token says so on this line instead of 'failed (exit 3)' — or, before #378, instead of never finishing at all."
       },
       {
@@ -1092,7 +1096,7 @@
       },
       {
         "event": "ran from a menu",
-        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Class... (#897, which replaced Add Next Class: its counts say which way, 'the next class in this unit', 'in a new unit' or 'as a copy of a class'), Re-date Classes..., Make Room for Classes..., Class Dates..., or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, took part of the last change back (an undo that put some files back and kept the entry because others were edited since, #531), cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
+        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Class... (#897, which replaced Add Next Class: its counts say which way, 'the next class in this unit', 'in a new unit' or 'as a copy of a class'), Re-date Classes..., Make Room for Classes..., Class Dates..., Roll Over to a New Year... (#897 piece B: its counts say which way the website went, 'website: new', 'website: kept', 'website: not deployed yet', 'website: deploys to a folder' or 'website: kept, a new one would have the same address'), or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, took part of the last change back (an undo that put some files back and kept the entry because others were edited since, #531), cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
         "line": "{course}/{section} · Section ▸ Publish Pages… — {carried out|changed nothing|cancelled at the plan|…}, {N pages ticked}",
         "why": "#457 batch B. The assistant's functions now run from the menu bar for a teacher who never opened the assistant, and the assistant's own trail lines are written by its conversation, which the menu does not have. Without this a page published from the menu is a page nobody can say who published. Not 'section menu item ran': Help is not in the Section menu (the plan review's note 11)."
       },
@@ -23691,7 +23695,7 @@
   "workLeases": {
     "note": "A work lease is a file under courses/.internal/activity/ saying which process is doing what to a course or a folder, so another window, another copy of Plantoir or an assistant working from outside can leave that work alone. Its FORMAT is file-formats.json -> workLease. This block is the rules every READER shares. #245 (the import's staging folders) wrote the first of them - who counts as alive (liveness) - and #156 (builds, previews and deploys, both ways) added the second beside it - who stands in whose way (declining) - rather than a second reader.",
     "liveness": {
-      "rule": "A lease's owner is ALIVE unless one of these says it is gone, asked in this order: the process id is 0 or less; the signal check (kill(pid, 0) on the mac) says there is no such process; the process table says there is no such process; the process has finished and is waiting to be collected (a zombie); the lease records a name and the running process's name is a different one (compared without regard to case, on the first sixteen characters, which is all the mac's table keeps); the lease records a start time and the running process started at a different one. An IMPORT lease with no name line is judged as if it said Plantoir, the only program that ever wrote one (a one-line import lease left by a pre-#245 crash would otherwise be judged on its id alone, and after a restart that id can belong to an unrelated process for the whole uptime - which since #245 refuses every import of the course). A BUILD, PREVIEW or PUBLISH lease with no name line (or an empty one) is not judged here at all: it is treated as GONE before this rule is asked (#156; workLeases.declining), because neither app writes one and Windows' reader calls fewer than two lines stale. A signal answer of 'not permitted' means the process EXISTS and belongs to someone else. A table that cannot be asked means cannot tell, and cannot tell is ALIVE.",
+      "rule": "A lease's owner is ALIVE unless one of these says it is gone, asked in this order: the process id is 0 or less; the signal check (kill(pid, 0) on the mac) says there is no such process; the process table says there is no such process; the process has finished and is waiting to be collected (a zombie); the lease records a name and the running process's name is a different one (compared without regard to case, on the first sixteen characters, which is all the mac's table keeps); the lease records a start time and the running process started at a different one. A recorded start with no point in it, whole seconds only, is compared with the table's start on its whole seconds: a launcher can read its own start only to the second (deploy.sh since #829, workLeases.launcherLeases), and the second it names still tells the process that took the lease from one handed the same id later. An IMPORT lease with no name line is judged as if it said Plantoir, the only program that ever wrote one (a one-line import lease left by a pre-#245 crash would otherwise be judged on its id alone, and after a restart that id can belong to an unrelated process for the whole uptime - which since #245 refuses every import of the course). A BUILD, PREVIEW or PUBLISH lease with no name line (or an empty one) is not judged here at all: it is treated as GONE before this rule is asked (#156; workLeases.declining), because neither app writes one and Windows' reader calls fewer than two lines stale. A signal answer of 'not permitted' means the process EXISTS and belongs to someone else. A table that cannot be asked means cannot tell, and cannot tell is ALIVE.",
       "why": "The two directions are not equal. Reading a live owner as gone removes somebody's half-made work; reading a gone owner as alive leaves litter until the next time the folder is opened. So only a positive answer that nobody is there counts as gone. Measured on the mac as an ordinary user, 2026-09-25: kill(1, 0) - launchd, root's - returns -1 with EPERM, and until #245 the import read that as gone and swept another account's live import; kill(0, 0) returns 0, because pid 0 means the caller's own process group; proc_name also fails with EPERM for another account's process; sysctl KERN_PROC_PID answers for ANY process - name, state and start time - and gives an empty answer for an id nobody holds. A zombie still answers the signal check, so the state is read from the table (measured: a finished child not yet collected answered kill 0 and the table said zombie).",
       "whyTheStartTime": "Every copy of Plantoir is called Plantoir, so the name check alone cannot tell a Plantoir that crashed from a different Plantoir that was later handed the same number - and since #245 a live lease REFUSES a second import rather than merely leaving litter, so a recycled number read as alive would block a retry until that unrelated process exits. The start time names the exact process. Windows' lease has no such line and its reader stops at the name; the mac writes the fourth line and Windows ignores it.",
       "howToRunACase": "signal is what the signal check answered: exists, noSuchProcess, notPermitted (EPERM) or otherError. table is what the process table answered: an object {name, zombie, start}, the string noSuchProcess, the string couldNotAsk, or null when the rule never asks it. lease is what the lease file records beyond its id: name (line 2) and start (line 4), null when absent. kind is the lease's kind when the case depends on it (only 'import' does), absent otherwise. A case with appliesOn ['mac'] is the mac's alone: Windows' reader treats a lease of fewer than two lines as stale and reads no import leases, so it has no such input. The rule is run against these answers directly, so a case needs no real process and runs as any user on any machine.",
@@ -23714,7 +23718,39 @@
         {"name": "a Windows-shaped lease - name, no start - is judged on the name", "pid": 4321, "signal": "exists", "table": {"name": "Plantoir", "zombie": false, "start": "1790345209.217862"}, "lease": {"name": "Plantoir", "start": null}, "expect": "alive"},
         {"name": "a one-line IMPORT lease (the import before #245, and an older copy of Plantoir today) is judged as written by Plantoir - a live older Plantoir is alive", "kind": "import", "appliesOn": ["mac"], "pid": 4321, "signal": "exists", "table": {"name": "Plantoir", "zombie": false, "start": "1790345209.217862"}, "lease": {"name": null, "start": null}, "expect": "alive"},
         {"name": "a one-line IMPORT lease left by a crash, whose id now belongs to an unrelated process after a restart: gone, not a refusal for the whole uptime", "kind": "import", "appliesOn": ["mac"], "pid": 4321, "signal": "exists", "table": {"name": "mdworker", "zombie": false, "start": "1790349999.000001"}, "lease": {"name": null, "start": null}, "expect": "gone"},
-        {"name": "a signal answer this code cannot read goes on to the table", "pid": 4321, "signal": "otherError", "table": {"name": "Plantoir", "zombie": false, "start": "1790345209.217862"}, "lease": {"name": "Plantoir", "start": null}, "expect": "alive"}
+        {"name": "a signal answer this code cannot read goes on to the table", "pid": 4321, "signal": "otherError", "table": {"name": "Plantoir", "zombie": false, "start": "1790345209.217862"}, "lease": {"name": "Plantoir", "start": null}, "expect": "alive"},
+        {"name": "#829: a deploy typed in Terminal - bash, its start in whole seconds - is alive while that bash runs", "pid": 4321, "signal": "exists", "table": {"name": "bash", "zombie": false, "start": "1790345209.217862"}, "lease": {"name": "bash", "start": "1790345209"}, "expect": "alive"},
+        {"name": "#829: its id now belongs to another bash, started in another second: recycled, gone", "pid": 4321, "signal": "exists", "table": {"name": "bash", "zombie": false, "start": "1790349999.000001"}, "lease": {"name": "bash", "start": "1790345209"}, "expect": "gone"},
+        {"name": "#829: a whole-second start is compared on whole seconds only, never as a prefix of the text", "pid": 4321, "signal": "exists", "table": {"name": "bash", "zombie": false, "start": "17903452091.000001"}, "lease": {"name": "bash", "start": "1790345209"}, "expect": "gone"},
+        {"name": "#829: the deploy was ended by kill -9, which runs no trap: its lease is left, and gone by the signal", "pid": 4321, "signal": "noSuchProcess", "table": null, "lease": {"name": "bash", "start": "1790345209"}, "expect": "gone"},
+        {"name": "#829: a bash lease with an EMPTY start is judged on its name alone, so any later bash with that id reads alive: why deploy.sh takes no lease when it cannot read its start", "appliesOn": ["mac"], "pid": 4321, "signal": "exists", "table": {"name": "bash", "zombie": false, "start": "1790349999.000001"}, "lease": {"name": "bash", "start": ""}, "expect": "alive", "why": "An empty line 4 is the mac's own shape when the process table does not answer (ProcessLiveness.leaseBody), and the mac reads it as no start. Mac only because Windows' reader has never been held to an empty fourth line; Windows writes three lines or a start."}
+      ]
+    },
+    "launcherLeases": {
+      "issue": "#829",
+      "rule": "deploy.sh, deploying one section, takes <COURSE>.build.<pid>.lease and <COURSE>.publish.<pid>.lease for its own process (file-formats.json -> workLease: line 2 the name the process table keeps, `ps -o ucomm`, which is bash; line 3 the moment to the second, in the 28-character shape with seven zeros; line 4 its start in WHOLE seconds, read from `ps -o lstart` and turned into seconds by `date`, both in UTC (TZ=UTC0), which workLeases.liveness compares on whole seconds; line 5 empty; line 6 `sections <N>=<moment>`, so it holds only that section) after its #439 guard (deployWhileItsSectionDeploys) has let it through and before anything is changed, and gives both back on every way out it can see (its EXIT trap, ^C made an ordinary exit). It takes none for --reset-token or --logout (nothing is deployed), for --plans (course-wide sharing, which takes no lease here), and when PLANTOIR_LEASES_HELD_BY names a process that is running: the app sets that to its own id on every launcher it starts (HelperPrograms.environment), because each of its doors already holds both leases for that deploy. The variable is read once, when deploy.sh starts. It takes none either when its own start cannot be read (line 4 would be empty, and a lease with no start is judged on its name alone, workLeases.liveness). A course code with no folder in courses/ is refused with deploy.sh's Course folder not found before any lease is taken (the Fable sweep of #829, F1), and a code holding a slash takes none. Taking them and giving them back each write a line on the trail (activityTrail.mustRecord 'task started' -> launcherLineWhenADeployRunningOutsidePlantoirHoldsItsSection, 'task finished' -> launcherLineWhenItLetsItsSectionGo). Only when courses/ is there; the folders it makes for the leases it removes again when they are left empty. A failure to write never stops the deploy.",
+      "why": "#729 greys Deploy from the leases other programs hold (returningToASectionMidDeploy.heldElsewhere). A deploy typed in Terminal held none, and neither did a leftover run of a deploy set for later whose app had gone (#439), so the button stayed pressable and the press was refused only by the launcher's guard, in words. Measured before #829 (a folder deploy typed in Terminal, the real deploy.sh, a stand-in build listing courses/.internal/activity during the deploy's own build): no activity folder during or after. A lease written this way also makes an outside assistant and a deploy set for later hold back for the deploy, as they do for the app's (workLeases.declining).",
+      "variable": "PLANTOIR_LEASES_HELD_BY",
+      "whyTheVariable": "Every deploy.sh the app runs is its own child, and the app holds the build and publish leases for that deploy under its own id. A second pair under the child's id is a stranger's to the app (WorkLeaseFiles.everyLeaseHeldElsewhere leaves out only its own id), so the app's window would read its own deploy as somebody else's: Deploy greyed on the other sections in another program's words, and the in-app assistant declining a build with courseIsBeingBuiltElsewhere. The variable is read once, when deploy.sh starts, so a leftover scheduled run (#439, the second case #829 names) is covered only in part: a deploy.sh that STARTS after its app has gone (the deploy leg after the app was ended during the build leg) takes its own leases, and one that was already running when its app was ended holds none for the rest of its run. That second shape is the usual one, since a scheduled run spends most of its time inside deploy.sh. Measured by the #829 implementation review: the holder alive at the start and killed during the deploy's build, leases held []. It errs the old way (Deploy pressable, the guard refuses in words), never worse than before #829.",
+      "whyTheStartIsReadInUTC": "`ps -o lstart` prints local time with no zone, and in the hour the clocks go back (the first Sunday of November in Ontario) that text names two seconds an hour apart. Read in local time, a deploy started at 01:30 EST (1793514600) was read as 01:30 EDT (1793511000), so its lease read as GONE for its whole life (the #829 implementation review, M1, TZ America/Toronto). Asked with TZ=UTC0, both `ps` and `date` work in a zone that never changes. scripts/test_deploy_sh_work_leases.py holds the case with a fixed clock.",
+      "killed": "kill -9 runs no trap, so its leases stay on disk; their owner is gone, so every reader reads them as gone at once (workLeases.liveness: the signal says no such process). Measured 2026-11-14 on this Mac (Apple M4 Pro, macOS 26.6): a bash that took its leases with deploy.sh's own block was read ALIVE by ProcessLiveness 20 of 20 times while it ran and GONE 20 of 20 after kill -9; with the rule before #829 (the start compared as text) it read GONE 5 of 5 while it ran, so the button would never have greyed. A recycled id is told apart by the start's second.",
+      "rejected": [
+        "Line 4 left empty: the lease is then judged on its name alone, and an id handed to any other bash would grey Deploy for that process's whole life. So a start that cannot be read means no lease at all, which errs the way deploy.sh did before #829.",
+        "Reading the start to the microsecond from the shell: macOS's sysctl tool does not answer kern.proc.pid (measured: unknown oid), there is no host Python on a teacher's Mac, and perl or osascript are not a launcher's tools.",
+        "The child taking leases beside the app's, and the app telling its own child's lease from a stranger's: it needs the app to know its children's ids at the moment it reads the folder, which it does not for the scheduled wrapper's legs. (The #829 implementation review answered this: the process table gives each holder's parent, so the app could count a lease whose holder descends from it as its own, and a leftover would then always grey Deploy. Proposed as a follow-up issue, not built here.)",
+        "Taking the leases in preview.sh --build-only as well: #829 is about the deploy; a build typed in Terminal is still refused in words by the guard (deployWhileItsSectionDeploys, `building`)."
+      ],
+      "casesShape": "heldBy is what PLANTOIR_LEASES_HELD_BY says when deploy.sh starts: absent, running (a process id that is running), gone (an id no process has), or notANumber. arguments are deploy.sh's after the course and section. start, when present, is unreadable: the process table gives deploy.sh no start for itself. course, when present, is notFound: the code typed names no folder in courses/. expect is the kinds of lease the run holds while it works.",
+      "cases": [
+        {"name": "a deploy typed in Terminal holds a build and a publish lease", "heldBy": "absent", "arguments": ["--to-folder", "<a folder>"], "expect": ["build", "publish"]},
+        {"name": "a deploy the app started (its id, running) holds none of its own", "heldBy": "running", "arguments": ["--to-folder", "<a folder>"], "expect": []},
+        {"name": "a leftover run whose app had already gone when this deploy.sh started holds its own", "heldBy": "gone", "arguments": ["--to-folder", "<a folder>"], "expect": ["build", "publish"], "why": "Only a deploy.sh that starts after its app has gone. One that was already running when the app was ended read a running id at its start and holds none (whyTheVariable)."},
+        {"name": "a variable that is not a process id is no holder", "heldBy": "notANumber", "arguments": ["--to-folder", "<a folder>"], "expect": ["build", "publish"]},
+        {"name": "its own start cannot be read: no lease, rather than one judged on its name alone", "heldBy": "absent", "start": "unreadable", "arguments": ["--to-folder", "<a folder>"], "expect": []},
+        {"name": "a course code with no folder in courses/ is refused before anything is taken: no lease and no trail line", "heldBy": "absent", "course": "notFound", "arguments": ["--to-folder", "<a folder>"], "expect": [], "why": "The Fable sweep of #829, F1: a mistyped code took both leases and wrote both trail lines before Course folder not found refused it."},
+        {"name": "--reset-token deploys nothing and holds nothing", "heldBy": "absent", "arguments": ["--reset-token"], "expect": []},
+        {"name": "--logout deploys nothing and holds nothing", "heldBy": "absent", "arguments": ["--logout"], "expect": []},
+        {"name": "sharing unit plans (--plans) is course-wide and holds nothing here", "heldBy": "absent", "arguments": ["--plans"], "expect": []}
       ]
     },
     "declining": {
@@ -23724,7 +23760,7 @@
       "whyTheScheduledPublishWaits": "Director's ruling (a), 2026-09-25, reversible. Going ahead anyway was REJECTED: two builds on one workspace is the fault being fixed. Standing down at once was REJECTED: a thirty-second build would cost a night's publish. So it waits - wall clock, so a Mac that sleeps does not pause the count - looking again every fifteen seconds for up to ten minutes, holding nothing while it waits; then takes its own build and publish leases and looks once more. Still busy at ten minutes, it stands down: deploys nothing, clears the job so it cannot recur, and leaves scheduledPublishStopped kind courseWasBusy for the section to show. It does not wait for a PREVIEW, because a preview left open overnight would otherwise cost the morning's publish; its build ends that preview, as it always has.",
       "takeThenCheck": "Every door writes its own build lease FIRST and then looks, with nothing awaited in between, and then counts only a lease taken BEFORE its own build lease: an earlier moment (line 3), or the same moment and a lower process id. Two programs that each take a build and look at once therefore cannot BOTH go ahead - exactly one sees the other as earlier - and never both go ahead is the guarantee. The CLAIM is this program's build moment, not the earliest of its leases: a publish set for later does not wait for previews, so a window whose old preview lease predates such a publish's build must still decline its own Deploy, and an earliest-lease claim would let it go ahead (the review of #156 proposed that claim; the case above shows the two builds it allows). A Preview writes its build lease BEFORE its preview lease, so a Preview and an outside build that race cannot both back off either. What remains is one harmless shape: a Deploy pressed while this window already has a preview up, racing an outside build that lands between the two - both back off, nothing runs, and a retry works. The moments are compared as text, exact for the one fixed 28-character shape both apps write (UTC, seven fractional digits, of which the mac's DateFormatter fills three - millisecond resolution, so a same-moment tie is ordinary and goes to the lower pid); anything not in that shape counts as earlier. The window's Deploy takes its claim BEFORE it stops the teacher's preview, so its build lease is up for the whole of that stop: the stop (preview.sh --stop) ends builds as well as servers by working directory, and no other program may be told the course is free while it runs. The residual: a program that looks BEFORE it takes (Windows today, an older mac) can start in the instant between another's take and its own look; that is Windows' own shape and is recorded rather than closed.",
       "whatIsSaid": {
-        "window": "wording.courseIsBeingBuiltElsewhere, in the window's Cannot Preview Yet or Cannot Deploy Yet alert - nothing has run, so the console has nothing to show. Since #835 the Cannot Preview Yet alert says wording.sectionIsBeingBuiltElsewhere instead when the lease in the way names the section asked about",
+        "window": "wording.courseIsBeingBuiltElsewhere, in the window's Cannot Preview Yet or Cannot Deploy Yet alert - nothing has run, so the console has nothing to show. Since #835 the Cannot Preview Yet alert says wording.sectionIsBeingBuiltElsewhere instead when the lease in the way names the section asked about, and since #829's sweep wording.sectionIsBeingDeployed when another program's publish lease names it (previewWhileItsSectionDeploys.leaseCases)",
         "inAppAssistant": "wording.courseIsBeingBuiltElsewhere",
         "outsideAssistant": "outsideChanges.whatIsSaid (#433). Until #433 it was wording.courseIsBusy for every decline, and publish_pages and undo_last_change wrote and then appended that same sentence where the preview would have been refreshed - so a change that SUCCEEDED ended with 'busy ... wait ... ask again', which a model reads as a refusal",
         "scheduledPublish": "nothing while it waits; scheduledPublishStopped.sentences.courseWasBusy if it stands down",
@@ -26274,7 +26310,7 @@
     "layers": {
       "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
       "launcher": "preview.sh, on a serving run only, before it changes anything, reads the LIVE process table for a deploy of the same course and section working in the same folder: deploy.sh C S (not --reset-token, --logout or --help; --diagnose deploys), or a deploy set for later of C/S (its script's name, ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh, <CODE> written as ScheduledDeploy.sanitizedCode writes it — labelCodeCases; the name must end .sh, so a log being read is not a deploy), or, since #729, a deploy's build leg, preview.sh C S --build-only --for-deploy, by the same folder rule as deploy.sh. The table is read by the one reader every launcher carries, the_launchers_running in the PROCESS TABLE BLOCK, which the look before a website builder is set up again asks too (#388); a table that cannot be read — `ps` fails, or its answer does not list this run — lets the preview through. It prints sentences.launcher, writes the trail line, and exits 1. The cases are launcherCases.",
-      "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app) holds build and publish work leases for the COURSE; the window's existing take-then-check (workLeases) refuses with wording.courseIsBeingBuiltElsewhere. Unchanged by this rule and course-wide, which is wider than it.",
+      "lease": "Another program on this Mac that is deploying (a deploy set for later, an outside assistant, another copy of the app, and since #829 a deploy.sh typed at a command line) holds build and publish work leases for the COURSE, naming the section where it knows it (#835); the window's existing take-then-check (workLeases) refuses. What it says is leaseCases: wording.sectionIsBeingDeployed when a publish lease of another program names the section asked about, the sentence this app's own deploy of the section is told with (one situation, one sentence, whoever deploys); wording.sectionIsBeingBuiltElsewhere when the lease in the way names the section and none of the publish leases does; wording.courseIsBeingBuiltElsewhere when it names no section (Windows, an older Plantoir). Course-wide for a lease that names no section, which is wider than this rule.",
       "assistant": "The in-app assistant's (and the MCP server's own) preview, before it opens a window, stops a preview or runs a --build-only rebuild (mac: AssistToolRunner.bringThePreviewUpToDate), asks the same in-process publish record and answers wording.sectionIsBeingDeployed, with the same trail line as the window."
     },
     "sentences": {
@@ -26340,8 +26376,8 @@
         "previewFrom": "window",
         "section": "same",
         "expect": "refused",
-        "layer": "launcher",
-        "why": "A bare launcher writes no lease; the window's preview reaches preview.sh, which sees the deploy in the process table."
+        "layer": "lease",
+        "why": "Since #829 deploy.sh takes a build and a publish lease naming its section, so the window's take-then-check refuses at the lease layer before preview.sh is reached, with wording.sectionIsBeingDeployed (leaseCases). Read from the code and the pure decision compiled alone by the Fable sweep's fixes (2026-11-14): until then the window said wording.sectionIsBeingBuiltElsewhere, which names three programs and not this one. A deploy.sh from before #829, which takes no lease, still reaches preview.sh, which sees it in the process table."
       },
       {
         "name": "any deploy of the section, with the preview started from a command line",
@@ -26378,6 +26414,62 @@
         "expect": "refused",
         "layer": "lease",
         "why": "Not this rule: #156's course-level lease, unchanged, with its own sentence."
+      }
+    ],
+    "leaseCasesShape": "What the window's Cannot Preview Yet says once another program's lease has declined a preview of `section` (mac: SectionDetailView.previewDeclinedSentence, over WorkLeaseFiles.aDeployHolds). `others` are live leases of the course in workLeases.declining.sections' shape, `inTheWay` is the index of the one the take-then-check returned, and `expect` names the sentence by its key in assist-wording.json. Run by PreviewWhileDeployingTests. Mac only for now (leaseCasesAppliesOn): Windows writes no section line and its deploy.ps1 takes no lease, so on Windows no lease can name a section being deployed until #829's Windows half lands.",
+    "leaseCasesAppliesOn": [
+      "mac"
+    ],
+    "leaseCases": [
+      {
+        "name": "a deploy typed in Terminal (deploy.sh's two leases, #829) is told as this app's own deploy is",
+        "section": 2,
+        "others": [
+          {"kind": "publish", "pid": 4321, "sections": [2]},
+          {"kind": "build", "pid": 4321, "sections": [2]}
+        ],
+        "inTheWay": 0,
+        "expect": "sectionIsBeingDeployed"
+      },
+      {
+        "name": "the same, with the build lease the one found in the way: the order the files were listed in does not change the sentence",
+        "section": 2,
+        "others": [
+          {"kind": "build", "pid": 4321, "sections": [2]},
+          {"kind": "publish", "pid": 4321, "sections": [2]}
+        ],
+        "inTheWay": 0,
+        "expect": "sectionIsBeingDeployed"
+      },
+      {
+        "name": "a preview being built elsewhere names the section but deploys nothing",
+        "section": 2,
+        "others": [
+          {"kind": "build", "pid": 4321, "sections": [2]},
+          {"kind": "preview", "pid": 4321, "sections": [2]}
+        ],
+        "inTheWay": 0,
+        "expect": "sectionIsBeingBuiltElsewhere"
+      },
+      {
+        "name": "another program deploying a sibling section while it builds this one: this section is built, not deployed",
+        "section": 2,
+        "others": [
+          {"kind": "build", "pid": 4321, "sections": [1, 2]},
+          {"kind": "publish", "pid": 4321, "sections": [1]}
+        ],
+        "inTheWay": 0,
+        "expect": "sectionIsBeingBuiltElsewhere"
+      },
+      {
+        "name": "a deploy whose leases name no section (Windows, an older Plantoir) may be of another section, so the course is named",
+        "section": 2,
+        "others": [
+          {"kind": "publish", "pid": 4321},
+          {"kind": "build", "pid": 4321}
+        ],
+        "inTheWay": 0,
+        "expect": "courseIsBeingBuiltElsewhere"
       }
     ],
     "labelCodeCasesShape": "Each case is a course code as typed and the <CODE> a scheduled deploy's script name carries for it (ScheduledDeploy.agentLabel). Run on the mac through ScheduledDeploy.sanitizedCode (PreviewWhileDeployingTests), and through the launchers' one reader, the_launchers_running (scripts/test_preview_while_deploying.py). The two rules differ outside ASCII — Swift keeps any letter or digit, the launchers keep A-Z and 0-9 — and agree on every code the apps' CourseCodeRule accepts, which the mac pins by walking the Basic Multilingual Plane. #388, N5.",
@@ -27437,7 +27529,7 @@
         },
         "expect": "refused",
         "who": "another",
-        "why": "The Terminal pair (#439 ruling 9): a bare launcher writes no lease, so only the process table sees it."
+        "why": "The Terminal pair (#439 ruling 9): no launcher reads leases, so only the process table sees the other deploy. Since #829 that deploy.sh holds leases the apps read; this guard does not read them."
       },
       {
         "name": "deploy.sh for the section refuses the build leg",
@@ -27951,7 +28043,7 @@
       "A leftover run that HANGS refuses that section's deploys until it ends, and nothing in the app ends it: cancelling or setting the deploy again boots out the job, which is already gone, and the script is a process group of its own. Logging out of the Mac, or restarting it, ends it. Its legs run with --non-interactive, so a question cannot hold it; a destination that never answers could. While its run lived, its leases blocked the same way - what is new is that it survives a re-set.",
       "A leftover run's own after-work is still lost: the app's record that the section was deployed (it stays ' — Edited', the harmless direction), the run's trail line and its notification. Its script does write the section's outcome record, and since #439 never over a newer run's (scheduledPublishStopped.newerRecordWins).",
       "A deploy set for later before #237 names no folder in its label, so its leftover run refuses that course and section in every working folder until it ends; a newly set run never ends such a run's app (its plist is gone, so there is nothing to boot out), so the run's app and leases live on, #156's ten-minute wait sees them, and if it is still working when the new run starts the new run's legs are refused by this guard and the run is recorded as stopped.",
-      "A scheduled run does not wait for a deploy typed in Terminal (it writes no lease); its legs are refused here and the run is recorded as stopped, which is better than two deploys of one section at once.",
+      "Since #829 a deploy typed in Terminal takes build and publish leases, so a scheduled run of its section waits for it as it waits for any other program (#156's wait, workLeases.launcherLeases). Only a deploy.sh that took none (one from before #829, or one whose own start could not be read) is not waited for: the scheduled run's legs are refused here and the run is recorded as stopped, which is better than two deploys of one section at once.",
       "The look is the live process table, which lists every account's processes. A process another account runs is listed but never counted: lsof cannot read its working folder, and a folder that belongs to another account is not this one (#729 review, L-a1, measured: until then another account's build or deploy of the same course code and section refused this teacher's, in every folder). That is the mac's two-look mechanics (ps, then lsof and ps -p's owner), so it is tested in scripts/test_deploy_while_its_section_deploys.py (otherAccount), not as a shared case. A process of THIS account whose folder lsof cannot read still counts, as #381 decided.",
       "Two builds or deploys of one section started within a few milliseconds of each other each see the other and BOTH are refused (#729 review, L-a2, measured with real processes: started together, both refused 20 of 20; started 50, 100, 200, 400 or 800 ms apart, exactly one refused, 10 of 10 at each). The overlap never gets through; each teacher sees the refusal and a second press goes ahead. No tie-break was added: one that is provably right needs an order both runs agree on, which the process table does not give. #439 already had this shape for two deploy.sh runs.",
       "One narrow race turns a deploy off yet lets it go out: the sidebar's Cancel Deploy dialog opened before the deploy's time and confirmed after its run has started. The run has removed its own plist, so cancelScheduledDeploy boots the label out blind, ending the run's app as a re-set does, and the deploy its script started still goes out (the guard keeps it from overlapping anything); no trail line says so. Every other cancel - a rename (CourseRenamer), the assistants' cancels, the cleanup - acts only on a plist found on disk, so it never reaches a working run. Recorded rather than built (#439 review finding 5, narrowed by the fixes review): it needs the dialog's moment to pass while it is open.",
@@ -28440,6 +28532,7 @@
       "reDateClasses",
       "makeRoomForClasses",
       "classDates",
+      "rollOverToANewYear",
       "back",
       "forward",
       "reloadPage"
@@ -28635,6 +28728,7 @@
           "reloadCourses",
           "removeSection",
           "rename",
+          "rollOverToANewYear",
           "scheduleDeploy",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
@@ -28690,6 +28784,7 @@
           "reloadCourses",
           "reloadPage",
           "removeSection",
+          "rollOverToANewYear",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
@@ -28887,6 +28982,7 @@
           "reloadPage",
           "removeSection",
           "rename",
+          "rollOverToANewYear",
           "scheduleDeploy",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
@@ -29047,6 +29143,7 @@
           "reloadCourses",
           "removeSection",
           "rename",
+          "rollOverToANewYear",
           "scheduleDeploy",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
@@ -29091,6 +29188,7 @@
           "reloadCourses",
           "removeSection",
           "rename",
+          "rollOverToANewYear",
           "scheduleDeploy",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
@@ -29369,6 +29467,114 @@
         "One menu item per way (Add Next Class in a New Unit, Duplicate as Next Class...), ruled earlier the same evening and replaced: one item and a question reads as one act with three answers.",
         "Keeping Add Next Class beside Add Class... as a one-step item (Russell, 2026-11-13 night).",
         "The ways as items of their own on the section row's right-click menu (the same ruling): the row's menu carries Add Class... itself, which asks the same question."
+      ]
+    },
+    "rollOverSheet": {
+      "note": "GitHub #897 piece B (Russell, 2026-11-13: in the SECTION menu, above Get Ready for the Start of the Year..., rolling the one section): Section > Roll Over to a New Year... runs the rollover the built-in assistant's window asks about in words, through the same tool call (re_date_classes with rollover \"yes\" and website \"new\" or \"same\"; plan_re_date_classes first), and asks the website question in its sheet. Live exactly where Re-date Classes... is (subjectMenus.cases), with no situation key of its own. The question is asked ONLY where there is a website to keep or leave (the plan review's amendment 12): sectionIsPinned is true when ANY marker the release walks is on disk for the section (.netlify_sites/section<N>.json, .cloudflare_sites/section<N>.json, and the legacy .merged_output/section<N>/.netlify_site.json; one that cannot be read counts, since the release reports it still pinned), and hasAHostedDestination is true when the primary or any additional destination is not a folder. Where it is asked, NOTHING is chosen, and the sheet cannot go on until one answer is (the window's decision, 2026-09-08: neither answer is guessed). The call never carries anything but \"new\" or \"same\", so rolloverWebsiteNotDecided cannot reach the menu. With no class dates on file the window's Class Dates sheet comes first, with the reason wording.datesToReDate. When the last date on file is before today the sheet says so (wording.menuRollOverDatesAreOld) and points at Class Dates...; it does not open that sheet from inside its own (the plan review's amendment 16: one sheet is up at a time). From the menu the whole rollover is ONE undo entry (the re-date, the published-pages record set aside, and the website's markers), a copy of the course is saved first on the path where the dates are already right too, and the website is settled before the preview is rebuilt; the window keeps its two entries and its order (the plan review's amendments 1, 10 and 11). A new website the sheet cannot truthfully offer is not offered (the implementation review's W1, measured): a Cloudflare website is named for the course, the section and the CALENDAR year (deploy.py suggest_pages_name), and deploying reuses a website of that name, so a section first deployed in February and rolled over onto a \"new\" website in September would be deployed onto February's again. Where the course deploys to Cloudflare and a record the section keeps there (.cloudflare_sites/section<N>.json, or a section<N>.previous-<stamp>.json a rollover set aside) holds the name a new website would get this year, the sheet asks nothing, sends \"same\", and says why in the sheet, the plan and the finished line (wording.menuRollOverANewWebsiteWouldReuseItsAddress). The deploy path's own fix is GitHub #915, which this does not make. The mac runs these cases in RollOverFromTheMenuTests.testTheWebsiteRuleIsTheContracts, and the name cases in RollOverFromTheMenuTests.testTheCloudflareNameRuleIsTheContracts.",
+      "factKeys": {
+        "sectionIsPinned": "Any marker the release walks is on disk for the section, of any destination type, the legacy one included, an unreadable one included.",
+        "hasAHostedDestination": "The course's primary or any additional destination is a web host (not local_folder).",
+        "aNewWebsiteWouldReuseItsAddress": "The course deploys to Cloudflare (primary or additional), and a record this section keeps there, its own or one set aside by an earlier rollover, holds a name for which cloudflareAddressReuse below is true this calendar year."
+      },
+      "websites": {
+        "asked": "wording.rolloverWebsiteQuestion over wording.menuRollOverNewWebsite and wording.menuRollOverKeepWebsite, in that order, nothing chosen",
+        "notDeployedYet": "wording.menuRollOverNotDeployedYet, no question",
+        "deploysToAFolder": "wording.menuRollOverDeploysToAFolder, no question",
+        "aNewWebsiteWouldReuseItsAddress": "wording.menuRollOverANewWebsiteWouldReuseItsAddress, no question"
+      },
+      "sheet": {
+        "title": "wording.menuRollOverTitle",
+        "intro": "wording.menuRollOverIntro",
+        "dates": "wording.menuRollOverDates: the first and last date on file",
+        "datesAreOld": "wording.menuRollOverDatesAreOld, when the last date on file is before today",
+        "goButton": "wording.menuRollOverButton",
+        "planLines": "after the re-date's card: for 'same' wording.menuRollOverPlanKeepsTheWebsite, for 'new' the window's own new-website line; wording.menuRollOverNotDeployedYet, wording.menuRollOverDeploysToAFolder or wording.menuRollOverANewWebsiteWouldReuseItsAddress in place of either where the website rule says so, and wording.menuRollOverDeploysToAFolder for either answer on a course that deploys only to a folder whatever marker an old host left; where the dates are already right, 'new' is said as the other branch says it (It would also start...), not in the window's imperative; then wording.menuRollOverPlanSetsTheRecordAside",
+        "finishedInPlaceOf": {
+          "rolloverKeptTheSameWebsite": "wording.rolloverDeploysToAFolderFromTheMenu, for a course that deploys only to a folder; wording.menuRollOverANewWebsiteWouldReuseItsAddress, where a new website would reuse the address",
+          "rolloverHadNoWebsiteYet": "wording.menuRollOverNotDeployedYet, which is true of Cloudflare (no name is asked) and of a course that also deploys to a folder",
+          "rolloverCouldNotStartANewWebsite": "wording.rolloverCouldNotStartANewWebsiteFromTheMenu",
+          "rolloverStartedANewWebsite": "wording.rolloverStartedANewWebsiteFromTheMenu, whose last sentence (wording.rolloverANewWebsiteIsMadeAtTheNextDeploy) is true on Cloudflare, which asks for no name (the Fable sweep's T1); for a course that deploys only to a folder it ends on wording.menuRollOverDeploysToAFolder instead (wording.rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder)"
+        }
+      },
+      "cases": [
+        {
+          "why": "Deployed to a web host: asked, and nothing goes until an answer is chosen.",
+          "facts": {"sectionIsPinned": true, "hasAHostedDestination": true, "aNewWebsiteWouldReuseItsAddress": false},
+          "website": "asked",
+          "answer": null,
+          "websiteSent": null
+        },
+        {
+          "why": "Asked, answered: a new website.",
+          "facts": {"sectionIsPinned": true, "hasAHostedDestination": true, "aNewWebsiteWouldReuseItsAddress": false},
+          "website": "asked",
+          "answer": "new",
+          "websiteSent": "new"
+        },
+        {
+          "why": "Asked, answered: the same website.",
+          "facts": {"sectionIsPinned": true, "hasAHostedDestination": true, "aNewWebsiteWouldReuseItsAddress": false},
+          "website": "asked",
+          "answer": "same",
+          "websiteSent": "same"
+        },
+        {
+          "why": "A marker left from a host the course no longer deploys to (or the legacy marker alone, or one that cannot be read) still pins the section, so the question is still asked: sending 'new' unasked would cut it loose.",
+          "facts": {"sectionIsPinned": true, "hasAHostedDestination": false, "aNewWebsiteWouldReuseItsAddress": false},
+          "website": "asked",
+          "answer": null,
+          "websiteSent": null
+        },
+        {
+          "why": "A web host and no marker: never deployed. No question; 'new', which says there was no website to move away from.",
+          "facts": {"sectionIsPinned": false, "hasAHostedDestination": true, "aNewWebsiteWouldReuseItsAddress": false},
+          "website": "notDeployedYet",
+          "answer": null,
+          "websiteSent": "new"
+        },
+        {
+          "why": "A folder only: a folder keeps no marker, so 'never deployed' would be false. No question; 'same', with the folder's finished line.",
+          "facts": {"sectionIsPinned": false, "hasAHostedDestination": false, "aNewWebsiteWouldReuseItsAddress": false},
+          "website": "deploysToAFolder",
+          "answer": null,
+          "websiteSent": "same"
+        },
+        {
+          "why": "Deployed to Cloudflare in February, rolled over in September of the same year: a new website would get February's name and replace it. No question; 'same', and the sheet says why.",
+          "facts": {"sectionIsPinned": true, "hasAHostedDestination": true, "aNewWebsiteWouldReuseItsAddress": true},
+          "website": "aNewWebsiteWouldReuseItsAddress",
+          "answer": null,
+          "websiteSent": "same"
+        },
+        {
+          "why": "Rolled onto a new website once this year and not deployed since: only the set-aside record holds this year's name, and the next deploy would reuse it. Still no question, still 'same'.",
+          "facts": {"sectionIsPinned": false, "hasAHostedDestination": true, "aNewWebsiteWouldReuseItsAddress": true},
+          "website": "aNewWebsiteWouldReuseItsAddress",
+          "answer": null,
+          "websiteSent": "same"
+        }
+      ],
+      "cloudflareAddressReuse": {
+        "note": "Whether a new Cloudflare website started in `year` would get a name one of `keptNames` already holds. The name deploy.py gives a new website is sanitize_pages_name(\"<course>-s<section>-<year>\"), with \"-<surname>\" on the end when a surname is saved; the app does not keep the surname, so a kept name matches when it IS that stem or begins with the stem and a hyphen. Cleaning is sanitize_pages_name's: lower case, anything outside a to z, 0 to 9 and the hyphen to a hyphen, runs of hyphens to one, none at either end, at most 58 characters.",
+        "cases": [
+          {"why": "February 2026 and September 2026: the same name, so a new website would reuse it.", "courseCode": "ICS3U", "section": 1, "year": 2026, "keptNames": ["ics3u-s1-2026-lastname"], "wouldReuse": true},
+          {"why": "Deployed in February 2026 with no surname saved, rolled over in September 2026.", "courseCode": "ICS3U", "section": 1, "year": 2026, "keptNames": ["ics3u-s1-2026"], "wouldReuse": true},
+          {"why": "Deployed in September 2025, rolled over in September 2026: a new year, a new name.", "courseCode": "ICS3U", "section": 1, "year": 2026, "keptNames": ["ics3u-s1-2025-lastname"], "wouldReuse": false},
+          {"why": "Section 1's stem is not Section 10's.", "courseCode": "ICS3U", "section": 1, "year": 2026, "keptNames": ["ics3u-s10-2026-lastname"], "wouldReuse": false},
+          {"why": "A course code with a space is cleaned as deploy.py cleans it.", "courseCode": "ICS 3U", "section": 2, "year": 2026, "keptNames": ["ics-3u-s2-2026"], "wouldReuse": true},
+          {"why": "A record set aside by an earlier rollover counts: the next deploy would reuse its name.", "courseCode": "ICS3U", "section": 1, "year": 2026, "keptNames": ["ics3u-s1-2025-lastname", "ics3u-s1-2026-lastname"], "wouldReuse": true},
+          {"why": "No record holds a name.", "courseCode": "ICS3U", "section": 1, "year": 2026, "keptNames": [], "wouldReuse": false}
+        ]
+      },
+      "rejected": [
+        "Deciding by markers alone (the plan's first version): a section that deploys to a folder has none and was told it had never been deployed (the plan review's amendment 12).",
+        "A Change Class Dates... button inside the sheet that returns to it: one sheet is up at a time, and Cancel there would lose the chosen answer (the plan review's amendment 16).",
+        "The Course menu, rolling every section of the course at once (Russell, 2026-11-13).",
+        "The section row's right-click menu: a once-a-year act.",
+        "Offering 'new' on a Cloudflare section whose new website would reuse its address, with a warning beside it (the implementation review's W1): an answer whose result is the opposite of its words is not an answer. Changing deploy.py's name rule from this piece: that is GitHub #915.",
+        "Recording both halves of each marker's move in the menu's undo entry (the implementation review's I1, measured there): a deploy between the rollover and Undo Last Change left the new marker alone and DELETED the kept copy, last year's website's only record. The menu records the half that left the marker's place only, so an undo never deletes a kept copy.",
+        "Going on with a rollover from the menu when the copy of the course saved first could not be made (the director's ruling on the implementation review's I2): it is refused before anything is written, with wording.startOfYearNeedsABackup.",
+        "Turning a scheduled deploy back on when the rollover is undone (the plan review's amendment 15, a SHOULD): left to #899's journal, which needs an operation for it; until then Undo Last Change puts the markers back and the schedule stays off, as the finished sheet already says."
       ]
     },
     "rejected": [
@@ -32298,7 +32504,7 @@
       "The attribution is in English on every page, French courses included (PhET allows a translation; none is written yet).",
       "A simulation's sounds play after a student touches it; nothing turns them off (it is part of the simulation, and not ruled on).",
       "Obsidian shows the block as a code block (no Obsidian plugin reads ```phet).",
-      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Whether Netlify takes a long header whole (twenty simulations' worth, 421 hashes, a 22,766-character line) is measured with a credentialed test site before this piece merges (documentation/07). A pass says a line of that length is served whole; it does not say where Netlify's limit lies."
+      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Measured 2026-11-14 on a credentialed test site: a site of 20 stand-in simulations carrying 421 script hashes wrote one policy line of 22,766 characters, Netlify took the deploy and sent that line whole, once, with each of three answers checked (documentation/07). That says a line of that length is served whole; it does not say where Netlify's limit lies."
     ]
   },
   "previewStartPage": {
@@ -39813,7 +40019,7 @@
       "helpForASection": "{course} Section {section} is being previewed or deployed somewhere else on this computer, by an assistant working from another app, another copy of Plantoir, or a scheduled deploy that is running now. Deploy will be available again once that preview is stopped or that deploy has finished.",
       "helpForASectionWhy": "#835. Said instead of help when the lease in the way NAMES this section: then only this section's Deploy is grey, and a sentence naming the whole course would read as if every section were. help stays for a lease that names no section, which greys every section.",
       "helpWhy": "GitHub #729. The Deploy button's help and its accessibility hint, while another program holds the course. It names the three programs a lease can come from, as wording.courseIsBeingBuiltElsewhere does, and promises only the end each can reach: a preview held elsewhere does not finish by itself, it is stopped (the plan review's M6). 'This computer' so one sentence serves both platforms. No 'lease', 'process' or 'program' (CLAUDE.md rule 1). The third program is 'a scheduled deploy that is running now' since #835 (Russell, 2026-11-13): until then it was 'a deploy set for later', which he read as 'having a deploy scheduled stops me deploying'. A schedule that has not fired holds nothing; only its run, while it works, takes a lease. wording.courseIsBeingBuiltElsewhere names it the same way.",
-      "rule": "Deploy (the button, the Section menu's Deploy… and its shortcut) is unavailable exactly when a press would be refused by another program's work lease: what WorkLeaseFiles.blocking answers for the course's live leases held by OTHER processes, asked as a build with no claim (workLeases.declining; kinds build, publish and preview). On the sections the lease names, or, for a lease that names none (Windows, an older Plantoir, course-wide work), on every section of that course in this working folder (#835, workLeases.declining.sections). Available again, without a click, when the lease is removed or its holder's process ends (a killed holder's lease then reads as stale, workLeases.liveness). The folder not being ready wins: its reason is the help. A course kept for reference has no Deploy button at all, as before. A program that holds no lease (a deploy typed at a command line) is not seen by the button; the press meets the launcher's guard, which refuses in words (deployWhileItsSectionDeploys).",
+      "rule": "Deploy (the button, the Section menu's Deploy… and its shortcut) is unavailable exactly when a press would be refused by another program's work lease: what WorkLeaseFiles.blocking answers for the course's live leases held by OTHER processes, asked as a build with no claim (workLeases.declining; kinds build, publish and preview). On the sections the lease names, or, for a lease that names none (Windows, an older Plantoir, course-wide work), on every section of that course in this working folder (#835, workLeases.declining.sections). Available again, without a click, when the lease is removed or its holder's process ends (a killed holder's lease then reads as stale, workLeases.liveness). The folder not being ready wins: its reason is the help. A course kept for reference has no Deploy button at all, as before. Since #829 a deploy typed at a command line holds a build and a publish lease naming its section (workLeases.launcherLeases), so it greys Deploy like any other program's. A program that holds no lease (a build typed at a command line, or a deploy.sh from before #829) is not seen by the button; the press meets the launcher's guard, which refuses in words (deployWhileItsSectionDeploys).",
       "how": "Events, never a clock. Mac: one LeaseWatcher per working folder a window shows (LeaseWatchers, owned through WorkspaceModel): a directory watch on EVERY level of the path that exists (courses/, courses/.internal, courses/.internal/activity), where a change in the activity folder is a re-read and a change at a level above it (a folder made, removed, renamed or replaced) re-arms every level from the path as it is now; one process-exit watch per holder's process id (ProcessEnding); and a re-read when a section appears, when the app or its window comes to the front, when the Mac wakes from sleep, and when the pointer enters the Deploy button. Watching the deepest level alone was the first build, and the #729 implementation review measured it deaf for the session when .internal was made alone before the activity folder (0 of 20); watching every level also follows .internal renamed away and back, which moving the watch down alone does not. Measured W1 to W10 and W12 to W15 on Apple silicon, 40 of 40 each (documentation/09-mac-app.md -> 'Deploy waits for another program (#729)'); W11, sleep and wake, was NOT measured, since an agent may not sleep the Mac. No timed re-read is used.",
       "fields": "Each case lays out leases under the working folder's courses/.internal/activity/ and asks about Deploy on course EXC2O. holds: the leases there, each {kind, course ('EXC2O' this course, 'OTHER' another), holder, folder}. holder 'another' is a live process that is not this app; 'gone' is a process that has ended (its lease left behind); 'this' is this app itself. folder 'this' is the working folder the window shows, 'another' a different working folder. section: 'this' or 'sibling' (another section of the same course), the section whose Deploy is asked about. folderReady: false when the folder's tools are still being copied (the readiness reason is set). then: 'nothing', 'theHolderRemovesItsLease' or 'theHolderIsKilled' (its lease stays on disk), with nobody touching the window. deployAvailable: before 'then'; afterThen: after it, with no click. help: 'heldElsewhere' (the sentence above), 'heldElsewhereForASection' (helpForASection, with the section asked about), 'folderReadinessReason' or 'ordinary', before 'then'. A hold may carry sections, a list of 'this' and 'sibling': the sections its lease names (#835); absent, it names none. button: 'none' when the course is kept for reference.",
       "cases": [
@@ -39830,14 +40036,15 @@
         {"name": "a lease whose holder has gone", "holds": [{"kind": "build", "course": "EXC2O", "holder": "gone", "folder": "this"}], "section": "this", "folderReady": true, "then": "nothing", "deployAvailable": true, "help": "ordinary", "why": "workLeases.liveness: a lease whose owner is gone is ignored, so nothing left on disk can grey Deploy for ever."},
         {"name": "the holder removes its lease while the teacher watches", "holds": [{"kind": "build", "course": "EXC2O", "holder": "another", "folder": "this"}], "section": "this", "folderReady": true, "then": "theHolderRemovesItsLease", "deployAvailable": false, "afterThen": true, "help": "heldElsewhere"},
         {"name": "the holder is killed and its lease stays", "holds": [{"kind": "publish", "course": "EXC2O", "holder": "another", "folder": "this"}], "section": "this", "folderReady": true, "then": "theHolderIsKilled", "deployAvailable": false, "afterThen": true, "help": "heldElsewhere", "why": "No file event ever comes for this; the holder's process ending is the event (mac: ProcessEnding). Never stuck grey after the other program ends."},
-        {"name": "a deploy typed at a command line holds no lease", "holds": [], "section": "this", "folderReady": true, "then": "nothing", "deployAvailable": true, "help": "ordinary", "why": "Not seen by the button. A press reaches the launcher's guard, which refuses in words (deployWhileItsSectionDeploys)."},
+        {"name": "a program that holds no lease (a build typed at a command line, or a deploy.sh from before #829)", "holds": [], "section": "this", "folderReady": true, "then": "nothing", "deployAvailable": true, "help": "ordinary", "why": "Not seen by the button. A press reaches the launcher's guard, which refuses in words (deployWhileItsSectionDeploys). Until #829 this case was a deploy typed at a command line; since #829 that deploy holds leases (the next case)."},
+        {"name": "a deploy typed in Terminal holds leases naming its section (#829)", "holds": [{"kind": "build", "course": "EXC2O", "holder": "another", "folder": "this", "sections": ["this"]}, {"kind": "publish", "course": "EXC2O", "holder": "another", "folder": "this", "sections": ["this"]}], "section": "this", "folderReady": true, "then": "nothing", "deployAvailable": false, "help": "heldElsewhereForASection", "why": "workLeases.launcherLeases: deploy.sh takes a build and a publish lease for its own process, naming its one section, so the button greys there as it does for any other program's deploy. A sibling section stays available, as for the app's own leases that name a section."},
         {"name": "the same course held in another working folder", "holds": [{"kind": "build", "course": "EXC2O", "holder": "another", "folder": "another"}], "section": "this", "folderReady": true, "then": "nothing", "deployAvailable": true, "help": "ordinary"},
         {"name": "the folder is not ready and the course is held", "holds": [{"kind": "build", "course": "EXC2O", "holder": "another", "folder": "this"}], "section": "this", "folderReady": false, "then": "nothing", "deployAvailable": false, "help": "folderReadinessReason", "why": "The folder not being ready is the more basic reason, and every button says it."},
         {"name": "this app's own leases never count", "holds": [{"kind": "build", "course": "EXC2O", "holder": "this", "folder": "this"}, {"kind": "preview", "course": "EXC2O", "holder": "this", "folder": "this"}], "section": "this", "folderReady": true, "then": "nothing", "deployAvailable": true, "help": "ordinary", "why": "This app's own work is CourseActivity's question (deployIsUnderWay), never its leases'."},
         {"name": "a course kept for reference", "holds": [{"kind": "build", "course": "EXC2O", "holder": "another", "folder": "this"}], "section": "this", "folderReady": true, "then": "nothing", "keptForReference": true, "button": "none", "why": "Unchanged: no Deploy button is drawn on a course kept for reference."}
       ]
     },
-    "knownLimits": "The in-app assistant's WINDOWLESS deploy (no section window open when it was asked) runs on a runner of its own (mac: AssistSiteWork), so a section selected while it runs greys Deploy and says nothing in the console: showsTheRun is false in those cases, deliberately stated rather than claimed. Since #729 another PROGRAM's work greys Deploy too (heldElsewhere), from its work leases. What is still not seen by the button: a program that holds no lease (a deploy typed at a command line, or a leftover run of a deploy set for later, #439), whose press is refused in words by the launcher's guard (deployWhileItsSectionDeploys); and a lease that names no section (Windows, an older Plantoir, course-wide work) greys Deploy on every section of that course, where a press is refused anyway. Since #835 a lease that names its sections greys only those (heldElsewhere.rule)."
+    "knownLimits": "The in-app assistant's WINDOWLESS deploy (no section window open when it was asked) runs on a runner of its own (mac: AssistSiteWork), so a section selected while it runs greys Deploy and says nothing in the console: showsTheRun is false in those cases, deliberately stated rather than claimed. Since #729 another PROGRAM's work greys Deploy too (heldElsewhere), from its work leases. Since #829 a deploy typed at a command line holds leases from deploy.sh itself (workLeases.launcherLeases) and greys it too. A leftover run of a deploy set for later (#439) does so only for a deploy.sh that started after its app had gone; one already running when its app was ended holds none (launcherLeases.whyTheVariable), and is not seen by the button. What is still not seen by the button: a program that holds no lease (a build typed at a command line, preview.sh --build-only, or a deploy.sh from before #829), whose press is refused in words by the launcher's guard (deployWhileItsSectionDeploys); and a lease that names no section (Windows, an older Plantoir, course-wide work) greys Deploy on every section of that course, where a press is refused anyway. Since #835 a lease that names its sections greys only those (heldElsewhere.rule)."
   },
   "sectionProblems": {
     "appliesOn": ["mac", "windows"],

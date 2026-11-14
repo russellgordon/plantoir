@@ -535,6 +535,30 @@ nonisolated enum WorkLeaseFiles {
         return nil
     }
 
+    /// Whether another live program is DEPLOYING this section: one of its
+    /// `publish` leases names the section (#829, the Fable sweep of the
+    /// deploy-freshness batch). Asked by the window once a preview has been
+    /// declined, to choose the sentence: a deploy of the section is told the
+    /// way this app's own deploy of it is told
+    /// (`previewWhileItsSectionDeploys.leaseCases`), whoever runs it.
+    ///
+    /// A lease that names no sections (Windows, an older Plantoir) is not
+    /// taken to name this one: it may be deploying another section, so the
+    /// course-wide sentence stays the true one for it. Any publish lease
+    /// counts, not only the one `blocking` returned, so the answer does not
+    /// depend on the order the files were listed in.
+    static func aDeployHolds(section: Int, among holdings: [Holding]) -> Bool {
+        for holding in holdings {
+            if holding.kind.lowercased() != WorkLeaseFiles.publishKind {
+                continue
+            }
+            if holding.entry(forSection: section) != nil {
+                return true
+            }
+        }
+        return false
+    }
+
     /// What an outside assistant's change meets among the other programs'
     /// leases (#433).
     ///

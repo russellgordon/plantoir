@@ -39,6 +39,10 @@ final class SectionVerbSheetModel: Identifiable {
         /// Add Class… (#897): how the class is added, then — for a copy —
         /// the class to copy and the plan.
         case addClass
+        /// Roll Over to a New Year… (#897 piece B): the dates, the website
+        /// question where there is a website (`RollOverFromTheMenu`), then
+        /// the plan. Drawn by `rollOverChoosing`.
+        case rollOver
         case laterClassesAtDeploy
         case classDates
         case result
@@ -148,6 +152,9 @@ final class SectionVerbSheetModel: Identifiable {
     /// Add Class…'s classes to copy, and the one chosen, by path.
     var sourceRows: [SourceRow] = []
     var chosenSource: String?
+
+    /// Roll Over to a New Year…'s dates and website answer (#897 piece B).
+    var rollOver: RollOverFromTheMenu.Choice = RollOverFromTheMenu.Choice()
 
     /// #475: the classes asked about at Deploy, and the ones ticked to GO
     /// OUT (all, to begin with — a ticked box always means included, #694).
@@ -297,6 +304,8 @@ final class SectionVerbSheetModel: Identifiable {
             return AssistWording.menuMakeRoomAt(noun: noun)
         case .addClass:
             return AssistWording.menuHowToAddAClass(noun: noun)
+        case .rollOver:
+            return AssistWording.menuRollOverIntro(noun: noun)
         default:
             return ""
         }
@@ -324,6 +333,8 @@ final class SectionVerbSheetModel: Identifiable {
                 return AssistWording.menuMakeRoomButton
             case .addClass:
                 return AssistWording.menuDuplicateButton
+            case .rollOver:
+                return AssistWording.menuRollOverButton
             default:
                 return AssistWording.menuPublishButton
             }
@@ -346,6 +357,10 @@ final class SectionVerbSheetModel: Identifiable {
                     return false
                 }
                 return way != .asACopyOfAClass || chosenSource != nil
+            case .rollOver:
+                // Nothing is sent until the website question, where it is
+                // asked, has an answer.
+                return rollOver.websiteSent != nil
             default:
                 return true
             }
@@ -1018,6 +1033,8 @@ struct SectionVerbSheet: View {
                 .accessibilityIdentifier("sectionVerbSheetSearch")
                 sourceTable
             }
+        case .rollOver:
+            rollOverChoosing
         default:
             EmptyView()
         }
