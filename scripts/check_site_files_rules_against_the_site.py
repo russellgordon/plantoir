@@ -26,9 +26,14 @@ run through them in Node:
   (property-information), so the emitter looks for each under the name the
   tree really holds it by;
 * `addressFixture`'s pages parsed by Quartz's own HTML parser and read by
-  addressesThePagesUse: exactly the fixture's `needed` (the Python test reads
-  the same fixture twice more, by site_files and by an element table of its
-  own);
+  addressesThePagesUse, following the carried files through the same parser
+  (siteFiles.followed): exactly the fixture's `needed` (the Python test reads
+  the same fixture twice more, by site_files and by a reader of its own, and
+  pins `needed` to a list written there by hand);
+* the follow limits: a chain of stylesheets one deeper than
+  followed.limits.depth throws FollowLimitReached with followed.limitReached,
+  and the emitter, given a lower limit in its side file, carries EVERY file
+  and says plantoir: error: rather than leave one out;
 * `cases`: each a small course written to content/, its pages built, and the
   emitter run over the PUBLISHED pages, as Quartz's first emit hands them,
   and again over every page, as a rebuild does: exactly the case's files
@@ -93,7 +98,7 @@ import { CrawlLinks } from "QUARTZ_TRANSFORMERS/links"
 import { Assets } from "QUARTZ_EMITTERS/assets"
 import { slugifyFilePath, pathToRoot, joinSegments } from "QUARTZ_UTIL/path"
 import { glob } from "QUARTZ_UTIL/glob"
-import { resolvedFromPage, isHiddenPage, printPdfPath, addressesThePagesUse } from "RULES_TS"
+import { resolvedFromPage, isHiddenPage, printPdfPath, addressesThePagesUse, followCarriedFiles } from "RULES_TS"
 import { PlantoirAssets } from "EMITTER_TS"
 
 const rules = JSON.parse(readFileSync(process.argv[2], "utf-8"))
@@ -119,6 +124,17 @@ for (const rule of rules.addresses.attributes) {
 // The third reading's fixture (addressFixture), parsed by Quartz's own HTML
 // parser and read by the emitter's own function: exactly the files the
 // fixture says a page needs.
+// A course's files as the emitter hands them to the rules: by address, with
+// their text, parsed by Quartz's own HTML parser.
+function carriedFrom(files, textOf) {
+  const byAddress = new Map()
+  for (const fp of files) if (!byAddress.has(slugifyFilePath(fp))) byAddress.set(slugifyFilePath(fp), fp)
+  return {
+    contentPathOf: (address) => byAddress.get(address) ?? null,
+    textOf: (address) => (byAddress.has(address) ? textOf(byAddress.get(address)) : null),
+    parseHtml: (text) => fromHtml(text),
+  }
+}
 {
   count += 1
   const fixture = rules.addressFixture
@@ -127,9 +143,36 @@ for (const rule of rules.addresses.attributes) {
   for (const [name, text] of Object.entries(fixture.pages)) {
     pages.push({ slug: name.replace(/\.html$/, ""), tree: fromHtml(text), frontmatter: {}, declared: [] })
   }
-  const used = [...addressesThePagesUse(pages, fileAddresses, { addresses: rules.addresses }, (fp) => slugifyFilePath(fp))].sort()
+  const carried = carriedFrom(fixture.files, (fp) => (fixture.fileText ?? {})[fp] ?? "x")
+  const used = [...addressesThePagesUse(pages, fileAddresses, { addresses: rules.addresses, followed: rules.followed }, (fp) => slugifyFilePath(fp), carried)].sort()
   const needed = [...fixture.needed].sort()
   if (!same(used, needed)) failures.push(`addressFixture: the emitter's reader needs ${JSON.stringify(used)}, the fixture ${JSON.stringify(needed)}`)
+}
+// The follow limits: one stylesheet deeper than followed.limits.depth throws,
+// with the contract's words; one fewer is followed to its end.
+{
+  count += 1
+  const depth = rules.followed.limits.depth
+  const files = []
+  const text = {}
+  for (let number = 0; number <= depth + 1; number += 1) {
+    files.push(`Media/s${number}.css`)
+    text[`Media/s${number}.css`] = number <= depth ? `@import "s${number + 1}.css";` : "p { color: red }"
+  }
+  const fileAddresses = new Set(files)
+  const side = { addresses: rules.addresses, followed: rules.followed }
+  const carried = carriedFrom(files, (fp) => text[fp])
+  let thrown = null
+  try {
+    followCarriedFiles(new Set(["Media/s0.css"]), fileAddresses, side, carried)
+  } catch (error) {
+    thrown = error
+  }
+  if (thrown === null || thrown.name !== "FollowLimitReached" || thrown.message !== rules.followed.limitReached) {
+    failures.push(`followed.limits.depth: a chain ${depth + 1} deep did not throw FollowLimitReached with limitReached (${thrown})`)
+  }
+  const shorter = followCarriedFiles(new Set(["Media/s2.css"]), fileAddresses, side, carried)
+  if (!shorter.has(`Media/s${depth + 1}.css`)) failures.push("followed.limits.depth: a chain within the limit was not followed to its end")
 }
 for (const [page, address, resolved] of rules.resolveCases) {
   count += 1
@@ -162,7 +205,7 @@ for (const c of rules.cases) {
   rmSync(root, { recursive: true, force: true })
   for (const name of c.files) {
     mkdirSync(dirname(join(content, name)), { recursive: true })
-    writeFileSync(join(content, name), "file " + name)
+    writeFileSync(join(content, name), (c.fileText ?? {})[name] ?? "file " + name)
   }
   for (const [name, markdown] of Object.entries(c.pages)) {
     mkdirSync(dirname(join(content, name)), { recursive: true })
@@ -248,6 +291,41 @@ for (const c of rules.cases) {
   } finally {
     process.chdir(cwd)
   }
+}
+
+// The emitter past the follow limit: given a side file whose depth is 1, a
+// page's stylesheet that imports another carries EVERY course file, as
+// Quartz's own Assets did, and says plantoir: error: with limitReached.
+{
+  count += 1
+  const root = join(work, "follow-limit")
+  const content = join(root, "content")
+  rmSync(root, { recursive: true, force: true })
+  const files = { "Media/a.css": '@import "b.css";', "Media/b.css": '@import "c.css";', "Media/c.css": "p { color: red }", "Media/unused.png": "png" }
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(content, name)), { recursive: true })
+    writeFileSync(join(content, name), text)
+  }
+  mkdirSync(join(root, "quartz"), { recursive: true })
+  const followed = { ...rules.followed, limits: { ...rules.followed.limits, depth: 1 } }
+  writeFileSync(join(root, "quartz", "plantoir_site_files.json"), JSON.stringify({ ...sides[rules.cases[0].name], followed }))
+  const tree = fromHtml('<link rel="stylesheet" href="Media/a.css">')
+  const ctx = { argv: { directory: content, output: join(root, "public") }, cfg: { configuration: { ignorePatterns: IGNORE, locale: "en-US" } } }
+  const said = []
+  const error = console.error
+  console.error = (...parts) => said.push(parts.join(" "))
+  const cwd = process.cwd()
+  process.chdir(root)
+  try {
+    await drain(PlantoirAssets().emit(ctx, [[tree, { data: { slug: "index", frontmatter: {} } }]], {}))
+  } finally {
+    process.chdir(cwd)
+    console.error = error
+  }
+  const got = filesUnder(join(root, "public"))
+  const every = Object.keys(files).sort()
+  if (!same(got, every)) failures.push(`the emitter past the follow limit carried ${JSON.stringify(got)}, not every file ${JSON.stringify(every)}`)
+  if (!said.includes("plantoir: error: " + rules.followed.limitReached)) failures.push(`the emitter past the follow limit said ${JSON.stringify(said)}`)
 }
 
 console.log(JSON.stringify({ count, failures, cases: rules.cases.length }))

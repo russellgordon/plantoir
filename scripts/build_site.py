@@ -3510,6 +3510,13 @@ BUILD_ID_FILE = ".build-id"
 # files from an earlier one's (plan review of #379, findings 11 and 14).
 _this_build_id: str | None = None
 
+# Whether this build wrote quartz/plantoir_site_files.json (#901). False
+# only when the write failed: the emitter then reads no page's addresses,
+# the check after the build puts back every file the pages use, and the
+# teacher is told so in one line that says the site is complete
+# (siteFiles.sideFile.whenMissing; 901a fix review, M1).
+_side_file_written: bool = True
+
 
 def _new_build_id() -> str:
     import uuid
@@ -7805,7 +7812,7 @@ def _check_the_site_files(output_dir: Path, host_output_dir: Path, course_code: 
         site_files.after_the_build(output_dir / "public", output_dir / "content", host_output_dir,
                                    course=course_code, section=section_number, mode=mode,
                                    emitter=emitter, build_id=_this_build_id or "",
-                                   printer=_say_now)
+                                   printer=_say_now, side_file_written=_side_file_written)
     except Exception as error:
         _say_now(f"plantoir: error: the built website's files could not be checked ({error}); "
                  f"it will be built again before it is next deployed.")
@@ -11098,11 +11105,15 @@ def build_section_site(
     footer_html = config.get("footer_html", "")
     inject_custom_footer_components(quartz_layout_ts, quartz_footer_tsx, footer_html)
     # #901, ALWAYS: what the site's emitter reads besides the pages - the files
-    # always carried and the footer's addresses (siteFiles.sideFile).
+    # always carried, the footer's addresses, the places that hold an address
+    # and how a carried file is followed (siteFiles.sideFile).
+    global _side_file_written
     try:
         site_files.write_side_file(output_dir / "quartz", footer_html)
+        _side_file_written = True
     except OSError as error:
-        print(f"⚠️ Could not note which files the footer uses: {error}")
+        _side_file_written = False
+        print(f"⚠️  {site_files.rules('words', 'sideFileNotWritten')} ({error})")
 
     # Update page title (now with per-section emoji and optional section marker)
     config_path = output_dir / "quartz.config.ts"

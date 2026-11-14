@@ -97,7 +97,7 @@ final class SiteFilesReportTests: XCTestCase {
         let sorted: String = try XCTUnwrap(found["lineWhenSortedAfterTheBuild"] as? String)
         let notZero: [String: Any] = try XCTUnwrap(found["notZero"] as? [String: Any])
         let failedPart: String = try XCTUnwrap(notZero["putBackFailed"] as? String)
-        let unreferencedPart: String = try XCTUnwrap(notZero["unreferenced"] as? String)
+        let keptPart: String = try XCTUnwrap(notZero["kept"] as? String)
         let filled: (String, String) -> String = { (template: String, parts: String) -> String in
             return template
                 .replacingOccurrences(of: "{course}/{section} · ", with: "")
@@ -115,15 +115,24 @@ final class SiteFilesReportTests: XCTestCase {
             course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 3, takenOut: 2,
             unreferenced: 4, firstTime: false, changed: true, assetsEmitter: "plantoir"
         )
+        // Four no page names, two of them taken out: two kept (notZero.keptRule).
         let bothParts: String = failedPart.replacingOccurrences(of: "{putBackFailed}", with: "3")
-            + unreferencedPart.replacingOccurrences(of: "{unreferenced}", with: "4")
+            + keptPart.replacingOccurrences(of: "{kept}", with: "2")
         XCTAssertEqual(both.trailSentence, filled(line, bothParts))
         let quartz: SiteFilesReport = SiteFilesReport(
             course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 0, takenOut: 2,
             unreferenced: 4, firstTime: false, changed: true, assetsEmitter: SiteFilesReport.quartzsOwnEmitter
         )
-        let quartzParts: String = unreferencedPart.replacingOccurrences(of: "{unreferenced}", with: "4")
+        let quartzParts: String = keptPart.replacingOccurrences(of: "{kept}", with: "2")
         XCTAssertEqual(quartz.trailSentence, filled(sorted, quartzParts))
+        // Every file no page names was taken out: nothing is kept, so nothing
+        // is said about it (901a fix review, M2).
+        let allTakenOut: SiteFilesReport = SiteFilesReport(
+            course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 0, takenOut: 2,
+            unreferenced: 2, firstTime: false, changed: true, assetsEmitter: "plantoir"
+        )
+        XCTAssertEqual(allTakenOut.keptBecauseMentioned, 0)
+        XCTAssertEqual(allTakenOut.trailSentence, filled(line, ""))
     }
 
     /// A file no page names that is still on the site (the site's text

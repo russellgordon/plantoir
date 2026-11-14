@@ -13,12 +13,16 @@ contracts/shared-rules.json -> siteFiles it can read without Quartz.
   folder, the check run with repair on, and the counts and the files left
   as the case says;
 * `addressFixture` read three ways that share no code: site_files' reader
-  (the contract's one list of places that hold an address), this test's own
-  element table written from the HTML standard over a small DOM it builds,
-  and the fixture's `needed`, written by hand. Two readers written one from
-  the other agreed on the same mistake (901a review: alt text, a link's
-  title and a description were read as addresses), so a third is written
-  differently;
+  (the contract's one list of places that hold an address, following the
+  carried files), this test's own reader written from the HTML, SVG and CSS
+  standards over a small DOM it builds, with its own CSS tokenizer and its
+  own walk of the carried files, and NEEDED_BY_HAND, the needed addresses
+  written out in this file, which the fixture's `needed` must equal too.
+  Two readers written one from the other agreed on the same mistake (901a
+  review: alt text, a link's title and a description were read as
+  addresses), and a third that shared the contract's list agreed with them
+  by construction (901a fix review, I2), so the expected set is written here
+  by hand;
 * what a teacher reads and when (siteFiles.whenSaid), the marker
   (siteFiles.marker: counts only, never a file's name), the record
   (file-formats.json -> siteFilesRecord) and the side file;
@@ -177,6 +181,8 @@ class TheCheck(unittest.TestCase):
 # on a mistake without a third, differently made, saying so.
 
 URL_ATTRIBUTES_BY_ELEMENT = {
+    # HTML's attribute index, and SVG 2's href on its elements that load a
+    # resource (image, use, feImage, script, a), with SVG 1.1's xlink:href.
     "a": ("href", "xlink:href"),
     "area": ("href",),
     "link": ("href",),
@@ -187,7 +193,6 @@ URL_ATTRIBUTES_BY_ELEMENT = {
     "track": ("src",),
     "iframe": ("src",),
     "embed": ("src",),
-    "script": ("src",),
     "input": ("src", "formaction"),
     "object": ("data",),
     "form": ("action",),
@@ -198,12 +203,93 @@ URL_ATTRIBUTES_BY_ELEMENT = {
     "th": ("background",),
     "image": ("href", "xlink:href"),
     "use": ("href", "xlink:href"),
+    "feimage": ("href", "xlink:href"),
+    "script": ("src", "href", "xlink:href"),
 }
 SRCSET_BY_ELEMENT = {"img": "srcset", "source": "srcset", "link": "imagesrcset"}
 SHARING_META = ("og:image", "og:image:url", "og:image:secure_url", "og:video", "og:video:url",
                 "og:video:secure_url", "og:audio", "og:audio:url", "og:audio:secure_url", "og:url",
                 "twitter:image", "twitter:player", "twitter:url")
-CSS_URL = __import__("re").compile(r"url\(\s*['\"]?([^'\")]+?)['\"]?\s*\)")
+
+
+def css_addresses_the_third_way(css):
+    """Every address in CSS, by a small tokenizer of this test's own: a
+    string inside url(), image-set() or -webkit-image-set() at its own
+    level, a string straight after @import, and an unquoted url(...)."""
+    found = []
+    functions = []
+    word_before = ""
+    position = 0
+    length = len(css)
+    while position < length:
+        character = css[position]
+        if character in "'\"":
+            closing = css.find(character, position + 1)
+            if closing < 0:
+                closing = length
+            value = css[position + 1:closing].strip()
+            inside = functions[-1] if functions else None
+            if inside in ("url", "image-set", "-webkit-image-set"):
+                found.append(value)
+            elif inside is None and word_before == "@import":
+                found.append(value)
+            word_before = ""
+            position = closing + 1
+            continue
+        if character.isalnum() or character in "-_@":
+            finish = position
+            while finish < length and (css[finish].isalnum() or css[finish] in "-_@"):
+                finish += 1
+            word = css[position:finish].lower()
+            if finish < length and css[finish] == "(":
+                finish += 1
+                ahead = finish
+                while ahead < length and css[ahead].isspace():
+                    ahead += 1
+                if word == "url" and ahead < length and css[ahead] not in "'\"":
+                    closing = css.find(")", ahead)
+                    if closing < 0:
+                        closing = length
+                    found.append(css[ahead:closing].strip())
+                    finish = closing + 1
+                else:
+                    functions.append(word)
+            word_before = word
+            position = finish
+            continue
+        if character == ")" and functions:
+            functions.pop()
+        if not character.isspace():
+            word_before = ""
+        position += 1
+    return found
+
+
+def refresh_the_third_way(content):
+    """The address in a refresh's content, read the HTML standard's way:
+    the time, then ; or , then an optional URL=, then the address, which
+    may be quoted."""
+    text = content.strip()
+    position = 0
+    while position < len(text) and (text[position].isdigit() or text[position] == "."):
+        position += 1
+    if position == 0:
+        return None
+    rest = text[position:].lstrip()
+    if rest[:1] in (";", ","):
+        rest = rest[1:].lstrip()
+    if rest[:3].lower() == "url":
+        after = rest[3:].lstrip()
+        if after.startswith("="):
+            rest = after[1:].lstrip()
+    if rest[:1] in ("'", '"'):
+        quote = rest[0]
+        rest = rest[1:]
+        closing = rest.find(quote)
+        if closing >= 0:
+            rest = rest[:closing]
+    rest = rest.strip()
+    return rest if rest else None
 
 
 class Node:
@@ -272,15 +358,19 @@ def addresses_the_third_way(html_text):
                 if words:
                     found.append((words[0], "page"))
         if "style" in node.attributes:
-            for match in CSS_URL.finditer(node.attributes["style"]):
-                found.append((match.group(1).strip(), "page"))
+            for address in css_addresses_the_third_way(node.attributes["style"]):
+                found.append((address, "page"))
         if node.tag == "style":
-            for match in CSS_URL.finditer("".join(node.text)):
-                found.append((match.group(1).strip(), "page"))
+            for address in css_addresses_the_third_way("".join(node.text)):
+                found.append((address, "page"))
         if node.tag == "meta":
             kind = node.attributes.get("property", node.attributes.get("name"))
             if kind in SHARING_META and "content" in node.attributes:
                 found.append((node.attributes["content"].strip(), "page"))
+            if node.attributes.get("http-equiv", "").strip().lower() == "refresh" and "content" in node.attributes:
+                refreshed = refresh_the_third_way(node.attributes["content"])
+                if refreshed is not None:
+                    found.append((refreshed, "page"))
         if "data-geogebra" in node.attributes:
             spec = json.loads(node.attributes["data-geogebra"])
             found.append(((spec.get("root") or ".").rstrip("/") + "/" + spec["sketch"], "page"))
@@ -291,20 +381,93 @@ def addresses_the_third_way(html_text):
     return found
 
 
-def needed_the_third_way(pages, file_addresses):
+def needed_the_third_way(pages, files_by_address, file_text):
+    """Every course file the pages need, and every one a needed HTML, SVG or
+    CSS file needs in turn, by a depth-first walk of this test's own."""
     from urllib.parse import unquote, urljoin, urlsplit
+    root = "https://fixture.invalid/"
     needed = set()
+
+    def take(from_url, address, base):
+        joined = urljoin(root if base == "root" else from_url, address)
+        parts = urlsplit(joined)
+        if parts.netloc != "fixture.invalid":
+            return
+        target = unquote(parts.path).lstrip("/")
+        if target not in files_by_address or target in needed:
+            return
+        needed.add(target)
+        content_path = files_by_address[target]
+        ending = content_path.rsplit(".", 1)[-1].lower()
+        text = file_text.get(content_path, "")
+        if ending in ("html", "htm", "svg"):
+            for inner, inner_base in addresses_the_third_way(text):
+                take(root + target, inner, inner_base)
+        elif ending == "css":
+            for inner in css_addresses_the_third_way(text):
+                take(root + target, inner, "page")
+
     for name, html_text in pages.items():
-        page_url = "https://fixture.invalid/" + name[: -len(".html")]
+        page_url = root + name[: -len(".html")]
         for address, base in addresses_the_third_way(html_text):
-            joined = urljoin("https://fixture.invalid/" if base == "root" else page_url, address)
-            parts = urlsplit(joined)
-            if parts.netloc != "fixture.invalid":
-                continue
-            target = unquote(parts.path).lstrip("/")
-            if target in file_addresses:
-                needed.add(target)
+            take(page_url, address, base)
     return needed
+
+
+# The addresses addressFixture's pages need, written out by hand from
+# reading the pages and the carried files, never derived from the contract's
+# list or from either reader (901a fix review, I2). The fixture's `needed`
+# must equal this, and so must both readings.
+NEEDED_BY_HAND = {
+    "favicon.ico",
+    "Media/button.pdf",
+    "Media/cell.png",
+    "Media/clip.mp4",
+    "Media/clip.vtt",
+    "Media/form.pdf",
+    "Media/frame.pdf",
+    "Media/img-2x.png",
+    "Media/img.png",
+    "Media/link.pdf",
+    "Media/object.pdf",
+    "Media/og-image.png",
+    "Media/phet",
+    "Media/poster.jpg",
+    "Media/program.wasm",
+    "Media/sketch.ggb",
+    "Media/style-attribute.png",
+    "Media/style-element.png",
+    "Media/svg-image.png",
+    "Media/svg-use.svg",
+    "Media/table.png",
+    # Unit-2/Day-3.html: a refresh, an @import string, an image-set's two
+    # strings and its url(), feImage by href and by xlink:href, SVG's script.
+    "Media/refresh.pdf",
+    "Media/import-string.css",
+    "Media/set-1x.png",
+    "Media/set-2x.png",
+    "Media/set-avif.avif",
+    "Media/fe-image.png",
+    "Media/fe-xlink.png",
+    "Media/svg-script.js",
+    # A carried stylesheet's picture.
+    "Media/import-pic.png",
+    # A teacher's own page in a frame, served without .html, and what it
+    # loads: its stylesheet, that stylesheet's picture and import, the
+    # imports' loop and pictures, its script and its picture.
+    "Media/teacher-page",
+    "Media/teacher-page.css",
+    "Media/teacher-page.js",
+    "Media/teacher-pic.png",
+    "Media/paper.png",
+    "Media/deeper.css",
+    "Media/deep.png",
+    "Media/linked.css",
+    "Media/linked-pic.png",
+    # A carried SVG and the picture inside it.
+    "Media/diagram.svg",
+    "Media/diagram-inner.png",
+}
 
 
 class TheThirdReading(unittest.TestCase):
@@ -313,8 +476,13 @@ class TheThirdReading(unittest.TestCase):
         self.temporary = Path(tempfile.mkdtemp(prefix="plantoir-site-files-third-"))
         self.fixture = RULES["addressFixture"]
         self.file_addresses = set()
+        self.files_by_address = {}
         for name in self.fixture["files"]:
             self.file_addresses.add(site_files.slugify_file_path(name))
+            self.files_by_address[site_files.slugify_file_path(name)] = name
+        self.content_files = {}
+        for name in self.fixture["files"]:
+            self.content_files[name] = self.fixture.get("fileText", {}).get(name, "x")
 
     def tearDown(self):
         shutil.rmtree(self.temporary, ignore_errors=True)
@@ -329,24 +497,108 @@ class TheThirdReading(unittest.TestCase):
         self.assertTrue(needed <= self.file_addresses)
 
     def test_three_readings_agree_on_the_fixture(self):
-        needed = set(self.fixture["needed"])
-        third = needed_the_third_way(self.fixture["pages"], self.file_addresses)
-        public = self.temporary / "public"
+        self.assertEqual(sorted(self.fixture["needed"]), sorted(NEEDED_BY_HAND),
+                         "the contract's needed against the list written in this test")
+        third = needed_the_third_way(self.fixture["pages"], self.files_by_address, self.fixture.get("fileText", {}))
+        public, content = self.temporary / "public", self.temporary / "content"
         write_tree(public, self.fixture["pages"])
-        product = site_files.addresses_the_site_uses(public) & self.file_addresses
-        self.assertEqual(sorted(third), sorted(needed), "the test's own reading against the hand-written list")
-        self.assertEqual(sorted(product), sorted(needed), "site_files' reading against the hand-written list")
+        write_tree(content, self.content_files)
+        files = site_files.course_files(content)
+        product = site_files.follow_carried_files(site_files.addresses_the_site_uses(public), files, content,
+                                                  site_files.address_rules(), site_files.followed_rules())
+        product = product & self.file_addresses
+        self.assertEqual(sorted(third), sorted(NEEDED_BY_HAND), "the test's own reading against the hand-written list")
+        self.assertEqual(sorted(product), sorted(NEEDED_BY_HAND), "site_files' reading against the hand-written list")
 
     def test_the_check_puts_back_exactly_the_needed_files_and_nothing_on_a_correct_tree(self):
         public, content = self.temporary / "public", self.temporary / "content"
         write_tree(public, self.fixture["pages"])
-        write_tree(content, self.fixture["files"])
+        write_tree(content, self.content_files)
         outcome = site_files.check(public, content, repair=True)
-        self.assertEqual(outcome["putBack"], len(self.fixture["needed"]))
+        self.assertEqual(outcome["putBack"], len(NEEDED_BY_HAND))
         self.assertEqual(outcome["unreferenced"], 0)
         again = site_files.check(public, content, repair=False)
         self.assertEqual((again["putBack"], again["putBackFailed"], again["unreferenced"]), (0, 0, 0))
-        self.assertEqual(again["carried"], len(self.fixture["needed"]))
+        self.assertEqual(again["carried"], len(NEEDED_BY_HAND))
+
+
+class FollowingACarriedFile(unittest.TestCase):
+    """siteFiles.followed (901a fix review, I1): a file a carried HTML, SVG
+    or CSS file loads is used too, transitively, and the walk ends."""
+
+    def setUp(self):
+        self.temporary = Path(tempfile.mkdtemp(prefix="plantoir-site-files-follow-"))
+        self.content = self.temporary / "content"
+
+    def tearDown(self):
+        shutil.rmtree(self.temporary, ignore_errors=True)
+
+    def follow(self, used, **limits):
+        files = site_files.course_files(self.content)
+        return site_files.follow_carried_files(set(used), files, self.content, site_files.address_rules(),
+                                               site_files.followed_rules(), **limits)
+
+    def test_the_kinds_and_limits_are_the_contracts(self):
+        followed = RULES["followed"]
+        self.assertEqual(site_files.side_file("")["followed"], followed)
+        self.assertEqual(site_files.kind_of_carried_file("Media/Page.HTML", followed["kinds"]), "html")
+        self.assertEqual(site_files.kind_of_carried_file("Media/a.svg", followed["kinds"]), "html")
+        self.assertEqual(site_files.kind_of_carried_file("Media/a.css", followed["kinds"]), "css")
+        self.assertIsNone(site_files.kind_of_carried_file("Media/sketch.js", followed["kinds"]),
+                          "JavaScript is never read (knownLimits)")
+        self.assertIsNone(site_files.kind_of_carried_file("Media/a.png", followed["kinds"]))
+        self.assertGreaterEqual(followed["limits"]["depth"], 8)
+        self.assertGreaterEqual(followed["limits"]["files"], 1000)
+
+    def test_a_loop_is_read_once(self):
+        write_tree(self.content, {"Media/a.css": '@import "b.css";', "Media/b.css": "@import url(a.css); p{background:url(c.png)}",
+                                  "Media/c.png": "png"})
+        self.assertEqual(self.follow({"Media/a.css"}), {"Media/a.css", "Media/b.css", "Media/c.png"})
+
+    def test_an_address_that_leaves_the_course_is_not_followed(self):
+        write_tree(self.content, {"Media/page.html": ('<img src="https://example.org/x.png"><img src="/static/icon.png">'
+                                                      '<img src="//cdn.example.org/y.png"><img src="#top"><img src="nothing.png">'),
+                                  "Media/x.png": "png"})
+        self.assertEqual(self.follow({"Media/page"}), {"Media/page"})
+
+    def test_a_chain_deeper_than_the_limit_says_so_rather_than_stop(self):
+        depth = RULES["followed"]["limits"]["depth"]
+        chain = {}
+        for number in range(depth + 1):
+            chain[f"Media/s{number}.css"] = f'@import "s{number + 1}.css";'
+        chain[f"Media/s{depth + 1}.css"] = "p { color: red }"
+        write_tree(self.content, chain)
+        with self.assertRaises(site_files.FollowLimitReached) as raised:
+            self.follow({"Media/s0.css"})
+        self.assertEqual(str(raised.exception), RULES["followed"]["limitReached"])
+        # A chain whose last stylesheet lies `depth - 1` files below the page
+        # is followed to its end.
+        shorter = self.follow({"Media/s2.css"})
+        self.assertIn(f"Media/s{depth + 1}.css", shorter)
+
+    def test_more_files_than_the_limit_says_so(self):
+        write_tree(self.content, {"Media/a.css": '@import "b.css"; @import "c.css";', "Media/b.css": "", "Media/c.css": ""})
+        with self.assertRaises(site_files.FollowLimitReached):
+            self.follow({"Media/a.css"}, files_limit=2)
+        self.assertEqual(len(self.follow({"Media/a.css"}, files_limit=3)), 3)
+
+    def test_a_check_that_reaches_the_limit_fails_loudly(self):
+        """The check raises, so build_site says plantoir: error: and leaves
+        the build unmarked (check.failure); it never quietly leaves a file
+        off."""
+        public = self.temporary / "public"
+        write_tree(public, {"index.html": '<link rel="stylesheet" href="Media/a.css">', "Media/a.css": "x"})
+        write_tree(self.content, {"Media/a.css": '@import "b.css";', "Media/b.css": '@import "a.css";'})
+        original = site_files.follow_carried_files
+
+        def tight(used, files, content_dir, address_rules, followed, depth_limit=None, files_limit=None):
+            return original(used, files, content_dir, address_rules, followed, depth_limit=1)
+        site_files.follow_carried_files = tight
+        try:
+            with self.assertRaises(site_files.FollowLimitReached):
+                site_files.check(public, self.content, repair=True)
+        finally:
+            site_files.follow_carried_files = original
 
 
 class TheOneList(unittest.TestCase):
@@ -378,7 +630,8 @@ class TheOneList(unittest.TestCase):
             encoding="utf-8")
         self.assertIn("addresses?: AddressRules", source)
         self.assertNotIn("Object.entries(properties)) {\n      if (typeof value === \"string\")", source)
-        for name in ('"imagesrcset"', '"srcSet"', '"datageogebra"', '"data-geogebra"', '"poster"', '"xLinkHref"'):
+        for name in ('"imagesrcset"', '"srcSet"', '"datageogebra"', '"data-geogebra"', '"poster"', '"xLinkHref"',
+                     '"feimage"', '"refresh"', '".css"', '".html"', '".svg"', 'depth: 16', 'files: 10000'):
             self.assertFalse(name in source, name + " is the contract's to say, not the rules file's")
 
 
@@ -488,6 +741,30 @@ class WhatIsSaid(unittest.TestCase):
             self.assertEqual(len(said), 2, "the same count says nothing more")
         finally:
             shutil.rmtree(root, ignore_errors=True)
+
+    def test_a_missing_side_file_is_said_in_one_true_line(self):
+        """The emitter read nothing, so every file the pages use was put back:
+        one line, which says the site is complete, not one per file
+        (siteFiles.sideFile.whenMissing; 901a fix review, M1)."""
+        words = RULES["words"]
+        outcome = dict(self.OUTCOME, putBack=3, putBackFiles=["Media/a.png", "Media/b.png", "Media/c.png"])
+        lines = site_files.lines_to_say(outcome, {"leftOff": 2}, mode="deploy", section=4, side_file_written=False)
+        self.assertEqual(lines, [words["sideFileMissingPutBack"].replace("{count}", "3").replace("{files}", "files")
+                                 .replace("{section}", "4")])
+        one = dict(self.OUTCOME, putBack=1, putBackFiles=["Media/a.png"])
+        lines = site_files.lines_to_say(one, {"leftOff": 2}, mode="preview", section=4, side_file_written=False)
+        self.assertEqual(lines, [words["sideFileMissingPutBackPreview"].replace("{count}", "1").replace("{files}", "file")])
+        # A file that could not be put back: the site is not complete, so it
+        # is never called complete, and each file is said.
+        failed = dict(outcome, putBackFailed=1, putBackFailedFiles=["Media/d.png"])
+        lines = site_files.lines_to_say(failed, {"leftOff": 2}, mode="deploy", section=4, side_file_written=False)
+        self.assertEqual(len(lines), 4)
+        for line in lines:
+            self.assertNotIn("complete", line)
+        # The side file written: a line per file, as before.
+        self.assertEqual(len(site_files.lines_to_say(outcome, {"leftOff": 2}, mode="deploy", section=4)), 3)
+        for key in ("sideFileNotWritten", "sideFileMissingPutBack", "sideFileMissingPutBackPreview"):
+            self.assertNotIn("footer", words[key])
 
     def test_the_side_file_holds_the_footers_addresses(self):
         side = site_files.side_file('<a href="https://school.example"><img src="Media/logo.png" alt="Logo"></a>')

@@ -10,8 +10,9 @@
 //   one of the attributes in siteFiles.addresses on one of its elements
 //   (src, href, srcset, poster, an object's data, SVG's href, a style's
 //   url(...), a GeoGebra sketch's data-geogebra, read from its own `root`),
-//   a <meta> whose content is defined to be an address, or a <style>'s
-//   url(...). Alt text, a link's title, aria-label, a description, any other
+//   a <meta> whose content is defined to be an address, a refresh's
+//   address, or an address in a <style>'s CSS (url(...), @import, image-set).
+//   Alt text, a link's title, aria-label, a description, any other
 //   attribute, text and code are never addresses: a page that only MENTIONS
 //   a file's name does not use it. The list is the contract's, handed in
 //   through the build's side file (sideFile.keys.addresses), so this file
@@ -24,9 +25,16 @@
 // * or it is always carried (the site's root favicon.ico, written into
 //   content/ by the build).
 //
-// A file named only by another file (a teacher's HTML that loads its own
-// script), only by a hidden page, or only by a page a published page embeds
-// that is itself hidden, is not carried: a student can reach none of them.
+// A file a CARRIED file loads is carried too (siteFiles.followed, 901a fix
+// review I1): a carried HTML, SVG or CSS file (a teacher's own page shown in
+// a frame, a stylesheet a page links) is read at the same places, from its
+// own address, transitively, breadth first with a visited set, and only a
+// course file is followed. Past siteFiles.followed.limits it throws
+// FollowLimitReached rather than stop quietly. JavaScript is never read
+// (siteFiles.knownLimits).
+//
+// A file named only by a hidden page, or only by a page a published page
+// embeds that is itself hidden, is not carried: a student can reach neither.
 //
 // No imports, so `node --experimental-strip-types` runs this file alone; the
 // emitter hands in Quartz's own slugifyFilePath.
@@ -42,6 +50,13 @@ export type TreeNode = {
 const BASE = "https://site.invalid/"
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/
 const CSS_URL = /url\(\s*(['"]?)([\s\S]*?)\1\s*\)/gi
+// CSS's other two places that hold an address as a plain string (901a fix
+// review, I2): `@import "x.css"` and the strings inside image-set(...).
+// scripts/site_files.py has the same three, letter for letter.
+const CSS_IMPORT = /@import\s+(['"])([\s\S]*?)\1/gi
+const IMAGE_SET = /image-set\(/gi
+// A refresh: the time, a separator, an optional url=, then the address.
+const REFRESH = /^\s*[0-9.]+\s*[;,]?\s*(?:url\s*=\s*)?([\s\S]*)$/i
 
 // The publish filter's own rule (patches/publish.ts). On a rebuild Quartz
 // hands emitters every page, hidden ones included, so the emitter checks.
@@ -60,12 +75,69 @@ export function printPdfPath(frontmatter: Record<string, unknown> | undefined): 
   return "Media/" + pdf.trim()
 }
 
+// Every address a piece of CSS holds (siteFiles.addresses.reads.css): each
+// url(...), each string after @import, and each string directly inside an
+// image-set(...) or -webkit-image-set(...).
 export function addressesInCss(text: string): string[] {
+  const css = String(text ?? "")
   const found: string[] = []
-  for (const match of String(text).matchAll(CSS_URL)) {
+  for (const match of css.matchAll(CSS_URL)) {
     found.push(match[2].trim())
   }
+  for (const match of css.matchAll(CSS_IMPORT)) {
+    found.push(match[2].trim())
+  }
+  for (const item of stringsInImageSets(css)) {
+    found.push(item)
+  }
   return found
+}
+
+// The quoted strings at the first level of each image-set(...). A url(...)
+// inside it is read by CSS_URL, and a type("...") is one level deeper, so
+// neither is taken here.
+function stringsInImageSets(text: string): string[] {
+  const found: string[] = []
+  for (const match of text.matchAll(IMAGE_SET)) {
+    let depth = 1
+    let position = (match.index ?? 0) + match[0].length
+    while (position < text.length && depth > 0) {
+      const character = text[position]
+      if (character === "'" || character === '"') {
+        const closing = text.indexOf(character, position + 1)
+        if (closing < 0) {
+          break
+        }
+        if (depth === 1) {
+          found.push(text.slice(position + 1, closing).trim())
+        }
+        position = closing + 1
+        continue
+      }
+      if (character === "(") {
+        depth += 1
+      } else if (character === ")") {
+        depth -= 1
+      }
+      position += 1
+    }
+  }
+  return found
+}
+
+// The address in a refresh meta tag's content (addresses.reads.refresh), or null.
+export function refreshAddress(content: string): string | null {
+  const match = REFRESH.exec(String(content ?? ""))
+  if (match === null) {
+    return null
+  }
+  let rest = match[1].trim()
+  if (rest.startsWith("'") || rest.startsWith('"')) {
+    const closing = rest.indexOf(rest[0], 1)
+    rest = closing >= 0 ? rest.slice(1, closing) : rest.slice(1)
+  }
+  rest = rest.trim()
+  return rest === "" ? null : rest
 }
 
 // `<root>/<sketch>` from a data-geogebra JSON, or null.
@@ -103,6 +175,7 @@ export type AddressAttribute = {
 export type AddressRules = {
   attributes?: AddressAttribute[]
   metaContent?: string[]
+  metaHttpEquiv?: string[]
 }
 
 function ruleFor(rules: AddressRules, tagName: string, name: string): AddressAttribute | null {
@@ -183,6 +256,10 @@ function stringOf(value: unknown): string | null {
 export function addressesInTree(tree: TreeNode, rules: AddressRules): string[] {
   const found: string[] = []
   const metaNames = new Set(rules.metaContent ?? [])
+  const metaHttpEquiv = new Set<string>()
+  for (const kind of rules.metaHttpEquiv ?? []) {
+    metaHttpEquiv.add(kind.toLowerCase())
+  }
   const walk = (node: TreeNode, inStyle: boolean) => {
     if (node.type === "text" && inStyle && typeof node.value === "string") {
       found.push(...addressesInCss(node.value))
@@ -190,10 +267,19 @@ export function addressesInTree(tree: TreeNode, rules: AddressRules): string[] {
     const tagName = typeof node.tagName === "string" ? node.tagName : ""
     const properties = node.properties ?? {}
     if (tagName.toLowerCase() === "meta") {
+      // `property` is read before `name` when a <meta> has both, in both
+      // readers (siteFiles.addresses.metaRule).
       const named = stringOf(properties.property) ?? stringOf(properties.name)
       const content = stringOf(properties.content)
       if (named !== null && content !== null && metaNames.has(named)) {
         found.push(content)
+      }
+      const httpEquiv = stringOf(properties.httpEquiv)
+      if (httpEquiv !== null && content !== null && metaHttpEquiv.has(httpEquiv.trim().toLowerCase())) {
+        const refreshed = refreshAddress(content)
+        if (refreshed !== null) {
+          found.push(refreshed)
+        }
       }
     }
     if (node.type === "element") {
@@ -259,18 +345,126 @@ export type SitePage = {
   declared?: string[]
 }
 
+// siteFiles.followed, as the side file carries it.
+export type Followed = {
+  kinds?: Record<string, string>
+  limits?: { depth?: number; files?: number }
+  limitReached?: string
+}
+
 // quartz/plantoir_site_files.json (siteFiles.sideFile). Without `addresses`
-// no attribute is read, so every file a page shows is left to the check
-// after the build, which puts it back and fails the gates.
-export type SideFile = { alwaysCarried?: string[]; footerAddresses?: string[]; addresses?: AddressRules }
+// no attribute is read, and without `followed` no carried file is read, so
+// every file a page uses is left to the check after the build, which puts
+// it back and fails the gates.
+export type SideFile = {
+  alwaysCarried?: string[]
+  footerAddresses?: string[]
+  addresses?: AddressRules
+  followed?: Followed
+}
+
+// How the emitter hands a carried file to the rules: its content path (null
+// for no course file), its text (null when it cannot be read; asked only of
+// a file of a followed kind, so no picture is ever read), and Quartz's own
+// HTML parser, so this file needs no import.
+export type CarriedFiles = {
+  contentPathOf: (address: string) => string | null
+  textOf: (address: string) => string | null
+  parseHtml: (text: string) => TreeNode
+}
+
+// Thrown when more carried files load one another than followed.limits
+// allows. The emitter carries every file then, and says so.
+export class FollowLimitReached extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "FollowLimitReached"
+  }
+}
+
+// "html", "css" or null, by the content path's ending, lower-cased
+// (siteFiles.followed.kinds).
+export function kindOfCarriedFile(contentPath: string, followed: Followed | undefined): string | null {
+  const lower = contentPath.toLowerCase()
+  for (const [ending, kind] of Object.entries(followed?.kinds ?? {})) {
+    if (lower.endsWith(ending)) {
+      return kind
+    }
+  }
+  return null
+}
+
+// `used`, with every course file a carried HTML, SVG or CSS file loads,
+// transitively: each is read at the same places as a page, its addresses
+// resolved from its OWN address, and only a course file is followed.
+// scripts/site_files.follow_carried_files is the same walk.
+export function followCarriedFiles(
+  used: Set<string>,
+  fileAddresses: Set<string>,
+  side: SideFile,
+  carried: CarriedFiles,
+): Set<string> {
+  const followed = side.followed
+  const depthLimit = Number(followed?.limits?.depth ?? 16)
+  const filesLimit = Number(followed?.limits?.files ?? 10000)
+  const result = new Set<string>(used)
+  const queue: Array<[string, number]> = []
+  for (const address of [...used].sort()) {
+    queue.push([address, 0])
+  }
+  const visited = new Set<string>()
+  let read = 0
+  let position = 0
+  while (position < queue.length) {
+    const [address, depth] = queue[position]
+    position += 1
+    if (visited.has(address)) {
+      continue
+    }
+    visited.add(address)
+    if (!fileAddresses.has(address)) {
+      continue
+    }
+    const contentPath = carried.contentPathOf(address)
+    if (contentPath === null) {
+      continue
+    }
+    const kind = kindOfCarriedFile(contentPath, followed)
+    if (kind === null) {
+      continue
+    }
+    if (depth >= depthLimit || read >= filesLimit) {
+      throw new FollowLimitReached(String(followed?.limitReached ?? "too many files load one another"))
+    }
+    read += 1
+    const text = carried.textOf(address)
+    if (text === null) {
+      continue
+    }
+    const found = kind === "html" ? addressesInTree(carried.parseHtml(text), side.addresses ?? {}) : addressesInCss(text)
+    for (const candidate of found) {
+      const target = resolvedFromPage(address, candidate)
+      if (target === null || !fileAddresses.has(target)) {
+        continue
+      }
+      result.add(target)
+      if (!visited.has(target)) {
+        queue.push([target, depth + 1])
+      }
+    }
+  }
+  return result
+}
 
 // The addresses (Quartz's slugs of content paths) of every file the
-// published pages use, among `fileAddresses`.
+// published pages use, among `fileAddresses`, and, given `carried`, every
+// file those load in turn (followCarriedFiles).
 export function addressesThePagesUse(
   pages: SitePage[],
   fileAddresses: Set<string>,
   side: SideFile,
   slugOf: (contentPath: string) => string,
+  carried?: CarriedFiles,
 ): Set<string> {
   const used = new Set<string>()
   const footer = side.footerAddresses ?? []
@@ -308,5 +502,8 @@ export function addressesThePagesUse(
       used.add(target)
     }
   }
-  return used
+  if (carried === undefined) {
+    return used
+  }
+  return followCarriedFiles(used, fileAddresses, side, carried)
 }

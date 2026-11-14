@@ -4460,10 +4460,16 @@ fi
 # The course's files the main build carried (#901): one PLANTOIR_SITE_FILES:
 # line, Plantoir's emitter, and neither safety count above zero - a file a
 # page needed that the emitter left out, or one it carried that no page
-# names, is the emitter's fault, which the safety net must not hide.
-if python3 - /tmp/verify_main_build.log <<'SITEFILESPY'
+# names, is the emitter's fault, which the safety net must not hide. A build
+# that could not write the emitter's side file fails too
+# (siteFiles.sideFile.whenMissing), as every put-back does.
+if python3 - /tmp/verify_main_build.log contracts/shared-rules.json <<'SITEFILESPY'
 import json, re, sys
 said = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+words = json.load(open(sys.argv[2], encoding="utf-8"))["siteFiles"]["words"]
+if words["sideFileNotWritten"] in said:
+    print("   the build could not write the site's side file (siteFiles.words.sideFileNotWritten)")
+    sys.exit(1)
 lines = re.findall(r"PLANTOIR_SITE_FILES: (\{[^\r\n]*\})", said)
 if len(lines) != 1:
     print(f"   the main build printed {len(lines)} PLANTOIR_SITE_FILES: lines, not one")

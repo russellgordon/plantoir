@@ -52,6 +52,19 @@ struct SiteFilesReport: Equatable {
         return assetsEmitter == SiteFilesReport.quartzsOwnEmitter
     }
 
+    /// The files no page names that are still on the site because its text
+    /// mentions them: `unreferenced` less `takenOut` (`activityTrail.mustRecord`
+    /// → `notZero.keptRule`). `unreferenced` alone counts the files already
+    /// taken out too, so it read as if they were still there (901a fix
+    /// review, M2).
+    nonisolated var keptBecauseMentioned: Int {
+        let kept: Int = unreferenced - takenOut
+        if kept < 0 {
+            return 0
+        }
+        return kept
+    }
+
     /// The parts of the line that are said only when their count is above
     /// zero (`activityTrail.mustRecord` → `notZero`), in the contract's order.
     nonisolated var countsSaidWhenNotZero: String {
@@ -59,8 +72,8 @@ struct SiteFilesReport: Equatable {
         if putBackFailed > 0 {
             parts += ", \(putBackFailed) could not be put back"
         }
-        if unreferenced > 0 {
-            parts += ", \(unreferenced) found on the website that no page names"
+        if keptBecauseMentioned > 0 {
+            parts += ", \(keptBecauseMentioned) kept because the website mentions them"
         }
         return parts
     }

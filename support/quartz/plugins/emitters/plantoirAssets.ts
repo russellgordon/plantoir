@@ -18,19 +18,28 @@
 // and said, and the gates fail on it.
 //
 // quartz/plantoir_site_files.json (written by the build) is READ, not
-// imported: the files always carried, the footer's addresses, and which
+// imported: the files always carried, the footer's addresses, which
 // attributes hold an address (siteFiles.addresses, the one list this and
-// scripts/site_files.py both follow). Without it only the root favicon is
+// scripts/site_files.py both follow) and how a carried HTML, SVG or CSS file
+// is followed (siteFiles.followed). Without it only the root favicon is
 // always carried and no attribute is read, so every file a page uses is left
 // to the check after the build, which puts it back and fails the gates.
+//
+// A carried file is read from content/ only when it is of a followed kind,
+// parsed by Quartz's own HTML parser (hast-util-from-html, which
+// plantoirFigures.ts uses too) or read as CSS. When more carried files load
+// one another than followed.limits allows, this carries EVERY file, as
+// Quartz's own Assets did, and says so on a plantoir: error: line: a file
+// wrongly left out breaks a page silently, which is the worse direction.
 
 import { readFileSync } from "fs"
 import fs from "fs"
 import path from "path"
+import { fromHtml } from "hast-util-from-html"
 import { FilePath, joinSegments, slugifyFilePath } from "../../util/path"
 import { glob } from "../../util/glob"
 import { QuartzEmitterPlugin } from "../types"
-import { addressesThePagesUse, SideFile, SitePage, TreeNode } from "./siteFilesRules"
+import { addressesThePagesUse, CarriedFiles, SideFile, SitePage, TreeNode } from "./siteFilesRules"
 
 const SIDE_FILE = path.join("quartz", "plantoir_site_files.json")
 const LAST_USED = "__plantoirSiteFilesLastUsed"
@@ -66,6 +75,47 @@ function sitePages(content: Content): SitePage[] {
 
 const slugOf = (contentPath: string): string => slugifyFilePath(contentPath as FilePath)
 
+// The course's files as the rules read a carried one: by address, the first
+// content path met for it, as scripts/site_files.course_files keeps.
+function carriedFiles(directory: string, offered: FilePath[]): CarriedFiles {
+  const byAddress = new Map<string, FilePath>()
+  for (const fp of offered) {
+    const address = slugOf(fp)
+    if (!byAddress.has(address)) {
+      byAddress.set(address, fp)
+    }
+  }
+  return {
+    contentPathOf: (address) => byAddress.get(address) ?? null,
+    textOf: (address) => {
+      const fp = byAddress.get(address)
+      if (fp === undefined) {
+        return null
+      }
+      try {
+        return readFileSync(joinSegments(directory, fp), "utf-8")
+      } catch {
+        return null
+      }
+    },
+    parseHtml: (text) => fromHtml(text) as unknown as TreeNode,
+  }
+}
+
+// Every address the published pages use, and the files those load. Past the
+// follow limit, every file (siteFiles.followed.limits), said loudly.
+function addressesUsed(content: Content, addresses: Set<string>, directory: string, offered: FilePath[]): Set<string> {
+  try {
+    return addressesThePagesUse(sitePages(content), addresses, sideFile(), slugOf, carriedFiles(directory, offered))
+  } catch (error) {
+    if ((error as Error)?.name === "FollowLimitReached") {
+      console.error("plantoir: error: " + (error as Error).message)
+      return new Set<string>(addresses)
+    }
+    throw error
+  }
+}
+
 async function filesOffered(directory: string, ignorePatterns: string[]): Promise<FilePath[]> {
   return await glob("**", directory, ["**/*.md", ...ignorePatterns])
 }
@@ -96,7 +146,7 @@ export const PlantoirAssets: QuartzEmitterPlugin = () => {
       for (const fp of offered) {
         addresses.add(slugOf(fp))
       }
-      const used = addressesThePagesUse(sitePages(content as unknown as Content), addresses, sideFile(), slugOf)
+      const used = addressesUsed(content as unknown as Content, addresses, argv.directory, offered)
       ;(globalThis as Record<string, unknown>)[LAST_USED] = used
       for (const fp of offered) {
         if (!used.has(slugOf(fp))) {
@@ -119,7 +169,7 @@ export const PlantoirAssets: QuartzEmitterPlugin = () => {
       for (const fp of offered) {
         addresses.add(slugOf(fp))
       }
-      const used = addressesThePagesUse(sitePages(content as unknown as Content), addresses, sideFile(), slugOf)
+      const used = addressesUsed(content as unknown as Content, addresses, argv.directory, offered)
       const before = ((globalThis as Record<string, unknown>)[LAST_USED] as Set<string> | undefined) ?? new Set<string>()
       ;(globalThis as Record<string, unknown>)[LAST_USED] = used
       const changed = new Set<string>()

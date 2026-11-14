@@ -5037,10 +5037,11 @@ A published page uses a file when:
   `content/`.
 
 A file reached only through a hidden page is not carried: Quartz renders a
-hidden page embedded in a published one as nothing. A file named only by
-another file (a teacher's HTML that loads its own script) is not carried
-either (0 such files on the 27 sites, plan review 901-9). A reference
-matches only letter for letter after decoding; a match by case or Unicode
+hidden page embedded in a published one as nothing. A file a CARRIED file
+loads is carried too: a teacher's own HTML page in a frame keeps its script,
+its stylesheet and its pictures, and a stylesheet keeps its pictures and its
+imports (below, "A file a carried file loads"). A JavaScript file is never
+read. A reference matches only letter for letter after decoding; a match by case or Unicode
 form is the teacher's own broken link on both sides (901-6: none of 530
 unmatched references matched that way).
 
@@ -5105,9 +5106,13 @@ write `site leaves off files no published page uses` from it when it is the
 first, the count changed, a safety count is above zero (`unreferenced`
 included: a file no page names that the check kept because the site's text
 mentions it is exactly what a problem report needs), or Quartz's own emitter
-ran. The line says how many could not be put back and how many were found on
-the site that no page names only when those counts are not zero (`notZero`
-in the event's `mustRecord` entry) (`SiteFilesReport` on the mac, from a run's console and a
+ran. The line says how many could not be put back and how many no page names
+but were kept because the site's text mentions them (`unreferenced` less
+`takenOut`) only when those counts are not zero (`notZero` in the event's
+`mustRecord` entry; until 901a's fix review it said `unreferenced` itself as
+"found on the website that no page names", which counted the files already
+taken out, so "5 taken out, 5 found on the website" read as if five were
+still there) (`SiteFilesReport` on the mac, from a run's console and a
 scheduled deploy's record, as `KeptDownloadsReport`). A deploy typed in
 Terminal writes no such line, as `PLANTOIR_DOWNLOADED:` writes none: the plan
 had `deploy.sh` write it, which would double every line for a deploy the app
@@ -5145,13 +5150,23 @@ the side file the emitter reads no attribute and the check puts back every
 used file, which the gates fail on.
 
 Two readers written one from the other share their mistakes, so the tests
-read a third way. `siteFiles.addressFixture` is a small built site with 21
-files its pages use and 11 they only mention (alt, title, aria-label, a
-description, `og:image:alt`, a `<div src>`, a data attribute nobody reads,
-text, a comment, code, a script). `scripts/test_site_files.py` derives its
-needed set with `site_files`' reader, and again with its own element table
-written from the HTML standard over a small DOM it builds, and both must
-equal the hand-written `needed`; the image's check parses the same pages
+read a third way. `siteFiles.addressFixture` is a small built site with 41
+files its pages use (20 of them added by the fix review's round, below) and
+16 they only mention (alt, title, aria-label, a description, `og:image:alt`,
+a `<div src>`, a data attribute nobody reads, text, a comment, code, a
+script, a `<meta>` whose property is not an address, a carried page's alt
+text and text, a file only a script loads, a file beside a carried page).
+`scripts/test_site_files.py` derives its needed set with `site_files`'
+reader, and again with a reader of its own (an element table written from
+the HTML and SVG standards over a small DOM it builds, its own CSS
+tokenizer, its own refresh reading and its own depth-first walk of the
+carried files), and both must equal `NEEDED_BY_HAND`, the needed addresses
+written out in the test itself, which the fixture's `needed` must equal as
+well. The fix review found the first version of this third reading agreed
+with the other two by construction: its element table had the contract's
+elements and attributes and the same `url()`-only CSS rule, so a form all
+three missed passed. The expected set is now typed by hand, never derived
+from the contract's list. The image's check parses the same pages
 with Quartz's own HTML parser and runs `addressesThePagesUse` on them, and
 pins every attribute's `property` against Quartz's `property-information`.
 The image's check also writes the description meta tags into each case's
@@ -5175,6 +5190,101 @@ second copy is a second answer).
 `<iframe srcdoc>` (a page inside an attribute), a script's own `fetch`, and a
 sharing picture written as an absolute address on the section's domain are
 read by neither reader (`siteFiles.knownLimits`).
+
+### A file a carried file loads, and the forms the readers missed (901a's fix review)
+
+The fix review measured, through the real launchers, that both readers read
+only built pages, so a course file's own addresses were never followed. A
+page with `<iframe src="../../Media/r901-frame.html">` had the frame carried
+and served, and the `r901-frame.js` it loads answered 404, with its picture
+off as well; a carried stylesheet's `url(p-css-inner.png)` was off too.
+Under Quartz's own Assets all of them were on the site, `putBack` stayed 0,
+and nothing was said. The likely shape in the field is a teacher's HTML
+export in Media shown in a frame. The director ruled that a file loaded by a
+carried file is carried, because a file wrongly left out breaks a student's
+page silently, which is the worse direction.
+
+`siteFiles.followed`: a carried file whose content path ends in `.html`,
+`.htm`, `.svg` or `.css` is read from `content/`, HTML and SVG at the same
+places as a built page (by the same reader: Quartz's own HTML parser in the
+emitter, `hast-util-from-html`, which `plantoirFigures.ts` already uses; the
+check's own parser in Python), CSS by the CSS reading. Each address is
+resolved from the carried file's OWN address, which for a course `.html`
+file is its name without `.html` in the same folder, so `frame.js` beside it
+resolves beside it. Only an address that names a course file is followed: one
+on another site, an anchor, or one that names no course file is never read.
+The walk is breadth first from every file the pages use, with a visited set,
+in both readers (`siteFilesRules.followCarriedFiles`,
+`site_files.follow_carried_files`). Past `followed.limits` (depth 16, 10,000
+files read) it does not stop quietly: the emitter carries EVERY course file,
+as Quartz's own Assets did, and prints `plantoir: error:` with
+`followed.limitReached`; the check raises with the same words, so the build
+says `plantoir: error:` and is left unmarked, and the gates fail. A visited
+set already ends a loop, so the limits only bound a course of unusual size.
+The image's check proves both: a chain one deeper than the limit throws, and
+the emitter given a depth of 1 in its side file carries every file and says
+the line.
+
+JavaScript is not read: a file only a script loads (a p5.js sketch's
+`loadImage('cat.png')`) is left off, and `siteFiles.knownLimits` says how a
+teacher meets it and how to name the file so it is carried (a Help line
+says so too). Reading a script for strings would carry every name it
+mentions, an answer key included, which is the exposure #901 exists to stop.
+
+Rejected: carrying a carried HTML file's whole folder (the review's option
+b: it carries a teacher's whole export folder, drafts and answer keys beside
+it, and still misses a picture in another folder); only a `knownLimits` line
+(option c: the page breaks with nothing said); following in the check alone,
+which would put the files back on every build and fail the gates for a
+correct page.
+
+The same review found four forms all three readings missed, each measured
+off through a real build: `<style>@import "x.css"</style>` (the string form),
+`image-set("x.png" 1x)`, SVG's `<feImage href>`, and `<meta
+http-equiv="refresh" content="N; url=x.pdf">`. Both readers now read every
+string after `@import` and every string directly inside an `image-set(` or
+`-webkit-image-set(` (a `url(...)` inside it was already read; a
+`type("image/avif")` is one level deeper and is not an address), list
+`feimage` and `script` (SVG's own script) for `href` and `xlink:href`, and
+read a refresh's address (`addresses.metaHttpEquiv`, `addresses.reads.refresh`).
+A `<meta>` with both a `property` and a `name` is read by its `property` in
+both readers (`addresses.metaRule`): the check had taken whichever came first
+in the source.
+
+`<form action="x.html">` names nothing (the review's M5): the site serves a
+course `.html` file at its name without `.html`, and only a page's links,
+pictures and frames are rewritten to that name. It was broken before #901,
+and the same is true of a `.html` address inside a carried HTML file; both
+are in `knownLimits`.
+
+Measured on the tip's files (copies under the run's scratch folder,
+`901a/round3/old/`): with the tip's `siteFilesRules.ts`, `plantoirAssets.ts`
+and `site_files.py`, the Node check (run against a scratch copy of Quartz's
+sources with a darwin esbuild 0.19.12, not the image's 0.25.1; the image row
+in `verify.sh` is the gate) failed 13 rows: the four new courses at both
+emits and in the check, and the fixture. With the tip's `site_files.py` the
+Python test failed 14 (four `checkCases`, the fixture twice, the six
+following tests, the missing side file's line, and the deploy's build, which
+now hands the check whether the side file was written).
+
+### When the side file could not be written
+
+Measured by the fix review (the side file made a directory inside a
+container): the build exits 0, every file a page uses is put back, and the
+site is whole. The emitter reads no attribute without it, so the check puts
+back every used file. It is written on every build (ALWAYS section) from the
+same toolchain as the emitter, so only a failed write leaves it missing; a
+scheduled deploy from an older `.toolchain` runs the older image's Assets
+path, which copies everything. The warning used to say only the footer was
+affected; it now says every file a page uses will be put back
+(`words.sideFileNotWritten`), and after the check the build says ONE line,
+`words.sideFileMissingPutBack` (`…Preview` in a preview), with the count and
+that the site is complete, instead of a line per file (the review counted 66).
+A file that could not be put back is said on its own line, and then the site
+is not called complete. `verify.sh`'s main-build row fails on
+`sideFileNotWritten`, as on every put-back. It clears at the next build that
+can write the file: every build writes it, and a build after the toolchain
+refreshes runs in a new container with a fresh scaffold.
 
 ### Preview and deploy agree
 
