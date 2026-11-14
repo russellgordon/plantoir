@@ -20,6 +20,11 @@ namespace Plantoir.Tests;
 /// it. A shared file could be broken from this machine and every gate on this
 /// machine would stay green.</para>
 ///
+/// <para>Since #886 it also discovers and runs Plantoir Help's
+/// <c>help/tests/test_*.py</c>, from the repository root as <c>verify.sh</c>
+/// does, with the runtime's <c>node</c> on PATH (see
+/// <see cref="SharedHelpTestFilePasses"/>).</para>
+///
 /// <para><b>Why the whole folder rather than the publishing files only.</b> The
 /// first draft of this work watched five publishing files and left the rest.
 /// Two measurements killed that: <c>build_site.py</c> is executed by a publish
@@ -104,12 +109,91 @@ public class PythonToolchainTests
     [MemberData(nameof(PythonTestFiles))]
     public void SharedPythonTestFilePasses(string fileName)
     {
-        var result = RunPython(fileName);
+        var result = RunPython(ScriptsDirectory, fileName, $"scripts/{fileName}");
         _output.WriteLine($"ran on {Interpreter.Describe()}");
 
         Assert.True(
             result.ExitCode == 0,
             $"scripts/{fileName} failed on {Interpreter.Describe()} (exit code {result.ExitCode}).\n\n{result.Output}");
+    }
+
+    // MARK: - Plantoir Help's tests (#886)
+
+    private static string HelpTestsDirectory => Path.Combine(RepoRoot, "help", "tests");
+
+    /// <summary>
+    /// Every <c>help/tests/test_*.py</c>, discovered rather than listed (#886).
+    ///
+    /// <para><c>help/</c> is the one source of Plantoir Help on both platforms
+    /// (#839): its outline, its word check and its token checks are shared
+    /// truth, so a change made from this machine must be gated here as a
+    /// change to <c>scripts/</c> is. Until #886 nothing on Windows ran them,
+    /// and the first run found a real fault: <c>build_help.py</c> printed
+    /// "▸" to a cp1252 pipe and ended in a traceback, so <c>test_tokens.py</c>
+    /// failed 2 of 14 on the runtime's Python 3.14.10. The <c>hiutil</c> tests
+    /// skip off a Mac, by design; the rest must pass.</para>
+    /// </summary>
+    public static IEnumerable<object[]> HelpTestFiles()
+    {
+        foreach (string path in Directory.GetFiles(HelpTestsDirectory, "test_*.py").OrderBy(p => p))
+            yield return new object[] { Path.GetFileName(path) };
+    }
+
+    /// <summary>
+    /// Runs one Help test file as <c>verify.sh</c> does on the Mac:
+    /// <c>python3 help/tests/test_x.py</c> from the REPOSITORY ROOT (the files
+    /// put their own folder on <c>sys.path</c>, so the runtime's <c>._pth</c>
+    /// needs nothing more), with the runtime's <c>node</c> on PATH so the
+    /// search tests run rather than skip.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(HelpTestFiles))]
+    public void SharedHelpTestFilePasses(string fileName)
+    {
+        string relative = Path.Combine("help", "tests", fileName);
+        var result = RunPython(RepoRoot, relative, $"help/tests/{fileName}", withRuntimeNode: true);
+        _output.WriteLine($"ran on {Interpreter.Describe()}");
+        _output.WriteLine(result.Output);
+
+        Assert.True(
+            result.ExitCode == 0,
+            $"help/tests/{fileName} failed on {Interpreter.Describe()} (exit code {result.ExitCode}).\n\n{result.Output}");
+    }
+
+    /// <summary>
+    /// The Help tests must not go quiet either: a moved folder would make the
+    /// theory above vanish and the suite green having run none of them.
+    ///
+    /// <para>The floor is "above zero" rather than today's count (seven on
+    /// 2026-11-14), unlike <see cref="TheSharedPythonTestsAreActuallyFound"/>:
+    /// <c>help/</c> is the Mac's, in active work in this release, and a floor
+    /// at today's count would turn this gate red the day the Mac folds two
+    /// test files into one, which is a change nobody here owes an answer
+    /// to.</para>
+    /// </summary>
+    [Fact]
+    public void TheHelpTestsAreActuallyFound()
+    {
+        int found = HelpTestFiles().Count();
+        Assert.True(
+            found > 0,
+            $"Expected Plantoir Help's tests in {HelpTestsDirectory}; found none. "
+            + "A suite that passes having run nothing is worse than no suite.");
+    }
+
+    /// <summary>
+    /// With a runtime fetched, its <c>node</c> must be there for the Help
+    /// tests: the search tests skip without one, and a skip here would read as
+    /// a pass.
+    /// </summary>
+    [Fact]
+    public void TheHelpTestsGetTheRuntimesNodeWhenOneIsFetched()
+    {
+        if (NativeRuntime.Folder is not { } runtime)
+            return;
+        string node = Path.Combine(runtime, "node", "node.exe");
+        Assert.True(File.Exists(node),
+            $"A runtime is fetched at {runtime}, but it has no node\\node.exe, so Help's search tests would skip. Re-run windows-app\\Vendor\\fetch-runtime.ps1.");
     }
 
     /// <summary>
@@ -179,16 +263,18 @@ public class PythonToolchainTests
 
     // MARK: - Running one
 
-    private static (int ExitCode, string Output) RunPython(string fileName)
+    private static (int ExitCode, string Output) RunPython(
+        string workingDirectory, string script, string displayName, bool withRuntimeNode = false)
     {
         var start = new ProcessStartInfo
         {
             FileName = Interpreter.Path,
-            // Run from `scripts/`, exactly as `verify.sh` does (`cd scripts && python3 …`).
-            // These files import their siblings by BARE NAME — `import deploy`,
-            // `import netlify_badge` — which resolves only when the interpreter's
-            // working directory is the folder they sit in.
-            WorkingDirectory = ScriptsDirectory,
+            // Run from where `verify.sh` runs each file: `scripts/` for the
+            // toolchain's (`cd scripts && python3 …`), whose files import their
+            // siblings by BARE NAME — `import deploy`, `import netlify_badge` —
+            // which resolves only when the working directory is their folder;
+            // the repository root for Help's (`python3 help/tests/test_x.py`).
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -212,7 +298,17 @@ public class PythonToolchainTests
             foreach (string argument in new[] { "-B", "-X", "utf8", "-c", RuntimeShim })
                 start.ArgumentList.Add(argument);
         }
-        start.ArgumentList.Add(fileName);
+        start.ArgumentList.Add(script);
+
+        // Help's search tests run its search.js with node, and skip without
+        // one. The runtime carries node (Quartz needs it); put it first so the
+        // tests run rather than skip. verify.sh uses whatever node is on the
+        // Mac's PATH.
+        if (withRuntimeNode && NativeRuntime.Folder is { } runtimeFolder)
+        {
+            string nodeFolder = Path.Combine(runtimeFolder, "node");
+            start.Environment["PATH"] = nodeFolder + Path.PathSeparator + (start.Environment["PATH"] ?? "");
+        }
 
         // WITHOUT THESE TWO, TWO FILES FAIL ON WINDOWS AND IT LOOKS LIKE A
         // PRODUCT BUG. `build_site.py` prints emoji ("📝 Added exclusion note
@@ -266,7 +362,7 @@ public class PythonToolchainTests
             catch { /* the pipes went with the process; report the timeout alone */ }
 
             return (124,
-                $"scripts/{fileName} did not finish within {TimeoutMilliseconds / 1000} seconds.\n\n{partial}".Trim());
+                $"{displayName} did not finish within {TimeoutMilliseconds / 1000} seconds.\n\n{partial}".Trim());
         }
 
         // unittest writes its report to stderr, so the failure detail is there
