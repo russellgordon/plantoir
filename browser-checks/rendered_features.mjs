@@ -62,7 +62,7 @@ import { fileURLToPath } from "node:url"
 import { outsidePins, pinnedButNotAsked, sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
 import { whoseRefusal } from "./lib/frame_refusals.mjs"
 import { INDEX_WAIT_CEILING_MS, indexWaitNote, untilFetchDataSettles } from "./lib/index_wait.mjs"
-import { byDesignFor, judgeRefusals, refusalMessages, runsAsScript, sortRefusedScripts } from "./lib/refused_by_design.mjs"
+import { byDesignFor, hashOf, inlineScriptsIn, isRefusalLine, judgeRefusals, loaderIn, namedHash, refusalMessages, runsAsScript, sortRefusedScripts } from "./lib/refused_by_design.mjs"
 import { startSiteServer } from "./lib/site_server.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -353,7 +353,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [], indexWaitsGaveUp: 0 }
+  const record = { offSite: [], aborted: new Set(), console: [], consoleWhere: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [], indexWaitsGaveUp: 0 }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -502,6 +502,9 @@ function watchPage(page, record) {
   page.on("response", (response) => {
     const request = response.request()
     if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) return
+    // A redirect is not a document: nothing in it runs, and its body cannot
+    // be read (597b fix review, d1's MINOR).
+    if (response.status() >= 300 && response.status() < 400) return
     record.documents.push(Promise.all([response.text(), response.headerValue("content-security-policy")])
       .then(([body, policy]) => ({ url: response.url(), body, policy: policy ?? "" }), () => null))
   })
@@ -533,6 +536,7 @@ function watchPage(page, record) {
     if (refused) {
       record.frameRefusals.push({ url: refused[1], why: text.slice(0, 200) })
       record.console.push(text)
+      record.consoleWhere.push(at)
       return
     }
     if ((message.type() === "error" || /Mixed Content|Refused to /i.test(text)) && saidByAnEmbed(text, at)) {
@@ -548,6 +552,10 @@ function watchPage(page, record) {
     }
     // A resource that failed is named by the message's place, not its words.
     record.console.push(at && !text.includes(at) ? `${text} (${at})` : text)
+    // Where it was said, kept beside the line (the frame's own address:
+    // about:srcdoc for Netlify's badge), for rendered_rows.json ->
+    // refusedByDesign.frame.
+    record.consoleWhere.push(at)
   })
   page.on("pageerror", (error) => {
     // Thrown inside a teacher's embed (measured 2026-11-13: GeoGebra's,
@@ -1419,12 +1427,18 @@ const OFFLINE_LINES = {
 // The refusals the site's policy makes on purpose, on hosts that have one
 // (rendered_rows.json -> refusedByDesign, lib/refused_by_design.mjs): every
 // document the page was sent, each fetched again as the host serves it to a
-// client that is not a browser, and the inline scripts the page holds now.
+// client that is not a browser, read for the entry's loader; the inline
+// scripts the page holds now; and, to be printed, every srcdoc frame the
+// page holds with the hashes of its inline scripts (the second deployed run
+// could not say which script was refused, or where: 597b's second run).
 // Answers null on a host with none, so nothing is looked at there.
 async function readRefusals(page, record) {
   const entries = byDesignFor(ROWS.refusedByDesign, options.host)
   if (entries.length === 0) return null
+  const entry = entries[0]
   const documents = []
+  const read = []
+  const ownHashes = new Set()
   for (const pending of record.documents) {
     const received = await pending
     let served = null
@@ -1436,7 +1450,10 @@ async function readRefusals(page, record) {
         served = null
       }
     }
+    if (typeof served === "string") for (const text of inlineScriptsIn(served)) ownHashes.add(hashOf(text))
     documents.push(received ? { policy: received.policy, received: received.body, served } : null)
+    const carries = loaderIn(entry, received?.body ?? null) ?? loaderIn(entry, served)
+    read.push({ url: received?.url ?? null, carriesLoader: carries })
   }
   let inTheDom = []
   try {
@@ -1445,7 +1462,44 @@ async function readRefusals(page, record) {
   } catch {
     inTheDom = []
   }
-  return { entries, sorted: sortRefusedScripts({ documents, inTheDom }) }
+  const frames = []
+  for (const frame of page.frames()) {
+    if (frame === page.mainFrame() || frame.url() !== entry.frame) continue
+    try {
+      const element = await frame.frameElement()
+      const id = (await element.getAttribute("id")) ?? ""
+      const texts = await frame.evaluate(() => Array.from(document.querySelectorAll("script:not([src])")).map((script) => script.text))
+      const scripts = []
+      for (const text of texts) scripts.push({ hash: hashOf(text), start: text.trim().replace(/\s+/g, " ").slice(0, 40) })
+      frames.push({ id, scripts })
+    } catch {
+      frames.push({ id: "?", scripts: [] })
+    }
+  }
+  return { entries, evidence: { sorted: sortRefusedScripts({ documents, inTheDom }), documents: read, ownHashes: [...ownHashes] }, frames }
+}
+
+// What the page's srcdoc frames held and what Chromium named, said in the
+// clean-page row's line on a host with a refusedByDesign entry, so a run
+// that is red here says which script was refused and where (the second
+// deployed run's log could not).
+function framesSaid(refusals, messages) {
+  if (!refusals) return ""
+  const entry = refusals.entries[0]
+  const named = new Set()
+  const where = new Set()
+  for (const message of messages) {
+    if (!isRefusalLine(entry, message.text)) continue
+    where.add(message.at ?? "no address")
+    const hash = namedHash(message.text)
+    if (hash) named.add(hash)
+  }
+  const carried = refusals.evidence.documents.filter((one) => one.carriesLoader === true).length
+  const frames = refusals.frames.map((frame) => `#${frame.id || "(no id)"} ${frame.scripts.map((one) => `${one.hash} "${one.start}"`).join(", ") || "no inline script"}`)
+  return `; seen: ${carried} of ${refusals.evidence.documents.length} document(s) carried ${entry.name}'s loader`
+    + `, refusals said in ${[...where].join(", ") || "nothing"}`
+    + (named.size > 0 ? `, naming ${[...named].join(", ")}` : "")
+    + `, ${entry.frame} frames now: ${frames.join("; ") || "none"}`
 }
 
 function judgeClean(record, network, refusals = null) {
@@ -1453,34 +1507,43 @@ function judgeClean(record, network, refusals = null) {
   let setAside = 0
   const offline = Object.keys(OFFLINE_LINES).filter((host) => network[host])
   const forTheNetwork = (text) => offline.some((host) => OFFLINE_LINES[host].test(text))
-  // What the site's policy refuses on purpose: set aside by line, only on a
-  // page that holds such a script and none of its own refused.
-  // Counted as messages, not as records (lib/refused_by_design.mjs,
-  // refusalMessages): WebKit records each "Refused to" line twice.
-  const { messages, twinOf } = refusalMessages(record.console, record.refused)
-  const judged = refusals ? judgeRefusals(refusals.entries, refusals.sorted, messages) : { setAside: [], entry: null, failures: [] }
+  // What the site's policy refuses on purpose: set aside message by
+  // message, only what lib/refused_by_design.mjs judged certain to be the
+  // host's. Counted as messages, not as records (refusalMessages): WebKit
+  // records each "Refused to" line twice, and each record is set aside only
+  // as often as a message it is a copy of was.
+  const { messages, twins } = refusalMessages(record.console, record.refused, record.consoleWhere)
+  const judged = refusals ? judgeRefusals(refusals.entries, refusals.evidence, messages) : { setAside: [], entry: null, failures: [] }
   for (const failure of judged.failures) said.push("refused: " + failure)
-  const byDesign = new Set(judged.setAside)
-  for (const [text, twin] of twinOf) if (byDesign.has(twin)) byDesign.add(text)
+  const asideConsole = new Set()
+  const asideRefused = new Set()
+  for (const message of judged.setAside) {
+    if (message.console !== undefined) asideConsole.add(message.console)
+    if (message.refused !== undefined) asideRefused.add(message.refused)
+  }
+  for (let index = 0; index < twins.length; index += 1) if (twins[index] >= 0 && asideConsole.has(twins[index])) asideRefused.add(index)
   const refusedByDesign = judged.setAside.length
+  // A line in a refusedByDesign wording is judged by that rule alone, never
+  // by expectedConsole's looser pattern (whose "netlify" matches the site's
+  // own address on every Netlify page): 597b's second run.
+  const byDesignWording = (text) => (refusals?.entries ?? []).some((entry) => isRefusalLine(entry, text))
   const consider = (label, text) => {
-    if (byDesign.has(text)) return
-    if (expectedLine(text)) return
+    if (!byDesignWording(text) && expectedLine(text)) return
     if (forTheNetwork(text)) {
       setAside += 1
       return
     }
     if (!said.some((one) => one.includes(text.slice(0, 80)))) said.push(label + text.slice(0, 200))
   }
-  for (const text of record.console) consider("console: ", text)
+  for (let index = 0; index < record.console.length; index += 1) if (!asideConsole.has(index)) consider("console: ", record.console[index])
   for (const text of record.pageErrors) consider("page error: ", text)
-  for (const text of record.refused) consider("refused: ", text)
+  for (let index = 0; index < record.refused.length; index += 1) if (!asideRefused.has(index)) consider("refused: ", record.refused[index])
   for (const text of record.mixed) said.push("mixed content: " + text.slice(0, 200))
   const aside = (setAside > 0 ? `; ${setAside} line(s) set aside that only say ${offline.join(" and ")} could not be reached (no network)` : "")
     + (record.embedLines > 0 ? `; ${record.embedLines} line(s) from inside a teacher's embeds set aside (the embeds row judges the frames)` : "")
-  const designed = refusedByDesign > 0 ? `; ${refusedByDesign} refusal line(s) of ${judged.entry.name} set aside (refused by the site's policy by design, rendered_rows.json -> refusedByDesign)` : ""
-  if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}${designed}` }
-  if (refusedByDesign > 0) return { expected: `${refusedByDesign} refusal line(s) of ${judged.entry.name}, of the ${judged.allowed} its scripts account for, and nothing else${aside}`, byDesign: judged.entry.name, byDesignLines: refusedByDesign }
+  const seen = framesSaid(refusals, messages)
+  if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}${seen}` }
+  if (refusedByDesign > 0) return { expected: `${refusedByDesign} refusal(s) of ${judged.entry.name} in ${judged.entry.frame}, of the ${judged.allowed} its documents account for, and nothing else${aside}${seen}`, byDesign: judged.entry.name, byDesignLines: refusedByDesign, byDesignSeen: seen }
   return { ok: `nothing reported to the console, no page error, nothing refused${aside}` }
 }
 
@@ -1725,7 +1788,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
 
 function toOutcome(row, outcome) {
   if (outcome?.skip) return { row, state: "SKIPPED", detail: outcome.skip }
-  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts ?? [], asked: outcome.asked, byDesign: outcome.byDesign, byDesignLines: outcome.byDesignLines }
+  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts ?? [], asked: outcome.asked, byDesign: outcome.byDesign, byDesignLines: outcome.byDesignLines, byDesignSeen: outcome.byDesignSeen }
   if (outcome?.fail && outcome.asked) return { row, state: "FAIL", detail: outcome.fail, asked: outcome.asked }
   if (outcome?.ok && outcome.asked) return { row, state: "OK", detail: outcome.ok, asked: outcome.asked }
   if (outcome?.ok && outcome.partSkipped) return { row, state: "OK", detail: outcome.ok, partSkipped: outcome.partSkipped }
@@ -1796,7 +1859,10 @@ async function plainRun(engines, network) {
         for (const one of expected) byName.set(one.byDesign, [...(byName.get(one.byDesign) ?? []), one])
         for (const [name, ones] of [...byName].sort()) {
           const counted = ones.map((one) => `${one.page} ${one.byDesignLines ?? "?"}`)
-          say("EXPECTED", row.name, engineName, `${name} refused by the site's policy on ${ones.length} of ${mine.length} pages (${counted.join(", ")}): by design, set aside only where the page holds a refused inline script the host sent the browser alone, and only as many lines as such scripts account for (rendered_rows.json -> refusedByDesign)`)
+          // With the first page's evidence (its documents, where the
+          // refusals were said, Chromium's named hash, the frames), so the
+          // run that passes here records what it set aside.
+          say("EXPECTED", row.name, engineName, `${name} refused by the site's policy on ${ones.length} of ${mine.length} pages (${counted.join(", ")}): by design, set aside only where said in its own frame, on a page whose documents carried its loader, one a document that did (rendered_rows.json -> refusedByDesign); e.g. ${ones[0].page}${ones[0].byDesignSeen ?? ""}`)
         }
         const clean = mine.filter((one) => one.state === "OK")
         if (clean.length > 0) say("OK", `${row.name}, the other pages`, engineName, `${clean.length} pages - ${clean.map((one) => one.page).join(", ")}`)

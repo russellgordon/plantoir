@@ -3212,57 +3212,111 @@ script:
   its own issue (drafted as the 597b follow-up), for both platforms.
 - **Netlify's own badge script is refused by our policy on purpose**, and
   the clean-page row counted that refusal as a failure of all 11 pages in
-  both engines. What identifies it, measured from the run: one refusal a
-  page, worded `Executing inline script violates the following Content
-  Security Policy directive 'script-src …` in Chromium and `Refused to
-  execute a script because its hash, its nonce, or 'unsafe-inline' does not
-  appear in the script-src directive of the Content Security Policy.` in
-  WebKit, while the live policy listed exactly the site's own five inline
-  scripts. The wording alone is not enough, because a policy that lost one
-  of the site's hashes (the drift `netlify_badge.py` exists to prevent) is
-  refused in the same words. So `rendered_rows.json` → `refusedByDesign`
-  names the two wordings, and `browser-checks/lib/refused_by_design.mjs` sets
-  a line aside only on a page holding a refused inline script that is in the
-  page as the browser received it and NOT in the page as the host serves it
-  to a client that is not a browser (the injection is made for browsers; the
-  run's pages fetched with curl carried none). A refused script that is in
-  the site's own page, or that is in neither (made at run time by the page's
-  scripts), fails the row. What is set aside is an `EXPECTED: clean page`
-  line in each engine, counted in the DONE line, named in its own Result
-  block line ("Refused by the site's own policy by design …"), and allowed
-  on Netlify only, one such line an engine; the six-a-host pin of
-  `thirdPartyHostsToday` counts the other EXPECTED lines only. **The count
-  is pinned inside the checker, page by page** (597b fix review, d1: the
-  first version collapsed every page into one EXPECTED line an engine, so
-  its "at most one an engine" could never fail, and one injected script
-  set aside every line in the badge's wording on its page). Now each page
-  may hold at most `refusedScriptsPerDocument` (1) refused script the host
-  sent the browser alone in any one document, and must show exactly
-  `linesPerRefusedScript` (1) message for each; anything else fails the
-  page and names the count. WebKit records one refusal twice (in the
-  console list with the page's address, and in the refused list), and
+  both engines. Both engines word it the same way on every page:
+  `Executing inline script violates the following Content Security Policy
+  directive 'script-src …` in Chromium and `Refused to execute a script
+  because its hash, its nonce, or 'unsafe-inline' does not appear in the
+  script-src directive of the Content Security Policy.` in WebKit. The live
+  policy listed exactly the site's own five inline scripts. The wording
+  alone is not enough, because a policy that lost one of the site's hashes
+  (the drift `netlify_badge.py` exists to prevent) is refused in the same
+  words.
+
+  **What the badge really is (the second deployed run, 2026-11-14).** The
+  first version of the rule looked for a refused inline script that was in
+  the page as the browser received it and not in the page as the host
+  serves it to anything else. It had been proven only against a stand-in
+  that wrote an inline script into the page. On real Netlify it set
+  nothing aside: the second run read `39 OK, 2 FAIL, 0 SKIPPED, 6
+  EXPECTED`, with the clean page failing on all 11 pages in both engines,
+  where 8 EXPECTED had been predicted. The run's full checker log
+  (`rendered-netlify.log` in the run's work folder) showed one refusal
+  line on every page. The served copy it saved
+  (`rendered-netlify-mark.html`) and a live free-tier test site fetched
+  with curl showed what Netlify sends. It appends
+  `<script async src="/.netlify/scripts/hud?variant=public"
+  data-nf-variant="public" …>` after the page's own `</html>`, to curl as
+  well as to browsers. That file is served from the site's own origin, so
+  `'self'` lets it run. Its source (fetched read-only from the live test
+  site) builds `iframe#nl-badge-frame` and writes the badge into the frame's
+  `srcdoc`, with one inline script. A srcdoc frame takes its page's
+  policy, so that script is refused there. #625 had settled the same thing
+  from the other side (`about:srcdoc:85`). The refused script is in
+  neither copy of the page, so the first rule could never find it.
+
+  **The rule now** (`rendered_rows.json` → `refusedByDesign`, with `frame`,
+  `loader` and `refusalsPerDocument`; `lib/refused_by_design.mjs`). A
+  message is set aside only when all of these hold:
+  - it is in one of the two wordings;
+  - the browser said it in `about:srcdoc`, which is the console message's
+    own address, kept beside each line as `consoleWhere`. No page a site
+    builds makes a srcdoc frame;
+  - every document the page was sent could be read for the loader, which is
+    looked for only after the last `</html>`;
+  - there are exactly `refusalsPerDocument` (1) such messages for each
+    document that carried the loader.
+
+  A redirect is not counted as a document. The same words said in the page
+  itself fail with that address named, whatever the host. A refusal in the
+  frame that names one of the page's own hashes (Chromium names the refused
+  script's hash) fails. An inline script the host writes into the page
+  itself fails, so the old stand-in's model is red now. The page's own
+  copies are still read, but only to name a refused script of the site's
+  own (`sortRefusedScripts`). A line in these wordings is never set aside
+  by `expectedConsole`, whose `netlify` matches the site's own address on
+  every Netlify page. That pattern was what had quietly set aside WebKit's
+  console copy of the badge's refusal on both runs, leaving only its
+  refused-list copy red. Every clean-page line on a host with an entry now
+  ends with what was seen: how many documents carried the loader, where
+  each refusal was said, the hash Chromium named, and the srcdoc frames the
+  page holds with their scripts' hashes. A red run therefore says which
+  script was refused and where, which the second run's log could not.
+
+  What is set aside is an `EXPECTED: clean page` line in each engine,
+  counted in the DONE line, named in its own Result block line ("Refused
+  by the site's own policy by design …"), and allowed on Netlify only, one
+  such line an engine. The six-a-host pin of `thirdPartyHostsToday` counts
+  the other EXPECTED lines only. WebKit records one refusal twice (in the
+  console list with the frame's address, and in the refused list).
   `refusalMessages` counts those as one message, one for one, so two
-  refusals in the same words stay two. Measured on the stand-in edge below,
-  both engines, the new checker: one message a document, so Tasks
-  (loaded, reloaded, taken to My Progress) 3, Embeds (reloaded) 2, every
-  other page 1, and `39 OK, 0 FAIL, 0 SKIPPED, 8 EXPECTED`; before the
-  twin was counted once, WebKit failed every page at 2 against 1. **This
-  logic has not yet met a real Netlify page**: the first run predates it.
+  refusals in the same words stay two, and each record is set aside only
+  as often as its message was.
+
+  **Measured on a stand-in for the real edge** (2026-11-14:
+  `M/measure/597c-hud/edge3.mjs`, the run's build with its real `_headers`,
+  Netlify's loader appended after `</html>` for every client, and Netlify's
+  own `hud.js` served at `/.netlify/scripts/hud`). The 597b checker gave
+  the real run's two lines word for word: Chromium's `console:` and
+  WebKit's `refused:`. The new checker gave `39 OK, 0 FAIL, 0 SKIPPED, 8
+  EXPECTED`, one refusal a document in both engines, so Tasks (loaded,
+  reloaded, taken to My Progress) 3, Embeds (reloaded) 2, and every other
+  page 1. Chromium named `sha256-BkKP2XO6WOEc3kXOiLr2ZoY83hamalKjPY9xBcbXVuw=`,
+  the hash of the frame's one script. These cases were proved still red in
+  both engines on the Tasks page:
+  - the policy with one of the site's hashes dropped (the row names the
+    site's script);
+  - a second inline script in the badge's srcdoc ("4 … account for 2");
+  - an inline script written into the page itself;
+  - the same build checked as `--host cloudflare`, where nothing is set
+    aside.
+
+  The load event waits for the async loader, and the loader mounts the
+  frame at once, so every document a row waited on is refused once. That
+  is why one fewer than the documents also fails. None at all sets nothing
+  aside.
+
+  Rejected:
+  - ignoring CSP refusals on Netlify, which hides the hash drift;
+  - pinning the badge script's hash, which is Netlify's to change and would
+    turn the gate red on a Netlify release;
+  - requiring the frame to still be in the last document, because Quartz's
+    page swap can remove it.
+
   The next credentialed run must show both clean-page EXPECTED lines with
-  those counts (Tasks 3, Embeds 2, the rest 1) and no clean-page FAIL. A
-  page failing on the badge's own wording with nothing set aside is most
-  likely a redirect whose document Playwright could not read (Netlify's
-  pretty URLs): without the document nothing can be told apart, so it errs
-  red, and that is the first thing to look at. Measured on a local stand-in for Netlify's edge (the run's build
-  with its real `_headers`, a script added to every page for a browser's
-  User-Agent only): the 597b checker gave `39 OK, 2 FAIL, 0 SKIPPED, 6
-  EXPECTED`, the first run's line exactly; the new one `39 OK, 0 FAIL, 0
-  SKIPPED, 8 EXPECTED`. Proved still red: the same script sent to every
-  client, and the run's policy with one of the site's hashes dropped (badge
-  still added), each failed the row in both engines, naming the site's own
-  script. Rejected: ignoring CSP refusals on Netlify (that hides the hash
-  drift), and matching the badge by its content (never read; the sites were
-  deleted).
+  those counts and no clean-page FAIL, 8 EXPECTED on Netlify. If a page
+  still fails on the badge's wording, its line now names where the
+  refusal was said and what the frames held, and that is the first thing
+  to read.
 - **The tasks row reloaded while the page was still fetching
   `static/contentIndex.json`**, and WebKit throws "TypeError: Load failed"
   into the page when a navigation cancels that fetch (Quartz's `fetchData`,

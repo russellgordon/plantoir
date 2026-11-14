@@ -4958,7 +4958,7 @@ browsers, on the deployed sites (#597)").
 | `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
-| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, sent to browsers only) from the site's own script refused; `test_refused_by_design.mjs` beside it |
+| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, refused in the srcdoc frame its appended loader builds) from the site's own script refused; `test_refused_by_design.mjs` beside it |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
@@ -5004,25 +5004,35 @@ Waits are on the state asked about, with a ceiling.
   row failed both engines on YouTube's advert requests, Vimeo's and PhET's
   fullscreen checks and GeoGebra reaching for the page.
 - **A refusal the site's policy makes on purpose is set aside, by what it
-  is, never by its words alone** (#597's second half, the first deployed
-  run, 2026-11-13). Netlify adds its badge as an inline script on a page's
-  way to a browser, and the policy `netlify_badge.py` writes refuses it by
-  design, one refusal a page in both engines. `rendered_rows.json` →
-  `refusedByDesign` names the host and the two engines' wordings, and
-  `browser-checks/lib/refused_by_design.mjs` sets a line aside only on a page
-  holding a refused inline script that is in some document the page was
-  sent, as the browser received it, and in no document fetched again at the
-  same address without a browser's User-Agent; the site's own refused
-  script, or one its scripts made, fails the row, so a policy that lost a
-  hash is still red. The refusals are counted page by page: at most one
-  such script a document (`refusedScriptsPerDocument`) and exactly one
-  message for each (`linesPerRefusedScript`, WebKit's two records of one
-  message counted once), so a second injected script, a refusal more than
-  the scripts account for, or one fewer fails the page and names the count
-  (597b fix review, d1; measured on a stand-in edge: Tasks 3, Embeds 2,
-  every other page 1, in both engines). What is set aside is an EXPECTED
-  line of the clean-page row, with each page's count, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
-  documentation/07-deployment.md has the measurements.
+  is, never by its words alone** (#597's second half). Netlify appends a
+  loader after every page's own `</html>`
+  (`<script async src="/.netlify/scripts/hud?variant=public" …>`). The
+  loader builds `iframe#nl-badge-frame` and writes the badge into its
+  `srcdoc` with one inline script, which the policy `netlify_badge.py`
+  writes refuses by design in both engines. `rendered_rows.json` →
+  `refusedByDesign` names the host, the two engines' wordings, the `frame`
+  the refusal is said in (`about:srcdoc`), the `loader`, and
+  `refusalsPerDocument` (1). `browser-checks/lib/refused_by_design.mjs`
+  sets a message aside only when all of these hold:
+  - it is in those wordings;
+  - the browser said it in that frame (the console message's own address);
+  - every document the page was sent was read for the loader;
+  - there is exactly one for each document that carried the loader.
+
+  The same words said in the page itself fail, whatever the host, so a
+  policy that lost one of the site's hashes is still red. A second refusal
+  in the frame, or one fewer, fails the page and names the count. The
+  first version looked for the refused script in the page's own HTML. It
+  set nothing aside on real Netlify (the second deployed run, 2026-11-14:
+  2 FAIL, 6 EXPECTED where 8 were predicted), because the script is built
+  in the frame at run time. Measured on a stand-in serving Netlify's own
+  loader and `hud.js`: Tasks 3, Embeds 2, every other page 1, in both
+  engines. What is set aside is an EXPECTED line of the clean-page row,
+  with each page's count and what was seen (documents with the loader,
+  where each refusal was said, Chromium's named hash, the srcdoc frames'
+  scripts), never a pass. Its node test runs in
+  `verify-deploy.sh --self-test`; documentation/07-deployment.md has the
+  measurements.
 - **A row that takes the page elsewhere waits for the page's own index
   request first.** Quartz fetches `static/contentIndex.json` as a page loads
   and nothing catches it, so a reload that cancels it makes WebKit throw
