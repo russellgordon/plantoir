@@ -9559,7 +9559,7 @@ teacher there and never to share or deploy a plan itself.
 and Codex (in that order: GitHub's plans page says every plan includes
 Copilot), each with what is true of it now and one next step. It is reached
 three ways (ruling 3): the pane's own tab, Help ▸ Set Up an Assistant…, and
-Revise With ▸ Set Up Another Assistant…, last in every Revise With submenu.
+Revise With ▸ Set Up an Assistant…, last in every Revise With submenu.
 The two menu items open the pane and set up nothing themselves. **Revise With
 is now always drawn** (ruling, 2026-11-13): a teacher with no assistant at all
 sees it holding the one set-up item. Until #855 a teacher with none saw no
@@ -9584,8 +9584,11 @@ only). The quit rule is `shared-rules.json` →
    Safari works and "check your connection" reads as false.
 2. The maker's own documented set-up is fetched by Plantoir through
    `URLSession` (so the Mac's proxy settings apply), following redirects only
-   to HTTPS on the hosts the recipe names (review L4). All three documented
-   addresses redirect (measured 2026-11-13).
+   to addresses that start with one of the recipe's `allowedAddresses`
+   (scheme, host and path, review L4). By whole address, not host, since the
+   implementation review: `raw.githubusercontent.com` serves any GitHub
+   user's files, so only `/github/copilot-cli/` on it is GitHub's. All three
+   documented addresses redirect (measured 2026-11-13).
 3. Before anything runs, Plantoir looks at the home folder (which of the
    recipe's `removes`, and the folders above them, exist; the bytes of every
    shell start-up file) and writes the record with state `installing` and
@@ -9665,12 +9668,59 @@ activation (up to 2.3 s each time Plantoir comes to the front); npm routes
 (the Mac carries no Node, and two of the three npm packages only fetch the
 same native program).
 
-**Reusable.** `SetUpRecipe`, `SetUpRunner`, `SetUpRecord` and
-`ProgramIdentityChecking` know nothing about assistants: the two programs a
-printed handout needs, which Russell ruled Plantoir sets up too, are planned
-to run through them with recipes of their own (the record's `kind` keeps them
-apart). Sign-in, the pane and the wording are the assistant layer
-(`AssistantSetUp`, `AssistantSetUpCentre`, `AssistantSetUpWording`).
+**One set-up at a time, app-wide** (implementation review finding 1,
+measured): two that overlap each snapshot the start-up files at their own
+start, so a line Codex added during Claude's run was recorded by both, and
+Remove of Claude took Codex's line away. While one runs, every other row's Set
+Up and Try Again are unavailable and say why (`wording.oneAtATime`); queueing
+was rejected, since a set-up starting later is an offer the teacher did not
+make at that moment. Remove also leaves a block another entry records too
+(`SetUpRemoval.profileBlocksShared`), so a record made before this rule is
+safe as well.
+
+**A record that cannot be read is never written over** (finding 2, measured:
+one entry with a state this version does not know made the whole record load
+as empty, and the next write kept only the new entry, so Plantoir's own copy
+became "set up outside Plantoir" with no Remove). Every write now refuses
+when the record is there and unreadable (a set-up then runs nothing); the
+pane moves it aside as `record-unreadable-<seconds>-<id>.json`, writes the
+trail line `outside assistant set-up record set aside`, and shows a program
+it finds with no entry as `recordUnreadable` ("Already set up. Plantoir
+couldn't read its note…"). Every read-change-write is one step under one
+lock: 40 stores finishing together kept 40 of 40, against 6 of 40 before.
+
+**Try Again on a set-up cut short settles it first** (finding 5), so the new
+run's snapshot does not count the earlier run's files as the teacher's.
+
+**Quit Anyway ends the set-up before the app goes** (finding 4): `stopNow`
+asks it to end, polls up to `quitGraceMilliseconds` (500) for it to go, then
+ends its whole process group outright. `stop()`'s later outright end is a
+task a quitting app never lives to run; measured with a stand-in that
+ignores the request to end: after `stop()` it was still running 1 s later,
+after `stopNow()` it was gone. The question has its own first button,
+Finish Setting Up (Russell, 2026-11-13 evening;
+`quittingWhileWorkIsUnderWay.buttons.firstButtonByQuestion`), which still
+means Keep Working; Quit Anyway is unchanged.
+
+**The menu item is "Set Up an Assistant…" in Revise With and in Help**
+(Russell, 2026-11-13 evening): "Another" read wrongly when none is set up;
+a title that changes with the state was rejected.
+
+**What a second kind of set-up reuses, and what it must add** (finding 3;
+the two programs a printed handout needs, planned after #855). It REUSES
+`SetUpRecord` (the before-and-after snapshot, the record written first, the
+exact Remove, `kind` to keep the two apart, the unreadable-record rule and
+the lock), the process handling in `SetUpRunner` (`run`, a session of its
+own, the time limit, `stop` and `stopNow`), `childEnvironment`,
+`SetUpNetwork.answers`, and the quit wiring (`SetUpsUnderWay`; its
+`settingUpSeveral` says "assistants" and needs a word for the handout
+programs). It must ADD: an identity checked by SHA-256 rather than a
+Developer ID (`ProgramIdentityChecking` and `SetUpRecipe.Program` know only
+identifier and team), a download-verify-unpack step beside `perform`'s
+"fetch the maker's set-up and run it" (which caps a fetch at 2 MB and always
+runs it with an interpreter), and an optional follow-on download. Sign-in,
+the pane and the wording are the assistant layer (`AssistantSetUp`,
+`AssistantSetUpCentre`, `AssistantSetUpWording`).
 
 **The trail:** `outside assistant set-up opened` (from where),
 `… set-up started`, `outside assistant set up` (with seconds),

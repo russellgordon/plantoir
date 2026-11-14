@@ -278,6 +278,11 @@ enum QuitConfirmation {
     static let settingUpMessage: String =
         "Quitting now stops it. The next time Plantoir opens, it finishes the set-up or takes away what it had added."
 
+    /// The first button's title while set-ups are the only work under way
+    /// (#855, Russell 2026-11-13 evening: the set-up question has its own
+    /// buttons). It still means `keepWorking`; `buttons.firstButtonByQuestion`.
+    static let finishSettingUpButton: String = "Finish Setting Up"
+
     static let keepWorkingButton: String = "Keep Working"
     static let quitAnywayButton: String = "Quit Anyway"
 
@@ -290,6 +295,27 @@ enum QuitConfirmation {
     ]
 
     // MARK: - Functions
+
+    /// The buttons for the question about `workUnderWay`, in the same order
+    /// and with the same meanings as `buttonsInOrder`: only the first title
+    /// changes, to Finish Setting Up, when set-ups are all that is under way.
+    static func buttons(onlySettingUp: Bool) -> [Button] {
+        if !onlySettingUp {
+            return buttonsInOrder
+        }
+        return [
+            Button(title: finishSettingUpButton, choice: .keepWorking),
+            Button(title: quitAnywayButton, choice: .quitAnyway)
+        ]
+    }
+
+    /// Whether the work under way now is set-ups and nothing else.
+    static func onlySettingUpNow() -> Bool {
+        return CourseActivity.activePublishes.isEmpty
+            && CourseActivity.activePreviewBuilds.isEmpty
+            && CourseActivity.activeCopies.isEmpty
+            && !SetUpsUnderWay.names.isEmpty
+    }
 
     /// What this app is in the middle of, in the words the teacher is shown —
     /// or nil when it is in the middle of nothing.
@@ -435,10 +461,7 @@ enum QuitConfirmation {
         if let message = kinds.message() {
             return message
         }
-        let onlySettingUp: Bool = CourseActivity.activePreviewBuilds.isEmpty
-            && CourseActivity.activeCopies.isEmpty
-            && !SetUpsUnderWay.names.isEmpty
-        if onlySettingUp {
+        if onlySettingUpNow() {
             return settingUpMessage
         }
         return explanation(publishing: false)

@@ -68,7 +68,7 @@ nonisolated enum AssistantSetUp {
             maker: "GitHub",
             installerAddress: URL(string: "https://gh.io/copilot-install")!,
             interpreter: "/bin/bash",
-            allowedHosts: ["gh.io", "raw.githubusercontent.com"],
+            allowedAddresses: ["https://gh.io/copilot-install", "https://raw.githubusercontent.com/github/copilot-cli/"],
             reachabilityHosts: ["github.com", "release-assets.githubusercontent.com"],
             extraEnvironment: [:],
             programs: [
@@ -97,7 +97,7 @@ nonisolated enum AssistantSetUp {
             maker: "Anthropic",
             installerAddress: URL(string: "https://claude.ai/install.sh")!,
             interpreter: "/bin/bash",
-            allowedHosts: ["claude.ai", "downloads.claude.ai"],
+            allowedAddresses: ["https://claude.ai/install.sh", "https://downloads.claude.ai/claude-code-releases/"],
             reachabilityHosts: ["downloads.claude.ai"],
             extraEnvironment: [:],
             programs: [
@@ -126,7 +126,7 @@ nonisolated enum AssistantSetUp {
             maker: "OpenAI",
             installerAddress: URL(string: "https://chatgpt.com/codex/install.sh")!,
             interpreter: "/bin/sh",
-            allowedHosts: ["chatgpt.com", "releases.openai.com"],
+            allowedAddresses: ["https://chatgpt.com/codex/install.sh", "https://releases.openai.com/codex/"],
             reachabilityHosts: ["releases.openai.com"],
             extraEnvironment: ["CODEX_NON_INTERACTIVE": "1"],
             programs: [
@@ -182,6 +182,10 @@ nonisolated enum AssistantSetUp {
 nonisolated enum AssistantSetUpState: String, Sendable, CaseIterable {
     case notSetUp
     case setUpElsewhere
+    /// Found, with no entry, after a record Plantoir could not read was set
+    /// aside: it may be one Plantoir set up, so it is left alone and the
+    /// pane says why (review finding 2).
+    case recordUnreadable
     case downloading
     case checking
     case failedNoConnection
@@ -227,6 +231,7 @@ nonisolated enum AssistantSetUpState: String, Sendable, CaseIterable {
     ///   - recorded: what the record says Plantoir set up, or nil.
     ///   - lastOutcome: how this session's last set-up of it ended, or nil.
     ///   - hasSignedInCheck: the maker documents a signed-in question.
+    ///   - recordSetAside: a record that could not be read was set aside.
     static func decide(
         found: Bool,
         recorded: SetUpRecordEntry.State?,
@@ -234,7 +239,8 @@ nonisolated enum AssistantSetUpState: String, Sendable, CaseIterable {
         lastOutcome: SetUpOutcome?,
         signIn: SignIn,
         status: Status,
-        hasSignedInCheck: Bool
+        hasSignedInCheck: Bool,
+        recordSetAside: Bool = false
     ) -> AssistantSetUpState {
         if activity == .downloading {
             return .downloading
@@ -272,7 +278,7 @@ nonisolated enum AssistantSetUpState: String, Sendable, CaseIterable {
             }
         }
         if found {
-            return .setUpElsewhere
+            return recordSetAside ? .recordUnreadable : .setUpElsewhere
         }
         if let lastOutcome {
             switch lastOutcome {

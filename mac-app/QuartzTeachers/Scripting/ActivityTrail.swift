@@ -1168,6 +1168,10 @@ nonisolated enum ActivityTrail {
         /// Settings pane, the Help menu, Revise With), so a report shows how
         /// the teacher got there.
         case outsideAssistantSetUpOpened = "outside assistant set-up opened"
+        /// Plantoir's record of the assistants it set up could not be read
+        /// (damaged, or from a newer Plantoir) and was kept aside, never
+        /// written over (#855, implementation review finding 2).
+        case outsideAssistantSetUpRecordSetAside = "outside assistant set-up record set aside"
         /// A set-up of Claude Code, Codex or GitHub Copilot started, on the
         /// teacher's Download and Set Up (#855).
         case outsideAssistantSetUpStarted = "outside assistant set-up started"

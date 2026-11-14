@@ -1228,7 +1228,7 @@ struct SidebarView: View {
     /// and so on at the top level — one command, two names.
     ///
     /// Always drawn on a live course's rows since #855, as the menu bar draws
-    /// it, ending with Set Up Another Assistant… (the same view the menu bar
+    /// it, ending with Set Up an Assistant… (the same view the menu bar
     /// uses). Still left out on a course kept for reference, where no door
     /// opens (decision s), and with no working folder.
     @ViewBuilder
@@ -1617,7 +1617,7 @@ struct SidebarView: View {
     /// Claude item: a teacher with one of the two sees one item, a teacher
     /// with both sees both, and a teacher with neither sees no sign that
     /// either exists. Plantoir sets one up only when the teacher asks, from
-    /// Set Up Another Assistant… (#855); the door itself opens onto whatever
+    /// Set Up an Assistant… (#855); the door itself opens onto whatever
     /// copy the search finds.
     @ViewBuilder
     func reviseWithCodexItem(course: Course, row: SidebarSelection) -> some View {

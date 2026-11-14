@@ -106,7 +106,7 @@
         "why": "The first publish of a section stops behind a dialog asking for a Netlify or Cloudflare token, and a teacher who does not notice it reports a publish that 'never finished'. This line is the difference between reading that as a hang and reading it as a question waiting. The answer is a live credential and is never written down - only the name of the thing asked for."
       },
       {
-        "carries": "nothing but the fact - the page is plantoir.app's public support page",
+        "carries": "which page: plantoir.app's public support page (Help > Plantoir Help), or, since #855, the Help page asked for by its anchor ({anchor}, a page id such as set-up-assistant or github-education), opened in the Help book once the app carries one and as the support page until then. Never anything the teacher typed.",
         "event": "opened Plantoir Help",
         "why": "GitHub #457 item 4 (the HIG sweep; Russell, 2026-10-08: Help opens the support page). Help ▸ Plantoir Help used to be the system's item, which said 'Help isn't available for Plantoir'; it now opens https://plantoir.app/support/ in the browser. A teacher who looked for help just before something went wrong is a teacher whose report should say so, and the line is the only trace the app has that they did."
       },
@@ -1260,6 +1260,12 @@
         "why": "#855 (plan review L6). A report of 'it offered me something I did not ask for' is answered by where the teacher opened it. Nothing is offered unasked, so there is no line for an offer."
       },
       {
+        "event": "outside assistant set-up record set aside",
+        "carries": "that Plantoir's record of the assistants it set up could not be read (damaged, or written by a newer Plantoir) and was kept aside, with the name it was given (record-unreadable-<seconds>-<id>.json, no path).",
+        "line": "could not read Plantoir’s record of the assistants it set up, so it was kept aside as {name}",
+        "why": "#855 (implementation review finding 2). After it, a program Plantoir set up shows as set up outside Plantoir, and Remove is not offered for it; the trail is how that is explained."
+      },
+      {
         "event": "outside assistant set-up started",
         "carries": "which assistant, by the name a teacher reads. Written only on the teacher's Download and Set Up.",
         "line": "started setting up {tool}",
@@ -1298,7 +1304,7 @@
       {
         "event": "outside assistant removed",
         "carries": "which assistant, how many items and start-up blocks Plantoir took away, how many blocks it left because the teacher had changed them, and whether anything could not be taken away. Counts only, never a path.",
-        "line": "removed the copy of {tool} Plantoir set up ({items} items, {blocks} start-up blocks[, {n} left because the teacher had changed them][, not everything could be taken away])",
+        "line": "removed the copy of {tool} Plantoir set up ({items} items, {blocks} start-up blocks[, {n} left because another set-up also added them][, {n} left because the teacher had changed them][, not everything could be taken away])",
         "why": "#855 (ruling 4). Removing Codex takes away the start-up line its set-up added, which can change what a teacher's own Terminal finds; the trail says it happened."
       }
     ],
@@ -14768,6 +14774,14 @@
     "whatIsNeverAskedAbout": "Work belonging to another process - a publish set to happen on its own, an assistant driving the app over a connection, or a teacher's own command line. None of them is visible from here, so none of them is asked about; they are protected instead by the quit path refusing to stop anything while a launcher for that folder is running on the machine.",
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
+      "titles": {
+        "keepWorking": "Keep Working",
+        "quitAnyway": "Quit Anyway"
+      },
+      "firstButtonByQuestion": {
+        "whileAnAssistantIsSetUp": "Finish Setting Up"
+      },
+      "firstButtonByQuestionWhy": "#855, Russell 2026-11-13 evening: the quit question while an outside assistant is being set up has its own first button, Finish Setting Up, which means keepWorking. It is used when set-ups are the only work under way (the question then names them); with a publish, a preview build or a copy also under way the question names those and keeps Keep Working. The meanings and their order never change: only the first title does. Each case may say expectFirstButton.",
       "default": "keepWorking",
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
@@ -15099,7 +15113,7 @@
       ]
     },
     "whileAnAssistantIsSetUp": {
-      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with the usual two buttons (keepWorking finishes the set-up; quitAnyway stops it). Quit Anyway ends the set-up's whole process group, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
+      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with its own first button (buttons.firstButtonByQuestion: Finish Setting Up, which is keepWorking) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
       "words": {
         "settingUpOne": "setting up {tool}",
         "settingUpSeveral": "setting up {n} assistants",
@@ -15130,6 +15144,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
+        "expectFirstButton": "Keep Working",
         "why": "The case this exists for."
       },
       {
@@ -15239,6 +15254,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
+        "expectFirstButton": "Finish Setting Up",
         "why": "#855 (Russell, 2026-11-13). A set-up stopped part way can leave a half-written program in the home folder; the teacher is asked, and Quit Anyway stops it for the next launch to settle. assistantsBeingSetUp is 0 when a case leaves it out."
       },
       {

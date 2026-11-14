@@ -29,7 +29,7 @@ nonisolated enum PlantoirHelpPage {
     }
 }
 
-/// Set Up Another Assistant… in Revise With ▸ and Set Up an Assistant… in
+/// Set Up an Assistant… in Revise With ▸ and Set Up an Assistant… in
 /// Help ▸ (#855, ruling 3): both open Settings ▸ Other Assistants and
 /// install nothing themselves. ONE view for every place it is drawn, so the
 /// menu bar's item and every row's context menu item cannot differ.

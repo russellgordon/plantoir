@@ -18,6 +18,7 @@ final class SetUpRunnerTests: XCTestCase {
     mode="$(cat "$HOME/mode" 2>/dev/null || echo succeed)"
     case "$mode" in
       slow) sleep 600 & sleep 600 ;;
+      ignores) trap '' TERM; echo $$ > "$HOME/pid"; sleep 600 ;;
       quick) exit 0 ;;
     esac
     mkdir -p "$HOME/.codex/packages/standalone/releases/9.9/bin" "$HOME/.local/bin"
@@ -78,7 +79,7 @@ final class SetUpRunnerTests: XCTestCase {
             reach: { (host: String) async -> Bool in
                 return reaches
             },
-            fetch: { (address: URL, allowedHosts: [String]) async -> SetUpDependencies.Fetched in
+            fetch: { (address: URL, allowedAddresses: [String]) async -> SetUpDependencies.Fetched in
                 return .script(script)
             },
             identity: StandInCheck(),
@@ -264,10 +265,19 @@ final class SetUpRunnerTests: XCTestCase {
 
     /// Redirects go only to HTTPS on the recipe's hosts.
     func testRedirectsStayWithTheMaker() {
-        let hosts: [String] = AssistantSetUp.codex.recipe.allowedHosts
-        XCTAssertTrue(SetUpRedirectGuard.follows(URL(string: "https://releases.openai.com/codex/install.sh"), allowedHosts: hosts))
-        XCTAssertFalse(SetUpRedirectGuard.follows(URL(string: "https://example.org/install.sh"), allowedHosts: hosts))
-        XCTAssertFalse(SetUpRedirectGuard.follows(URL(string: "http://releases.openai.com/codex/install.sh"), allowedHosts: hosts))
+        let codex: [String] = AssistantSetUp.codex.recipe.allowedAddresses
+        XCTAssertTrue(SetUpRedirectGuard.follows(URL(string: "https://releases.openai.com/codex/install.sh"), allowedAddresses: codex))
+        XCTAssertFalse(SetUpRedirectGuard.follows(URL(string: "https://example.org/install.sh"), allowedAddresses: codex))
+        XCTAssertFalse(SetUpRedirectGuard.follows(URL(string: "http://releases.openai.com/codex/install.sh"), allowedAddresses: codex))
+        XCTAssertFalse(SetUpRedirectGuard.follows(URL(string: "https://releases.openai.com/other/install.sh"), allowedAddresses: codex))
+        // The right host, someone else's file (review finding 7).
+        let copilot: [String] = AssistantSetUp.copilot.recipe.allowedAddresses
+        XCTAssertTrue(SetUpRedirectGuard.follows(
+            URL(string: "https://raw.githubusercontent.com/github/copilot-cli/refs/heads/main/install.sh"), allowedAddresses: copilot
+        ))
+        XCTAssertFalse(SetUpRedirectGuard.follows(
+            URL(string: "https://raw.githubusercontent.com/someone/else/main/install.sh"), allowedAddresses: copilot
+        ))
     }
 
     /// The real check refuses a script and Apple's own program, and the
@@ -355,5 +365,198 @@ final class AssistantSetUpCentreTests: XCTestCase {
             XCTAssertFalse(line.contains("/"), line)
         }
         XCTAssertEqual(lines[0], "set up Codex: in place and made by OpenAI, in 4 s")
+    }
+}
+
+/// The implementation review's findings 1, 2 and 4 (#855), each written to
+/// fail on the code before the fix (proved by copying the old file in).
+@MainActor
+final class SetUpReviewFixTests: XCTestCase {
+
+    // MARK: - Stored properties
+
+    var homes: [URL] = []
+
+    // MARK: - Functions
+
+    override func tearDown() {
+        for home in homes {
+            try? FileManager.default.removeItem(at: home)
+        }
+        homes = []
+        SetUpsUnderWay.reset()
+        super.tearDown()
+    }
+
+    func freshHome() throws -> URL {
+        let home: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plantoir-set-up-fix-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        homes.append(home)
+        return home
+    }
+
+    nonisolated static func entry(_ key: String, block: SetUpProfileChange?) -> SetUpRecordEntry {
+        var changes: [SetUpProfileChange] = []
+        if let block {
+            changes.append(block)
+        }
+        return SetUpRecordEntry(
+            key: key, kind: "assistant", state: .installed, started: Date(), finished: Date(), before: nil,
+            created: [], createdFolders: [], profileChanges: changes, changedInPlace: []
+        )
+    }
+
+    // MARK: - Tests
+
+    /// Finding 1: a Codex line that appeared during Claude's run is in both
+    /// entries. Removing Claude must leave it, because Codex still owns it.
+    func testRemovingClaudeLeavesALineCodexAlsoRecords() throws {
+        let home: URL = try freshHome()
+        let codexBlock: String = "\n# >>> Codex installer >>>\nexport PATH=\"x:$PATH\"\n# <<< Codex installer <<<\n"
+        let teachers: String = "# my own line\n"
+        try (teachers + codexBlock).write(to: home.appendingPathComponent(".zprofile"), atomically: true, encoding: .utf8)
+        let shared: SetUpProfileChange = SetUpProfileChange(path: ".zprofile", appended: codexBlock, fileWasCreated: false)
+        let claude: SetUpRecordEntry = SetUpReviewFixTests.entry("claude", block: shared)
+        let codex: SetUpRecordEntry = SetUpReviewFixTests.entry("codex", block: shared)
+        try SetUpRecord.store(claude, home: home)
+        try SetUpRecord.store(codex, home: home)
+        _ = SetUpRecord.takeAway(claude, recipe: AssistantSetUp.claude.recipe, home: home)
+        let after: String = try String(contentsOf: home.appendingPathComponent(".zprofile"), encoding: .utf8)
+        XCTAssertEqual(after, teachers + codexBlock, "Codex's line went with Claude")
+    }
+
+    /// Finding 1, the cause: a second set-up is refused while one runs.
+    func testOnlyOneSetUpRunsAtATime() async throws {
+        let home: URL = try freshHome()
+        try "slow".write(to: home.appendingPathComponent("mode"), atomically: true, encoding: .utf8)
+        let centre: AssistantSetUpCentre = AssistantSetUpCentre(
+            home: home,
+            dependencies: SetUpRunnerTests.dependencies(shell: "/bin/zsh"),
+            doorFinds: { (key: String) -> Bool in
+                return false
+            },
+            openWindow: { (path: String) -> Bool in
+                return false
+            },
+            windowFolder: { () throws -> URL in
+                return home
+            },
+            presenceChanged: {
+            }
+        )
+        centre.refresh()
+        centre.setUp(AssistantSetUp.codex)
+        centre.setUp(AssistantSetUp.claude)
+        XCTAssertEqual(centre.state(of: AssistantSetUp.codex), .downloading)
+        XCTAssertEqual(centre.state(of: AssistantSetUp.claude), .notSetUp, "a second set-up started beside the first")
+        XCTAssertNotNil(centre.waitingLine(for: AssistantSetUp.claude))
+        centre.stopEverySetUp()
+    }
+
+    /// Finding 2: a record that cannot be read (a newer state) is never
+    /// written over, and the entries in it survive.
+    func testAnUnreadableRecordIsNeverWrittenOver() throws {
+        let home: URL = try freshHome()
+        let url: URL = SetUpRecord.recordURL(home: home)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let newer: String = """
+        [{"key":"claude","kind":"assistant","state":"installed","started":"2026-11-13T10:00:00Z","created":[],"createdFolders":[],"profileChanges":[],"changedInPlace":[]},
+         {"key":"copilot","kind":"assistant","state":"removing","started":"2026-11-13T10:00:00Z","created":[],"createdFolders":[],"profileChanges":[],"changedInPlace":[]}]
+        """
+        try newer.write(to: url, atomically: true, encoding: .utf8)
+        try? SetUpRecord.store(SetUpReviewFixTests.entry("codex", block: nil), home: home)
+        let after: String = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(after.contains("\"claude\""), "the record was written over: \(after)")
+        XCTAssertTrue(after.contains("removing"))
+    }
+
+    /// Finding 2: the pane sets an unreadable record aside, and a program it
+    /// finds is then said to be left alone for that reason.
+    func testTheCentreSetsAnUnreadableRecordAside() throws {
+        let home: URL = try freshHome()
+        let url: URL = SetUpRecord.recordURL(home: home)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "not json".write(to: url, atomically: true, encoding: .utf8)
+        let centre: AssistantSetUpCentre = AssistantSetUpCentre(
+            home: home,
+            dependencies: SetUpRunnerTests.dependencies(shell: "/bin/zsh"),
+            doorFinds: { (key: String) -> Bool in
+                return key == "claude"
+            },
+            openWindow: { (path: String) -> Bool in
+                return false
+            },
+            windowFolder: { () throws -> URL in
+                return home
+            },
+            presenceChanged: {
+            }
+        )
+        centre.refresh()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertTrue(SetUpRecord.aRecordWasSetAside(home: home))
+        XCTAssertEqual(centre.state(of: AssistantSetUp.claude), .recordUnreadable)
+        XCTAssertEqual(centre.state(of: AssistantSetUp.codex), .notSetUp)
+    }
+
+    /// Finding 2: writes from runs that finish together lose nothing.
+    func testWritesThatFinishTogetherLoseNothing() async throws {
+        let home: URL = try freshHome()
+        let keys: [String] = ["a", "b", "c", "d", "e", "f", "g", "h"]
+        await withTaskGroup(of: Void.self) { (group: inout TaskGroup<Void>) in
+            for key in keys {
+                group.addTask { @concurrent in
+                    try? SetUpRecord.store(SetUpReviewFixTests.entry(key, block: nil), home: home)
+                }
+            }
+        }
+        var stored: [String] = []
+        for entry in SetUpRecord.load(home: home) {
+            stored.append(entry.key)
+        }
+        XCTAssertEqual(stored.sorted(), keys)
+    }
+
+    /// Finding 4: at a quit, a set-up that ignores the request to end is
+    /// ended outright before `stopEverySetUp` returns.
+    func testQuitEndsASetUpThatIgnoresTheRequest() async throws {
+        let home: URL = try freshHome()
+        try "ignores".write(to: home.appendingPathComponent("mode"), atomically: true, encoding: .utf8)
+        let centre: AssistantSetUpCentre = AssistantSetUpCentre(
+            home: home,
+            dependencies: SetUpRunnerTests.dependencies(shell: "/bin/zsh"),
+            doorFinds: { (key: String) -> Bool in
+                return false
+            },
+            openWindow: { (path: String) -> Bool in
+                return false
+            },
+            windowFolder: { () throws -> URL in
+                return home
+            },
+            presenceChanged: {
+            }
+        )
+        centre.refresh()
+        centre.setUp(AssistantSetUp.codex)
+        let pidFile: URL = home.appendingPathComponent("pid")
+        while !FileManager.default.fileExists(atPath: pidFile.path) {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let text: String = try String(contentsOf: pidFile, encoding: .utf8)
+        let pid: pid_t = try XCTUnwrap(pid_t(text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        centre.stopEverySetUp()
+        // The kill has been sent; give the waiting thread a moment to reap
+        // it, well inside the 2 s the old later kill took.
+        let deadline: Date = Date().addingTimeInterval(1)
+        var gone: Bool = false
+        while Date() < deadline && !gone {
+            gone = kill(pid, 0) != 0
+            if !gone {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        XCTAssertTrue(gone, "the set-up outlived the quit")
     }
 }

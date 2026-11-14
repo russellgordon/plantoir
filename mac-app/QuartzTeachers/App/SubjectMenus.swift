@@ -360,7 +360,7 @@ struct SectionMenu: Commands {
 /// ENABLED by the rule. The reasons an item is greyed (#458) follow it.
 ///
 /// **Always drawn since #855** (Russell, 2026-11-13: Revise With is always
-/// shown), ending with Set Up Another Assistant… after a divider, which
+/// shown), ending with Set Up an Assistant… after a divider, which
 /// opens Settings ▸ Other Assistants and installs nothing itself. A teacher
 /// with no assistant at all sees the submenu with that one item. Until #855
 /// the submenu was left out when there was nothing to put in it, so a

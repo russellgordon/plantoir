@@ -117,6 +117,14 @@ final class QuitConfirmationTests: XCTestCase {
                 expectAsk,
                 "\(name): the rule and the contract disagree"
             )
+            // #855: the question's first button, where the case names it.
+            if let firstButton = testCase["expectFirstButton"] as? String {
+                let buttons: [QuitConfirmation.Button] = QuitConfirmation.buttons(
+                    onlySettingUp: QuitConfirmation.onlySettingUpNow()
+                )
+                XCTAssertEqual(buttons[0].title, firstButton, name)
+                XCTAssertEqual(buttons[0].choice, .keepWorking, name)
+            }
         }
     }
 

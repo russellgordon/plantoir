@@ -65,7 +65,7 @@ final class AssistantSetUpContractTests: XCTestCase {
             XCTAssertEqual(written["maker"] as? String, agent.maker)
             XCTAssertEqual(written["installerURL"] as? String, recipe.installerAddress.absoluteString)
             XCTAssertEqual(written["interpreter"] as? String, recipe.interpreter)
-            XCTAssertEqual(written["allowedHosts"] as? [String], recipe.allowedHosts)
+            XCTAssertEqual(written["allowedAddresses"] as? [String], recipe.allowedAddresses)
             XCTAssertEqual(written["reachabilityHosts"] as? [String], recipe.reachabilityHosts)
             XCTAssertEqual(written["extraEnvironment"] as? [String: String], recipe.extraEnvironment)
             XCTAssertEqual(written["removes"] as? [String], recipe.removes)
@@ -92,7 +92,7 @@ final class AssistantSetUpContractTests: XCTestCase {
             XCTAssertTrue(recipe.programs[0].path.hasPrefix(".local/bin/"), agent.key)
             // The address and every redirect host are the maker's, over HTTPS.
             XCTAssertEqual(recipe.installerAddress.scheme, "https")
-            XCTAssertTrue(recipe.allowedHosts.contains(recipe.installerHost), agent.key)
+            XCTAssertTrue(SetUpRedirectGuard.follows(recipe.installerAddress, allowedAddresses: recipe.allowedAddresses), agent.key)
         }
         // The Copilot identity is #783's, not a second copy.
         XCTAssertEqual(AssistantSetUp.copilot.recipe.programs[0].identifier, CopilotLauncher.signedIdentifier)
@@ -109,6 +109,7 @@ final class AssistantSetUpContractTests: XCTestCase {
         XCTAssertEqual(Int64(minutes), SetUpRunner.longestRunMinutes)
         let grace: Int = try XCTUnwrap(block["stopGraceSeconds"] as? Int)
         XCTAssertEqual(Int64(grace), SetUpRunner.stopGraceSeconds)
+        XCTAssertEqual(block["quitGraceMilliseconds"] as? Int, SetUpRunner.quitGraceMilliseconds)
         XCTAssertEqual(block["profileFiles"] as? [String], SetUpRecord.profileFiles)
         let environment: [String: Any] = try XCTUnwrap(block["childEnvironment"] as? [String: Any])
         XCTAssertEqual(environment["names"] as? [String], SetUpRunner.childEnvironmentNames)
@@ -145,6 +146,7 @@ final class AssistantSetUpContractTests: XCTestCase {
             } else if (given["signIn"] as? String) == "windowOpen" {
                 signIn = .windowOpen
             }
+            let recordSetAside: Bool = try XCTUnwrap(given["recordSetAside"] as? Bool, name)
             let status: AssistantSetUpState.Status = try XCTUnwrap(
                 AssistantSetUpState.Status(rawValue: try XCTUnwrap(given["status"] as? String)), name
             )
@@ -155,7 +157,8 @@ final class AssistantSetUpContractTests: XCTestCase {
                 lastOutcome: AssistantSetUpContractTests.outcome(named: given["lastOutcome"] as? String),
                 signIn: signIn,
                 status: status,
-                hasSignedInCheck: try XCTUnwrap(given["hasSignedInCheck"] as? Bool)
+                hasSignedInCheck: try XCTUnwrap(given["hasSignedInCheck"] as? Bool),
+                recordSetAside: recordSetAside
             )
             XCTAssertEqual(decided.rawValue, expect, name)
         }
@@ -191,6 +194,18 @@ final class AssistantSetUpContractTests: XCTestCase {
         XCTAssertEqual(words["settingUpOne"], QuitConfirmation.settingUpOne)
         XCTAssertEqual(words["settingUpSeveral"], QuitConfirmation.settingUpSeveral)
         XCTAssertEqual(words["message"], QuitConfirmation.settingUpMessage)
+        // Its own first button (Russell, 2026-11-13 evening), by meaning and title.
+        let buttons: [String: Any] = try XCTUnwrap(quit["buttons"] as? [String: Any])
+        let titles: [String: String] = try XCTUnwrap(buttons["titles"] as? [String: String])
+        XCTAssertEqual(titles["keepWorking"], QuitConfirmation.keepWorkingButton)
+        XCTAssertEqual(titles["quitAnyway"], QuitConfirmation.quitAnywayButton)
+        let byQuestion: [String: String] = try XCTUnwrap(buttons["firstButtonByQuestion"] as? [String: String])
+        XCTAssertEqual(byQuestion["whileAnAssistantIsSetUp"], QuitConfirmation.finishSettingUpButton)
+        let setUpButtons: [QuitConfirmation.Button] = QuitConfirmation.buttons(onlySettingUp: true)
+        XCTAssertEqual(setUpButtons[0].title, QuitConfirmation.finishSettingUpButton)
+        XCTAssertEqual(setUpButtons[0].choice, .keepWorking)
+        XCTAssertEqual(setUpButtons[1].choice, .quitAnyway)
+        XCTAssertEqual(QuitConfirmation.buttons(onlySettingUp: false)[0].title, QuitConfirmation.keepWorkingButton)
         XCTAssertEqual(
             QuitConfirmation.workUnderWay(publishes: [], previews: [], setUps: ["Codex"]),
             "setting up Codex"

@@ -24,8 +24,11 @@ nonisolated enum AssistantSetUpWording {
         "Plantoir works without any of these. If you have an account with one of them, "
         + "Plantoir can set it up for you here, and Revise With then offers it on your courses."
 
-    /// Revise With ▸, last, after a divider (ruling 3).
-    static let menuItem: String = "Set Up Another Assistant…"
+    /// Revise With ▸, last, after a divider (ruling 3). "Set Up an
+    /// Assistant…", always (Russell, 2026-11-13 evening): "Another" read
+    /// wrongly when none is set up, and a title that changes with the state
+    /// was rejected. The same words as the Help menu's item.
+    static let menuItem: String = "Set Up an Assistant…"
 
     /// Help ▸, beside Plantoir Help (ruling 3).
     static let helpMenuItem: String = "Set Up an Assistant…"
@@ -42,6 +45,12 @@ nonisolated enum AssistantSetUpWording {
     static let notSetUp: String = "Not set up."
     static let setUpElsewhere: String =
         "Already set up, outside Plantoir. Plantoir uses it as it is and leaves it alone."
+    static let recordUnreadable: String =
+        "Already set up. Plantoir couldn’t read its note of what it had set up, so it uses {tool} "
+        + "as it is and leaves it alone."
+    /// Under a row's own line while another assistant is being set up: one
+    /// at a time (review finding 1). `{other}` is that assistant's name.
+    static let oneAtATime: String = "Plantoir is setting up {other} now. You can set this one up once that has finished."
 
     static let confirmTitle: String = "Set up {tool}?"
     static let confirmBody: String =
@@ -119,6 +128,8 @@ nonisolated enum AssistantSetUpWording {
             return notSetUp
         case .setUpElsewhere:
             return setUpElsewhere
+        case .recordUnreadable:
+            return recordUnreadable
         case .downloading:
             return downloading
         case .checking:
@@ -166,6 +177,8 @@ nonisolated enum AssistantSetUpWording {
             "removeButton": removeButton,
             "notSetUp": notSetUp,
             "setUpElsewhere": setUpElsewhere,
+            "recordUnreadable": recordUnreadable,
+            "oneAtATime": oneAtATime,
             "confirmTitle": confirmTitle,
             "confirmBody": confirmBody,
             "confirmPlansLink": confirmPlansLink,

@@ -52,7 +52,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
     GitHub Copilot…  [if copilot]
     Local AI Assistant…  [if local]
     ----  [if any reviser]
-    Set Up Another Assistant…
+    Set Up an Assistant…
   ----
   Open in Obsidian
   Show in Finder
@@ -92,7 +92,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
     GitHub Copilot…  [if copilot]
     Local AI Assistant…  [if local]
     ----  [if any reviser]
-    Set Up Another Assistant…
+    Set Up an Assistant…
   ----
   Open in Obsidian
   Show in Finder

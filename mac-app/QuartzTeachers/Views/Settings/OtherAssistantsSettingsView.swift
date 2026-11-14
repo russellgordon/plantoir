@@ -107,6 +107,12 @@ struct OtherAssistantsSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("otherAssistantLine-\(agent.key)")
             }
+            if let waiting = centre.waitingLine(for: agent) {
+                Text(waiting)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("otherAssistantWaiting-\(agent.key)")
+            }
             HStack(spacing: 8) {
                 buttons(for: agent, in: state)
             }
@@ -122,11 +128,13 @@ struct OtherAssistantsSettingsView: View {
             Button(AssistantSetUpWording.setUpButton) {
                 confirming = AssistantSetUpChoice(agent: agent)
             }
+            .disabled(centre.otherSetUpUnderWay(than: agent) != nil)
             .accessibilityIdentifier("otherAssistantSetUp-\(agent.key)")
         case .failedNoConnection, .failedNotFromMaker, .failedOther, .failedTookTooLong, .stopped, .interrupted:
             Button(AssistantSetUpWording.tryAgainButton) {
                 confirming = AssistantSetUpChoice(agent: agent)
             }
+            .disabled(centre.otherSetUpUnderWay(than: agent) != nil)
             .accessibilityIdentifier("otherAssistantTryAgain-\(agent.key)")
             Button(AssistantSetUpWording.showMeHowButton) {
                 PlantoirHelpPage.open(anchor: AssistantSetUp.helpAnchor)
@@ -164,6 +172,10 @@ struct OtherAssistantsSettingsView: View {
             removeButton(for: agent)
         case .setUpElsewhere:
             EmptyView()
+        case .recordUnreadable:
+            Button(AssistantSetUpWording.showMeHowButton) {
+                PlantoirHelpPage.open(anchor: AssistantSetUp.helpAnchor)
+            }
         }
     }
 

@@ -346,7 +346,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `NSAlert` reports a POSITION and nothing else: two `addButton`
         // calls written out here could be reordered in one line and would
         // then swap what each answer means, so Keep Working would quit.
-        for button in QuitConfirmation.buttonsInOrder {
+        let buttons: [QuitConfirmation.Button] = QuitConfirmation.buttons(
+            onlySettingUp: QuitConfirmation.onlySettingUpNow()
+        )
+        for button in buttons {
             alert.addButton(withTitle: button.title)
         }
         let response: NSApplication.ModalResponse = alert.runModal()

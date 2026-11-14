@@ -4961,7 +4961,7 @@
     "hiddenWhenNotInstalled" : true,
     "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown its door at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: a teacher sees an item for each assistant installed, in the order Claude, Codex, GitHub Copilot. Since #855 (Russell, 2026-11-13: Revise With is always shown) the submenu itself is ALWAYS drawn, ending with setUp.menuItem, so a teacher with no assistant at all sees Revise With holding that one item. Until #855 the submenu was left out when it had nothing in it and a teacher with none saw no sign that any existed; that rule is gone, and Windows' menu changes with it.",
     "menuItemWhy" : "Each agent's menuItem is the item's title INSIDE Revise With ▸ — in the menu bar's Course and Section menus and, since the HIG sweep (#457 item 4, 2026-10-08), in every course and section row's context menu as well, so one command has one name everywhere (HIG: stable command names). Until the sweep the row's context menu showed it at the top level as 'Revise with Claude…' / 'Revise with Codex…' while the menu bar said Revise With ▸ Claude…, and this key held the context menu's words. 'Revise with Claude' is still the command's name in a SENTENCE (shared-rules.json -> workspaceWait's agent names, the support page); only the menu item's title moved. Windows draws its own menu, so it chooses where the item sits, but the item's words are these.",
-    "installedOnlyWhenAsked" : "Plantoir sets up an outside assistant only when the teacher asks, from Settings > Other Assistants (reached also from Help > Set Up an Assistant… and Revise With > Set Up Another Assistant…), and only after a confirmation that says what is downloaded, from whom, where it goes, and where the course content goes (setUp). Nothing is offered unasked: no launch-time offer, no notice, no badge. Plantoir still works without any of them (the never-requires rule). Until #855 this key was neverInstalled ('Plantoir never installs an outside assistant and never offers to'); Russell reversed it on 2026-11-13 because teachers with an account may not know how to set the tool up.",
+    "installedOnlyWhenAsked" : "Plantoir sets up an outside assistant only when the teacher asks, from Settings > Other Assistants (reached also from Help > Set Up an Assistant… and Revise With > Set Up an Assistant…), and only after a confirmation that says what is downloaded, from whom, where it goes, and where the course content goes (setUp). Nothing is offered unasked: no launch-time offer, no notice, no badge. Plantoir still works without any of them (the never-requires rule). Until #855 this key was neverInstalled ('Plantoir never installs an outside assistant and never offers to'); Russell reversed it on 2026-11-13 because teachers with an account may not know how to set the tool up.",
     "neverProbedForSignIn" : "Finding the tool says nothing about whether the teacher is signed in to it, and the DOOR does not try to find out: that would mean running the tool while a context menu is being drawn. A teacher who is signed out meets their assistant's own sign-in step inside the terminal. Narrowed by #855: Settings > Other Assistants asks the maker's own signed-in question (setUp.agents' signedInCheck) for a tool Plantoir set up, only after its set-up, after its sign-in window and on Check Again, never while a menu or a tab draws, and keeps the exit code alone, never the output, which names the account.",
     "note" : "The OUTSIDE doors: handing one course to a command-line assistant the teacher already has on their own machine, so it can work on their pages through Plantoir's MCP server. Distinct from the assistant Plantoir carries itself (contracts/assist-cases.json), which runs on the teacher's machine with no account and no CLI. AUTHORED, not generated. This block is the first contract data either door has ever had: it arrived on the mac with issue #205, which added the Codex door, and it describes BOTH doors so that the Claude half states what the two apps already do rather than leaving it written down nowhere.",
     "planAUnit" : {
@@ -5063,9 +5063,11 @@
       },
       "longestRunMinutes" : 30,
       "stopGraceSeconds" : 5,
+      "quitGraceMilliseconds" : 500,
+      "oneAtATime" : "One set-up at a time, app-wide (implementation review finding 1, measured: two set-ups that overlap each snapshot the start-up files at their own start, so a line Codex added during Claude's run was recorded by both, and Remove of Claude took Codex's line away). While one runs, every other row's Set Up and Try Again are unavailable and the row shows wording.oneAtATime under its own line; the centre refuses a second start too. Rejected: queueing (a set-up the teacher is not watching starting later is an offer they did not make at that moment).",
       "steps" : [
         "Ask every host the agent's reachabilityHosts names, and the installer's own host: any answer counts, only a failure to connect does not; one that does not answer is failedNoConnection and nothing runs (review M2).",
-        "Fetch the set-up from installerURL, following redirects only to an https address on one of allowedHosts (review L4); anything else is failedOther.",
+        "Fetch the set-up from installerURL, following redirects only to an address that starts with one of allowedAddresses, scheme, host and path (review L4; by whole address rather than host since the implementation review, because raw.githubusercontent.com serves any GitHub user's files); anything else is failedOther.",
         "Look at the home folder (which of removes, and the folders above them, exist; the bytes of every start-up file in profileFiles) and WRITE THE RECORD with state installing and that snapshot, before anything runs (review M3). A record that cannot be written runs nothing.",
         "Run it with interpreter, childEnvironment and no terminal, for at most longestRunMinutes; Stop, or quitting anyway, ends its whole process group (a grace of stopGraceSeconds, then outright).",
         "Look again: the removes paths and folders that appeared, and each start-up file that grew at its end by an appended block (that exact block) or changed otherwise (recorded, never edited).",
@@ -5084,7 +5086,9 @@
       "record" : {
         "where" : "{home}/Library/Application Support/Plantoir/set-up/record.json (under --state-dir's home in a UI test; a throwaway home under the unit suite)",
         "carries" : "per set-up: key, kind (assistant), state (installing | installed), when, the before-snapshot while installing, created (removes paths that appeared), createdFolders (folders above them that appeared), profileChanges (file, the exact appended block, whether the file was created), changedInPlace (start-up files changed other than by appending). Paths relative to the home folder, so no home folder's name is written.",
-        "removeRule" : "Remove takes away created (a link itself, never what it leads to), then each appended block (the last copy of it, written back through a linked file so a dotfile manager's link is kept; a file the set-up created is deleted once nothing but white space is left), then createdFolders that are empty, deepest first. A recorded path that the agent's removes does not list, or that leads outside the home folder, is refused. A block no longer in its file as written (the teacher edited it) is left alone. Never keeps.",
+        "removeRule" : "Remove takes away created (a link itself, never what it leads to), then each appended block (the last copy of it, written back through a linked file so a dotfile manager's link is kept; a file the set-up created is deleted once nothing but white space is left), then createdFolders that are empty, deepest first. A recorded path that the agent's removes does not list, or that leads outside the home folder, is refused. A block no longer in its file as written (the teacher edited it) is left alone, and so is a block another entry also records (not this one's alone; that entry's Remove takes it). Never keeps.",
+        "unreadable" : "A record that is there and cannot be read (damaged, or written by a newer Plantoir with a state this one does not know) is NEVER written over: every write refuses (a set-up then runs nothing, couldNotRecord), and the pane moves it aside beside itself as record-unreadable-<seconds>-<id>.json, writes the trail line, and from then on shows a program it finds with no entry as recordUnreadable rather than setUpElsewhere, because it may be one Plantoir set up. Implementation review finding 2: a record with one unknown state used to load as empty, and the next write kept only the new entry.",
+        "writesAreSerialised" : "Every read-change-write of the record is one step under one lock, so two runs finishing together cannot lose an entry.",
         "atLaunch" : "A record still installing (a quit, a crash or a power cut cut the set-up short) is settled at the next launch: compared with its snapshot; complete and the maker's, it is completed; otherwise what it added is taken away and it is forgotten."
       },
       "agents" : [
@@ -5094,9 +5098,9 @@
           "maker" : "GitHub",
           "installerURL" : "https://gh.io/copilot-install",
           "interpreter" : "/bin/bash",
-          "allowedHosts" : [
-            "gh.io",
-            "raw.githubusercontent.com"
+          "allowedAddresses" : [
+            "https://gh.io/copilot-install",
+            "https://raw.githubusercontent.com/github/copilot-cli/"
           ],
           "reachabilityHosts" : [
             "github.com",
@@ -5133,9 +5137,9 @@
           "maker" : "Anthropic",
           "installerURL" : "https://claude.ai/install.sh",
           "interpreter" : "/bin/bash",
-          "allowedHosts" : [
-            "claude.ai",
-            "downloads.claude.ai"
+          "allowedAddresses" : [
+            "https://claude.ai/install.sh",
+            "https://downloads.claude.ai/claude-code-releases/"
           ],
           "reachabilityHosts" : [
             "downloads.claude.ai"
@@ -5179,9 +5183,9 @@
           "maker" : "OpenAI",
           "installerURL" : "https://chatgpt.com/codex/install.sh",
           "interpreter" : "/bin/sh",
-          "allowedHosts" : [
-            "chatgpt.com",
-            "releases.openai.com"
+          "allowedAddresses" : [
+            "https://chatgpt.com/codex/install.sh",
+            "https://releases.openai.com/codex/"
           ],
           "reachabilityHosts" : [
             "releases.openai.com"
@@ -5228,7 +5232,7 @@
           "measured" : "2026-11-13: chatgpt.com/codex/install.sh answers 302 to releases.openai.com/codex/install.sh (1500 lines, sha256 5a8eea5c…). It keeps the package in ~/.codex/packages/standalone and links ~/.local/bin/codex (and codex-code-mode-host on a Mac) into it, and appends a '# >>> Codex installer >>>' block to the start-up file SHELL picks (zsh .zprofile, bash .bash_profile, anything else .profile) unless the block is there already: ruling 4 accepts the line and Remove takes it away from the record. CODEX_NON_INTERACTIVE=1 skips its two questions ('Start Codex now?', 'Uninstall the existing … Codex now?'). codex-code-mode-host is signed Identifier codex-code-mode-host, team 2DC432GLL2 (the Homebrew cask's 0.162.0, same package format). It falls back to GitHub when releases.openai.com fails, so only releases.openai.com is asked first."
         }
       ],
-      "menuItem" : "Set Up Another Assistant…",
+      "menuItem" : "Set Up an Assistant…",
       "helpMenuItem" : "Set Up an Assistant…",
       "helpAnchor" : "set-up-assistant",
       "wording" : {
@@ -5249,7 +5253,7 @@
         "helpMenuItem" : "Set Up an Assistant…",
         "installedSignedOut" : "{tool} is set up. Sign in to your {maker} account to start using it.",
         "interrupted" : "Plantoir didn’t finish setting up {tool} last time. Try again to finish it.",
-        "menuItem" : "Set Up Another Assistant…",
+        "menuItem" : "Set Up an Assistant…",
         "notSetUp" : "Not set up.",
         "paneIntro" : "Plantoir works without any of these. If you have an account with one of them, Plantoir can set it up for you here, and Revise With then offers it on your courses.",
         "paneTitle" : "Other Assistants",
@@ -5262,6 +5266,8 @@
         "removeTitle" : "Remove {tool}?",
         "setUpButton" : "Set Up…",
         "setUpElsewhere" : "Already set up, outside Plantoir. Plantoir uses it as it is and leaves it alone.",
+        "recordUnreadable" : "Already set up. Plantoir couldn’t read its note of what it had set up, so it uses {tool} as it is and leaves it alone.",
+        "oneAtATime" : "Plantoir is setting up {other} now. You can set this one up once that has finished.",
         "showMeHowButton" : "Show Me How",
         "signInAgainButton" : "Sign In Again…",
         "signInButton" : "Sign In…",
@@ -5274,7 +5280,7 @@
         "tryAgainButton" : "Try Again"
       },
       "stateCases" : {
-        "how" : "given: found (the door finds the program, anyone's), recorded (null | installing | installed: what the record holds for it), activity (idle | downloading | checking), lastOutcome (null or the outcome of this session's last set-up: finished, noConnection, couldNotFetch, couldNotStart, exited, leftNothing, notFromMaker, stopped, tookTooLong, couldNotRecord), signIn (notAsked | windowOpen | an integer, the sign-in window's exit code), status (notAsked | signedIn | notSignedIn: the maker's signed-in question), hasSignedInCheck (false for GitHub Copilot). expect is the state, whose sentence is the wording key of the same name. Run by both apps against their own rule (AssistantSetUpState.decide on the mac).",
+        "how" : "given: recordSetAside (a record that could not be read was set aside here), found (the door finds the program, anyone's), recorded (null | installing | installed: what the record holds for it), activity (idle | downloading | checking), lastOutcome (null or the outcome of this session's last set-up: finished, noConnection, couldNotFetch, couldNotStart, exited, leftNothing, notFromMaker, stopped, tookTooLong, couldNotRecord), signIn (notAsked | windowOpen | an integer, the sign-in window's exit code), status (notAsked | signedIn | notSignedIn: the maker's signed-in question), hasSignedInCheck (false for GitHub Copilot). expect is the state, whose sentence is the wording key of the same name. Run by both apps against their own rule (AssistantSetUpState.decide on the mac).",
         "cases" : [
           {
             "name" : "nothing there, nothing done",
@@ -5285,7 +5291,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "notSetUp"
           },
@@ -5298,7 +5305,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "setUpElsewhere"
           },
@@ -5311,7 +5319,8 @@
               "lastOutcome" : "exited",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "setUpElsewhere"
           },
@@ -5324,7 +5333,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "downloading"
           },
@@ -5337,7 +5347,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "checking"
           },
@@ -5350,7 +5361,8 @@
               "lastOutcome" : "noConnection",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "failedNoConnection"
           },
@@ -5363,7 +5375,8 @@
               "lastOutcome" : "notFromMaker",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "failedNotFromMaker"
           },
@@ -5376,7 +5389,8 @@
               "lastOutcome" : "exited",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "failedOther"
           },
@@ -5389,7 +5403,8 @@
               "lastOutcome" : "leftNothing",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "failedOther"
           },
@@ -5402,7 +5417,8 @@
               "lastOutcome" : "tookTooLong",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "failedTookTooLong"
           },
@@ -5415,7 +5431,8 @@
               "lastOutcome" : "stopped",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "stopped"
           },
@@ -5428,7 +5445,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "interrupted"
           },
@@ -5441,7 +5459,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "installedSignedOut"
           },
@@ -5454,7 +5473,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "signedIn",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "readySignedIn"
           },
@@ -5467,7 +5487,8 @@
               "lastOutcome" : null,
               "signIn" : "windowOpen",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "signingIn"
           },
@@ -5480,7 +5501,8 @@
               "lastOutcome" : null,
               "signIn" : 1,
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "signInNotConfirmed"
           },
@@ -5493,7 +5515,8 @@
               "lastOutcome" : null,
               "signIn" : 0,
               "status" : "signedIn",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "readySignedIn"
           },
@@ -5506,7 +5529,8 @@
               "lastOutcome" : null,
               "signIn" : 0,
               "status" : "notSignedIn",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "signInNotConfirmed"
           },
@@ -5519,7 +5543,8 @@
               "lastOutcome" : null,
               "signIn" : 0,
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "signingIn"
           },
@@ -5532,7 +5557,8 @@
               "lastOutcome" : null,
               "signIn" : 0,
               "status" : "notAsked",
-              "hasSignedInCheck" : false
+              "hasSignedInCheck" : false,
+              "recordSetAside" : false
             },
             "expect" : "readySignInFinished"
           },
@@ -5545,7 +5571,8 @@
               "lastOutcome" : null,
               "signIn" : 1,
               "status" : "notAsked",
-              "hasSignedInCheck" : false
+              "hasSignedInCheck" : false,
+              "recordSetAside" : false
             },
             "expect" : "signInNotConfirmed"
           },
@@ -5558,7 +5585,8 @@
               "lastOutcome" : null,
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "notSetUp"
           },
@@ -5571,9 +5599,38 @@
               "lastOutcome" : "stopped",
               "signIn" : "notAsked",
               "status" : "notAsked",
-              "hasSignedInCheck" : true
+              "hasSignedInCheck" : true,
+              "recordSetAside" : false
             },
             "expect" : "downloading"
+          },
+          {
+            "name" : "found after an unreadable record was set aside",
+            "given" : {
+              "found" : true,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : true
+            },
+            "expect" : "recordUnreadable"
+          },
+          {
+            "name" : "not found after an unreadable record was set aside",
+            "given" : {
+              "found" : false,
+              "recorded" : null,
+              "activity" : "idle",
+              "lastOutcome" : null,
+              "signIn" : "notAsked",
+              "status" : "notAsked",
+              "hasSignedInCheck" : true,
+              "recordSetAside" : true
+            },
+            "expect" : "notSetUp"
           }
         ]
       },

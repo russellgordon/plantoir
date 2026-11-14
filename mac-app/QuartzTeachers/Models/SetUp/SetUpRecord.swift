@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// What a maker's set-up changed in the teacher's home folder, as Plantoir saw
 /// it before and after, so that Remove takes away exactly what Plantoir's
@@ -98,6 +99,9 @@ nonisolated struct SetUpRemoval: Equatable, Sendable {
     /// Blocks that were no longer in their file as written (the teacher
     /// edited it): left alone.
     var profileBlocksNotFound: Int = 0
+    /// Blocks another set-up's entry also records, so not this one's alone:
+    /// left for that one's Remove.
+    var profileBlocksShared: Int = 0
     /// Paths that could not be taken away.
     var failures: Int = 0
     /// Recorded paths refused because the recipe does not list them, or
@@ -142,17 +146,50 @@ nonisolated enum SetUpRecord {
         return home.appendingPathComponent(relativeLocation)
     }
 
-    /// Every entry, or none when there is no record or it cannot be read.
-    static func load(home: URL) -> [SetUpRecordEntry] {
-        guard let data = try? Data(contentsOf: recordURL(home: home)) else {
-            return []
+    /// What reading the record found.
+    enum Reading: Equatable {
+        /// No record yet.
+        case none
+        case entries([SetUpRecordEntry])
+        /// A record is there and could not be read: damaged, or written by
+        /// a newer Plantoir (a state this one does not know). Never written
+        /// over (review finding 2).
+        case unreadable
+    }
+
+    /// Why a write was refused.
+    enum WriteProblem: Error {
+        case theRecordCouldNotBeRead
+    }
+
+    /// One writer at a time, so two set-ups that finish together cannot each
+    /// read the record, add their own entry and write back without the
+    /// other's (review finding 2).
+    private static let writing: Mutex<Int> = Mutex(0)
+
+    /// The record as it is.
+    static func read(home: URL) -> Reading {
+        let url: URL = recordURL(home: home)
+        if !somethingIsThere(url) {
+            return .none
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            return .unreadable
         }
         let decoder: JSONDecoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let entries = try? decoder.decode([SetUpRecordEntry].self, from: data) else {
-            return []
+            return .unreadable
         }
-        return entries
+        return .entries(entries)
+    }
+
+    /// Every entry, or none when there is no record or it cannot be read.
+    static func load(home: URL) -> [SetUpRecordEntry] {
+        if case .entries(let entries) = read(home: home) {
+            return entries
+        }
+        return []
     }
 
     /// The entry for `key`, or nil.
@@ -174,23 +211,76 @@ nonisolated enum SetUpRecord {
         try data.write(to: url, options: .atomic)
     }
 
+    /// Reads, changes and writes the record as one step, under the lock, and
+    /// refuses when the record is there and cannot be read.
+    static func change(home: URL, _ edit: ([SetUpRecordEntry]) -> [SetUpRecordEntry]) throws {
+        try writing.withLock { (unused: inout Int) throws -> Void in
+            var entries: [SetUpRecordEntry] = []
+            switch read(home: home) {
+            case .unreadable:
+                throw WriteProblem.theRecordCouldNotBeRead
+            case .none:
+                entries = []
+            case .entries(let existing):
+                entries = existing
+            }
+            try save(edit(entries), home: home)
+        }
+    }
+
     /// Puts `entry` in place of any entry with its key.
     static func store(_ entry: SetUpRecordEntry, home: URL) throws {
-        var entries: [SetUpRecordEntry] = []
-        for existing in load(home: home) where existing.key != entry.key {
-            entries.append(existing)
+        try change(home: home) { (entries: [SetUpRecordEntry]) -> [SetUpRecordEntry] in
+            var kept: [SetUpRecordEntry] = []
+            for existing in entries where existing.key != entry.key {
+                kept.append(existing)
+            }
+            kept.append(entry)
+            return kept
         }
-        entries.append(entry)
-        try save(entries, home: home)
     }
 
     /// Takes the entry for `key` out of the record.
     static func forget(_ key: String, home: URL) throws {
-        var entries: [SetUpRecordEntry] = []
-        for existing in load(home: home) where existing.key != key {
-            entries.append(existing)
+        try change(home: home) { (entries: [SetUpRecordEntry]) -> [SetUpRecordEntry] in
+            var kept: [SetUpRecordEntry] = []
+            for existing in entries where existing.key != key {
+                kept.append(existing)
+            }
+            return kept
         }
-        try save(entries, home: home)
+    }
+
+    /// Moves a record that could not be read aside, beside itself, under a
+    /// name that is never reused, so nothing is lost and a new record can be
+    /// started. Returns the name it was given, or nil when there was nothing
+    /// to move or it could not be moved.
+    static func setAsideUnreadable(home: URL, now: Date = Date()) -> String? {
+        if read(home: home) != .unreadable {
+            return nil
+        }
+        let url: URL = recordURL(home: home)
+        let stamp: String = String(Int(now.timeIntervalSince1970))
+        let aside: URL = url.deletingLastPathComponent()
+            .appendingPathComponent("record-unreadable-\(stamp)-\(UUID().uuidString.prefix(8)).json")
+        do {
+            try FileManager.default.moveItem(at: url, to: aside)
+            return aside.lastPathComponent
+        } catch {
+            return nil
+        }
+    }
+
+    /// Whether a record was ever set aside here.
+    static func aRecordWasSetAside(home: URL) -> Bool {
+        let folder: URL = recordURL(home: home).deletingLastPathComponent()
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return false
+        }
+        for name in names where name.hasPrefix("record-unreadable-") {
+            return true
+        }
+        return false
     }
 
     /// Whether anything (a link that leads nowhere included) is at `path`.
@@ -321,9 +411,22 @@ nonisolated enum SetUpRecord {
                 removal.failures += 1
             }
         }
+        // A block another entry ALSO records is not this entry's alone: two
+        // set-ups that overlapped both saw it appear (review finding 1).
+        // Left where it is; the other entry's Remove takes it.
+        var othersBlocks: [SetUpProfileChange] = []
+        for other in load(home: home) where other.key != entry.key {
+            for change in other.profileChanges {
+                othersBlocks.append(change)
+            }
+        }
         for change in entry.profileChanges {
             if !profileFiles.contains(change.path) {
                 removal.refused += 1
+                continue
+            }
+            if othersBlocks.contains(change) {
+                removal.profileBlocksShared += 1
                 continue
             }
             switch takeAwayBlock(change, home: home) {

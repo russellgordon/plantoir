@@ -77,8 +77,8 @@ nonisolated struct SetUpDependencies: Sendable {
 
     /// Whether `host` answers at all.
     var reach: @Sendable (String) async -> Bool
-    /// The maker's set-up, fetched from `address` through `allowedHosts` only.
-    var fetch: @Sendable (_ address: URL, _ allowedHosts: [String]) async -> Fetched
+    /// The maker's set-up, fetched from `address` through `allowedAddresses` only.
+    var fetch: @Sendable (_ address: URL, _ allowedAddresses: [String]) async -> Fetched
     var identity: any ProgramIdentityChecking
     /// The login shell from the account record, never `$SHELL` (review H3).
     var accountShell: String
@@ -98,8 +98,8 @@ nonisolated struct SetUpDependencies: Sendable {
             reach: { (host: String) async -> Bool in
                 return await SetUpNetwork.answers(host: host)
             },
-            fetch: { (address: URL, allowedHosts: [String]) async -> Fetched in
-                return await SetUpNetwork.fetchSetUp(from: address, allowedHosts: allowedHosts)
+            fetch: { (address: URL, allowedAddresses: [String]) async -> Fetched in
+                return await SetUpNetwork.fetchSetUp(from: address, allowedAddresses: allowedAddresses)
             },
             identity: DeveloperIDCheck(),
             accountShell: SetUpRunner.accountShell(),
@@ -111,8 +111,11 @@ nonisolated struct SetUpDependencies: Sendable {
 }
 
 /// One set-up of one program, from the press of the button to the record
-/// (#855). Nothing here knows about assistants: the handout programs planned
-/// after #855 run through the same steps with a different `SetUpRecipe`.
+/// (#855). Nothing here knows about assistants. The handout programs planned
+/// after #855 reuse the process handling (`run`, `stopNow`, the limit), the
+/// child environment and the record, and must add their own
+/// download-verify-unpack step beside `perform`'s "run the maker's set-up"
+/// (`SetUpRecipe`'s comment says what exactly).
 ///
 /// The steps, in order:
 /// 1. Ask every host the set-up needs (review M2), so "no connection" is
@@ -219,6 +222,41 @@ nonisolated final class SetUpRunner: Sendable {
         }
     }
 
+    /// Stops the set-up AT ONCE, for a quit: asks it to end, gives it at
+    /// most `quitGraceMilliseconds` (polling whether it has gone), then ends
+    /// the whole group outright, before returning. `stop()`'s later outright
+    /// end is a task that a quitting app never lives to run, so a set-up
+    /// that ignored the request outlived the quit (review finding 4).
+    func stopNow() {
+        stopWasAsked.withLock { (asked: inout Bool) in
+            asked = true
+        }
+        signalTheGroup(SIGTERM)
+        var waited: Int = 0
+        while waited < SetUpRunner.quitGraceMilliseconds && !isReaped {
+            usleep(20_000)
+            waited += 20
+        }
+        // The whole group, leader reaped or not: what it started in the
+        // background goes with it, as `run` does once a set-up ends.
+        let group: pid_t = childProcess.withLock { (pid: inout pid_t) -> pid_t in
+            return pid
+        }
+        if group > 0 {
+            killpg(group, SIGKILL)
+        }
+    }
+
+    /// How long a set-up is given to end on its own at a quit.
+    static let quitGraceMilliseconds: Int = 500
+
+    /// Whether the set-up has ended and been reaped.
+    var isReaped: Bool {
+        return reaped.withLock { (value: inout Bool) -> Bool in
+            return value
+        }
+    }
+
     /// Whether Stop has been asked for.
     var wasStopped: Bool {
         return stopWasAsked.withLock { (asked: inout Bool) -> Bool in
@@ -263,7 +301,7 @@ nonisolated final class SetUpRunner: Sendable {
             return .stopped
         }
 
-        let fetched: SetUpDependencies.Fetched = await dependencies.fetch(recipe.installerAddress, recipe.allowedHosts)
+        let fetched: SetUpDependencies.Fetched = await dependencies.fetch(recipe.installerAddress, recipe.allowedAddresses)
         let script: Data
         switch fetched {
         case .script(let data):
@@ -613,10 +651,10 @@ nonisolated enum SetUpNetwork {
     }
 
     /// The maker's set-up, or why it was refused: a redirect to a host
-    /// `allowedHosts` does not name, an answer other than 200, or something
+    /// `allowedAddresses` does not name, an answer other than 200, or something
     /// far larger than any of the three (each under 100 KB, 2026-11-13).
-    static func fetchSetUp(from address: URL, allowedHosts: [String]) async -> SetUpDependencies.Fetched {
-        let guardian: SetUpRedirectGuard = SetUpRedirectGuard(allowedHosts: allowedHosts)
+    static func fetchSetUp(from address: URL, allowedAddresses: [String]) async -> SetUpDependencies.Fetched {
+        let guardian: SetUpRedirectGuard = SetUpRedirectGuard(allowedAddresses: allowedAddresses)
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         let session: URLSession = URLSession(configuration: configuration)
@@ -631,7 +669,7 @@ nonisolated enum SetUpNetwork {
             if http.statusCode != 200 {
                 return .refused("answer \(http.statusCode)")
             }
-            guard let finalHost = http.url?.host, allowedHosts.contains(finalHost) else {
+            if !SetUpRedirectGuard.follows(http.url, allowedAddresses: allowedAddresses) {
                 return .refused("answered from another host")
             }
             if data.isEmpty || data.count > 2_000_000 {
@@ -644,17 +682,18 @@ nonisolated enum SetUpNetwork {
     }
 }
 
-/// Follows a redirect only to an HTTPS address on a host the recipe names.
+/// Follows a redirect only to an HTTPS address the recipe names, down to the
+/// path.
 nonisolated final class SetUpRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
 
     // MARK: - Stored properties
 
-    let allowedHosts: [String]
+    let allowedAddresses: [String]
 
     // MARK: - Initializer
 
-    init(allowedHosts: [String]) {
-        self.allowedHosts = allowedHosts
+    init(allowedAddresses: [String]) {
+        self.allowedAddresses = allowedAddresses
     }
 
     // MARK: - Functions
@@ -669,7 +708,7 @@ nonisolated final class SetUpRedirectGuard: NSObject, URLSessionTaskDelegate, Se
         // The completion-handler form: the async form of this delegate
         // method crashed the Swift 6 compiler in SILGen (Xcode 27, measured
         // 2026-11-13).
-        if SetUpRedirectGuard.follows(request.url, allowedHosts: allowedHosts) {
+        if SetUpRedirectGuard.follows(request.url, allowedAddresses: allowedAddresses) {
             completionHandler(request)
         } else {
             completionHandler(nil)
@@ -677,10 +716,14 @@ nonisolated final class SetUpRedirectGuard: NSObject, URLSessionTaskDelegate, Se
     }
 
     /// The rule, apart from a session, for a test.
-    static func follows(_ address: URL?, allowedHosts: [String]) -> Bool {
-        guard let address, address.scheme == "https", let host = address.host else {
+    static func follows(_ address: URL?, allowedAddresses: [String]) -> Bool {
+        guard let address, address.scheme == "https", address.host != nil else {
             return false
         }
-        return allowedHosts.contains(host)
+        let text: String = address.absoluteString
+        for prefix in allowedAddresses where text.hasPrefix(prefix) {
+            return true
+        }
+        return false
     }
 }

@@ -5,11 +5,18 @@ import Foundation
 /// lead to, what it must leave behind and whose signature that must carry,
 /// and what Plantoir may take away again.
 ///
-/// **General on purpose.** #855 sets up three assistants through it; the
-/// owner has ruled that Plantoir also sets up the two programs a printed
-/// handout needs, and that piece is planned to reuse this shape and
-/// `SetUpRunner` unchanged: nothing here knows about signing in, menus or
-/// assistants. What is assistant-only lives in `AssistantSetUp`.
+/// **What a second kind of set-up reuses, and what it must add** (review
+/// finding 3). #855 sets up three assistants, each by RUNNING the maker's
+/// own set-up and then checking a Developer ID. The two programs a printed
+/// handout needs (planned after #855) are a pinned archive checked by
+/// SHA-256 and unpacked, then a second download. They reuse `SetUpRecord`
+/// (snapshot, record, exact Remove, `kind`), the process handling in
+/// `SetUpRunner` (`run`, a session of its own, stop, the time limit), the
+/// child environment, the reachability question and the quit wiring. They
+/// must ADD: an identity checked by hash rather than signature, a
+/// download-verify-unpack step beside "run the maker's set-up", and an
+/// optional follow-on command. Nothing here knows about signing in, menus or
+/// assistants; that is `AssistantSetUp`.
 ///
 /// Paths are written relative to the home folder ("`.local/bin/claude`"), so
 /// a record written on one Mac never names a teacher's home, and a test can
@@ -46,10 +53,13 @@ nonisolated struct SetUpRecipe: Sendable, Equatable {
     /// What runs the fetched set-up: `/bin/bash` or `/bin/sh`, as the maker's
     /// own instructions pipe it.
     let interpreter: String
-    /// Every host the fetch of the set-up may pass through: the documented
-    /// address redirects (measured, 2026-11-13), and a redirect anywhere else
-    /// is refused (plan review L4).
-    let allowedHosts: [String]
+    /// Every address the fetch of the set-up may pass through, as HTTPS
+    /// prefixes down to the path (the documented address redirects, measured
+    /// 2026-11-13): a redirect anywhere else is refused (plan review L4).
+    /// Whole origins and paths, not hosts alone (review finding 7):
+    /// `raw.githubusercontent.com` serves any GitHub user's files, so only
+    /// `/github/copilot-cli/` on it is GitHub's set-up.
+    let allowedAddresses: [String]
     /// The hosts the set-up downloads from, asked first so that "no
     /// connection" can be told apart from every other failure (review M2):
     /// the makers' set-ups exit 1 for nearly everything.
@@ -68,7 +78,7 @@ nonisolated struct SetUpRecipe: Sendable, Equatable {
 
     // MARK: - Computed properties
 
-    /// The host of `installerAddress`, which is always allowed.
+    /// The host of `installerAddress`, asked first for reachability.
     var installerHost: String {
         return installerAddress.host ?? ""
     }

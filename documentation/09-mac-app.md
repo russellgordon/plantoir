@@ -16817,8 +16817,8 @@ there. The `windows` issue for #850 carries the list.
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
 A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
-reached also from Help ▸ Set Up an Assistant… and Revise With ▸ Set Up Another
-Assistant… (one view, `SetUpAnotherAssistantButton`, in the menu bar, every
+reached also from Help ▸ Set Up an Assistant… and Revise With ▸ Set Up an
+Assistant… (the same words in both since Russell's evening ruling; one view, `SetUpAnotherAssistantButton`, in the menu bar, every
 live row's context menu and the Help menu, so the item cannot differ between
 them). Each row's sentence and buttons come from `AssistantSetUpState.decide`,
 run against `outsideAgents.setUp.stateCases`. Set Up… opens

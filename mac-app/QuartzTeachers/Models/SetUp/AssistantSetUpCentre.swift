@@ -69,6 +69,10 @@ final class AssistantSetUpCentre {
     private(set) var statuses: [String: AssistantSetUpState.Status] = [:]
     /// A Remove that could not take everything away, by key.
     private(set) var removalProblems: [String: Bool] = [:]
+    /// True once a record that could not be read was set aside here: a
+    /// program found with no entry may then be one Plantoir set up, and the
+    /// pane says so (review finding 2).
+    private(set) var recordWasSetAside: Bool = false
 
     @ObservationIgnored private var runners: [String: SetUpRunner] = [:]
     @ObservationIgnored var home: URL
@@ -104,6 +108,19 @@ final class AssistantSetUpCentre {
 
     /// Looks again at what the doors find and what the record says.
     func refresh() {
+        // A record that could not be read (damaged, or from a newer
+        // Plantoir) is moved aside, never written over, and said so on the
+        // trail (review finding 2).
+        if let asideName = SetUpRecord.setAsideUnreadable(home: home) {
+            ActivityTrail.note(
+                .outsideAssistantSetUpRecordSetAside,
+                "could not read Plantoir’s record of the assistants it set up, so it was kept aside as \(asideName)"
+            )
+        }
+        let setAside: Bool = SetUpRecord.aRecordWasSetAside(home: home)
+        if setAside != recordWasSetAside {
+            recordWasSetAside = setAside
+        }
         var newFound: [String: Bool] = [:]
         var newRecorded: [String: SetUpRecordEntry.State] = [:]
         for agent in AssistantSetUp.agents {
@@ -129,8 +146,30 @@ final class AssistantSetUpCentre {
             lastOutcome: lastOutcomes[agent.key],
             signIn: signIns[agent.key] ?? .notAsked,
             status: statuses[agent.key] ?? .notAsked,
-            hasSignedInCheck: agent.signedInCheckArguments != nil
+            hasSignedInCheck: agent.signedInCheckArguments != nil,
+            recordSetAside: recordWasSetAside
         )
+    }
+
+    /// The assistant being set up now, other than `agent`, or nil. One set-up
+    /// at a time, app-wide (review finding 1): two that overlap would each
+    /// see the other's start-up line appear and record it as their own.
+    func otherSetUpUnderWay(than agent: AssistantSetUpAgent) -> AssistantSetUpAgent? {
+        for other in AssistantSetUp.agents where other.key != agent.key {
+            let activity: AssistantSetUpState.Activity = activities[other.key] ?? .idle
+            if activity != .idle {
+                return other
+            }
+        }
+        return nil
+    }
+
+    /// The line a row shows under its own while another set-up runs, or nil.
+    func waitingLine(for agent: AssistantSetUpAgent) -> String? {
+        guard let other = otherSetUpUnderWay(than: agent) else {
+            return nil
+        }
+        return AssistantSetUpWording.oneAtATime.replacingOccurrences(of: "{other}", with: other.displayName)
     }
 
     /// The sentence the row shows.
@@ -165,6 +204,10 @@ final class AssistantSetUpCentre {
             // The teacher's own copy: never set up over it.
             return
         }
+        if otherSetUpUnderWay(than: agent) != nil || !SetUpsUnderWay.names.isEmpty {
+            // One at a time, app-wide (review finding 1).
+            return
+        }
         lastOutcomes[agent.key] = nil
         removalProblems[agent.key] = nil
         signIns[agent.key] = nil
@@ -179,7 +222,22 @@ final class AssistantSetUpCentre {
         let started: Date = Date()
         let key: String = agent.key
         let reporter: SetUpProgressReporter = SetUpProgressReporter(centre: self)
+        let interrupted: SetUpRecordEntry? = AssistantSetUpCentre.interruptedEntry(for: agent.key, home: home)
+        let homeFolder: URL = home
+        let settleWith: SetUpDependencies = dependencies
         Task { @MainActor [weak self] in
+            // Try Again on a set-up cut short: settle it FIRST, so the new
+            // run's snapshot does not count the earlier run's files as the
+            // teacher's (review finding 5).
+            if let interrupted {
+                let finishedNow: Bool = await AssistantSetUpCentre.settle(
+                    interrupted, recipe: agent.recipe, home: homeFolder, dependencies: settleWith
+                )
+                ActivityTrail.note(
+                    .outsideAssistantSetUpSettled,
+                    AssistantSetUpCentre.settledLine(agent: agent, finished: finishedNow)
+                )
+            }
             let outcome: SetUpOutcome = await runner.perform(progress: { (phase: SetUpPhase) in
                 Task { @MainActor in
                     reporter.centre?.moved(key, to: phase)
@@ -238,8 +296,16 @@ final class AssistantSetUpCentre {
     /// `installing`, and the next launch settles it.
     func stopEverySetUp() {
         for runner in runners.values {
-            runner.stop()
+            runner.stopNow()
         }
+    }
+
+    /// The record's entry for `key` when it is still `installing`.
+    static func interruptedEntry(for key: String, home: URL) -> SetUpRecordEntry? {
+        guard let entry = SetUpRecord.entry(for: key, home: home) else {
+            return nil
+        }
+        return entry.state == .installing ? entry : nil
     }
 
     /// Opens the maker's own sign-in in a window of its own: the same
@@ -416,8 +482,7 @@ final class AssistantSetUpCentre {
             return
         }
         let removal: SetUpRemoval = SetUpRecord.takeAway(entry, recipe: agent.recipe, home: home)
-        if removal.finishedCleanly {
-            try? SetUpRecord.forget(agent.key, home: home)
+        if removal.finishedCleanly && (try? SetUpRecord.forget(agent.key, home: home)) != nil {
             removalProblems[agent.key] = nil
         } else {
             removalProblems[agent.key] = true
@@ -434,6 +499,9 @@ final class AssistantSetUpCentre {
     static func removedLine(agent: AssistantSetUpAgent, removal: SetUpRemoval) -> String {
         var line: String = "removed the copy of \(agent.displayName) Plantoir set up "
         line += "(\(removal.removedPaths + removal.removedFolders) items, \(removal.profileBlocksRemoved) start-up blocks"
+        if removal.profileBlocksShared > 0 {
+            line += ", \(removal.profileBlocksShared) left because another set-up also added them"
+        }
         if removal.profileBlocksNotFound > 0 {
             line += ", \(removal.profileBlocksNotFound) left because the teacher had changed them"
         }
