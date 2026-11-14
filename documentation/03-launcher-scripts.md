@@ -2808,6 +2808,16 @@ all XNU compares).
     run against both launchers, against `deploy.sh` since #771 by
     `scripts/test_deploy_token_refusal.py`) —
     `07-deployment.md` → "A token Cloudflare refuses".
+    Since #696 `deploy.sh --token status|save|remove --target
+    netlify|cloudflare` looks after the saved token with no course or
+    section, for Plantoir ▸ Settings ▸ Deploying: it runs before every
+    course-shaped step, answers with one line of JSON, and checks a pasted
+    token (read from standard input) against the folder's class websites
+    before saving it. A deploy's own paste is tidied and checked against its
+    section's website the same way. The store's functions and
+    `token_check_answer` now sit above the course code for it —
+    `07-deployment.md` → "Deploy tokens in Settings". `deploy.ps1` has no
+    `--token` mode yet; the `windows` issue for #696 owes it.
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in

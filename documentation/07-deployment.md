@@ -1349,9 +1349,12 @@ limit, not something the order fixes.** `validate_cf_token` sends curl's
 errors to `/dev/null` (and `Test-CloudflareToken` is `catch { return $false
 }`), so a paste made with no connection prints the same two refusal lines and
 none of `connectionExplanation`'s signs: that teacher is told to check the
-permission. The paste check is deliberately left as it was: a refused paste is
-not saved, so it costs a re-paste on the next deploy and nothing else, and the
-paste is where #696 asks again in the sheet instead of failing.
+permission. The paste check's classifier is deliberately left as it was: a
+refused paste is not saved, so it costs a re-paste on the next deploy and
+nothing else. Since #696 the paste is tidied first and, for a section that has
+deployed before, tried against that section's own website before it is saved,
+and Settings ▸ Deploying checks a token more strictly (below, "Deploy tokens
+in Settings").
 
 **The hint itself may be the wrong hint, and is shipped anyway.**
 `/user/tokens/verify` does not check permissions — it answers `active` for a
@@ -1361,10 +1364,13 @@ Tokens page rather than My Profile. Measured 2026-11-01 against the live
 endpoint with made-up tokens: three characters → **HTTP 400**, code 6003
 "Invalid format for Authorization header"; forty characters of nonsense →
 **HTTP 401**, code 1000 "Invalid API Token"; no header → 400, code 1001.
-Russell's ruling: ship the lift, since it is what the launchers already say;
-measuring real tokens of each kind against both verify endpoints is #696, and
-if the hint proves wrong both launchers are reworded there and the drift test
-moves the contract with them.
+Russell's ruling: ship the lift, since it is what the launchers already say.
+#696 did not measure real tokens: it added the check that answers the
+permission question directly, in Settings, where a Cloudflare token is also
+asked for the Account ID's Pages projects (`tokenCannotUseAccount`).
+Measuring real tokens of each kind is still owed, by the director with a test
+token, and if the deploy-time hint proves wrong both launchers are reworded
+then.
 
 **A SAVED token is cleared only when the service says no (#716).** The
 saved-token checks used the same yes/no probe, so a Mac on a captive portal,
@@ -1484,6 +1490,165 @@ of the launcher does not; and keeping `[[:space:]]`, which also takes CR, VT
 and FF (`grep -E` reads line by line, so never LF), so the test could compare
 only behaviour and never the text. The paste checks keep their own
 `[[:space:]]` patterns, deliberately, as above: they are not this rule.
+
+### Deploy tokens in Settings, and a token checked before it is saved (#696)
+
+**What it is.** Plantoir ▸ Settings ▸ Deploying shows the teacher's Netlify and
+Cloudflare tokens: whether one is saved and accepted, the end date where the
+service gives one, Change Token… and Remove Token. Russell's two rulings
+(2026-11-13, on the issue): the end date shows beside "Connected" where the
+service gives one, and a course's Deploy screen warns when it is under 30 days
+away; a pasted token that cannot reach the course's existing sites is checked
+before it is saved, the teacher is told, and offered to keep the old token.
+The rules and every case are `contracts/shared-rules.json` → `deployTokens`.
+
+**The launcher holds the token, not the app.** `deploy.sh --token
+status|save|remove --target netlify|cloudflare [--account <ID>]
+[--use-anyway]` is a mode of its own with no course and no section. It runs
+before every course-shaped step and exits, so it never starts the website
+builder. It answers with one line of JSON (`deployTokens.answerShape`):
+`saved`, `answer` (accepted, refused, unheard, notSaved, notSent), `endsOn`,
+`problem` and `unreachable`. `save` reads the token from standard input, all
+of it, so a paste with a line break inside is refused by the paste rule rather
+than cut at the break. The token is never printed, logged or put in an
+argument by the app; it does reach `curl`'s `Authorization` header argument,
+exactly as every deploy's check has always done.
+
+To make that possible the token store's functions (`get_token_keychain` and
+the rest), the check addresses and `token_check_answer` moved from beside the
+deploy's own token handling to above the course code, unchanged except that
+`token_check_answer` is now `http_answer` (the request) plus
+`token_answer_word` (the classifier), both still between the `# BEGIN
+token_check_answer` markers. The Settings checks classify every answer with
+`token_answer_word`, so #716's rule stays the one classifier. The plan said
+to add the new checks INSIDE `token_check_answer`; they are beside it
+instead, because `savedTokenCheck.cases` run that function against a single
+stubbed request, and the Settings checks make up to two.
+
+**The Settings check is stricter than the deploy's.** Netlify: `GET /user`,
+classified as #716 does, and nothing more. Cloudflare: `GET
+/user/tokens/verify`, then an accepted answer whose own `result.status` is
+`expired` or `disabled` is refused (`tokenExpired`, `tokenDisabled`), and,
+with the Account ID from Settings, `GET /accounts/{id}/pages/projects`: the
+service's own refusal (400, 401, 403, or a 404 whose body is Cloudflare's) is
+`tokenCannotUseAccount`. That last one is the fault the old paste check
+reported as success: verify answers `success: true` for a token without the
+Pages permission or naming no account, and every deploy with it failed later.
+A status check never clears a token, refused or not (#716 clears only at a
+deploy); Settings shows it refused and leaves the change to the teacher.
+
+**What the hosts say about an end date** (read 2026-11-13; nothing measured
+with a real token):
+
+| Host | Where | What |
+|---|---|---|
+| Cloudflare | `GET /user/tokens/verify` → `result` | `status`: `active`, `disabled` or `expired`; `expires_on`: optional date-time ([developers.cloudflare.com/api/resources/user/subresources/tokens/methods/verify](https://developers.cloudflare.com/api/resources/user/subresources/tokens/methods/verify/)) |
+| Netlify | `GET /api/v1/user` | the account (id, email, site count…), nothing about the token; no documented endpoint returns a personal access token's expiry ([open-api.netlify.com](https://open-api.netlify.com/)) |
+| GitHub | | #669's to measure with a real token first (the first ruling); not in this piece |
+
+To be measured by the director with a test token: the instant Cloudflare
+stores for an end date picked in its dashboard's TTL field (midnight UTC or
+the teacher's local midnight), whether verify ever answers `success: true`
+with `status: expired`, and what `GET /accounts/{id}/pages/projects` answers
+for an account the token does not name (403 or 404; both are read as
+`tokenCannotUseAccount` only when the body is Cloudflare's refusal).
+
+**The end date is an instant, shown as a local date.** The launcher keeps
+`expires_on` exactly as written when it is an ISO 8601 date and time with
+seconds and a zone written `Z` or `±hh:mm`, and drops anything else
+(`endDate.reading`). The app shows that instant's date in the Mac's time zone,
+so a token ending at midnight UTC reads as ending the day before in Ontario,
+which is when it stops. `daysLeft` counts calendar days in that time zone;
+under 30 is a warning, and exactly 30 is not, because the ruling says "under
+30 days" (`endDate.cases`, Toronto, UTC, Tokyo and Vancouver). Measured with a
+standalone build of the Swift rule against the contract, in the scratchpad's
+`measure/696/swift`: 17 cases pass, and the two mutants fail (`<=` for `<`
+fails "exactly 30 days"; the calendar left in UTC fails 11).
+
+**The Deploy screen warns from a remembered date (review MUST 2).** A
+deploy to Cloudflare prints `PLANTOIR_TOKEN_ENDS: cloudflare <date>` (or
+`none`) after its token check is accepted, which costs one more small request
+to verify per Cloudflare deploy. The app keeps it in its settings
+(`cloudflareTokenEndsOn`, not a secret), as does every Settings check, and a
+section whose course deploys to Cloudflare shows the warning and Open
+Settings… above its site; Course Settings' Cloudflare part shows the same
+sentence. Nothing is asked of Cloudflare when the screen opens. Nothing is
+printed when Cloudflare could not be asked, so a dropped connection never
+erases a date. Netlify gives no date, so it gets no warning.
+
+**Checked against the class websites before it is saved (second ruling).**
+`save` tries the new token against every section marker in the working folder
+(`courses/<CODE>/.netlify_sites/section<N>.json`'s top-level `id`, or
+`.cloudflare_sites/…`'s `name` in the Account ID's account). The service's own
+401, 403 or 404 is unreachable, anything else unheard. Any unreachable stops
+the save with the list; the app asks "That token cannot reach N of your class
+websites", naming them, with Keep My Old Token (the default) and Use the New
+Token (`--use-anyway`). Any unheard stops it with `sitesNotChecked`. Without
+it a token from another account made the next deploy build a new site at a new
+address and report success: `deploy.py` prints "Creating a fresh Netlify site
+for this section…" on a 404, and `remake_pages_project_if_gone` makes the
+Cloudflare project again. A 404 can also mean the teacher deleted the site on
+purpose, which is what Use the New Token is for. Whether Netlify answers
+another account's site with 404 or 401 is to be measured with two test
+accounts; both are read as unreachable. Only this working folder's markers
+are tried: a teacher with two working folders is checked against the one
+whose window is open.
+
+**The deploy's own paste is checked too (review MUST 1).** The likelier path
+to the fault was never Settings: a saved token is refused and cleared (#716),
+the next deploy asks, and the teacher pastes another account's token. A pasted
+token is now tidied by the paste rule, and for a section with a marker it is
+tried against that section's site before it is saved; a Cloudflare paste waits
+until the account is known to be tried. Unreachable and unheard each stop the
+deploy with two lines ending "saved as your token"
+(`deployTokens.deployTimeRefusals`), which `FailureExplainer.tokenNotSavedMarker`
+lifts and joins (two new `failureExplanations` cases). A section with no
+marker has nothing to try, and the token is saved at once as before.
+
+**The paste rule** (`deployTokens.paste`, 17 cases): trim every kind of
+whitespace from both ends (a no-break space, a zero-width space and a
+byte-order mark included), take off one leading `Bearer `, then refuse an
+empty paste, whitespace inside, or anything that is not printable ASCII (a
+curly quote). Refused, never repaired. Before it, a no-break space copied off a
+page was sent with the token and the teacher was told the token was invalid.
+
+**Remove** deletes the token (and for Netlify prunes the old tokens file's
+entry, as `--reset-token` does) and leaves the Cloudflare account entry,
+because the Account ID belongs to Settings (#457). Its question says a deploy
+set for later will not run; such a deploy stops at the token question with
+exit 3, as it always has.
+
+**Tested.** `scripts/test_deploy_tokens.py` runs every case through the real
+`deploy.sh`: the paste, end-date reading and refusal-line functions cut from
+between their markers, and the `--token` mode and whole deploys in a scratch
+folder with the token store as three files and `curl` answering from the
+case's routes, refusing any token but the one pasted, and logging each
+address. Must-fail, measured: against `origin/dev`'s `deploy.sh` copied in and
+restored, four of the five deploy-paste cases and both end-date-line tests
+fail (six failures); the case where the token reaches the site passes on both,
+as it should. The `--token` cases fail on the old launcher because the mode
+does not exist. The app half is `DeployTokenTests` (the words, end-date and
+marker cases, the pane's model through a stand-in launcher, and the real
+runner against a stand-in `deploy.sh` that proves the token arrives on
+standard input).
+
+**Rejected.** The app reading and writing the token store itself (a system
+access prompt on the teacher's Mac, toolchain logic in the app, a second copy
+on Windows). "Accepted by Cloudflare" instead of "Connected" (the plan's
+wording; the ruling names "Connected", and the line only says it after the
+check accepted the token). A network check each time the Deploy screen opens.
+A line saying the account was not checked when Settings has no Account ID
+(every Cloudflare deploy from Plantoir already refuses without one, #668).
+A count of scheduled deploys in Remove's question (the question says it in
+words, true for one or none). Keeping the token off the store tool's own
+command line while saving (`security -i`): unchanged, as for every deploy; it
+needs its own issue. GitHub Pages: #669.
+
+**Windows.** `deploy.ps1` was not edited: this Mac has no PowerShell, and the
+plan review ruled the Mac piece does not edit it blind. The `windows` issue
+asks for the same `--token` mode on Credential Manager, the paste rule, the
+deploy-time check and lines, the end-date line, the pane and the four trail
+events, all against `deployTokens`.
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 

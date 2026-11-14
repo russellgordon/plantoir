@@ -16576,6 +16576,63 @@ this is the app's half.
   would otherwise take a `user:password@host` for an address and leave the
   username behind.
 
+## Settings ▸ Deploying: the tokens (#696)
+
+Plantoir ▸ Settings ▸ Deploying has a **Netlify** section above the
+**Cloudflare Pages** one (Russell, 2026-10-27: Netlify in its own section).
+Each shows a status line, **Change Token…**, **Remove Token** and **Check
+Again**. The launcher half, the rules and what was measured and rejected are
+in `documentation/07-deployment.md` → "Deploy tokens in Settings, and a token
+checked before it is saved (#696)"; the words are
+`DeployTokenWording`, pinned key by key to `deployTokens.words`.
+
+- **`DeployTokenPanel`** (`Models/DeployTokens/`, `@Observable`, one per
+  destination) runs `deploy.sh --token …` in the first open window's working
+  folder through `DeployTokenLauncher.run` and reads its one line of JSON
+  (`DeployTokenAnswer`). With no window open the line says to open a working
+  folder. The app never reads or writes the token store; the pasted token is
+  written into the launcher's standard input BEFORE it starts and the pipe
+  closed, so a launcher that exits without reading it cannot make the write
+  fail with a broken pipe.
+- **The status line** reads "Connected to Netlify." or, for Cloudflare with
+  an end date, "Connected to Cloudflare. The token ends on 30 June 2027."
+  (the instant's date in the Mac's time zone); under 30 days it says so in
+  orange. Refused, expired, turned off, cannot use the account above, could
+  not be checked and not connected each have their own sentence. Opening the
+  pane checks both tokens, and changing the Account ID checks Cloudflare's
+  again. A check never clears a token.
+- **Change Token…** opens the deploy's own `CredentialRequestSheet`, with the
+  same steps, in a settings mode: its own title, Check and Save, a spinner
+  while the launcher checks, and the reason under the field when nothing was
+  saved (`sheetProblem`). It closes only when a token is saved. When the new
+  token cannot reach some of the folder's class websites the sheet stays open
+  behind an alert naming them, with Keep My Old Token (the default, and what
+  Escape chooses) and Use the New Token, which saves it with `--use-anyway`.
+  The pasted token is held in memory only while that alert is open.
+- **Remove Token** asks first and says a deploy set for later will not run.
+- **The end date travels to the Deploy screen** through
+  `AppSettings.cloudflareTokenEndsOn`, written by every Settings check and by
+  `DeployTokenEndReport` from a deploy's `PLANTOIR_TOKEN_ENDS:` line (read in
+  `ScriptRunner` and from a scheduled run's log). `DeployTokenEndNoticeView`
+  shows the warning above a section's site when the course deploys to
+  Cloudflare Pages and the date is under 30 days away or past, with Open
+  Settings…; Course Settings' Cloudflare part shows the same sentence. No
+  request is made when either opens.
+- **The trail** has four events: `deploy token changed in Settings`,
+  `deploy token removed in Settings`, `deploy token change refused in
+  Settings` (with the problem key) and `old deploy token kept in Settings`
+  (with a count). None carries the token, the Account ID, a site's name or an
+  address.
+- **Off the undo list on purpose.** Saving and removing a token are not
+  undoable (#899's ruling): nothing here is recorded for Undo.
+
+Measured: a standalone build of `DeployTokenAnswer.swift` and
+`DeployTokenWording.swift` against the contract (scratchpad
+`measure/696/swift`) runs the 12 end-date and 5 marker cases and the words
+key by key with no failure. `DeployTokenTests` runs the same through XCTest
+and the pane's model through a stand-in launcher; it was compiled by
+`build-for-testing` and is the director's to run.
+
 ## A deployed folder opened in the browser (#850)
 
 GitHub [#850](https://github.com/russellgordon/plantoir/issues/850), v2.0.0.
