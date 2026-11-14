@@ -172,6 +172,22 @@ nonisolated enum ActivityTrail {
         /// folder, never a page. Without it the trail shows nothing at all
         /// for the one restore outcome that leaves a section changed.
         case sectionRestoreStoppedPartWay = "section restore stopped part way"
+        /// A WHOLE-course restore moved a file and then could not move
+        /// every file back (#909), at the restore or at the next reading
+        /// that settled one that did not finish. The course may hold some
+        /// files from the backup and some as they were. Carries the course
+        /// and where the set-aside files were kept, as a path inside the
+        /// working folder, never a page. Its own event rather than the
+        /// section's, because a line named for a section would mislead a
+        /// reader of a whole-course report.
+        case courseRestoreStoppedPartWay = "course restore stopped part way"
+        /// A reading of the working folder found a restore that did not
+        /// finish (#909) and settled it: put back as it was, finished
+        /// (it had happened), kept where a teacher can open it, or removed
+        /// (it had moved nothing). Carries the course, the backup's file
+        /// name, what was found and what was done, and any kept path,
+        /// never a page.
+        case unfinishedRestoreSettled = "unfinished restore settled"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
@@ -1761,6 +1777,51 @@ nonisolated enum ActivityTrail {
     static func sectionRestoreStoppedPartWayLine(keptAt: String) -> String {
         return "a section restore stopped part way and could not move every file back; the section may hold "
              + "some files from the backup and some as they were; the files set aside are kept in " + keptAt
+    }
+
+    /// The words for `courseRestoreStoppedPartWay` (#909): what may be
+    /// mixed, and where the set-aside files are. A path, never a page.
+    static func courseRestoreStoppedPartWayLine(keptAt: String, atTheNextReading: Bool) -> String {
+        var line: String = "a whole-course restore stopped part way and could not move every file back"
+        if atTheNextReading {
+            line += " when the restore that did not finish was put back at the next reading"
+        }
+        return line + "; the course may hold some files from the backup and some as they were; "
+             + "the files set aside are kept in " + keptAt
+    }
+
+    /// The words for `unfinishedRestoreSettled` (#909): which restore, what
+    /// was found and what was done.
+    static func unfinishedRestoreSettledLine(_ outcome: RestoreSettle.Settled) -> String {
+        var line: String = "found "
+        if let course = outcome.course {
+            line += "a restore of \(course)"
+            if let backup = outcome.backup {
+                line += " from \(backup)"
+            }
+            line += " that did not finish (\(outcome.found))"
+        } else {
+            line += "a folder a restore had set aside, with no record of it"
+        }
+        switch outcome.action {
+        case .putBack:
+            line += ": put back as it was"
+        case .finish:
+            line += ": it had happened, and what was left of it was tidied away"
+        case .remove:
+            line += ": it had moved nothing, and was removed"
+        case .keep:
+            line += ": kept"
+            if let keptAt = outcome.keptAt {
+                line += " in " + keptAt
+            }
+        case .leave:
+            line += ": left as it is"
+        }
+        if let newcomers = outcome.newcomersKeptAt {
+            line += "; files made in the course meanwhile are kept in " + newcomers
+        }
+        return line
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and

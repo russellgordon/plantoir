@@ -13,7 +13,7 @@ import Foundation
 ///
 /// | kind | held while… |
 /// |---|---|
-/// | `build` | any preview of the course is being built, or any section of it is publishing |
+/// | `build` | any preview of the course is being built, any section of it is publishing, or the whole course is being restored (#909) |
 /// | `publish` | any section of the course is publishing |
 /// | `preview` | any section of the course has a preview up |
 /// | `assist` | `Plantoir --mcp-stdio` only: the course the Claude door named, for the whole conversation (#458) |
@@ -174,6 +174,12 @@ enum WorkLeaseRegistry {
         for lease in PreviewLeases.active {
             let key: Wanted = Wanted(folderPath: lease.folderPath, courseCode: lease.courseCode, kind: WorkLeaseFiles.previewKind)
             wanted[key] = adding(section: lease.sectionNumber, port: lease.port, to: wanted[key])
+        }
+        // A whole-course restore holds the whole course (#909): section 0 is
+        // course-wide work, so the file names no sections.
+        for restore in CourseActivity.activeRestores {
+            let key: Wanted = Wanted(folderPath: restore.folderPath, courseCode: restore.courseCode, kind: WorkLeaseFiles.buildKind)
+            wanted[key] = adding(section: 0, port: nil, to: wanted[key])
         }
         if let heldForTheConversation {
             var hold: Hold = wanted[heldForTheConversation] ?? Hold()

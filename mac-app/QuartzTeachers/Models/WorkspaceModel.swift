@@ -2201,6 +2201,19 @@ class WorkspaceModel {
                 .unfinishedReplaceOfAReferenceCoursePutRight, ReferenceReplacer.trailLine(for: outcome)
             )
         }
+        // A restore that did not finish (#909) is settled here too, before
+        // the listing, so a course put back as it was is in the list. Only
+        // by a process with a window to say so in: an outside assistant's
+        // server leaves it for the app, and with the settings moved out
+        // first and in last the half-moved course reads as no course to it
+        // meanwhile. Told once, in the backup alert's slot.
+        if !AssistMCPServer.isServing {
+            let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: coursesDirectoryURL)
+            if !said.isEmpty && backupProblem == nil {
+                backupProblemTitle = RestoreWholeCourseWording.didNotFinishTitle
+                backupProblem = said.joined(separator: "\n\n")
+            }
+        }
 
         var entryURLs: [URL] = []
         do {
@@ -2749,22 +2762,41 @@ class WorkspaceModel {
     ///
     /// Async since #351: that archive is a zip, and it runs off the main
     /// actor.
+    ///
+    /// Since #909 the restore is staged (`CourseRestorer.restoreBackup`), and
+    /// this function holds it: a course-wide `build` lease from the click
+    /// until the restore has happened or stopped, so another program's build
+    /// of the course declines and a publish set for later waits; the
+    /// refusals asked before the archive, after it, and immediately before
+    /// the swap (`wholeCourseRestoreRefusal`); and the free space asked
+    /// before the archive, which is written to the same disk.
     func restoreBackup(_ item: BackupItem) async {
-        guard let coursesDirectoryURL else {
+        guard let coursesDirectoryURL, let workspacePath = workspaceURL?.path else {
             return
         }
         if isBeingCopied(item.courseCode) {
             return
         }
+        // Taken first, then looked past (take, then check), so this restore
+        // and another program's build cannot both go ahead.
+        CourseActivity.beginRestore(folderPath: workspacePath, courseCode: item.courseCode)
+        defer { CourseActivity.endRestore(folderPath: workspacePath, courseCode: item.courseCode) }
         // A Claude, Codex or GitHub Copilot session open on the course elsewhere holds a restore too
         // (#458): it replaces the pages that session is changing.
-        if let refusal = structuralRefusal(
-            courseCode: item.courseCode,
-            act: "restore",
-            whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
-        ) {
+        if let refusal = wholeCourseRestoreRefusal(courseCode: item.courseCode) {
             backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = refusal
+            return
+        }
+        var liveCourseURL: URL? = coursesDirectoryURL.appendingPathComponent(item.courseCode)
+        if let candidate = liveCourseURL, !FileManager.default.fileExists(atPath: candidate.path) {
+            liveCourseURL = nil
+        }
+        if let shortfall = WholeCourseRestore.spaceShortfall(
+            courseURL: liveCourseURL, zipURL: item.fileURL, coursesDirectoryURL: coursesDirectoryURL
+        ) {
+            backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
+            backupProblem = CourseRestorer.Problem.notEnoughSpace(item.courseCode, shortfall).localizedDescription
             return
         }
         do {
@@ -2772,13 +2804,12 @@ class WorkspaceModel {
             // contents in place, so Obsidian's file watcher — anchored to
             // the course folder, which is the vault — keeps up instead of
             // showing stale files until the vault is reopened.
-            var archiveFileName: String?
+            var archiveURL: URL?
             for course in courses {
                 if course.code == item.courseCode {
-                    let archiveURL: URL = try await CourseArchiver.archiveCourse(
+                    archiveURL = try await CourseArchiver.archiveCourse(
                         course, coursesDirectoryURL: coursesDirectoryURL
                     )
-                    archiveFileName = archiveURL.lastPathComponent
                 }
             }
             // Asked AGAIN after the zip (#351). It runs off the main actor
@@ -2786,35 +2817,34 @@ class WorkspaceModel {
             // it would have the course replaced under it — the case the check
             // above exists to refuse. The archive stays: it is a copy of the
             // course as it is, and harmless.
-            if let refusal = structuralRefusal(
-                courseCode: item.courseCode,
-                act: "restore",
-                whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
-            ) {
+            if let refusal = wholeCourseRestoreRefusal(courseCode: item.courseCode) {
                 backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
                 backupProblem = refusal
                 reloadCourses()
                 return
             }
-            try CourseRestorer.restoreBackup(item, coursesDirectoryURL: coursesDirectoryURL)
-            // The built site goes with the pages it was built from, for the
-            // reason `CourseRestorer.restoreSection` gives: the restored
-            // files carry the timestamps they had when they were backed up,
-            // which can be OLDER than the site built since — so the
-            // freshness check would read "up to date" and a deploy would
-            // publish the pages the teacher has just undone. Missed here
-            // until 2026-09-10, when renaming a course's word for a unit made
-            // this backup its last resort: a site built under "Module" over a
-            // vault restored to "Unit" is exactly that case. The kept copies
-            // of geogebra.org sketches stay: each is named by its fence, so
-            // a restored page whose fence has one still uses it, offline
-            // included (#789).
-            BuildOutputLocation.discardBuiltSites(
-                forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
-                courseCode: item.courseCode
+            // And a third time, once the backup is unpacked and checked and
+            // immediately before anything moves (#909 plan review, M3): the
+            // unpack takes seconds on a slow disk, minutes from a backup the
+            // cloud has to download first.
+            try CourseRestorer.restoreBackup(
+                item,
+                coursesDirectoryURL: coursesDirectoryURL,
+                archiveURL: archiveURL,
+                beforeTheSwap: { () throws in
+                    if let refusal = self.wholeCourseRestoreRefusal(courseCode: item.courseCode) {
+                        throw CourseRestorer.Problem.refused(refusal)
+                    }
+                }
             )
-            // (The records of renames under way are cleared by the restorer
-            // itself, so a test can see it.)
+            // The built site went with the pages it was built from, inside
+            // the restore and BEFORE its swap since #909 (the reason is
+            // `CourseRestorer.restoreSection`'s: the restored files carry the
+            // timestamps they had when they were backed up, which can be
+            // OLDER than the site built since). The kept copies of
+            // geogebra.org sketches stay (#789). The records of renames
+            // under way are cleared by the restorer itself, after the
+            // restore has happened.
             //
             // One line for every whole-course restore (#572): it is how a
             // replaced reference course comes back, and until then nothing on
@@ -2823,7 +2853,7 @@ class WorkspaceModel {
                 .courseRestoredFromABackup,
                 WorkspaceModel.restoredTrailLine(
                     item: item,
-                    archiveFileName: archiveFileName,
+                    archiveFileName: archiveURL?.lastPathComponent,
                     coursesDirectoryURL: coursesDirectoryURL
                 )
             )
@@ -2836,6 +2866,32 @@ class WorkspaceModel {
         selection = nil
         reloadCourses()
         selection = SidebarSelection.course(item.courseCode)
+    }
+
+    /// Why a whole-course restore of this course may not go on now, as the
+    /// sentence the teacher reads, or nil (`WholeCourseRestore.refusal`, in
+    /// its order): this app's own preview, deploy or copy; an outside
+    /// session's hold (#458); a restore of the course that has not settled
+    /// (#909); another program building the course, counted against this
+    /// restore's own lease (`workLeases.declining`, take then check).
+    func wholeCourseRestoreRefusal(courseCode: String) -> String? {
+        guard let workspacePath = workspaceURL?.path, let coursesDirectoryURL else {
+            return nil
+        }
+        var facts: WholeCourseRestore.RefusalFacts = WholeCourseRestore.RefusalFacts()
+        facts.busyHere = CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode)
+        facts.revisingAssistant = CourseActivity.revisingAssistant(folderPath: workspacePath, courseCode: courseCode)
+        refreshCoursesRevisedElsewhere()
+        facts.unsettledRestore = RestoreSettle.unsettledRecordExists(
+            forCourse: courseCode, coursesDirectoryURL: coursesDirectoryURL
+        )
+        facts.buildingElsewhere = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspacePath, courseCode: courseCode, afterTaking: true
+        ) != nil
+        guard let refusal = WholeCourseRestore.refusal(facts) else {
+            return nil
+        }
+        return WholeCourseRestore.sentence(for: refusal, courseCode: courseCode, assistant: facts.revisingAssistant)
     }
 
     /// The line a whole-course restore leaves: the code it shows (read from
