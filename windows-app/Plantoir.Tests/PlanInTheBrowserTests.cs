@@ -12,8 +12,9 @@ namespace Plantoir.Tests;
 /// map of the case's files and links, and on a real disk. Three cases link a
 /// FILE (<c>unit-1/notes.html</c>, <c>home.html</c>, <c>look.html</c>), which
 /// needs a symbolic link this account cannot make (WinError 1314, measured
-/// 2026-11-13): on disk they are reported by name in the test output, and the
-/// test fails if anything else is not run. The page on screen is the served
+/// 2026-11-13): on disk they run in <see cref="TheFileLinkCasesHoldOnDisk"/>,
+/// which is SKIPPED by name where the account cannot make one, and any other
+/// case whose link cannot be made fails. The page on screen is the served
 /// address a web view would report (<see cref="LocalSiteFixtures.Address"/>).
 /// Starting the browser and the trail line are 790b.
 /// </summary>

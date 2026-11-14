@@ -10,8 +10,8 @@ namespace Plantoir.Tests;
 /// item 3), each case run TWO ways through <see cref="PlanNavigation.Decide"/>
 /// and a real <see cref="LocalSiteGuard"/>: against a map of the case's links
 /// (every case, always), and on a real disk with each link made (a folder link
-/// as a junction). A link this PC cannot make is reported by name in the test
-/// output and asserted to be a FILE link, never skipped silently. The page is
+/// as a junction). A link this PC cannot make FAILS the case (none links a
+/// file today), never a silent pass (790a review 2, L9). The page is
 /// the served address of the case's <c>page</c>, and the href is resolved
 /// against it by the URL parser, as WebView2 resolves it, so <c>..</c> is
 /// judged in the same space the web view reports. Plus the Windows-only facts
