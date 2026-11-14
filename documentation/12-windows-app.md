@@ -2561,6 +2561,136 @@ test). The other classes that walk `mustRecord` (`AgentGuidanceTests`,
 `CourseBackupTests`) passed, 123 of 123. `scripts/test_held_skills.py`, which
 reads `help/`, passed in 9 s.
 
+### After the mac's fourteen pieces: held by name a fourth time (2026-11-14)
+
+At about 05:15 EST the mac merged fourteen pieces into `dev`
+(d75c36543..cadd8eb11, 263 files): #899's journal core (switched off), #897
+pieces A and C, #785a, #597's second half, #891, #696, #812 and #813, the
+"checks that mislead" batch (#802, #905, #906, #907, #738), #674 (PhET), #692
+(video players), #853 and #876 (the redactor), and #879, #887, #791 and #866.
+Nothing under `windows-app/` changed. `verify-deploy.ps1` changed in one line
+(the surname prompt it expects, `deploy.py`'s new example). The shared Python
+it changed runs here today through `PythonToolchainTests`. A full suite on
+cadd8eb11 read BASELINE_TOTALS (this PC, a Lenovo 20QES70500, i5-8365U, 16 GB,
+Windows 11 Pro 26200, BASELINE_NOTE). Each red is sorted below by the open
+`windows` issue of v2.0.0 whose body names it.
+
+**Held, 61 entries, all v2.0.0.**
+
+| Issue | Entries | Area: what |
+|---|---|---|
+| #928 | 3 | `ActivityTrailEvents`: `preview already starting`, `preview again abandoned`, `preview could not start` |
+| #921 | 9 | `ActivityTrailEvents`: the four `deploy token …` events and `Cloudflare token end date learned`; `MachineWordUsedIn`: `deployTokens.words.problemCouldNotSave`; `CredentialRequestsSaidDifferently`: `cloudflareToken` (the TTL step now promises an end date in Settings and a warning, which Windows does not show yet); `FailureExplanationCases`: the two #696 refusals |
+| #936 | 8 | `ActivityTrailEvents`: `files for the site downloaded`, `… could not be downloaded`; `FailureExplanationCases`: the five PhET stops; `SectionProblemKinds`: `phetSimulationsNotReady` |
+| #899 | 2 | `ActivityTrailEvents`: `undo could not record a step`, `undo rolled back` (as #949 asks: the owner is the whole of Undo, of which #949 is the first Windows piece) |
+| #920 | 3 | `CredentialRequestsSaidDifferently`: `teacherSurname`, `siteName`, `siteNameConflict` (the invented sample names) |
+| #927 | 35 | `SubjectMenuItemsUnderAnOlderName`: `addClass`, said here as `addNextClass`; `AssistWordingKeys`: the 34 Add Class… sentences |
+| #946 | 1 | `AgentGuidanceWordsSaidDifferently`: `askFound` (it names GitHub Copilot) |
+
+The 34 Add Class… sentences are held, not added: nothing the built-in
+assistant is shown changes. `scripts/test_tool_surface_digest.py` and
+`research/ai-assist/toolhash.py` are untouched by the merge, so the digest's
+expectation did not move, and the test DIGEST_NOTE.
+Add Next Class is not renamed: the issue says renaming the item is the fix,
+and the item is a menu a teacher sees, so it waits for #927's dialog.
+
+**Five new areas, each read where its red was.**
+- `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
+  name in `NamedGapLedger.SubjectMenuItemsOlderNames`). Both
+  `SubjectMenusContractTests` facts read the older name in the held name's
+  place. The older name must be an item here and gone from the contract, it
+  keeps the item list's order, and every case's `enabled` is compared exactly
+  with the held name read as the older one. At least three run cases must
+  enable it (five in the contract; two name #889's held situation keys).
+  `NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose` keeps
+  the map and the entries one to one.
+- `CredentialRequestsSaidDifferently` (`credentialRequests.requests`, by
+  name). A held request's title, label, secrecy, link and number of steps are
+  still compared exactly. Its explanation and steps together must still
+  differ. The number of held requests met must equal the entries.
+- `FailureExplanationCases` (`failureExplanations.cases`, by the case's `why`
+  up to its first colon, since the cases carry no name). A held key must name
+  exactly one case, and that case must be explained by NOTHING here: the
+  contract's honest fallback, the raw output shown. A sentence of another
+  kind fails as a wrong explanation, not a missing one.
+- `SectionProblemKinds` (`sectionProblems.kinds`, by kind; "has it" is
+  `SectionProblemsWording.KindLabels`). The sixteen kinds this app has are
+  still counted and compared label by label and scope by scope. A held kind
+  must be in none of this app's rule lists.
+- `AgentGuidanceWordsSaidDifferently` (`printablePages.agentGuidance.words`,
+  by key). A held sentence must still differ, it is still checked for the
+  machinery, and the count met must equal the entries.
+
+**Fixed in test code only, small and certain (#920 items 3 and 5).**
+`WizardSkeletonToggleTests` and `ClubWizardTests` read a case without
+`usesLCSTerminology` as the switch off, which is what the contract now means
+(there is no switch). A case that still carries the key is read as before.
+The toggle's floor is 15 cases (`contracts/README.md`'s census), and the
+school's list is compared only while the contract carries one: it has
+`factory` alone now. Every case's outcome is still compared exactly, and all
+15 pass with this app's switch off. `PreviewAppearanceTests.TheCloudflareMarkersExamplesAreRead`
+expects the marker example's new invented project name. No product code
+changed.
+
+**A defect, not held: the redactor (#941).** `LogRedactorTests` is red. Two
+of its tests fail: `LogRedactor_AllContractCases_Pass` (24 of the 50
+`problemReportRedaction.cases`, as #941 counts them) and
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 assembled cases
+expected, 12 found). The 24 are credential shapes and the second word of a
+two-word account name that today's Windows redactor writes into a trail line
+and a problem report. Those are shipped behaviour, so a ledger entry would
+ship the leak quietly. They stay red until #941 lands. **Measured for
+#941 on this PC:** #941's twelve C# patterns pasted verbatim into
+`PatternRules`, in the contract's order (a scratch copy, never committed).
+They pass all 50 `problemReportRedaction.cases`, all 15 `redactedAgainCases`,
+and both `ruleOrder.cases` under .NET's engine. That includes the case ending
+in a carriage return, which #941 feared would differ. With today's patterns,
+24 of 50, 8 of 15 and both rule-order cases differ, exactly as #941 counted
+under ICU. What is left for #941 is the two counts in
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 to 12 and 1 to 3), the
+three tests it lists, and the linear-time bound, which is unmeasured on .NET.
+The port is kept at `S\work\hold4\LogRedactor.port.cs` for that piece.
+
+**No owner, left red: `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`.**
+#696 put `read -rsp "Paste the token: "` inside `deploy.sh`'s
+`run_token_mode()`, and that function does not start with `assert_can_ask`.
+The question cannot be reached by a scheduled deploy, read rather than run:
+token mode refuses every option but its own, `--non-interactive` included,
+and asks only on a terminal. No `windows` issue names it, and relaxing the
+test would soften it, so the director raises it with the mac.
+
+**Proved three ways** by mutation over the hooked classes, restoring
+`NamedGapLedger.cs` by writing its bytes back (`S\work\hold4\mutation-*.txt`).
+Each round ran the 94 tests of the hooked classes in about 7 s.
+- **Closed.** One entry per new area for something this app already has:
+  `undoLastChange` under an older name, `netlifyToken`, a failure case it
+  explains as the contract does, `mediaFolderMissing` and `askTitle`. Each
+  failed with the closed message ("… it now EXISTS on this side"): 7 failed.
+  The seventh was the menu cases' fact, which read the older name where
+  `undoLastChange` is enabled.
+- **Withdrawn.** One entry per new area for a key the contract lacks. Each
+  failed with the withdrawn message: 6 failed (the kind in both of its facts).
+- **Removal.** Taking out every entry this piece added brought back the ten
+  baseline reds of those classes: trail events, wording, the machine word,
+  the credential requests, the failure explanations, both kinds facts, both
+  menu facts and the guidance words.
+- **Restored:** `Passed! - Failed: 0, Passed: 94`.
+- **Counts that cannot fall to zero unseen.** The held credential requests,
+  failure cases and guidance words met must equal their entries, so an entry
+  that matches nothing fails. Sixteen problem kinds are still compared. At
+  least three run menu cases must enable the renamed item. An item held as
+  missing outright may not also be held under an older name
+  (`NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose`).
+
+**Unrun rather than red**, read by key with no Windows reader yet:
+`activityTrail.lineShape.placeCases` (#946), `subjectMenus.addClassSheet` and
+`class-planning.json` → `duplicatingAsTheNextClass` (#927),
+`colourSchemePicker` (#920), `deployTokens` (#921), `keptDownloads`,
+`phetFences` and `buildOutputLocation.keptDownloadsSurviveTheSweep` (#936),
+`videoEmbeds` (#939), `quittingWhileWorkIsUnderWay.previewBuildRecord` (#928),
+`undo` and `undo-traces.json` (#949), `problemReportRedaction.redactedAgainCases`
+and `ruleOrder` (#941), and the `undoListDays` of 61 (#912).
+
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
 `PythonToolchainTests` runs every `scripts/test_*.py` here, so a shared test

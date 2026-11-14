@@ -347,6 +347,10 @@ public class NamedGapLedgerTests
         var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItemsUnderAnOlderName)
             .Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal).ToList();
         Assert.Equal(held, NamedGapLedger.SubjectMenuItemsOlderNames.Keys.OrderBy(key => key, StringComparer.Ordinal).ToList());
+        // An item held as missing outright is taken out of every comparison
+        // before its older name is read, so holding it here too would hold nothing.
+        var missing = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItems).Select(entry => entry.Key).ToHashSet();
+        Assert.Empty(held.Where(missing.Contains));
     }
 
     private static System.Collections.Generic.List<string> Problems(
