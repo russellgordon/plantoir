@@ -126,31 +126,35 @@ public sealed partial class SidebarPane
     }
 
     /// <summary>
-    /// A reference course's SECTION: no assistant, no Schedule Deploy… —
-    /// but Cancel Scheduled Deploy… whenever one exists, because the act that
-    /// STOPS a deploy is never withheld (gate by direction).
+    /// A reference course's SECTION: no assistant, no Schedule Deploy… and no
+    /// Cancel Scheduled Deploy… — the row and the menu bar agree with
+    /// <c>subjectMenus</c>, which leaves cancelScheduledDeploy out for a
+    /// course kept for reference (#527).
     /// </summary>
     /// <remarks>
-    /// The menu bar does NOT offer that Cancel (#488): <c>subjectMenus</c>
-    /// greys cancelScheduledDeploy on a course kept for reference, because the
-    /// mac's row has no Cancel and the mac turns such a schedule off by itself
-    /// (<c>ScheduledDeployCleanup</c>). Windows does not turn it off by itself
-    /// yet, so this row keeps the teacher's one way to stop it — written up for
-    /// the mac (documentation/12-windows-app.md → "Menus, the Section menu's
-    /// functions and #475 on Windows").
+    /// <para>No Cancel is needed because there is nothing left for one to
+    /// stop. Every read of the working folder turns off any deploy a reference
+    /// course still has (<see cref="ReferenceCourseUpkeep.BringUpToDate"/>,
+    /// since #241; <c>scheduledDeployCancellation</c>, "a course kept for
+    /// reference is met when the working folder is read"), writing
+    /// <c>scheduled deploy turned off</c>. The app refuses to SET one on such a
+    /// course (<c>ScheduledDeploy.Problem</c>), and a run that fires anyway
+    /// refuses itself (<c>keptForReference</c>). That is the mac's arrangement
+    /// (<c>ScheduledDeployCleanup</c>): its row has no Cancel either.</para>
+    ///
+    /// <para>Until #527 this row kept Cancel Scheduled Deploy…, written when
+    /// Windows did not yet turn such a schedule off by itself. Since then the
+    /// item could only find a task the last read had not removed: one whose
+    /// cancel failed (retried on the next read), or one made outside Plantoir
+    /// since that read (which the next read removes, and which refuses itself
+    /// if it fires first). documentation/12-windows-app.md → "Menus, the
+    /// Section menu's functions and #475 on Windows".</para>
     /// </remarks>
     private MenuFlyout ReferenceSectionMenu(Course course, int number)
     {
         string sectionDir = course.SectionDirectory(number);
         var row = new SidebarSelection.SectionItem(course.Code, number);
         var menu = new MenuFlyout();
-        if (Workspace.WorkspacePath is { } scheduledIn
-            && Plantoir.Core.Assist.TaskScheduling.NextRun(scheduledIn, course.Code, number) is { } when)
-        {
-            menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
-                Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
-            menu.Items.Add(new MenuFlyoutSeparator());
-        }
         menu.Items.Add(ObsidianItem(course, number, row));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, Selecting(row, () => FolderActions.ShowInFileExplorer(sectionDir))));

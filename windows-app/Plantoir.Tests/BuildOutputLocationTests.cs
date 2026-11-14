@@ -191,20 +191,27 @@ public class BuildOutputLocationTests : IDisposable
     [Fact]
     public void TheStartOfTheBuildIsWhatIsComparedWith()
     {
+        // On the real clock, in order (#799): the Save, a moment, the site.
+        // This used to date the site minutes AHEAD, which the clock guard now
+        // rightly reads as a build dated later than now; the order of the
+        // Save, the marker and the front page is what this pins, and it holds
+        // with every time at or before now. 50 ms is three ticks of Windows'
+        // file clock (FreshnessCases.PauseMilliseconds).
         var course = CourseWith("ADA1O", "# a lesson", DateTime.UtcNow.AddMinutes(-5));
+        Thread.Sleep(FreshnessCases.PauseMilliseconds);
+        DateTime afterTheSave = DateTime.UtcNow;
+        Thread.Sleep(FreshnessCases.PauseMilliseconds);
         MakeBuild("ADA1O", 1);
-        string index = BuildOutputLocation.BuiltIndexFor(_buildsRoot, "ADA1O", 1);
         string marker = Path.Combine(BuildOutputLocation.ForSection(_buildsRoot, "ADA1O", 1), BuildFreshness.BuildStartedMarker);
-        // The course's newest file is its settings, written just now by
+        // The course's newest entry is its settings, written just now by
         // CourseWith: "the teacher's Save". The site FINISHED after it.
-        File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(2));
         Assert.False(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));        // no marker: index.html's time, as before
 
         File.WriteAllText(marker, "");
-        File.SetLastWriteTimeUtc(marker, DateTime.UtcNow.AddMinutes(-10));          // but it STARTED before the Save
+        File.SetLastWriteTimeUtc(marker, afterTheSave.AddMinutes(-10));             // but it STARTED before the Save
         Assert.True(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));
 
-        File.SetLastWriteTimeUtc(marker, DateTime.UtcNow.AddMinutes(1));            // started after the Save
+        File.SetLastWriteTimeUtc(marker, afterTheSave);                             // started after the Save
         Assert.False(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));
         Assert.Equal(".build-started",
             ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["buildStartedMarker"]!["file"]!.ToString());

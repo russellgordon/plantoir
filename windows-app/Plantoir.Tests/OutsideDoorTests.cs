@@ -165,12 +165,25 @@ public class OutsideDoorTests : IDisposable
     [Fact]
     public void AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor_AndCmdIsNotWatched()
     {
-        Assert.False(OutsideDoor.Start(NoWindowExe(StubProgramCollection.ExitOneExe)));
+        // Watched for 10 s rather than the product's grace: the .NET Framework
+        // stub can take over a second to exit on a loaded PC, which the 400 ms
+        // default misses (#882 review, M1). The default itself is pinned by
+        // TheDefaultGraceIsFourHundredMilliseconds below.
+        Assert.False(OutsideDoor.Start(NoWindowExe(StubProgramCollection.ExitOneExe), TimeSpan.FromSeconds(10)));
         Assert.True(OutsideDoor.Start(NoWindowExe(StubProgramCollection.StayExe), TimeSpan.FromMilliseconds(250)));
         var clock = Stopwatch.StartNew();
         Assert.True(OutsideDoor.Start(NoWindow("/c ping -n 3 127.0.0.1 >nul")));
         Assert.True(clock.ElapsedMilliseconds < 300, $"cmd was watched: {clock.ElapsedMilliseconds} ms");
     }
+
+    /// <summary>
+    /// The watch a click pays for an <c>.exe</c> door. Short on purpose: a
+    /// multi-second wait freezes every successful open (documentation 12, "A
+    /// door that fails to start is now honest").
+    /// </summary>
+    [Fact]
+    public void TheDefaultGraceIsFourHundredMilliseconds() =>
+        Assert.Equal(TimeSpan.FromMilliseconds(400), OutsideDoor.StartGrace);
 
     private static ProcessStartInfo NoWindowExe(string exe) =>
         new(exe) { UseShellExecute = false, CreateNoWindow = true };
@@ -431,15 +444,20 @@ public sealed class StubProgramCollection
 
     private static string MakeFolder()
     {
-        // Clean up any probe folders a crash before this left behind, and the
-        // one this run makes when the process ends: the stub compiler used to
-        // leave a plantoir-probe-* folder in %TEMP% per run.
-        foreach (string old in SafeEnumerate(Path.GetTempPath(), "plantoir-probe*"))
-            try { Directory.Delete(old, recursive: true); } catch { }
-        string folder = Directory.CreateTempSubdirectory("plantoir-probe").FullName;
+        // A folder THIS process owns (#882): sweeping every plantoir-probe*
+        // folder here used to delete the stubs of another test run on the PC
+        // while it was running. The folder goes when this process ends; a
+        // crashed run's is swept only once its owner is provably gone.
+        string folder = RunOwnedTempFolders.Create(FolderPrefix);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { Directory.Delete(folder, recursive: true); } catch { } };
         return folder;
     }
+
+    /// <summary>Deliberately NOT <c>plantoir-probe…</c>: older copies of this suite still delete every folder that matches that.</summary>
+    internal const string FolderPrefix = "plantoir-stubs-";
+
+    /// <summary>The folder the stubs are compiled into, made on first use.</summary>
+    internal static string StubFolder => Folder.Value;
 
     private static string Compile(string name, string code)
     {
@@ -457,11 +475,5 @@ public sealed class StubProgramCollection
         process.WaitForExit();
         if (!File.Exists(exe)) throw new InvalidOperationException("The stub did not compile: " + said);
         return exe;
-    }
-
-    private static IEnumerable<string> SafeEnumerate(string root, string pattern)
-    {
-        try { return Directory.EnumerateDirectories(root, pattern); }
-        catch { return Array.Empty<string>(); }
     }
 }
