@@ -106,6 +106,24 @@ final class WorkLeaseLivenessTests: XCTestCase {
             if expect.keys.contains("assistant") {
                 XCTAssertEqual(WorkLeaseFiles.assistantLine(in: body), expect["assistant"] as? String, name)
             }
+            // #835: the sixth line, for a lease of the case's kind.
+            if expect.keys.contains("sections") {
+                let kind: String = item["kind"] as? String ?? "build"
+                let read: [WorkLeaseFiles.SectionEntry]? = WorkLeaseFiles.sections(ofALeaseOfKind: kind, text: body)
+                guard let wanted = expect["sections"] as? [[String: Any]] else {
+                    XCTAssertNil(read, name)
+                    continue
+                }
+                var expected: [WorkLeaseFiles.SectionEntry] = []
+                for one in wanted {
+                    expected.append(WorkLeaseFiles.SectionEntry(
+                        section: try XCTUnwrap(one["section"] as? Int, name),
+                        moment: try XCTUnwrap(one["moment"] as? String, name),
+                        port: one["port"] as? Int
+                    ))
+                }
+                XCTAssertEqual(read, expected, name)
+            }
         }
     }
 

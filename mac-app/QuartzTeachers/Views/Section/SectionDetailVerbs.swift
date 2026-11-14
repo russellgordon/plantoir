@@ -520,7 +520,7 @@ extension SectionDetailView {
             return true
         }
         if WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false, section: sectionNumber
         ) != nil {
             return true
         }

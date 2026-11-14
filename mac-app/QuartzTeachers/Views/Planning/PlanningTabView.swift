@@ -125,7 +125,7 @@ struct PlanningTabView: View {
                 ContentUnavailableView(
                     PlanningWording.cannotShowTitle,
                     systemImage: "exclamationmark.triangle",
-                    description: Text(PlanningWording.cannotShowDescription)
+                    description: Text(MachineWord.filling(PlanningWording.cannotShowDescription))
                 )
                 .accessibilityIdentifier("planningCannotShow")
             } else {
@@ -363,9 +363,9 @@ struct PlanningTabView: View {
                 case .opened:
                     break
                 case .couldNotOpen:
-                    browserProblem = PlanInTheBrowser.couldNotOpen
+                    browserProblem = MachineWord.filling(PlanInTheBrowser.couldNotOpen)
                 case .noBrowser:
-                    browserProblem = PlanInTheBrowser.noBrowser
+                    browserProblem = MachineWord.filling(PlanInTheBrowser.noBrowser)
                 }
             }
         )

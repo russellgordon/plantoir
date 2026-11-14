@@ -1956,7 +1956,8 @@ enum ScheduledDeploy {
         if let section {
             let coursesDirectory: URL = section.courseDirectory.deletingLastPathComponent()
             let answer: CourseWait = waitForTheCourse(
-                courseCode: section.courseCode, coursesDirectory: coursesDirectory
+                courseCode: section.courseCode, coursesDirectory: coursesDirectory,
+                section: section.sectionNumber
             )
             switch answer {
             case .goAhead(let leases, let waited, let waitedFor):
@@ -2617,9 +2618,17 @@ enum ScheduledDeploy {
     /// Holds NOTHING while it waits, so the program it is waiting for is not
     /// itself made to wait. Every seam is injectable so a test can run the
     /// whole ten minutes in no time and stage the race exactly.
+    ///
+    /// **Its section, since #835** (the director's ruling on #835's plan):
+    /// it waits only for work on its own section, or for work that names no
+    /// section (Windows, an older Plantoir, course-wide work), and its own
+    /// leases name its section, so a build of a sibling elsewhere neither
+    /// holds it up nor is held up by it. `section` nil is the whole course,
+    /// as before.
     nonisolated static func waitForTheCourse(
         courseCode: String,
         coursesDirectory: URL,
+        section: Int? = nil,
         now: () -> Date = { return Date() },
         pause: (TimeInterval) -> Void = { seconds in Thread.sleep(forTimeInterval: seconds) },
         heldElsewhere: (() -> [WorkLeaseFiles.Holding])? = nil,
@@ -2634,20 +2643,35 @@ enum ScheduledDeploy {
             let holdings: [WorkLeaseFiles.Holding] = ScheduledDeploy.readHoldings(
                 heldElsewhere: heldElsewhere, courseCode: courseCode, coursesDirectory: coursesDirectory
             )
-            if let inTheWay = WorkLeaseFiles.blocking(among: holdings, asker: .aScheduledPublish, claim: nil) {
+            let asked: Int? = WorkLeaseRegistry.sectionAsked(section)
+            if let inTheWay = WorkLeaseFiles.blocking(
+                among: holdings, asker: .aScheduledPublish, claim: nil, section: asked
+            ) {
                 lastSeen = inTheWay
             } else {
-                // Free: take, then check.
+                // Free: take, then check. The section's entry carries the
+                // same moment as line 3: one moment, one claim.
                 var taken: [URL] = []
                 var claim: WorkLeaseFiles.Claim? = nil
+                // The real clock, as the lease has always been stamped: `now`
+                // is the wall-clock seam for the cap, which a test moves.
+                let takenAt: Date = Date()
+                var entries: [WorkLeaseFiles.SectionEntry]? = nil
+                if let asked {
+                    entries = [
+                        WorkLeaseFiles.SectionEntry(section: asked, moment: ProcessLiveness.leaseMomentText(takenAt))
+                    ]
+                }
                 if let build = WorkLeaseFiles.write(
-                    kind: WorkLeaseFiles.buildKind, courseCode: courseCode, coursesDirectory: coursesDirectory
+                    kind: WorkLeaseFiles.buildKind, courseCode: courseCode, coursesDirectory: coursesDirectory,
+                    moment: takenAt, sections: entries
                 ) {
                     taken.append(build.url)
                     claim = WorkLeaseFiles.Claim(moment: build.moment, pid: getpid())
                 }
                 if let publish = WorkLeaseFiles.write(
-                    kind: WorkLeaseFiles.publishKind, courseCode: courseCode, coursesDirectory: coursesDirectory
+                    kind: WorkLeaseFiles.publishKind, courseCode: courseCode, coursesDirectory: coursesDirectory,
+                    moment: takenAt, sections: entries
                 ) {
                     taken.append(publish.url)
                 }
@@ -2661,7 +2685,7 @@ enum ScheduledDeploy {
                     heldElsewhere: heldElsewhere, courseCode: courseCode, coursesDirectory: coursesDirectory
                 )
                 if let earlier = WorkLeaseFiles.blocking(
-                    among: afterTaking, asker: .aScheduledPublish, claim: claim
+                    among: afterTaking, asker: .aScheduledPublish, claim: claim, section: asked
                 ) {
                     for url in taken {
                         WorkLeaseFiles.remove(at: url)

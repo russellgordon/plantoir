@@ -322,6 +322,56 @@ public sealed class AgentGuidanceTests : IDisposable
     }
 
     /// <summary>
+    /// #790 item 4 (the mac's <c>PrintablePagesTests.testTheUnitPlanningSkillIsWrittenWithItsTemplateAndBothRootFilesNameIt</c>,
+    /// #707): the unit-planning skill travels the same way WITH its template —
+    /// every <c>unitPlanning.agentGuidance.template</c> file written into both
+    /// homes, and each of its fonts byte for byte, by count and SHA-256 as the
+    /// contract records them (a font that an editor or a line-ending rule
+    /// touched would load as nothing) — both root files name it, and each
+    /// skill in <c>mentionedBy</c> names it.
+    /// </summary>
+    [Fact]
+    public void TheUnitPlanningSkillIsWrittenWithItsTemplateAndBothRootFilesNameIt()
+    {
+        var guidance = ContractLoader.LoadJson("shared-rules.json")["unitPlanning"]!["agentGuidance"]!;
+        string skillName = guidance["skill"]!.ToString();
+        var template = guidance["template"]!.AsArray().Select(s => s!.ToString()).ToList();
+        var fonts = guidance["fonts"]!.AsArray().ToList();
+        var mentionedBy = guidance["mentionedBy"]!.AsArray().Select(s => s!.ToString()).ToList();
+        Assert.True(template.Count >= 8, "unitPlanning.agentGuidance.template shrank");
+        Assert.True(fonts.Count >= 19, "unitPlanning.agentGuidance.fonts shrank");
+        Assert.NotEmpty(mentionedBy);
+        var routesTo = Contract["pageAuthoringSkill"]!["routesTo"]!.AsArray().Select(s => s!.ToString()).ToList();
+        Assert.False(routesTo.Contains(skillName), "a plan is not part of a page");
+
+        Assert.Empty(Pass().Failures);
+        foreach (string home in AgentGuidance.SkillHomes)
+        {
+            string skillFolder = Path.Combine(_folder, home, "skills", skillName);
+            Assert.Contains("name: " + skillName, File.ReadAllText(Path.Combine(skillFolder, "SKILL.md")));
+            foreach (string file in template)
+                Assert.True(File.Exists(Path.Combine(skillFolder, file.Replace('/', Path.DirectorySeparatorChar))),
+                            $"{home}: {file} must be written");
+            foreach (var font in fonts)
+            {
+                string file = font!["file"]!.ToString();
+                byte[] bytes = File.ReadAllBytes(Path.Combine(skillFolder, file.Replace('/', Path.DirectorySeparatorChar)));
+                Assert.True(font["bytes"]!.GetValue<int>() == bytes.Length, $"{home}: {file} is {bytes.Length} bytes");
+                Assert.Equal(font["sha256"]!.ToString(),
+                             Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant());
+            }
+            foreach (string mentioning in mentionedBy)
+            {
+                string other = File.ReadAllText(Path.Combine(_folder, home, "skills", mentioning, "SKILL.md"));
+                Assert.True(other.Contains($"`{skillName}`", StringComparison.Ordinal), $"{home}: {mentioning} must name {skillName}");
+            }
+        }
+        foreach (string name in AgentGuidance.RootFiles)
+            Assert.True(File.ReadAllText(Path.Combine(_folder, name)).Contains(skillName, StringComparison.Ordinal),
+                        $"{name} must name the {skillName} skill");
+    }
+
+    /// <summary>
     /// #600 (the mac's <c>PrintablePagesTests.testThePageAuthoringSkillIsWrittenAndBothRootFilesRouteToItFirst</c>,
     /// #596): the page-authoring skill travels the same way, names every
     /// feature skill it routes to in backticks — each written beside it — and

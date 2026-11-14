@@ -1,5 +1,21 @@
 {
  "about": "Dated facts a page states with {{fact:<id>}}: {\"value\": \u2026, \"read\": \"YYYY-MM-DD\", \"source\": \"<where it was read>\"}. A fact read more than 60 days ago is a warning under --check (F refuses it at a release). assistantOnTheWeb is the one switch that puts the assistant section on the web copy (decision 12): false until Russell says Copilot is verified (#804).",
  "assistantOnTheWeb": false,
- "facts": {}
+ "facts": {
+  "netlifyCreditsAMonth": {
+   "value": "300",
+   "read": "2026-11-01",
+   "source": "documentation/07-deployment.md, read there from Netlify's 'How credits work' page"
+  },
+  "netlifyCreditsADeploy": {
+   "value": "15",
+   "read": "2026-11-01",
+   "source": "documentation/07-deployment.md, read there from Netlify's 'How credits work' page"
+  },
+  "netlifyCreditsToDeployThreeSections": {
+   "value": "45",
+   "read": "2026-11-01",
+   "source": "documentation/07-deployment.md: each section is its own site, so one deploy of a three-section course is 45 credits"
+  }
+ }
 }

@@ -41,8 +41,8 @@ import Security
 ///   `brew install copilot` installs AWS's tool of the same name at the same
 ///   path (measured 2026-11-13).
 ///
-/// The menu item only appears when `isAvailable` is true. Plantoir never
-/// installs Copilot here; #855 is where offering it is decided.
+/// The menu item only appears when `isAvailable` is true. Plantoir sets
+/// Copilot up only when the teacher asks (#855, `AssistantSetUp`).
 nonisolated enum CopilotLauncher {
 
     // MARK: - Stored properties
@@ -128,7 +128,8 @@ nonisolated enum CopilotLauncher {
     ///
     /// This checks WHICH program it is, never whether anybody is signed in to
     /// it (`outsideAgents.neverProbedForSignIn` holds for this door too). #855
-    /// calls the same function after it installs Copilot.
+    /// checks the same identifier and team after it sets Copilot up, with
+    /// every page hashed (`DeveloperIDCheck`).
     static func isGitHubsCopilot(atPath path: String) -> Bool {
         let resolvedPath: String = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
         if resolvedPath.contains("/node_modules/\(npmPackage)/") {

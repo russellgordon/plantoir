@@ -3019,12 +3019,14 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
   handouts are kept), and the unit-planning skill a folder,
   `courses/<CODE>/.internal/planning/`, whose `plan.json` files the mac
-  reads for the Revise doors' greeting (Windows owes that reader: the
-  `windows` issue for #707) and shows on the course page's Planning tab
-  (Windows owes the tab: the `windows` issue for #708, and 09 → "The course
-  page's Planning tab (#708)"); the held marking skill adds one more when it
-  ships, `courses/<CODE>/.internal/marking/marking.json` (the two marking
-  folders' paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
+  reads for the Revise doors' greeting and shows on the course page's
+  Planning tab (Windows has the reader, the greeting's sentence and the
+  tab's rules in Core since 790a, and owes the tab and the call site that
+  turns the sentence on: #801, #820, and "Unit planning on Windows (#790,
+  #801, #820)" below); the held marking skill adds one more when it
+  ships,
+  `courses/<CODE>/.internal/marking/marking.json` (the two marking folders'
+  paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the
   rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
@@ -12855,6 +12857,299 @@ proves when it is asked, not what the window shows).
 
 **For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
 KNOW about #700").
+
+## Unit planning on Windows (#790, #801, #820)
+
+The mac's unit planning (#707, #708, #803; `09-mac-app.md` → "Unit planning
+(#707)" and "The course page's Planning tab (#708)") comes to Windows in two
+halves, because the greeting's sentence names a Planning tab and must not
+reach a teacher before the tab does (790 plan review M6). **790a**, this
+section's first half, is Core only: nothing a teacher sees changed.
+**790b** builds the tab, its web view, Plan a Unit, Open in Browser's launch
+and the three trail events, and turns the greeting's sentence on.
+
+### What 790a built
+
+- **The reader**, `Plantoir.Core/Models/UnitPlans.cs`: every
+  `courses/<CODE>/.internal/planning/<slug>/plan.json` read against
+  `unitPlanning.planFile`, never throwing; a broken file is left out and
+  COUNTED. `UnitPlansTests` walks the 18 `planFileCases` on disk and pins
+  `neverFolderNames` to `CourseArchiver.ExcludedFromArchives` (#790 item 5).
+  Two Windows facts, measured: a UTF-8 byte order mark (which Windows
+  editors write) made `JsonDocument` refuse the file, so it is skipped
+  first, as the mac's `JSONSerialization` skips it; and .NET's `$` matches
+  before a final line break where the mac's does not, so `IsUnitSlug`
+  refuses one by hand. A unit folder that is a junction is not read, as the
+  mac's listing skips a symbolic link.
+- **One "which unit is current" rule.** `UnitPlans.Covers` is the only
+  function that says whether a plan covers today; the greeting's order
+  (`NamedFirst`) and the tab's starting entry (`PlanningTab.StartingChoice`)
+  both call it (#820 item 1), so the two cannot disagree.
+- **The greeting's last sentence and its trail clause, as pure functions.**
+  `ClaudeCodeLauncher.Prepare` and `CodexLauncher.Prepare` return the argv
+  and the "assistant opened" line (`OutsideDoor.Session`) with nothing
+  started; `Open` calls them. `UnitPlansGreetingTests` walks the 18
+  `greetingUnitPlansCases` through BOTH, each on its own `today`. An
+  opening message (Fix with…, Plan a Unit…) replaces the greeting, so
+  neither the sentence nor the clause rides along. **The call site is not
+  wired**: `SidebarPane.ReviseWithClaude`/`ReviseWithCodex` pass no plans,
+  so today's greeting is exactly what it was; 790b passes
+  `UnitPlans.ToMention(course directory, kept for reference, today)`.
+- **Where #880's sentence goes.** `ClaudeCodeLauncher.Greeting` keeps its
+  sentences in a list: the plain greeting, then (marked in the code) the
+  reference-courses sentence of `outsideAgents.greetingReferenceCourses`
+  (#856, owned on Windows by #880), then the unit-plans sentence, joined by
+  one space, and the whole text's double quotes made apostrophes. Adding
+  #880's sentence is one `sentences.Add` before the unit plans' and changes
+  neither function's shape. Since the mac's #859 the plain greeting also
+  ends with `greetingHandoutsSentence`, BEFORE the reference-courses
+  sentence (`greetingReferenceCourses.where`; `greetingHandoutsCases` case 3
+  crosses all three); that is #895's on Windows, held by name in
+  `NamedGapLedger.FixWithGreetingCases`, and it is one more entry at the
+  front of the same list. Only Plan a Unit's message says it today (below).
+- **The guidance**: `AgentGuidanceTests.TheUnitPlanningSkillIsWrittenWithItsTemplateAndBothRootFilesNameIt`,
+  every template file in both homes and each of the 19 fonts by byte count
+  and SHA-256 (#790 item 4). A font with one byte appended turns it red.
+- **The tab's rules and words**, `PlanningTab.cs`: `tabCases`,
+  `choiceCases`, `followsThePage` (by Windows path, without regard to
+  case), `saveOnPlanning`, the "looked at a course's unit plans" line
+  texts, and `PlanningTabWording` (all 21 `words`). `PlanAUnit.cs`: the
+  buttons, the message for all six `messageCases`, the trail text. Since
+  the mac's #859 the message ends `{handouts}`, `greetingHandoutsSentence`
+  verbatim (`ClaudeCodeLauncher.HandoutsSentence`, pinned to the contract by
+  `PlanAUnitTests.TheWordsAreTheContracts`): #895's Plan a Unit part, built
+  here because nothing calls `PlanAUnit.OpeningMessage` until 790b, while
+  the Revise and Fix with doors' handouts sentence stays held for #895.
+  `PlanningAssets.Refresh`: the `assets` mirror.
+- **The guard's Core**, `LocalSiteGuard.cs`, `LocalPageDecision.cs`,
+  `PlanNavigation.cs`, `PlanInTheBrowser.cs`, below.
+
+### The guard: the folder served by the app itself, at an address that IS the path
+
+`whatAPageMayRead` asks for three guards. The mac reads the planning folder
+through `loadFileURL(allowingReadAccessTo:)`. On Windows the view will answer
+every request itself (`WebResourceRequested`, 790b), at one host whose URL
+path is the file's absolute path,
+`https://plans.plantoir.invalid/C:/Users/…/planning/unit-1/index.html`, each
+segment percent-encoded, with NO folder mapped to the host.
+
+- **Why the path is in the address.** Under `SetVirtualHostNameToFolderMapping`
+  the URL root is the planning folder and the URL standard clamps `..`
+  there, so `../../../course_config.json` from a unit's page comes back
+  INSIDE the folder. Measured by the plan review's probe (WebView2 SDK
+  1.0.3179.45 on this PC): five contract cases would answer load where the
+  contract says refuse. With the path in the address, the web view's own
+  resolution is the file's, and the tests hand the guard exactly the
+  address WebView2 would report.
+- **Addresses are built from the nominal path**, as the app holds it; real
+  paths are only ever compared. On a mapped network drive the real path is
+  `\\server\share\…`, which has no drive segment (review L1.2; not measured,
+  mapping a share needs an administrator here). The first segment must be a
+  drive, the one place a colon belongs (L1.1). A segment that decodes to
+  `.`, `..`, nothing, a separator, a colon (`index.html::$DATA`), a
+  character Windows refuses, a trailing dot or space (Windows strips them
+  and reads another file), or a device name (`CON`, `COM1`, `COM¹`,
+  `CONIN$`…) names nothing. The device names are Microsoft's list in
+  "Naming Files, Paths, and Namespaces" (superscript ¹ ² ³ included) plus
+  `COM0` and `LPT0` (790a review L2): that page's list starts at COM1, but
+  the same page names COM0 as a device link in the Win32 namespace, so both
+  are refused rather than trusted. Measured on this PC (Windows 11 Pro
+  26200), through a FULL path only `NUL` still opens a device: `CON`,
+  `COM1`, `COM0`, `LPT0`, `COM¹.txt` and `CONIN$` all create ordinary files.
+  The list is the second check behind the handle's `GetFileType`, kept for
+  the Windows versions that still reserve them.
+- **A page longer than MAX_PATH is served** (790a review L1). The disk is
+  asked through `\\?\` + `Path.GetFullPath(path)` (`\\?\UNC\…` for a share;
+  `WindowsLocalFiles.Extended`), so a 324-character page inside the root is
+  no longer refused as "nothing to read there"; the app's manifest declares
+  no long-path awareness, and the machine's registry switch would be needed
+  besides. The prefix turns Windows' own name parsing off, so
+  `GetFullPath` takes `.` and `..` out first, and what the prefix would let
+  through (a trailing dot or space, a device name) the segment check has
+  already refused. `LocalSiteGuardTests.APageOverMaxPathIsServedAndStillKeptInside`
+  serves a 300-plus-character page, and refuses as OUTSIDE (not merely
+  unreadable) both a `..` climb out of it and a junction into a long path
+  outside.
+- **Real paths** come from `GetFinalPathNameByHandle` on the longest part
+  of the path that exists, which follows junctions and symbolic links and
+  expands 8.3 short names (measured: `PL6C19~1\SNC2D\INTERN~1\planning\unit\INDEX~1.HTM`
+  is judged inside). A link is `LinkTarget != null`, never the
+  reparse-point attribute alone: a OneDrive Files On-Demand placeholder is
+  a reparse point and not a link, and treating it as one would refuse every
+  plan in a OneDrive-backed Desktop (not measured here: this PC has no
+  OneDrive folder in use; on Russell's hand list). The root is looked for
+  again at every call, so a folder made after the view opened is seen, and
+  nothing is inside before it exists (#811 plan review L9).
+- **One handle** (review L2). `LocalSiteGuard.Answer` opens the file once,
+  links followed; checks THAT handle's real path is inside, that it is an
+  ordinary disk file (`GetFileType` and the directory attribute: a device
+  or a folder is refused, L1.3), and that its type is on the allowlist both
+  as written and as it resolves; and serves the bytes from the same handle.
+  A junction swapped between the check and the read changes nothing. Read,
+  write and delete are shared, so a tab reading a page never blocks the
+  assistant writing it.
+- **`file:` addresses** are read by the contract's rule (this PC's own
+  files only, no host or `localhost`), and one naming another machine is
+  refused WITHOUT asking the disk: `file://server/share` would be an SMB
+  connection from the teacher's PC. Measured with a counting seam: zero
+  calls. A served page's click on a `file:` link raises no navigation in
+  WebView2 at all (review L5), so a contract case with a `file:` address
+  inside the folder would not load on Windows; none has one. 790b's
+  adapter must load the SERVED address of a `file:` path the decision lets
+  through, so no page is ever read through Chromium's own file access.
+- **What it does not see**: a hard link to a file outside the course is
+  the same file; no path check can tell, on either platform. The guard
+  keeps mistakes and links out, not a writer who could copy the file in.
+  (The assets mirror, which WRITES, does see one: below.)
+  Duplicate keys in a `plan.json`: `JsonDocument` keeps both and which one
+  is read may differ from the mac; no case covers it. A `plan.json` whose
+  text cannot become a string (an escaped lone surrogate `\ud800`, a raw
+  byte that is not UTF-8) parses in `JsonDocument` and then throws
+  `InvalidOperationException` from `GetString`; `PlanFrom` catches it with
+  `JsonException`, so the plan is unreadable and counted, never a crash
+  (790a review M1, `UnitPlansTests.TextThatIsNotAStringIsAPlanThatCannotBeRead`).
+
+**Rejected**: the folder mapping plus a filter (the clamp above, and a
+mapping that keeps serving whatever the filter misses); `file:` navigation
+in WebView2 (no folder-scoped read: a `file:` page can ask for any `file:`
+path); a loopback web server (a port anything on the PC can reach); the
+reparse-point attribute as the test for a link (OneDrive, above).
+
+### Both ways for every link case, and what this PC cannot make
+
+`navigationCases` and `openInBrowser` carry `links`. **This account cannot
+make a FILE symbolic link** (`File.CreateSymbolicLink` fails, WinError
+1314; Developer Mode is off), and three `openInBrowser` cases link a file
+(`unit-1/notes.html`, `unit-1/home.html`, `unit-1/look.html`). So
+`PlanNavigationTests` and `PlanInTheBrowserTests` run EVERY case twice:
+against a map of the case's files and links (`LocalSiteFixtures.LinkMap`,
+an `ILocalFiles` seam that follows the links by hand), and on a real disk
+with each folder link made as a junction. The three file-link cases are
+left out of the disk theory when this account cannot make a file link
+(`LocalSiteFixtures.CanMakeFileLinks`, asked once by making one in a
+temporary folder), and `PlanInTheBrowserTests.TheFileLinkCasesHoldOnDisk`
+runs them on disk where it can and is otherwise SKIPPED with the three
+names in its reason, so the totals line here reads `Skipped: 1` for it.
+Until 790a's second review (L9) they returned early with a line in the
+test output and counted as PASSED, invisibly at the default verbosity.
+`TheFileLinkCasesAreTheContractsThree` pins the three names to the
+contract, and any other case whose link cannot be made FAILS (no
+`navigationCases` case links a file). The map is not a formality: judging a page
+by its written extension alone turns "a link named like a page that leads
+to a script" red under the map ONLY (measured), because the disk cannot
+make that link here. The real resolver's handling of a FILE symbolic link
+is therefore not measured on this PC; the threat on Windows is a junction,
+which needs no privilege and is measured.
+
+Windows-only facts, not proposed to the contract: `.cmd`, `.bat`, `.ps1`,
+`.lnk`, `.url`, `.exe`, `.msi`, `.scr` and `notes.html.exe` are never a
+page; `index.html.`, `index.html::$DATA`, `index.html%20` and `CON.html` are
+outside the plan; an escaped `..` or separator is refused; our own host on
+`http:`, on another port or with a user name is not the plan.
+
+### The command line's budget, measured (plan review L4)
+
+cmd's bound is 8,191 UTF-16 units and a name is cut at 60 TEXT ELEMENTS
+(`unitNameMaxCharacters`, counted as `fixWith.charactersAre` says), and a
+text element has NO bound in UTF-16 units. Six names of 60 ZWJ family
+emoji (11 units each), "and 3 more", an 80-element course name of the
+same emoji and the How I Teach sentence make a greeting of 5,362 units:
+for a shim in a 240-character folder (`OutsideDoor.LimitFor`: 7,823) the
+Claude door's line is 5,756 and the Codex door's 6,193 with a
+240-character working folder
+(`UnitPlansGreetingTests.TheWorstSentenceStillFitsBothDoorsCommandLines`).
+But a letter under 40 stacked combining accents is ONE element of 41
+units, and six names of those (790a review M2) made a greeting of 14,879
+units here (the reviewer's fixture, 15,110): the door refused to open,
+every time.
+
+**So the door drops names from the END** until its whole command line is
+within `OutsideDoor.LimitFor` its real program, the same bound and the same
+function Fix with…'s rows are dropped to (`OutsideDoor.GreetingThatFits`,
+called by both `Prepare`s with the program `Open` found). The names dropped
+are counted into `greetingUnitPlans.more` (", and N more"), which is what
+`fixWith.charactersAre` says Windows does when its own UTF-16 bound bites
+before the character bound; no sentence changed, and the `one`/`some`
+choice is still by how many plans there are. The limit used is
+`LimitFor`: 8,191 for an `.exe`, and for an npm shim 8,191 less its
+folder's length and 128 (`ShimExpansionAllowance`, measured 2026-11-12,
+"What the outside doors hand to Windows, and how"). Measured with that
+fixture (`NamesTooLongForTheCommandLineAreDroppedFromTheEnd`): a
+`claude.exe` door names 3 (line 7,878 of 8,191); a shim in a 240-character
+folder names 2 (5,754 of 7,823); Codex names 2 either way (5,933 of 8,191,
+6,191 of 7,823). It never names fewer than one: the contract has no words
+for a sentence naming none, so one name still too long leaves the line
+over and the door refuses, as it does for an over-long course name (a
+pre-existing gap, not this piece's). The trail clause still counts every
+plan. Rejected: a UTF-16 cap on each name as well as the 60 elements (it
+cuts a name a teacher would recognise when dropping a later name would do,
+and the contract bounds names in elements only); refusing the door (the
+behaviour this replaced).
+
+### The assets mirror goes further than the mac's
+
+`PlanningAssets.Refresh` does nothing when the planning folder does not
+exist, and nothing when `.internal`, `planning`, `assets` or ANY entry under
+`assets` is a link. The mac refuses only a linked planning folder or
+`assets`. On Windows the deeper check is needed, because .NET's
+`EnumerateFiles(AllDirectories)`, which `ToolchainMirror.SyncDirectory` uses
+on both sides, walks THROUGH a junction: with `assets\fonts` a junction, the
+mirror would delete "extra" files from the folder behind it (each of the
+four shapes is a `PlanningAssetsTests` case, and a link-blind mirror turns
+all four red). On the mac the destination walk does not follow a link, so
+the harm there is writing through one, not deleting (790 plan review, new
+finding a).
+
+**It never overwrites a file in place** (790a review 2, M1). A file in
+`assets` that is a HARD LINK to a teacher's file outside the course (no
+privilege is needed on one volume, and `LinkTarget` cannot see one) was
+written through by `File.Copy(overwrite: true)`: measured, the teacher's
+file then held the template's stylesheet. So `PlanningAssets` keeps a
+mirror of its own: a file whose size and modification time match the
+template's is left alone, one of the same size is compared byte for byte
+and left alone untouched when it matches, and anything else is DELETED and
+written anew, which takes the name away from the hard link and leaves the
+file outside as it was (`PlanningAssetsTests.AHardLinkedAssetIsReplacedNeverWrittenThrough`).
+Kept local to the assets: `ToolchainMirror.SyncDirectory` still overwrites
+in place for `.toolchain`, which nothing hard-links into. Rejected:
+refusing any file with a link count above 1 (one more handle per file per
+look, and the plan's look would then stay stale until someone found the
+link). Extra FOLDERS are not removed, only extra files, as before (review
+2, L7: cosmetic, since the plan site cannot reach an empty folder).
+
+`PlanningAssets.WhyNot` says why a refresh would do nothing (no planning
+folder, no template, a link), the link checks first. The second review
+(L6) reported a DANGLING junction at `assets` passing because
+`Directory.Exists` is false through it; measured here on .NET 9, it is
+TRUE (`LinkTarget` names the deleted target), so the original check
+refused it too. The order is explicit now anyway, and
+`ADanglingJunctionAtAssetsIsRefusedAsALink` pins it. A refusal is not a
+failed copy: `couldNotRefreshTheLookLine` is for files that could not be
+copied, and 790b's caller can tell the two apart through `WhyNot`.
+
+### The machine word in the tab's sentences (Russell, 2026-11-13, on #801)
+
+Three `unitPlanning.tab.words` sentences named the Mac. They now carry
+`{machine}` with their `usedIn` entries (`cannotShowDescription`,
+`openInBrowserCouldNotOpen`, `openInBrowserNoBrowser`), and the trail line
+`couldNotShowLine` drops "on this Mac" as Coverage's did (5107c8d8b): a
+`usedIn` entry for a `mustRecord` line would be an array index into a list
+that grows every day. `MachineWordContractTests` says the three filled with
+"PC". The mac follows since #902: its constants carry `{machine}`, filled
+with `MachineWord.filling` where `PlanningTabView` shows them, and
+`PlanningTrail.couldNotShow` no longer says " on this Mac" (nothing is
+filled there). `PlanningTabTests.testTheWordsAreTheContracts` and
+`testTheTabsTrailLinesAreTheContractsAndNameNoPlan` pin both.
+
+### What 790b still owes
+
+The course page's two tabs and the Planning tab's view (#801 items 1, 2, 6),
+the web view on this guard with its own proxied environment (790 plan review
+H1: preconnect and a meta refresh opened sockets no event saw, measured), the
+headless guard harness, Plan a Unit's buttons, Open in Browser's launch
+through the `https` ProgId (#820 items 3 to 6), the three trail events (the
+`NamedGapLedger` holds them until their first `Note`), and the one-line
+`SidebarPane` change that turns the greeting's sentence on.
 
 ## Sharing unit plans (#709): what Windows owes
 

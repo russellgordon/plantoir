@@ -82,7 +82,8 @@ nonisolated enum UpdateWording {
     /// A build or publish another program holds a lease for. Names the
     /// COURSE and no program, the way
     /// `AssistWording.courseIsBeingBuiltElsewhere` does and for its reason:
-    /// the lease names only the course, and the sentence has to be true
+    /// the gate holds for a lease of the course whatever section it names
+    /// (#835), and the sentence has to be true
     /// whichever program holds it.
     ///
     /// Phrased as what PLANTOIR is doing — waiting — so the title's "once it
