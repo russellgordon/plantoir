@@ -13547,7 +13547,7 @@ and `example-password`):
 |---|---|---|
 | `"Authorization": "Basic …"` (JSON), `'Authorization': 'Basic …'` (Python) | left whole | `basicAuthHeader` reads quotes round the name and the value, and `=` as well as `:` |
 | `curl -u user:pass`, `--user user:pass`, `--user 'user:pass word'` | left whole | `userFlag`, new: a value holding a colon after `-u` or `--user`, a quoted value to its closing quote |
-| `ftp://user:pass@host`, `sftp://…` | the username stayed (`ftp://example-user:[removed: email address]/`) | `urlUserinfo` reads any scheme |
+| `ftp://user:pass@plans.example`, `sftp://…` | the username stayed (`ftp://example-user:[removed: email address]/`) | `urlUserinfo` reads any scheme |
 | a password with a raw `/` or a space | the username and part of the password stayed | `urlUserinfo` takes a `/`, and single spaces unless the password starts with a digit |
 | `Authorization: Basic [removed: token]` redacted again | `… [removed: token] token]` | `basicAuthHeader` and `userFlag` leave a placeholder alone, as #780 made the label rules do |
 | `/Users/First Last/…`, `C:\Users\First Last\…` | `/Users/person Last/…`: the second word of the name stayed | several words are taken when they run on to a separator, a quote, a colon or the end of the line |
