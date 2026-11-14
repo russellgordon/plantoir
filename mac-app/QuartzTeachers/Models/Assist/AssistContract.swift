@@ -329,6 +329,7 @@ enum AssistContract {
             ),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "sectionIsBeingDeployed": AssistWording.sectionIsBeingDeployed(course: course, section: section),
+            "sectionIsBeingBuiltElsewhere": AssistWording.sectionIsBeingBuiltElsewhere(course: course, section: section),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
             // The assistant's Open in Obsidian (#610).
             "openedThePageInObsidian": AssistWording.openedThePageInObsidian(page: pagePlaceholder),

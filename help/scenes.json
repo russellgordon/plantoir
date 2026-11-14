@@ -1,4 +1,1933 @@
 {
  "about": "One entry per picture a page shows with {{picture:<scene>}}. Scene ids are <page id>-<n> and are never renumbered: a new picture takes the next number. Fields: page (the page that shows it), shows (what the picture shows), labels (the red word labels), expectText (words the capture must show, read back by OCR; filled by P3 and CF), awaiting_capture (true until both pictures exist), waiting_on (\"#<issue>\", or absent), setup (how the scene is set up in a scratch state), windows (null until Windows), raw (true when the site also needs an unannotated copy, <scene>-<light|dark>-raw.webp). Files: help/pictures/<scene>-light.webp and <scene>-dark.webp.",
- "scenes": {}
+ "scenes": {
+  "organised-1": {
+   "page": "organised",
+   "shows": "The main window with two courses, their sections, and a reference course",
+   "labels": [
+    "Course",
+    "Section 1",
+    "Reference Courses"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "organised-2": {
+   "page": "organised",
+   "shows": "The working folder's courses folder opened in Finder, one folder per course",
+   "labels": [
+    "courses",
+    "One folder per course"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "publish-and-deploy-1": {
+   "page": "publish-and-deploy",
+   "shows": "The Publishing and Deploying\u2026 dialog from the Help menu",
+   "labels": [
+    "Help \u25b8 Publishing and Deploying\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "example-course-1": {
+   "page": "example-course",
+   "shows": "The New to this? box at the top of New Course or Club",
+   "labels": [
+    "Add Example Course"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "tour-example-course-1": {
+   "page": "tour-example-course",
+   "shows": "Obsidian's file list for EXC2O",
+   "labels": [
+    "Shared: every section",
+    "section1: Section 1 only",
+    "section2: Section 2 only"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "tour-example-course-2": {
+   "page": "tour-example-course",
+   "shows": "Plantoir's sidebar with EXC2O and its two sections",
+   "labels": [
+    "Course",
+    "Section 1",
+    "Section 2"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "tour-example-course-3": {
+   "page": "tour-example-course",
+   "shows": "How This Site Is Organised on the built site, its diagram of class pages linking to one concept page",
+   "labels": [
+    "Class pages",
+    "Reference pages"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "tour-example-course-4": {
+   "page": "tour-example-course",
+   "shows": "Section 1's and Section 2's sites side by side",
+   "labels": [
+    "Section 1's site",
+    "Section 2's site"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "shared-and-section-1": {
+   "page": "shared-and-section",
+   "shows": "Obsidian: section1 expanded beside the shared folders",
+   "labels": [
+    "Front page",
+    "All Classes",
+    "Key Links"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "shared-and-section-2": {
+   "page": "shared-and-section",
+   "shows": "A shared page's settings with publishForSection1 and publishForSection2",
+   "labels": [
+    "Section 1",
+    "Section 2"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "class-pages-1": {
+   "page": "class-pages",
+   "shows": "All Classes in Obsidian, in order",
+   "labels": [
+    "Unit 1, Day 13",
+    "All Classes"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "class-pages-2": {
+   "page": "class-pages",
+   "shows": "New Course's field for the unit word, with its example caption",
+   "labels": [
+    "What do you call a unit?"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "class-pages-3": {
+   "page": "class-pages",
+   "shows": "A section's front page on the site with Most Recent Class",
+   "labels": [
+    "Most Recent Class"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "one-lesson-1": {
+   "page": "one-lesson",
+   "shows": "A class page in Obsidian beside the concept page it links",
+   "labels": [
+    "Agenda",
+    "Link to a shared page"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "one-lesson-2": {
+   "page": "one-lesson",
+   "shows": "The concept page on the site with its backlinks",
+   "labels": [
+    "Backlinks: the classes that used it"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "two-sections-1": {
+   "page": "two-sections",
+   "shows": "Section 1's and Section 2's sites side by side, different Most Recent Class",
+   "labels": [
+    "Section 1: Unit 5, Day 17",
+    "Section 2: Unit 5, Day 16"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "two-sections-2": {
+   "page": "two-sections",
+   "shows": "Hide Pages\u2026 in Section 2",
+   "labels": [
+    "Hide"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "write-in-obsidian-1": {
+   "page": "write-in-obsidian",
+   "shows": "A section selected in Plantoir, with Open in Obsidian in the toolbar",
+   "labels": [
+    "Open in Obsidian"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "write-in-obsidian-2": {
+   "page": "write-in-obsidian",
+   "shows": "Obsidian open on the course, a class page open from the section's All Classes folder",
+   "labels": [
+    "All Classes",
+    "The page's settings at the top"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "add-next-class-1": {
+   "page": "add-next-class",
+   "shows": "The Section menu open on Add Next Class",
+   "labels": [
+    "Add Next Class"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "add-next-class-2": {
+   "page": "add-next-class",
+   "shows": "The new class page in Obsidian's file list, in the section's All Classes folder, with its number",
+   "labels": [
+    "The new page"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "publish-pages-1": {
+   "page": "publish-pages",
+   "shows": "The Publish Pages sheet with its list of hidden pages, two of them ticked",
+   "labels": [
+    "Page",
+    "Find a page",
+    "Continue"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "publish-pages-2": {
+   "page": "publish-pages",
+   "shows": "The plan shown after Continue: every page that would change and what changes",
+   "labels": [
+    "What changes",
+    "Publish"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "publish-pages-3": {
+   "page": "publish-pages",
+   "shows": "The Section menu with Undo Last Change",
+   "labels": [
+    "Undo Last Change"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "publish-class-for-date-1": {
+   "page": "publish-class-for-date",
+   "shows": "The Publish Class for a Date sheet with its date field",
+   "labels": [
+    "The day of the class",
+    "Continue"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "publish-class-for-date-2": {
+   "page": "publish-class-for-date",
+   "shows": "The plan for one day's class: the class page and the pages it links to",
+   "labels": [
+    "What changes",
+    "Publish"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "links-checklist-1": {
+   "page": "links-checklist",
+   "shows": "The Links to Hidden Pages sheet with its groups of pages, some ticked",
+   "labels": [
+    "Used by a class students can see",
+    "Classes not yet published"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "links-checklist-2": {
+   "page": "links-checklist",
+   "shows": "The Links to Hidden Pages sheet with its two notes and its buttons",
+   "labels": [
+    "Not Now",
+    "Publish"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "preview-1": {
+   "page": "preview",
+   "shows": "A section's preview in its window, with the toolbar",
+   "labels": [
+    "Stop Preview",
+    "Back",
+    "Reload",
+    "Open in Browser"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "preview-2": {
+   "page": "preview",
+   "shows": "The progress shown while a preview is made",
+   "labels": [
+    "What is happening now"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "preview-3": {
+   "page": "preview",
+   "shows": "The Preview pane of Settings with the choice of where a preview opens",
+   "labels": [
+    "When you press Preview, open"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "deploy-2": {
+   "page": "deploy",
+   "shows": "The progress of a deploy in the section's window",
+   "labels": [
+    "Progress"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "deploy-3": {
+   "page": "deploy",
+   "shows": "A finished deploy, with the website's address as a link",
+   "labels": [
+    "The site's address"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "later-classes-1": {
+   "page": "later-classes",
+   "shows": "The sheet that asks about classes dated later, every class ticked",
+   "labels": [
+    "Page",
+    "Date",
+    "Deploy Ticked"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "schedule-deploy-1": {
+   "page": "schedule-deploy",
+   "shows": "The Schedule a deploy sheet with its plan",
+   "labels": [
+    "Deploy at",
+    "Schedule"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "schedule-deploy-2": {
+   "page": "schedule-deploy",
+   "shows": "The clock beside a section in the sidebar, with its hover text",
+   "labels": [
+    "The clock"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "schedule-deploy-3": {
+   "page": "schedule-deploy",
+   "shows": "The notification after a scheduled deploy",
+   "labels": [
+    "Click to open the section"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "class-dates-1": {
+   "page": "class-dates",
+   "shows": "The class dates sheet with dates pasted in",
+   "labels": [
+    "Type or paste",
+    "Where these came from",
+    "Read the Dates"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "class-dates-2": {
+   "page": "class-dates",
+   "shows": "The question asked when dates can be read two ways",
+   "labels": [
+    "Day First",
+    "Month First"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "redate-1": {
+   "page": "redate",
+   "shows": "The Re-date Classes sheet showing its plan",
+   "labels": [
+    "The plan",
+    "Re-date"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "make-room-1": {
+   "page": "make-room",
+   "shows": "The Make Room for Classes sheet: the class to go in front of, and how many",
+   "labels": [
+    "The class a new one goes in front of",
+    "How many",
+    "Continue"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "make-room-2": {
+   "page": "make-room",
+   "shows": "The plan for making room, with its sentence about Undo Last Change",
+   "labels": [
+    "Make Room"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "start-of-year-1": {
+   "page": "start-of-year",
+   "shows": "The Get Ready for the Start of the Year sheet with its reasons",
+   "labels": [
+    "Going into draft",
+    "Why",
+    "Put These into Draft"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "page-settings-1": {
+   "page": "page-settings",
+   "shows": "A shared page's settings in Obsidian, the publish lines marked",
+   "labels": [
+    "publishForSection1",
+    "publishForSection2"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "media-1": {
+   "page": "media",
+   "shows": "A page in Obsidian with an embedded picture from Media",
+   "labels": [
+    "Media folder"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "printing-1": {
+   "page": "printing",
+   "shows": "Course Settings, the Printing part, with the corner sketch",
+   "labels": [
+    "School name",
+    "Blanks to fill in"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "printing-2": {
+   "page": "printing",
+   "shows": "The page's Print button and its choices",
+   "labels": [
+    "Print",
+    "Questions only"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "printing-3": {
+   "page": "printing",
+   "shows": "The printed handout",
+   "labels": [
+    "Answer key"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "figures-1": {
+   "page": "figures",
+   "shows": "A tikz block beside the diagram it draws",
+   "labels": [
+    "What you type",
+    "What students see"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "figures-2": {
+   "page": "figures",
+   "shows": "A graph on the class site",
+   "labels": [
+    "Drag to move"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "obsidian-addons-1": {
+   "page": "obsidian-addons",
+   "shows": "The Obsidian pane of Settings with its one switch",
+   "labels": [
+    "Obsidian",
+    "The switch"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "geogebra-1": {
+   "page": "geogebra",
+   "shows": "A geogebra block in Obsidian",
+   "labels": [
+    "file:",
+    "alt:"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "geogebra-2": {
+   "page": "geogebra",
+   "shows": "The sketch on the class site, opened",
+   "labels": [
+    "Open the sketch",
+    "Reset"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "code-1": {
+   "page": "code",
+   "shows": "A runnable Python block on the class site",
+   "labels": [
+    "Run",
+    "Stop",
+    "Reset"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "quizzes-1": {
+   "page": "quizzes",
+   "shows": "A quiz in Obsidian beside the checked question on the site",
+   "labels": [
+    "What you type",
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "task-boxes-1": {
+   "page": "task-boxes",
+   "shows": "A checklist on a class page of the class site, some boxes ticked",
+   "labels": [
+    "Boxes a student ticked"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "my-progress-1": {
+   "page": "my-progress",
+   "shows": "A page in Obsidian with tick boxes under a Success criteria heading",
+   "labels": [
+    "Success criteria",
+    "Tick boxes"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "my-progress-2": {
+   "page": "my-progress",
+   "shows": "The My Progress page on the class site, with its counts",
+   "labels": [
+    "My Progress",
+    "Ticked"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "coverage-1": {
+   "page": "coverage",
+   "shows": "A section's Coverage tab with its map",
+   "labels": [
+    "Coverage",
+    "Make the Map Again"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "coverage-2": {
+   "page": "coverage",
+   "shows": "The coverage map page on the class site",
+   "labels": [
+    "Pale: few pages"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "second-curriculum-1": {
+   "page": "second-curriculum",
+   "shows": "Curriculum folders in Course Settings, two ticked",
+   "labels": [
+    "Curriculum folders"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "second-curriculum-2": {
+   "page": "second-curriculum",
+   "shows": "Two maps on the class site",
+   "labels": [
+    "Ontario",
+    "AP"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "cloudflare-1": {
+   "page": "cloudflare",
+   "shows": "Plantoir \u25b8 Settings \u25b8 Deploying with the Account ID field",
+   "labels": [
+    "Cloudflare Account ID",
+    "Where do I find this?"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "cloudflare-2": {
+   "page": "cloudflare",
+   "shows": "Course Settings \u25b8 Deploying set to Cloudflare Pages",
+   "labels": [
+    "Deploy to: Cloudflare Pages",
+    "Also deploy to, for redundancy"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "cloudflare-3": {
+   "page": "cloudflare",
+   "shows": "The Connect to Cloudflare sheet asking for the token",
+   "labels": [
+    "Cloudflare token",
+    "Continue"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "cloudflare-4": {
+   "page": "cloudflare",
+   "shows": "The finished deploy with its live address",
+   "labels": [
+    "Your website is live",
+    "The address to give your class"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "cloudflare-5": {
+   "page": "cloudflare",
+   "shows": "The class site in a browser at its pages.dev address",
+   "labels": [
+    "pages.dev address"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "new-course-1": {
+   "page": "new-course",
+   "shows": "New Course or Club, Basics filled in",
+   "labels": [
+    "Province",
+    "Course code",
+    "Timetable section numbers"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "new-course-2": {
+   "page": "new-course",
+   "shows": "Starting Content for a code with ready-made pages",
+   "labels": [
+    "Pre-populate course with example content",
+    "Include \u2026 curriculum pages"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "new-course-3": {
+   "page": "new-course",
+   "shows": "Starting Content for a code with a subject starting point only",
+   "labels": [
+    "Start from a \u2026 skeleton"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "club-1": {
+   "page": "club",
+   "shows": "New Course or Club with This is a club on",
+   "labels": [
+    "This is a club",
+    "Meetings"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "add-section-1": {
+   "page": "add-section",
+   "shows": "The Add a Section sheet for a course",
+   "labels": [
+    "Section number",
+    "Add Section"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "course-settings-1": {
+   "page": "course-settings",
+   "shows": "Course Settings, top of the form",
+   "labels": [
+    "Course name",
+    "Save"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "course-settings-2": {
+   "page": "course-settings",
+   "shows": "The Content Structure and Marks parts",
+   "labels": [
+    "Shared folders",
+    "Folders whose work counts for marks"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "course-settings-3": {
+   "page": "course-settings",
+   "shows": "Sidebar Visibility table",
+   "labels": [
+    "Hide",
+    "Expandable"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "section-look-1": {
+   "page": "section-look",
+   "shows": "A Section Settings part with the colour scheme and its sample",
+   "labels": [
+    "Colour scheme",
+    "Preview:"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "section-look-2": {
+   "page": "section-look",
+   "shows": "The fonts with their sample sentences",
+   "labels": [
+    "Header & body fonts",
+    "Code font"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "course-folders-1": {
+   "page": "course-folders",
+   "shows": "Content Structure in Course Settings, with the four lists and the + and \u2212 buttons under one of them",
+   "labels": [
+    "Shared folders (all sections)",
+    "Per-section folders",
+    "Add"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "course-folders-2": {
+   "page": "course-folders",
+   "shows": "The sheet that renames a folder, with its explanation",
+   "labels": [
+    "New name",
+    "Rename"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "special-folders-1": {
+   "page": "special-folders",
+   "shows": "The Folders Plantoir uses sheet, listing one course's own folders by name",
+   "labels": [
+    "Your lessons",
+    "Images and files you add to pages",
+    "Done"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "unit-word-1": {
+   "page": "unit-word",
+   "shows": "The sheet that renames the unit word, saying how many class pages and links would change",
+   "labels": [
+    "Rename"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "rename-remove-1": {
+   "page": "rename-remove",
+   "shows": "A course code being edited in the sidebar",
+   "labels": [
+    "Course code"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "rename-remove-2": {
+   "page": "rename-remove",
+   "shows": "The Remove question",
+   "labels": [
+    "Remove"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "working-folder-1": {
+   "page": "working-folder",
+   "shows": "Plantoir's window with no working folder open, showing Choose Your Working Folder",
+   "labels": [
+    "Choose Folder\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "working-folder-2": {
+   "page": "working-folder",
+   "shows": "The File menu open on Open Recent, listing folders opened before",
+   "labels": [
+    "Open Recent",
+    "Clear Menu"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "destinations-1": {
+   "page": "destinations",
+   "shows": "Course Settings \u25b8 Deploying with Deploy to open",
+   "labels": [
+    "Deploy to",
+    "Also deploy to, for redundancy"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "netlify-1": {
+   "page": "netlify",
+   "shows": "The Teacher Surname question at a first Netlify deploy",
+   "labels": [
+    "Surname"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "folder-deploy-1": {
+   "page": "folder-deploy",
+   "shows": "Deploying set to a folder",
+   "labels": [
+    "Folder",
+    "Choose\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "folder-deploy-2": {
+   "page": "folder-deploy",
+   "shows": "The folder in Finder after a deploy",
+   "labels": [
+    "section1"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "site-address-1": {
+   "page": "site-address",
+   "shows": "The Choose a Website Address sheet at a first Netlify deploy, filled with the suggested address",
+   "labels": [
+    "Website address"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "keep-for-reference-1": {
+   "page": "keep-for-reference",
+   "shows": "The Keep a Copy for Reference sheet",
+   "labels": [
+    "School year",
+    "Keep a Copy"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "keep-for-reference-2": {
+   "page": "keep-for-reference",
+   "shows": "The Reference Courses shelf in the sidebar, the new copy in its school year's group",
+   "labels": [
+    "Reference Courses"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "school-year-1": {
+   "page": "school-year",
+   "shows": "The Set School Year sheet for a reference course, its School year pop-up open",
+   "labels": [
+    "School year",
+    "Set School Year"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "import-for-reference-1": {
+   "page": "import-for-reference",
+   "shows": "The Import courses for reference sheet with courses listed",
+   "labels": [
+    "Courses to import",
+    "School year",
+    "Import"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "copy-a-page-1": {
+   "page": "copy-a-page",
+   "shows": "The Copy a Page sheet with its checklist of linked pages",
+   "labels": [
+    "Page",
+    "Copy into",
+    "Also copy the pages this page links to"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "copy-a-page-2": {
+   "page": "copy-a-page",
+   "shows": "The Copy a Page sheet's result",
+   "labels": [
+    "Arrived hidden",
+    "Show in Finder"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "reference-groups-1": {
+   "page": "reference-groups",
+   "shows": "The Reference Courses heading's menu, open",
+   "labels": [
+    "New Reference Course\u2026",
+    "New Group\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "reference-groups-2": {
+   "page": "reference-groups",
+   "shows": "The Reference Courses shelf with a group the teacher made, a course in it",
+   "labels": [
+    "Group"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "replace-reference-course-1": {
+   "page": "replace-reference-course",
+   "shows": "The Replace question with its facts",
+   "labels": [
+    "Being replaced",
+    "Backed up first as",
+    "Replace"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "backups-1": {
+   "page": "backups",
+   "shows": "All Backups: the table of backups",
+   "labels": [
+    "All Backups",
+    "Made By"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "backups-2": {
+   "page": "backups",
+   "shows": "The question asked before a backup is restored",
+   "labels": [
+    "Restore"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "archive-1": {
+   "page": "archive",
+   "shows": "Archived items in the sidebar",
+   "labels": [
+    "Archived"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "missing-page-1": {
+   "page": "missing-page",
+   "shows": "A section's Problems tab naming a page whose settings cannot be read",
+   "labels": [
+    "Problems",
+    "The page"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "problems-1": {
+   "page": "problems",
+   "shows": "The sidebar, with the warning symbol on a section's row",
+   "labels": [
+    "Problems marker"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "problems-2": {
+   "page": "problems",
+   "shows": "The Problems tab with rows, one with a repair button",
+   "labels": [
+    "Kind",
+    "Page",
+    "Problem"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "slow-first-build-1": {
+   "page": "slow-first-build",
+   "shows": "The section's window while a first preview is made",
+   "labels": [
+    "What is happening now",
+    "Why might this take a while?"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "deploy-failed-1": {
+   "page": "deploy-failed",
+   "shows": "Deploy greyed in the toolbar, with the help that says why",
+   "labels": [
+    "Deploy (greyed)",
+    "Why"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "deploy-failed-2": {
+   "page": "deploy-failed",
+   "shows": "A failed deploy in the section's window, with the sentence that explains it",
+   "labels": [
+    "What went wrong"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "synced-folder-1": {
+   "page": "synced-folder",
+   "shows": "The folder picker's note about a synced folder",
+   "labels": [
+    "Use This Folder Anyway",
+    "Choose a Different Folder\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "updates-1": {
+   "page": "updates",
+   "shows": "The window that offers a new version of Plantoir",
+   "labels": [
+    "The new version's notes"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "quitting-1": {
+   "page": "quitting",
+   "shows": "The question Plantoir asks when quitting during a deploy",
+   "labels": [
+    "Keep Working",
+    "Quit Anyway"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "report-1": {
+   "page": "report",
+   "shows": "The Send a report about a problem alert",
+   "labels": [
+    "Save Report\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "local-assistant-1": {
+   "page": "local-assistant",
+   "shows": "The Assistant pane of Settings, with the three choices of which assistant runs on this Mac",
+   "labels": [
+    "Choose for me",
+    "The smaller assistant",
+    "The larger assistant"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "local-assistant-2": {
+   "page": "local-assistant",
+   "shows": "The Assistant window for a section, with what the assistant will do and its question",
+   "labels": [
+    "Shall I go ahead?",
+    "Go"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "how-i-teach-1": {
+   "page": "how-i-teach",
+   "shows": "The Content Structure part of a course's settings, with the How I Teach page row",
+   "labels": [
+    "How I Teach page",
+    "Create and Open"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "share-plan-1": {
+   "page": "share-plan",
+   "shows": "The share bar at the foot of the Planning tab, before the plans are shared",
+   "labels": [
+    "Share Unit Plans",
+    "Protect with a Username and Password",
+    "Include Answer Keys"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "test-authoring-1": {
+   "page": "test-authoring",
+   "shows": "A unit test's folder in Finder, inside the handouts folder outside the course, with Version A.pdf, Version A - Solutions.pdf and Marking Guide.pdf",
+   "labels": [
+    "Test",
+    "Solutions",
+    "Marking guide"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "notation-1": {
+   "page": "notation",
+   "shows": "A formula between dollar signs as typed in Obsidian, beside the same formula on the class website",
+   "labels": [
+    "What you type",
+    "What students see"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "notation-2": {
+   "page": "notation",
+   "shows": "Chemical formulas and an equation on the example course's What This Site Can Do page, on its class website",
+   "labels": [
+    "Chemistry"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "diagrams-from-text-1": {
+   "page": "diagrams-from-text",
+   "shows": "A mermaid block in Obsidian beside the diagram it draws on the site",
+   "labels": [
+    "What you type",
+    "What students see"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "diagrams-from-text-2": {
+   "page": "diagrams-from-text",
+   "shows": "A timeline from a ready-made course on its class site",
+   "labels": [
+    "Timeline"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "code-blocks-1": {
+   "page": "code-blocks",
+   "shows": "A coloured code block on a Computer studies course's site, with the pointer over it",
+   "labels": [
+    "Line numbers",
+    "Copy"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "tables-boxes-footnotes-1": {
+   "page": "tables-boxes-footnotes",
+   "shows": "A ready-made course's What This Site Can Do page on its site, with a table and a callout box",
+   "labels": [
+    "Table",
+    "Callout"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-mathematics-1": {
+   "page": "subject-mathematics",
+   "shows": "The GeoGebra sketch on MPM2D's page The Slope-Angle Conjecture, opened on the class website",
+   "labels": [
+    "GeoGebra sketch"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-mathematics-2": {
+   "page": "subject-mathematics",
+   "shows": "The graph of two parabolas on MPM2D's page Transformations of Parabolas, on the class website",
+   "labels": [
+    "Graph students can move"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-mathematics-3": {
+   "page": "subject-mathematics",
+   "shows": "MPM2D's page Similar Triangles Practice printed as a handout, its questions beside its answers page",
+   "labels": [
+    "Questions",
+    "Answers"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-english-1": {
+   "page": "subject-english",
+   "shows": "The self-check question on ENG2D's page Romeo and Juliet, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-english-2": {
+   "page": "subject-english",
+   "shows": "ENG2D's page The Prologue, Line by Line on the class website, with its Print button and a folded answer",
+   "labels": [
+    "Print",
+    "Folded answer"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-canadian-and-world-studies-1": {
+   "page": "subject-canadian-and-world-studies",
+   "shows": "The part A film to practise on, on CHC2D's page Photographs, on the class website",
+   "labels": [
+    "Film from YouTube"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-canadian-and-world-studies-2": {
+   "page": "subject-canadian-and-world-studies",
+   "shows": "The self-check question on CHC2D's page Newspapers and Propaganda, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-visual-art-1": {
+   "page": "subject-visual-art",
+   "shows": "The part Three works to look at twice, on AVI1O's page Looking Twice, on the class website",
+   "labels": [
+    "Picture",
+    "Credit line"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-visual-art-2": {
+   "page": "subject-visual-art",
+   "shows": "AVI1O's page A Looking Sheet on the class website, with its picture, questions and Print button",
+   "labels": [
+    "Print"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-drama-1": {
+   "page": "subject-drama",
+   "shows": "The part Tableau on the professional stage, on ADA1O's page Tableau, on the class website",
+   "labels": [
+    "Interview from YouTube"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-drama-2": {
+   "page": "subject-drama",
+   "shows": "The self-check question on ADA1O's page Thought Tracking, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-business-1": {
+   "page": "subject-business",
+   "shows": "BOH4M's page The New Supervisor on the class website, with its Print button and a folded note",
+   "labels": [
+    "Print",
+    "Folded note"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-business-2": {
+   "page": "subject-business",
+   "shows": "The self-check question on BOH4M's page Levels of Management, on the class website",
+   "labels": [
+    "Check"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-guidance-and-careers-1": {
+   "page": "subject-guidance-and-careers",
+   "shows": "The success criteria at the end of GLC2O's page The Budget, on the class website",
+   "labels": [
+    "Success criteria",
+    "Tick boxes"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-guidance-and-careers-2": {
+   "page": "subject-guidance-and-careers",
+   "shows": "The My Progress page on the website of a section made from GLC2O",
+   "labels": [
+    "My Progress",
+    "Ticked"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-dance-1": {
+   "page": "subject-dance",
+   "shows": "One part of ATC1O's page Four Forms on Film, on the class website, with the film's player and its questions",
+   "labels": [
+    "Film from YouTube",
+    "Questions"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "subject-dance-2": {
+   "page": "subject-dance",
+   "shows": "ATC1O's page Four Forms on Film in Obsidian, with the line that holds a film's address",
+   "labels": [
+    "The film's address"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "assistants-1": {
+   "page": "assistants",
+   "shows": "The Course menu with its Revise With submenu open, listing the assistants found on this Mac",
+   "labels": [
+    "Claude\u2026",
+    "Codex\u2026",
+    "GitHub Copilot\u2026",
+    "Local AI Assistant\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Claude Code, Codex and GitHub Copilot's command-line tool all installed; a course row selected.",
+   "windows": null,
+   "raw": false
+  },
+  "revise-with-1": {
+   "page": "revise-with",
+   "shows": "Revise With in the Course menu, with a course selected in the sidebar",
+   "labels": [
+    "Revise With \u25b8 Claude\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course row selected; at least Claude Code installed.",
+   "windows": null,
+   "raw": false
+  },
+  "revise-with-2": {
+   "page": "revise-with",
+   "shows": "A course's How I Teach page open in Obsidian",
+   "labels": [
+    "How I Teach"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "",
+   "windows": null,
+   "raw": false
+  },
+  "fix-with-1": {
+   "page": "fix-with",
+   "shows": "A section's Problems tab, with ticked rows and the Fix with buttons under the table",
+   "labels": [
+    "Fix with Claude\u2026"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A section whose last preview found problems; Claude Code installed.",
+   "windows": null,
+   "raw": false
+  },
+  "plan-a-unit-1": {
+   "page": "plan-a-unit",
+   "shows": "The Planning tab of a course, showing one unit's plan",
+   "labels": [
+    "Planning",
+    "Unit",
+    "Open in Browser"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course with at least one unit plan built.",
+   "windows": null,
+   "raw": false
+  },
+  "plan-a-unit-2": {
+   "page": "plan-a-unit",
+   "shows": "The Planning tab with All Plans chosen in the Unit pop-up",
+   "labels": [
+    "All Plans"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course with plans for two or more units.",
+   "windows": null,
+   "raw": false
+  },
+  "copilot-1": {
+   "page": "copilot",
+   "shows": "A GitHub Copilot session opened from Plantoir in a Terminal window, with the opening message already sent",
+   "labels": [
+    "GitHub Copilot"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Needs a real GitHub Copilot session opened from Revise With (FS-13 doubt 1: not yet seen running).",
+   "windows": null,
+   "raw": false
+  },
+  "copilot-2": {
+   "page": "copilot",
+   "shows": "GitHub Copilot asking in its own window before it runs a command",
+   "labels": [
+    "Yes",
+    "No"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Needs a real GitHub Copilot session (FS-13 doubt 1); the labels are GitHub's own answers and must be checked against the window.",
+   "windows": null,
+   "raw": false
+  },
+  "github-education-1": {
+   "page": "github-education",
+   "shows": "GitHub's public page for teachers, at github.com/education/teachers",
+   "labels": [
+    "GitHub Education"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "GitHub's public page, not signed in.",
+   "windows": null,
+   "raw": false
+  },
+  "github-education-2": {
+   "page": "github-education",
+   "shows": "GitHub's public instructions for applying to GitHub Education as a teacher",
+   "labels": [
+    "Start an application"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "GitHub's public documentation page, not signed in. The form itself is behind sign-in and is not pictured.",
+   "windows": null,
+   "raw": false
+  },
+  "github-education-3": {
+   "page": "github-education",
+   "shows": "GitHub's public instructions for turning on GitHub Copilot Pro as a verified teacher",
+   "labels": [
+    "Copilot settings"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "GitHub's public documentation page, not signed in.",
+   "windows": null,
+   "raw": false
+  }
+ }
 }

@@ -143,6 +143,8 @@ struct QuartzTeachersApp: App {
             // need a person" is the same errand as looking for help — and it
             // is the menu somebody opens when they have run out of ideas.
             CommandGroup(after: .help) {
+                // #855, ruling 3: opens Settings ▸ Other Assistants.
+                SetUpAnotherAssistantButton(title: AssistantSetUpWording.helpMenuItem, from: .helpMenu)
                 PublishingAndDeployingCommand()
                 ProblemReportCommands()
             }

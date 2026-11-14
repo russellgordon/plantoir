@@ -66,9 +66,10 @@ final class LeaseWatcher {
     // MARK: - Stored properties
 
     /// For each course another live program holds in a way that would refuse
-    /// a Deploy pressed here, the first holding that would refuse it. Keyed
-    /// by the course code upper-cased, the way leases name it.
-    private(set) var holdingElsewhere: [String: WorkLeaseFiles.Holding] = [:]
+    /// a Deploy pressed here, every holding of a kind that would refuse one,
+    /// so each section asks of them for itself (#835). Keyed by the course
+    /// code upper-cased, the way leases name it.
+    private(set) var holdingElsewhere: [String: [WorkLeaseFiles.Holding]] = [:]
 
     /// Moves every time `holdingElsewhere` changes, and only then.
     private(set) var generation: Int = 0
@@ -125,8 +126,15 @@ final class LeaseWatcher {
 
     /// What another program holds on a course that would refuse a Deploy
     /// pressed here, or nil.
-    func holding(forCourse courseCode: String) -> WorkLeaseFiles.Holding? {
-        return holdingElsewhere[courseCode.uppercased()]
+    ///
+    /// `section`, since #835: a lease that names sections greys only the
+    /// sections it names; one that names none greys every section of the
+    /// course. Nil asks for the whole course: any lease of it answers.
+    func holding(forCourse courseCode: String, section: Int? = nil) -> WorkLeaseFiles.Holding? {
+        let held: [WorkLeaseFiles.Holding] = holdingElsewhere[courseCode.uppercased()] ?? []
+        return WorkLeaseFiles.blocking(
+            among: held, asker: .aBuild, claim: nil, section: WorkLeaseRegistry.sectionAsked(section)
+        )
     }
 
     /// Begin watching. Calling it again does nothing.
@@ -170,7 +178,7 @@ final class LeaseWatcher {
         rereads += 1
         let everyLease: [(course: String, holding: WorkLeaseFiles.Holding)] =
             WorkLeaseFiles.everyLeaseHeldElsewhere(coursesDirectory: coursesDirectory, ownPID: ownPID)
-        let answer: (holdings: [String: WorkLeaseFiles.Holding], holders: Set<Int32>) =
+        let answer: (holdings: [String: [WorkLeaseFiles.Holding]], holders: Set<Int32>) =
             LeaseWatcher.whatRefusesADeploy(among: everyLease)
         if answer.holdings != holdingElsewhere {
             holdingElsewhere = answer.holdings
@@ -181,13 +189,15 @@ final class LeaseWatcher {
         }
     }
 
-    /// The rule, with nothing read from disk: for each course, what
-    /// `WorkLeaseFiles.blocking` says would refuse a build asked with no
-    /// claim (a press, before anything is taken), and the process ids of
-    /// every holder whose lease is of a kind that refuses one.
+    /// The rule, with nothing read from disk: for each course, every holding
+    /// `WorkLeaseFiles.blocking` could answer for a build asked with no claim
+    /// (a press, before anything is taken), kept whole so that each
+    /// section's question is asked of them (`holding(forCourse:section:)`,
+    /// #835), and the process ids of every holder whose lease is of a kind
+    /// that refuses one.
     nonisolated static func whatRefusesADeploy(
         among everyLease: [(course: String, holding: WorkLeaseFiles.Holding)]
-    ) -> (holdings: [String: WorkLeaseFiles.Holding], holders: Set<Int32>) {
+    ) -> (holdings: [String: [WorkLeaseFiles.Holding]], holders: Set<Int32>) {
         var byCourse: [String: [WorkLeaseFiles.Holding]] = [:]
         var holders: Set<Int32> = []
         for entry in everyLease {
@@ -199,10 +209,14 @@ final class LeaseWatcher {
                 holders.insert(entry.holding.pid)
             }
         }
-        var holdings: [String: WorkLeaseFiles.Holding] = [:]
+        var holdings: [String: [WorkLeaseFiles.Holding]] = [:]
         for (course, list) in byCourse {
-            if let blocking = WorkLeaseFiles.blocking(among: list, asker: .aBuild, claim: nil) {
-                holdings[course] = blocking
+            var refusing: [WorkLeaseFiles.Holding] = []
+            for holding in list where WorkLeaseFiles.kindsThatBlockABuild.contains(holding.kind.lowercased()) {
+                refusing.append(holding)
+            }
+            if !refusing.isEmpty {
+                holdings[course] = refusing
             }
         }
         return (holdings: holdings, holders: holders)
