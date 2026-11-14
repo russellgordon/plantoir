@@ -467,8 +467,9 @@ final class CopilotLauncherTests: XCTestCase {
 
     // MARK: - Presence and the words
 
-    /// GitHub Copilot alone is enough for Revise With ▸ to exist. MUST FAIL if
-    /// `anyReviseTargetExists` leaves it out.
+    /// GitHub Copilot alone is a revising target, which is what decides the
+    /// divider above Set Up an Assistant… in Revise With ▸ (the menu itself is
+    /// always drawn, #855). MUST FAIL if `anyReviseTargetExists` leaves it out.
     func testCopilotAloneIsARevisingTarget() {
         XCTAssertTrue(OutsideAssistantPresence.anyReviseTargetExists(claude: false, codex: false, copilot: true, local: false))
         XCTAssertFalse(OutsideAssistantPresence.anyReviseTargetExists(claude: false, codex: false, copilot: false, local: false))

@@ -1,5 +1,2771 @@
 {
  "about": "Control labels a page names with {{control:<id>}}. Each entry: \"label\" as the app shows it; \"mac\" names ONE place the label is checked against: {\"file\": \"<repository path>\"} (a Swift string literal in that file), {\"wording\": \"Type.member\"} (the literal of a static let or var under mac-app/QuartzTeachers), or {\"say\": \"<contract file>#<key path>\"}; \"windows\" is null until the Windows side fills it. \"keys\" holds shortcuts that are not menu items, for {{key:<id>}}: {\"mac\": \"\u21e7\u2318P\", \"windows\": null, \"source\": \"<where it is set>\"}.",
- "entries": {},
+ "entries": {
+  "newCourseOrClub": {
+   "label": "New Course or Club",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newToThis": {
+   "label": "New to this?",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "addExampleCourse": {
+   "label": "Add Example Course",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "wizardClose": {
+   "label": "Close",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "previewButton": {
+   "label": "Preview",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "deployButton": {
+   "label": "Deploy",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "referenceCourses": {
+   "label": "Reference Courses",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "deployingPart": {
+   "label": "Deploying",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "unitWordField": {
+   "label": "What do you call a unit?",
+   "mac": {
+    "wording": "UnitWordRenameWording.fieldLabel"
+   },
+   "windows": null
+  },
+  "unitWordRename": {
+   "label": "Rename\u2026",
+   "mac": {
+    "wording": "UnitWordRenameWording.renameButton"
+   },
+   "windows": null
+  },
+  "publishingAndDeployingTitle": {
+   "label": "Publishing and Deploying",
+   "mac": {
+    "say": "assist-wording#wording.publishingAndDeployingTitle"
+   },
+   "windows": null
+  },
+  "ok": {
+   "label": "OK",
+   "mac": {
+    "say": "assist-wording#wording.menuDoneButton"
+   },
+   "windows": null
+  },
+  "findAPage": {
+   "label": "Find a page",
+   "mac": {
+    "say": "assist-wording#wording.menuFindAPage"
+   },
+   "windows": null
+  },
+  "continueButton": {
+   "label": "Continue",
+   "mac": {
+    "say": "assist-wording#wording.menuContinueButton"
+   },
+   "windows": null
+  },
+  "hideButton": {
+   "label": "Hide",
+   "mac": {
+    "say": "assist-wording#wording.menuHideButton"
+   },
+   "windows": null
+  },
+  "showOnFrontPage": {
+   "label": "Show on Front Page",
+   "mac": {
+    "say": "class-planning#todaysClassOnTheFrontPage.wording.show"
+   },
+   "windows": null
+  },
+  "notToday": {
+   "label": "Not Today",
+   "mac": {
+    "say": "class-planning#todaysClassOnTheFrontPage.wording.notToday"
+   },
+   "windows": null
+  },
+  "openInObsidian": {
+   "label": "Open in Obsidian",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "stopPreview": {
+   "label": "Stop Preview",
+   "mac": {
+    "say": "shared-rules#previewStartPage.wording.stopPreview"
+   },
+   "windows": null
+  },
+  "previewAtLastViewed": {
+   "label": "Preview at Last Viewed",
+   "mac": {
+    "say": "shared-rules#previewStartPage.wording.previewAtLastViewed"
+   },
+   "windows": null
+  },
+  "back": {
+   "label": "Back",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "forward": {
+   "label": "Forward",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "reload": {
+   "label": "Reload",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "openInBrowser": {
+   "label": "Open in Browser",
+   "mac": {
+    "wording": "DeployedFolderWording.menuItem"
+   },
+   "windows": null
+  },
+  "websiteTab": {
+   "label": "Website",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/SectionProblemsWording.swift"
+   },
+   "windows": null
+  },
+  "noPreviewRunning": {
+   "label": "No Preview Running",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/NoPreviewPlaceholderView.swift"
+   },
+   "windows": null
+  },
+  "previewPane": {
+   "label": "Preview",
+   "mac": {
+    "say": "shared-rules#previewStartPage.wording.paneTitle"
+   },
+   "windows": null
+  },
+  "previewOpensSetting": {
+   "label": "When you press Preview, open",
+   "mac": {
+    "say": "shared-rules#previewStartPage.wording.settingLabel"
+   },
+   "windows": null
+  },
+  "frontPageChoice": {
+   "label": "The site's front page",
+   "mac": {
+    "say": "shared-rules#previewStartPage.wording.frontPageChoice"
+   },
+   "windows": null
+  },
+  "lastViewedChoice": {
+   "label": "The page you last viewed",
+   "mac": {
+    "say": "shared-rules#previewStartPage.wording.lastViewedChoice"
+   },
+   "windows": null
+  },
+  "rebuildPreviewTitle": {
+   "label": "Rebuild preview",
+   "mac": {
+    "say": "assist-wording#wording.menuRebuildPreviewTitle"
+   },
+   "windows": null
+  },
+  "pageColumn": {
+   "label": "Page",
+   "mac": {
+    "say": "assist-wording#wording.menuPlanPageColumn"
+   },
+   "windows": null
+  },
+  "folderColumn": {
+   "label": "Folder",
+   "mac": {
+    "say": "assist-wording#wording.menuPlanFolderColumn"
+   },
+   "windows": null
+  },
+  "dateColumn": {
+   "label": "Date",
+   "mac": {
+    "say": "assist-wording#wording.menuPickDateColumn"
+   },
+   "windows": null
+  },
+  "whatChangesColumn": {
+   "label": "What changes",
+   "mac": {
+    "say": "assist-wording#wording.menuPlanChangeColumn"
+   },
+   "windows": null
+  },
+  "publishButton": {
+   "label": "Publish",
+   "mac": {
+    "say": "assist-wording#wording.menuPublishButton"
+   },
+   "windows": null
+  },
+  "cancel": {
+   "label": "Cancel",
+   "mac": {
+    "say": "assist-wording#wording.menuCancelButton"
+   },
+   "windows": null
+  },
+  "addNextClassTitle": {
+   "label": "Add next class",
+   "mac": {
+    "say": "assist-wording#wording.menuAddNextClassTitle"
+   },
+   "windows": null
+  },
+  "undoLastChangeTitle": {
+   "label": "Undo last change",
+   "mac": {
+    "say": "assist-wording#wording.menuUndoLastChangeTitle"
+   },
+   "windows": null
+  },
+  "linksNotNow": {
+   "label": "Not Now",
+   "mac": {
+    "say": "shared-rules#linksChecklist.wording.notNow"
+   },
+   "windows": null
+  },
+  "linksUsedByAClass": {
+   "label": "Used by a class students can see",
+   "mac": {
+    "say": "shared-rules#linksChecklist.wording.fromAClassHeading"
+   },
+   "windows": null
+  },
+  "linksFromOtherPages": {
+   "label": "Linked from other pages students can see",
+   "mac": {
+    "say": "shared-rules#linksChecklist.wording.notReachedHeading"
+   },
+   "windows": null
+  },
+  "linksClassesNotYetPublished": {
+   "label": "Classes not yet published",
+   "mac": {
+    "say": "shared-rules#linksChecklist.wording.classesHeading"
+   },
+   "windows": null
+  },
+  "laterClassesTitle": {
+   "label": "Deploy classes dated later?",
+   "mac": {
+    "say": "assist-wording#wording.laterClassesTitle"
+   },
+   "windows": null
+  },
+  "deployTicked": {
+   "label": "Deploy Ticked",
+   "mac": {
+    "say": "assist-wording#wording.deployTickedButton"
+   },
+   "windows": null
+  },
+  "cannotDeployYet": {
+   "label": "Cannot Deploy Yet",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "openSettings": {
+   "label": "Open Settings\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "showInFinder": {
+   "label": "Show in Finder",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/TaskProgressView.swift"
+   },
+   "windows": null
+  },
+  "scheduleADeploy": {
+   "label": "Schedule a deploy",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/ScheduleDeploySheet.swift"
+   },
+   "windows": null
+  },
+  "deployAt": {
+   "label": "Deploy at",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/ScheduleDeploySheet.swift"
+   },
+   "windows": null
+  },
+  "scheduleButton": {
+   "label": "Schedule",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/ScheduleDeploySheet.swift"
+   },
+   "windows": null
+  },
+  "cancelScheduledDeployQuestion": {
+   "label": "Cancel this scheduled deploy?",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "cancelIt": {
+   "label": "Cancel It",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "leaveItScheduled": {
+   "label": "Leave It Scheduled",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "howLateSetting": {
+   "label": "How late a scheduled deploy may still run",
+   "mac": {
+    "say": "shared-rules#scheduledDeployCancellation.wording.settingTitle"
+   },
+   "windows": null
+  },
+  "typeOrPaste": {
+   "label": "Type or paste",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "aFile": {
+   "label": "A file",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "aGoogleSheet": {
+   "label": "A Google Sheet",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "chooseAFile": {
+   "label": "Choose a File\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "whereTheseCameFrom": {
+   "label": "Where these came from",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "readTheDates": {
+   "label": "Read the Dates",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "rememberTheseDates": {
+   "label": "Remember These Dates",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "classDatesBack": {
+   "label": "Back",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionScheduleSheet.swift"
+   },
+   "windows": null
+  },
+  "reDateButton": {
+   "label": "Re-date",
+   "mac": {
+    "say": "assist-wording#wording.menuReDateButton"
+   },
+   "windows": null
+  },
+  "makeRoomButton": {
+   "label": "Make Room",
+   "mac": {
+    "say": "assist-wording#wording.menuMakeRoomButton"
+   },
+   "windows": null
+  },
+  "putTheseIntoDraft": {
+   "label": "Put These into Draft",
+   "mac": {
+    "say": "shared-rules#startOfYear.wording.goButton"
+   },
+   "windows": null
+  },
+  "putThemBack": {
+   "label": "Put Them Back",
+   "mac": {
+    "say": "shared-rules#startOfYear.wording.undoButton"
+   },
+   "windows": null
+  },
+  "startOfYearUndo": {
+   "label": "Undo\u2026",
+   "mac": {
+    "say": "shared-rules#startOfYear.wording.undoButtonAfterward"
+   },
+   "windows": null
+  },
+  "whyColumn": {
+   "label": "Why",
+   "mac": {
+    "say": "shared-rules#startOfYear.wording.reasonColumn"
+   },
+   "windows": null
+  },
+  "done": {
+   "label": "Done",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/StartOfYearSheet.swift"
+   },
+   "windows": null
+  },
+  "problemsTab": {
+   "label": "Problems",
+   "mac": {
+    "wording": "SectionProblemsWording.tabProblems"
+   },
+   "windows": null
+  },
+  "printingPart": {
+   "label": "Printing",
+   "mac": {
+    "wording": "CourseSettingsWording.printingHeader"
+   },
+   "windows": null
+  },
+  "printingSchoolName": {
+   "label": "School name",
+   "mac": {
+    "wording": "CourseSettingsWording.printingSchoolName"
+   },
+   "windows": null
+  },
+  "printingBlanks": {
+   "label": "Blanks to fill in",
+   "mac": {
+    "wording": "CourseSettingsWording.printingBlanks"
+   },
+   "windows": null
+  },
+  "printingSchoolNamePrints": {
+   "label": "School name prints",
+   "mac": {
+    "wording": "CourseSettingsWording.printingSchoolNameGoes"
+   },
+   "windows": null
+  },
+  "printingCourseCodePrints": {
+   "label": "Course code prints",
+   "mac": {
+    "wording": "CourseSettingsWording.printingCourseCodeGoes"
+   },
+   "windows": null
+  },
+  "printButton": {
+   "label": "Print",
+   "mac": {
+    "say": "shared-rules#printablePages.words.print"
+   },
+   "windows": null
+  },
+  "printPaper": {
+   "label": "Paper",
+   "mac": {
+    "say": "shared-rules#printablePages.words.paper"
+   },
+   "windows": null
+  },
+  "printPortrait": {
+   "label": "Portrait",
+   "mac": {
+    "say": "shared-rules#printablePages.words.portrait"
+   },
+   "windows": null
+  },
+  "printLandscape": {
+   "label": "Landscape",
+   "mac": {
+    "say": "shared-rules#printablePages.words.landscape"
+   },
+   "windows": null
+  },
+  "printQuestionsOnly": {
+   "label": "Questions only",
+   "mac": {
+    "say": "shared-rules#printablePages.words.questionsOnly"
+   },
+   "windows": null
+  },
+  "printAnswersOnly": {
+   "label": "Answers only",
+   "mac": {
+    "say": "shared-rules#printablePages.words.answersOnly"
+   },
+   "windows": null
+  },
+  "printBoth": {
+   "label": "Both",
+   "mac": {
+    "say": "shared-rules#printablePages.words.both"
+   },
+   "windows": null
+  },
+  "saveCourseSettings": {
+   "label": "Save",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "contentStructurePart": {
+   "label": "Content Structure",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "curriculumFolders": {
+   "label": "Curriculum folders",
+   "mac": {
+    "wording": "CurriculumFoldersOffer.label"
+   },
+   "windows": null
+  },
+  "obsidianPane": {
+   "label": "Obsidian",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.paneTitle"
+   },
+   "windows": null
+  },
+  "addOnsSetting": {
+   "label": "Add the add-ons that draw diagrams and graphs to courses that have them",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.settingLabel"
+   },
+   "windows": null
+  },
+  "addOnsOfferTitle": {
+   "label": "Show diagrams and graphs in Obsidian too?",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.offerTitle"
+   },
+   "windows": null
+  },
+  "addOnsAddThem": {
+   "label": "Add Them",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.offerAdd"
+   },
+   "windows": null
+  },
+  "addOnsNotNow": {
+   "label": "Not Now",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.offerNotNow"
+   },
+   "windows": null
+  },
+  "addOnsDontAskAgain": {
+   "label": "Don't ask again",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.dontAskAgain"
+   },
+   "windows": null
+  },
+  "addOnsCloses": {
+   "label": "Closes",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.closesLabel"
+   },
+   "windows": null
+  },
+  "addOnsOpensAgain": {
+   "label": "Opens again",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.opensAgainLabel"
+   },
+   "windows": null
+  },
+  "addOnsKept": {
+   "label": "Kept",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.keptLabel"
+   },
+   "windows": null
+  },
+  "addOnsReopenTitle": {
+   "label": "Reopen Obsidian to show diagrams and graphs?",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.reopenTitle"
+   },
+   "windows": null
+  },
+  "addOnsReopen": {
+   "label": "Reopen Obsidian",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.reopen"
+   },
+   "windows": null
+  },
+  "addOnsLater": {
+   "label": "Later",
+   "mac": {
+    "say": "shared-rules#obsidianAddOnsForFigures.wording.later"
+   },
+   "windows": null
+  },
+  "codeRun": {
+   "label": "Run",
+   "mac": {
+    "say": "shared-rules#codeRunnerBlocks.words.run"
+   },
+   "windows": null
+  },
+  "codeStop": {
+   "label": "Stop",
+   "mac": {
+    "say": "shared-rules#codeRunnerBlocks.words.stop"
+   },
+   "windows": null
+  },
+  "codeReset": {
+   "label": "Reset",
+   "mac": {
+    "say": "shared-rules#codeRunnerBlocks.words.reset"
+   },
+   "windows": null
+  },
+  "codeOutput": {
+   "label": "Output",
+   "mac": {
+    "say": "shared-rules#codeRunnerBlocks.words.outputLabel"
+   },
+   "windows": null
+  },
+  "quizCheck": {
+   "label": "Check",
+   "mac": {
+    "say": "shared-rules#quizCallouts.words.site.check"
+   },
+   "windows": null
+  },
+  "quizShowAnswer": {
+   "label": "Show answer",
+   "mac": {
+    "say": "shared-rules#quizCallouts.words.site.showAnswer"
+   },
+   "windows": null
+  },
+  "myProgressTitle": {
+   "label": "My Progress",
+   "mac": {
+    "say": "shared-rules#myProgress.words.title"
+   },
+   "windows": null
+  },
+  "coverageTab": {
+   "label": "Coverage",
+   "mac": {
+    "say": "shared-rules#coverageTab.tab.words.tabCoverage"
+   },
+   "windows": null
+  },
+  "makeTheMap": {
+   "label": "Make the Map",
+   "mac": {
+    "say": "shared-rules#coverageTab.tab.words.makeTheMap"
+   },
+   "windows": null
+  },
+  "makeTheMapAgain": {
+   "label": "Make the Map Again",
+   "mac": {
+    "say": "shared-rules#coverageTab.tab.words.makeTheMapAgain"
+   },
+   "windows": null
+  },
+  "coverageHeading": {
+   "label": "Coverage if every page were published",
+   "mac": {
+    "say": "shared-rules#coverageTab.pageWords.heading"
+   },
+   "windows": null
+  },
+  "coverageEmptyTitle": {
+   "label": "No Coverage Map Yet",
+   "mac": {
+    "say": "shared-rules#coverageTab.tab.words.emptyTitle"
+   },
+   "windows": null
+  },
+  "includeCoverageMap": {
+   "label": "Include the curriculum coverage map",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetBasicsPart": {
+   "label": "Basics",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetProvince": {
+   "label": "Province",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetProvinceOntario": {
+   "label": "Ontario",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetProvinceBritishColumbia": {
+   "label": "British Columbia",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetCourseCode": {
+   "label": "Course code",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetCourseName": {
+   "label": "Course name",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetThisIsAClub": {
+   "label": "This is a club",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetTimetableSectionNumbers": {
+   "label": "Timetable section numbers",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetKeepThisCourseForReference": {
+   "label": "Keep this course for reference",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetStartingContentPart": {
+   "label": "Starting Content",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetPrePopulateWithExampleContent": {
+   "label": "Pre-populate course with example content",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "includeTheCurriculumCoverageMap": {
+   "label": "Include the curriculum coverage map",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "explainTheMapOnThePage": {
+   "label": "Explain the map on the page",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetAppearancePart": {
+   "label": "Appearance",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetBehaviourPart": {
+   "label": "Behaviour",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetUnitsPart": {
+   "label": "Units",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetMeetingsPart": {
+   "label": "Meetings",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetDeployingPart": {
+   "label": "Deploying",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetStructurePart": {
+   "label": "Structure",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetUseLCSSpecificTerminology": {
+   "label": "Use LCS-specific terminology",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetFoldersAndFiles": {
+   "label": "Folders and files",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetFooterPart": {
+   "label": "Footer",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetAdvanced": {
+   "label": "Advanced",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetCreateCourse": {
+   "label": "Create Course",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetCreateClub": {
+   "label": "Create Club",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetClubShortLabel": {
+   "label": "Short label",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetClubCode": {
+   "label": "Club code",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetClubName": {
+   "label": "Club name",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetFolderForMeetingPages": {
+   "label": "Folder for meeting pages",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetFrontPageHeading": {
+   "label": "Front page heading",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "newCourseSheetPagesAreNamed": {
+   "label": "Pages are named",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/WizardWording.swift"
+   },
+   "windows": null
+  },
+  "sidebarFoldersExpandWhenClicking": {
+   "label": "Sidebar folders expand when clicking",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sidebarFoldersExpandChevronOrFolderName": {
+   "label": "Chevron or folder name",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sidebarFoldersExpandChevronOnly": {
+   "label": "Chevron only (name opens the folder)",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "showPageReadTimeEstimatesToStudents": {
+   "label": "Show page read-time estimates to students",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "foldersWhoseWorkCountsForMarks": {
+   "label": "Folders whose work counts for marks",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/GradedFolderWording.swift"
+   },
+   "windows": null
+  },
+  "languageAndRegion": {
+   "label": "Language and region",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/CourseSettingsWording.swift"
+   },
+   "windows": null
+  },
+  "perSectionFoldersList": {
+   "label": "Per-section folders",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "perSectionFilesList": {
+   "label": "Per-section files",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "addSectionSheetSectionNumber": {
+   "label": "Section number:",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/AddSectionSheet.swift"
+   },
+   "windows": null
+  },
+  "addSectionSheetAddSectionButton": {
+   "label": "Add Section",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/AddSectionSheet.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsOverallPart": {
+   "label": "Settings \u2014 Overall",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsCourseName": {
+   "label": "Course name",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsClassPagesPart": {
+   "label": "Class Pages",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsFooterPart": {
+   "label": "Footer",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsPrintingPart": {
+   "label": "Printing",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/CourseSettingsWording.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsContentStructurePart": {
+   "label": "Content Structure",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsMarksPart": {
+   "label": "Marks",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsSidebarVisibilityPart": {
+   "label": "Sidebar Visibility",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sidebarVisibilityHideColumn": {
+   "label": "Hide",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SidebarVisibilityTableView.swift"
+   },
+   "windows": null
+  },
+  "sidebarVisibilityExpandableColumn": {
+   "label": "Expandable",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SidebarVisibilityTableView.swift"
+   },
+   "windows": null
+  },
+  "sidebarVisibilityFolderOrFileColumn": {
+   "label": "Folder or file",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SidebarVisibilityTableView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsSaveButton": {
+   "label": "Save",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsRevertButton": {
+   "label": "Revert",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsSavedConfirmation": {
+   "label": "Saved \u2713",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsPreviewAgain": {
+   "label": "Preview Again",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsSharedFoldersAllSections": {
+   "label": "Shared folders (all sections)",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseSettingsSharedFilesAllSections": {
+   "label": "Shared files (all sections)",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift"
+   },
+   "windows": null
+  },
+  "courseDetailSettingsTab": {
+   "label": "Settings",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/PlanningTab.swift"
+   },
+   "windows": null
+  },
+  "courseDetailPlanningTab": {
+   "label": "Planning",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/PlanningTab.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsHeaderEmoji": {
+   "label": "Header emoji",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SectionSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsColourScheme": {
+   "label": "Colour scheme",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/ColourSchemePickerView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsHeaderAndBodyFonts": {
+   "label": "Header & body fonts",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/FontChoiceEditorView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsCodeFont": {
+   "label": "Code font",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/FontChoiceEditorView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsShowSectionMarker": {
+   "label": "Show section marker in the site title",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SectionSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsShowTheGrade": {
+   "label": "Show the grade in the site title",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SectionSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsAdvanced": {
+   "label": "Advanced",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SectionSettingsView.swift"
+   },
+   "windows": null
+  },
+  "sectionSettingsCustomDomain": {
+   "label": "Custom domain",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/SectionSettingsView.swift"
+   },
+   "windows": null
+  },
+  "folderListAddButton": {
+   "label": "Add",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/StringListEditorView.swift"
+   },
+   "windows": null
+  },
+  "folderListRenameMenuItem": {
+   "label": "Rename\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/StringListEditorView.swift"
+   },
+   "windows": null
+  },
+  "folderRenameSheetNewName": {
+   "label": "New name",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/StringListEditorView.swift"
+   },
+   "windows": null
+  },
+  "folderRenameSheetRenameButton": {
+   "label": "Rename",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/StringListEditorView.swift"
+   },
+   "windows": null
+  },
+  "folderListRemove": {
+   "label": "Remove",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/StringListEditorView.swift"
+   },
+   "windows": null
+  },
+  "specialFoldersLink": {
+   "label": "What else does Plantoir use my folders for?",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.openedBy"
+   },
+   "windows": null
+  },
+  "specialFoldersSheetTitle": {
+   "label": "Folders Plantoir uses",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.title"
+   },
+   "windows": null
+  },
+  "specialFoldersRowLessons": {
+   "label": "Your lessons",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[0].what"
+   },
+   "windows": null
+  },
+  "specialFoldersRowCurriculum": {
+   "label": "Your curriculum expectations",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[1].what"
+   },
+   "windows": null
+  },
+  "specialFoldersRowMarks": {
+   "label": "Work that counts for marks",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[2].what"
+   },
+   "windows": null
+  },
+  "specialFoldersRowMedia": {
+   "label": "Images and files you add to pages",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[3].what"
+   },
+   "windows": null
+  },
+  "specialFoldersRowFolderPage": {
+   "label": "The page a folder opens on",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[4].what"
+   },
+   "windows": null
+  },
+  "specialFoldersRowKeyLinks": {
+   "label": "The shortcuts in your sidebar",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[5].what"
+   },
+   "windows": null
+  },
+  "specialFoldersRowWrittenForYou": {
+   "label": "Written for you, every time you build",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.rows[6].what"
+   },
+   "windows": null
+  },
+  "unitWordRenameSheetRenameButton": {
+   "label": "Rename",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/UnitWordRenameSheet.swift"
+   },
+   "windows": null
+  },
+  "sidebarRenameMenuItem": {
+   "label": "Rename",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "renameCourseCloseObsidianAndRename": {
+   "label": "Close Obsidian and Rename",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "renameCourseCouldNotRename": {
+   "label": "Could not rename",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "removeCourseAlertRemoveButton": {
+   "label": "Remove",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarArchived": {
+   "label": "Archived",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "workingFolderPickerTitle": {
+   "label": "Choose Your Working Folder",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/WorkspacePickerView.swift"
+   },
+   "windows": null
+  },
+  "workingFolderPickerChooseFolder": {
+   "label": "Choose Folder\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/WorkspacePickerView.swift"
+   },
+   "windows": null
+  },
+  "workingFolderPickerSetUpThisFolder": {
+   "label": "Set Up This Folder",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/WorkspacePickerView.swift"
+   },
+   "windows": null
+  },
+  "openWorkingFolderPanelOpenButton": {
+   "label": "Open",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/App/FileCommands.swift"
+   },
+   "windows": null
+  },
+  "deployingPartDeployTo": {
+   "label": "Deploy to",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "deployToCloudflarePages": {
+   "label": "Cloudflare Pages",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/DeployingSettingsView.swift"
+   },
+   "windows": null
+  },
+  "deployToNetlify": {
+   "label": "Netlify",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "deployToAFolderOnThisMac": {
+   "label": "A folder on this Mac",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "deployingPartAlsoDeployTo": {
+   "label": "Also deploy to, for redundancy",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "deployingPartFolderField": {
+   "label": "Folder",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "deployingPartChooseFolderButton": {
+   "label": "Choose\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "deployingPartAccountIDNotSetYet": {
+   "label": "Not set yet",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"
+   },
+   "windows": null
+  },
+  "plantoirSettingsDeployingPane": {
+   "label": "Deploying",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/PlantoirSettingsView.swift"
+   },
+   "windows": null
+  },
+  "plantoirSettingsCloudflareAccountID": {
+   "label": "Cloudflare Account ID",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/DeployingSettingsView.swift"
+   },
+   "windows": null
+  },
+  "plantoirSettingsWhereDoIFindThis": {
+   "label": "Where do I find this?",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/DeployingSettingsView.swift"
+   },
+   "windows": null
+  },
+  "accountIDHelpSheetUseThisID": {
+   "label": "Use This ID",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/DeployingSettingsView.swift"
+   },
+   "windows": null
+  },
+  "connectToCloudflareSheetTitle": {
+   "label": "Connect to Cloudflare",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[1].title"
+   },
+   "windows": null
+  },
+  "connectToCloudflareSheetTokenField": {
+   "label": "Cloudflare token",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[1].fieldLabel"
+   },
+   "windows": null
+  },
+  "connectToCloudflareSheetLink": {
+   "label": "Open Cloudflare\u2019s API tokens page",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[1].linkTitle"
+   },
+   "windows": null
+  },
+  "connectToNetlifySheetTitle": {
+   "label": "Connect to Netlify",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[0].title"
+   },
+   "windows": null
+  },
+  "connectToNetlifySheetTokenField": {
+   "label": "Netlify token",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[0].fieldLabel"
+   },
+   "windows": null
+  },
+  "connectToNetlifySheetLink": {
+   "label": "Open Netlify\u2019s access tokens page",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[0].linkTitle"
+   },
+   "windows": null
+  },
+  "accountIDHelpSheetTitle": {
+   "label": "Where to find your Account ID",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[3].title"
+   },
+   "windows": null
+  },
+  "teacherSurnameSheetTitle": {
+   "label": "Teacher Surname",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[4].title"
+   },
+   "windows": null
+  },
+  "teacherSurnameSheetSurnameField": {
+   "label": "Surname",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[4].fieldLabel"
+   },
+   "windows": null
+  },
+  "websiteAddressSheetTitle": {
+   "label": "Choose a Website Address",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[5].title"
+   },
+   "windows": null
+  },
+  "websiteAddressSheetAddressField": {
+   "label": "Website address",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[5].fieldLabel"
+   },
+   "windows": null
+  },
+  "websiteAddressTakenSheetTitle": {
+   "label": "Website Address Already Taken",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[6].title"
+   },
+   "windows": null
+  },
+  "credentialSheetContinueButton": {
+   "label": "Continue",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/CredentialRequestSheet.swift"
+   },
+   "windows": null
+  },
+  "keepACopySheetSchoolYearPopUp": {
+   "label": "School year",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/KeepACopyForReferenceSheet.swift"
+   },
+   "windows": null
+  },
+  "keepACopySheetFolderNameField": {
+   "label": "Folder name",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/KeepACopyForReferenceSheet.swift"
+   },
+   "windows": null
+  },
+  "keepACopySheetKeepACopyButton": {
+   "label": "Keep a Copy",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/KeepACopyForReferenceSheet.swift"
+   },
+   "windows": null
+  },
+  "referenceShelfSchoolYearOther": {
+   "label": "Other",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/SchoolYear.swift"
+   },
+   "windows": null
+  },
+  "referenceCourseReplaceItButton": {
+   "label": "Replace It\u2026",
+   "mac": {
+    "wording": "ReferenceReplaceWording.replaceButton"
+   },
+   "windows": null
+  },
+  "setSchoolYearSheetSchoolYearPopUp": {
+   "label": "School year",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/SetSchoolYearSheet.swift"
+   },
+   "windows": null
+  },
+  "setSchoolYearSheetSetSchoolYearButton": {
+   "label": "Set School Year",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/SetSchoolYearSheet.swift"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetTitle": {
+   "label": "Import courses for reference",
+   "mac": {
+    "wording": "ReferenceImportWording.title"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetSchoolYearPopUp": {
+   "label": "School year",
+   "mac": {
+    "wording": "ReferenceImportWording.schoolYearLabel"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetImportButton": {
+   "label": "Import",
+   "mac": {
+    "wording": "ReferenceImportWording.importButton"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetStopButton": {
+   "label": "Stop",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/ImportCoursesForReferenceSheet.swift"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetImportedTitle": {
+   "label": "Imported",
+   "mac": {
+    "wording": "ReferenceImportWording.doneTitle"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetChooseSharedFolderButton": {
+   "label": "Choose Shared Folder\u2026",
+   "mac": {
+    "wording": "ReferenceImportWording.olderLayoutChooseSharedButton"
+   },
+   "windows": null
+  },
+  "sidebarRowImportForReferenceMenuItem": {
+   "label": "Import for Reference\u2026",
+   "mac": {
+    "wording": "ReferenceImportWording.importForReferenceMenuItem"
+   },
+   "windows": null
+  },
+  "newCourseSheetCreateReferenceCourseButton": {
+   "label": "Create Reference Course",
+   "mac": {
+    "wording": "ReferenceCreationWording.createButton"
+   },
+   "windows": null
+  },
+  "copyAPageSheetPageLabel": {
+   "label": "Page",
+   "mac": {
+    "wording": "CopyPageWording.whichPage"
+   },
+   "windows": null
+  },
+  "copyAPageSheetSearchField": {
+   "label": "Search",
+   "mac": {
+    "wording": "CopyPageWording.pagePickerPrompt"
+   },
+   "windows": null
+  },
+  "copyAPageSheetCopyIntoPopUp": {
+   "label": "Copy into",
+   "mac": {
+    "wording": "CopyPageWording.whichCourse"
+   },
+   "windows": null
+  },
+  "copyAPageSheetFolderPopUp": {
+   "label": "Folder",
+   "mac": {
+    "wording": "CopyPageWording.whichFolder"
+   },
+   "windows": null
+  },
+  "copyAPageSheetAlsoCopyLinkedPages": {
+   "label": "Also copy the pages this page links to",
+   "mac": {
+    "wording": "CopyPageWording.alsoCopyLinkedPages"
+   },
+   "windows": null
+  },
+  "copyAPageSheetCopyButton": {
+   "label": "Copy",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CopyPage/CopyPageSheet.swift"
+   },
+   "windows": null
+  },
+  "copyAPageSheetCopyAnotherButton": {
+   "label": "Copy another",
+   "mac": {
+    "wording": "CopyPageWording.copyAnother"
+   },
+   "windows": null
+  },
+  "copyAPageSheetDoneButton": {
+   "label": "Done",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/CopyPage/CopyPageSheet.swift"
+   },
+   "windows": null
+  },
+  "referenceShelfActionsButton": {
+   "label": "Reference Courses Actions",
+   "mac": {
+    "wording": "ReferenceGroupWording.headingMenuLabel"
+   },
+   "windows": null
+  },
+  "referenceShelfNewReferenceCourseMenuItem": {
+   "label": "New Reference Course\u2026",
+   "mac": {
+    "wording": "ReferenceCreationWording.newReferenceCourseMenuItem"
+   },
+   "windows": null
+  },
+  "referenceShelfNewGroupMenuItem": {
+   "label": "New Group\u2026",
+   "mac": {
+    "wording": "ReferenceGroupWording.newGroupMenuItem"
+   },
+   "windows": null
+  },
+  "referenceGroupSheetNewGroupTitle": {
+   "label": "New Group",
+   "mac": {
+    "wording": "ReferenceGroupWording.newGroupTitle"
+   },
+   "windows": null
+  },
+  "referenceGroupSheetNameField": {
+   "label": "Name",
+   "mac": {
+    "wording": "ReferenceGroupWording.nameLabel"
+   },
+   "windows": null
+  },
+  "referenceGroupSheetCreateButton": {
+   "label": "Create",
+   "mac": {
+    "wording": "ReferenceGroupWording.createButton"
+   },
+   "windows": null
+  },
+  "referenceShelfRenameGroupMenuItem": {
+   "label": "Rename Group\u2026",
+   "mac": {
+    "wording": "ReferenceGroupWording.renameGroupMenuItem"
+   },
+   "windows": null
+  },
+  "referenceGroupSheetRenameGroupTitle": {
+   "label": "Rename Group",
+   "mac": {
+    "wording": "ReferenceGroupWording.renameGroupTitle"
+   },
+   "windows": null
+  },
+  "referenceGroupSheetRenameButton": {
+   "label": "Rename",
+   "mac": {
+    "wording": "ReferenceGroupWording.renameButton"
+   },
+   "windows": null
+  },
+  "referenceShelfRemoveGroupMenuItem": {
+   "label": "Remove Group",
+   "mac": {
+    "wording": "ReferenceGroupWording.removeGroupMenuItem"
+   },
+   "windows": null
+  },
+  "referenceShelfRemoveGroupAskingMenuItem": {
+   "label": "Remove Group\u2026",
+   "mac": {
+    "wording": "ReferenceGroupWording.removeGroupAskingMenuItem"
+   },
+   "windows": null
+  },
+  "removeGroupQuestionItsCoursesRow": {
+   "label": "Its courses",
+   "mac": {
+    "wording": "ReferenceGroupWording.removeGroupCoursesLabel"
+   },
+   "windows": null
+  },
+  "removeGroupQuestionTheCoursesThemselvesRow": {
+   "label": "The courses themselves",
+   "mac": {
+    "wording": "ReferenceGroupWording.removeGroupStaysLabel"
+   },
+   "windows": null
+  },
+  "removeGroupQuestionRemoveGroupButton": {
+   "label": "Remove Group",
+   "mac": {
+    "wording": "ReferenceGroupWording.removeButton"
+   },
+   "windows": null
+  },
+  "referenceShelfMoveToGroupMenuItem": {
+   "label": "Move to Group",
+   "mac": {
+    "wording": "ReferenceGroupWording.moveToGroupMenuItem"
+   },
+   "windows": null
+  },
+  "referenceShelfStartTheGroupsAgainMenuItem": {
+   "label": "Start the Groups Again\u2026",
+   "mac": {
+    "wording": "ReferenceGroupWording.startAgainMenuItem"
+   },
+   "windows": null
+  },
+  "startTheGroupsAgainQuestionStartAgainButton": {
+   "label": "Start Again",
+   "mac": {
+    "wording": "ReferenceGroupWording.startAgainButton"
+   },
+   "windows": null
+  },
+  "replaceReferenceCourseQuestionBeingReplacedRow": {
+   "label": "Being replaced",
+   "mac": {
+    "wording": "ReferenceReplaceWording.beingReplacedLabel"
+   },
+   "windows": null
+  },
+  "replaceReferenceCourseQuestionKeptOnRow": {
+   "label": "Kept on",
+   "mac": {
+    "wording": "ReferenceReplaceWording.keptOnLabel"
+   },
+   "windows": null
+  },
+  "replaceReferenceCourseQuestionBackedUpFirstAsRow": {
+   "label": "Backed up first as",
+   "mac": {
+    "wording": "ReferenceReplaceWording.backedUpLabel"
+   },
+   "windows": null
+  },
+  "replaceReferenceCourseQuestionToUndoRow": {
+   "label": "To undo",
+   "mac": {
+    "wording": "ReferenceReplaceWording.toUndoLabel"
+   },
+   "windows": null
+  },
+  "replaceReferenceCourseQuestionReplaceButton": {
+   "label": "Replace",
+   "mac": {
+    "wording": "ReferenceReplaceWording.confirmButton"
+   },
+   "windows": null
+  },
+  "sidebarCoursesAndClubsGroup": {
+   "label": "Courses & Clubs",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarBackupsGroup": {
+   "label": "Backups",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarAllBackupsRow": {
+   "label": "All Backups",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarCourseBackUpNowMenuItem": {
+   "label": "Back Up Now",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarRowRestoreMenuItem": {
+   "label": "Restore\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarRowDeleteBackupMenuItem": {
+   "label": "Delete Backup\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarRestoreQuestionRestoreButton": {
+   "label": "Restore",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "sidebarDeleteQuestionDeleteButton": {
+   "label": "Delete",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+   },
+   "windows": null
+  },
+  "allBackupsColumnCourse": {
+   "label": "Course",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/AllBackupsView.swift"
+   },
+   "windows": null
+  },
+  "allBackupsColumnMade": {
+   "label": "Made",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/AllBackupsView.swift"
+   },
+   "windows": null
+  },
+  "allBackupsColumnMadeBy": {
+   "label": "Made By",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/AllBackupsView.swift"
+   },
+   "windows": null
+  },
+  "allBackupsColumnSize": {
+   "label": "Size",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/AllBackupsView.swift"
+   },
+   "windows": null
+  },
+  "allBackupsMadeByYou": {
+   "label": "You",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/AllBackupsView.swift"
+   },
+   "windows": null
+  },
+  "allBackupsDeleteBackupButton": {
+   "label": "Delete Backup\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/AllBackupsView.swift"
+   },
+   "windows": null
+  },
+  "problemsTabColumnInclude": {
+   "label": "Include",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.columnIncluded"
+   },
+   "windows": null
+  },
+  "problemsTabColumnKind": {
+   "label": "Kind",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.columnKind"
+   },
+   "windows": null
+  },
+  "problemsTabColumnPage": {
+   "label": "Page",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.columnPage"
+   },
+   "windows": null
+  },
+  "problemsTabColumnProblem": {
+   "label": "Problem",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.columnProblem"
+   },
+   "windows": null
+  },
+  "problemsTabColumnFirstFound": {
+   "label": "First found",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.columnFirstFound"
+   },
+   "windows": null
+  },
+  "problemsTabColumnLastFound": {
+   "label": "Last found",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.columnLastFound"
+   },
+   "windows": null
+  },
+  "problemsTabPageWholeSection": {
+   "label": "Whole section",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.wholeSection"
+   },
+   "windows": null
+  },
+  "problemsTabPageWholeCourse": {
+   "label": "Whole course",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.wholeCourse"
+   },
+   "windows": null
+  },
+  "newProblemsAlertShowButton": {
+   "label": "Show",
+   "mac": {
+    "say": "shared-rules#sectionProblems.words.show"
+   },
+   "windows": null
+  },
+  "newProblemsAlertNotNowButton": {
+   "label": "Not Now",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/SiteHealthRepair.swift"
+   },
+   "windows": null
+  },
+  "problemsRepairPutTheMediaFolderBackButton": {
+   "label": "Put the Media folder back",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/SiteHealthRepair.swift"
+   },
+   "windows": null
+  },
+  "problemsRepairAddTheMissingPageButton": {
+   "label": "Add the missing page",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/SiteHealthRepair.swift"
+   },
+   "windows": null
+  },
+  "problemsRepairOutcomePreviewAgainButton": {
+   "label": "Preview Again",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+   },
+   "windows": null
+  },
+  "problemsRepairOutcomeCloseButton": {
+   "label": "Close",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/SiteHealthRepair.swift"
+   },
+   "windows": null
+  },
+  "problemsTabKindCurriculumMap": {
+   "label": "Curriculum map",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[0].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindMediaFolder": {
+   "label": "Media folder",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[2].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindFrontPage": {
+   "label": "Front page",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[3].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindPageSettings": {
+   "label": "Page settings",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[6].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindLinkToAHiddenPage": {
+   "label": "Link to a hidden page",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[7].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindHandout": {
+   "label": "Handout",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[8].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindDiagramOrGraph": {
+   "label": "Diagram or graph",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[9].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindSwiftProgram": {
+   "label": "Swift program",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[10].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindSelfCheckQuestion": {
+   "label": "Self-check question",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[11].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindRunnableCode": {
+   "label": "Runnable code",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[12].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindGeoGebraSketch": {
+   "label": "GeoGebra sketch",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[14].label"
+   },
+   "windows": null
+  },
+  "problemsTabKindFileTooLarge": {
+   "label": "File too large",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[15].label"
+   },
+   "windows": null
+  },
+  "progressViewWhyMightThisTakeAWhileLink": {
+   "label": "Why might this take a while?",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/TaskProgressView.swift"
+   },
+   "windows": null
+  },
+  "whyTakingLongFirstTimeSetupHeading": {
+   "label": "First-time setup",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/WhyTakingLongView.swift"
+   },
+   "windows": null
+  },
+  "whyTakingLongFirstTimeDeployingHeading": {
+   "label": "First-time deploying",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/WhyTakingLongView.swift"
+   },
+   "windows": null
+  },
+  "whyTakingLongPhotosAndAttachmentsHeading": {
+   "label": "Photos and attachments",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/WhyTakingLongView.swift"
+   },
+   "windows": null
+  },
+  "whyTakingLongInternetConnectionHeading": {
+   "label": "Internet connection",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/WhyTakingLongView.swift"
+   },
+   "windows": null
+  },
+  "progressViewCancelButton": {
+   "label": "Cancel",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Console/TaskProgressView.swift"
+   },
+   "windows": null
+  },
+  "syncedFolderUseThisFolderAnywayButton": {
+   "label": "Use This Folder Anyway",
+   "mac": {
+    "say": "shared-rules#cloudSyncedFolders.wording.useAnywayButton"
+   },
+   "windows": null
+  },
+  "syncedFolderChooseADifferentFolderButton": {
+   "label": "Choose a Different Folder\u2026",
+   "mac": {
+    "say": "shared-rules#cloudSyncedFolders.wording.chooseDifferentFolderButton"
+   },
+   "windows": null
+  },
+  "syncedFolderNoticeGotItButton": {
+   "label": "Got It",
+   "mac": {
+    "say": "shared-rules#cloudSyncedFolders.wording.dismissNoticeButton"
+   },
+   "windows": null
+  },
+  "syncedFolderNoticeShowDetailsButton": {
+   "label": "Show Details",
+   "mac": {
+    "say": "shared-rules#cloudSyncedFolders.wording.showDetailsButton"
+   },
+   "windows": null
+  },
+  "syncedFolderNoticeHideDetailsButton": {
+   "label": "Hide Details",
+   "mac": {
+    "say": "shared-rules#cloudSyncedFolders.wording.hideDetailsButton"
+   },
+   "windows": null
+  },
+  "quitQuestionKeepWorkingButton": {
+   "label": "Keep Working",
+   "mac": {
+    "wording": "QuitConfirmation.keepWorkingButton"
+   },
+   "windows": null
+  },
+  "quitQuestionQuitAnywayButton": {
+   "label": "Quit Anyway",
+   "mac": {
+    "wording": "QuitConfirmation.quitAnywayButton"
+   },
+   "windows": null
+  },
+  "problemReportAlertTitle": {
+   "label": "Send a report about a problem",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/App/ProblemReportCommands.swift"
+   },
+   "windows": null
+  },
+  "problemReportNothingToReportYetTitle": {
+   "label": "There is nothing to report yet",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/App/ProblemReportCommands.swift"
+   },
+   "windows": null
+  },
+  "problemReportCouldNotBeSavedTitle": {
+   "label": "The report could not be saved",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/App/ProblemReportCommands.swift"
+   },
+   "windows": null
+  },
+  "problemReportSaveReportButton": {
+   "label": "Save Report\u2026",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/App/ProblemReportCommands.swift"
+   },
+   "windows": null
+  },
+  "problemReportIncludeWhatITypedCheckbox": {
+   "label": "Include what I typed to the local AI assistant",
+   "mac": {
+    "say": "shared-rules#problemReportDialog.includePromptsLabel"
+   },
+   "windows": null
+  },
+  "assistantSettingsPane": {
+   "label": "Assistant",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/PlantoirSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantBeforeItChangesGroup": {
+   "label": "Before it changes your pages",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantAskBeforeChanging": {
+   "label": "Ask me before changing anything",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantWhichRunsGroup": {
+   "label": "Which assistant runs on this Mac",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantOnThisMacGroup": {
+   "label": "On this Mac",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantChooseForMe": {
+   "label": "Choose for me",
+   "mac": {
+    "say": "shared-rules#assistantModelChoice.choices[0].label"
+   },
+   "windows": null
+  },
+  "assistantSmaller": {
+   "label": "The smaller assistant",
+   "mac": {
+    "say": "shared-rules#assistantModelChoice.choices[1].label"
+   },
+   "windows": null
+  },
+  "assistantLarger": {
+   "label": "The larger assistant",
+   "mac": {
+    "say": "shared-rules#assistantModelChoice.choices[2].label"
+   },
+   "windows": null
+  },
+  "assistantDownloadButton": {
+   "label": "Download",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantStopButton": {
+   "label": "Stop",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantRemoveButton": {
+   "label": "Remove",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
+   },
+   "windows": null
+  },
+  "assistantWindowTitle": {
+   "label": "Assistant",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/App/QuartzTeachersApp.swift"
+   },
+   "windows": null
+  },
+  "assistantGo": {
+   "label": "Go",
+   "mac": {
+    "say": "assist-wording#wording.planAccepted"
+   },
+   "windows": null
+  },
+  "assistantDeploy": {
+   "label": "Deploy",
+   "mac": {
+    "say": "assist-wording#wording.deployAccepted"
+   },
+   "windows": null
+  },
+  "assistantCancel": {
+   "label": "Cancel",
+   "mac": {
+    "say": "assist-wording#wording.cancelled"
+   },
+   "windows": null
+  },
+  "howITeachRow": {
+   "label": "How I Teach page",
+   "mac": {
+    "say": "shared-rules#howITeachPage.settingsButton.rowLabel"
+   },
+   "windows": null
+  },
+  "howITeachCreateAndOpen": {
+   "label": "Create and Open",
+   "mac": {
+    "say": "shared-rules#howITeachPage.settingsButton.createButton"
+   },
+   "windows": null
+  },
+  "howITeachOpen": {
+   "label": "Open",
+   "mac": {
+    "say": "shared-rules#howITeachPage.settingsButton.openButton"
+   },
+   "windows": null
+  },
+  "sharePlanProtect": {
+   "label": "Protect with a Username and Password",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.protect"
+   },
+   "windows": null
+  },
+  "sharePlanIncludeAnswerKeys": {
+   "label": "Include Answer Keys",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.includeAnswerKeys"
+   },
+   "windows": null
+  },
+  "sharePlanShareUnitPlans": {
+   "label": "Share Unit Plans",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.share"
+   },
+   "windows": null
+  },
+  "sharePlanShareAgain": {
+   "label": "Share Again",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.shareAgain"
+   },
+   "windows": null
+  },
+  "sharePlanChangePassword": {
+   "label": "Change Password\u2026",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.changePassword"
+   },
+   "windows": null
+  },
+  "sharePlanAddPassword": {
+   "label": "Add a Password\u2026",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.addPassword"
+   },
+   "windows": null
+  },
+  "sharePlanRemovePassword": {
+   "label": "Remove Password\u2026",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.removePassword"
+   },
+   "windows": null
+  },
+  "sharePlanStopSharing": {
+   "label": "Stop Sharing",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.stopSharing"
+   },
+   "windows": null
+  },
+  "sharePlanCopyLink": {
+   "label": "Copy Link",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.copyLink"
+   },
+   "windows": null
+  },
+  "sharePlanWarningTitle": {
+   "label": "Share without a password?",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.crawlerWarningTitle"
+   },
+   "windows": null
+  },
+  "sharePlanShareWithoutPassword": {
+   "label": "Share Without a Password",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.shareAnyway"
+   },
+   "windows": null
+  },
+  "sharePlanConsoleTitle": {
+   "label": "Sharing unit plans",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.words.consoleSheetTitle"
+   },
+   "windows": null
+  },
+  "sharePlanListsTitle": {
+   "label": "Share these files?",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.openShareLists.sheetTitle"
+   },
+   "windows": null
+  },
+  "sharePlanListsShareButton": {
+   "label": "Share",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.openShareLists.shareButton"
+   },
+   "windows": null
+  },
+  "sharePlanDontShare": {
+   "label": "Don't Share",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.wordsForTheTables.moveToNotShared"
+   },
+   "windows": null
+  },
+  "sharePlanMoveToShared": {
+   "label": "Share",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.wordsForTheTables.moveToShared"
+   },
+   "windows": null
+  },
+  "sharePlanSearch": {
+   "label": "Search Documents",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.wordsForTheTables.searchPrompt"
+   },
+   "windows": null
+  },
+  "sharePlanUnitPopUp": {
+   "label": "Unit",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.wordsForTheTables.unitPopup"
+   },
+   "windows": null
+  },
+  "sharePlanAllUnits": {
+   "label": "All Units",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.wordsForTheTables.allUnits"
+   },
+   "windows": null
+  },
+  "sharePlanAnswerKeysOnly": {
+   "label": "Answer Keys Only",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.wordsForTheTables.keysOnly"
+   },
+   "windows": null
+  },
+  "sharePlanAnswerKeysFolder": {
+   "label": "Answer Keys",
+   "mac": {
+    "say": "shared-rules#unitPlanning.share.answerKeysFolder.name"
+   },
+   "windows": null
+  },
+  "sharePlanUsernameTitle": {
+   "label": "Choose a Username for These Plans",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[7].title"
+   },
+   "windows": null
+  },
+  "sharePlanPasswordTitle": {
+   "label": "Choose a Password for These Plans",
+   "mac": {
+    "say": "app-rules#credentialRequests.requests[8].title"
+   },
+   "windows": null
+  },
+  "specialFoldersDone": {
+   "label": "Done",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.dismissedBy"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetDoneButton": {
+   "label": "Done",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/ImportCoursesForReferenceSheet.swift"
+   },
+   "windows": null
+  },
+  "updateNoticeOk": {
+   "label": "OK",
+   "mac": {
+    "say": "shared-rules#appUpdates.wording.okButton"
+   },
+   "windows": null
+  },
+  "fixWithClaudeButton": {
+   "label": "Fix with Claude\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.fixWith.buttons[0].title"
+   },
+   "windows": null
+  },
+  "fixWithCodexButton": {
+   "label": "Fix with Codex\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.fixWith.buttons[1].title"
+   },
+   "windows": null
+  },
+  "fixWithGitHubCopilotButton": {
+   "label": "Fix with GitHub Copilot\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.fixWith.buttons[2].title"
+   },
+   "windows": null
+  },
+  "planAUnitWithClaudeButton": {
+   "label": "Plan a Unit with Claude\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.planAUnit.buttons[0].title"
+   },
+   "windows": null
+  },
+  "planAUnitWithCodexButton": {
+   "label": "Plan a Unit with Codex\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.planAUnit.buttons[1].title"
+   },
+   "windows": null
+  },
+  "planAUnitWithGitHubCopilotButton": {
+   "label": "Plan a Unit with GitHub Copilot\u2026",
+   "mac": {
+    "say": "app-rules#outsideAgents.planAUnit.buttons[2].title"
+   },
+   "windows": null
+  },
+  "planningTabUnitPopUp": {
+   "label": "Unit",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.unitPopup"
+   },
+   "windows": null
+  },
+  "planningTabAllPlansChoice": {
+   "label": "All Plans",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.allPlans"
+   },
+   "windows": null
+  },
+  "planningTabBackButton": {
+   "label": "Back",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.back"
+   },
+   "windows": null
+  },
+  "planningTabForwardButton": {
+   "label": "Forward",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.forward"
+   },
+   "windows": null
+  },
+  "planningTabReloadButton": {
+   "label": "Reload",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.reload"
+   },
+   "windows": null
+  },
+  "planningTabOpenInBrowserButton": {
+   "label": "Open in Browser",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.openInBrowser"
+   },
+   "windows": null
+  },
+  "planningTabNoUnitPlansYetTitle": {
+   "label": "No Unit Plans Yet",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.emptyTitle"
+   },
+   "windows": null
+  },
+  "planningTabUnitPlansCannotBeShownTitle": {
+   "label": "Unit Plans Can\u2019t Be Shown",
+   "mac": {
+    "say": "shared-rules#unitPlanning.tab.words.cannotShowTitle"
+   },
+   "windows": null
+  },
+  "outsideAssistantClaudeDidNotOpenTitle": {
+   "label": "Claude didn\u2019t open",
+   "mac": {
+    "say": "app-rules#outsideAgents.agents[0].didNotOpenTitle"
+   },
+   "windows": null
+  },
+  "outsideAssistantCodexDidNotOpenTitle": {
+   "label": "Codex didn\u2019t open",
+   "mac": {
+    "say": "app-rules#outsideAgents.agents[1].didNotOpenTitle"
+   },
+   "windows": null
+  },
+  "outsideAssistantGitHubCopilotDidNotOpenTitle": {
+   "label": "GitHub Copilot didn\u2019t open",
+   "mac": {
+    "say": "app-rules#outsideAgents.agents[2].didNotOpenTitle"
+   },
+   "windows": null
+  },
+  "agentGuidanceSheetShowWhatWouldBeAdded": {
+   "label": "Show what would be added",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/AgentGuidance.swift"
+   },
+   "windows": null
+  },
+  "agentGuidanceSheetNotNowButton": {
+   "label": "Not Now",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/AgentGuidance.swift"
+   },
+   "windows": null
+  },
+  "agentGuidanceSheetAddButton": {
+   "label": "Add",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/AgentGuidance.swift"
+   },
+   "windows": null
+  }
+ },
  "keys": {}
 }
