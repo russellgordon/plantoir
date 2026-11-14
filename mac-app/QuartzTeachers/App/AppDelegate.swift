@@ -122,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // (#855): completed if what it needed is there and its maker's,
             // otherwise what it had added is taken away. Reads one small
             // record and does nothing more when no set-up was cut short.
+            AssistantSetUpCentre.shared.launchSettleIsPending = true
             Task { @MainActor in
                 await AssistantSetUpCentre.shared.settleInterruptedSetUps()
             }

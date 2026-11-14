@@ -271,16 +271,33 @@ nonisolated enum SetUpRecord {
         }
     }
 
-    /// Whether a record was ever set aside here.
-    static func aRecordWasSetAside(home: URL) -> Bool {
-        let folder: URL = recordURL(home: home).deletingLastPathComponent()
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
-            return false
+    /// Where the keys of the programs found when a record was set aside are
+    /// kept: only those may be ones Plantoir set up, so only those show as
+    /// `recordUnreadable` (fix review 2). A copy the teacher sets up
+    /// themselves later shows as theirs.
+    static func foundWhenSetAsideURL(home: URL) -> URL {
+        return recordURL(home: home).deletingLastPathComponent().appendingPathComponent("found-when-set-aside.json")
+    }
+
+    /// Adds `keys` to the programs found when a record was set aside.
+    static func noteFoundWhenSetAside(_ keys: [String], home: URL) {
+        var all: [String] = keysFoundWhenSetAside(home: home)
+        for key in keys where !all.contains(key) {
+            all.append(key)
         }
-        for name in names where name.hasPrefix("record-unreadable-") {
-            return true
+        all.sort()
+        if let data = try? JSONEncoder().encode(all) {
+            try? data.write(to: foundWhenSetAsideURL(home: home), options: .atomic)
         }
-        return false
+    }
+
+    /// The programs found when a record was set aside, or none.
+    static func keysFoundWhenSetAside(home: URL) -> [String] {
+        guard let data = try? Data(contentsOf: foundWhenSetAsideURL(home: home)),
+              let keys = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return keys
     }
 
     /// Whether anything (a link that leads nowhere included) is at `path`.

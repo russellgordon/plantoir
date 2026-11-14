@@ -69,10 +69,14 @@ final class AssistantSetUpCentre {
     private(set) var statuses: [String: AssistantSetUpState.Status] = [:]
     /// A Remove that could not take everything away, by key.
     private(set) var removalProblems: [String: Bool] = [:]
-    /// True once a record that could not be read was set aside here: a
-    /// program found with no entry may then be one Plantoir set up, and the
-    /// pane says so (review finding 2).
-    private(set) var recordWasSetAside: Bool = false
+    /// The programs found when a record that could not be read was set
+    /// aside here: each may be one Plantoir set up, and the pane says so
+    /// (review finding 2). Only those found at that moment (fix review 2).
+    private(set) var foundWhenSetAside: [String] = []
+    /// True from launch until the launch's settle of cut-short set-ups has
+    /// run; Set Up and Try Again wait for it (fix review 6), so the two
+    /// settles cannot race. Set by the app delegate; false in a test.
+    var launchSettleIsPending: Bool = false
 
     @ObservationIgnored private var runners: [String: SetUpRunner] = [:]
     @ObservationIgnored var home: URL
@@ -112,14 +116,19 @@ final class AssistantSetUpCentre {
         // Plantoir) is moved aside, never written over, and said so on the
         // trail (review finding 2).
         if let asideName = SetUpRecord.setAsideUnreadable(home: home) {
+            var foundNow: [String] = []
+            for agent in AssistantSetUp.agents where doorFinds(agent.key) {
+                foundNow.append(agent.key)
+            }
+            SetUpRecord.noteFoundWhenSetAside(foundNow, home: home)
             ActivityTrail.note(
                 .outsideAssistantSetUpRecordSetAside,
                 "could not read Plantoir’s record of the assistants it set up, so it was kept aside as \(asideName)"
             )
         }
-        let setAside: Bool = SetUpRecord.aRecordWasSetAside(home: home)
-        if setAside != recordWasSetAside {
-            recordWasSetAside = setAside
+        let setAside: [String] = SetUpRecord.keysFoundWhenSetAside(home: home)
+        if setAside != foundWhenSetAside {
+            foundWhenSetAside = setAside
         }
         var newFound: [String: Bool] = [:]
         var newRecorded: [String: SetUpRecordEntry.State] = [:]
@@ -147,7 +156,7 @@ final class AssistantSetUpCentre {
             signIn: signIns[agent.key] ?? .notAsked,
             status: statuses[agent.key] ?? .notAsked,
             hasSignedInCheck: agent.signedInCheckArguments != nil,
-            recordSetAside: recordWasSetAside
+            recordSetAside: foundWhenSetAside.contains(agent.key)
         )
     }
 
@@ -180,9 +189,24 @@ final class AssistantSetUpCentre {
         return AssistantSetUpWording.filled(AssistantSetUpWording.line(for: state(of: agent)), for: agent)
     }
 
-    /// Whether Remove is offered: only for a set-up the record holds.
+    /// Whether Remove is offered: only for a set-up the record holds, and
+    /// not while any set-up runs (one change to the start-up files at a
+    /// time, fix review 6).
     func canRemove(_ agent: AssistantSetUpAgent) -> Bool {
-        return recorded[agent.key] != nil && (activities[agent.key] ?? .idle) == .idle
+        return recorded[agent.key] != nil && !anySetUpIsUnderWay
+    }
+
+    /// Whether any set-up is running in this copy of Plantoir.
+    var anySetUpIsUnderWay: Bool {
+        for agent in AssistantSetUp.agents where (activities[agent.key] ?? .idle) != .idle {
+            return true
+        }
+        return false
+    }
+
+    /// Whether Set Up and Try Again can be pressed for `agent` now.
+    func canStartSetUp(_ agent: AssistantSetUpAgent) -> Bool {
+        return otherSetUpUnderWay(than: agent) == nil && !launchSettleIsPending
     }
 
     /// Notes where the set-up was opened from.
@@ -204,7 +228,7 @@ final class AssistantSetUpCentre {
             // The teacher's own copy: never set up over it.
             return
         }
-        if otherSetUpUnderWay(than: agent) != nil || !SetUpsUnderWay.names.isEmpty {
+        if !canStartSetUp(agent) || !SetUpsUnderWay.names.isEmpty {
             // One at a time, app-wide (review finding 1).
             return
         }
@@ -517,6 +541,9 @@ final class AssistantSetUpCentre {
     /// taken away and the record forgotten. Off the main actor for the
     /// signature check, and only when such a record exists.
     func settleInterruptedSetUps() async {
+        defer {
+            launchSettleIsPending = false
+        }
         let entries: [SetUpRecordEntry] = SetUpRecord.load(home: home)
         for entry in entries where entry.state == .installing && entry.kind == AssistantSetUp.recordKind {
             guard let agent = AssistantSetUp.agent(forKey: entry.key) else {

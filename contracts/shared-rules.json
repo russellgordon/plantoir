@@ -1263,7 +1263,7 @@
         "event": "outside assistant set-up record set aside",
         "carries": "that Plantoir's record of the assistants it set up could not be read (damaged, or written by a newer Plantoir) and was kept aside, with the name it was given (record-unreadable-<seconds>-<id>.json, no path).",
         "line": "could not read Plantoir’s record of the assistants it set up, so it was kept aside as {name}",
-        "why": "#855 (implementation review finding 2). After it, a program Plantoir set up shows as set up outside Plantoir, and Remove is not offered for it; the trail is how that is explained."
+        "why": "#855 (implementation review finding 2). After it, a program found at that moment shows as recordUnreadable (it may be one Plantoir set up, and it is left alone), and Remove is not offered for it; the trail is how that is explained."
       },
       {
         "event": "outside assistant set-up started",
@@ -15269,6 +15269,20 @@
         },
         "expectAsk": false,
         "why": "The rule that must never bend, for a set-up too: the next launch settles it."
+      },
+      {
+        "name": "an outside assistant is being set up while a section deploys",
+        "given": {
+          "publishesUnderWay": 1,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "assistantsBeingSetUp": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": true,
+        "expectFirstButton": "Keep Working",
+        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website, so it keeps Keep Working; Finish Setting Up is only for a question about set-ups alone (buttons.firstButtonByQuestionWhy)."
       }
     ]
   },

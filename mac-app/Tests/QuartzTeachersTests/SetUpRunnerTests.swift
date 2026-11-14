@@ -495,9 +495,72 @@ final class SetUpReviewFixTests: XCTestCase {
         )
         centre.refresh()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
-        XCTAssertTrue(SetUpRecord.aRecordWasSetAside(home: home))
+        XCTAssertEqual(SetUpRecord.keysFoundWhenSetAside(home: home), ["claude"])
         XCTAssertEqual(centre.state(of: AssistantSetUp.claude), .recordUnreadable)
         XCTAssertEqual(centre.state(of: AssistantSetUp.codex), .notSetUp)
+        // A copy the teacher sets up later, after the record was set aside,
+        // is theirs (fix review 2), and the set-aside is not repeated.
+        let later: AssistantSetUpCentre = AssistantSetUpCentre(
+            home: home,
+            dependencies: SetUpRunnerTests.dependencies(shell: "/bin/zsh"),
+            doorFinds: { (key: String) -> Bool in
+                return true
+            },
+            openWindow: { (path: String) -> Bool in
+                return false
+            },
+            windowFolder: { () throws -> URL in
+                return home
+            },
+            presenceChanged: {
+            }
+        )
+        later.refresh()
+        XCTAssertEqual(later.state(of: AssistantSetUp.claude), .recordUnreadable)
+        XCTAssertEqual(later.state(of: AssistantSetUp.codex), .setUpElsewhere)
+    }
+
+    /// Fix review 6: no set-up starts while the launch's settle is pending.
+    func testNoSetUpStartsBeforeTheLaunchSettle() throws {
+        let home: URL = try freshHome()
+        let centre: AssistantSetUpCentre = AssistantSetUpCentre(
+            home: home,
+            dependencies: SetUpRunnerTests.dependencies(shell: "/bin/zsh"),
+            doorFinds: { (key: String) -> Bool in
+                return false
+            },
+            openWindow: { (path: String) -> Bool in
+                return false
+            },
+            windowFolder: { () throws -> URL in
+                return home
+            },
+            presenceChanged: {
+            }
+        )
+        centre.refresh()
+        centre.launchSettleIsPending = true
+        XCTAssertFalse(centre.canStartSetUp(AssistantSetUp.codex))
+        centre.setUp(AssistantSetUp.codex)
+        XCTAssertEqual(centre.state(of: AssistantSetUp.codex), .notSetUp)
+    }
+
+    /// Fix review 8: dot segments are resolved before the address is compared.
+    func testDotSegmentsAreResolvedBeforeComparing() {
+        let copilot: [String] = AssistantSetUp.copilot.recipe.allowedAddresses
+        XCTAssertFalse(SetUpRedirectGuard.follows(
+            URL(string: "https://raw.githubusercontent.com/github/copilot-cli/../../someone/else/x.sh"),
+            allowedAddresses: copilot
+        ))
+    }
+
+    /// Fix review 7: the one-at-a-time line belongs only under rows that
+    /// offer Set Up or Try Again.
+    func testOnlyRowsThatOfferASetUpSayWhyTheyWait() {
+        XCTAssertTrue(AssistantSetUpState.offersSetUp(.notSetUp))
+        XCTAssertTrue(AssistantSetUpState.offersSetUp(.failedOther))
+        XCTAssertFalse(AssistantSetUpState.offersSetUp(.readySignedIn))
+        XCTAssertFalse(AssistantSetUpState.offersSetUp(.setUpElsewhere))
     }
 
     /// Finding 2: writes from runs that finish together lose nothing.

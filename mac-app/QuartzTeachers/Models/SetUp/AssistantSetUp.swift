@@ -225,6 +225,17 @@ nonisolated enum AssistantSetUpState: String, Sendable, CaseIterable {
 
     // MARK: - Functions
 
+    /// Whether a row in `state` draws Set Up or Try Again, the only rows the
+    /// one-at-a-time line belongs under (fix review 7).
+    static func offersSetUp(_ state: AssistantSetUpState) -> Bool {
+        switch state {
+        case .notSetUp, .failedNoConnection, .failedNotFromMaker, .failedOther, .failedTookTooLong, .stopped, .interrupted:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// The state from the facts.
     /// - Parameters:
     ///   - found: the door finds the program (anyone's).

@@ -9585,7 +9585,7 @@ only). The quit rule is `shared-rules.json` →
 2. The maker's own documented set-up is fetched by Plantoir through
    `URLSession` (so the Mac's proxy settings apply), following redirects only
    to addresses that start with one of the recipe's `allowedAddresses`
-   (scheme, host and path, review L4). By whole address, not host, since the
+   (scheme, host and path, review L4), dot segments resolved first. By whole address, not host, since the
    implementation review: `raw.githubusercontent.com` serves any GitHub
    user's files, so only `/github/copilot-cli/` on it is GitHub's. All three
    documented addresses redirect (measured 2026-11-13).
@@ -9676,7 +9676,13 @@ Up and Try Again are unavailable and say why (`wording.oneAtATime`); queueing
 was rejected, since a set-up starting later is an offer the teacher did not
 make at that moment. Remove also leaves a block another entry records too
 (`SetUpRemoval.profileBlocksShared`), so a record made before this rule is
-safe as well.
+safe as well. Remove is unavailable while a set-up runs, and Set Up and Try
+Again wait until the launch's settle of cut-short set-ups has run, so the two
+settles cannot race (fix review 6). **Both this rule and the record's lock
+hold within ONE running copy of Plantoir**: a second copy running at once
+(CLAUDE.md Trap 2) can still overlap a set-up or lose a write. Rejected for
+now: an advisory `flock` on the set-up folder, which would cover two copies;
+a second copy is a developer's situation, not a teacher's.
 
 **A record that cannot be read is never written over** (finding 2, measured:
 one entry with a state this version does not know made the whole record load
@@ -9684,8 +9690,10 @@ as empty, and the next write kept only the new entry, so Plantoir's own copy
 became "set up outside Plantoir" with no Remove). Every write now refuses
 when the record is there and unreadable (a set-up then runs nothing); the
 pane moves it aside as `record-unreadable-<seconds>-<id>.json`, writes the
-trail line `outside assistant set-up record set aside`, and shows a program
-it finds with no entry as `recordUnreadable` ("Already set up. Plantoir
+trail line `outside assistant set-up record set aside`, and shows each
+program it found AT THAT MOMENT with no entry as `recordUnreadable` (kept as
+`found-when-set-aside.json`; a copy the teacher sets up later is theirs,
+fix review 2) ("Already set up. Plantoir
 couldn't read its note…"). Every read-change-write is one step under one
 lock: 40 stores finishing together kept 40 of 40, against 6 of 40 before.
 
@@ -9694,7 +9702,8 @@ run's snapshot does not count the earlier run's files as the teacher's.
 
 **Quit Anyway ends the set-up before the app goes** (finding 4): `stopNow`
 asks it to end, polls up to `quitGraceMilliseconds` (500) for it to go, then
-ends its whole process group outright. `stop()`'s later outright end is a
+ends its whole process group outright, unless the set-up has already been
+reaped (its number may by then belong to something else). `stop()`'s later outright end is a
 task a quitting app never lives to run; measured with a stand-in that
 ignores the request to end: after `stop()` it was still running 1 s later,
 after `stopNow()` it was gone. The question has its own first button,

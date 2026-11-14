@@ -242,7 +242,10 @@ nonisolated final class SetUpRunner: Sendable {
         let group: pid_t = childProcess.withLock { (pid: inout pid_t) -> pid_t in
             return pid
         }
-        if group > 0 {
+        // Only while the leader is unreaped: once `run` has reaped it, it
+        // has already ended the group itself, and the number may since
+        // belong to something else (`signalTheGroup`'s rule).
+        if group > 0 && !isReaped {
             killpg(group, SIGKILL)
         }
     }
@@ -720,7 +723,9 @@ nonisolated final class SetUpRedirectGuard: NSObject, URLSessionTaskDelegate, Se
         guard let address, address.scheme == "https", address.host != nil else {
             return false
         }
-        let text: String = address.absoluteString
+        // Dot segments resolved first, so `/github/copilot-cli/../../x/`
+        // is compared as the address it really names (fix review 8).
+        let text: String = address.standardized.absoluteString
         for prefix in allowedAddresses where text.hasPrefix(prefix) {
             return true
         }
