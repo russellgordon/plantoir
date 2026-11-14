@@ -261,12 +261,11 @@ enum WholeCourseRestore {
         var total: Int64 = 0
         while let entry = walker.nextObject() as? URL {
             if CourseArchiver.excludedFromArchives.contains(entry.lastPathComponent) {
-                walker.skipDescendants()
+                RestoreSwap.skipIfAFolder(walker, entry)
                 continue
             }
             let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
             if values?.isSymbolicLink == true {
-                walker.skipDescendants()
                 continue
             }
             if values?.isRegularFile == true {

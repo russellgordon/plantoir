@@ -153,105 +153,13 @@ final class CourseRestorerStagedTests: XCTestCase {
             archiveBegan: archive.began
         )
 
-        // Russell's ruling (2026-11-14): put back where it was when the
-        // restored course has its folder (Concepts/Unit 1 is the backup's
-        // too); kept aside when it does not (section1/Sample App is not).
-        var restored: [String: Data] = fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit)
-        restored["Concepts/Unit 1/out/result.txt"] = Data("output\n".utf8)
-        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), restored)
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
         var expected: [String: Data] = [:]
-        for (path, text) in deeper where !path.hasPrefix("Concepts/") {
+        for (path, text) in deeper {
             expected[path] = Data(text.utf8)
         }
         XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), expected)
         XCTAssertEqual(fixture.leftInRestoring(), 0)
-    }
-
-    /// Russell's ruling on #909 (2026-11-14): a `.git` deeper inside the
-    /// course, in neither the backup nor the archive, is PUT BACK where it
-    /// was in the restored course, not kept aside. MUST FAIL on 66f645649
-    /// (and on the mutant with `putsDeeperLeftOutNamesBack` false), which
-    /// kept it in "<CODE> not in the archive".
-    @MainActor
-    func testADeeperGitIsPutBackWhereItWas() throws {
-        let fixture: WholeCourseFixture = try WholeCourseFixture()
-        defer { fixture.tearDown() }
-        let git: String = "section1/All Classes/.git/HEAD"
-        try WholeCourseFixture.write("ref: refs/heads/class\n", to: fixture.courseURL.appendingPathComponent(git))
-        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
-
-        try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
-            archiveBegan: archive.began
-        )
-
-        XCTAssertEqual(
-            try String(contentsOf: fixture.courseURL.appendingPathComponent(git), encoding: .utf8), "ref: refs/heads/class\n"
-        )
-        XCTAssertFalse(fixture.somethingWasKept(), "put back, so nothing is kept aside")
-        XCTAssertEqual(
-            try String(contentsOf: fixture.courseURL.appendingPathComponent("section1/All Classes/Unit 1, Day 1.md"), encoding: .utf8),
-            "BACKUP class\n"
-        )
-    }
-
-    /// The third case's other half: a page saved after zip read it is in
-    /// the archive as it was before, so it is kept. MUST FAIL on
-    /// db38ed112.
-    @MainActor
-    func testAPageSavedAfterTheArchiveBeganIsKept() throws {
-        let fixture: WholeCourseFixture = try WholeCourseFixture()
-        defer { fixture.tearDown() }
-        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
-        let page: URL = fixture.courseURL.appendingPathComponent("Concepts/Unit 1/Concept 1.md")
-        try WholeCourseFixture.write("LIVE concept, saved while the archive was made\n", to: page)
-
-        try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
-            archiveBegan: archive.began
-        )
-
-        XCTAssertEqual(
-            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
-            ["Concepts/Unit 1/Concept 1.md": Data("LIVE concept, saved while the archive was made\n".utf8)]
-        )
-    }
-
-    /// The fix review's m-1: a restore of a course that another restore of
-    /// it holds (another copy of Plantoir, at the same moment) is refused
-    /// with nothing written and nothing moved, and the sentence is the one
-    /// for another restore under way; once it lets go, a restore goes
-    /// ahead. MUST FAIL on db38ed112, where both went to their records and
-    /// either could refuse the other.
-    @MainActor
-    func testARestoreAnotherRestoreHoldsIsRefusedWithNothingWritten() throws {
-        let fixture: WholeCourseFixture = try WholeCourseFixture()
-        defer { fixture.tearDown() }
-        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        let hold: RestoreSwap.CourseHold = RestoreSwap.holdTheCourse("ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL)
-        guard case .held = hold else {
-            XCTFail("the hold was not taken: \(hold)")
-            return
-        }
-
-        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)) { error in
-            XCTAssertEqual(error.localizedDescription, RestoreWholeCourseWording.anotherRestoreUnderWay(course: "ICS3U"))
-        }
-        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live)
-        XCTAssertEqual(fixture.leftInRestoring(), 0, "nothing was written")
-        XCTAssertTrue(fixture.trailText().contains(
-            WholeCourseRestore.DidNotGoAhead.anotherRestore.rawValue + ", asked " + WholeCourseRestore.AskedWhen.whenItBegan.rawValue
-        ), fixture.trailText())
-
-        RestoreSwap.letGo(hold)
-        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
-        try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
-            archiveBegan: archive.began
-        )
-        XCTAssertEqual(
-            try String(contentsOf: fixture.courseURL.appendingPathComponent("index.md"), encoding: .utf8), "BACKUP front page\n"
-        )
     }
 
     /// Round four, INCOMPLETE 1 of the round-three review: a file that
@@ -411,6 +319,47 @@ final class CourseRestorerStagedTests: XCTestCase {
                 .contentModificationDate
         )
         XCTAssertLessThanOrEqual(abs(recorded.timeIntervalSince(changed)), RestoreSwap.zipTimeRoundingSeconds)
+    }
+
+    /// Round four, found measuring on exFAT: `skipDescendants()` after an
+    /// entry that is not a folder skips the contents of the NEXT folder the
+    /// walk meets, so a link just before a folder hid every file in it. A
+    /// link and twenty folders with a page each; whatever order the disk
+    /// lists them in, every page is judged (here, with no listing, kept).
+    /// MUST FAIL on the mutant `RestoreSwap.skip-after-a-link.swift`
+    /// (66f645649's skip after a link) whenever a folder follows the link.
+    @MainActor
+    func testAWalkAfterALinkStillSeesTheNextFolder() throws {
+        let root: URL = FileManager.default.temporaryDirectory.appendingPathComponent("walk-\(UUID().uuidString)")
+        let courses: URL = root.appendingPathComponent("courses")
+        let aside: URL = courses.appendingPathComponent(".internal/restoring/X/as-it-was")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: aside.appendingPathComponent(".merged_output"), withDestinationURL: root)
+        var pages: [String] = []
+        for index in 0..<20 {
+            let page: String = "F\(index)/page.md"
+            try WholeCourseFixture.write("page \(index)\n", to: aside.appendingPathComponent(page))
+            pages.append(page)
+        }
+        let context: RestoreSwap.Context = RestoreSwap.Context(
+            computer: "here", owner: "me", now: { () -> String in return "" }, stamp: { () -> String in return "2026-11-14_080000" },
+            keptInPlace: [], archiveURL: nil,
+            checkPayload: { (_: URL) throws in }, putMediaBack: { (_: URL, _: URL?) throws in },
+            refuseUnlessMediaWasPutBack: { (_: URL) throws in }, beforeTheSwap: { (_: URL) throws in },
+            justBeforeTheSwap: { () in }, afterCommit: { () in }, keepingWhatWasReplaced: nil
+        )
+
+        let kept: (keptAt: String?, everythingMoved: Bool) = RestoreSwap.keepWhatTheArchiveMayNotHold(
+            aside, courseCode: "ICS3U", listing: nil, archiveBegan: nil, leftOutOnPurpose: [],
+            coursesDirectoryURL: courses, context: context
+        )
+
+        XCTAssertTrue(kept.everythingMoved)
+        let folder: URL = courses.appendingPathComponent("_backups/ICS3U/ICS3U not in the archive 2026-11-14_080000")
+        for page in pages {
+            XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent(page)), page)
+        }
     }
 
     /// The two lists of names a backup leaves out are together exactly

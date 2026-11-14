@@ -534,13 +534,6 @@ nonisolated enum RestoreSwap {
     /// every restore.
     static let leftOutNamesKeptAtAnyDepth: [String] = ["node_modules", ".git", "dist", "build", "out"]
 
-    /// Russell's ruling on #909's held question (2026-11-14): a name in
-    /// `leftOutNamesKeptAtAnyDepth` found below the top of the set-aside
-    /// copy is PUT BACK where it was in the restored course (when its
-    /// folder is there and nothing is in its place), rather than kept
-    /// aside. One that cannot go back is kept aside as before.
-    static let putsDeeperLeftOutNamesBack: Bool = true
-
     /// The other names a backup leaves out: made again (the built site's
     /// link, Finder's `.DS_Store`, the three caches), so they are removed
     /// with the set-aside copy and never kept. With
@@ -1250,25 +1243,16 @@ nonisolated enum RestoreSwap {
             let inside: String = relative(entry, to: aside)
             let name: String = entry.lastPathComponent
             if leftOutNamesKeptAtAnyDepth.contains(name) {
-                walker.skipDescendants()
-                // Russell's ruling on #909 (2026-11-14): put back where it
-                // was in the restored course when its folder is there and
-                // nothing is in its place; otherwise kept aside as before.
-                if putsDeeperLeftOutNamesBack && putBackIntoTheCourse(
-                    inside, from: aside, courseURL: coursesDirectoryURL.appendingPathComponent(courseCode)
-                ) {
-                    continue
-                }
                 picked.append(inside)
+                skipIfAFolder(walker, entry)
                 continue
             }
             if leftOutNamesMadeAgain.contains(name) || isInside(inside, anyOf: leftOutOnPurpose) {
-                walker.skipDescendants()
+                skipIfAFolder(walker, entry)
                 continue
             }
             let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
             if values?.isSymbolicLink == true {
-                walker.skipDescendants()
                 // A link: zip follows it, so the archive holds what it
                 // pointed at under its path. One that is not listed is kept
                 // as a link; what it points at is never touched.
@@ -1308,24 +1292,16 @@ nonisolated enum RestoreSwap {
         return (insideTheWorkingFolder(folder, coursesDirectoryURL: coursesDirectoryURL), everythingMoved)
     }
 
-    /// Moves an item of the set-aside copy to the same path in the restored
-    /// course, never over anything and only into a folder that is there.
-    /// True when it moved.
-    static func putBackIntoTheCourse(_ inside: String, from aside: URL, courseURL: URL) -> Bool {
-        let destination: URL = absolute(inside, in: courseURL)
-        let parent: URL = destination.deletingLastPathComponent()
+    /// `skipDescendants` only for a real folder. Called after any other
+    /// entry (a file, a link), it skips the contents of the NEXT folder the
+    /// walk meets: measured on an exFAT image on 2026-11-14, a link at the
+    /// top (`.merged_output`) made the walk skip all of `.obsidian`, and an
+    /// edited `workspace.json` there was removed with the copy. A walk never
+    /// descends into a link, so a link needs no skip.
+    static func skipIfAFolder(_ walker: FileManager.DirectoryEnumerator, _ entry: URL) {
         var status: stat = stat()
-        if lstat(parent.path, &status) != 0 || (status.st_mode & S_IFMT) != S_IFDIR {
-            return false
-        }
-        if itemExists(at: destination) {
-            return false
-        }
-        do {
-            try FileManager.default.moveItem(at: absolute(inside, in: aside), to: destination)
-            return true
-        } catch {
-            return false
+        if lstat(entry.path, &status) == 0 && (status.st_mode & S_IFMT) == S_IFDIR {
+            walker.skipDescendants()
         }
     }
 
@@ -1449,7 +1425,6 @@ nonisolated enum RestoreSwap {
                 while let entry = walker.nextObject() as? URL {
                     let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
                     if values?.isSymbolicLink == true {
-                        walker.skipDescendants()
                         continue
                     }
                     if values?.isRegularFile != true {
@@ -1567,7 +1542,6 @@ nonisolated enum RestoreSwap {
             while let entry = walker.nextObject() as? URL {
                 let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
                 if values?.isSymbolicLink == true {
-                    walker.skipDescendants()
                     continue
                 }
                 clearLockAndMakeWritable(entry)

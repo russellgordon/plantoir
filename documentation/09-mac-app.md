@@ -13446,7 +13446,7 @@ Every removal in the restore code, and where what it removes exists first:
 | `RestoreSwap.restore`, either catch before the swap (`removeStaging`) | the record and the unpack; nothing of the course has moved | the zip |
 | the live way back, every file back (`removeStaging` after `keepNewcomers`) | the backup's items moved back, the empty set-aside folder | the zip; what was written into them is with the newcomers first, and when that cannot all be moved nothing is removed |
 | a live stop (`keepTheSetAside`) and a settle's blocked way back | what is left of staging after the set-aside copy and newcomers moved | the same |
-| `finishAfterTheCommit`, `removeUnlocking(aside)` | the course as it was | all of it in `<CODE> as it was before restoring again` when the record keeps it (decided by the engine since round four); otherwise the archive made first, whose LISTING holds every file removed (path, size, recorded time, and no time of the file's at or after `archiveBegan`); a deeper `.git`, `node_modules`, `dist`, `build` or `out` put back into the restored course, or kept; everything else moved out first; a failed move stops the removal |
+| `finishAfterTheCommit`, `removeUnlocking(aside)` | the course as it was | all of it in `<CODE> as it was before restoring again` when the record keeps it (decided by the engine since round four); otherwise the archive made first, whose LISTING holds every file removed (path, size, recorded time, and no time of the file's at or after `archiveBegan`); a deeper `.git`, `node_modules`, `dist`, `build` or `out`, and everything else, moved out first; a failed move stops the removal |
 | `finishAfterTheCommit`, the same removal, `leftOutNamesMadeAgain` | `.DS_Store`, `__pycache__`, `.cache`, `.quartz-cache`, the built site's link, at any depth | nowhere: each is made again |
 | `finishAfterTheCommit`, the same removal, `Record.leftOutOnPurpose` | Plantoir's own Obsidian add-ons (`.obsidian/plugins/<name>` with Plantoir's marker) | the app's bundle: the next pass puts them back (12.9 MB) |
 | `justBeforeTheSwap`, `BuildOutputLocation.discardBuiltSites` | the course's built sites, outside the working folder | nowhere: derived, built again from the restored pages (the round-three review) |
@@ -13521,10 +13521,12 @@ file that puts 66f645649's behaviour back (`909/round4/mustfail/`).
   the file's content time, and no creation or content time at or after
   `archiveBegan`. Everything else is kept, hidden files included. Measured
   after: 0 lost in all 13 cases on APFS and exFAT. REJECTED: the inode-change
-  time the review proposed. It is changed by the swap's own renames at the
-  top, by a reference course's unlocking before the swap (every locked page),
-  and by Finder tags, so it keeps too much; and a folder moved in keeps its
-  children's old inode times, so it misses them. REJECTED: a CRC of every
+  time the review proposed. The review measured it changed by the swap's
+  own renames at the top; by POSIX's definition it is also changed by a
+  reference course's unlocking before the swap (`chflags` on every locked
+  page) and by any extended-attribute write, so it would keep too much (not
+  measured here); and a rename changes only the moved item's, so the pages
+  inside a folder moved in keep old ones and would be missed. REJECTED: a CRC of every
   file against the listing, which reads the whole course (500 MB) at every
   restore for a case the recorded time already catches. Cost on a 500 MB
   course, measured below.
@@ -13538,16 +13540,59 @@ file that puts 66f645649's behaviour back (`909/round4/mustfail/`).
   `confirmKeptWithItsBackups` promises the teacher is told where, and after
   a crash between `done` and the keep nobody was. Behind M11's rule,
   `tellsTheTeacherOnceAfterPuttingRight` (held question M15).
-- **Russell's ruling (2026-11-14):** a `.git` (and the other names in
-  `leftOutNamesKeptAtAnyDepth`) below the top is PUT BACK where it was in
-  the restored course when its folder is there and nothing is in its place
-  (`putsDeeperLeftOutNamesBack`); otherwise it is kept aside as before.
+- **Russell's ruling of 2026-11-14 supersedes this piece's `.git` rules:**
+  backups will hold a course's `.git`, and a restore will bring back
+  exactly what the backup holds. That is a follow-on piece (the leave-out
+  list on both platforms, sizes, the shared store); until it lands, a
+  deeper `.git` is kept aside as round three built it, nothing lost.
+- **Found while measuring on exFAT: a walk skipped a whole folder.**
+  `FileManager`'s enumerator's `skipDescendants()` called after an entry
+  that is not a folder (round three called it after every link) skips the
+  contents of the NEXT folder the walk meets. On APFS's order it happened to
+  miss nothing; on an exFAT image `.merged_output` (a link) comes just before
+  `.obsidian`, so an edited `workspace.json` was never looked at and was
+  removed with the copy (1 lost; the same walk is in
+  `keepWhatWasWrittenIntoTheBackupsItems`, which keeps a crash's newcomers).
+  Now a skip is made only for a real folder (`RestoreSwap.skipIfAFolder`); a
+  walk never enters a link, so a link needs none. The same fix in
+  `removeUnlocking`, `WholeCourseRestore.sizeOfWhatAnArchiveHolds` and
+  `BackupSizes.logicalSize(ofFolder:)`.
 - **Kept folders are counted** in the size beside Backups
   (`BackupSpace.bytesTaken`, `BackupSizes.keptFolders`), never listed or
   pruned; All Backups says what they add (`keptFoldersTake`).
 - The known limits are `backups.restoreWholeCourse.knownLimits`.
 
-Measurements (Apple M4 Pro, one core, `nice -n 19`): MEASURED_ROUND_FOUR
+Measured on the final engine (`909/round4/harness/`, `RestoreSwap.swift` and
+`RestoreSettle.swift` copied verbatim; Apple M4 Pro, one core, `nice -n 19`),
+the same on APFS and on an exFAT image (attached, run, detached, deleted):
+
+| What | 66f645649 | Now |
+|---|---|---|
+| arrivals after the zip's scan (mv, cp -p, ditto, a folder of three, one at the top, one replaced by the same size), APFS | 8 files lost | 0 |
+| the timetable and `workspace.json` edited after the archive began | lost | kept |
+| all 13 `edges.py` cases | | 0 lost on each volume |
+| Plantoir's add-ons, left out on purpose | | removed, not kept |
+| the door's gap (`gap.py`) | the page lost | kept whole |
+| a crash between `done` and the keep, then a settle | kept, nothing said | kept, `keptWhatWasInTheFolder` / `keptWhatTheArchiveMayNotHold` said once |
+| SIGKILL before each of 25 steps, then a settle | | 22 as they were, 3 the backup's |
+| a failure at each of 19 forward moves | | 19 of 19 byte for byte |
+| 171 double faults | | 0 lost, 0 mixes holding settings |
+| a kill, a kill in the settle, a second settle | | 190 runs, 0 not as they were |
+| the settle killed at each move back | | 39 of 39 |
+| two settlers | | 60 of 60 |
+| two restores at once, 4 shapes × 10 | | 40 of 40 exactly one went ahead |
+
+The listing's cost, measured on a 500 MB course (2,097 files: 2,000 pages and
+96 pictures of 5 MB; its archive 504.5 MB, zipped in 7.2 s): the listing read
+in 4 ms, the walk judging every file in 21 to 25 ms (three runs, `-O`). Each
+mutant in `909/round4/mustfail/`, compiled into the harness, loses what
+66f645649 lost: `times-alone` 10 files over 8 cases, `says-nothing` keeps
+and says nothing, `skip-after-a-link` 1 file on exFAT; `door-decides` now
+loses nothing (the listing rule keeps the page in `not in the archive`) and
+is red in XCTest on the folder's name. The harness archive is now real
+(`/usr/bin/zip` with the app's arguments, one name per process), so
+`run_staged.py`'s "lost 45" after a commit counts files that are in the
+archive, which it does not read.
 
 **For Undo (#899, U5).** U5 must land after this. An undo of a whole-course
 restore is a staged restore of the archive made first, a redo one of the

@@ -6605,9 +6605,7 @@ read from the archive's own central directory (path, size, recorded time;
 zip directory reader (`System.IO.Compression.ZipArchive` lists entries
 without unpacking them; its `LastWriteTime` is the recorded local time);
 the record's `leftOutOnPurpose`; the engine, not the door, decides
-`keepsWhatWasReplaced`; a deeper `.git` and the other deeper left-out names
-are put back into the restored course when they can be (Russell's ruling);
-a settle that keeps files says `keptWhatWasInTheFolder` or
+`keepsWhatWasReplaced`; a settle that keeps files says `keptWhatWasInTheFolder` or
 `keptWhatTheArchiveMayNotHold`; and the size beside Backups counts kept
 folders (`backups.keptFoldersCounted`, `wording.keptFoldersTake`).
 `documentation/09-mac-app.md` → "Round four" says what was measured and

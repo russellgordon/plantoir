@@ -56,10 +56,8 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         }
         defer { RestoreSwap.letGo(hold) }
         var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        let putBack: [String] = (testCase["deeperPutBack"] as? [String]) ?? []
         if !deeper.isEmpty {
-            // What the course should be is the backup's, with the deeper
-            // items put back (Russell's ruling, 2026-11-14); the rest are
+            // What the course should be is the backup's; the deeper items are
             // judged by keptIn below.
             for path in deeper.keys {
                 live[path] = nil
@@ -121,11 +119,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         case "asItWas":
             XCTAssertEqual(now, live, "\(name): the course is not as it was")
         case "theBackup":
-            var expected: [String: Data] = fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"])
-            for path in putBack {
-                expected[path] = deeper[path]
-            }
-            XCTAssertEqual(now, expected, "\(name): the course is not the backup's")
+            XCTAssertEqual(now, fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"]), "\(name): the course is not the backup's")
         case "mix":
             XCTAssertNotEqual(now, live, name)
             XCTAssertNotEqual(now, fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"]), name)
@@ -139,11 +133,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         }
         XCTAssertEqual(fixture.somethingWasKept(), try XCTUnwrap(testCase["kept"] as? Bool, name), "\(name): kept")
         if testCase["keptIn"] as? String == "notInTheArchive" {
-            var keptAside: [String: Data] = deeper
-            for path in putBack {
-                keptAside[path] = nil
-            }
-            XCTAssertEqual(try fixture.keptIn(folderStartingWith: RestoreSwap.notInTheArchiveName("ICS3U") + " "), keptAside, "\(name): keptIn")
+            XCTAssertEqual(try fixture.keptIn(folderStartingWith: RestoreSwap.notInTheArchiveName("ICS3U") + " "), deeper, "\(name): keptIn")
         }
         let staging: String = try XCTUnwrap(testCase["staging"] as? String, name)
         XCTAssertEqual(fixture.leftInRestoring() == 0, staging == "removed", "\(name): staging")
@@ -252,8 +242,6 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         switch act {
         case "deeperLeftOutName":
             try WholeCourseFixture.write("ref: refs/heads/sample\n", to: course.appendingPathComponent("section1/Sample App/.git/HEAD"))
-        case "deeperLeftOutNameWhereTheBackupHasItsFolder":
-            try WholeCourseFixture.write("ref: refs/heads/class\n", to: course.appendingPathComponent("section1/All Classes/.git/HEAD"))
         case "deeperMadeAgainName":
             try WholeCourseFixture.write("finder\n", to: course.appendingPathComponent("section1/.DS_Store"))
         case "addOnLeftOutOnPurpose":
@@ -268,7 +256,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
         // Acts AFTER the archive.
         switch act {
-        case "nothing", "deeperLeftOutName", "deeperLeftOutNameWhereTheBackupHasItsFolder", "deeperMadeAgainName", "addOnLeftOutOnPurpose":
+        case "nothing", "deeperLeftOutName", "deeperMadeAgainName", "addOnLeftOutOnPurpose":
             break
         case "editInPlaceAfterTheArchive":
             try WholeCourseFixture.write("LIVE concept, edited after the archive\n", to: course.appendingPathComponent("Concepts/Unit 1/Concept 1.md"))
@@ -311,10 +299,6 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             expected[path] = before[path]
         }
         XCTAssertEqual(found, expected, name)
-        let restored: [String: Data] = try WholeCourseFixture.snapshot(of: course)
-        for path in (testCase["inTheCourse"] as? [String]) ?? [] {
-            XCTAssertEqual(restored[path], before[path], "\(name): \(path) put back where it was")
-        }
     }
 
     // MARK: - Functions: the rule and the pure cases
