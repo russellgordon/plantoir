@@ -3289,9 +3289,173 @@
         "expect": "Shared Basic French unit plans and Basic Skills.",
         "input": "Shared Basic French unit plans and Basic Skills.",
         "why": "#709 review L4: a rule for 'Basic' that is not anchored on Authorization: mangles a course called Basic French."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "headers {\"Authorization\": \"Basic [removed: token]",
+        "input": "headers {\"Authorization\": \"Basic {basic}\"}",
+        "why": "#853: a JSON dump of request headers, quotes round the header's name and its value. Before #853 the rule read `Authorization:` with the colon straight after the name, so this went through whole. `\\S+` takes the closing quote and brace with the value, as it takes the closing quote of the curl case above; base64 holds no quote, so nothing of the credential is left either way."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "{'Authorization': 'Basic [removed: token] 'User-Agent': 'Plantoir'}",
+        "input": "{'Authorization': 'Basic {basic}', 'User-Agent': 'Plantoir'}",
+        "why": "#853: the same header as Python prints a dict of them, in single quotes. scripts/share_plan.py builds exactly these two headers for a protected unit plan; it prints neither today, so this is the shape a traceback or a debugging print would carry."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "curl -u [removed: token] https://plans.example/",
+        "input": "curl -u {user}:{password} https://plans.example/",
+        "why": "#853 (rule userFlag): a username and password handed to curl's -u. The flag is kept so the line still says a user was given. No launcher uses -u today; the rule is for a command a teacher or a tool echoes."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "curl --user [removed: token] https://plans.example/",
+        "input": "curl --user '{user}:{password} and two more words' https://plans.example/",
+        "why": "#853 (rule userFlag): the long form, with a quoted value that holds spaces, taken to its closing quote."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "Opening ftp://[removed: token]@plans.example/",
+        "input": "Opening ftp://{user}:{password}@plans.example/",
+        "why": "#853 (rule urlUserinfo): any scheme, not only http and https. Before #853 the email rule took the password and the host for an address and left the username: `ftp://example-user:[removed: email address]/` (measured)."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "Opening https://[removed: token]@plans.example/",
+        "input": "Opening https://{user}:{password}/2@plans.example/",
+        "why": "#853 (rule urlUserinfo): a password holding a raw slash. Before #853 the rule stopped at the slash and the email rule left `https://example-user:example-password/` behind it (measured)."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "Opening https://[removed: token]@plans.example/",
+        "input": "Opening https://{user}:{password} 2@plans.example/",
+        "why": "#853 (rule urlUserinfo): a password holding a raw space, which only text a person typed and a tool echoed can carry. Single spaces are taken unless the password starts with a digit: see the next case."
+      },
+      {
+        "expect": "Preview at http://localhost:8081 is ready; write to [removed: email address]",
+        "input": "Preview at http://localhost:8081 is ready; write to helpdesk@school.example",
+        "why": "#853, KEPT: a port is not a password. Allowing spaces in a password let the first draft take everything from `localhost:` to the `@` of a later address on the same line (measured on an invented trail), so a password that starts with a digit may not hold a space. The address is still removed by the email rule."
+      },
+      {
+        "expect": "git push -u origin issue/853-redactor-shapes",
+        "input": "git push -u origin issue/853-redactor-shapes",
+        "why": "#853, KEPT: userFlag takes only a value holding a colon. A branch name after -u is not a credential."
+      },
+      {
+        "expect": "Working folder /Users/person/Documents/Teaching/ICS3U",
+        "input": "Working folder /Users/First Last/Documents/Teaching/ICS3U",
+        "why": "#876: an account folder whose name holds a space. School-issued accounts are often First Last, and the rule stopped at the space: `/Users/person Last/…` (measured), the second word of the name left on the trail. Several words are taken when they run on to a separator."
+      },
+      {
+        "expect": "Reading C:\\Users\\person\\Documents\\Teaching",
+        "input": "Reading C:\\Users\\First Last\\Documents\\Teaching",
+        "why": "#876: the same in the Windows shape, `C:\\Users\\person Last\\…` before (measured on the mac's copy of the rule)."
+      },
+      {
+        "expect": "HOME='/Users/person'",
+        "input": "HOME='/Users/First Last'",
+        "why": "#876: a quote, a colon or the end of the line ends the name as a separator does, so a home folder written on its own is taken whole."
+      },
+      {
+        "expect": "cd /users/person/Documents and c:\\users\\person\\AppData",
+        "input": "cd /users/firstlast/Documents and c:\\users\\First Last\\AppData",
+        "why": "#876: read without regard to case, since neither file system minds, and the prefix is kept as it was written."
+      },
+      {
+        "expect": "moved /Users/person to /Users/person/Archive",
+        "input": "moved /Users/sample to /Users/sample/Archive",
+        "why": "#876, KEPT: words that do not run on to a separator are not part of the name, so the words between two paths stay. The one shape still missed is a two-word name followed by words and then another path on the same line: the first word goes and the second stays, as before #876 (documentation/09-mac-app.md)."
+      },
+      {
+        "assembledFrom": {"password": "example-password", "user": "example-user"},
+        "expect": "curl -u [removed: token] https://plans.example/",
+        "input": "curl -u {user}@school.example:{password} https://plans.example/",
+        "why": "#853 round 2 (review W1): a school login is usually an address. With the email rule first, this was written `curl -u [removed: email address]:example-password`: the placeholder hid the value from userFlag and the password stayed (measured). userFlag now runs before the email rule (`ruleOrder`), and it reads a placeholder as part of a value, so neither order leaves the password."
+      },
+      {
+        "assembledFrom": {"password": "example-password", "user": "example-user"},
+        "expect": "Working folder /Users/person then curl -u [removed: token] https://plans.example/",
+        "input": "Working folder /Users/sample then curl -u {user}:{password} https://plans.example/",
+        "why": "#853 round 2, found by the rule-order harness: #876's further words of a name ran on to any colon, so the name took `sample then curl -u example-user` and the password after the colon was written out (`/Users/person:example-password`, measured). A further word now ends at a colon only when white space or the end of the line follows it, and a word that starts with a dash is never a further word of a name, nor, since the third round, one that would start another rule's match (a label word followed by `=` or `:`, or `Bearer`, `Authorization` or `Account` not followed by a letter; in the second round, any word holding one of them)."
+      },
+      {
+        "expect": "Working folder /Users/person token: [removed: token]",
+        "input": "Working folder /Users/sample token: an-invented-value",
+        "why": "#853 round 2, the same: the name took `sample token` and the value lost its label, so labelledSecret did not see it (`/Users/person: an-invented-value`, measured)."
+      },
+      {
+        "expect": "token: Bearer [removed: token]",
+        "input": "token: Bearer an-invented-bearer-value",
+        "why": "#853 round 2, found by the rule-order harness, and on dev too: with labelledSecret first, the label's value was the word `Bearer` and the token after it was written out (`token: [removed: token] an-invented-bearer-value`, measured). The header rules now run before labelledSecret, and none of the three label rules takes another rule's label as its value, so neither order leaves it."
+      },
+      {
+        "expect": "Reading 'C:\\\\Users\\\\person\\\\AppData\\\\Local'",
+        "input": "Reading 'C:\\\\Users\\\\First Last\\\\AppData\\\\Local'",
+        "why": "#853 round 2 (review I1): Python prints a Windows path in a dict or an exception with every backslash doubled, and Windows runs the shared Python natively. The rule read a single backslash only, so the whole name was left, before #876 and after it (measured). It reads one or two."
+      },
+      {
+        "expect": "Working folder /Users/person/Documents",
+        "input": "Working folder /Users/First O'Last/Documents",
+        "why": "#853 round 2 (review I2): an apostrophe followed by a letter is part of the name. The rule stopped at it and left everything after it, the most identifying part (`/Users/person'Last/…`, measured). Any other quote still ends the name, as in the `HOME='…'` case above."
+      },
+      {
+        "expect": "Reading C:\\Users\\person\\Documents",
+        "input": "Reading C:\\Users\\First O'Last\\Documents",
+        "why": "#853 round 2: the same in the Windows shape. A Windows account name may hold an apostrophe and a space; a macOS account's short name holds neither."
+      },
+      {
+        "expect": "Working folder /Users/person/Documents",
+        "input": "Working folder /Users/First Hyphen-Last/Documents",
+        "why": "#853 round 2: a hyphenated name goes whole. A pin: it passed before as well, since a hyphen was always a name character."
+      },
+      {
+        "expect": "Reading C:\\Users\\person\\AppData",
+        "input": "Reading C:\\Users\\Fïrst Läst\\AppData",
+        "why": "#853 round 2: a letter outside ASCII is a name character like any other. A pin: it passed before as well."
+      },
+      {
+        "expect": "Reading C:\\Users\\person\r",
+        "input": "Reading C:\\Users\\First Last\r",
+        "why": "#853 round 2 (review M6): a line of Windows console output can end in a carriage return. .NET documents that its multiline `$` matches before `\\n` only, so with no `\\r` among the name's terminators the rule there would fall back to the first word and leave the second (unmeasured: no .NET on the mac). It passed on the mac before as well, since ICU's `$` matches before a carriage return (measured)."
+      },
+      {
+        "expect": "/Users/person is 92% full; see https://support.example/disk",
+        "input": "/Users/sample is 92% full; see https://support.example/disk",
+        "why": "#853 round 2 (review M3), KEPT: an address's `://` does not end a name, so the words before it stay. Before, they went, and the line read `/Users/person://support.example/disk`, a different path."
+      },
+      {
+        "expect": "Preview at http://[::1]:8081 is ready; write to [removed: email address]",
+        "input": "Preview at http://[::1]:8081 is ready; write to helpdesk@school.example",
+        "why": "#853 round 2 (review M2), KEPT: a username holds no `[`, `]`, `?` or `#`, so an IPv6 host and its port are not read as a username and a password. Before, the line read `Preview at http://[removed: token]@school.example`."
+      },
+      {
+        "expect": "obsidian://open?vault=Teaching:Unit 1 then ask [removed: email address]",
+        "input": "obsidian://open?vault=Teaching:Unit 1 then ask teacher@school.example",
+        "why": "#853 round 2 (review M2), KEPT: the same for an `obsidian://` link, whose `?` ends what could have been a username. Before, everything from `open` to the address went."
+      },
+      {
+        "expect": "password: [removed: token]",
+        "input": "password: Basic xq7Kp2mZ",
+        "why": "#853 round 3 (fix review I1): `Basic` and a word after any label other than `Authorization`. The second round stopped the label rules taking `Basic` as their value, on the grounds that the rule owning that label would take what follows, but `basicAuthHeader` owns `Basic` only after `Authorization`, so nobody took it and the line went through whole (measured; `token: Basic …` and `api_key: Basic …` the same). `labelledSecret` now takes `Basic` and the word after it together, read atomically so that a second pass cannot take the word `Basic` alone."
+      },
+      {
+        "expect": "Working folder /Users/person/Documents",
+        "input": "Working folder /Users/First Secretan/Documents",
+        "why": "#853 round 3 (fix review m3), #876: a surname that holds a label word (`Secretan` holds `secret`; `Tokenfield` and `Accountly` the same) is taken with the rest of the name. A further word of a name is refused only when it would start another rule's match: a label word followed by `=` or `:`, or `Bearer`, `Authorization` or `Account` not followed by a letter. Before, any word holding one of those words anywhere stopped the name, and the line read `/Users/person Secretan/Documents` (measured)."
+      },
+      {
+        "expect": "password: Basic token: [removed: token]",
+        "input": "password: Basic token: an-invented-value",
+        "why": "#853 round 4 (Fable sweep F1): a label, then `Basic`, then another label and its value. Round 3 had `labelledSecret` take `Basic` and the word after it, but its refusals were checked before `Basic`, so the word after `Basic` was taken unchecked: here it took `token:` and wrote the value out (`password: [removed: token] an-invented-value`, measured; round 2's patterns removed it). The refusals are now checked after `Basic`, so the outer label leaves the inner label to take its own value, as it does for `token: Bearer …`. `Basic` is read as many times as it is written, so `password: Basic Basic …` loses its value too (before, the last word stayed, on `dev` as well)."
+      },
+      {
+        "expect": "password: Basic --account [removed: account id]",
+        "input": "password: Basic --account 9b2c4d6e8f0a1b3c5d7e9f0a1b2c3d4e",
+        "why": "#853 round 4 (Fable sweep F1): the same with an account flag after `Basic`. Round 3 took `--account` as the password and left the identifier (`password: [removed: token] 9b2c…`, measured). `accountFlag` takes it now, and the second pass changes nothing."
       }
     ],
-    "note": "What is taken OUT of a problem report before it is written to disk, and - just as important - what is KEPT. Redaction happens as the file is written, never as it is sent: a report that is only safe when it leaves by the right button leaks the first time somebody opens the folder it sits in, and writing it safe is what lets a teacher open the file and see for themselves what they are about to send. The rules lean towards removing too much, because removing a build hash by mistake costs a moment of puzzlement while a surviving token costs the teacher their account - but the four KEPT cases below are load-bearing, and a redactor that swallows them produces reports nobody can diagnose from. There is no way to switch this off in a development build: a redactor that is off while it is being worked on is a redactor nobody has run.",
+    "note": "What is taken OUT of a problem report before it is written to disk, and - just as important - what is KEPT. Redaction happens as the file is written, never as it is sent: a report that is only safe when it leaves by the right button leaks the first time somebody opens the folder it sits in, and writing it safe is what lets a teacher open the file and see for themselves what they are about to send. The rules lean towards removing too much, because removing a build hash by mistake costs a moment of puzzlement while a surviving token costs the teacher their account - but the KEPT cases below are load-bearing, and a redactor that swallows them produces reports nobody can diagnose from. There is no way to switch this off in a development build: a redactor that is off while it is being worked on is a redactor nobody has run.",
     "placeholders": {
       "account": "[removed: account id]",
       "email": "[removed: email address]",
@@ -3299,16 +3463,44 @@
       "token": "[removed: token]"
     },
     "redactedAgainCases": {
-      "rule": "Redacting a line that is already redacted changes nothing: `labelledSecret` and `bearerHeader` do not take a value that is already a placeholder (`(?!\\[removed: )` before their `\\S+`). Each `input` is redacted once more and must come back as `expect`.",
-      "why": "#780's implementation review: the trail writer redacts a line, cleans it and redacts it again whenever it held a control character, and before this the second pass read `[removed: token]` as a value and wrote `[removed: token] token]`. It was already happening in v1.9.3 wherever a caller redacted a line before handing it to the trail writer, which redacts again (the mac's `ScriptRunner` 'started …' line is one).",
+      "rule": "Redacting a line that is already redacted changes nothing: `labelledSecret` and `bearerHeader`, and since #853 `basicAuthHeader` and `userFlag`, do not take a value that is already a placeholder (`(?!\\[removed: )` before their `\\S+`); since #853's second round `userFlag` refuses only a placeholder standing alone and reads one inside a value, and none of the three label rules takes another rule's label as its value, nor, since the third round, an account flag or label whose identifier is already a placeholder. Each `input` is redacted once more and must come back as `expect`.",
+      "why": "#780's implementation review: the trail writer redacts a line, cleans it and redacts it again whenever it held a control character, and before this the second pass read `[removed: token]` as a value and wrote `[removed: token] token]`. `basicAuthHeader` did the same until #853 (`Basic [removed: token] token]`, measured); its case is the seventh. #853's second round adds two: `token: Bearer [removed: token]`, which became `token: [removed: token] [removed: token]` when labelledSecret took the word `Bearer` as its value (measured), and a Windows path with doubled backslashes, which the home-folder rule now reads. #853's third round adds two more: `password: --account [removed: account id]` and `password: Account ID: [removed: account id]`, where the second pass took `--account` or `Account` as the label's value once the identifier beside it was a placeholder (measured; 1,012 of the fix review's 30,009 generated lines changed on a second pass that way). #853's fourth round adds `password: Basic token: [removed: token]`, which round 3's patterns turned into `password: [removed: token] [removed: token]` on a second pass (measured). It was already happening in v1.9.3 wherever a caller redacted a line before handing it to the trail writer, which redacts again (the mac's `ScriptRunner` 'started …' line is one).",
       "cases": [
         { "input": "CLOUDFLARE_API_TOKEN=[removed: token]", "expect": "CLOUDFLARE_API_TOKEN=[removed: token]" },
         { "input": "Paste Cloudflare token: [removed: token]", "expect": "Paste Cloudflare token: [removed: token]" },
         { "input": "authorization: Bearer [removed: token]", "expect": "authorization: Bearer [removed: token]" },
         { "input": "Working folder /Users/person/Documents", "expect": "Working folder /Users/person/Documents" },
         { "input": "Logged in as [removed: email address]", "expect": "Logged in as [removed: email address]" },
-        { "input": "deploy.sh ICS3U 1 --account [removed: account id]", "expect": "deploy.sh ICS3U 1 --account [removed: account id]" }
+        { "input": "deploy.sh ICS3U 1 --account [removed: account id]", "expect": "deploy.sh ICS3U 1 --account [removed: account id]" },
+        { "input": "Authorization: Basic [removed: token]", "expect": "Authorization: Basic [removed: token]" },
+        { "input": "curl -u [removed: token] https://plans.example/", "expect": "curl -u [removed: token] https://plans.example/" },
+        { "input": "Opening ftp://[removed: token]@plans.example/", "expect": "Opening ftp://[removed: token]@plans.example/" },
+        { "input": "Reading C:\\Users\\person\\Documents", "expect": "Reading C:\\Users\\person\\Documents" },
+        { "input": "token: Bearer [removed: token]", "expect": "token: Bearer [removed: token]" },
+        { "input": "Reading 'C:\\\\Users\\\\person\\\\AppData'", "expect": "Reading 'C:\\\\Users\\\\person\\\\AppData'" },
+        { "input": "password: --account [removed: account id]", "expect": "password: --account [removed: account id]" },
+        { "input": "password: Account ID: [removed: account id]", "expect": "password: Account ID: [removed: account id]" },
+        { "input": "password: Basic token: [removed: token]", "expect": "password: Basic token: [removed: token]" }
       ]
+    },
+    "ruleOrder": {
+      "rule": "The pattern rules run in exactly this order, then the 40-character run, which is not a pattern rule and always runs last. Each app checks its own list of rules against this one, by name, and runs each of `cases` twice: in this order it must come out as `expect`, and with the rule `wrongOrder.move` taken out and put back just before `wrongOrder.before` it must come out differently.",
+      "why": "#853 round 2 set the order; round 3 pinned it by behaviour as well as by name. The order decides what is left when two rules match the same text. Measured with a harness that builds, for every pair of rules (78), lines both rules match (each rule's shape nested in the other's value, and the two side by side with a space, a colon and a space, a comma, a semicolon or a tab between them; 3,149 lines): in this order no line leaves any piece of a secret, where the rules as they stood before round 2 left one on 442 of the 2,944 lines that both of a pair matched. Run as a pair alone, in the other order, 51 lines in 14 pair-orders still leave something (the email rule first takes the password and host of `https://name:password@host.example` and leaves the name, which is why urlUserinfo runs first; labelledSecret first takes `/Users/First` from `token: /Users/First Last/…` and leaves `Last`, which is why the home-folder rules run before it). Round 2's two examples of a leak from the order, `curl -u name@school…:password` and `token: Bearer …`, no longer depend on it: round 2's pattern changes closed both in any order (fix review, measured with Windows' order: every case passed). So round 3 measured every order one move away from this one (a rule taken out and put back elsewhere, 121 orders) over a generated corpus of three rules each (30,009 lines): 107 change some line, 70 leave a piece of a secret that this order removes, and 14 change nothing. Most of the 70 differ only on shapes no trail prints (a label inside a label inside an address's password); the two `cases` are the realistic lines found, a token read from a file in a two-word home folder, and with the contract's other cases they fail 19 of the 121 orders, where the other cases alone failed 2. The name check stays because it is the only check that catches the other 102, the 14 among them where on every line generated the order makes no difference today but a later change to a pattern could make it matter. Making every pair safe in either order would need each rule to read every other rule's shapes, so the order is pinned here instead. REJECTED: letting urlUserinfo read the email rule's placeholder as a password, so that the email rule could run first; it made the KEPT `Preview at http://localhost:8081` case lose everything to the address on a second pass (measured).",
+      "cases": [
+        {
+          "expect": "Reading the token: [removed: token]",
+          "input": "Reading the token: /Users/First Last/Library/token.txt",
+          "why": "macHomeFolder before labelledSecret. With the home-folder rule after it, labelledSecret takes `/Users/First` as the token's value and the rule after it finds no home folder, so `Last/Library/token.txt` is written out, the second word of the account name with it (measured). It fails 9 of the 121 one-move orders.",
+          "wrongOrder": { "move": "macHomeFolder", "before": "netlifyToken" }
+        },
+        {
+          "expect": "Reading the token: [removed: token]",
+          "input": "Reading the token: C:\\Users\\First Last\\AppData\\token.txt",
+          "why": "windowsHomeFolder before labelledSecret, the same on Windows: with labelledSecret first, the line keeps `Last\\AppData\\token.txt` (measured). It fails 10 of the 121 one-move orders.",
+          "wrongOrder": { "move": "labelledSecret", "before": "windowsHomeFolder" }
+        }
+      ],
+      "order": ["urlUserinfo", "macHomeFolder", "windowsHomeFolder", "basicAuthHeader", "bearerHeader", "labelledSecret", "netlifyToken", "accountFlag", "accountIdentifier", "accountPath", "userFlag", "emailAddress"]
     },
     "secretLength": 40
   },

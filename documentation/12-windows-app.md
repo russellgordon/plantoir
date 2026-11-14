@@ -1553,7 +1553,14 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   and the host from an address with a username and password written into it
   and left the username in the line, and `basicAuthHeader`, anchored on
   `Authorization:` so a course called
-  Basic French is left alone; same patterns and order as `LogRedactor.swift`.
+  Basic French is left alone; same patterns and order as `LogRedactor.swift`
+  had then. (The mac's patterns and order moved again with #853 and #876,
+  and the order is a contract since #853's second round,
+  `problemReportRedaction.ruleOrder`, pinned by behaviour as well as by
+  name since the third round, `ruleOrder.cases`; the `windows` issue for
+  that batch says what Windows owes, and `documentation/09-mac-app.md` →
+  "The second round (#853 round 2)", "The third round (#853 round 3)" and
+  "The fourth round (#853 round 4)" say why.)
   The contract keeps both cases' credentials in pieces (`assembledFrom`, mac
   #844), and `LogRedactorTests.Filled` builds the line before redacting it,
   as `problemReportRedaction.assembledInput.rule` says.
