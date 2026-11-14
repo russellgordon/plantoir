@@ -253,11 +253,19 @@ The image is layered as follows (in order):
    carries the modules, `PythonToolchainTests` must keep reading one as a
    failure. `verify.sh` runs the seven only in the image and reads any exit
    but 0 as a FAIL, 77 included. `scripts/test_image_only_tests_say_so.py`
-   holds the list, checks the block is the same in all seven and comes before
-   their imports, and runs it with the modules kept from the child. Rejected:
+   keeps no list: it finds the files that carry the block, reads which files
+   `verify.sh` runs in the image (`python3 /opt/scripts/test_<name>.py`, 14 on
+   2026-11-13), and fails a block in a file `verify.sh` does not run there. On
+   a Mac it runs each of the 14 with the modules hidden (1.5 s on the M4 Pro):
+   a file with the block must exit 77 with the one line, and one without it
+   must pass, so a new image test that needs the module and does not say so
+   is found. It also checks the block is the same everywhere and comes before
+   the imports, and runs it with the modules kept from the child. Rejected:
    one shared guard module, which every one of the seven image runs would
    then have to mount (or the Dockerfile bake, shipping test code); and
-   skipping the seven by name on a Mac, which a Windows run would inherit.
+   skipping the seven by name on a Mac, which a Windows run would inherit;
+   and a list of the seven kept by hand, which a new file would miss until
+   somebody added it (the first version of this change kept one).
 10. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
