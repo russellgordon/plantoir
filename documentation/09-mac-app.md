@@ -13579,13 +13579,14 @@ redactor the new one changed only the intended lines and these:
 - `http://localhost:8081/@scope/pkg` becomes `http://[removed: token]@scope/pkg`.
   A password that starts with a digit and holds a slash is still taken, so a
   port followed by a path with an `@` in it goes too. Kept as the cost.
-- A one-word account followed by words to the end of the line
-  (`Opened /Users/name in Finder`) loses those words, since they cannot be
-  told from the rest of a two-word name. No line in the trail has that
-  shape: a path there always runs on with a `/`. Every string literal in the
-  mac test target that holds a path, an address or a header (223) was run
-  through both redactors as well; the two that changed are test messages and
-  an artificial launcher marker that no test redacts.
+- A one-word account followed by words loses those words whenever they run
+  on to a `/`, a quote, a colon or the end of the line, since they cannot be
+  told from the rest of a two-word name (how far that reaches, measured, is
+  under "The second round" below). No line in the trail has that shape: a
+  path there always runs on with a `/`. Every string literal in the mac test
+  target that holds a path, an address or a header (223) was run through
+  both redactors as well; the two that changed are test messages and an
+  artificial launcher marker that no test redacts.
 - `docker exec -u 501:20` loses the user and group. No launcher runs it.
 
 REJECTED: letting any password hold spaces. The first draft did, and
@@ -13605,8 +13606,151 @@ each machine's name differs.
 another path on the same line (`/Users/First Last and /Users/…`): the first
 word goes and the second stays, as before #876, because the words do not
 run on to a separator. A password that starts with a digit and holds a
-space. An apostrophe in an account name (`O'Brien`): the rule stops at the
-quote, as it always has.
+space. (An apostrophe in an account name was on this list until the second
+round below.)
+
+**The second round (#853 round 2): rule order, three more shapes, and
+linear time.** The batch's review (Opus, 2026-11-13) found a password left
+behind in the likeliest `-u` value of all, and the release director's
+ruling asked for the rule order to be tested for every pair of rules rather
+than case by case.
+Measured by compiling `LogRedactor.swift` alone with a small driver, every
+value invented.
+
+*The order.* `curl -u name@school.example:password` was written
+`curl -u [removed: email address]:password`: the email rule ran first, and
+its placeholder hid the value from `userFlag`. A harness then built, for
+each of the 78 pairs of rules (the twelve pattern rules and the
+40-character run), lines that both rules of the pair match: each rule's own
+shape nested in the other's value where it could legally stand there, and
+the two shapes side by side with a space, a colon and a space, a comma, a
+semicolon or a tab between them (two values glued with nothing between are
+one run of characters, which no rule can be said to own, so it builds none).
+A line leaks when any four characters of a secret survive. With the rules as
+they stood, 442 of 2,944 such lines leaked through the whole redactor. Two
+of the leaks were real shapes on `dev` as well as on the branch:
+`token: Bearer abc…` (`labelledSecret` took the word `Bearer` as its value
+and wrote the token out) and the `-u` address above. Others came from
+#876's further words of a name, which ran on to any colon:
+`/Users/sample token: abc` lost its label (`/Users/person: abc`), and
+`/Users/sample then curl -u name:password` wrote the password out.
+
+What changed, each a contract case: the order is now `urlUserinfo`, the two
+home-folder rules, `basicAuthHeader`, `bearerHeader`, `labelledSecret`,
+`netlifyToken`, the three account rules, `userFlag`, `emailAddress`
+(`problemReportRedaction.ruleOrder`, checked by name by
+`SharedRulesContractTests.testTheRedactionRulesRunInTheContractsOrder`). The
+three label rules never take another rule's label as their value (`Bearer`
+or `Basic` and a word, an `Authorization` header, a `token:` label with a
+space and a value after it, an account flag or label with its identifier).
+`userFlag` reads a placeholder inside a value and refuses only one that
+stands alone. The email rule takes an address whose name another rule
+already took (`[removed: token]@school…`), except after `://`. A further
+word of a name ends at a colon only when white space or the end of the line
+follows it, and a word that starts with a dash or holds another rule's label
+is never part of a name. After all of it, 0 of 3,149 lines leak through the
+whole redactor.
+
+Run as a pair alone in the other order, 51 lines in 14 pair-orders still
+leak, and each is a place where the shipping order is the safe one. Two
+examples: the email rule first takes `password@host.example` out of
+`https://name:password@host.example` and leaves the name, which is why
+`urlUserinfo` runs first; `labelledSecret` first takes `/Users/First` out of
+`password=/Users/First Last/x` and leaves `Last`, which is why the
+home-folder rules run before it. REJECTED: making every pair safe in either
+order. Each rule would have to read every other rule's shapes, and the one
+attempt measured (letting `urlUserinfo` read the email rule's placeholder as
+a password) made the KEPT `Preview at http://localhost:8081` case lose
+everything up to the address on a second pass. The order is pinned in the
+contract instead, so a platform that runs the rules in another order fails
+its suite rather than leaking.
+
+*Three more shapes.* A Windows path with doubled backslashes, the way Python
+prints one in a dict or an exception (`'C:\\Users\\First Last\\…'`),
+was left whole, before #876 and after it; the Windows rule reads one or two
+backslashes now. An apostrophe followed by a letter is part of a name, so
+`/Users/First O'Last/…` goes whole: before, the rule stopped at the
+apostrophe and left everything after it, the most identifying part. Any other
+quote still ends a name (`HOME='/Users/First Last'`). A hyphenated name and a
+name with a letter outside ASCII were already taken whole; each has a case
+now as a pin. A carriage return ends a name as the end of a line does, for
+Windows: .NET documents that its multiline `$` matches before `\n` only,
+so a console line ending in `\r\n` would have ended the name at its first
+word there. On the mac this was already right, since ICU's `$` matches
+before a carriage return (measured); on .NET it is unmeasured, since there
+is no .NET on this Mac.
+
+*Two over-redactions fixed.* A username holds no `[`, `]`, `?` or `#`
+(none may stand in one unencoded), so `Preview at http://[::1]:8081 is
+ready; write to helpdesk@school.example` and
+`obsidian://open?vault=Teaching:Unit 1 then ask teacher@school.example`
+keep everything but the address; before, both lost everything from the
+scheme to the address. Both are KEPT cases. Still a cost, and named:
+`See https://plantoir.app:help for details or write help@plantoir.app`
+loses everything from `plantoir.app` to the address, which is the price of
+a password with spaces in it. `-menu 10:30` loses its time (`-u` may close
+a run of short flags, and `-menu` looks like one). Only a space or a tab
+may sit between `-u` and its value now, so a flag at the end of one line no
+longer takes the start of the next when a whole report is redacted at once.
+
+*How far a home-folder name reaches, stated truly.* The first word after
+`/Users/` (or `C:\Users\`) always goes. Further words go with it when the
+run of words ends at a `/` (or a backslash), a quote, a colon followed by
+white space, or the end of the line, and none of the further words starts
+with a dash or holds `token`, `secret`, `password`, `api key`, `Bearer`,
+`Authorization` or `Account`. So a one-word account followed by ordinary
+words loses those words up to the next such end: `home directory
+/Users/sample does not exist. Error: mount failed` is written
+`home directory /Users/person: mount failed`, `cd /Users/sample && ls
+Documents and ICS3U/Unit-1` is written `cd /Users/person/Unit-1`, and
+`/Users/sample isn't writable` loses everything after the name. An address
+no longer ends the run (`/Users/sample is 92% full; see https://…` keeps
+its words, a KEPT case; before, it read `/Users/person://…`, a different
+path). On the invented 200-line trail the review built, the dev and branch
+redactors differ on three lines, all costs already named above. REJECTED:
+capping a name at two or three words, which would shorten the reach. An
+account name of more words would then leave its last words on the trail,
+and a miss is not traded for a tidier line.
+
+*Linear time.* A trail line is redacted before the app writes it, so a slow
+rule holds up the write. Timed on one line of 100,000 characters with no
+match, each rule alone, one run each (Apple M4 Pro, with other timings running
+beside it, so read the orders of magnitude rather than the digits):
+
+| Line of 100,000 characters | Rule | `dev` | before this round | now |
+|---|---|---|---|---|
+| `a` repeated | `emailAddress` | 223.5 s | 140.6 s | 0.067 s |
+| `curl -u '` then `a:` repeated, no closing quote | `userFlag` | (no rule) | 91.8 s | 0.002 s |
+| the same with `"` | `userFlag` | (no rule) | 53.8 s | 0.002 s |
+| `x://y:z ` repeated | `urlUserinfo` | 0.001 s | 10.8 s | 0.006 s |
+| `https://a:b ` then `c ` repeated, no `@` | `urlUserinfo` | 0.001 s | 0.007 s | 0.011 s |
+
+Every rule, on 26 such lines at 10,000 and at 100,000 characters (the best
+of three), now grows by at most 10.7 times, which is linear.
+
+The email rule could start a match at every character of a long run of
+address characters and read the rest of the run again from each; it now
+starts only where such a run starts, which takes every address it took
+before. `userFlag`'s quoted value reads to its first colon only, its flag is
+read atomically up to its first `u`, and a further word of a spaced password
+holds no colon, so one address cannot run on into the next.
+`ProblemReportTests.testNoRuleTakesLongerThanLinearTime` bounds the growth
+rather than the seconds: on eight lines that were slow, ten times the
+characters may take at most fifty times as long, in the same run (linear
+work grows about ten times, and reached thirty-nine on a busy machine; the
+quadratic rules grew about a hundred). REJECTED: a limit in seconds, which a
+slower machine or a busy one would fail.
+
+*Still missed after the second round, named* (the review's list; none is
+printed by the product today): `curl -U` and `--proxy-user`; an
+`Authorization: Token …` or `Digest …` header; `Cookie:` and `Set-Cookie:`
+lines; a JSON `"password": "…"` or `"token": "…"`, where the quote between
+the label and the colon defeats `labelledSecret`; a JSON-escaped address
+(`https:\/\/name:…@`), whose username stays; a password with a double
+space or a tab in it; a Basic value on the line after its header when lines
+are redacted one at a time (a whole report redacted at once catches it); a
+UNC path, `\\server\Users\First Last\…`. The JSON label and the UNC
+path are worth a follow-up issue.
 
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
