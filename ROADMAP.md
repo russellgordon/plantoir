@@ -137,6 +137,9 @@ ready.
 - **A course that could not be opened in Obsidian is reported as such** on
   the Mac, where a failed open used to read as one that worked.
   ([#721](https://github.com/russellgordon/plantoir/issues/721))
+- **The rest of self-check quizzes**, building on what arrived in 1.8: an
+  answer key when you print, and questions that use a PhET simulation.
+  ([#511](https://github.com/russellgordon/plantoir/issues/511))
 - **Mac fixes:**
   - the first Preview after the Mac wakes from sleep should start promptly
     ([#517](https://github.com/russellgordon/plantoir/issues/517));
@@ -211,10 +214,6 @@ ready.
   ([#507](https://github.com/russellgordon/plantoir/issues/507)), and look into doing
   the same with GitHub Copilot's desktop app
   ([#784](https://github.com/russellgordon/plantoir/issues/784)).
-- **The rest of self-check quizzes**, building on what arrived in 1.8: an
-  answer key when you print, and questions that use PhET (2.0.0). Questions
-  with a GeoGebra sketch arrived with GeoGebra itself, in 1.9.
-  ([#511](https://github.com/russellgordon/plantoir/issues/511))
 - **Students choose their own colour scheme** on a published site
   ([#606](https://github.com/russellgordon/plantoir/issues/606)).
 
