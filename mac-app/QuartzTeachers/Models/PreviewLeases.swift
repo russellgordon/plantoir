@@ -93,7 +93,7 @@ enum PreviewLeases {
         // served on (#835): two copies of Plantoir share the folder's one
         // website builder, and each chose its port knowing only its own
         // previews, so both were handed 8081 and the second ended the first
-        // (measured 3 of 3, `S/plans/835-measured.md` run G). A lease that
+        // (measured 3 of 3 for #835's plan). A lease that
         // names no port (Windows, an older Plantoir) cannot be avoided here;
         // the builder's own claim on the address refuses that second preview
         // in words (`twoPreviewsOneAddress`, #835b).

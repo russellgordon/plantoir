@@ -13114,17 +13114,17 @@ and a stopped virtual machine adds 22 to 27 s (#312). So the first scheduled
 deploy after an update can take between a few seconds and about two minutes
 longer than the one before it, which is why the trail line says so.
 
-**Two sections of one course set for the same time take turns** (the
-review's LOW 2). They wait for each other on the course's leases
-(`waitForTheCourse`, ten minutes, looking every fifteen seconds), and the
-first now holds them through its copy (0.84 to 4.7 s measured above, up to
-14.3 s at background priority), any wait for another program's copy (up to
-five minutes) and, after an update, the builder built again (6 to 70 s) and
-the site rebuilt (about 32 s). The second section's own copy then finds
-nothing to change (0.85 s) and its builder is already built, so it adds
-only its own deploy. It stands down `courseWasBusy` only if the first takes
-more than ten minutes in all, which needs the five-minute wait used up as
-well; it was not measured end to end, for want of a real launchd job.
+**Two sections of one course set for the same time no longer take turns**
+(since #835's third piece; until then they waited for each other on the
+course's leases). A scheduled deploy waits only for work on its own section
+(`waitForTheCourse(section:)`, ten minutes, looking every fifteen seconds),
+and its leases name its section, so the two run at once. What they still
+share is the copy of the app's tools (0.84 to 4.7 s measured above, up to
+14.3 s at background priority; the second finds nothing to change, 0.85 s)
+and, after an update, the builder being built again (6 to 70 s), which one
+of them does while the other waits. Two sections of one course deploying at
+once is what #835's paired runs measured; the pair was not measured end to
+end under launchd.
 
 **Rejected:**
 - **Standing down when the copy fails** (Windows' choice): it turns a copy
