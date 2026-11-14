@@ -76,6 +76,18 @@ nonisolated enum HelperPrograms {
     /// follow `HOME`. `contracts/app-rules.json` → `launcherTrailFolder`.
     static let trailFolderVariable: String = "PLANTOIR_TRAIL_DIR"
 
+    /// The variable that tells a launcher this app already holds the work
+    /// leases for what it is about to do (GitHub #829): this process's own
+    /// id. deploy.sh takes a build and a publish lease for a deploy typed in
+    /// Terminal, so the app greys Deploy for it, and takes none while the
+    /// process this names is running, because every door of the app that
+    /// runs deploy.sh (the window, the in-app assistant, `--mcp-stdio`, a
+    /// deploy set for later) holds both leases itself, and a lease of the
+    /// child's own would be a stranger's to this app. A leftover run whose
+    /// app has gone names a process that is gone, and takes its own.
+    /// `contracts/shared-rules.json` → `workLeases.launcherLeases`.
+    static let leasesHeldByVariable: String = "PLANTOIR_LEASES_HELD_BY"
+
     // MARK: - Functions
 
     /// `~/Library/Application Support/Plantoir/tools/bin` — the folder the
@@ -159,15 +171,20 @@ nonisolated enum HelperPrograms {
     /// would have worked out anyway, so nothing changes there, and under a
     /// test run it names the test's throwaway trail, so a real launcher the
     /// unit suite starts never writes into the teacher's trail either.
+    ///
+    /// `PLANTOIR_LEASES_HELD_BY` is ALWAYS set, to this process's id,
+    /// replacing any inherited value (`leasesHeldByVariable`, #829).
     static func environment(
         basedOn inherited: [String: String] = ProcessInfo.processInfo.environment,
         inHomeFolder homeFolder: URL = RealHome.forFiles,
         bundledHelpers: URL? = bundledHelpersDirectory(),
-        trailFolder: URL = ActivityTrail.store.folderURL
+        trailFolder: URL = ActivityTrail.store.folderURL,
+        leaseHolder: Int32 = getpid()
     ) -> [String: String] {
         var result: [String: String] = inherited
         result["PATH"] = pathValue(inheriting: inherited["PATH"], inHomeFolder: homeFolder)
         result[trailFolderVariable] = trailFolder.path
+        result[leasesHeldByVariable] = String(leaseHolder)
         if let bundledHelpers {
             result[bundledHelpersVariable] = bundledHelpers.path
         } else {

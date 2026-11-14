@@ -596,6 +596,17 @@ else
   cat /tmp/verify_deploy_while_its_section_deploys_test.log
 fi
 
+# A deploy typed in Terminal holds a build and a publish lease while it works,
+# so the app's Deploy greys for it (GitHub #829): the real deploy.sh to a
+# folder, every case of workLeases.launcherLeases, the six lines, the ways out
+# a trap sees, and kill -9 leaving leases whose owner is gone.
+if (cd scripts && python3 test_deploy_sh_work_leases.py) >/tmp/verify_deploy_sh_work_leases_test.log 2>&1; then
+  pass "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
+else
+  fail "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
+  cat /tmp/verify_deploy_sh_work_leases_test.log
+fi
+
 if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then
   pass "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
 else

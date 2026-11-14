@@ -2493,7 +2493,7 @@ ICS4U 2 --build-only --for-deploy`, parent the app) is never refused by
 itself; a build that ends between the table and `lsof` is skipped. Rejected
 (`deployWhileItsSectionDeploys.rejected`): counting only a deploy's build leg
 and letting a plain rebuild through (the plan's first shape), because a
-`deploy.sh` typed in Terminal holds no lease and its build broke the
+`deploy.sh` typed in Terminal held no lease (until #829) and its build broke the
 rebuild's; an environment variable instead of an argument, because `ps -Ao
 args` does not show the environment; passing `--for-deploy` from the
 scheduled wrapper, whose own script is already in the table and counts as
@@ -2559,6 +2559,81 @@ course and THEN runs its wrapper as `powershell.exe -File`. And a task set
 since #309 carries its folder's id. Its own limit (a deploy run inside another
 process is not seen) and what was rejected are in the Windows section of this
 page, under "A section still being deployed is not deployed again".
+
+#### A deploy typed in Terminal takes a work lease (#829)
+
+Since v2.0.0 ([#829](https://github.com/russellgordon/plantoir/issues/829)).
+The app greys Deploy for a course another program holds a build, publish or
+preview lease on (#729, [09](09-mac-app.md) → "Deploy waits for another
+program (#729)"). Until #829 a `deploy.sh` typed in Terminal held
+none, and nor did a leftover run of a deploy set for later whose app had gone
+(#439), so the button stayed pressable and the press was refused only by the
+guard above, in words. Measured before the change, with the real `deploy.sh`
+deploying to a folder in a scratch working folder and a stand-in build that
+listed `courses/.internal/activity` during the deploy's own build: no activity
+folder during the deploy or after it.
+
+**What it does.** Between the `WORK LEASE BLOCK` markers in `deploy.sh` only,
+called straight after the #439 guard lets the run through and before anything
+changes: `take_the_work_leases` writes `<COURSE>.build.<pid>.lease` and
+`<COURSE>.publish.<pid>.lease` for the script's own process, each through a
+`.writing` file and a rename, in `contracts/file-formats.json` →
+`workLease`'s six lines: the pid; `ps -o ucomm`, which is `bash` (the same
+`p_comm` the readers compare against); the moment to the second, written
+`…T08:05:24.0000000Z`; the start in WHOLE seconds; an empty line 5; and
+`sections <N>=<moment>`, so only that section's Deploy greys. It makes
+`courses/.internal` and its `activity` folder only if they are missing, and
+`give_back_the_work_leases` removes the leases by their own paths and those
+folders if they are left empty, so a launcher test's working folder ends as it
+began. The rule and its seven cases are `shared-rules.json` → `workLeases
+.launcherLeases`.
+
+**When it takes none.** For `--reset-token` and `--logout` (nothing is
+deployed), for `--plans` (course-wide sharing, left as it was), and when
+`PLANTOIR_LEASES_HELD_BY` names a process that is running. The app sets that
+variable to its own id on every launcher it starts
+(`HelperPrograms.environment`), because each door of the app that runs
+`deploy.sh` (the window, the in-app assistant, `--mcp-stdio`, a deploy set for
+later) already holds both leases, and a second pair under the child's id would
+be a stranger's to the app: its window would grey its own other sections in
+another program's words. A leftover run whose app has gone names a dead id,
+so its `deploy.sh` takes its own.
+
+**Given back on every way out a trap sees.** A later `trap … EXIT` replaces an
+earlier one, so the two EXIT traps set after the leases (the getting-ready
+turn's, identical in the three launchers, and the token hand-off's) give them
+back too, through a `declare -F` guard that does nothing in `setup.sh` and
+`preview.sh`. ^C is made an ordinary exit 130, as the token block already did,
+because bash 3.2 runs no EXIT trap when a foreground command dies of a ^C sent
+to the group; SIGTERM and SIGHUP stay untrapped, so bash still ends at once and
+runs the EXIT trap (the app's Stop is SIGTERM to bash). Measured by
+`scripts/test_deploy_sh_work_leases.py`: a normal end, a failed deploy, ^C to
+the group, SIGTERM and SIGHUP to bash alone all leave nothing.
+
+**kill -9.** No trap runs, so the leases stay, naming a process that is gone.
+`workLeases.liveness` gained one rule for them: a start with no point in it is
+compared on its whole seconds, because a shell cannot read its own start more
+finely (`ps -o lstart` is to the second, and `sysctl -b kern.proc.pid.<pid>`
+answers "unknown oid" on macOS 26.6). Measured on this Mac (Apple M4 Pro,
+macOS 26.6) with `ProcessLiveness` compiled alone beside a harness: a bash
+that took its leases with the block's own functions was read ALIVE 20 of 20
+times while it ran and GONE 20 of 20 after `kill -9`; with the rule before
+#829 (the start compared as text) it read GONE 5 of 5 while it ran, so the
+button would never have greyed. The second `ps -o lstart` gives was the
+kernel's `p_starttime.tv_sec` 20 of 20.
+
+**Rejected.** Line 4 left empty (judged on the name alone, an id handed to any
+other `bash` would grey Deploy for that process's life); reading the
+microseconds with perl or osascript (not a launcher's tools, and no host
+Python on a teacher's Mac); the child taking leases beside the app's and the
+app telling its own child's from a stranger's (it does not know its children's
+ids at the moment it reads the folder, for the scheduled wrapper's legs);
+leases from `preview.sh --build-only` typed in Terminal too (not #829's case;
+the guard still refuses it in words). Known limits: the moment is to the
+second, so an app lease taken later in the same second reads the Terminal
+deploy as earlier and backs off, which is the safe direction; the help
+sentence names the programs a lease used to come from and not a deploy typed
+in Terminal (a question for Russell on #829).
 
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 

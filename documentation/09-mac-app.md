@@ -917,10 +917,19 @@ notification.
 in reserve was not built.
 
 **What is still not seen.**
-- A program that holds no lease: a deploy typed in Terminal, or a leftover
-  run (#439). The launcher's guard refuses its press in words, and #729's
-  first part widened what that guard sees ([03](03-launcher-scripts.md) → "A
-  section being deployed cannot be deployed again (#439)").
+- A program that holds no lease: a build typed in Terminal
+  (`preview.sh --build-only`), or a `deploy.sh` from before #829. The
+  launcher's guard refuses its press in words, and #729's first part widened
+  what that guard sees ([03](03-launcher-scripts.md) → "A section being
+  deployed cannot be deployed again (#439)"). Since #829 a deploy typed in
+  Terminal, and a leftover run (#439) whose app has gone, take a build and a
+  publish lease from `deploy.sh` itself, naming their section, so the button
+  greys for them like any other program's ([03](03-launcher-scripts.md) → "A
+  deploy typed in Terminal takes a work lease (#829)"). The app's own children
+  take none: `HelperPrograms.environment` hands every launcher
+  `PLANTOIR_LEASES_HELD_BY`, the app's own id. The help sentence does not name
+  a Terminal deploy among the programs it lists (a question for Russell on
+  #829).
 - A holder run by another account (its `Plantoir`, say). W7 shows that a
   watch on such a process arms without firing at once. That it fires when
   such a process ends was NOT measured, because no other account's process

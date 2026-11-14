@@ -2332,6 +2332,128 @@ if [[ "$RESET_TOKEN" != "true" ]]; then
   refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy
 fi
 
+# >>> WORK LEASE BLOCK >>> deploy.sh only; scripts/test_deploy_sh_work_leases.py
+# cuts these functions out and runs them, and drives the whole launcher.
+# ---- A deploy typed in Terminal says so to the app (GitHub #829) ----------
+# The app greys Deploy for a course another program holds a build, publish or
+# preview lease on (#729, shared-rules.json -> returningToASectionMidDeploy
+# .heldElsewhere), and an outside assistant and a deploy set for later hold
+# back for the same leases (workLeases.declining). A deploy typed here held
+# none, so the button stayed pressable and the press was refused only by the
+# guard above, in words. So this run takes `<COURSE>.build.<pid>.lease` and
+# `<COURSE>.publish.<pid>.lease` for its own process while it works, in the
+# shape contracts/file-formats.json -> workLease describes, naming its one
+# section (line 6), and gives them back on every way out.
+#
+# NOT taken when PLANTOIR_LEASES_HELD_BY names a process that is running: the
+# app sets it to its own process id on every launcher it starts
+# (HelperPrograms.environment), and the app's window, assistant, outside
+# assistant and deploy set for later already hold both leases for that
+# deploy. A lease of this run's own beside them would be a stranger's to the
+# app (another pid), so its window would read its own deploy as somebody
+# else's. A leftover run of a deploy set for later whose app has gone names a
+# process that is gone, and takes its own (#829's second case).
+# The rule and its cases are contracts/shared-rules.json -> workLeases
+# .launcherLeases.
+#
+# The start is written in WHOLE seconds: a shell cannot read its own start to
+# the microsecond (`ps -o lstart` is to the second; macOS's sysctl tool does
+# not answer kern.proc.pid), and workLeases.liveness compares a start with no
+# point on its whole seconds. A lease left by `kill -9`, which runs no trap,
+# names a process that is gone, so every reader reads it as gone at once.
+WORK_LEASES_TAKEN=()
+WORK_LEASE_FOLDERS_MADE=()
+
+# this_run_takes_work_leases HELD_BY: 0 (yes) unless HELD_BY is a process id
+# that is running now.
+this_run_takes_work_leases() {
+  local held_by="$1"
+  case "$held_by" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  if [[ "$held_by" -le 0 ]]; then
+    return 0
+  fi
+  if ps -p "$held_by" >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
+# work_lease_start_of PID: when PID started, in whole seconds since 1970, or
+# nothing when the table does not say.
+work_lease_start_of() {
+  local started
+  started="$(LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | sed 's/[[:space:]]*$//')"
+  [[ -n "$started" ]] || return 0
+  LC_ALL=C date -j -f "%a %b %e %T %Y" "$started" +%s 2>/dev/null || true
+}
+
+# take_the_work_leases COURSE SECTION: writes both leases atomically (a file
+# beside them that is not a lease, then a rename). A failure never stops the
+# deploy, as neither app's does: the guard above is what refuses an overlap.
+take_the_work_leases() {
+  local course="$1" section="$2" courses activity name moment started kind body made
+  courses="$(pwd)/courses"
+  # Only when courses/ is there, as the mac's own writer does.
+  [[ -d "$courses" ]] || return 0
+  case "$section" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  activity="${courses}/.internal/activity"
+  if [[ ! -d "${courses}/.internal" ]]; then
+    mkdir "${courses}/.internal" 2>/dev/null || return 0
+    WORK_LEASE_FOLDERS_MADE+=("${courses}/.internal")
+  fi
+  if [[ ! -d "$activity" ]]; then
+    mkdir "$activity" 2>/dev/null || return 0
+    WORK_LEASE_FOLDERS_MADE=("$activity" "${WORK_LEASE_FOLDERS_MADE[@]+"${WORK_LEASE_FOLDERS_MADE[@]}"}")
+  fi
+  name="$(LC_ALL=C ps -o ucomm= -p "$$" 2>/dev/null | sed 's/[[:space:]]*$//')"
+  [[ -n "$name" ]] || name="bash"
+  moment="$(date -u +%Y-%m-%dT%H:%M:%S).0000000Z"
+  started="$(work_lease_start_of "$$")"
+  body="$(printf '%s\n%s\n%s\n%s\n\nsections %s=%s' "$$" "$name" "$moment" "$started" "$section" "$moment")"
+  for kind in build publish; do
+    made="${activity}/$(printf '%s' "$course" | tr '[:lower:]' '[:upper:]').${kind}.$$.lease"
+    if printf '%s\n' "$body" > "${made}.writing" 2>/dev/null && mv -f "${made}.writing" "$made" 2>/dev/null; then
+      WORK_LEASES_TAKEN+=("$made")
+    else
+      rm -f "${made}.writing" 2>/dev/null || true
+    fi
+  done
+  trap 'give_back_the_work_leases || true' EXIT
+  # bash 3.2 runs no EXIT trap when a foreground command dies of a ^C sent to
+  # the whole group (the token block below measured it, #835 review M1), so
+  # ^C is made an ordinary exit with the status it would have given. SIGTERM
+  # and SIGHUP are left untrapped, as that block explains: untrapped, bash
+  # still runs the EXIT trap at once.
+  trap 'exit 130' INT
+}
+
+# give_back_the_work_leases: removes this run's leases by their own paths, and
+# the folders it made for them if nothing else is in them. Nothing here may
+# fail: it runs from a trap under `set -e`.
+give_back_the_work_leases() {
+  local taken folder
+  for taken in "${WORK_LEASES_TAKEN[@]+"${WORK_LEASES_TAKEN[@]}"}"; do
+    rm -f "$taken" 2>/dev/null || true
+  done
+  WORK_LEASES_TAKEN=()
+  for folder in "${WORK_LEASE_FOLDERS_MADE[@]+"${WORK_LEASE_FOLDERS_MADE[@]}"}"; do
+    rmdir "$folder" 2>/dev/null || true
+  done
+  WORK_LEASE_FOLDERS_MADE=()
+  return 0
+}
+# <<< WORK LEASE BLOCK <<<
+
+if [[ "$RESET_TOKEN" != "true" && "$PLANS_MODE" != "true" ]]; then
+  if this_run_takes_work_leases "${PLANTOIR_LEASES_HELD_BY:-}"; then
+    take_the_work_leases "$COURSE_CODE" "$SECTION_NUM"
+  fi
+fi
+
 # Resolve IMAGE (same rules as setup.sh and preview.sh)
 BUILD_CONTEXT=""
 if [[ -n "$OVERRIDE_IMAGE" ]]; then
@@ -3510,7 +3632,9 @@ take_the_ready_turn() {
   done
   printf '%s\n' "$$" > "$READY_TURN/pid"
   READY_TURN_IS_OURS=1
-  trap give_back_the_ready_turn EXIT
+  # The work leases a deploy.sh took before this (#829) are given back by
+  # this one trap too, since a later `trap … EXIT` replaces an earlier one.
+  trap 'give_back_the_ready_turn; if declare -F give_back_the_work_leases >/dev/null; then give_back_the_work_leases || true; fi' EXIT
 }
 
 give_back_the_ready_turn() {
@@ -5657,7 +5781,9 @@ hand_the_token_to_the_builder() {
   fi
   # Nothing in the trap may fail: under `set -e` a failing command there
   # becomes the run's exit status.
-  trap 'forget_the_token_file || true; if declare -F give_back_the_ready_turn >/dev/null; then give_back_the_ready_turn || true; fi' EXIT
+  # The work leases (#829) are given back here as well: this trap replaces
+  # the one that gave them back.
+  trap 'forget_the_token_file || true; if declare -F give_back_the_ready_turn >/dev/null; then give_back_the_ready_turn || true; fi; if declare -F give_back_the_work_leases >/dev/null; then give_back_the_work_leases || true; fi' EXIT
   # bash 3.2 (macOS's /bin/bash) does not run the EXIT trap when a
   # FOREGROUND command dies of SIGINT sent to the whole group (^C typed into
   # the terminal): measured, the folder was left (#835 review M1). SIGINT is
