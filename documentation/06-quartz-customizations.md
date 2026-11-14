@@ -5320,9 +5320,17 @@ YouTube player that was 650 px wide on a laptop is now 600 px.
   `origin/dev`'s `build_site.py` (3 tests) and with the transformer wired
   after OFM (2).
 - `browser-checks/video_players.mjs` (verify.sh 6h-v, in Chrome for Testing
-  and Playwright's WebKit, engines found as the rendered check finds them;
-  an engine that is not there is a SKIP by name, and a failure under
-  `PLANTOIR_REQUIRE_ENGINES`):
+  and Playwright's WebKit). Playwright's driver and WebKit come from
+  Plantoir's browsers cache (`PLANTOIR_BROWSERS_CACHE`, else
+  `~/Library/Caches/Plantoir-dev/browsers`), the driver held to
+  `package-lock.json`'s version as the rendered check holds it. Chrome for
+  Testing is the path verify.sh passes (`PRINT_CHROME`: `PLANTOIR_CHROME`,
+  else the cached copy); the check does not search for it itself. An
+  engine that is not there is a SKIP by name, and a FAIL under
+  `PLANTOIR_REQUIRE_ENGINES`, as is no Node 22. Every exit of the check is
+  caught, since verify.sh runs under `set -euo pipefail`, and the
+  sabotages run only after a clean pass, as 6h-r's do; a sabotage run whose
+  log does not name the same engines is a failure. What it checks:
   the skill's video example as 6n built it, every request to another host
   refused so nothing loads or plays. 600 px and 16:9 at 1300 px, the
   column's width and 16:9 at 390 px, a title, `loading="lazy"`, the referrer
@@ -5349,15 +5357,19 @@ YouTube player that was 650 px wide on a laptop is now 600 px.
   video` points the short-form player at id 9999999999, which
   player.vimeo.com answers 404 (curl, 2026-11-13; 22439234 and 76979871
   answer 200). It is `gate: false`, run by name with a deployed host's
-  rows, since a gate's local run does not run the row at all. Measured
-  with the row's own code cut out of `rendered_features.mjs`, every
-  off-site request answered by a stub: green on the built Embeds page in
-  Chrome for Testing and WebKit; red on the sabotage in Chrome ("…9999999999?dnt=1
-  answered 404"); and, on the old same-video fixture with the short-form
-  player's request never answered, the OLD row green and the new row red
-  ("answered nothing") in WebKit. The sabotage in WebKit did not finish
-  under that stub (a 404 frame there never reached `load`) and is left to a
-  deployed run.
+  rows, since a gate's local run does not run the row at all, and no
+  gate runs it yet: the by-name run is owed by #597's deployed half
+  (verify-deploy's rendered check). Measured 2026-11-13 with every embed
+  frame's document fulfilled by a stub in the router (200, or 404 for
+  9999999999) and `--pretend-offline`: the plain row green in Chrome for
+  Testing and WebKit ("all 5 frames' documents answered 2xx"), and the
+  sabotage red for its own reason in BOTH engines in 2 s ("…9999999999?dnt=1
+  answered 404"; first by the fix review, then reproduced). An earlier probe
+  of the implementer's, outside the rendered check, stalled in WebKit; that
+  was the probe, not the row, whose every wait has a ceiling. On the old
+  same-video fixture with the short-form player's request never answered,
+  the OLD row passed and the new one said "answered nothing". Only the run
+  against the real player.vimeo.com is left to a networked run.
 - `codeRunnerBlocks.isolation.cases`: a page with a short-form player is a
   `frame` page, never isolated.
 

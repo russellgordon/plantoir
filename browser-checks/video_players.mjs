@@ -87,7 +87,15 @@ function loadEngines() {
   process.env.PLAYWRIGHT_BROWSERS_PATH = join(CACHE, "engines")
   let playwright = null
   try {
-    playwright = createRequire(join(CACHE, "package.json"))("playwright-core")
+    const require = createRequire(join(CACHE, "package.json"))
+    playwright = require("playwright-core")
+    // The same pin the rendered check holds the driver to (package-lock.json).
+    const wanted = JSON.parse(readFileSync(new URL("./package-lock.json", import.meta.url), "utf-8")).packages["node_modules/playwright-core"].version
+    const got = require("playwright-core/package.json").version
+    if (got !== wanted) {
+      const why = `the cache holds Playwright ${got}, the lockfile pins ${wanted} (run ./browser-checks/fetch-browsers.sh)`
+      return { engines, missing: { chromium: why, webkit: why } }
+    }
   } catch {
     const why = `no Playwright driver in ${CACHE} (run ./browser-checks/fetch-browsers.sh)`
     return { engines, missing: { chromium: why, webkit: why } }

@@ -6209,12 +6209,28 @@ fi
 # An engine that is not on this Mac is a SKIP by name, never a pass.
 echo ""
 echo "🎬 YouTube and Vimeo players, in Chrome and in Safari's engine (#692)…"
+# The engines a log says ran, in the words 6h-r uses (rendered_engines,
+# defined with 6h-r below and so not yet here).
+video_engine_words() {
+  case "$1" in
+    chromium,webkit|webkit,chromium) echo "in Chrome for Testing and WebKit" ;;
+    chromium) echo "in Chrome for Testing ONLY (WebKit did not run)" ;;
+    webkit) echo "in WebKit ONLY (Chrome for Testing did not run)" ;;
+    *) echo "in no engine" ;;
+  esac
+}
 if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
-  skip "YouTube and Vimeo players from the picture form in Chrome and Safari's engine (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac"
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+  else
+    skip "YouTube and Vimeo players from the picture form in Chrome and Safari's engine (#692, browser-checks/video_players.mjs): no Node 22 or later on this Mac"
+  fi
 else
-  node browser-checks/video_players.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_video_players.log 2>&1
-  VIDEO_PLAYERS_EXIT=$?
-  VIDEO_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_players.log | tail -1 | sed 's/^ENGINES: //')"
+  # verify.sh runs under set -euo pipefail: every exit is caught here, so a
+  # missing engine is a SKIP and a fault a FAIL, never the end of the run.
+  VIDEO_PLAYERS_EXIT=0
+  node browser-checks/video_players.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_video_players.log 2>&1 || VIDEO_PLAYERS_EXIT=$?
+  VIDEO_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_players.log | tail -1 | sed 's/^ENGINES: //' || true)"
   while IFS= read -r VIDEO_SKIPPED_LINE; do
     VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_LINE#SKIPPED: }"
     VIDEO_SKIPPED_ENGINE="${VIDEO_SKIPPED_ENGINE%%:*}"
@@ -6223,16 +6239,18 @@ else
     else
       skip "YouTube and Vimeo players from the picture form (#692, browser-checks/video_players.mjs) in ${VIDEO_SKIPPED_LINE#SKIPPED: }"
     fi
-  done < <(grep '^SKIPPED: ' /tmp/verify_video_players.log)
+  done < <(grep '^SKIPPED: ' /tmp/verify_video_players.log || true)
   if [[ $VIDEO_PLAYERS_EXIT -eq 3 ]]; then
     :
-  elif [[ $VIDEO_PLAYERS_EXIT -eq 0 ]]; then
-    pass "YouTube and Vimeo players from the picture form, in ${VIDEO_ENGINES}: $(head -1 /tmp/verify_video_players.log | sed 's/^OK: //') (#692, browser-checks/video_players.mjs)"
+  elif [[ $VIDEO_PLAYERS_EXIT -eq 0 && -n "$VIDEO_ENGINES" && "$VIDEO_ENGINES" != "none" ]]; then
+    pass "YouTube and Vimeo players from the picture form, $(video_engine_words "$VIDEO_ENGINES"): $(head -1 /tmp/verify_video_players.log | sed 's/^OK: //') (#692, browser-checks/video_players.mjs)"
   else
-    fail "a YouTube or Vimeo player was the wrong size, untitled, not lazy or not privately addressed (browser-checks/video_players.mjs, #692)"
+    fail "a YouTube or Vimeo player was the wrong size, untitled, not lazy or not privately addressed, or the check did not finish (browser-checks/video_players.mjs, #692)"
     cat /tmp/verify_video_players.log
   fi
-  if [[ $VIDEO_PLAYERS_EXIT -ne 3 ]]; then
+  # The sabotages run only when the clean check passed, as 6h-r's do: a
+  # check already red proves nothing by failing again.
+  if [[ $VIDEO_PLAYERS_EXIT -eq 0 && -n "$VIDEO_ENGINES" && "$VIDEO_ENGINES" != "none" ]]; then
     VIDEO_SABOTAGE_SITE="/tmp/plantoir-verify-video-sabotage"
     for VIDEO_SABOTAGE in size player address; do
       rm -rf "$VIDEO_SABOTAGE_SITE"
@@ -6272,15 +6290,21 @@ VIDEOPY
         fail "the video players' check passed on a site broken by '$VIDEO_SABOTAGE', so it cannot see that fault (browser-checks/video_players.mjs, #692)"
         continue
       fi
-      # Red for its own reason in EVERY engine that ran, not in one of them.
+      # Red for its own reason in EVERY engine the clean check ran in, and
+      # the sabotage's own run must say it ran in those same engines: a log
+      # with no ENGINES line is a failure, never a pass.
       VIDEO_SABOTAGE_SEEN=yes
+      VIDEO_SABOTAGE_ENGINES="$(grep '^ENGINES: ' /tmp/verify_video_sabotage.log | tail -1 | sed 's/^ENGINES: //' || true)"
+      if [[ "$VIDEO_SABOTAGE_ENGINES" != "$VIDEO_ENGINES" ]]; then
+        VIDEO_SABOTAGE_SEEN=no
+      fi
       for VIDEO_ENGINE in ${VIDEO_ENGINES//,/ }; do
         if ! tr '|' '\n' </tmp/verify_video_sabotage.log | grep "\[${VIDEO_ENGINE}\]" | grep -q "$VIDEO_SABOTAGE_REASON"; then
           VIDEO_SABOTAGE_SEEN=no
         fi
       done
       if [[ "$VIDEO_SABOTAGE_SEEN" == "yes" ]]; then
-        pass "the video players' check sees the '$VIDEO_SABOTAGE' sabotage for its own reason, in ${VIDEO_ENGINES} (#692)"
+        pass "the video players' check sees the '$VIDEO_SABOTAGE' sabotage for its own reason, $(video_engine_words "$VIDEO_ENGINES") (#692)"
       else
         fail "the video players' check failed the '$VIDEO_SABOTAGE' sabotage for another reason, or not in every engine (#692): $(head -c 300 /tmp/verify_video_sabotage.log)"
       fi
