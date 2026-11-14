@@ -228,6 +228,8 @@ final class SectionVerbs {
             return "Section ▸ Make Room for Classes…"
         case .classDates:
             return "Section ▸ Class Dates…"
+        case .rollOverToANewYear:
+            return "Section ▸ Roll Over to a New Year…"
         default:
             return item.rawValue
         }
@@ -301,10 +303,21 @@ final class SectionVerbs {
     }
 
     /// Re-date Classes… (or its plan). No `website` key, ever: that key
-    /// makes it a rollover, which the menu is not.
+    /// makes it a rollover, which Re-date Classes… is not (Roll Over to a
+    /// New Year… is, `rollOver`).
     static func reDateClasses(course: String, section: Int, planning: Bool) -> AssistToolCall {
         return call(planning ? "plan_re_date_classes" : "re_date_classes",
                     ["course": course, "section": section])
+    }
+
+    /// Roll Over to a New Year… (or its plan, #897 piece B): the window's
+    /// rollover call, `rollover: "yes"` with the website answer the sheet
+    /// chose (`RollOverFromTheMenu.websiteSent`), always "new" or "same".
+    /// Both are arguments the runner already read; the local schema shows
+    /// neither, so nothing the built-in assistant is shown moves.
+    static func rollOver(course: String, section: Int, website: String, planning: Bool) -> AssistToolCall {
+        return call(planning ? "plan_re_date_classes" : "re_date_classes",
+                    ["course": course, "section": section, "rollover": "yes", "website": website])
     }
 
     static func makeRoom(course: String, section: Int, unit: Int, atDay: Int, howMany: Int, planning: Bool) -> AssistToolCall {

@@ -427,6 +427,29 @@ final class FileFormatsContractTests: XCTestCase {
         }
     }
 
+    // MARK: - A section's custom domain (#904)
+
+    /// Every case of `customDomainReading` through the app's own reader,
+    /// the one the deploy's live-site link and the settings form use. The
+    /// shared Python runs the same cases (scripts/test_custom_domains.py).
+    func testACustomDomainIsReadTheContractsWay() throws {
+        let rule: [String: Any] = try FileFormatsContractTests.section("customDomainReading")
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let values: [String: Any] = try XCTUnwrap(testCase["config"] as? [String: Any])
+            let destination: String = try XCTUnwrap(testCase["destination"] as? String)
+            let expected: String = try XCTUnwrap(testCase["expect"] as? String)
+            let configuration: CourseConfiguration = CourseConfiguration(values: values, lastSavedData: Data())
+            XCTAssertEqual(
+                configuration.customDomain(forSection: 1, destinationType: destination),
+                expected,
+                name
+            )
+        }
+    }
+
     // MARK: - Private
 
     private func documentedKeys() throws -> [String] {

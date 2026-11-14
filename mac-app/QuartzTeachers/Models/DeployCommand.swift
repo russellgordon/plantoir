@@ -294,10 +294,7 @@ enum DeployCommand {
         // so it did nothing at all. `.merged_output` is a symlink out to
         // Application Support, and it may not exist yet; that is ordinary and
         // not a failure.
-        let legacyURL: URL = course.directoryURL
-            .appendingPathComponent(".merged_output")
-            .appendingPathComponent("section\(sectionNumber)")
-            .appendingPathComponent(".netlify_site.json")
+        let legacyURL: URL = legacyMarkerURL(forSection: sectionNumber, in: course)
         if FileManager.default.fileExists(atPath: legacyURL.path) {
             if let contents = try? String(contentsOf: legacyURL, encoding: .utf8) {
                 let keptURL: URL = legacyURL.deletingLastPathComponent()
@@ -322,6 +319,37 @@ enum DeployCommand {
         }
 
         return SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles, stillPinned: stillPinned)
+    }
+
+    /// The legacy Netlify marker `releaseSite` also moves: inside the BUILT
+    /// output, `.merged_output/section<N>/.netlify_site.json` (see there).
+    static func legacyMarkerURL(forSection sectionNumber: Int, in course: Course) -> URL {
+        return course.directoryURL
+            .appendingPathComponent(".merged_output")
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent(".netlify_site.json")
+    }
+
+    /// Whether ANY marker `releaseSite` would try to move is on disk for the
+    /// section: one per destination type, and the legacy one. A marker that
+    /// cannot be read still counts, since `releaseSite` reports it as still
+    /// pinned (#897 piece B, the plan review's amendment 12). The ONE test
+    /// Section ▸ Roll Over to a New Year…'s sheet asks before offering the
+    /// website question, over the same URLs the release walks, so the sheet
+    /// and the release cannot disagree about whether there is a website to
+    /// keep or leave.
+    static func sectionIsPinned(forSection sectionNumber: Int, in course: Course) -> Bool {
+        for destinationType in CourseConfiguration.knownDeployTargetTypes {
+            guard let markerURL = firstDeployMarkerURL(
+                forSection: sectionNumber, in: course, destinationType: destinationType
+            ) else {
+                continue
+            }
+            if FileManager.default.fileExists(atPath: markerURL.path) {
+                return true
+            }
+        }
+        return FileManager.default.fileExists(atPath: legacyMarkerURL(forSection: sectionNumber, in: course).path)
     }
 
     /// The moment, spelled the way both apps spell it in a kept filename.

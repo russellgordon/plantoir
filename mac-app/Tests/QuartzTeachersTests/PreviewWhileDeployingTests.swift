@@ -175,6 +175,71 @@ final class PreviewWhileDeployingTests: XCTestCase {
         XCTAssertEqual(windowCases, 4, "same window, another window, the in-app assistant, another section")
     }
 
+    /// The LEASE layer's sentence (#829's sweep): a deploy of this section by
+    /// another program, a Terminal `deploy.sh` among them since #829, is told
+    /// with the sentence this app's own deploy of the section is told with.
+    /// Red before the fix, where the Terminal case was told
+    /// `sectionIsBeingBuiltElsewhere`.
+    func testEveryLeaseCaseIsTheSentenceCannotPreviewYetShows() throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["previewWhileItsSectionDeploys"])
+        let cases: [[String: Any]] = try XCTUnwrap(rule["leaseCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 5, "Cases went missing from the contract.")
+        let wording: [String: Any] = try WorkLeaseLivenessTests.contract("assist-wording.json", ["wording"])
+        var ran: Int = 0
+        for item in cases {
+            let name: String = item["name"] as? String ?? "?"
+            let section: Int = try XCTUnwrap(item["section"] as? Int, name)
+            var holdings: [WorkLeaseFiles.Holding] = []
+            for entry in try XCTUnwrap(item["others"] as? [[String: Any]], name) {
+                let kind: String = try XCTUnwrap(entry["kind"] as? String, name)
+                let pid: Int32 = Int32(try XCTUnwrap(entry["pid"] as? Int, name))
+                var sections: [WorkLeaseFiles.SectionEntry]? = nil
+                if let named = entry["sections"] as? [Int] {
+                    var read: [WorkLeaseFiles.SectionEntry] = []
+                    for number in named {
+                        read.append(WorkLeaseFiles.SectionEntry(section: number, moment: "2026-11-14T03:00:00.0000000Z"))
+                    }
+                    sections = read
+                }
+                holdings.append(WorkLeaseFiles.Holding(
+                    kind: kind, pid: pid, moment: "2026-11-14T03:00:00.0000000Z", sections: sections
+                ))
+            }
+            let index: Int = try XCTUnwrap(item["inTheWay"] as? Int, name)
+            XCTAssertNotNil(
+                WorkLeaseFiles.blocking(among: holdings, asker: .aBuild, claim: nil, section: section),
+                "Not a decline at all: \(name)"
+            )
+            let key: String = try XCTUnwrap(item["expect"] as? String, name)
+            var expected: String = ""
+            switch key {
+            case "sectionIsBeingDeployed":
+                expected = AssistWording.sectionIsBeingDeployed(course: "ICS4U", section: String(section))
+            case "sectionIsBeingBuiltElsewhere":
+                expected = AssistWording.sectionIsBeingBuiltElsewhere(course: "ICS4U", section: String(section))
+            case "courseIsBeingBuiltElsewhere":
+                expected = AssistWording.courseIsBeingBuiltElsewhere(course: "ICS4U")
+            default:
+                XCTFail("Unknown sentence '\(key)' in: \(name)")
+                continue
+            }
+            XCTAssertNotNil(wording[key], "assist-wording.json has no \(key)")
+            XCTAssertEqual(
+                SectionDetailView.previewDeclinedSentence(
+                    inTheWay: holdings[index], among: holdings, displayCode: "ICS4U", section: section
+                ),
+                expected,
+                name
+            )
+            ran += 1
+        }
+        XCTAssertEqual(ran, cases.count, "A case was not run.")
+        let body: String = try codeLines(of: "SectionDetailView.swift", from: "    func startPreview(at request: PreviewStartPage.Request = .frontPage) {",
+                                          to: "        Task { @MainActor in")
+        XCTAssertTrue(body.contains("SectionDetailView.previewDeclinedSentence("),
+                      "startPreview chooses its lease-layer sentence somewhere else")
+    }
+
     func testTheTrailLineIsTheContractsAndIsWritten() throws {
         let entry: [String: Any] = try trailEntry("build declined, course busy elsewhere")
         XCTAssertEqual(entry["lineWhenItsSectionIsBeingDeployed"] as? String,

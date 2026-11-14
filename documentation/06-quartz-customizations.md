@@ -5457,8 +5457,12 @@ was written).
   simulation; not ruled on). The rendered check holds every frame's audio
   suspended.
 - Each simulation adds about 21 hashes (about 1 KB) to the policy a Netlify
-  publish sends with every file of the site (documentation/07). Whether
-  Netlify serves a long one whole is measured before this piece merges.
+  publish sends with every file of the site (documentation/07). Netlify
+  serves a long one whole: measured 2026-11-14, a site of 20 stand-in
+  simulations carrying 421 script hashes wrote one policy line of 22,766
+  characters, and Netlify took the deploy and sent that line whole, once,
+  with each of three answers checked. Where its limit lies is not
+  measured.
 - On a deployed site the rendered check meets the Simulation page like any
   other fixture page (`rendered_rows.json` → `pages`), and verify-deploy.sh's
   build downloads the simulation from PhET as a teacher's first build does:
