@@ -6238,6 +6238,24 @@ differs, and why:
 Trail: `backups deleted` (`BackupDeleter.TrailLine`). The UI test
 `AllBackupsUiTests` compiles and has never run (the desktop was locked).
 
+**A whole-course restore is staged on the mac since #909, and Windows owes
+it (#873).** The mac no longer empties a course and refills it: it unpacks the
+backup beside the course, records every move before the first, sets the
+course's items aside (settings first) and moves the backup's in (settings
+last), puts everything back on any failure, and settles a restore a crash
+interrupted at the next reading of the folder. What Windows inherits as data
+is `contracts/course-management.json` → `backups.restoreWholeCourse` and
+`file-formats.json` → `restoreRecord`; the design, the measurements and what
+was rejected are in `documentation/09-mac-app.md` → "Restoring a whole
+course: staged, and settled at the next reading (#909)". What the contract
+cannot carry and Windows must design: NTFS has no clone, so the staging
+folder must be on the course's own volume or every move is a copy; a file
+held open by another program refuses a rename on Windows where it never does
+on the Mac, so the way back will run in ordinary use (`leftAsItWasInUse`),
+with a bounded retry of a sharing violation on each move before it counts as
+a failure; `FileStream.Flush(true)` in place of `F_FULLFSYNC`; and the
+record's `/` paths normalised.
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived

@@ -1695,6 +1695,49 @@
       }
     ]
   },
+  "restoreRecord": {
+    "note": "#909. The record a whole-course restore writes in its staging folder before anything in the course moves, so the next reading of the folder (on either platform, or on the other computer of a synced folder) can settle a restore that did not finish (course-management.json -> backups.restoreWholeCourse.recoveryCases). AUTHORED; edit as text. Both apps read the other's.",
+    "path": "courses/.internal/restoring/<id>/restore.json, beside backup/ (the unpacked zip), as-it-was/ (the course's own items, set aside) and, when the way back met one, 'made while the restore was unfinished/'. While a settle holds it the file is restore.settling.<pid>.json, with settler.<pid> beside it holding the settler's lease body (workLease.lines 1 to 4), written BEFORE the rename that claims it.",
+    "fields": {
+      "version": "1",
+      "kind": "course (a section restore writes no record: backups.restoreOneSection)",
+      "course": "the course folder's code",
+      "backup": "the backup zip's file name",
+      "archive": "the file name of the archive made of the course first, or null (an arrival, or Restore from Archive)",
+      "phase": "unpacking, swapping, done or stopped",
+      "moves": "every planned move in order, each {from, to, out}: paths relative to courses/ with / between parts (Windows normalises them), out true for the course's own item moved aside and false for the backup's moved in. Empty until phase swapping.",
+      "computer": "the computer that wrote it: the mac's hardware UUID, Windows' MachineGuid (sharedMediaStore's computer)",
+      "owner": "the writer's lease body (workLease.lines 1 to 4), so a reader judges it with workLeases.liveness",
+      "writtenAt": "ISO 8601 with fractional seconds, UTC",
+      "journalStep": "null; Undo (#899, U5) fills it with its journal step"
+    },
+    "absentKeys": "archive and journalStep may be absent rather than null (the mac leaves out a key with no value); a reader treats an absent key as null, and ignores a key it does not know.",
+    "flush": "Written to .restore.json.tmp, flushed past the disk's cache (F_FULLFSYNC on the mac, FileStream.Flush(true) on Windows), renamed over restore.json, and the folder flushed, before the step it names: unpacking before the unpack, swapping before the first move, done before anything is removed. A power cut leaves the old record or the new one, never half of one.",
+    "example": {
+      "version": 1,
+      "kind": "course",
+      "course": "ICS3U",
+      "backup": "ICS3U 2026-11-13_201500.zip",
+      "archive": "ICS3U archived 2026-11-14_081200.zip",
+      "phase": "swapping",
+      "moves": [
+        {
+          "from": "ICS3U/course_config.json",
+          "to": ".internal/restoring/6F1C/as-it-was/course_config.json",
+          "out": true
+        },
+        {
+          "from": ".internal/restoring/6F1C/backup/ICS3U/course_config.json",
+          "to": "ICS3U/course_config.json",
+          "out": false
+        }
+      ],
+      "computer": "0B8E5A1C-1111-2222-3333-444455556666",
+      "owner": "4321\nPlantoir\n2026-11-14T08:12:03.1000000Z\nThu Nov 14 08:01:00 2026\n",
+      "writtenAt": "2026-11-14T13:12:03.120Z",
+      "journalStep": null
+    }
+  },
   "sharedMediaStore": {
     "note": "The shared Media store a working folder's small backups keep their Media files in (#785). Written and read by both apps, because a working folder in a synced drive is used by both: a small backup either one makes must restore on the other, and a sweep on either must never delete what the other's backups need. The mac's SharedMediaStore, SharedMediaList and SharedMediaHold (mac-app/QuartzTeachers/Models/SharedMedia/). The RULES (which backups are small, the sweep, the restore) are course-management.json -> backups.sharedMedia. AUTHORED; edit as text.",
     "directory": "courses/_backups/.shared-media/ inside the working folder: hidden, so the mac's backup listing skips it and Windows' FindBackups finds nothing in it that parses; inside _backups, so it travels with the working folder and is left out of every deploy (deploy.py's /_backups/).",

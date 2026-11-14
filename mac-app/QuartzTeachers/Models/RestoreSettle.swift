@@ -381,10 +381,16 @@ nonisolated enum RestoreSettle {
             }
             claimed = mine
         }
-        let facts: RestoreSettleRule.Facts = self.facts(
-            of: claimed, record: record, claimedBy: nil,
-            coursesDirectoryURL: coursesDirectoryURL, context: context
-        )
+        // Asked again of the record as it is under the claim. A folder with
+        // no record keeps the facts read before: renaming it to claim it can
+        // change its modification date, and its age is what was judged.
+        var facts: RestoreSettleRule.Facts = before
+        if record != nil {
+            facts = self.facts(
+                of: claimed, record: record, claimedBy: nil,
+                coursesDirectoryURL: coursesDirectoryURL, context: context
+            )
+        }
         let decided: (action: RestoreSettleRule.Action, says: RestoreSettleRule.Saying?) = RestoreSettleRule.decide(facts)
         let foundName: String = record?.phase.rawValue ?? "an unrecorded folder"
         let swapContext: RestoreSwap.Context = swapContext(for: record?.course ?? "", context: context)

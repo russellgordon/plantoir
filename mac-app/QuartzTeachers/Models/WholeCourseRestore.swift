@@ -127,13 +127,21 @@ enum WholeCourseRestore {
             // Unknown: the unpack's own check is the fallback.
             return nil
         }
-        var needed: Int64 = unpacked
+        var courseBytes: Int64? = nil
         if let courseURL {
-            needed += sizeOfWhatAnArchiveHolds(courseURL)
+            courseBytes = sizeOfWhatAnArchiveHolds(courseURL)
         }
         guard let free = freeSpace(at: coursesDirectoryURL) else {
             return nil
         }
+        return shortfall(courseBytes: courseBytes, unpackedBytes: unpacked, free: free)
+    }
+
+    /// The arithmetic, alone (`spaceCases`): the archive (at most the
+    /// course's own bytes; none for an arrival) plus the unpacked backup,
+    /// against the free space. Nil when there is room.
+    nonisolated static func shortfall(courseBytes: Int64?, unpackedBytes: Int64, free: Int64) -> Int64? {
+        let needed: Int64 = (courseBytes ?? 0) + unpackedBytes
         if free >= needed {
             return nil
         }
