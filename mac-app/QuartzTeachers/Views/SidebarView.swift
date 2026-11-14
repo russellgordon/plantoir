@@ -428,17 +428,37 @@ struct SidebarView: View {
             Text(restoreMessage(for: item))
         }
         .alert(
-            "Restore \(workspace.backupRestoreRequest?.courseCode ?? "") from this backup?",
+            OneSectionRestoreWording.title(course: workspace.backupRestoreRequest?.courseCode ?? ""),
             isPresented: backupRestoreRequestIsPresented,
             presenting: workspace.backupRestoreRequest
         ) { item in
-            Button("Restore") {
-                Task { await workspace.restoreBackup(item) }
-            }
-            Button("Cancel", role: .cancel) {
+            // A backup made for ONE section offers that section first
+            // (#897 C, Russell's ruling: "Restore Section N" is the
+            // default), and the whole course beside it.
+            if let sectionNumber = workspace.backupRestoreOfferedSection {
+                Button(OneSectionRestoreWording.restoreSectionButton(section: sectionNumber)) {
+                    Task { await workspace.restoreOneSection(sectionNumber, from: item) }
+                }
+                .keyboardShortcut(.defaultAction)
+                Button(OneSectionRestoreWording.restoreWholeCourseButton) {
+                    Task { await workspace.restoreBackup(item) }
+                }
+                Button("Cancel", role: .cancel) {
+                }
+            } else {
+                Button("Restore") {
+                    Task { await workspace.restoreBackup(item) }
+                }
+                Button("Cancel", role: .cancel) {
+                }
             }
         } message: { item in
-            Text("""
+            if let sectionNumber = workspace.backupRestoreOfferedSection {
+                Text(OneSectionRestoreWording.message(
+                    section: sectionNumber, madeBy: item.maker.description, when: item.whenDescription
+                ))
+            } else {
+                Text("""
                 \(item.courseCode) goes back to how it was when this backup was made:
 
                 \(item.whenDescription)
@@ -449,6 +469,7 @@ struct SidebarView: View {
 
                 This backup is kept.
                 """)
+            }
         }
         .alert(
             "Delete this backup of \(workspace.backupDeleteRequest?.courseCode ?? "")?",

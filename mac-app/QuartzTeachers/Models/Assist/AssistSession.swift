@@ -616,6 +616,18 @@ final class AssistSession {
         return String(line.prefix(longest)) + "…"
     }
 
+    /// What the conversation says when "Restore Section N…" fails.
+    ///
+    /// "Nothing was put back:" and the reason, except for a restore that
+    /// stopped part way after moving files (#897 C): the section was changed
+    /// there, so the restorer's own sentence says what is, alone.
+    static func restoreProblemText(for error: Error) -> String {
+        if case CourseRestorer.Problem.sectionRestoreStoppedPartWay = error {
+            return error.localizedDescription
+        }
+        return "Nothing was put back: \(error.localizedDescription)"
+    }
+
     /// Put this section back to how it was when the conversation started, and
     /// record in the transcript that it happened.
     ///
@@ -637,7 +649,7 @@ final class AssistSession {
             )
         } catch {
             restoreNotes.append(RestoreNote(
-                text: "Nothing was put back: \(error.localizedDescription)",
+                text: AssistSession.restoreProblemText(for: error),
                 isProblem: true,
                 saidSoFar: saidSoFar
             ))
