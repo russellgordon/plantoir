@@ -25,7 +25,8 @@ public class RealStateTripwireTests
     {
         ["ClaudeCodeLauncher.cs"] = (2, "finds the user's own Claude Code install (home folder, LOCALAPPDATA Programs); read-only"),
         ["CodexLauncher.cs"] = (2, "finds the user's own Codex install (home folder, npm under APPDATA); read-only"),
-        ["TaskScheduling.cs"] = (3, "the installed exe path; the wrapper's runtime line; and StateDirExpression, the one place $healthDir and $pendingDir name LOCALAPPDATA (#179: overridable by PLANTOIR_TEST_WRAPPER_STATE_DIR inside TEMP only)"),
+        ["TaskScheduling.cs"] = (4, "the installed exe path; the wrapper's runtime line; StateDirExpression, the one place $healthDir and $pendingDir name LOCALAPPDATA (#179: overridable by PLANTOIR_TEST_WRAPPER_STATE_DIR inside TEMP only); and the wrapper's $buildsRoot (#799), where the LAUNCHERS build, from the real LOCALAPPDATA as Enter-NativeRuntime computes it, read-only, so the question reads the site deploy.ps1 sends (tests move LOCALAPPDATA in the child)"),
+        ["BuildBeforeDeployingQuestion.cs"] = (1, "deploy.ps1's Write-TrailLine, copied byte for byte into the scheduled wrapper (#799): its default trail folder when PLANTOIR_TRAIL_DIR is not handed over, which the app always hands the wrapper (LauncherEnvironment)"),
         ["FolderActions.cs"] = (1, "reads Obsidian's vault registry under APPDATA; never written by tests"),
         ["BuildOutputLocation.cs"] = (1, "the home folder, to say whether a builds root is under it; a parameter in tests"),
         ["App.xaml.cs"] = (1, "LOCALAPPDATA for the per-user install check (#337): where the INSTALLER put the app, not where state is kept"),

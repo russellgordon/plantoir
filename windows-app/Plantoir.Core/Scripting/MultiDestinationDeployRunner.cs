@@ -212,6 +212,17 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     };
 
     /// <summary>
+    /// The words of the trail line for the shared build, or null when none is
+    /// written: no build was asked for (<paramref name="reason"/> null), or it
+    /// did not go through. A pure function so the rule is tested without a
+    /// console; <c>RunAsync</c> calls it only after the build's own cancel and
+    /// failure checks (pinned by source order in
+    /// <c>BuiltBeforeDeployingTrailTests</c>).
+    /// </summary>
+    public static string? TrailLineAfterBuild(string? reason, bool built, bool cancelled, bool stopped) =>
+        reason is null || !built || cancelled || stopped ? null : ActivityTrail.BuiltBeforeDeployingWords(reason);
+
+    /// <summary>
     /// Runs the whole sequence: an optional shared build, then each
     /// destination's own deploy, one after another.
     ///
@@ -228,7 +239,7 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         IReadOnlyList<CourseConfiguration.DeployDestination> destinations,
         string cloudflareAccountID,
         string workingDirectory,
-        bool needsBuild)
+        string? buildReason)
     {
         // Before the first destination, whatever door started this (#241):
         // a course kept for reference is never deployed. Asked of the file,
@@ -277,7 +288,7 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                     course.Configuration.CustomDomain(sectionNumber, destination.Type));
                 runner.CustomDomainForLinks = domainForThisDestination.Length == 0 ? null : domainForThisDestination;
 
-                bool buildsFirst = index == 0 && needsBuild;
+                bool buildsFirst = index == 0 && buildReason is not null;
                 if (buildsFirst)
                 {
                     runner.Milestones = BuildAndDeployMilestones(destination.Type);
@@ -314,6 +325,14 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                         leg.RefusedWhileItsSectionDeploys = FailureExplainer.SectionDeployRefusalOf(runner.Transcript.RecentText(8000));
                         break;
                     }
+                    // The build went through: one line on the trail, with WHY
+                    // (#799, activityTrail.mustRecord -> "site built again
+                    // before deploying"). Only here, after the cancel and the
+                    // failure checks, so a build that stopped, failed or was
+                    // refused writes nothing. deploy.ps1 then asks for itself,
+                    // finds the build current, and writes no second line.
+                    if (TrailLineAfterBuild(buildReason, built, runner.WasCancelled, runner.WasStoppedByUser) is { } builtWords)
+                        ActivityTrail.Note(ActivityTrail.Event.SiteBuiltAgainBeforeDeploying, builtWords, course.Code, sectionNumber);
                     // Still true here on the success path — cleared by the
                     // deploy Run() call below, as part of its normal reset.
                 }

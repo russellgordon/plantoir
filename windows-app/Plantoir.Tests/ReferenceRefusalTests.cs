@@ -81,7 +81,7 @@ public class ReferenceRefusalTests : IDisposable
     {
         var runner = new MultiDestinationDeployRunner();
         var refused = await Assert.ThrowsAsync<ReferenceCourse.Refused>(() => runner.RunAsync(Kept, 1,
-            Kept.Configuration.AllDeployDestinations, "", _folder, needsBuild: true));
+            Kept.Configuration.AllDeployDestinations, "", _folder, buildReason: BuildFreshness.ReasonPages));
         Assert.Equal(Refusal, refused.Message);
         Assert.False(runner.IsRunning);
     }
