@@ -3376,6 +3376,12 @@ of #892 and nothing else, with Netlify's rendered line reading `39 OK, 0
 FAIL, 0 SKIPPED, 8 EXPECTED` and the badge's two lines under their own
 Result heading. The self-test went from 62 cases to 77.
 
+#799 reached `dev` on 2026-11-14 (3180c439b) and the Mac's stack with it,
+so a run on that tree should show none of the four: 0 failed, both hosts
+`checked`, and both second deploys "built nothing, uploaded nothing", on a
+test course that records no custom domain. A red Cloudflare row of #892's
+shape on that tree is a regression, not the expected red described above.
+
 **What a teacher's embed says is set aside, and counted.** The first
 deployed-mode run (the fixture site served under `--base … --host netlify`,
 2026-11-13) failed the clean-page row on the Embeds page in both engines for

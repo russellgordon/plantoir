@@ -687,8 +687,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > failures off their pinned count, and the second deploy's and the
    > sharing card's judgements (#892, #799, a custom domain included), a
    > refused frame inside an embed set aside, and a host serving an earlier
-   > deployment. It reads 62 passed, 0 failed on
-   > the mac (about 2 minutes), and 13 passed, 0 failed on Windows until
+   > deployment. It reads 92 passed, 0 failed on
+   > the mac (about 2 minutes; counted on stack 12 with `dev` d75c36543
+   > merged, 2026-11-14), and 13 passed, 0 failed on Windows until
    > Windows has #869's, #762's, #597's and #892's cases.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
