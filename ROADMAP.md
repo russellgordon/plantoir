@@ -172,8 +172,11 @@ ready.
   ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
 - **Guidance for writing tests.** Notes for an assistant working beside
   Plantoir on writing a unit test with its solutions and practice test. ([#751](https://github.com/russellgordon/plantoir/issues/751))
-- **Grove Colours for everyone.** The colour scheme once named for one
-  school is now called Grove Colours and is offered to every teacher.
+- **Grove Colours for everyone, and a renamed switch.** The colour scheme
+  once named for one school is now called Grove Colours and is offered to
+  every teacher. The switch in the New Course wizard that uses that school's
+  own terms is renamed "Use Grove-specific terminology"; most teachers will
+  leave it off.
   ([#891](https://github.com/russellgordon/plantoir/issues/891))
 - **A more thorough privacy check on problem reports.** Plantoir does not
   put your passwords or what is written on your pages into a problem report.
