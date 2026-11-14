@@ -32,7 +32,10 @@ public class ClubWizardTests
             var filled = ClubFill.Applying(c["isClub"]!.GetValue<bool>(), new ClubFillFields(
                 Strings(given["sharedFolders"]), Strings(given["perSectionFolders"]), given["classFolder"]!.ToString(),
                 given["unitWord"]!.ToString(), given["frontPageHeading"]!.ToString(),
-                ClassPageSchemes.NounReading(given["noun"]!.ToString())), c["usesLCSTerminology"]!.GetValue<bool>());
+                ClassPageSchemes.NounReading(given["noun"]!.ToString())),
+                // ABSENT MEANS OFF: the mac's #891 removed the switch and its
+                // key from the cases (this app's switch goes with #920).
+                c["usesLCSTerminology"]?.GetValue<bool>() ?? false);
 
             string name = c["name"]!.ToString();
             Assert.True(Strings(expect["sharedFolders"]).SequenceEqual(filled.SharedFolders), $"{name}: sharedFolders");

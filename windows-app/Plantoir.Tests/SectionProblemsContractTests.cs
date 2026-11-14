@@ -116,15 +116,24 @@ public class SectionProblemsContractTests
     {
         var problems = Section();
         var rule = problems["rowState"]!;
-        Assert.Equal(rule["clearsAcrossSections"]!.AsArray().Select(k => k!.ToString()).ToHashSet(),
+        // A kind this app has no label for yet (#674's Science simulation,
+        // owed by #936) is held open by name in every list here that names it.
+        var heldKinds = HeldKinds();
+        Assert.Equal(rule["clearsAcrossSections"]!.AsArray().Select(k => k!.ToString()).Where(k => !heldKinds.Contains(k)).ToHashSet(),
                      SectionProblemsRules.ClearsAcrossSections.ToHashSet());
         var machine = rule["notAboutThePage"]!.AsObject();
         Assert.Equal(machine.Select(p => p.Key).ToHashSet(), SectionProblemsRules.NotAboutThePage.Keys.ToHashSet());
         foreach (var (kind, reasons) in machine)
             Assert.Equal(reasons!.AsArray().Select(r => r!.ToString()).ToHashSet(), SectionProblemsRules.NotAboutThePage[kind].ToHashSet());
         var kinds = problems["kinds"]!.AsArray();
-        Assert.Equal(kinds.Where(k => k!["from"]!.ToString() == "site").Select(k => k!["kind"]!.ToString()).ToHashSet(),
+        Assert.Equal(kinds.Where(k => k!["from"]!.ToString() == "site").Select(k => k!["kind"]!.ToString()).Where(k => !heldKinds.Contains(k)).ToHashSet(),
                      SectionProblemsRules.SaidByTheSite.ToHashSet());
+        foreach (string kind in heldKinds)
+        {
+            Assert.False(SectionProblemsRules.ClearsAcrossSections.Contains(kind), $"{kind} is held as no kind here, and SectionProblemsRules.ClearsAcrossSections names it");
+            Assert.False(SectionProblemsRules.SaidByTheSite.Contains(kind), $"{kind} is held as no kind here, and SectionProblemsRules.SaidByTheSite names it");
+            Assert.False(SectionProblemsRules.NotAboutThePage.ContainsKey(kind), $"{kind} is held as no kind here, and SectionProblemsRules.NotAboutThePage names it");
+        }
         Assert.Equal(problems["marker"]!["prefix"]!.ToString(), SectionProblemsMarker.Prefix);
         Assert.Equal(problems["alert"]!["acknowledgedKept"]!.GetValue<int>(), ProblemsAcknowledgements.Kept);
         Assert.Equal(problems["file"]!["name"]!.ToString(), SectionProblemsRecord.FileName);
@@ -135,13 +144,29 @@ public class SectionProblemsContractTests
     [Fact]
     public void KindsAndScopesAreTheContracts()
     {
-        var kinds = Section()["kinds"]!.AsArray();
+        var all = Section()["kinds"]!.AsArray();
+        var heldKinds = HeldKinds();
+        var kinds = all.Where(k => !heldKinds.Contains(k!["kind"]!.ToString())).ToList();
+        // Sixteen kinds this app has, whatever is held: a held kind cannot
+        // take a real one's place in the count.
         Assert.Equal(16, kinds.Count);
         Assert.Equal(kinds.ToDictionary(k => k!["kind"]!.ToString(), k => k!["label"]!.ToString()),
                      SectionProblemsWording.KindLabels.ToDictionary(p => p.Key, p => p.Value));
         Assert.Equal(kinds.ToDictionary(k => k!["kind"]!.ToString(), k => k!["scope"]!.ToString()),
                      SectionProblemsWording.KindScopes.ToDictionary(p => p.Key, p => p.Value));
+        foreach (string kind in heldKinds)
+            Assert.False(SectionProblemsWording.KindScopes.ContainsKey(kind), $"{kind} is held as no kind here, and SectionProblemsWording.KindScopes names it");
     }
+
+    /// <summary>
+    /// The kinds <see cref="NamedGapLedger.SectionProblemKinds"/> holds open,
+    /// checked both ways: closed the day <c>SectionProblemsWording.KindLabels</c>
+    /// names one, withdrawn the day the contract's <c>kinds</c> no longer does.
+    /// </summary>
+    private static IReadOnlyCollection<string> HeldKinds() =>
+        NamedGapLedger.GapsIn(NamedGapLedger.SectionProblemKinds,
+            Section()["kinds"]!.AsArray().Select(k => k!["kind"]!.ToString()),
+            SectionProblemsWording.KindLabels.Keys);
 
     /// <summary>Every word, key by key, one constant each, its name the key with a capital — and no more.</summary>
     [Fact]

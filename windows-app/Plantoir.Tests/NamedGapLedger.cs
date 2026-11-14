@@ -216,6 +216,68 @@ internal static class NamedGapLedger
     /// </summary>
     internal const string QuitCases = "shared-rules.json → quittingWhileWorkIsUnderWay.cases";
 
+    // Wired in by the fourth hold of the night (2026-11-14, branch
+    // issue/hold4-after-the-macs-fourteen, after the mac's fourteen pieces
+    // merged at cadd8eb11): each area below holds only what a named
+    // `windows` issue of v2.0.0 builds.
+
+    /// <summary>
+    /// <c>shared-rules.json</c> → <c>subjectMenus.items</c>, by item name: an item
+    /// the contract RENAMED that this app still carries under its older name,
+    /// which <see cref="SubjectMenuItemsOlderNames"/> gives. Read by both facts
+    /// of <c>SubjectMenusContractTests</c>: the older name must be here and gone
+    /// from the contract, it stands in the held name's place in the item list,
+    /// and it must be enabled exactly where every case enables the held name.
+    /// </summary>
+    internal const string SubjectMenuItemsUnderAnOlderName = "shared-rules.json → subjectMenus.items (said under an older name here)";
+
+    /// <summary>
+    /// <c>app-rules.json</c> → <c>credentialRequests.requests</c>, by <c>name</c>: a
+    /// request this app has whose <c>explanation</c> or <c>steps</c> it says in
+    /// older words (<c>ContractTests.AppRules_CredentialRequests_MatchesContract</c>).
+    /// A held request must still differ there, keeps the contract's number of
+    /// steps, and has every other field compared exactly.
+    /// </summary>
+    internal const string CredentialRequestsSaidDifferently = "app-rules.json → credentialRequests.requests (said in older words here)";
+
+    /// <summary>
+    /// <c>app-rules.json</c> → <c>failureExplanations.cases</c>, by the case's
+    /// <c>why</c> up to its first colon (the cases carry no name): an output
+    /// this app does not recognise yet (<c>ContractTests.AppRules_FailureExplanations_MatchesContract</c>).
+    /// A held case must be explained by NOTHING here, the contract's honest
+    /// fallback (the raw output is shown), never by some other sentence.
+    /// </summary>
+    internal const string FailureExplanationCases = "app-rules.json → failureExplanations.cases (by why, to its first colon)";
+
+    /// <summary>
+    /// <c>shared-rules.json</c> → <c>sectionProblems.kinds</c>, by <c>kind</c>: a
+    /// Problems-tab kind this app has no label for yet
+    /// (<c>SectionProblemsContractTests.KindsAndScopesAreTheContracts</c>,
+    /// <c>TheRulesAreTheContracts</c>). "Has it" is <c>SectionProblemsWording.KindLabels</c>.
+    /// </summary>
+    internal const string SectionProblemKinds = "shared-rules.json → sectionProblems.kinds";
+
+    /// <summary>
+    /// <c>shared-rules.json</c> → <c>printablePages.agentGuidance.words</c>, by
+    /// key: a sentence of the guidance sheet this app says in older words
+    /// (<c>AgentGuidanceTests.TheAskWordsAreTheContractsAndNameNoMachinery</c>);
+    /// a held sentence must still differ, and is still checked for the machinery.
+    /// </summary>
+    internal const string AgentGuidanceWordsSaidDifferently = "shared-rules.json → printablePages.agentGuidance.words (said in older words here)";
+
+    /// <summary>
+    /// The older name each <see cref="SubjectMenuItemsUnderAnOlderName"/> entry
+    /// is said under here. Every entry has exactly one, and every name here has
+    /// an entry (<c>NamedGapLedgerTests</c>).
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string> SubjectMenuItemsOlderNames =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            // #897 piece A: "Add Class…" replaced "Add Next Class" on the mac;
+            // its enablement did not change (#927).
+            ["addClass"] = "addNextClass",
+        };
+
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
     // parses each entry's milestone as a version and requires it to be LATER
     // than the last Windows release (and, at a signed cut, than
@@ -293,6 +355,15 @@ internal static class NamedGapLedger
     // #911's held-by-name piece (2026-11-14): the mac's #897 C and #785a merged into dev.
     private const string Reason911 = "a one-section restore staged so that a failure part way moves everything back, and says when moving back failed too (the mac's #897 C), is #911's piece of v2.0.0; until it lands Windows' section restore is not staged, so it has no 'stopped part way' outcome to record, and its trail lines are unchanged";
     private const string Reason912 = "small backups that keep each Media file once in courses/_backups/.shared-media (the mac's #785a) are #912's piece of v2.0.0; until it lands Windows writes no small backup, sweeps nothing and lists no _shared-media name (BackupItem.From refuses every one), so none of these three can happen here";
+
+    // The fourth hold (2026-11-14): the mac's fourteen pieces merged at cadd8eb11.
+    private const string Reason920 = "the invented sample names on the surname and website-address sheets (the mac's #891) are #920's piece of v2.0.0, with the colour pickers and the switch; until it lands Windows' sheets carry the older example names, which name nothing a teacher acts on";
+    private const string Reason921 = "Settings ▸ Deploying, the tokens checked before they are saved and the Cloudflare token's end date (the mac's #696), are #921's piece of v2.0.0; until it lands Windows shows no end date and warns of none, so its older words for the TTL step are the true ones, and it records, says and explains none of the pane's events, problems or refusals";
+    private const string Reason927 = "Section ▸ Add Class… in place of Add Next Class, with its three ways (the mac's #897 piece A), is #927's piece of v2.0.0; until it lands Windows' menus have Add Next Class, enabled exactly where the contract enables Add Class…, and none of the sheet's sentences";
+    private const string Reason928 = "a preview start that does nothing while the window's own start waits, a run that never started, and a repair's Preview Again that does not survive its stop (the mac's #812 and #813) are #928's piece of v2.0.0, not built here yet";
+    private const string Reason936 = "PhET simulations and the kept-downloads folder (the mac's #674) are #936's piece of v2.0.0; until it lands Windows reads no PLANTOIR_DOWNLOADED: line, explains no stop for a simulation (the raw output is shown) and has no Science simulation row on the Problems tab";
+    private const string Reason946 = "the guidance sheet naming GitHub Copilot beside Claude Code and Codex (the mac's #887) is #946's piece of v2.0.0, with #879's trail prefix and #791's greeting check; until it lands the sheet names the two assistants Windows opens today";
+    private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -433,6 +504,54 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 911, V200, Reason911, "section restore stopped part way"),
         Owed(ActivityTrailEvents, 912, V200, Reason912,
              "backup kept its Media files once", "shared backup Media swept", "backup Media not found"),
+
+        // ---- the fourth hold (2026-11-14): what the mac's fourteen pieces
+        // brought at cadd8eb11. #891's two wizard tests were made to read the
+        // contract without the switch (test code only, #920 item 3); the
+        // redactor's 24 cases are NOT held: a credential shape that leaks is
+        // a defect (#941), never a gap.
+        Owed(ActivityTrailEvents, 928, V200, Reason928,
+             "preview already starting", "preview again abandoned", "preview could not start"),
+        Owed(ActivityTrailEvents, 921, V200, Reason921,
+             "deploy token changed in Settings", "deploy token removed in Settings",
+             "deploy token change refused in Settings", "old deploy token kept in Settings",
+             "Cloudflare token end date learned"),
+        Owed(ActivityTrailEvents, 936, V200, Reason936,
+             "files for the site downloaded", "files for the site could not be downloaded"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back"),
+        Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
+        Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
+        Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),
+        Owed(FailureExplanationCases, 936, V200, Reason936,
+             "#674 keptDownloads.stop, notReady (phetFences.stop.passFails)",
+             "#674 keptDownloads.stop, one simulation, offline",
+             "#674 keptDownloads.stop, three on three pages, offline (one simulation twice)",
+             "#674 keptDownloads.stop, eleven, offline",
+             "#674 keptDownloads.stop, one that arrived as something else"),
+        Owed(FailureExplanationCases, 921, V200, Reason921,
+             "GitHub #696, the second ruling and review MUST 1",
+             "GitHub #696, the paste rule (deployTokens.paste), in deploy.ps1's shape"),
+        Owed(SectionProblemKinds, 936, V200, Reason936, "phetSimulationsNotReady"),
+        Owed(SubjectMenuItemsUnderAnOlderName, 927, V200, Reason927, "addClass"),
+        Owed(AgentGuidanceWordsSaidDifferently, 946, V200, Reason946, "askFound"),
+        Owed(AssistWordingKeys, 927, V200, Reason927,
+             "menuAddClassTitle", "menuAddClassTitleForAMeeting",
+             "menuHowToAddAClass", "menuHowToAddAClassForAMeeting",
+             "menuAddClassNextInThisUnit", "menuAddClassNextInThisUnitForAMeeting",
+             "menuAddClassNextInANumberedCourse", "menuAddClassNextInANumberedCourseForAMeeting",
+             "menuAddClassInANewUnit", "menuAddClassInANewUnitForAMeeting",
+             "menuAddClassAsACopy", "menuAddClassAsACopyForAMeeting",
+             "menuAddClassInANewUnitInAModuleCourse", "menuAddClassNextInThisUnitInAModuleCourse",
+             "menuAddClassGreyedNoUnits", "menuAddClassGreyedNoUnitsForAMeeting",
+             "menuAddClassGreyedNothingToCopy", "menuAddClassGreyedNothingToCopyForAMeeting",
+             "menuAddClassGreyedRenameUnfinished", "menuAddClassGreyedRenameUnfinishedForAMeeting",
+             "menuAddClassGreyedRenameHoldsACopyInANumberedCourse", "menuAddClassGreyedRenameHoldsACopyInANumberedCourseForAMeeting",
+             "menuNeedsClassDatesFirst", "menuNeedsClassDatesFirstForAMeeting",
+             "menuPickClassToDuplicate", "menuPickClassToDuplicateForAMeeting",
+             "menuUnitWordRenameUnfinished", "menuUnitWordRenameUnfinishedForAMeeting",
+             "menuAddClassGreyedRenameHoldsANewUnit",
+             "menuAddButton", "menuDuplicateButton", "duplicatedFromTheMenu",
+             "theCopyCouldNotBeMadeHiddenFromTheMenu", "menuTheNextPageIsAlreadyThere"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")

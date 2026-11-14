@@ -846,8 +846,16 @@ public class ContractTests
         var defined = typeof(CredentialRequests).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Select(field => field.GetValue(null)).OfType<CredentialRequest>().Select(request => request.Name)
             .Concat(codeRequests.Keys);
-        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialRequestNames,
-            requests.Select(r => r!["name"]!.ToString()), defined);
+        var named = requests.Select(r => r!["name"]!.ToString()).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialRequestNames, named, defined);
+        // A request this app has and says in older words (#891's invented
+        // sample names, owed by #920; #696's TTL step, owed by #921) is held
+        // by name: its title, label, secrecy, link and number of steps are
+        // still compared exactly, and its explanation and steps together must
+        // still differ from the contract's, so the entry fails the day they
+        // match. The day the contract drops the request, the entry fails too.
+        NamedGapLedger.StillNamed(NamedGapLedger.CredentialRequestsSaidDifferently, named);
+        int saidDifferently = 0;
 
         foreach (var req in requests)
         {
@@ -857,20 +865,30 @@ public class ContractTests
             Assert.True(codeRequests.TryGetValue(name, out var codeReq), $"Missing request definition for {name}");
 
             Assert.Equal(req["title"]!.ToString(), codeReq!.Title);
-            // The explanation is the LONGEST thing a teacher reads in one of
-            // these dialogs and was the one field this sweep did not check —
-            // found 2026-09-07 while writing the hand-driven procedure for the
-            // new-site dialog, which told the checker not to eyeball it
-            // "because the contract pins it". It did not. It does now.
-            Assert.Equal(req["explanation"]!.ToString(), codeReq.Explanation);
             Assert.Equal(req["fieldLabel"]!.ToString(), codeReq.FieldLabel);
             Assert.Equal(req["isSecret"]!.GetValue<bool>(), codeReq.IsSecret);
             Assert.Equal(req["linkAddress"]!.ToString(), codeReq.LinkAddress);
             Assert.Equal(req["linkTitle"]!.ToString(), codeReq.LinkTitle);
 
             var expectSteps = req["steps"]!.AsArray().Select(s => s!.ToString()).ToList();
+            if (NamedGapLedger.Holding(NamedGapLedger.CredentialRequestsSaidDifferently, name) is { } held)
+            {
+                saidDifferently++;
+                Assert.Equal(expectSteps.Count, codeReq.Steps.Count);
+                bool same = req["explanation"]!.ToString() == codeReq.Explanation && expectSteps.SequenceEqual(codeReq.Steps);
+                Assert.False(same, NamedGapLedger.ClosedMessage(held));
+                continue;
+            }
+
+            // The explanation is the LONGEST thing a teacher reads in one of
+            // these dialogs and was the one field this sweep did not check —
+            // found 2026-09-07 while writing the hand-driven procedure for the
+            // new-site dialog, which told the checker not to eyeball it
+            // "because the contract pins it". It did not. It does now.
+            Assert.Equal(req["explanation"]!.ToString(), codeReq.Explanation);
             Assert.Equal(expectSteps, codeReq.Steps);
         }
+        Assert.Equal(NamedGapLedger.All.Count(entry => entry.Area == NamedGapLedger.CredentialRequestsSaidDifferently), saidDifferently);
     }
 
     [Fact]
@@ -1197,12 +1215,35 @@ public class ContractTests
         // Every case is played and every mismatch reported, rather than
         // stopping at the first: this list grows from the mac, and a red that
         // names only its first case hides which issues own the rest.
-        var mismatches = cases
-            .Where(c => c is not null)
-            .Select((c, index) => (index, expect: c!["expect"]?.ToString(), actual: FailureExplainer.Explanation(c["output"]!.ToString())))
-            .Where(result => result.expect != result.actual)
-            .Select(result => $"case {result.index}: expected \"{result.expect ?? "null"}\", got \"{result.actual ?? "null"}\"")
-            .ToList();
+        //
+        // A case this app does not recognise yet (#674's PhET stops, owed by
+        // #936; #696's token refusals, owed by #921) is held by its `why` up
+        // to the first colon, the cases having no name. A held case must name
+        // exactly one case and be explained by NOTHING here, the contract's
+        // honest fallback (the raw output is shown): never by another
+        // sentence, and the entry fails the day this app says the contract's.
+        var keys = cases.Select(c => c?["why"]?.ToString().Split(':')[0] ?? "").ToList();
+        NamedGapLedger.StillNamed(NamedGapLedger.FailureExplanationCases, keys);
+        int heldCases = 0;
+        var mismatches = new List<string>();
+        for (int index = 0; index < cases.Count; index++)
+        {
+            var c = cases[index];
+            if (c is null) continue;
+            string? expect = c["expect"]?.ToString();
+            string? actual = FailureExplainer.Explanation(c["output"]!.ToString());
+            if (NamedGapLedger.Holding(NamedGapLedger.FailureExplanationCases, keys[index]) is { } held && keys[index].Length > 0)
+            {
+                heldCases++;
+                Assert.Equal(1, keys.Count(key => key == keys[index]));
+                Assert.False(expect == actual, NamedGapLedger.ClosedMessage(held));
+                Assert.True(actual is null, $"case {index} is held as not recognised here (#{held.Issue}), and this app explains it as \"{actual}\": a wrong explanation, not a missing one");
+                continue;
+            }
+            if (expect != actual)
+                mismatches.Add($"case {index}: expected \"{expect ?? "null"}\", got \"{actual ?? "null"}\"");
+        }
+        Assert.Equal(NamedGapLedger.All.Count(entry => entry.Area == NamedGapLedger.FailureExplanationCases), heldCases);
         Assert.True(mismatches.Count == 0,
             "app-rules.json → failureExplanations: " + mismatches.Count + " of " + cases.Count +
             " cases explained differently here:\n" + string.Join("\n", mismatches));
