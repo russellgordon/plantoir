@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { byDesignFor, hashOf, inlineScriptsIn, isRefusalLine, judgeRefusals, policyAllows, refusalMessages, sortRefusedScripts } from "./refused_by_design.mjs"
+import { byDesignFor, hashOf, inlineScriptsIn, isRefusalLine, judgeRefusals, loaderIn, namedHash, policyAllows, refusalMessages, sortRefusedScripts } from "./refused_by_design.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ENTRIES = JSON.parse(readFileSync(join(HERE, "..", "rendered_rows.json"), "utf-8")).refusedByDesign
@@ -40,87 +40,97 @@ expect("both engines' wordings are the badge's refusal lines", isRefusalLine(NET
 expect("a refused import or a refused eval is not one of them", !isRefusalLine(NETLIFY[0], "Refused to load the script 'https://example.com/x.js' because it violates the following Content Security Policy directive: \"script-src 'self'\"")
   && !isRefusalLine(NETLIFY[0], "Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source of script"), "")
 
-// The first run's shape: the badge only in what the browser received.
-let sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [OWN_ONE, BADGE, OWN_TWO] })
-expect("a script only the browser was sent, refused, is the host's (injected)", sorted && sorted.injected.length === 1 && sorted.own.length === 0 && sorted.madeAtRunTime.length === 0, JSON.stringify(sorted))
-let judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, "Uncaught TypeError: boom"])
-expect("then its refusal line is set aside, and nothing else is", judged.failures.length === 0 && judged.setAside.length === 1 && judged.setAside[0] === CHROMIUM, JSON.stringify(judged))
+// The second deployed run's shape (2026-11-14, real Netlify): the loader
+// after </html>, in the copy served to anything; the refused script built in
+// the badge's srcdoc frame, in neither copy of the page. The tail is the
+// run's served copy of Runner-Deploy-Check, with the site id replaced.
+const LOADER = `<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="00000000-0000-4000-8000-000000000000" data-app-host="app.netlify.com" data-account-tier="free"></script>`
+const SERVED = `${SITE}${LOADER}`
+// The badge frame's one script, as Chromium names it (measured 2026-11-14
+// against Netlify's own hud.js), and the run's two wordings.
+const FRAME_HASH = "sha256-BkKP2XO6WOEc3kXOiLr2ZoY83hamalKjPY9xBcbXVuw="
+const REAL_POLICY = "'script-src 'self' 'unsafe-eval' 'sha256-26KsxcYYxZCwmG2ho9eotclt/D8QIgCYU6DUNU46mT4=' 'sha256-AE0EQudVMDsl926YZzlYRgeKgzPan7WBWeH3xMTf9kE='"
+const CHROMIUM_FRAME = `Executing inline script violates the following Content Security Policy directive ${REAL_POLICY}. Either the 'unsafe-inline' keyword, a hash ('${FRAME_HASH}'), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked. (about:srcdoc)`
+const WEBKIT_FRAME = `${WEBKIT} (about:srcdoc)`
+const PAGE = "https://example.netlify.app/Rendered-Check/Diagrams"
+const ENTRY = NETLIFY[0]
+const read = (count, carries = true) => {
+  const documents = []
+  for (let index = 0; index < count; index += 1) documents.push({ url: PAGE, carriesLoader: carries })
+  return documents
+}
+const evidence = (documents, extra = {}) => ({ sorted: sortRefusedScripts({ documents: [{ policy: POLICY, received: SERVED, served: SERVED }], inTheDom: [OWN_ONE, OWN_TWO] }), documents, ownHashes: [hashOf(OWN_ONE), hashOf(OWN_TWO)], ...extra })
+const said = (text, at) => ({ text, at })
+
+expect("real run: the loader Netlify appends after </html> is read", loaderIn(ENTRY, SERVED) === true, "")
+expect("real run: the loader's address in the page's own text, before </html>, is not the loader", loaderIn(ENTRY, SITE.replace("</body>", `<p>${LOADER.replace("<", "&lt;")}</p><code>${LOADER}</code></body>`)) === false, "")
+expect("real run: a page with no </html> carries no loader, and no copy at all is unread", loaderIn(ENTRY, "<p>x</p>") === false && loaderIn(ENTRY, null) === null, "")
+expect("real run: Chromium names the refused script's hash; WebKit names none", namedHash(CHROMIUM_FRAME) === FRAME_HASH && namedHash(WEBKIT_FRAME) === null, "")
+expect("real run: the page's copies hold the loader as a file, so no inline script of the page is refused", (() => { const sorted = evidence(read(1)).sorted; return sorted.own.length === 0 && sorted.injected.length === 0 && sorted.madeAtRunTime.length === 0 })(), "")
+
+let judged = judgeRefusals(NETLIFY, evidence(read(1)), [said(CHROMIUM_FRAME, "about:srcdoc"), said("Uncaught TypeError: boom", PAGE)])
+expect("real run [chromium]: the badge's refusal said in about:srcdoc, one document with the loader, is set aside and nothing else is", judged.failures.length === 0 && judged.setAside.length === 1 && judged.setAside[0].text === CHROMIUM_FRAME, JSON.stringify(judged))
+let counted = refusalMessages([WEBKIT_FRAME], [WEBKIT], ["about:srcdoc"])
+judged = judgeRefusals(NETLIFY, evidence(read(1)), counted.messages)
+expect("real run [webkit]: its console record and its refused record are one message, said in about:srcdoc, and set aside", counted.messages.length === 1 && counted.twins.join() === "0" && judged.failures.length === 0 && judged.setAside.length === 1, JSON.stringify(judged))
+
+judged = judgeRefusals(NETLIFY, evidence(read(1)), [said(CHROMIUM.replace(" (https://example.netlify.app/Rendered-Check/Quiz)", ""), PAGE)])
+expect("the same wording said in the page itself is the site's own and fails, whatever the host", judged.setAside.length === 0 && judged.failures.length === 1 && /said in https:\/\/example\.netlify\.app\/Rendered-Check\/Diagrams.*the site's own/.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(read(1)), [said(WEBKIT, null)])
+expect("a refusal whose frame the browser did not name is never set aside", judged.setAside.length === 0 && judged.failures.length === 1 && /did not name/.test(judged.failures[0]), JSON.stringify(judged))
 
 // The fault the policy exists to prevent: a hash of the site's own missing.
 const DRIFTED = `script-src 'self' 'unsafe-eval' '${hashOf(OWN_ONE)}'`
-sorted = sortRefusedScripts({ documents: [{ policy: DRIFTED, received: WITH_BADGE, served: SITE }], inTheDom: [] })
-judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM])
-expect("a policy that lost one of the site's own hashes fails, badge or no badge, and sets nothing aside", sorted.own.length === 1 && judged.failures.length === 1 && judged.setAside.length === 0 && /own inline script/.test(judged.failures[0]), JSON.stringify(judged))
+let sorted = sortRefusedScripts({ documents: [{ policy: DRIFTED, received: SERVED, served: SERVED }], inTheDom: [] })
+judged = judgeRefusals(NETLIFY, { sorted, documents: read(1), ownHashes: [hashOf(OWN_ONE), hashOf(OWN_TWO)] }, [said(CHROMIUM_FRAME, "about:srcdoc"), said(`Executing inline script violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('${hashOf(OWN_TWO)}'), or a nonce is required to enable inline execution.`, PAGE)])
+expect("a policy that lost one of the site's own hashes fails beside the badge, and sets nothing aside", sorted.own.length === 1 && judged.setAside.length === 0 && judged.failures.length === 2 && /own inline script/.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(read(1)), [said(CHROMIUM_FRAME.replace(FRAME_HASH, hashOf(OWN_ONE)), "about:srcdoc")])
+expect("a refusal in the frame that names one of the page's own hashes fails", judged.setAside.length === 0 && judged.failures.length === 1 && /hash of one of the page's own inline scripts/.test(judged.failures[0]), JSON.stringify(judged))
 
-// A script the host sends to everyone is the site's, whoever wrote it.
-sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: WITH_BADGE, served: WITH_BADGE }], inTheDom: [] })
-judged = judgeRefusals(NETLIFY, sorted, [WEBKIT])
-expect("a refused script in the page as the host serves it to anything is the site's own, and fails", sorted.own.length === 1 && sorted.injected.length === 0 && judged.failures.length === 1 && judged.setAside.length === 0, JSON.stringify(sorted))
+// The old stand-in's model: the host writes an inline script into the page.
+sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SITE.replace("</head>", "<script>window.edge=1</script></head>"), served: SITE }], inTheDom: [] })
+judged = judgeRefusals(NETLIFY, { sorted, documents: read(1), ownHashes: [] }, [said(WEBKIT_FRAME.replace("about:srcdoc", PAGE), PAGE)])
+expect("an inline script the host writes into the page itself is never set aside", sorted.injected.length === 1 && judged.setAside.length === 0 && judged.failures.length === 2 && /never in the page/.test(judged.failures[0]), JSON.stringify(judged))
 
-// A script the page's own scripts made, refused, is the site's too.
-sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SITE, served: SITE }], inTheDom: [OWN_ONE, "window.made = 1"] })
-judged = judgeRefusals(NETLIFY, sorted, [WEBKIT])
-expect("a refused script the page made at run time fails", sorted.madeAtRunTime.length === 1 && judged.failures.length === 1 && judged.setAside.length === 0, JSON.stringify(sorted))
+judged = judgeRefusals(NETLIFY, evidence(read(1, false)), [said(CHROMIUM_FRAME, "about:srcdoc")])
+expect("a refusal in a srcdoc frame on a page whose documents carried no loader fails", judged.setAside.length === 0 && judged.failures.length === 1 && /0 of 1 document\(s\) carrying its loader account for 0/.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence([{ url: PAGE, carriesLoader: true }, { url: PAGE, carriesLoader: null }]), [said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc")])
+expect("a document that could not be read for the loader sets nothing aside, and says so", judged.setAside.length === 0 && judged.failures.length === 1 && /1 of the 2 document\(s\) .* could not be read/.test(judged.failures[0]), JSON.stringify(judged))
 
-// No badge: a refusal line on its own is never set aside.
-sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SITE, served: SITE }], inTheDom: [OWN_ONE, OWN_TWO] })
-judged = judgeRefusals(NETLIFY, sorted, [WEBKIT])
-expect("with no refused script found, a refusal line stays a failure", judged.setAside.length === 0 && judged.failures.length === 0, JSON.stringify(judged))
+// Counted page by page, from the real run's pages: one refusal a document.
+judged = judgeRefusals(NETLIFY, evidence(read(1)), [said(CHROMIUM_FRAME, "about:srcdoc"), said(CHROMIUM_FRAME.replace(FRAME_HASH, "sha256-c2Vjb25k"), "about:srcdoc")])
+expect("counted: a second refusal in the badge's frame, one document, fails, naming the count", judged.setAside.length === 0 && judged.failures.length === 1 && /^2 refusal\(s\) .* account for 1 .*more than the host's/.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(read(3)), [said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc")])
+expect("counted: Tasks, loaded, reloaded and taken to My Progress, three documents and three refusals, all set aside", judged.failures.length === 0 && judged.setAside.length === 3 && judged.allowed === 3, JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(read(3)), [said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc")])
+expect("counted: three documents with the loader and two refusals fails, a refusal not seen", judged.setAside.length === 0 && judged.failures.length === 1 && /^2 refusal\(s\) .* account for 3 .*was not seen/.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(read(2)), [said(CHROMIUM_FRAME, "about:srcdoc"), said(CHROMIUM_FRAME, "about:srcdoc"), said(CHROMIUM_FRAME, "about:srcdoc")])
+expect("counted: Embeds, reloaded once, with three refusals in the frame fails", judged.setAside.length === 0 && judged.failures.length === 1 && /^3 refusal\(s\) .* account for 2 /.test(judged.failures[0]), JSON.stringify(judged))
+expect("nothing is looked at on a host no entry names", judgeRefusals([], evidence(read(1)), [said(CHROMIUM_FRAME, "about:srcdoc")]).setAside.length === 0 && judgeRefusals(NETLIFY, null, []).setAside.length === 0, "")
 
-// Without the page as served, nothing can be told apart.
-expect("a page whose served copy could not be fetched sets nothing aside", sortRefusedScripts({ documents: [{ policy: POLICY, received: WITH_BADGE, served: null }], inTheDom: [] }) === null
-  && judgeRefusals(NETLIFY, null, [WEBKIT]).setAside.length === 0, "")
-
-// A row that reloads, then goes to the next page: every document counts.
-const NEXT = SITE.replace("toggle", "toggleNext")
-const NEXT_POLICY = `${POLICY.replace(";", "")} '${hashOf(OWN_TWO.replace("toggle", "toggleNext"))}';`
-sorted = sortRefusedScripts({ documents: [
-  { policy: POLICY, received: WITH_BADGE, served: SITE },
-  { policy: NEXT_POLICY, received: NEXT.replace("</head>", `<script>${BADGE}</script></head>`), served: NEXT },
-], inTheDom: [BADGE] })
-expect("a reload and the next page: the badge once, as the host's, nothing of the site's", sorted && sorted.injected.length === 1 && sorted.own.length === 0 && sorted.madeAtRunTime.length === 0, JSON.stringify(sorted))
-
-// Counted page by page (597b fix review, d1): one refused script a document
-// that only the browser was sent, one line for each, as the first run
-// measured; anything more fails and says the count.
-sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [] })
-judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM, CHROMIUM])
-expect("counted: three refusal lines in the badge's wording where one badge accounts for one fail, naming the count, and nothing is set aside", judged.setAside.length === 0 && judged.failures.length === 1 && /^3 refusal lines .* account for 1 /.test(judged.failures[0]), JSON.stringify(judged))
-const SECOND = "(function(){window.second=1})()"
-const TWO_INJECTED = WITH_BADGE.replace("</head>", `<script>${SECOND}</script></head>`)
-sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: TWO_INJECTED, served: SITE }], inTheDom: [] })
-judged = judgeRefusals(NETLIFY, sorted, [WEBKIT, WEBKIT])
-expect("counted: a second refused script the host sent the browser alone, in one document, fails, naming the count", sorted.injectedPerDocument.join() === "2" && judged.setAside.length === 0 && judged.failures.length === 1 && /^2 refused inline scripts the host sent the browser alone in one document/.test(judged.failures[0]), JSON.stringify(judged))
-const RELOADED = [{ policy: POLICY, received: WITH_BADGE, served: SITE }, { policy: POLICY, received: WITH_BADGE, served: SITE }]
-sorted = sortRefusedScripts({ documents: RELOADED, inTheDom: [BADGE] })
-judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM])
-expect("counted: a page reloaded once was sent the badge twice, and its two lines are set aside", sorted.injectedPerDocument.join() === "1,1" && judged.failures.length === 0 && judged.setAside.length === 2 && judged.allowed === 2, JSON.stringify(judged))
-judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM, CHROMIUM])
-expect("counted: a page reloaded once with three lines in the badge's wording fails", judged.failures.length === 1 && judged.setAside.length === 0 && /^3 refusal lines .* account for 2 /.test(judged.failures[0]), JSON.stringify(judged))
-judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM])
-expect("counted: a page reloaded once with one line in the badge's wording, where it was sent the badge twice, fails", judged.failures.length === 1 && judged.setAside.length === 0 && /^1 refusal lines .* account for 2 .*was not seen/.test(judged.failures[0]), JSON.stringify(judged))
 // A page with a frame of the site's own (a PhET simulation's copy, #674):
-// the checker lists the frame's document first and the page's last. A
-// stand-in edge that added the badge to both (2026-11-14, both engines) gave
-// two lines, one from each document, which both are set aside for.
+// the checker lists the frame's document first and the page's last. Netlify
+// appends its loader to the frame's document too, so each builds a badge
+// frame of its own, and each is refused once in about:srcdoc.
 const SIM_OWN = "window.phet={chipper:{}}"
-const SIM = `<html><head><script>${SIM_OWN}</script></head><body></body></html>`
-const SIM_WITH_BADGE = SIM.replace("<head>", `<head><script>${BADGE}</script>`)
+const SIM = `<html><head><script>${SIM_OWN}</script></head><body></body></html>${LOADER}`
 const SIM_POLICY = POLICY.replace(";", ` '${hashOf(SIM_OWN)}';`)
-sorted = sortRefusedScripts({ documents: [{ policy: SIM_POLICY, received: SIM_WITH_BADGE, served: SIM }, { policy: SIM_POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [OWN_ONE, OWN_TWO] })
-judged = judgeRefusals(NETLIFY, sorted, [WEBKIT, WEBKIT])
-expect("counted: the badge in a page and in its own simulation's frame is two scripts, and their two lines are set aside", sorted.injectedPerDocument.join() === "1,1" && judged.failures.length === 0 && judged.setAside.length === 2, JSON.stringify(judged))
-sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SIM_WITH_BADGE, served: SIM }, { policy: SIM_POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [] })
-judged = judgeRefusals(NETLIFY, sorted, [WEBKIT, WEBKIT])
+sorted = sortRefusedScripts({ documents: [{ policy: SIM_POLICY, received: SIM, served: SIM }, { policy: SIM_POLICY, received: SERVED, served: SERVED }], inTheDom: [OWN_ONE, OWN_TWO] })
+judged = judgeRefusals(NETLIFY, { sorted, documents: read(2), ownHashes: [hashOf(SIM_OWN), hashOf(OWN_ONE), hashOf(OWN_TWO)] }, [said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc")])
+expect("counted: the badge in a page and in its own simulation's frame is two documents with the loader, and their two refusals are set aside", sorted.own.length === 0 && judged.failures.length === 0 && judged.setAside.length === 2, JSON.stringify(judged))
+sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SIM, served: SIM }, { policy: SIM_POLICY, received: SERVED, served: SERVED }], inTheDom: [] })
+judged = judgeRefusals(NETLIFY, { sorted, documents: read(2), ownHashes: [] }, [said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc")])
 expect("a simulation's own script that its frame's policy does not list is the site's, and fails", sorted.own.length === 1 && judged.failures.length === 1 && /own inline script/.test(judged.failures[0]), JSON.stringify(judged))
 const AT = " (https://example.netlify.app/Rendered-Check/Quiz)"
-let counted = refusalMessages([WEBKIT + AT], [WEBKIT])
-expect("counted: WebKit's one refusal, recorded in the console with its address and again in the refused list, is one message", counted.messages.length === 1 && counted.twinOf.get(WEBKIT) === WEBKIT + AT, JSON.stringify(counted.messages))
+counted = refusalMessages([WEBKIT + AT], [WEBKIT], [PAGE])
+expect("counted: WebKit's one refusal, recorded in the console with its address and again in the refused list, is one message", counted.messages.length === 1 && counted.twins.join() === "0" && counted.messages[0].at === PAGE, JSON.stringify(counted.messages))
 counted = refusalMessages([WEBKIT + AT, WEBKIT + AT], [WEBKIT, WEBKIT])
-expect("counted: two refusals in the same words are two messages, never one", counted.messages.length === 2, JSON.stringify(counted.messages))
+expect("counted: two refusals in the same words are two messages, never one", counted.messages.length === 2 && counted.twins.join() === "0,1", JSON.stringify(counted.messages))
 counted = refusalMessages([CHROMIUM], [WEBKIT])
-expect("counted: a refused line with no console twin is a message of its own", counted.messages.length === 2, JSON.stringify(counted.messages))
-expect("counted: refusedByDesign carries the two counts, one a document and one a script", NETLIFY[0].refusedScriptsPerDocument === 1 && NETLIFY[0].linesPerRefusedScript === 1 && !("expectedLinesPerEngine" in NETLIFY[0]), JSON.stringify(NETLIFY[0]))
+judged = judgeRefusals(NETLIFY, evidence(read(2)), [])
+expect("counted: a page whose documents carried the loader and said no refusal sets nothing aside and fails nothing", judged.setAside.length === 0 && judged.failures.length === 0, JSON.stringify(judged))
+expect("counted: a refused line with no console twin is a message of its own, with no frame", counted.messages.length === 2 && counted.messages[1].at === null, JSON.stringify(counted.messages))
+expect("counted: refusedByDesign carries its frame, its loader and one refusal a document, and none of the first version's keys", ENTRY.frame === "about:srcdoc" && typeof ENTRY.loader === "string" && ENTRY.refusalsPerDocument === 1 && !("refusedScriptsPerDocument" in ENTRY) && !("linesPerRefusedScript" in ENTRY), JSON.stringify(ENTRY))
 
 if (failures > 0) {
   console.log(`${failures} case(s) failed`)

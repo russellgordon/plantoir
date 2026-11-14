@@ -808,7 +808,8 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
   # names: none when Netlify sent no badge, which hides nothing, since
   # nothing is set aside on a page holding no such script. How many lines
   # each page set aside is pinned inside the checker, page by page
-  # (refusedScriptsPerDocument, linesPerRefusedScript: 597b fix review, d1),
+  # (refusalsPerDocument: one refusal in the badge's frame for each document
+  # that carried Netlify's loader; 597b fix review, d1, and its second run),
   # where a page over the count is a FAIL that names it.
   by_design_allowed=$(python3 -c 'import json,sys; print(sum(2 for entry in json.load(open(sys.argv[1])).get("refusedByDesign", []) if sys.argv[2] in entry["hosts"]))' "$SCRIPT_REPO/browser-checks/rendered_rows.json" "$host" 2>/dev/null)
   if [ "$status" -eq 0 ] && [ "$by_design_here" -gt "${by_design_allowed:-0}" ]; then
@@ -1848,7 +1849,10 @@ STUB
   # investigation, (d)): the clean-page row's EXPECTED line in each engine is
   # counted apart from thirdPartyHostsToday's pin, named in the Result block,
   # and allowed on Netlify only, at most one an engine.
-  BADGE_LINE="refused by the site's policy on 11 of 11 pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor): by design, set aside only where the page holds a refused inline script the host sent the browser alone (rendered_rows.json -> refusedByDesign)"
+  # The line as the checker printed it against a stand-in serving Netlify's
+  # own loader and hud.js (2026-11-14), the counts as the second deployed
+  # run's pages: Tasks 3 documents, Embeds 2, every other page 1.
+  BADGE_LINE="refused by the site's policy on 11 of 11 pages (Diagrams 1, Graphs 1, Python 1, Swift 1, Quiz 1, Tasks 3, Sketch 1, Embeds 2, Handout 1, Wrapped Text 1, Anchor 1): by design, set aside only where said in its own frame, on a page whose documents carried its loader, one a document that did (rendered_rows.json -> refusedByDesign); e.g. Diagrams; seen: 1 of 1 document(s) carried Netlify's own badge script's loader, refusals said in about:srcdoc, about:srcdoc frames now: #nl-badge-frame sha256-BkKP2XO6WOEc3kXOiLr2ZoY83hamalKjPY9xBcbXVuw= \"function nlSend(){ var wrap=document.que\""
   BADGE_LINES=()
   for st_line in "${GOOD_LINES[@]}"; do
     case "$st_line" in "DONE: "*) ;; *) BADGE_LINES+=("$st_line") ;; esac
@@ -2166,20 +2170,36 @@ STUB
 
   hdr "Self-test — the rendered check's rows, offline (597b first-run investigation, (d))"
   if node "$SCRIPT_REPO/browser-checks/lib/test_refused_by_design.mjs" >"$ST_DIR/by-design.txt" 2>&1; then
-    ok "a refusal the site's policy makes on purpose: $(grep -c '^OK: ' "$ST_DIR/by-design.txt") cases, Netlify's badge set aside only where the browser alone was sent it, the site's own refused script still a failure (browser-checks/lib/test_refused_by_design.mjs)"
+    ok "a refusal the site's policy makes on purpose: $(grep -c '^OK: ' "$ST_DIR/by-design.txt") cases, Netlify's badge set aside only where said in its srcdoc frame on a page that carried its loader, the site's own refused script still a failure (browser-checks/lib/test_refused_by_design.mjs)"
   else
     no "a refusal the site's policy makes on purpose: $(grep -v '^OK: ' "$ST_DIR/by-design.txt" | head -3)"
   fi
-  # Counted page by page (597b fix review, d1): a second injected script, or
-  # a refusal line more than the scripts found account for, fails the page.
-  for st_case in "three refusal lines in the badge's wording where one badge accounts for one fail" \
-                 "a second refused script the host sent the browser alone, in one document, fails" \
-                 "a page reloaded once with three lines in the badge's wording fails" \
-                 "a page reloaded once with one line in the badge's wording, where it was sent the badge twice, fails"; do
+  # Counted page by page (597b fix review, d1), and judged on where the
+  # browser said it (597b's second deployed run): a second refusal in the
+  # badge's frame, one fewer than its documents, or the wording said in the
+  # page itself fails the page.
+  for st_case in "a second refusal in the badge's frame, one document, fails, naming the count" \
+                 "three documents with the loader and two refusals fails, a refusal not seen" \
+                 "Embeds, reloaded once, with three refusals in the frame fails" \
+                 "Tasks, loaded, reloaded and taken to My Progress, three documents and three refusals, all set aside"; do
     if grep -qF "OK: counted: $st_case" "$ST_DIR/by-design.txt"; then
       ok "the badge's refusals are counted page by page: $st_case"
     else
       no "the badge's refusals are not counted page by page: no passing case \"$st_case\" in browser-checks/lib/test_refused_by_design.mjs"
+    fi
+  done
+  # Built from the second deployed run's lines (2026-11-14): what real
+  # Netlify sent is set aside in each engine, and the same words said in the
+  # page itself, or a policy that lost a hash of the site's own, stay red.
+  for st_case in "real run [chromium]: the badge's refusal said in about:srcdoc, one document with the loader, is set aside and nothing else is" \
+                 "real run [webkit]: its console record and its refused record are one message, said in about:srcdoc, and set aside" \
+                 "the same wording said in the page itself is the site's own and fails, whatever the host" \
+                 "a policy that lost one of the site's own hashes fails beside the badge, and sets nothing aside" \
+                 "an inline script the host writes into the page itself is never set aside"; do
+    if grep -qF "OK: $st_case" "$ST_DIR/by-design.txt"; then
+      ok "Netlify's badge as the real run showed it: $st_case"
+    else
+      no "Netlify's badge as the real run showed it: no passing case \"$st_case\" in browser-checks/lib/test_refused_by_design.mjs"
     fi
   done
   # The wait for a page's own index says when it reached its ceiling (597b
