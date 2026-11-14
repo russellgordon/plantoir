@@ -215,7 +215,8 @@ nonisolated struct SharedMediaList: Equatable, Sendable {
             guard let path = folderObject["path"] as? String else {
                 throw Problem.missingField("folders.path")
             }
-            if path != SharedMediaList.mediaFolderName && !SharedMediaList.isSafeMediaPath(path) {
+            let isMediaItself: Bool = Array(path.utf8) == Array(SharedMediaList.mediaFolderName.utf8)
+            if !isMediaItself && !SharedMediaList.isSafeMediaPath(path) {
                 throw Problem.unsafePath(path)
             }
             let mode: Int = (folderObject["mode"] as? Int) ?? 0o755
@@ -235,17 +236,46 @@ nonisolated struct SharedMediaList: Equatable, Sendable {
     /// `Media/…` with no part that is empty, `.` or `..`, and no backslash
     /// (a Windows separator read on the mac would be one strange name, and
     /// on Windows a way out of the folder).
+    ///
+    /// Judged by BYTES, never by Characters (#785 fix review, N1). Swift's
+    /// String splits and searches by Character, and a `/` or `\` followed by
+    /// a combining mark is ONE Character: measured, `Media/\u{0308}Bild.png`
+    /// split by `components(separatedBy:)` into one part, so a real picture
+    /// whose name begins with a combining mark made a list this version
+    /// refused to read, and `"\\\u{0301}x".contains("\\")` is false.
     static func isSafeMediaPath(_ path: String) -> Bool {
-        let parts: [String] = path.components(separatedBy: "/")
-        if parts.count < 2 || parts[0] != mediaFolderName {
+        let parts: [[UInt8]] = pathParts(path)
+        if parts.count < 2 || parts[0] != Array(mediaFolderName.utf8) {
             return false
         }
+        let backslash: UInt8 = UInt8(ascii: "\\")
+        let dot: UInt8 = UInt8(ascii: ".")
         for part in parts {
-            if part.isEmpty || part == "." || part == ".." || part.contains("\\") || part.contains("\0") {
+            if part.isEmpty || part == [dot] || part == [dot, dot] {
+                return false
+            }
+            if part.contains(backslash) || part.contains(0) {
                 return false
             }
         }
         return true
+    }
+
+    /// A list path's parts, split on the `/` BYTE, empty parts kept. A `/`
+    /// is ASCII, so each part is whole UTF-8.
+    static func pathParts(_ path: String) -> [[UInt8]] {
+        var parts: [[UInt8]] = []
+        var current: [UInt8] = []
+        for byte in path.utf8 {
+            if byte == UInt8(ascii: "/") {
+                parts.append(current)
+                current = []
+            } else {
+                current.append(byte)
+            }
+        }
+        parts.append(current)
+        return parts
     }
 
     /// 64 lower-case hexadecimal digits.

@@ -21,7 +21,12 @@ import Foundation
 ///    31 days ago (#899, by any computer); a backup being written, for a day
 ///    or while its process still runs on this computer; and a FINISHED
 ///    backup's pending list, for a day after it finished. Every age is a
-///    moment a list wrote down, never a file's date. A moment more than a
+///    moment a list wrote down, never a file's date. A pending list and a
+///    list whose zip is not here that ANOTHER computer wrote count their day
+///    from the LATER of that moment and when this computer first saw them,
+///    so a computer whose clock runs behind, or a list that syncs late,
+///    still gets its day here. A
+///    moment more than a
 ///    day ahead of this computer's clock is counted from when this computer
 ///    first saw the list instead, so a wrong clock cannot pin files for
 ///    years.
@@ -130,8 +135,10 @@ nonisolated enum SharedMediaSweepRule {
         /// Another computer's sweep record is in the store.
         var anotherComputersSweepRecordIsThere: Bool = false
 
-        /// When this computer first saw each list whose moment is more than
-        /// a day ahead of its clock, by file name.
+        /// When this computer first saw each list, by file name: every
+        /// pending list and backup's list whose zip is not here that another
+        /// computer wrote, and any list whose moment is more than a day ahead
+        /// of this computer's clock.
         var listsFirstSeen: [String: Date] = [:]
 
         var leftovers: [Leftover] = []
@@ -183,9 +190,11 @@ nonisolated enum SharedMediaSweepRule {
     static let unneededFor: TimeInterval = 24 * 60 * 60
 
     /// The same once another computer has written to the store: fourteen
-    /// days, long enough to cover a computer shut for a two-week holiday
-    /// with a backup it had not yet synced. The cost is only that space
-    /// comes back two weeks after a backup is deleted on a shared folder.
+    /// days. It covers up to fourteen days between this computer first
+    /// finding a file unneeded and another computer's lists naming it
+    /// arriving here; the wait runs from that first finding, not from the
+    /// other computer's backup. The cost is only that space comes back two
+    /// weeks after a backup is deleted on a shared folder.
     static let unneededForWhenShared: TimeInterval = 14 * 24 * 60 * 60
 
     /// How far ahead of this computer's clock a written moment may be
@@ -224,7 +233,7 @@ nonisolated enum SharedMediaSweepRule {
             if let host = list.host, host != inputs.thisComputer {
                 shared = true
             }
-            let written: Date = moment(list.writtenAt, of: list.fileName, inputs, &firstSeen)
+            let written: Date = honouredFrom(list.writtenAt, by: list.host, of: list.fileName, inputs, &firstSeen)
             if isYounger(than: pendingHonouredFor, writtenAt: written, now: inputs.now) {
                 needed.formUnion(list.checksums)
             } else {
@@ -308,27 +317,63 @@ nonisolated enum SharedMediaSweepRule {
         return seen
     }
 
-    /// A pending list being written is honoured for a day by its own
-    /// written moment, and after that while the process that wrote it still
-    /// runs on this computer (a process id means nothing on another
-    /// computer). A FINISHED backup's pending list is honoured for a day
-    /// after it finished, whatever runs. An Undo list is honoured for 31
+    /// A pending list being written is honoured for a day from its own
+    /// written moment (from the later of that and when this computer first
+    /// saw it, when another computer wrote it: `honouredFrom`), and after
+    /// that while the process that wrote it still runs on this computer (a
+    /// process id means nothing on another computer). A FINISHED backup's
+    /// pending list is honoured for a day after it finished (counted the
+    /// same way), whatever runs. An Undo list is honoured for 31
     /// days, whoever wrote it.
     static func holdIsHonoured(_ seen: HoldSeen, _ inputs: Inputs, _ firstSeen: inout [String: Date]) -> Bool {
-        let written: Date = moment(seen.hold.writtenAt, of: seen.fileName, inputs, &firstSeen)
         switch seen.hold.kind {
         case .undo:
+            let written: Date = moment(seen.hold.writtenAt, of: seen.fileName, inputs, &firstSeen)
             return isYounger(than: undoHonouredFor, writtenAt: written, now: inputs.now)
         case .pending:
             if let finished = seen.hold.finishedAt {
-                let finishedMoment: Date = moment(finished, of: seen.fileName, inputs, &firstSeen)
+                let finishedMoment: Date = honouredFrom(finished, by: seen.hold.host, of: seen.fileName, inputs, &firstSeen)
                 return isYounger(than: pendingHonouredFor, writtenAt: finishedMoment, now: inputs.now)
             }
+            let written: Date = honouredFrom(seen.hold.writtenAt, by: seen.hold.host, of: seen.fileName, inputs, &firstSeen)
             if isYounger(than: pendingHonouredFor, writtenAt: written, now: inputs.now) {
                 return true
             }
             return seen.hold.host == inputs.thisComputer && seen.writerIsRunningHere
         }
+    }
+
+    /// The moment a pending list, or a backup's list whose zip is not here,
+    /// is honoured from. For a list ANOTHER computer wrote (or one that does
+    /// not say), the LATER of its own moment and when this computer first
+    /// saw it, recorded in `firstSeen`: a computer whose clock runs behind
+    /// writes moments that look old here, and so does a list that syncs
+    /// late. Counted from its own moment alone, either was removed the
+    /// first time it was seen, and a picture it named could go (#785 fix
+    /// review, M-a, measured with a clock two days behind). A list this
+    /// computer wrote was dated by this clock and did not travel, so its own
+    /// moment is kept: counting it from first sight would hold a deleted
+    /// backup's pictures a day longer for nothing. A moment more than a day
+    /// ahead counts from first sight, as `moment` does.
+    static func honouredFrom(
+        _ written: Date,
+        by host: String?,
+        of fileName: String,
+        _ inputs: Inputs,
+        _ firstSeen: inout [String: Date]
+    ) -> Date {
+        if host == inputs.thisComputer {
+            return moment(written, of: fileName, inputs, &firstSeen)
+        }
+        let seen: Date = inputs.listsFirstSeen[fileName] ?? inputs.now
+        firstSeen[fileName] = seen
+        if written.timeIntervalSince(inputs.now) > futureAllowed {
+            return seen
+        }
+        if written > seen {
+            return written
+        }
+        return seen
     }
 
     /// True when less than `limit` has passed since `writtenAt`, and for a

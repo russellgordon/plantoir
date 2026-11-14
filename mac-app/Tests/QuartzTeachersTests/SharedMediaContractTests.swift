@@ -68,7 +68,7 @@ final class SharedMediaContractTests: XCTestCase {
         XCTAssertEqual(honoured["leftoverHours"] as? Int, Int(SharedMediaSweepRule.leftoverAge / 3600))
 
         let cases: [[String: Any]] = try XCTUnwrap(shared["sweepCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 31)
+        XCTAssertGreaterThanOrEqual(cases.count, 35)
         let now: Date = Date(timeIntervalSince1970: 1_800_000_000)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -273,17 +273,24 @@ final class SharedMediaContractTests: XCTestCase {
             index += 1
         }
         var withoutZips: [SharedMediaSweepRule.ListWithoutItsZip] = []
+        var firstSeen: [String: Date] = [:]
         index = 0
         for list in (testCase["listsWithoutTheirZips"] as? [[String: Any]]) ?? [] {
             let hours: Double = try XCTUnwrap(list["hoursAgo"] as? NSNumber).doubleValue
-            withoutZips.append(SharedMediaSweepRule.ListWithoutItsZip(
+            var withoutZip: SharedMediaSweepRule.ListWithoutItsZip = SharedMediaSweepRule.ListWithoutItsZip(
                 fileName: "withoutZip\(index)", writtenAt: now.addingTimeInterval(-hours * 3600),
                 checksums: checksums(list["lists"])
-            ))
+            )
+            if let computer = list["computer"] as? String {
+                withoutZip.host = computer == "this" ? "THIS" : "ANOTHER"
+            }
+            if let seenHours = list["firstSeenHoursAgo"] as? NSNumber {
+                firstSeen["withoutZip\(index)"] = now.addingTimeInterval(-seenHours.doubleValue * 3600)
+            }
+            withoutZips.append(withoutZip)
             index += 1
         }
         var holds: [SharedMediaSweepRule.HoldSeen] = []
-        var firstSeen: [String: Date] = [:]
         index = 0
         for list in (testCase["undoLists"] as? [[String: Any]]) ?? [] {
             let days: Double = try XCTUnwrap(list["daysAgo"] as? NSNumber).doubleValue
@@ -311,6 +318,9 @@ final class SharedMediaContractTests: XCTestCase {
             )
             if let finished = list["finishedHoursAgo"] as? NSNumber {
                 hold.finishedAt = now.addingTimeInterval(-finished.doubleValue * 3600)
+            }
+            if let seenHours = list["firstSeenHoursAgo"] as? NSNumber {
+                firstSeen["pending\(index)"] = now.addingTimeInterval(-seenHours.doubleValue * 3600)
             }
             holds.append(SharedMediaSweepRule.HoldSeen(
                 fileName: "pending\(index)",

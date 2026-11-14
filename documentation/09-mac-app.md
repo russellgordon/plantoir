@@ -11906,7 +11906,7 @@ piece 785b moves the automatic backups onto it. The code is
   holds every file (`zipinfo` listing, plan review amendment 2), which must
   ask `pathsNotHeld(by:)` for Media. Windows' `CourseRestorer` and its import
   are the same doors there. A test should walk every caller of `unpack`.
-- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 31
+- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 35
   cases): anything unreadable stops it; needed is every checksum named by a
   small backup that is there (or its pre-macOS 14 `.icloud` placeholder,
   through its list copy), a list whose zip has not arrived and is under a day
@@ -11919,7 +11919,17 @@ piece 785b moves the automatic backups onto it. The code is
   computer's sweep record; remembered in this computer's record). Every age is
   a moment a list or this computer wrote down; a moment more than a day ahead
   of this computer's clock is counted from when this computer first saw that
-  list (review M1). What a crash leaves that names nothing (a `.writing-*.zip`,
+  list (review M1). A pending list, or a list whose zip is not here, that
+  ANOTHER computer wrote counts its day from the LATER of its own moment and
+  when this computer first saw it (`honouredFrom`, fix review M-a): a computer
+  whose clock runs more than a day behind wrote moments that looked old here,
+  and its finished pending list was removed the first time it was seen.
+  Measured with B's clock two days behind and only B's zip and list copy
+  lagging: before, A deleted the picture and B's restore refused; after, A
+  kept it and B's restore put it back. A list this computer wrote keeps its
+  own moment, since it was dated by this clock and did not travel; counting
+  it from first sight too would hold a deleted backup's pictures one more
+  day for nothing (measured in the harness, which caught it). What a crash leaves that names nothing (a `.writing-*.zip`,
   the store's `.incoming-*` folders, `.writing-*` temporaries) is removed once
   its own date is more than a day old (review I1). It takes the lock
   exclusively without waiting, and deletes nothing while a backup or a
@@ -11931,9 +11941,12 @@ piece 785b moves the automatic backups onto it. The code is
   of B's reliance is B's pending list. It is the first file B writes and is
   now kept a day after B's backup finishes, so a sync service usually carries
   it to A first; and once A has seen any sign of B, A waits fourteen days, not
-  one, before deleting. Fourteen days covers a computer shut over a two-week
-  holiday with a backup it had not synced; the cost is that space comes back
-  two weeks after a delete on a shared folder. Measured before the fix: with
+  one, before deleting. The fourteen days run from when A first found the
+  file unneeded, not from B's backup, so they cover up to fourteen days
+  between that finding and B's lists arriving at A: a file A found unneeded on
+  day 1 goes on day 15 even if B wrote on day 2 and its lists arrive on day
+  16 (fix review M-b). The cost is that space comes back two weeks after a
+  delete on a shared folder. Measured before the fix: with
   an hour of sync lag, A deleted the picture and B's restore could not find
   it; after it, A keeps it and B's restore finds it. **No wait closes this race
   against a sync delay of any length:** if nothing of B's reaches A before A's
@@ -11968,7 +11981,29 @@ piece 785b moves the automatic backups onto it. The code is
   own date, which the whole zip does not: it brought a September date back
   an hour out (DOS time, across daylight saving). Harness totals: 288 checks
   on APFS, 299 with a second volume, none failed; fourteen sabotages of the
-  fixed code each turned 1 to 11 checks red.
+  fixed code each turned 1 to 11 checks red. After the fix review's round
+  (N1, M-a, M-c): 312 checks on APFS, 323 with an exFAT image and 323 with a
+  case-sensitive APFS image, none failed; the same harness on the code before
+  that round failed 21. The review's own byte driver, with names that begin
+  with a combining mark at the top of Media, gave 35 entries both ways and 0
+  differences.
+- **Names are split on the `/` BYTE** (fix review N1). Swift splits and
+  searches a `String` by Character, and a `/` or `\` followed by a combining
+  mark is one Character. Measured: `Media/\u{0308}Bild.png` split by
+  `components(separatedBy:)` into ONE part, so the list's path rule refused
+  the backup's own list; the writer compared the read-back list only as
+  bytes, published the backup as made, and the restore then failed with
+  `listUnreadable` while every sweep kept everything. `"\\\u{0301}x".contains("\\")`
+  is false, so the same rule also let a backslash through. `isSafeMediaPath`,
+  `folderPart` and `makeFolders` now split on the byte
+  (`SharedMediaList.pathParts`), and the writer DECODES the read-back list as
+  a restore will before the zip is given its name: a list this version would
+  refuse is never published. A Media name holding a backslash, legal on the
+  mac, is still refused by the path rule (it is a separator on Windows), so
+  such a course's small backup now fails in words and publishes nothing;
+  785b's fallback must handle that (below). A name that is not UTF-8 makes
+  its folder unreadable rather than decoded with replacement characters and
+  skipped (fix review M-c; APFS and exFAT cannot hold one).
 - **Rejected.** A guard on a store file's modification date (a copy keeps the
   source's, plan review amendment 1). An `added/` record of when a file
   ENTERED the store, reconsidered after the review's W3 and still rejected: a
@@ -11981,6 +12016,12 @@ piece 785b moves the automatic backups onto it. The code is
   restore as the old one). Git, hard links, compressing the store, a store
   per course; a `.plantoirbackup` extension; reporting missing pictures after
   the swap instead of before it.
+- **For 785b: never fall back to an unbounded whole zip when a small backup
+  is refused.** A course with two loop links in Media stops a small backup in
+  11.2 s with `mediaHasTooManyEntries`; the whole zip of the same course did
+  not finish in 100 s and left its `zip` orphaned and still looping (fix
+  review, measured). Issue #908 owns the whole zip's loop; until it lands, a
+  door that falls back must bound the whole zip or report the refusal.
 - **Known limits.** The two-computer race above. A clock set days forward
   deletes for real while it is forward and can end an Undo list's 31 days
   early (review M2). Since macOS 14 iCloud Drive keeps an evicted file under

@@ -299,9 +299,9 @@
         "futureAllowedHours": 24,
         "leftoverHours": 24
       },
-      "sweepRule": "Applied in this order. (1) A small backup whose list cannot be read, or any file in lists/ or pending/ that cannot be read or is of a kind or format this version does not know, stops the sweep: NOTHING is deleted or removed, and the trail says why. (2) Needed: every checksum named by a small backup that is in _backups/<any folder>/ (or its sync placeholder); by a backup's list in lists/ whose zip is not there but which was written less than listWithoutItsZipHours ago (another computer's list that synced before its zip); by an Undo list written less than undoListDays ago, whichever computer wrote it (#899 plan 4.5); by a pending list of a backup still being written, for pendingListHours from its writtenAt, or longer while the process it names still runs on THIS computer (a process id means nothing on another); and by a FINISHED backup's pending list (finishedAt set) for pendingListHours after finishedAt, whatever runs. Every age is a moment a list wrote down, never a file's date; a moment more than futureAllowedHours ahead of this computer's clock is counted from when this computer first saw that list (listsFirstSeen in its sweep record). (3) A store file that is not needed is deleted only when THIS computer first found it unneeded unneededBeforeDeletedHours or more ago, by its own record (sweep-<computer>.json), or unneededBeforeDeletedWhenSharedDays once another computer has written to the store: a list, a pending list or a small backup naming another computer as its host, or another computer's sweep record, ever seen (the record keeps sharedWithAnotherComputer once true). The first sweep to find a file unneeded writes the moment down; a first moment in this computer's future is replaced by now. (4) A name in files/ that is neither a checksum nor an unfinished copy (.incoming-...) is never touched. (5) Lists and pending lists that protect nothing are removed after the files. (6) What a crash left that names nothing (_backups/<CODE>/.writing-*.zip, the store's .incoming-* folders, .writing-* temporaries in the store, lists/ and pending/) is removed once its own modification date is more than leftoverHours old. The sweep takes the store's lock exclusively and never waits: while a backup or a restore holds it on this computer, the sweep deletes nothing.",
-      "sweepRuleWhy": "Deleting a store file is the one step that can lose a teacher's only copy of a picture, so every doubt keeps the file: what cannot be read stops everything, and nothing is deleted the first time it is found unneeded. The wait is recorded by the sweeping computer itself because a file's own dates cannot carry it: a copy keeps the source's modification date (#785 plan review, amendment 1: a picture taken in 2024 and copied in today looks two years old). TWO COMPUTERS on one synced folder: a picture computer B has just listed again in a new backup copies nothing into the store, so the only sign of B's reliance is B's pending list; it is the first file B writes, and it is kept for a day after B's backup finishes so a sync service can carry it to A before A's sweep, and once A has seen any sign of another computer it waits fourteen days rather than one. Fourteen days covers a computer shut over a two-week holiday with a backup it had not synced; the cost is only that space comes back two weeks after a delete on a shared folder. Measured before this rule by the #785 implementation review (W3): with an hour of sync lag, A deleted the picture and B's restore then could not find it. NO WAIT CLOSES THIS RACE against a sync delay of any length: if B's lists arrive after A's wait, the picture is gone, and B's restore then names it as missing, in words, before anything changes (restoreRule), never skipping it. REJECTED: a guard on the store file's modification date (copies keep the source's); an added/ record of when each file ENTERED the store, reconsidered after W3 and still rejected, because a file B lists again entered the store long ago, so the record says nothing about B's reliance: the kept pending list names every file a backup relies on, new and old, and is the stronger record; honouring a pending list by its process id on any computer (meaningless on another).",
-      "howToRunASweepCase": "Each single letter a to f stands for a checksum of 64 of that letter; store lists files/ entries, as a letter or as a literal name (kept under files/aa/). backups are the small backups present, each with the letters its list names (or unreadable true) and, when not this computer, computer another. listsWithoutTheirZips, undoLists and pendingLists give each list's age (hoursAgo or daysAgo; a negative age is in the future), its computer (this or another), for a far-future one firstSeenDaysAgo (when this computer first saw it; absent means now), and for a pending list whether its process still runs on this computer and, for a finished backup, finishedHoursAgo. sharedWithAnotherComputer and anotherComputersSweepRecord are what this computer already knows. leftovers are a crash's leftovers by path from courses/ with hoursAgo, their own modification date. unneededSinceHoursAgo is this computer's record before the sweep. Expected: expectKeptEverything (and nothing deleted or removed), expectDeleted (letters or names), expectStillRecorded (entries the record holds after the sweep), expectListsRemoved (by index: undo0, pending1, withoutZip0), expectFirstSeenRecorded (far-future lists recorded as first seen), expectLeftoversRemoved (by path).",
+      "sweepRule": "Applied in this order. (1) A small backup whose list cannot be read, or any file in lists/ or pending/ that cannot be read or is of a kind or format this version does not know, stops the sweep: NOTHING is deleted or removed, and the trail says why. (2) Needed: every checksum named by a small backup that is in _backups/<any folder>/ (or its sync placeholder); by a backup's list in lists/ whose zip is not there but which was written less than listWithoutItsZipHours ago (another computer's list that synced before its zip); by an Undo list written less than undoListDays ago, whichever computer wrote it (#899 plan 4.5); by a pending list of a backup still being written, for pendingListHours from its writtenAt, or longer while the process it names still runs on THIS computer (a process id means nothing on another); and by a FINISHED backup's pending list (finishedAt set) for pendingListHours after finishedAt, whatever runs. Every age is a moment a list wrote down, never a file's date. When ANOTHER computer wrote a pending list or a list whose zip is not here (or the list does not say which computer), its hours count from the LATER of that moment and when this computer first saw the list (listsFirstSeen in its sweep record, kept for every such list), so a computer whose clock runs behind, or a list that syncs late, still gets its hours here (#785 fix review, M-a); a list this computer wrote keeps its own moment. A moment more than futureAllowedHours ahead of this computer's clock, on any list, is counted from when this computer first saw that list. (3) A store file that is not needed is deleted only when THIS computer first found it unneeded unneededBeforeDeletedHours or more ago, by its own record (sweep-<computer>.json), or unneededBeforeDeletedWhenSharedDays once another computer has written to the store: a list, a pending list or a small backup naming another computer as its host, or another computer's sweep record, ever seen (the record keeps sharedWithAnotherComputer once true). The first sweep to find a file unneeded writes the moment down; a first moment in this computer's future is replaced by now. (4) A name in files/ that is neither a checksum nor an unfinished copy (.incoming-...) is never touched. (5) Lists and pending lists that protect nothing are removed after the files. (6) What a crash left that names nothing (_backups/<CODE>/.writing-*.zip, the store's .incoming-* folders, .writing-* temporaries in the store, lists/ and pending/) is removed once its own modification date is more than leftoverHours old. The sweep takes the store's lock exclusively and never waits: while a backup or a restore holds it on this computer, the sweep deletes nothing.",
+      "sweepRuleWhy": "Deleting a store file is the one step that can lose a teacher's only copy of a picture, so every doubt keeps the file: what cannot be read stops everything, and nothing is deleted the first time it is found unneeded. The wait is recorded by the sweeping computer itself because a file's own dates cannot carry it: a copy keeps the source's modification date (#785 plan review, amendment 1: a picture taken in 2024 and copied in today looks two years old). TWO COMPUTERS on one synced folder: a picture computer B has just listed again in a new backup copies nothing into the store, so the only sign of B's reliance is B's pending list; it is the first file B writes, and it is kept for a day after B's backup finishes so a sync service can carry it to A before A's sweep, and once A has seen any sign of another computer it waits fourteen days rather than one. Fourteen days covers up to fourteen days between A first finding a file unneeded and B's lists naming it arriving at A; the wait runs from A's first finding, not from B's backup, so a file A found unneeded on day 1 goes on day 15 even if B wrote on day 2 and its lists arrive on day 16. The cost is only that space comes back two weeks after a delete on a shared folder. Measured before this rule by the #785 implementation review (W3): with an hour of sync lag, A deleted the picture and B's restore then could not find it. NO WAIT CLOSES THIS RACE against a sync delay of any length: if B's lists arrive after A's wait, the picture is gone, and B's restore then names it as missing, in words, before anything changes (restoreRule), never skipping it. REJECTED: a guard on the store file's modification date (copies keep the source's); an added/ record of when each file ENTERED the store, reconsidered after W3 and still rejected, because a file B lists again entered the store long ago, so the record says nothing about B's reliance: the kept pending list names every file a backup relies on, new and old, and is the stronger record; honouring a pending list by its process id on any computer (meaningless on another).",
+      "howToRunASweepCase": "Each single letter a to f stands for a checksum of 64 of that letter; store lists files/ entries, as a letter or as a literal name (kept under files/aa/). backups are the small backups present, each with the letters its list names (or unreadable true) and, when not this computer, computer another. listsWithoutTheirZips, undoLists and pendingLists give each list's age (hoursAgo or daysAgo; a negative age is in the future), its computer (this or another), when this computer first saw it (firstSeenDaysAgo for an Undo list, used only when its moment is far ahead; firstSeenHoursAgo for a pending list or a list without its zip that another computer wrote; absent means now; a list without its zip with no computer is treated as another computer's), and for a pending list whether its process still runs on this computer and, for a finished backup, finishedHoursAgo. sharedWithAnotherComputer and anotherComputersSweepRecord are what this computer already knows. leftovers are a crash's leftovers by path from courses/ with hoursAgo, their own modification date. unneededSinceHoursAgo is this computer's record before the sweep. Expected: expectKeptEverything (and nothing deleted or removed), expectDeleted (letters or names), expectStillRecorded (entries the record holds after the sweep), expectListsRemoved (by index: undo0, pending1, withoutZip0), expectFirstSeenRecorded (every list recorded as first seen: each pending list and list without its zip another computer wrote, and a far-future list), expectLeftoversRemoved (by path).",
       "sweepCases": [
         {
           "name": "a file a small backup names is kept",
@@ -452,6 +452,7 @@
           "listsWithoutTheirZips": [
             {
               "hoursAgo": 30,
+              "firstSeenHoursAgo": 30,
               "lists": [
                 "a"
               ]
@@ -469,6 +470,34 @@
           ]
         },
         {
+          "name": "this computer's own backup, deleted 30 hours ago: its list keeps nothing and is removed the first time it is seen",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "listsWithoutTheirZips": [
+            {
+              "hoursAgo": 30,
+              "computer": "this",
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 30
+          },
+          "expectDeleted": [
+            "a"
+          ],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "withoutZip0"
+          ],
+          "expectFirstSeenRecorded": [],
+          "why": "A list this computer wrote was dated by this computer's clock and did not travel, so its own moment is kept; counting it from first sight would hold a deleted backup's pictures a day longer for nothing."
+        },
+        {
           "name": "a course's backups folder deleted by an older version: its files go after their day",
           "store": [
             "a",
@@ -478,12 +507,14 @@
           "listsWithoutTheirZips": [
             {
               "hoursAgo": 50,
+              "firstSeenHoursAgo": 50,
               "lists": [
                 "a"
               ]
             },
             {
               "hoursAgo": 50,
+              "firstSeenHoursAgo": 50,
               "lists": [
                 "b"
               ]
@@ -566,6 +597,7 @@
           "listsWithoutTheirZips": [
             {
               "hoursAgo": 48,
+              "firstSeenHoursAgo": 48,
               "lists": [
                 "c"
               ]
@@ -662,6 +694,7 @@
           "pendingLists": [
             {
               "hoursAgo": 30,
+              "firstSeenHoursAgo": 30,
               "computer": "another",
               "running": true,
               "lists": [
@@ -924,6 +957,91 @@
           "expectListsRemoved": [],
           "expectFirstSeenRecorded": [
             "undo0"
+          ]
+        },
+        {
+          "name": "another computer whose clock runs two days behind: its finished pending list, seen here for the first time, keeps its file for a day",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "sharedWithAnotherComputer": true,
+          "pendingLists": [
+            {
+              "hoursAgo": 50,
+              "finishedHoursAgo": 49,
+              "computer": "another",
+              "running": false,
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 400
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [],
+          "expectFirstSeenRecorded": [
+            "pending0"
+          ],
+          "why": "A pending list or a list whose zip is not here counts its day from the LATER of its own moment and when this computer first saw it. Counted from its own moment alone, a list written by a computer whose clock runs behind looked days old, was removed the first time it was seen, and the picture it named was deleted under that computer's new backup (#785 fix review, M-a, measured with a clock two days behind)."
+        },
+        {
+          "name": "the same list, first seen here 25 hours ago, keeps nothing and is removed",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "sharedWithAnotherComputer": true,
+          "pendingLists": [
+            {
+              "hoursAgo": 50,
+              "firstSeenHoursAgo": 25,
+              "finishedHoursAgo": 49,
+              "computer": "another",
+              "running": false,
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 400
+          },
+          "expectDeleted": [
+            "a"
+          ],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [
+            "pending0"
+          ]
+        },
+        {
+          "name": "a backup's list whose zip is not here, written three days ago and synced only now, keeps its files for a day",
+          "store": [
+            "a"
+          ],
+          "backups": [],
+          "sharedWithAnotherComputer": true,
+          "listsWithoutTheirZips": [
+            {
+              "hoursAgo": 72,
+              "computer": "another",
+              "lists": [
+                "a"
+              ]
+            }
+          ],
+          "unneededSinceHoursAgo": {
+            "a": 400
+          },
+          "expectDeleted": [],
+          "expectStillRecorded": [],
+          "expectListsRemoved": [],
+          "expectFirstSeenRecorded": [
+            "withoutZip0"
           ]
         },
         {

@@ -86,6 +86,8 @@ final class SharedMediaStoreTests: XCTestCase {
         XCTAssertNotNil(small[Array("Media/link to outside/far.png".utf8)], "a link to a folder outside the course")
         XCTAssertNotNil(small[Array("Media/caf\u{00E9}/cr\u{00E8}me.png".utf8)], "a precomposed name keeps its bytes (W2)")
         XCTAssertNil(small[Array("Media/cafe\u{0301}/cre\u{0300}me.png".utf8)], "and is not decomposed")
+        XCTAssertNotNil(small[Array("Media/\u{0308}Bild.png".utf8)], "a name that begins with a combining mark comes back (N1)")
+        XCTAssertNotNil(small[Array("Media/\u{0301}dir/\u{0301}lead.png".utf8)], "and so does a folder whose name does")
         XCTAssertGreaterThan(small.count, 100, "the comparison saw the awkward course, its loop included")
 
         let original: [[UInt8]: SharedMediaTestFiles.Node] = SharedMediaTestFiles.tree(course)
@@ -480,13 +482,62 @@ final class SharedMediaStoreTests: XCTestCase {
     }
 
     func testAListThatPointsOutsideMediaIsRefused() {
-        let unsafe: [String] = ["Media/../course_config.json", "/etc/hosts", "Media//x.png", "Media\\x.png", "Pages/x.png", "Media"]
+        // The last is a backslash followed by a combining mark: one
+        // Character, which a Character search for a backslash did not find
+        // (#785 fix review, N1).
+        let unsafe: [String] = [
+            "Media/../course_config.json", "/etc/hosts", "Media//x.png", "Media\\x.png", "Pages/x.png", "Media",
+            "Media/\\\u{0301}x.png",
+        ]
         for path in unsafe {
             let text: String = "{\"format\":1,\"kind\":\"backup\",\"course\":\"X\",\"backup\":\"b\","
                 + "\"writtenAt\":\"2026-11-13T18:38:00.000Z\",\"host\":\"h\",\"folders\":[],\"media\":[{\"path\":"
                 + "\"\(path.replacingOccurrences(of: "\\", with: "\\\\"))\",\"sha256\":\"\(String(repeating: "a", count: 64))\","
                 + "\"size\":1,\"modified\":\"2026-11-13T18:38:00.000Z\",\"mode\":420}]}"
             XCTAssertThrowsError(try SharedMediaList.decoded(from: Data(text.utf8)), path)
+            if path != "Media" {
+                XCTAssertFalse(SharedMediaList.isSafeMediaPath(path), path)
+            }
+        }
+    }
+
+    /// Paths are judged and split on the `/` BYTE (#785 fix review, N1): a
+    /// `/` followed by a combining mark is one Character.
+    func testAPathIsSplitOnTheSlashByte() {
+        XCTAssertTrue(SharedMediaList.isSafeMediaPath("Media/\u{0308}Bild.png"))
+        XCTAssertTrue(SharedMediaList.isSafeMediaPath("Media/combo/\u{0301}lead.png"))
+        XCTAssertEqual(SharedMediaRestore.folderPart(of: "Media/sub/\u{0308}x.png"), "Media/sub")
+        XCTAssertEqual(SharedMediaRestore.folderPart(of: "Media/\u{0308}x.png"), "Media")
+        XCTAssertEqual(SharedMediaRestore.folderPart(of: "x.png"), "")
+    }
+
+    /// A list this version would refuse to read is never published as a
+    /// backup that was made (#785 fix review, N1). A backslash in a Media
+    /// name is legal on the mac and refused by the list's path rule, so a
+    /// backup of such a course must fail in words and leave no zip, no list
+    /// copy and no pending list. Before the fix it was published, and
+    /// could not be restored.
+    func testABackupWhoseListCouldNotBeReadIsNeverPublished() throws {
+        let courses: URL = topURL.appendingPathComponent("courses")
+        let course: URL = courses.appendingPathComponent("ICS3U")
+        try SharedMediaTestFiles.write(Data("{}".utf8), to: course.appendingPathComponent("course_config.json"))
+        try SharedMediaTestFiles.write(
+            SharedMediaTestFiles.randomData(500), to: course.appendingPathComponent("Media/back\\slash.png")
+        )
+        let store: SharedMediaStore = SharedMediaStore(coursesDirectoryURL: courses)
+        XCTAssertThrowsError(try store.writeSmallBackup(
+            courseFolderURL: course, courseCode: "ICS3U",
+            zipName: "ICS3U_backup_2026-11-13_183800_menu-section1_shared-media.zip",
+            rules: CourseArchiver.archiveRules(forFolderAt: course)
+        ))
+        let fileManager: FileManager = FileManager.default
+        let backupsFolder: URL = courses.appendingPathComponent("_backups/ICS3U")
+        let inBackups: [String] = (try? fileManager.contentsOfDirectory(atPath: backupsFolder.path)) ?? []
+        XCTAssertEqual(inBackups, [], "no zip, published or not")
+        for folder in ["lists", "pending"] {
+            let url: URL = courses.appendingPathComponent("_backups/.shared-media").appendingPathComponent(folder)
+            let names: [String] = (try? fileManager.contentsOfDirectory(atPath: url.path)) ?? []
+            XCTAssertEqual(names, [], "nothing left in \(folder)/")
         }
     }
 
@@ -795,6 +846,17 @@ enum SharedMediaTestFiles {
         let creme: [UInt8] = Array("creme".utf8)
         _ = Darwin.write(composedFile, creme, creme.count)
         close(composedFile)
+        // #785 fix review, N1: a picture and a folder whose names BEGIN with
+        // a combining mark, directly inside Media. A `/` followed by one is a
+        // single Character, so a Character split read `Media/\u{0308}Bild.png`
+        // as one part and refused the list.
+        for path in [media.path + "/\u{0308}Bild.png", media.path + "/\u{0301}dir/\u{0301}lead.png"] {
+            mkdir((path as NSString).deletingLastPathComponent, 0o755)
+            let markFirst: Int32 = open(path, O_WRONLY | O_CREAT, 0o644)
+            let markBytes: [UInt8] = Array("mark first".utf8)
+            _ = Darwin.write(markFirst, markBytes, markBytes.count)
+            close(markFirst)
+        }
         symlink("a.png", media.appendingPathComponent("link to a.png").path)
         symlink("/nonexistent/nowhere.png", media.appendingPathComponent("broken link.png").path)
         try FileManager.default.setAttributes(

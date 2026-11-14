@@ -633,8 +633,15 @@ nonisolated struct SharedMediaStore: Sendable {
                 throw Problem.zipFailed(test.errors)
             }
             let readBack: Data? = try? SharedMediaStore.listData(insideZipAt: temporaryZipURL)
-            if readBack != list {
+            guard let readBack, readBack == list else {
                 throw Problem.zipFailed("the list inside the zip did not read back")
+            }
+            // Read back as a restore and a sweep will read it, so a list this
+            // version would refuse is never published as a backup that was
+            // made (#785 fix review, N1: such a backup could not be restored
+            // at all, and stopped every sweep while it existed).
+            if (try? SharedMediaList.decoded(from: readBack)) == nil {
+                throw Problem.zipFailed("the list inside the zip could not be read back")
             }
             try hooks.reached(.zipWritten)
         } catch {
@@ -1600,12 +1607,21 @@ nonisolated final class SharedMediaRestore: @unchecked Sendable {
         return Filled(filesPutBack: putBack, filesTakenFromTheCourse: fromTheCourse, missing: missingNow)
     }
 
-    /// Everything before a path's last `/`, its bytes untouched.
+    /// Everything before a path's last `/` BYTE, its bytes untouched (a `/`
+    /// followed by a combining mark is one Character, so a Character search
+    /// finds the slash before it: #785 fix review, N1).
     static func folderPart(of path: String) -> String {
-        guard let slash = path.lastIndex(of: "/") else {
+        let bytes: [UInt8] = Array(path.utf8)
+        var lastSlash: Int? = nil
+        for index in 0..<bytes.count {
+            if bytes[index] == UInt8(ascii: "/") {
+                lastSlash = index
+            }
+        }
+        guard let lastSlash else {
             return ""
         }
-        return String(path[..<slash])
+        return String(decoding: bytes[0..<lastSlash], as: UTF8.self)
     }
 
     /// Lets go of the lock. Called when the restore is over, whatever

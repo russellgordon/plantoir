@@ -68,7 +68,8 @@ nonisolated enum SharedMediaFiles {
 
     /// The names in a folder, as the listing gives their bytes, `.` and `..`
     /// left out, in byte order (Swift's own `<` treats the two Unicode forms
-    /// of a name as equal, so it cannot order them).
+    /// of a name as equal, so it cannot order them). Nil when the folder
+    /// cannot be read or holds a name that is not UTF-8.
     static func names(in folder: Folder, at relativePath: String) -> [String]? {
         let opened: Int32 = openat(folder.descriptor, relativePath, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         if opened < 0 {
@@ -100,7 +101,15 @@ nonisolated enum SharedMediaFiles {
         }
         var names: [String] = []
         for bytes in found {
-            names.append(String(decoding: bytes, as: UTF8.self))
+            let name: String = String(decoding: bytes, as: UTF8.self)
+            // A name that is not UTF-8 would be decoded with replacement
+            // characters and then not found under them, a silent hole in the
+            // backup (#785 fix review, M-c). APFS and exFAT cannot hold one;
+            // a network volume can. The whole folder counts as unreadable.
+            if Array(name.utf8) != bytes {
+                return nil
+            }
+            names.append(name)
         }
         return names
     }
@@ -232,11 +241,20 @@ nonisolated enum SharedMediaFiles {
     }
 
     /// Makes every missing folder along a relative path.
+    /// Split on the `/` byte, never by Character: a `/` followed by a
+    /// combining mark is one Character (#785 fix review, N1).
     static func makeFolders(in folder: Folder, at relativePath: String) -> Bool {
-        var built: String = ""
-        for part in relativePath.split(separator: "/", omittingEmptySubsequences: true) {
-            built = built.isEmpty ? String(part) : built + "/" + String(part)
-            if mkdirat(folder.descriptor, built, 0o755) != 0 && errno != EEXIST {
+        var built: [UInt8] = []
+        for part in SharedMediaList.pathParts(relativePath) {
+            if part.isEmpty {
+                continue
+            }
+            if !built.isEmpty {
+                built.append(UInt8(ascii: "/"))
+            }
+            built.append(contentsOf: part)
+            let builtPath: String = String(decoding: built, as: UTF8.self)
+            if mkdirat(folder.descriptor, builtPath, 0o755) != 0 && errno != EEXIST {
                 return false
             }
         }
