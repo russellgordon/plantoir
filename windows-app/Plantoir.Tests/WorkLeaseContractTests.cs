@@ -131,7 +131,7 @@ public class WorkLeaseContractTests
     {
         var cases = ContractLoader.LoadJson("shared-rules.json")["workLeases"]!["liveness"]!["cases"]!.AsArray();
         var wrong = new List<string>();
-        int ran = 0;
+        int ran = 0, heldMet = 0;
         foreach (var c in cases.Where(c => AppliesHere(c!)))
         {
             ran++;
@@ -153,10 +153,21 @@ public class WorkLeaseContractTests
             bool alive = WorkLease.IsAlive(c["pid"]!.GetValue<int>(), signal, answer, entry,
                 c["lease"]?["name"]?.ToString(), c["lease"]?["start"]?.ToString());
             string decided = alive ? "alive" : "gone";
+            // A case this app decides the other way until #829 compares a
+            // whole-second start on whole seconds is held by name: it must
+            // still be decided opposite, and the entry fails the day it is not.
+            if (NamedGapLedger.Holding(NamedGapLedger.LeaseLivenessCases, c["name"]!.ToString()) is { } held)
+            {
+                heldMet++;
+                Assert.False(decided == c["expect"]!.ToString(), NamedGapLedger.ClosedMessage(held));
+                continue;
+            }
             if (decided != c["expect"]!.ToString())
                 wrong.Add($"\"{c["name"]}\": expected {c["expect"]}, decided {decided}");
         }
-        Assert.True(ran >= 17, $"only {ran} liveness cases ran");
+        NamedGapLedger.StillNamed(NamedGapLedger.LeaseLivenessCases, cases.Where(c => AppliesHere(c!)).Select(c => c!["name"]!.ToString()));
+        Assert.Equal(NamedGapLedger.All.Count(entry => entry.Area == NamedGapLedger.LeaseLivenessCases), heldMet);
+        Assert.True(ran - heldMet >= 17, $"only {ran - heldMet} liveness cases ran unheld");
         Assert.True(wrong.Count == 0, string.Join("\n", wrong));
     }
 

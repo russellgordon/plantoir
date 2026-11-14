@@ -2575,7 +2575,7 @@ cadd8eb11 read BASELINE_TOTALS (this PC, a Lenovo 20QES70500, i5-8365U, 16 GB,
 Windows 11 Pro 26200, BASELINE_NOTE). Each red is sorted below by the open
 `windows` issue of v2.0.0 whose body names it.
 
-**Held, 61 entries, all v2.0.0.**
+**Held, 61 entries from these fourteen, all v2.0.0** (22 more from stack 13, below).
 
 | Issue | Entries | Area: what |
 |---|---|---|
@@ -2594,7 +2594,7 @@ expectation did not move, and the test DIGEST_NOTE.
 Add Next Class is not renamed: the issue says renaming the item is the fix,
 and the item is a menu a teacher sees, so it waits for #927's dialog.
 
-**Five new areas, each read where its red was.**
+**Five new areas, each read where its red was** (a sixth came with stack 13, below).
 - `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
   name in `NamedGapLedger.SubjectMenuItemsOlderNames`). Both
   `SubjectMenusContractTests` facts read the older name in the held name's
@@ -2681,6 +2681,44 @@ Each round ran the 94 tests of the hooked classes in about 7 s.
   least three run menu cases must enable the renamed item. An item held as
   missing outright may not also be held under an older name
   (`NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose`).
+
+**Then stack 13, folded into the same branch.** At about 06:30 EST `dev`
+moved again, to 956defd43: #800, #829 (a deploy typed in Terminal takes a
+work lease), #897 piece B (Roll Over to a New Year… on the Section menu),
+#904, and follow-ups to #674 and #597. Nothing under `windows-app/` changed.
+It turned four tests red here, held as 22 more entries:
+- **#897 (21).** The item `rollOverToANewYear` (`SubjectMenuItems`, so it is
+  taken out of every case's `enabled`) and its 20 sentences
+  (`AssistWordingKeys`).
+- **#829 (1).** The liveness case "#829: a deploy typed in Terminal - bash,
+  its start in whole seconds - is alive while that bash runs"
+  (`LeaseLivenessCases`, a sixth new area).
+
+Windows decides that liveness case as gone today, because `WorkLease.IsAlive`
+compares the start as text. It is held rather than called a defect because
+nothing on Windows writes a whole-second start: `deploy.ps1` takes no lease
+yet, and this app's own leases write six decimal places
+(`WorkLease.LeaseBody`). So no Windows hold is read as gone this way. When
+#829 has Windows write such a lease, Windows must also compare on whole
+seconds. A held liveness case must still be decided opposite to `expect`,
+the number of held cases met must equal the entries, and at least 17 cases
+are still decided exactly.
+
+Proved the same way (`mutation-closed2`, `-withdrawn2`, `-removal2`, 95
+tests):
+- An entry for the kill -9 case, which this app decides as the contract
+  does, failed with the closed message.
+- An entry for a case the contract lacks failed with the withdrawn message.
+- Taking out the 22 entries brought back the four reds.
+- Restored: `Passed! - Failed: 0, Passed: 95`.
+
+In all, the hold is 83 entries. Stack 13's other new lists have no Windows
+reader yet: `workLeases.launcherLeases`,
+`previewWhileItsSectionDeploys.leaseCases`, the two new
+`returningToASectionMidDeploy.heldElsewhere` cases,
+`subjectMenus.rollOverSheet`, `file-formats.json` → `customDomainReading`,
+and the trail lines `deploy.sh` writes beside `task started` and
+`task finished`.
 
 **Unrun rather than red**, read by key with no Windows reader yet:
 `activityTrail.lineShape.placeCases` (#946), `subjectMenus.addClassSheet` and
