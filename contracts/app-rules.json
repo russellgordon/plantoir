@@ -4142,13 +4142,13 @@
     "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",
     "greetingIsTheSameForEveryAgent" : true,
     "greetingMustNotSay" : {
-      "why" : "Russell, 2026-11-13 (the full ruling on #750, restated on #791): the greeting an assistant gives when it opens from Plantoir never mentions marking, class results or report card comments; those are offered only in context, by the skill in use. Each word is looked for case-insensitively in every greeting greetingMustSayHow builds, on every door, so 'mark' also catches 'marking' and 'marks'.",
-      "words" : [
-        "mark",
-        "class result",
-        "report card",
-        "comment"
-      ]
+      "expressions" : [
+        "\\bmark",
+        "\\bclass(?:'s)?\\s+results?\\b",
+        "\\breport[\\s-]+cards?\\b",
+        "\\bcomments?\\b"
+      ],
+      "why" : "Russell, 2026-11-13, in the full ruling on #750 (restated on #791): the greeting an assistant gives when it opens from Plantoir never mentions marking, results for a whole class, or the comments written on a report; those are offered only in context, by the skill in use. Each expression is matched without regard to case in every greeting greetingMustSayHow builds, on every door, so the first also catches marks and marking (and not a word that merely ends in those letters). Written as regular expressions, as printablePages.agentGuidance.held.words is, and for the same reason: scripts/test_held_skills.py reads every string in this file, and a rule naming what must not be offered is not an offer. This rule is not the hold: it stays when the held skills come back."
     },
     "greetingMustSay" : [
       {

@@ -8344,10 +8344,14 @@ constants for each (`ClaudeCodeLauncher.openingWithNameTemplate`,
 three variants (a name that differs from the code; a reference course and no
 unit plan yet; a name that is the code), and reads the greeting off the line
 the script starts the assistant with, at the position the door's `arguments`
-give `{greeting}`. It checks every entry, and every word of
-`greetingMustNotSay`: Russell's ruling on #750 (2026-11-13) that the greeting
-never mentions marking, class results or report card comments, which are
-offered only in context by the skill in use. A `where` the suite does not
+give `{greeting}`. It checks every entry, and every expression of
+`greetingMustNotSay` (matched without regard to case): Russell's ruling on
+#750 (2026-11-13) that the greeting never mentions marking, class results or
+report card comments, which are offered only in context by the skill in use.
+They are regular expressions, as the held skills' words are, because
+`scripts/test_held_skills.py` reads every string in `app-rules.json` and a
+plain list of those words would read to it as an offer. The rule is not the
+hold, and stays when the held skills come back. A `where` the suite does not
 know fails, so a new kind of entry proposed from either side turns the other
 red until it is implemented.
 

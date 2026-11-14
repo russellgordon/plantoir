@@ -1012,8 +1012,8 @@ final class AppRulesContractTests: XCTestCase {
     /// `outsideAgents.greetingMustSay` (#791): every entry is checked against
     /// the greeting each Revise door really sends, read off the command line
     /// its script starts the assistant with, in the variants
-    /// `greetingMustSayHow` names. `greetingMustNotSay` (Russell's ruling on
-    /// #750) is checked against the same greetings. The four sentences that
+    /// `greetingMustSayHow` names. Each of `greetingMustNotSay`'s expressions
+    /// (Russell's ruling on #750) is matched against the same greetings. The four sentences that
     /// gained a key are compared with their named constants as well.
     func testEveryDoorsGreetingSaysWhatTheContractSays() throws {
         let rules: [String: Any] = try AppRulesContractTests.readRules()
@@ -1044,8 +1044,12 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(ClaudeCodeLauncher.sectionsGreetingSentence, section["greetingSectionsSentence"] as? String)
 
         let mustNotSay: [String: Any] = try XCTUnwrap(section["greetingMustNotSay"] as? [String: Any])
-        let forbiddenWords: [String] = try XCTUnwrap(mustNotSay["words"] as? [String])
-        XCTAssertFalse(forbiddenWords.isEmpty)
+        let forbiddenPatterns: [String] = try XCTUnwrap(mustNotSay["expressions"] as? [String])
+        XCTAssertFalse(forbiddenPatterns.isEmpty)
+        var forbidden: [NSRegularExpression] = []
+        for pattern in forbiddenPatterns {
+            forbidden.append(try NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))
+        }
 
         // The variants greetingMustSayHow names.
         let variants: [GreetingVariant] = [
@@ -1118,9 +1122,12 @@ final class AppRulesContractTests: XCTestCase {
                     }
                 }
 
-                let lowered: String = greeting.lowercased()
-                for word in forbiddenWords {
-                    XCTAssertFalse(lowered.contains(word.lowercased()), label + ": the greeting says '\(word)'\n" + greeting)
+                let whole: NSRange = NSRange(greeting.startIndex..., in: greeting)
+                for expression in forbidden {
+                    XCTAssertNil(
+                        expression.firstMatch(in: greeting, options: [], range: whole),
+                        label + ": the greeting matches greetingMustNotSay's " + expression.pattern + "\n" + greeting
+                    )
                 }
             }
         }
