@@ -28,7 +28,7 @@ internal sealed record UndoReading
 /// <para><b>An instance, never a static</b> (the plan review's H1). The folder,
 /// the clock, the liveness check, the reach check and the switch are all
 /// passed in. Only the app's start-up will ever hand it the real
-/// <c>%LOCALAPPDATA%\Plantoir\undo\</c> (W4), so a test makes its own folder
+/// <c>undo\</c> folder of the app's own state folder (<c>AppDataRoot</c>, W4), so a test makes its own folder
 /// and its own clock, two test classes running at once cannot share a journal,
 /// and the contract's <c>clock:+n</c> is something a test can say.</para>
 ///

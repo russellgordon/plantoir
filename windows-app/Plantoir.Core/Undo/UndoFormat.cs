@@ -234,17 +234,17 @@ internal static class UndoFormat
             if (root.ValueKind != JsonValueKind.Object) return Unreadable(null, BlobNames(text), segment, place);
 
             long? seq = WholeNumber(root, "seq");
-            IReadOnlyList<string> names = BlobNames(text);
-            if (HasDuplicateKeys(root)) return Unreadable(seq, names, segment, place);
-            if (!IsTheNumberOne(root)) return Unreadable(seq, names, segment, place);
+            Func<IReadOnlyList<string>> names = () => BlobNames(text);   // scanned only for what cannot be read
+            if (HasDuplicateKeys(root)) return Unreadable(seq, names(), segment, place);
+            if (!IsTheNumberOne(root)) return Unreadable(seq, names(), segment, place);
             if (!root.TryGetProperty("event", out JsonElement eventElement)
                 || eventElement.ValueKind != JsonValueKind.String
                 || !Events.TryGetValue(eventElement.GetString()!, out UndoEvent kind))
-                return Unreadable(seq, names, segment, place);
+                return Unreadable(seq, names(), segment, place);
 
             // Every event needs a whole-number seq. A note too (events.note):
             // without one it is an unreadable line, a barrier at its place.
-            if (seq is null) return Unreadable(null, names, segment, place);
+            if (seq is null) return Unreadable(null, names(), segment, place);
 
             DateTimeOffset? at = root.TryGetProperty("at", out JsonElement atElement) && atElement.ValueKind == JsonValueKind.String
                 ? UndoMoment.Parse(atElement.GetString())
@@ -263,7 +263,7 @@ internal static class UndoFormat
                 if (!root.TryGetProperty("phase", out JsonElement phaseElement)
                     || phaseElement.ValueKind != JsonValueKind.String
                     || !Phases.TryGetValue(phaseElement.GetString()!, out UndoPhase known))
-                    return Unreadable(seq, names, segment, place);
+                    return Unreadable(seq, names(), segment, place);
                 phase = known;
             }
 
@@ -271,9 +271,9 @@ internal static class UndoFormat
             if (kind == UndoEvent.Begin)
             {
                 if (!root.TryGetProperty("step", out JsonElement stepElement) || stepElement.ValueKind != JsonValueKind.Object)
-                    return Unreadable(seq, names, segment, place);
+                    return Unreadable(seq, names(), segment, place);
                 if (WholeNumber(stepElement, "seq") is not { } stepSeq || stepSeq != seq.Value)
-                    return Unreadable(seq, names, segment, place);
+                    return Unreadable(seq, names(), segment, place);
                 step = ReadStep(stepElement, stepSeq, names);
             }
 
@@ -307,7 +307,7 @@ internal static class UndoFormat
 
     // ---- The step and its ops -------------------------------------------
 
-    private static UndoStep ReadStep(JsonElement element, long seq, IReadOnlyList<string> namesInText)
+    private static UndoStep ReadStep(JsonElement element, long seq, Func<IReadOnlyList<string>> namesInText)
     {
         bool readable = !HasDuplicateKeys(element);
 
@@ -382,7 +382,7 @@ internal static class UndoFormat
         }
         else
         {
-            blobs = namesInText;
+            blobs = namesInText();
         }
 
         return new UndoStep
