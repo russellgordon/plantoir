@@ -4,11 +4,20 @@ Builds the Windows release bundle: publish, optionally sign, package.
     powershell -File publish.ps1              # unsigned bundle (local testing)
     powershell -File publish.ps1 -Sign        # signed bundle (real releases)
     powershell -File publish.ps1 -WithoutAssistantEngine   # a developer's bundle with no llama\ (never with -Sign)
+    powershell -File publish.ps1 -CheckLedgerOnly          # only the named-gap check -Sign makes, then stop
+
+Before anything is built it runs NamedGapLedgerTests against <Version> (the
+release being built, not the last one shipped). With -Sign or
+-CheckLedgerOnly an entry owed by this release or an earlier one REFUSES the
+run; without them it is a warning, because an unsigned bundle is a test build
+made while that release's work is still open (#862).
 
 Output lands in windows-app\dist\PlantoirSetup.exe and Plantoir-win-x64.zip
 with SHA-256 printed for the release notes. The version comes from ONE place:
-<Version> in Plantoir\Plantoir.csproj — bump it there, tag the repo to
-match (v<version>), and this script names everything else accordingly.
+<Version> in Plantoir\Plantoir.csproj — raised on dev when work on a release
+starts (RELEASING.md -> "When the number is raised"), checked at the cut, the
+repo tagged to match (v<version>), and this script names everything else
+accordingly.
 
 Signing uses Azure Artifact Signing (a.k.a. Trusted Signing) via the
 `sign` dotnet tool and expects a prior `az login`. See the signing
@@ -21,6 +30,9 @@ param(
     # A developer's build with no assistant engine (no Vendor\llama). Refused
     # together with -Sign: a signed bundle without llama\ is what 1.9.0 shipped.
     [switch]$WithoutAssistantEngine,
+    # Run only the named-gap ledger check, enforced as -Sign enforces it, and
+    # stop: how the refusal is proved without a signing login or a build.
+    [switch]$CheckLedgerOnly,
     [string]$SigningEndpoint = "https://eus.codesigning.azure.net",
     [string]$SigningAccount  = "plantoir-signing",
     [string]$SigningProfile  = "plantoir-public",
@@ -29,6 +41,51 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+
+# ---- The named-gap ledger: nothing owed by this release may still be open --
+# Since #862 the ordinary suite compares the ledger with the last release
+# Windows SHIPPED (site.json and updates/windows.xml), because <Version> is
+# raised on dev when work on a release starts and every entry owed by that
+# release is allowed while the work is open. So the cut is checked HERE, in
+# the one command every Windows release runs: the same fact, with
+# PLANTOIR_LEDGER_BASELINE=build, compares each entry with <Version>.
+# Enforced only with -Sign (and -CheckLedgerOnly): an unsigned bundle is the
+# documented local test build, and website/shots/capture_windows.py makes one
+# too, both while the release's work is still open. Judged by the totals
+# (TestRunOutcome.ps1), never the exit code. Rejected: reading
+# NamedGapLedger.cs with a regex here (a second reader of C# source, which
+# drifts the first time a milestone constant is renamed).
+. "$PSScriptRoot\TestRunOutcome.ps1"
+$enforceLedger = $Sign -or $CheckLedgerOnly
+Write-Host "Checking the named-gap ledger against this build's <Version> (NamedGapLedgerTests)..." -ForegroundColor Green
+$baselineBefore = $env:PLANTOIR_LEDGER_BASELINE
+$env:PLANTOIR_LEDGER_BASELINE = 'build'
+try {
+    $ledgerRun = $null
+    Invoke-TestRun -DotnetArguments @('test', 'Plantoir.Tests\Plantoir.Tests.csproj', '--nologo',
+                                      '--filter', 'FullyQualifiedName~NamedGapLedgerTests') -Result ([ref]$ledgerRun) | Out-Null
+} finally {
+    $env:PLANTOIR_LEDGER_BASELINE = $baselineBefore
+}
+$ledgerOutcome = Get-TestRunOutcome -Output $ledgerRun.Output -ExitCode $ledgerRun.ExitCode
+if ($ledgerOutcome.Verdict -ne 'Passed') {
+    $owedLines = @($ledgerRun.Output -split "`r?`n" |
+                   Where-Object { $_ -match ' is owed by #\d+ on | names the milestone ' } |
+                   ForEach-Object { $_.Trim() })
+    $ledgerMessage = "The named-gap ledger is not clear for this build. $($ledgerOutcome.Summary)"
+    if ($owedLines.Count -gt 0) {
+        $ledgerMessage += "`n$($owedLines.Count) ledger entries are owed by this release or an earlier one:`n  " +
+                          ($owedLines -join "`n  ")
+    }
+    if ($enforceLedger) {
+        throw ("$ledgerMessage`nA signed release cannot be cut over them: build each, or move its issue and " +
+               "entry to a later milestone with Russell's say-so (contracts/README.md -> `"Named gaps`").")
+    }
+    Write-Warning "$ledgerMessage`nThis unsigned bundle is built anyway; publish.ps1 -Sign refuses it."
+} else {
+    Write-Host "Named-gap ledger: nothing owed by this build. $($ledgerOutcome.Summary)" -ForegroundColor Green
+}
+if ($CheckLedgerOnly) { return }
 
 # ---- The assistant's engine (llama\): refused when missing ----------------
 # The signed 1.9.0 shipped with NO llama\ folder: Plantoir.csproj includes
