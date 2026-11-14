@@ -18,7 +18,7 @@ Branch `issue/790a-unit-plans-core`. Lenovo 20QES70500 (i5-8365U, 16 GB, Windows
 
 - `UnitPlans` (the `plan.json` reader, never throwing; the greeting's last sentence and trail clause through both doors' `Prepare`, NOT wired), `PlanningTab`, `PlanAUnit` (its message ends with the handouts sentence: #895's Plan a Unit part), `PlanningAssets` (the `assets` mirror, never through a link and never overwriting in place), and the guard's Core (`LocalSiteGuard`, `PlanNavigation`, `PlanInTheBrowser`). `documentation/12-windows-app.md` → "Unit planning on Windows (#790, #801, #820)".
 - After two implementation reviews: unit names drop from the end to keep the door's command line under cmd's limit; a page over MAX_PATH is served; COM0 and LPT0 refused; a hard link in `assets` is replaced, never written through; the three file-link cases this account cannot make are a SKIPPED fact, not passes.
-- Gates: GATES-PLACEHOLDER
+- Gates: `dotnet test` (with `PLANTOIR_RUNTIME` at the main checkout's runtime) after merging `dev` 77a341b02: Failed 0, Passed 3715, Skipped 1, Total 3716 (16 m 43 s, at 46c7ece21); the one skip is `PlanInTheBrowserTests.TheFileLinkCasesHoldOnDisk`, by name (this account cannot make a file symbolic link). x64 Debug build succeeded. The must-fails for every review fix are in the closing comment on #790.
 
 ## 2026-11-12 — the installer waits for work still running from its own folder (#700)
 
