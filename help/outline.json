@@ -1303,6 +1303,7 @@
       "Section > Re-date Classes… moves EVERY class in the section onto the class dates on file, in order; nothing is chosen",
       "Check the plan before you agree",
       "To put new classes in front of planned ones, use Make Room for Classes… instead (link make-room)",
+      "At the start of a new year, Section > Roll Over to a New Year… re-dates the same way and also settles the website: keep last year's address, or start a new one; it asks only when the section has a website",
       "Preview, then deploy"
      ],
      "pictures": [
@@ -1401,7 +1402,7 @@
       "Section > Get Ready for the Start of the Year…",
       "Read what goes into draft and why; agree. Nothing is re-dated or published",
       "Undo it from the same menu until you next deploy or publish",
-      "To move a copied course onto this year's dates, use Re-date Classes… (link redate)",
+      "To move a copied course onto this year's dates, use Re-date Classes… (link redate), or Section > Roll Over to a New Year…, which also asks whether to keep last year's website or start a new one",
       "Deploy when it looks right"
      ],
      "pictures": [

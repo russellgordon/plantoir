@@ -2552,6 +2552,78 @@ nonisolated enum AssistWording {
              + "course's settings, then choose this again."
     }
 
+    // #897 piece B: Section ▸ Roll Over to a New Year…, the rollover the
+    // built-in assistant's window asks about in words, in the menu's voice.
+    // The window's own sentences are unchanged.
+
+    static func menuRollOverTitle(course: String, section: String) -> String {
+        return "Roll over \(course) Section \(section) to a new year"
+    }
+
+    static func menuRollOverIntro(noun: ClassNoun = .class) -> String {
+        return "Rolling over puts this section's \(noun.plural) onto the \(noun.singular) dates on file, "
+             + "and sets aside last year's record of which pages students could reach."
+    }
+
+    /// The dates the rollover will use, first to last.
+    static func menuRollOverDates(first: String, last: String, noun: ClassNoun = .class) -> String {
+        return "The dates on file for this section's \(noun.plural): \(first) to \(last)."
+    }
+
+    /// The last date on file is before today: probably last year's. A club
+    /// is pointed at the Section menu without the item's title, which says
+    /// "Class" (`menuNeedsClassDatesFirst` does the same).
+    static func menuRollOverDatesAreOld(noun: ClassNoun = .class) -> String {
+        let firstSentence: String = "The last of these dates has passed, so they may be last year's."
+        if noun == .meeting {
+            return firstSentence + " To give this year's meeting dates, cancel and add them from the "
+                 + "Section menu first."
+        }
+        return firstSentence + " To give this year's class dates, cancel and choose Section ▸ Class Dates… first."
+    }
+
+    /// The question's two answers, under `rolloverWebsiteQuestion`.
+    static let menuRollOverKeepWebsite: String =
+        "Keep last year's website, so links students saved keep working"
+
+    static let menuRollOverNewWebsite: String =
+        "Start a new website, and leave last year's as it is"
+
+    /// No question: the section has never been deployed to a web host.
+    static let menuRollOverNotDeployedYet: String =
+        "This section has not been deployed yet, so there is no website to keep. Plantoir asks what "
+        + "to call it the first time it is deployed."
+
+    /// No question: the section deploys only to a folder.
+    static let menuRollOverDeploysToAFolder: String =
+        "This section deploys to a folder, so there is no website address to keep or replace."
+
+    static let menuRollOverButton: String = "Roll Over"
+
+    /// The plan, for "same" (the plan review's amendment 14): the card the
+    /// window shows says nothing about the website on that answer.
+    static let menuRollOverPlanKeepsTheWebsite: String =
+        "It would keep deploying this section to the same website as last year."
+
+    /// The plan, for either answer: what `PublishedPagesRecord.release` sets aside.
+    static let menuRollOverPlanSetsTheRecordAside: String =
+        "It would also set aside last year's record of which pages students could reach, and the "
+        + "answers given about them last year, so the new year starts afresh."
+
+    /// `rolloverCouldNotStartANewWebsite` without the first person (the plan
+    /// review's amendment 13).
+    static func rolloverCouldNotStartANewWebsiteFromTheMenu(stillPinned: String) -> String {
+        return "This section could not be moved off \(stillPinned), so deploying it will still "
+             + "replace last year's website there. Try again, or check whether that file is "
+             + "locked or open somewhere else."
+    }
+
+    /// The finished line for a section that deploys only to a folder, in
+    /// place of `rolloverKeptTheSameWebsite`, which says "website".
+    static let rolloverDeploysToAFolderFromTheMenu: String =
+        "This section deploys to a folder, so where it deploys is unchanged. Nothing goes out until "
+        + "you deploy."
+
     /// Help ▸ Publishing and Deploying…: the difference, said to the teacher
     /// — `whatPublishingMeans` is the assistant's, and says "the teacher".
     static let publishingAndDeployingTitle: String = "Publishing and Deploying"

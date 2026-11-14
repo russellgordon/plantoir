@@ -112,6 +112,11 @@ nonisolated enum SubjectMenuRules {
         case reDateClasses
         case makeRoomForClasses
         case classDates
+        /// Roll Over to a New Year… (#897 piece B): the rollover only the
+        /// built-in assistant's window offered before, its website question
+        /// asked in a sheet (`RollOverFromTheMenu`). Greyed exactly as
+        /// Re-date Classes… is, since it is a re-date first.
+        case rollOverToANewYear
         // View
         case back
         case forward
@@ -423,6 +428,7 @@ nonisolated enum SubjectMenuRules {
                 enabled.insert(.reDateClasses)
                 enabled.insert(.makeRoomForClasses)
                 enabled.insert(.classDates)
+                enabled.insert(.rollOverToANewYear)
                 if situation.lastChangeIsHere {
                     enabled.insert(.undoLastChange)
                 }

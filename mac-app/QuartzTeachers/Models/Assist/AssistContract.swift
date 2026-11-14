@@ -813,6 +813,27 @@ enum AssistContract {
             "menuTheNextPageIsAlreadyThere": AssistWording.menuTheNextPageIsAlreadyThere(page: copyPlaceholder),
             "menuUnitWordRenameUnfinished": AssistWording.menuUnitWordRenameUnfinished(),
             "menuUnitWordRenameUnfinishedForAMeeting": AssistWording.menuUnitWordRenameUnfinished(noun: .meeting),
+            // #897 piece B: Section ▸ Roll Over to a New Year….
+            "menuRollOverTitle": AssistWording.menuRollOverTitle(course: course, section: section),
+            "menuRollOverIntro": AssistWording.menuRollOverIntro(),
+            "menuRollOverIntroForAMeeting": AssistWording.menuRollOverIntro(noun: .meeting),
+            "menuRollOverDates": AssistWording.menuRollOverDates(first: "2026-09-08", last: "2027-06-24"),
+            "menuRollOverDatesForAMeeting": AssistWording.menuRollOverDates(
+                first: "2026-09-08", last: "2027-06-24", noun: .meeting
+            ),
+            "menuRollOverDatesAreOld": AssistWording.menuRollOverDatesAreOld(),
+            "menuRollOverDatesAreOldForAMeeting": AssistWording.menuRollOverDatesAreOld(noun: .meeting),
+            "menuRollOverKeepWebsite": AssistWording.menuRollOverKeepWebsite,
+            "menuRollOverNewWebsite": AssistWording.menuRollOverNewWebsite,
+            "menuRollOverNotDeployedYet": AssistWording.menuRollOverNotDeployedYet,
+            "menuRollOverDeploysToAFolder": AssistWording.menuRollOverDeploysToAFolder,
+            "menuRollOverButton": AssistWording.menuRollOverButton,
+            "menuRollOverPlanKeepsTheWebsite": AssistWording.menuRollOverPlanKeepsTheWebsite,
+            "menuRollOverPlanSetsTheRecordAside": AssistWording.menuRollOverPlanSetsTheRecordAside,
+            "rolloverCouldNotStartANewWebsiteFromTheMenu": AssistWording.rolloverCouldNotStartANewWebsiteFromTheMenu(
+                stillPinned: ".netlify_sites/section1.json"
+            ),
+            "rolloverDeploysToAFolderFromTheMenu": AssistWording.rolloverDeploysToAFolderFromTheMenu,
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),

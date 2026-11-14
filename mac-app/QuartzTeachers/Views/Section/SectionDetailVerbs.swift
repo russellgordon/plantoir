@@ -194,6 +194,19 @@ extension SectionDetailView {
             model.way = model.availableWays.first
             model.sourceRows = SectionVerbSheetModel.sourceRows(course: course, sectionNumber: sectionNumber)
             verbSheet = model
+        case .rollOverToANewYear:
+            // #897 piece B: the dates, the website question where there is a
+            // website (nothing chosen), then the plan.
+            if askForDatesFirst(before: item) {
+                return
+            }
+            let model: SectionVerbSheetModel = SectionVerbSheetModel(
+                kind: .rollOver, course: course, sectionNumber: sectionNumber,
+                title: AssistWording.menuRollOverTitle(course: course.displayCode, section: String(sectionNumber)),
+                item: item
+            )
+            model.rollOver = RollOverFromTheMenu.choice(forSection: sectionNumber, in: course, today: CalendarDay.today())
+            verbSheet = model
         case .undoLastChange:
             runAtOnce(SectionVerbs.undoLastChange(), item: item, verbs: verbs, title: AssistWording.menuUndoLastChangeTitle)
         case .rebuildPreview:
@@ -210,7 +223,7 @@ extension SectionDetailView {
         }
     }
 
-    /// Add Class…, Re-date Classes… and Make Room for Classes… need the
+    /// Add Class…, Re-date Classes…, Roll Over to a New Year… and Make Room for Classes… need the
     /// section's class dates. With none on file, THIS window asks for them
     /// first — its own Class Dates sheet, never the assistant's prompt, which
     /// only the assistant's window shows (#457's plan review, blocker 1) —
@@ -226,7 +239,7 @@ extension SectionDetailView {
         switch item {
         case .addClass:
             model.reason = AssistWording.datesForTheNextPage(noun: noun)
-        case .reDateClasses:
+        case .reDateClasses, .rollOverToANewYear:
             model.reason = AssistWording.datesToReDate(noun: noun)
         default:
             model.reason = AssistWording.datesToMakeRoom(noun: noun)
@@ -367,6 +380,12 @@ extension SectionDetailView {
         case .reDateClasses:
             planCall = SectionVerbs.reDateClasses(course: code, section: sectionNumber, planning: true)
             model.pendingCall = SectionVerbs.reDateClasses(course: code, section: sectionNumber, planning: false)
+        case .rollOver:
+            guard let website = model.rollOver.websiteSent else {
+                return
+            }
+            planCall = SectionVerbs.rollOver(course: code, section: sectionNumber, website: website, planning: true)
+            model.pendingCall = SectionVerbs.rollOver(course: code, section: sectionNumber, website: website, planning: false)
         case .makeRoom:
             var unit: Int = 1
             var atDay: Int = 1
@@ -490,6 +509,8 @@ extension SectionDetailView {
             return count == 1 ? "1 page ticked" : "\(count) pages ticked"
         case .makeRoom:
             return model.howMany == 1 ? "room for 1" : "room for \(model.howMany)"
+        case .rollOver:
+            return RollOverFromTheMenu.counts(model.rollOver.website, answer: model.rollOver.answer)
         case .addClass:
             // How it was added, never the class's title (#897).
             switch model.way {

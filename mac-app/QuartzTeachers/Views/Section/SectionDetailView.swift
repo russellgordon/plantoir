@@ -1887,7 +1887,7 @@ struct SectionDetailView: View {
             stopShowingTheDeployedFolder()
         case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
              .addClass,
-             .reDateClasses, .makeRoomForClasses, .classDates:
+             .reDateClasses, .makeRoomForClasses, .classDates, .rollOverToANewYear:
             performVerb(item)
         default:
             break
