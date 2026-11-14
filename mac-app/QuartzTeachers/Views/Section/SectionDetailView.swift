@@ -3285,13 +3285,14 @@ struct SectionDetailView: View {
                 // asked about nothing and every later Preview did nothing.
                 // End them now, and say why in an alert as well as on the
                 // console, since the console is not always on screen. What
-                // the system said, when it said anything, goes to the trail
-                // only: the sentence is the one the teacher can act on.
+                // lies behind it (the missing piece's file name, or what the
+                // system said) goes to the trail only: the sentence is the
+                // one the teacher can act on.
                 previewBuildWait.end()
                 releasePreviewLease()
                 var trailLine: String = "the preview could not start, and the teacher was told why: " + problem
                 if let detail = previewRunner.launchProblemDetail {
-                    trailLine += " (the system said: " + detail + ")"
+                    trailLine += " (" + detail + ")"
                 }
                 ActivityTrail.note(
                     .previewCouldNotStart,

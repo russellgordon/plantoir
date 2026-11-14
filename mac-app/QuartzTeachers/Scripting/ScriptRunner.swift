@@ -28,9 +28,13 @@ class ScriptRunner {
     /// carries the system's own description of an error (#812's review).
     var launchProblem: String?
 
-    /// What the system said when a run could not get started, for the
-    /// trail only (it is redacted on the way in). Nil for every other
-    /// launch problem, and cleared at the start of every run.
+    /// What lies behind a launch problem, for the trail and never for a
+    /// teacher: which piece the folder is missing, or what the system said
+    /// when a run could not get started. Nil for every other launch
+    /// problem, and cleared at the start of every run. Only a section
+    /// window's preview writes it to the trail today (`preview could not
+    /// start`, redacted on the way in); a deploy, a set-up or the
+    /// assistant's rebuild that meets the same problem keeps it nowhere.
     var launchProblemDetail: String?
 
     /// When output last arrived — used to sense a stalled prompt.
@@ -242,14 +246,24 @@ class ScriptRunner {
     /// run, or would not launch it (#812's review). It used to be followed
     /// by the system's own description, which named the app's internal
     /// module and error type ("QuartzTeachers.PseudoTerminalError error 0")
-    /// and gave nothing to act on; that description now goes to the trail
-    /// through `launchProblemDetail`. The remedy is the one the launchers
+    /// and gave nothing to act on; that description is kept in
+    /// `launchProblemDetail` instead, which a section window's preview
+    /// writes to the trail. The remedy is the one the launchers
     /// already give when the website builder will not start
     /// (`hostBlockClash.saysWhenAStartIsRefused` in `app-rules.json`):
     /// both failures are the Mac running short of something, which a
     /// restart puts right.
     static let couldNotGetStarted: String =
         "Could not get started. Try again, or restart this Mac if it happens again."
+
+    /// What a teacher reads when the launcher a run needs is not in the
+    /// working folder. It used to name the launcher's file in brackets
+    /// ("(preview.sh)"), which since #812 reached the "Cannot Preview Yet"
+    /// alert and named a piece of the machinery there (rule 1 of the
+    /// repository's CLAUDE.md). The file's name is kept in
+    /// `launchProblemDetail` instead.
+    static let folderIsMissingAPiece: String =
+        "This working folder is missing a piece it needs. Try choosing your working folder again from the File menu."
 
     /// The shell every launcher runs under. A variable only so a test can
     /// point it at a program that is not there and meet the launch failure
@@ -387,7 +401,8 @@ class ScriptRunner {
 
         let scriptURL: URL = workingDirectory.appendingPathComponent(scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
-            launchProblem = "This working folder is missing a piece it needs (\(scriptName)). Try choosing your working folder again from the File menu."
+            launchProblem = ScriptRunner.folderIsMissingAPiece
+            launchProblemDetail = "the working folder has no " + scriptName
             return
         }
 
@@ -396,7 +411,7 @@ class ScriptRunner {
             newTerminal = try PseudoTerminal()
         } catch {
             launchProblem = ScriptRunner.couldNotGetStarted
-            launchProblemDetail = error.localizedDescription
+            launchProblemDetail = "the system said: " + error.localizedDescription
             return
         }
 
@@ -444,7 +459,7 @@ class ScriptRunner {
             try newProcess.run()
         } catch {
             launchProblem = ScriptRunner.couldNotGetStarted
-            launchProblemDetail = error.localizedDescription
+            launchProblemDetail = "the system said: " + error.localizedDescription
             return
         }
 

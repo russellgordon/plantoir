@@ -10,7 +10,8 @@ import XCTest
 ///
 /// Every launch problem `ScriptRunner.run` can leave is walked: Plantoir
 /// closing, the folder's tools still being copied or failed, the launcher
-/// missing, and a launch the system refused, met for real by pointing the
+/// missing (whose file name goes to the trail, never the sentence), and a
+/// launch the system refused, met for real by pointing the
 /// shell at a program that is not there. The pseudo-terminal failure cannot
 /// be caused from a test, so its sentence is checked as the constant both
 /// failures share, beside the description it replaced.
@@ -20,6 +21,10 @@ final class ScriptRunnerLaunchProblemTests: XCTestCase {
     // MARK: - Stored properties
 
     /// Words that belong to the machinery, never to a teacher's sentence.
+    /// Matched without regard to case, so "Script" and "Launcher" are
+    /// caught as well as "script" and "launcher". The file endings catch a
+    /// launcher named by its file ("preview.sh", "deploy.ps1"), which the
+    /// missing-launcher sentence used to carry in brackets.
     static let machineryWords: [String] = [
         "QuartzTeachers",
         "Pseudo",
@@ -28,6 +33,11 @@ final class ScriptRunnerLaunchProblemTests: XCTestCase {
         "NSCocoaErrorDomain",
         "couldn’t be completed",
         "bash",
+        ".sh",
+        ".ps1",
+        ".py",
+        "launcher",
+        "script",
     ]
 
     var folder: URL = URL(fileURLWithPath: "/")
@@ -69,7 +79,11 @@ final class ScriptRunnerLaunchProblemTests: XCTestCase {
         let missing: ScriptRunner = ScriptRunner()
         missing.run(scriptNamed: "preview.sh", arguments: [], workingDirectory: folder)
         sentences["missing launcher"] = try XCTUnwrap(missing.launchProblem)
-        XCTAssertNil(missing.launchProblemDetail)
+        let missingDetail: String = missing.launchProblemDetail ?? ""
+        XCTAssertTrue(
+            missingDetail.contains("preview.sh"),
+            "the missing launcher's name is kept for the trail, not the sentence"
+        )
 
         // The system refused to launch it: a real refusal, from a shell
         // that is not there.
@@ -99,6 +113,13 @@ final class ScriptRunnerLaunchProblemTests: XCTestCase {
             "the check must catch \(oldDescription)"
         )
 
+        // And it sees a launcher named by its file, as the missing-launcher
+        // sentence used to name one.
+        XCTAssertEqual(
+            ScriptRunnerLaunchProblemTests.machineryWordsIn("a piece it needs (preview.sh)."),
+            [".sh"]
+        )
+
         XCTAssertEqual(sentences.count, 6)
         for (name, sentence) in sentences {
             XCTAssertFalse(sentence.isEmpty, name)
@@ -110,8 +131,9 @@ final class ScriptRunnerLaunchProblemTests: XCTestCase {
     /// The machinery words a sentence carries.
     static func machineryWordsIn(_ sentence: String) -> [String] {
         var found: [String] = []
+        let lowercased: String = sentence.lowercased()
         for word in machineryWords {
-            if sentence.contains(word) {
+            if lowercased.contains(word.lowercased()) {
                 found.append(word)
             }
         }

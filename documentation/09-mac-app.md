@@ -2779,7 +2779,7 @@ one path where Preview now did nothing and said nothing. `ScriptRunner.run`
 has five early returns that record a `launchProblem` and leave the runner
 not running (the launcher missing from the folder, a pseudo-terminal it
 could not open, a process that would not launch, the folder's tools still
-being copied, Plantoir closing). Three of them clear the exit code first,
+being copied or having failed to copy, Plantoir closing). Three of them clear the exit code first,
 and the other two leave whatever an earlier run left, which on a window that
 has not run yet is nothing.
 The wait's first phase looked only for an exit code, so it ran its full ten
@@ -2809,12 +2809,30 @@ names the app's module and error type and gives nothing to act on (rule 1).
 Both returns now give `ScriptRunner.couldNotGetStarted`, whose remedy is the
 one the launchers already give when the website builder will not start
 (`app-rules.json` → `hostBlockClash.saysWhenAStartIsRefused`), and keep the
-system's description in `launchProblemDetail`, which only the trail reads:
-`preview could not start` adds it after the sentence, and the trail redacts
-it on the way in. `ScriptRunnerLaunchProblemTests` walks every launch
+system's description in `launchProblemDetail`, which no teacher reads. A
+section window's preview writes it to the trail (`preview could not start`
+adds it after the sentence, and the trail redacts it on the way in); a
+deploy, a set-up or the assistant's rebuild that meets the same failure
+shows the sentence and keeps the description nowhere, which is a follow-up
+of its own. `ScriptRunnerLaunchProblemTests` walks every launch
 problem, meeting the launch failure for real through `ScriptRunner.shell`
 pointed at a program that is not there, and finds no machinery word in any
-of them. Rejected: giving `PseudoTerminalError` a `LocalizedError` sentence
+of them.
+
+The fifth sentence had the same fault in a smaller way. The launcher missing
+from the folder was reported as "missing a piece it needs (preview.sh)", and
+once that sentence reached the alert it named a piece of the machinery by its
+file (rule 1). It is now `ScriptRunner.folderIsMissingAPiece`, with no file
+name, and the name goes to `launchProblemDetail` ("the working folder has no
+preview.sh"), so the trail still says which piece. The scheduled deploy's
+own refusal for a missing `deploy.sh` dropped its bracket the same way. The
+test's list of machinery words now also refuses ".sh", ".ps1", ".py",
+"launcher" and "script" without regard to case; with the old sentence it is
+red on ".sh". Rejected: keeping the name in the sentence because it helps a
+problem report (the trail carries it for exactly that, and the teacher can
+do nothing with a file name).
+
+Rejected: giving `PseudoTerminalError` a `LocalizedError` sentence
 (the process launch failure's description, "The file “bash” doesn’t exist.",
 would still reach the alert), and a `FailureExplainer` match (it reads a
 run's output, and these runs have none; its rule for what it does not
