@@ -319,6 +319,10 @@ COPY scripts/figures.py /opt/scripts/figures.py
 # each sketch's file, and gates the engine the site carries. Imported by
 # build_site.py by bare name.
 COPY scripts/geogebra.py /opt/scripts/geogebra.py
+# PhET simulations (#674), and the folder every file a page downloads the
+# first time it uses it is kept in (keptDownloads).
+COPY scripts/kept_downloads.py /opt/scripts/kept_downloads.py
+COPY scripts/phet.py /opt/scripts/phet.py
 # Runnable Swift (#493): which blocks the launcher must compile (`plan`, run by
 # preview.sh through docker exec before the build) and what the build gives
 # the site (`prepare`). Imported by build_site.py by bare name.
