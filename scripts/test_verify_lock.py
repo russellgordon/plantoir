@@ -6,7 +6,9 @@ Two runs at once corrupt each other — the same image tag, the same fixed log
 files, the same scratch folders in $HOME — and that is how #280 was found. A
 second run therefore says who holds the lock and exits 1, rather than
 queueing silently; the lock is let go on every exit, Ctrl-C, a kill and a
-hang-up included, and only by the run that took it.
+hang-up included, and only by the run that took it. Since #906 the same
+traps pass a signal on to the check the run is in the middle of, through
+run_check, and to nothing else.
 
 **How this runs the real thing.** The functions are cut out of the
 repository's `verify.sh` between its VERIFY LOCK markers — not retyped — and
@@ -64,6 +66,16 @@ def wait_for(path: Path, seconds: float = 10.0) -> None:
             return
         time.sleep(0.05)
     raise AssertionError(f"{path} never appeared")
+
+
+def alive(pid: int) -> bool:
+    """Whether the process is running; a zombie waiting to be reaped is not."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
+    return state.stdout.strip() != "" and not state.stdout.strip().startswith("Z")
 
 
 def wait_gone(path: Path, seconds: float = 10.0) -> bool:
@@ -207,6 +219,53 @@ class OneRunAtATime(unittest.TestCase):
                 holder.send_signal(ending)
                 holder.wait(timeout=30)
                 self.assertTrue(wait_gone(self.lock), f"{ending.name} left the lock behind")
+
+    def test_a_signal_ends_the_check_running_and_nothing_else(self):
+        """#906: a signal to verify.sh alone used to wait for the check in the
+        foreground to end by itself, because bash runs a trap only after its
+        foreground child ends. Now run_check runs it in the background and
+        the trap passes the signal on to that pid and to no other: the run
+        ends at once, the check with it, and a process the run started some
+        other way keeps running. An INT reaches the check as TERM, since a
+        background command with no job control ignores INT."""
+        home = Path(self.scratch.name)
+        then = ('sleep 30 >/dev/null 2>&1 & echo $! >> "$HOME/sleepers"; echo $! > "$HOME/bystander"\n'
+                "run_check /bin/sh -c 'echo $$ >> \"$HOME/sleepers\"; echo $$ > \"$HOME/check\"; exec sleep 30'\n"
+                'echo AFTER THE CHECK\n')
+        for ending, status in ((signal.SIGTERM, 143), (signal.SIGHUP, 129), (signal.SIGINT, 130)):
+            with self.subTest(signal=ending.name):
+                for name in ("check", "bystander"):
+                    (home / name).unlink(missing_ok=True)
+                said = home / ("said-" + ending.name)
+                with open(said, "wb") as output:
+                    holder = subprocess.Popen(a_run(self.lock, then), env=environment(self.lock),
+                                              stdout=output, stderr=subprocess.DEVNULL)
+                self.holders.append(holder)
+                wait_for(home / "check")
+                wait_for(home / "bystander")
+                check = int((home / "check").read_text(encoding="utf-8"))
+                bystander = int((home / "bystander").read_text(encoding="utf-8"))
+                started = time.monotonic()
+                holder.send_signal(ending)
+                holder.wait(timeout=10)
+                self.assertLess(time.monotonic() - started, 10)
+                self.assertEqual(holder.returncode, status)
+                self.assertNotIn(b"AFTER THE CHECK", said.read_bytes())
+                self.assertFalse(alive(check), f"{ending.name} left the check it was running behind")
+                self.assertTrue(alive(bystander), f"{ending.name} ended a process run_check did not start")
+                self.assertTrue(wait_gone(self.lock), f"{ending.name} left the lock behind")
+                os.kill(bystander, signal.SIGTERM)
+
+    def test_run_check_answers_the_checks_own_status(self):
+        then = ("run_check /bin/sh -c 'exit 3' || echo \"STATUS $?\"\n"
+                "run_check /bin/sh -c 'exit 0' && echo PASSED\n"
+                'echo "LEFT [$RUNNING_CHECK_PID]"\n')
+        result = subprocess.run(a_run(self.lock, then), env=environment(self.lock), capture_output=True, timeout=30)
+        said = result.stdout.decode("utf-8")
+        self.assertEqual(result.returncode, 0, said + result.stderr.decode("utf-8"))
+        self.assertIn("STATUS 3", said)
+        self.assertIn("PASSED", said)
+        self.assertIn("LEFT []", said, "the pid of a check that has ended is kept")
 
     def test_a_run_never_lets_go_of_a_lock_that_is_not_its_own(self):
         """Its own lock was taken over (say it was thought stale) — its exit

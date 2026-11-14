@@ -18,10 +18,10 @@
 //
 //   node browser-checks/maths_offline.mjs <chrome> <maths page url> <top-level page url> <printable page url one folder down>
 
-import { spawn } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, mathsUrl, startUrl, printableUrl] = process.argv.slice(2)
 if (!chromePath || !mathsUrl || !startUrl || !printableUrl) {
@@ -31,7 +31,7 @@ if (!chromePath || !mathsUrl || !startUrl || !printableUrl) {
 const SITE = new URL(mathsUrl).origin
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-maths-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1280,900",
   "--use-mock-keychain", "--password-store=basic",

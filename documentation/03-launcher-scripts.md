@@ -2438,7 +2438,9 @@ ending anywhere on the Mac at the wrong moment refused this one with
   (`test_deploy_sh_destination`, `test_deploy_non_interactive`,
   `test_deploy_sh_questions`, `test_deploy_token_refusal`) set
   `PLANTOIR_TRAIL_DIR` to a temporary folder, so a refused run in a test
-  never writes the real activity log (#738 covers the rest).
+  never writes the real activity log. Since #738 every test file that runs
+  a launcher does it the same way, through `scripts/launcher_test_trail.py`
+  ("Python tests and the trail", below).
 
 **The table cannot be read: let it through.** Not for #381's reason (the
 leases do NOT cover a leftover run — that is the fault): failing closed would
@@ -3108,6 +3110,44 @@ handed-over folder and not in the scratch `HOME`'s trail. Neither test reads
 the real trail. Python tests that start a launcher with `os.environ` and a
 scratch `HOME` remove the variable first, because an inherited one would send
 their lines out of the scratch folder.
+
+**Python tests and the trail (#738).** Every `scripts/test_*.py` that runs a
+launcher imports `launcher_test_trail`, which sets `PLANTOIR_TRAIL_DIR` for the
+whole run to a temporary folder removed at exit, so a launcher started with an
+environment built from `os.environ` writes there. The four deploy test files
+that carried their own copy of those three lines since #737 import it instead.
+A test that hands a launcher a scratch `HOME` still removes the variable, as
+above. `scripts/test_launcher_tests_keep_their_trail.py` holds the rule (a
+file that names a launcher and starts a process imports the helper: 26 files
+on 2026-11-13) and runs deploy.sh's own `note_on_the_trail` under a scratch
+`HOME`: the line lands in the helper's folder, and with the variable taken
+away it lands in that `HOME` (the must-fail). **Measured** before the change,
+on `dev` fcd0a51c5: all 119 `scripts/test_*.py`, each run with `HOME` pointed
+at a scratch folder and the variable unset, wrote 0 lines into that `HOME`'s
+trail, so the lines #738 found on 2026-11-01 had already stopped with #737;
+the helper keeps a new test from starting again. Two of the 26 run in the
+image (`test_coverage_tab`, `test_published_pages_record`), and `verify.sh`
+mounts the helper beside them, which `test_image_runs_find_their_modules.py`
+checks.
+
+The helper reaches only an environment copied from `os.environ`. Eleven of
+the 26 files build theirs from scratch, as a dict literal naming `PATH` and
+`HOME`, and the variable never reaches those. They are safe because each
+replaces `HOME` with a scratch folder, so a second rule in the same file
+reads every such literal and fails one whose `HOME` is taken from the real
+one (`os.environ`, `os.getenv`, `Path.home`, `expanduser`) unless it names
+`PLANTOIR_TRAIL_DIR` itself. On 2026-11-13 it found one:
+`test_port_blocks.py`'s run of the port-listing functions passed the real
+`HOME` and no variable. Those functions write no trail, so nothing leaked,
+and it now passes the helper's folder. The rule is a reading of the source,
+so a `HOME` built some other way from the real one would pass it. Off
+POSIX the two runs of the real function are skipped, the way
+`test_trail_lock` skips its own: under Git Bash a temporary folder is a
+drive-letter path, which `note_on_the_trail` rightly does not take, so the
+line would fall back to `HOME`. Rejected: running the 26 launcher tests
+under a scratch `HOME` as the proof, which took 333 s in that measurement
+(`test_port_blocks.py` alone 208 s). That run stays the one proof this
+leaves out.
 
 **Windows (#682).** `Write-TrailLine` in `preview.ps1` and `deploy.ps1` (one
 function, byte-identical in both) takes `PLANTOIR_TRAIL_DIR` when it is
