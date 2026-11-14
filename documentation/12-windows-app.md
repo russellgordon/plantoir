@@ -1974,6 +1974,68 @@ sides, the accept loop, the reads and writes, HttpClient's continuations
 and the timers, so it would change nothing. A dedicated server thread
 instead of `Task.Run` — the client side starves too, so it cures half.
 
+### A red that is a busy PC: the shared Python limit and one refused write (#916)
+
+Two more reds of the same family turned three gate runs red on 2026-11-13/14,
+while several agents ran suites and filtered runs on this PC (Lenovo
+20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200) at once. Both fixes are
+test code only.
+
+**`PythonToolchainTests` stopped healthy files at 180 s.** The limit is there
+to stop a HUNG file with its name, not to judge speed, and three files met
+it doing nothing wrong: `test_starting_content_prompts.py` (116 s and 151 s
+under load), `test_no_stored_credentials.py` (71 s beside one other test
+host, 193 s beside more) and `test_shared_writes_two_at_once.py`. Timed one
+after another under the suite lock on 2026-11-14 with the runtime's Python
+3.14.10, the way the runner starts them, all 119 files took 10 min 41 s and
+every one passed; the seven at 30 s or more:
+
+| File | Alone |
+|---|---|
+| `test_graded_folders_new_course.py` | 78.5 s |
+| `test_starting_content_prompts.py` | 68.5 s |
+| `test_shared_writes_two_at_once.py` | 59.8 s |
+| `test_deploy_sh_destination.py` | 46.1 s |
+| `test_share_plan.py` | 45.1 s |
+| `test_marking_comments.py` | 44.6 s |
+| `test_no_stored_credentials.py` | 33.8 s |
+
+The worst slowdown seen under load is 5.7 times (33.8 s to 193 s), which
+would take the slowest file to about 450 s. **The limit is now 600 s for
+every file** (`PythonToolchainTests.Limit`): above anything load has
+produced, and a hung file still stops the run inside ten minutes. A timeout
+says the file, the limit and how long it ran, and, for a file in
+`KnownSlowFiles` (the table above), that a busy PC is the likely cause; for
+any other file, to suspect a hang first. `AHungFileIsStoppedAtTheLimitAndNamed`
+proves the limit still bites: a file that sleeps 300 s, written into a temp
+folder (never into `scripts/`, which both platforms run), is stopped at a
+2 s limit with exit 124 and that sentence. **Rejected:** a per-file
+allowance table, because it is kept in step by hand with a folder the mac
+adds files to, and the third file stopped that night was in no earlier
+measurement, so the table would have missed exactly the file that needed it
+(`KnownSlowFiles` only words the message; every file gets the same limit).
+Splitting the slow files' scans in shared Python, because it changes files
+the mac's `verify.sh` runs, for no gain to a teacher.
+
+**`LastViewedPagesTests.OnlyTheNewestAreKept` read `Actual: "P3"` once.** It
+wrote 503 entries through `LastViewedPages.Remember` and ignored what each
+call returned. The stamps were never the cause: each is injected, a minute
+apart, and the same test with every stamp EQUAL passes (newest-first order is
+kept by `Insert(0)` and a stable sort). What fails it is one refused write:
+`Remember` saves through a temporary file and a rename onto
+`last-viewed-pages.json`, and a rename onto a file something else holds open
+(a scanner reading the file just written is the usual holder) throws, is
+caught, and returns false. One entry fewer means only P1 and P2 are pushed
+out, so P3 survives at the second assertion. Reproduced with a scratch test,
+not committed: holding the file open (`FileShare.Read`) for write 502 gives
+`Assert.Null() Failure … Actual: "P3"` exactly. The test now SEEDS the 500
+kept entries in one write of its own, oldest first (so the order is also
+proved to come from the stamps, not the file), and sends only the three that
+evict through `Remember`, each asserted to have written and retried up to
+five times; 23 s became under a second. The product's behaviour, one
+remembered page silently not saved when the file is held, is a separate
+matter and is not changed here.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -2426,7 +2488,8 @@ alone afterwards, they passed in 116 s and 193 s, the second already over
 the limit with one other suite running. One repository scan in the second
 file took 57.9 s over 15,274 files, `help/` is not among its costliest
 files, and the merge grew the repository by 0.6% in bytes, so the merge did
-not cause it (see "A red that is a clock", above). The same method as the
+not cause it (see "A red that is a clock", above). *(Since #916 the limit is
+600 s, with these files' times alone: "A red that is a busy PC", above.)* The same method as the
 two sections above: nothing a teacher sees today differs, and every red is
 held by name against the open `windows` issue that builds it.
 
