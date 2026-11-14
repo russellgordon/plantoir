@@ -26,6 +26,7 @@ import contracts
 import machine_line
 import class_pages
 import course_names
+import custom_domains
 import markdown_code
 import how_i_teach
 import page_visibility
@@ -191,21 +192,20 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
     # fields are per-destination for exactly this reason (a Netlify-only
     # domain must never leak into a Cloudflare Pages leg's own link), and
     # the primary is the one destination this single build is canonically
-    # published as. An older, single-string shape is read as-is: it was
-    # written back when a course could only ever have one destination, so
-    # there was only ever one destination it could have meant.
-    custom_domains = config.get("custom_domains", {})
-    if isinstance(custom_domains, dict):
-        section_domains = (custom_domains.get("sections") or {}).get(section_key)
-        if isinstance(section_domains, dict):
-            primary_destination_type = config.get("deploy_target") or "netlify"
-            section_custom_domain = section_domains.get(primary_destination_type)
-        else:
-            section_custom_domain = section_domains
-        if section_custom_domain:
-            cleaned = clean_base_url(section_custom_domain)
-            if cleaned:
-                return cleaned
+    # published as. An older, single-string shape is read as the primary's:
+    # it was written back when a course could only ever have one destination,
+    # so there was only ever one destination it could have meant.
+    #
+    # Read by custom_domains.for_destination, the one Python reader of the
+    # format (contracts/file-formats.json -> customDomainReading, #904). Until
+    # #904 this read it itself: a bare string reached a course whose primary
+    # is a FOLDER, which has no address, and a list or a number in the setting
+    # raised AttributeError and stopped the build (measured, Python 3.14).
+    section_custom_domain = custom_domains.for_destination(
+        config, section_number, custom_domains.primary_destination_type(config))
+    cleaned = clean_base_url(section_custom_domain)
+    if cleaned:
+        return cleaned
 
     # 2 and 3. The site markers, the PRIMARY destination's first (#799). The
     # Netlify marker used to be read first whatever the course deployed to,
@@ -262,7 +262,7 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
                 pass
         return ""
 
-    if (config.get("deploy_target") or "netlify") == "cloudflare_pages":
+    if custom_domains.primary_destination_type(config) == "cloudflare_pages":
         order = (cloudflare_marker_domain, netlify_marker_domain)
     else:
         order = (netlify_marker_domain, cloudflare_marker_domain)
