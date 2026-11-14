@@ -13254,9 +13254,9 @@ can touch its date).
 `F_FULLFSYNC` is not something a SIGKILL proves; the R7 guard (an original
 at neither end: nothing moves) is the defence. Edits made during the
 archive were replaced and were in neither the archive nor the backup
-before; since round three, the ones Finder shows that were saved after the
-archive began are kept in `<CODE> not in the archive <stamp>` (a hidden file
-is not, see round three). The archive itself is still a `zip -r` that follows links, so a
+before; since round four, every file the archive's own listing does not
+hold as it is now, hidden files included, is kept in `<CODE> not in the
+archive <stamp>` (round four, below). The archive itself is still a `zip -r` that follows links, so a
 link loop can hang a restore before the staged part begins (#908); this
 piece does not make it worse. The unpack runs on the main actor (2 s on
 exFAT; longer from a backup iCloud must download), so a Force Quit is the
@@ -13402,10 +13402,9 @@ the final file that puts db38ed112's behaviour back (`909/round3/mustfail/`).
   stores times to the even second, rounded up), whichever is later; the
   inode time is not asked of an item at the top, whose own renames change
   it. `.DS_Store`, `__pycache__`, `.cache`, `.quartz-cache` and the built
-  site's link are made again and are removed as before; a hidden file
-  changed while the archive was made is not kept, because Obsidian rewrites
-  its layout file every few seconds while open and that would leave a kept
-  folder after nearly every restore.
+  site's link are made again and are removed as before. (Round three left
+  out every hidden file, for Obsidian's layout file; round four keeps them
+  and judges every file by the archive's listing, below.)
 - **I-b: the way out said "moves to Archived", and the kept folder could not
   be found.** The confirmation's paragraph on the course as it is now is
   chosen by what will truly happen, with the test the door uses before it
@@ -13447,7 +13446,10 @@ Every removal in the restore code, and where what it removes exists first:
 | `RestoreSwap.restore`, either catch before the swap (`removeStaging`) | the record and the unpack; nothing of the course has moved | the zip |
 | the live way back, every file back (`removeStaging` after `keepNewcomers`) | the backup's items moved back, the empty set-aside folder | the zip; what was written into them is with the newcomers first, and when that cannot all be moved nothing is removed |
 | a live stop (`keepTheSetAside`) and a settle's blocked way back | what is left of staging after the set-aside copy and newcomers moved | the same |
-| `finishAfterTheCommit`, `removeUnlocking(aside)` | the course as it was | all of it in `<CODE> as it was before restoring again` when the record keeps it; otherwise the archive made first, with what it may not hold moved out first; a failed move stops the removal |
+| `finishAfterTheCommit`, `removeUnlocking(aside)` | the course as it was | all of it in `<CODE> as it was before restoring again` when the record keeps it (decided by the engine since round four); otherwise the archive made first, whose LISTING holds every file removed (path, size, recorded time, and no time of the file's at or after `archiveBegan`); a deeper `.git`, `node_modules`, `dist`, `build` or `out` put back into the restored course, or kept; everything else moved out first; a failed move stops the removal |
+| `finishAfterTheCommit`, the same removal, `leftOutNamesMadeAgain` | `.DS_Store`, `__pycache__`, `.cache`, `.quartz-cache`, the built site's link, at any depth | nowhere: each is made again |
+| `finishAfterTheCommit`, the same removal, `Record.leftOutOnPurpose` | Plantoir's own Obsidian add-ons (`.obsidian/plugins/<name>` with Plantoir's marker) | the app's bundle: the next pass puts them back (12.9 MB) |
+| `justBeforeTheSwap`, `BuildOutputLocation.discardBuiltSites` | the course's built sites, outside the working folder | nowhere: derived, built again from the restored pages (the round-three review) |
 | `finishAfterTheCommit`, `removeStaging` | the record and the backup's leftovers | the zip |
 | a settle's `remove` (an `unpacking` record, or a day-old folder holding only `backup/`) | the unpack | the zip |
 | a settle's `putBack` with every file back | as the live way back | as the live way back |
@@ -13495,6 +13497,57 @@ at its suffix check: the settle is right (nothing moved, everything kept,
 `stoppedPartWay`, as the plan review's R7 asks), and the test still expected
 the sentence to end at `notInTheSidebar`, written before round two joined
 `restoreAgainToPutItRight` after it. The test now checks the join.
+
+### Round four: what the archive HOLDS, decided in the engine, said after a settle
+
+The round-three review (Opus, `S/reviews/909-round3-review.md`) found two
+INCOMPLETE and five MINOR; each was reproduced first on 66f645649 in
+`909/round4/harness/` (`RestoreSwap.swift` and `RestoreSettle.swift` copied
+verbatim, the archive now made by `/usr/bin/zip` with the app's arguments as
+the door makes it), and each fix has an XCTest red on a mutant of the final
+file that puts 66f645649's behaviour back (`909/round4/mustfail/`).
+
+- **A file that ARRIVES after the zip's scan keeps its old dates.** The rule
+  of creation and content times alone found it in neither the archive nor a
+  kept folder. Measured on APFS with the real zip (`edges.py`, the review's
+  driver): a page moved in (`mv`), copied with `cp -p`, copied with `ditto`,
+  a folder of three moved in, a page moved to the top and a page replaced by
+  another of the same size were lost, 8 files; the timetable and Obsidian's
+  `workspace.json` edited after the archive began were lost too (hidden
+  files were outside the rule). Now whether a file is in the archive is read
+  from the archive's OWN listing, its central directory
+  (`RestoreSwap.ArchiveListing`, nothing unpacked): held means the path
+  (Unicode's composed form), the size, a recorded time within two seconds of
+  the file's content time, and no creation or content time at or after
+  `archiveBegan`. Everything else is kept, hidden files included. Measured
+  after: 0 lost in all 13 cases on APFS and exFAT. REJECTED: the inode-change
+  time the review proposed. It is changed by the swap's own renames at the
+  top, by a reference course's unlocking before the swap (every locked page),
+  and by Finder tags, so it keeps too much; and a folder moved in keeps its
+  children's old inode times, so it misses them. REJECTED: a CRC of every
+  file against the listing, which reads the whole course (500 MB) at every
+  restore for a case the recorded time already catches. Cost on a 500 MB
+  course, measured below.
+- **The keep was decided by the door.** `CourseRestorer.restoreBackup` decided
+  `keepsWhatWasReplaced` a moment before the engine looked; the review forced
+  that gap and lost a page. The engine now decides it under its hold, in the
+  step that writes the moves (`gap.py`: 66f645649 lost the page, now kept).
+- **A settle that keeps files now says where**, once
+  (`RestoreSettleRule.Saying.keptWhatWasInTheFolder`,
+  `.keptWhatTheArchiveMayNotHold`), and writes `course restore kept files`:
+  `confirmKeptWithItsBackups` promises the teacher is told where, and after
+  a crash between `done` and the keep nobody was. Behind M11's rule,
+  `tellsTheTeacherOnceAfterPuttingRight` (held question M15).
+- **Russell's ruling (2026-11-14):** a `.git` (and the other names in
+  `leftOutNamesKeptAtAnyDepth`) below the top is PUT BACK where it was in
+  the restored course when its folder is there and nothing is in its place
+  (`putsDeeperLeftOutNamesBack`); otherwise it is kept aside as before.
+- **Kept folders are counted** in the size beside Backups
+  (`BackupSpace.bytesTaken`, `BackupSizes.keptFolders`), never listed or
+  pruned; All Backups says what they add (`keptFoldersTake`).
+- The known limits are `backups.restoreWholeCourse.knownLimits`.
+
+Measurements (Apple M4 Pro, one core, `nice -n 19`): MEASURED_ROUND_FOUR
 
 **For Undo (#899, U5).** U5 must land after this. An undo of a whole-course
 restore is a staged restore of the archive made first, a redo one of the

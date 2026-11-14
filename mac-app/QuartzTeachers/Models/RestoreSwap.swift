@@ -88,10 +88,17 @@ nonisolated enum RestoreSwap {
         var journalStep: String?
         /// True when the set-aside copy is KEPT in the backups folder after
         /// the commit rather than removed: no archive was made of a course
-        /// folder that is there. Written in the first record, so a settle
-        /// that finds `done` after a crash keeps it too (the fix review's
-        /// I-a: the settle removed it, 45 of 45 files). Nil reads as false.
+        /// folder that is there. Decided by the engine under its hold, in
+        /// the step that writes the moves (`swapping`), so a settle that
+        /// finds `done` after a crash keeps it too (the fix review's I-a:
+        /// the settle removed it, 45 of 45 files). Nil reads as false.
         var keepsWhatWasReplaced: Bool? = nil
+        /// Folders inside the course the archive left out on purpose
+        /// (Plantoir's own Obsidian add-ons, `ObsidianFigureAddOns
+        /// .backupExclusions`), as paths inside it: removed with the copy,
+        /// as before, because the next pass puts them back. Everything
+        /// else the archive's listing does not hold is kept.
+        var leftOutOnPurpose: [String]? = nil
         /// The moment the archive made first began, when one was. A file of
         /// the set-aside copy written at or after it may not be in that
         /// archive, so it is kept rather than removed with the copy.
@@ -208,15 +215,13 @@ nonisolated enum RestoreSwap {
         /// deleted. Nil on every door today.
         let keepingWhatWasReplaced: ((URL) -> Void)?
 
-        /// True when no archive was made of a course folder that is there,
-        /// so the set-aside copy is the only copy of what was in it: it is
-        /// recorded (`Record.keepsWhatWasReplaced`) and kept, never removed
-        /// (the fix review's I-a).
-        var keepsWhatWasReplaced: Bool = false
-
         /// When the archive made first began, or nil when none was made
         /// (`Record.archiveBegan`).
         var archiveBegan: Date? = nil
+
+        /// `Record.leftOutOnPurpose`: the folders inside the course the
+        /// archive made first left out on purpose, as paths inside it.
+        var leftOutOnPurpose: [String] = []
     }
 
     /// What a restore that did not happen comes to.
@@ -309,6 +314,203 @@ nonisolated enum RestoreSwap {
         let newcomers: [String]
     }
 
+    /// One file a zip holds, as its central directory lists it.
+    struct ArchiveEntry: Equatable {
+
+        // MARK: - Stored properties
+
+        /// The size of the file the zip stored, uncompressed.
+        let size: UInt64
+
+        /// The modification time the zip recorded (MS-DOS form: local
+        /// time, to the even second), or nil when it does not read.
+        let recordedTime: Date?
+    }
+
+    /// What a zip holds, read from its central directory alone (no file in
+    /// it is unpacked): every file by its path inside the course, the
+    /// zip's first path part (the course folder's name) taken off, and
+    /// every folder those paths pass through. Paths are compared in
+    /// Unicode's composed form, since a zip keeps a name's bytes as the
+    /// disk gave them.
+    ///
+    /// Measured on 2026-11-14 for a 500 MB course (`909/round4/listing/`):
+    /// see `documentation/09-mac-app.md` → round four.
+    struct ArchiveListing {
+
+        // MARK: - Stored properties
+
+        let files: [String: ArchiveEntry]
+        let folders: Set<String>
+
+        // MARK: - Functions
+
+        /// The entry for a path inside the course, or nil.
+        func file(at inside: String) -> ArchiveEntry? {
+            return files[inside.precomposedStringWithCanonicalMapping]
+        }
+
+        /// Whether anything at all is listed at this path: a file, or a
+        /// folder with something in it.
+        func holdsAnything(at inside: String) -> Bool {
+            let key: String = inside.precomposedStringWithCanonicalMapping
+            return files[key] != nil || folders.contains(key)
+        }
+
+        /// The listing of the zip at `url`, or nil when it cannot be read
+        /// (missing, cut short, not a zip): then nothing is known to be in
+        /// it. Reads the end record, the zip64 end record when the counts
+        /// or offsets overflow, then every central directory entry.
+        static func read(_ url: URL) -> ArchiveListing? {
+            guard let handle = try? FileHandle(forReadingFrom: url) else {
+                return nil
+            }
+            defer { try? handle.close() }
+            guard let length = try? handle.seekToEnd(), length >= 22 else {
+                return nil
+            }
+            let tailLength: UInt64 = min(length, 22 + 65_535 + 20)
+            guard (try? handle.seek(toOffset: length - tailLength)) != nil,
+                  let tail = try? handle.read(upToCount: Int(tailLength)) else {
+                return nil
+            }
+            let tailBytes: [UInt8] = [UInt8](tail)
+            var endAt: Int = -1
+            var position: Int = tailBytes.count - 22
+            while position >= 0 {
+                if readUInt32(tailBytes, position) == 0x0605_4b50 {
+                    endAt = position
+                    break
+                }
+                position -= 1
+            }
+            if endAt < 0 {
+                return nil
+            }
+            var directorySize: UInt64 = UInt64(readUInt32(tailBytes, endAt + 12))
+            var directoryOffset: UInt64 = UInt64(readUInt32(tailBytes, endAt + 16))
+            let entryCount: UInt64 = UInt64(readUInt16(tailBytes, endAt + 10))
+            if directorySize == 0xFFFF_FFFF || directoryOffset == 0xFFFF_FFFF || entryCount == 0xFFFF {
+                // The zip64 locator sits just before the end record.
+                let locatorAt: Int = endAt - 20
+                guard locatorAt >= 0, readUInt32(tailBytes, locatorAt) == 0x0706_4b50 else {
+                    return nil
+                }
+                let zip64EndOffset: UInt64 = readUInt64(tailBytes, locatorAt + 8)
+                guard (try? handle.seek(toOffset: zip64EndOffset)) != nil,
+                      let zip64End = try? handle.read(upToCount: 56) else {
+                    return nil
+                }
+                let zip64Bytes: [UInt8] = [UInt8](zip64End)
+                guard zip64Bytes.count >= 56, readUInt32(zip64Bytes, 0) == 0x0606_4b50 else {
+                    return nil
+                }
+                directorySize = readUInt64(zip64Bytes, 40)
+                directoryOffset = readUInt64(zip64Bytes, 48)
+            }
+            guard directoryOffset + directorySize <= length,
+                  (try? handle.seek(toOffset: directoryOffset)) != nil,
+                  let directory = try? handle.read(upToCount: Int(directorySize)) else {
+                return nil
+            }
+            return parse([UInt8](directory))
+        }
+
+        /// Every central directory entry in `bytes`.
+        static func parse(_ bytes: [UInt8]) -> ArchiveListing? {
+            var files: [String: ArchiveEntry] = [:]
+            var folders: Set<String> = []
+            var position: Int = 0
+            while position + 46 <= bytes.count {
+                if readUInt32(bytes, position) != 0x0201_4b50 {
+                    return nil
+                }
+                let dosTime: UInt16 = readUInt16(bytes, position + 12)
+                let dosDate: UInt16 = readUInt16(bytes, position + 14)
+                var size: UInt64 = UInt64(readUInt32(bytes, position + 24))
+                let nameLength: Int = Int(readUInt16(bytes, position + 28))
+                let extraLength: Int = Int(readUInt16(bytes, position + 30))
+                let commentLength: Int = Int(readUInt16(bytes, position + 32))
+                let nameStart: Int = position + 46
+                let extraStart: Int = nameStart + nameLength
+                let next: Int = extraStart + extraLength + commentLength
+                if next > bytes.count {
+                    return nil
+                }
+                if size == 0xFFFF_FFFF {
+                    // The zip64 extra field carries the real size first.
+                    var extraAt: Int = extraStart
+                    while extraAt + 4 <= extraStart + extraLength {
+                        let tag: UInt16 = readUInt16(bytes, extraAt)
+                        let fieldLength: Int = Int(readUInt16(bytes, extraAt + 2))
+                        if tag == 0x0001 && fieldLength >= 8 {
+                            size = readUInt64(bytes, extraAt + 4)
+                            break
+                        }
+                        extraAt += 4 + fieldLength
+                    }
+                }
+                let nameBytes: ArraySlice<UInt8> = bytes[nameStart..<extraStart]
+                if let name = String(bytes: nameBytes, encoding: .utf8) {
+                    let parts: [Substring] = name.split(separator: "/")
+                    if parts.count >= 2 {
+                        var inside: String = ""
+                        for (index, part) in parts.enumerated() where index > 0 {
+                            if !inside.isEmpty {
+                                folders.insert(inside.precomposedStringWithCanonicalMapping)
+                                inside += "/"
+                            }
+                            inside += String(part)
+                        }
+                        let key: String = inside.precomposedStringWithCanonicalMapping
+                        if name.hasSuffix("/") {
+                            folders.insert(key)
+                        } else {
+                            files[key] = ArchiveEntry(size: size, recordedTime: dosMoment(date: dosDate, time: dosTime))
+                        }
+                    }
+                }
+                position = next
+            }
+            return ArchiveListing(files: files, folders: folders)
+        }
+
+        /// An MS-DOS date and time as a moment, read in this Mac's time
+        /// zone, as zip wrote it.
+        static func dosMoment(date: UInt16, time: UInt16) -> Date? {
+            var parts: DateComponents = DateComponents()
+            parts.year = 1980 + Int(date >> 9)
+            parts.month = Int((date >> 5) & 0x0F)
+            parts.day = Int(date & 0x1F)
+            parts.hour = Int(time >> 11)
+            parts.minute = Int((time >> 5) & 0x3F)
+            parts.second = Int(time & 0x1F) * 2
+            var calendar: Calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone.current
+            return calendar.date(from: parts)
+        }
+
+        static func readUInt16(_ bytes: [UInt8], _ at: Int) -> UInt16 {
+            return UInt16(bytes[at]) | (UInt16(bytes[at + 1]) << 8)
+        }
+
+        static func readUInt32(_ bytes: [UInt8], _ at: Int) -> UInt32 {
+            var value: UInt32 = 0
+            for index in 0..<4 {
+                value |= UInt32(bytes[at + index]) << (8 * UInt32(index))
+            }
+            return value
+        }
+
+        static func readUInt64(_ bytes: [UInt8], _ at: Int) -> UInt64 {
+            var value: UInt64 = 0
+            for index in 0..<8 {
+                value |= UInt64(bytes[at + index]) << (8 * UInt64(index))
+            }
+            return value
+        }
+    }
+
     // MARK: - Stored properties
 
     static let recordName: String = "restore.json"
@@ -332,11 +534,26 @@ nonisolated enum RestoreSwap {
     /// every restore.
     static let leftOutNamesKeptAtAnyDepth: [String] = ["node_modules", ".git", "dist", "build", "out"]
 
+    /// Russell's ruling on #909's held question (2026-11-14): a name in
+    /// `leftOutNamesKeptAtAnyDepth` found below the top of the set-aside
+    /// copy is PUT BACK where it was in the restored course (when its
+    /// folder is there and nothing is in its place), rather than kept
+    /// aside. One that cannot go back is kept aside as before.
+    static let putsDeeperLeftOutNamesBack: Bool = true
+
+    /// The other names a backup leaves out: made again (the built site's
+    /// link, Finder's `.DS_Store`, the three caches), so they are removed
+    /// with the set-aside copy and never kept. With
+    /// `leftOutNamesKeptAtAnyDepth` they are `CourseArchiver
+    /// .excludedFromArchives`, which a test pins.
+    static let leftOutNamesMadeAgain: [String] = [".merged_output", ".quartz-cache", ".cache", "__pycache__", ".DS_Store"]
+
     /// How much later than a file's creation its change must be to count as
     /// a change made after it was unpacked. A zip stores a time to the even
     /// second, rounded up, so a file unpacked from a backup made a moment
     /// ago can carry a modification time up to two seconds after it was
-    /// written to the disk.
+    /// written to the disk; and a file the archive's listing holds has a
+    /// recorded time within this of its own (`heldByTheArchive`).
     static let zipTimeRoundingSeconds: Double = 2
 
     // MARK: - Functions: names a teacher reads
@@ -745,7 +962,6 @@ nonisolated enum RestoreSwap {
         }
         defer { letGo(hold) }
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(courseCode)
-        let isAnArrival: Bool = !itemExists(at: courseURL)
         let staging: URL = restoringFolder(coursesDirectoryURL).appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
 
@@ -760,13 +976,11 @@ nonisolated enum RestoreSwap {
             owner: context.owner,
             writtenAt: context.now()
         )
-        // Recorded before anything moves, so the promise to keep is a fact
-        // of the record and not of this process (the fix review's I-a).
-        if context.keepsWhatWasReplaced && !isAnArrival {
-            record.keepsWhatWasReplaced = true
-        }
         if let began = context.archiveBegan {
             record.archiveBegan = momentTextRoundedDown(began)
+        }
+        if !context.leftOutOnPurpose.isEmpty {
+            record.leftOutOnPurpose = context.leftOutOnPurpose
         }
         let unpacked: URL = staging.appendingPathComponent(unpackName)
         let payload: URL
@@ -775,7 +989,7 @@ nonisolated enum RestoreSwap {
             try fileManager.createDirectory(at: unpacked, withIntermediateDirectories: true)
             payload = try unpack(zipURL, named: courseCode, into: unpacked)
             try context.checkPayload(payload)
-            try context.putMediaBack(unpacked, isAnArrival ? nil : courseURL)
+            try context.putMediaBack(unpacked, itemExists(at: courseURL) ? courseURL : nil)
             try context.refuseUnlessMediaWasPutBack(unpacked)
             if let archiveURL = context.archiveURL {
                 flush(archiveURL)
@@ -788,6 +1002,16 @@ nonisolated enum RestoreSwap {
 
         let aside: URL = staging.appendingPathComponent(asideName)
         var moves: [Move] = []
+        // Whether this is an arrival, and so whether the set-aside copy is
+        // the only copy of what was in the folder, is decided HERE, under
+        // the hold, in the step that writes the moves it acts on (the
+        // round-three review: the door decided it a moment earlier, and a
+        // folder made in that gap had its one page removed). No archive
+        // and a folder that is there: the copy is kept whole.
+        let isAnArrival: Bool = !itemExists(at: courseURL)
+        if context.archiveURL == nil && !isAnArrival {
+            record.keepsWhatWasReplaced = true
+        }
         do {
             if isAnArrival {
                 moves.append(Move(
@@ -934,8 +1158,15 @@ nonisolated enum RestoreSwap {
                 if let began = record.archiveBegan {
                     archiveBegan = RestoreSettle.parsedMoment(began)
                 }
+                // What the archive HOLDS, read from its own listing: the live
+                // restore's archive, or the one the record names for a settle.
+                var listing: ArchiveListing? = nil
+                if let archive = context.archiveURL ?? archiveNamed(in: record, coursesDirectoryURL: coursesDirectoryURL) {
+                    listing = ArchiveListing.read(archive)
+                }
                 let gathered: (keptAt: String?, everythingMoved: Bool) = keepWhatTheArchiveMayNotHold(
-                    aside, courseCode: record.course, archiveBegan: archiveBegan,
+                    aside, courseCode: record.course, listing: listing, archiveBegan: archiveBegan,
+                    leftOutOnPurpose: record.leftOutOnPurpose ?? [],
                     coursesDirectoryURL: coursesDirectoryURL, context: context
                 )
                 notInTheArchiveAt = gathered.keptAt
@@ -971,59 +1202,85 @@ nonisolated enum RestoreSwap {
     // MARK: - Functions: keeping what exists nowhere else
 
     /// Moves out of the set-aside copy, before it is removed, every file
-    /// the archive made first may not hold, into
+    /// the archive made first does not hold, into
     /// `courses/_backups/<CODE>/<CODE> not in the archive <stamp>/` at its
-    /// path inside the course (the third case, found by enumerating every
-    /// removal in the restore):
+    /// path inside the course (round three's third case; round four's rule,
+    /// `contracts/course-management.json` → `keptFolders.notInTheArchive`):
     ///
     /// * anything named in `leftOutNamesKeptAtAnyDepth`, at any depth: a
     ///   `.git` inside a section's sample project is in neither the backup
-    ///   nor the archive, and the copy's removal destroyed it;
-    /// * with `archiveBegan`, a file Finder shows that was made or changed
-    ///   at or after the archive began: a page saved in Obsidian while the
-    ///   archive was being zipped (a minute, for a large course) may be in
-    ///   it as it was before. A hidden file is not kept this way: Obsidian
-    ///   rewrites its layout file every few seconds while open, which would
-    ///   leave a kept folder after nearly every restore, and the archive
-    ///   holds the version from moments before.
+    ///   nor the archive;
+    /// * every file and link the archive's own LISTING does not hold
+    ///   (`heldByTheArchive`): a path and size the zip carries, with the
+    ///   time the zip recorded for it, and none of the file's own times at
+    ///   or after `archiveBegan`. Hidden files are judged the same way (the
+    ///   round-three review: an edit to the timetable was lost). When the
+    ///   listing cannot be read, nothing is known to be held, so every file
+    ///   is kept.
+    ///
+    /// Removed with the copy: `leftOutNamesMadeAgain`, which are made
+    /// again, and `leftOutOnPurpose`, the add-on folders the next pass puts
+    /// back.
+    ///
+    /// Until round four a file was judged by its creation and content
+    /// times alone, and a file that ARRIVED after the zip's scan with old
+    /// dates (`mv`, `cp -p`, `ditto`, a folder moved in) was in neither the
+    /// archive nor a kept folder: 6 of 6 such files lost on APFS (the
+    /// round-three review's `edges.py`).
     ///
     /// Returns where they went, and false when any could not be moved: then
     /// the copy must not be removed.
     static func keepWhatTheArchiveMayNotHold(
         _ aside: URL,
         courseCode: String,
+        listing: ArchiveListing?,
         archiveBegan: Date?,
+        leftOutOnPurpose: [String],
         coursesDirectoryURL: URL,
         context: Context
     ) -> (keptAt: String?, everythingMoved: Bool) {
-        let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isRegularFileKey, .creationDateKey, .contentModificationDateKey]
+        let keys: [URLResourceKey] = [
+            .isSymbolicLinkKey, .isRegularFileKey, .isDirectoryKey, .fileSizeKey, .creationDateKey, .contentModificationDateKey
+        ]
         guard let walker = FileManager.default.enumerator(at: aside, includingPropertiesForKeys: keys, options: []) else {
             return (nil, true)
         }
         var picked: [String] = []
         while let entry = walker.nextObject() as? URL {
             let inside: String = relative(entry, to: aside)
-            if leftOutNamesKeptAtAnyDepth.contains(entry.lastPathComponent) {
+            let name: String = entry.lastPathComponent
+            if leftOutNamesKeptAtAnyDepth.contains(name) {
+                walker.skipDescendants()
+                // Russell's ruling on #909 (2026-11-14): put back where it
+                // was in the restored course when its folder is there and
+                // nothing is in its place; otherwise kept aside as before.
+                if putsDeeperLeftOutNamesBack && putBackIntoTheCourse(
+                    inside, from: aside, courseURL: coursesDirectoryURL.appendingPathComponent(courseCode)
+                ) {
+                    continue
+                }
                 picked.append(inside)
+                continue
+            }
+            if leftOutNamesMadeAgain.contains(name) || isInside(inside, anyOf: leftOutOnPurpose) {
                 walker.skipDescendants()
                 continue
             }
             let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
             if values?.isSymbolicLink == true {
                 walker.skipDescendants()
+                // A link: zip follows it, so the archive holds what it
+                // pointed at under its path. One that is not listed is kept
+                // as a link; what it points at is never touched.
+                if listing?.holdsAnything(at: inside) != true {
+                    picked.append(inside)
+                }
                 continue
             }
-            guard let archiveBegan, values?.isRegularFile == true, !isHidden(inside) else {
+            if values?.isRegularFile != true {
                 continue
             }
-            // Compared exactly. A volume stores times coarser than the clock
-            // and truncates (exFAT about 10 ms, measured 2026-11-14), so a
-            // page saved in the archive's first 10 ms reads as older; a
-            // margin was rejected because it also keeps every page saved
-            // just before the restore was asked for, which the archive holds.
-            let made: Date = values?.creationDate ?? Date.distantPast
-            let changed: Date = values?.contentModificationDate ?? Date.distantPast
-            if made >= archiveBegan || changed >= archiveBegan {
+            if !heldByTheArchive(inside, values: values, listing: listing, archiveBegan: archiveBegan) {
                 picked.append(inside)
             }
         }
@@ -1049,6 +1306,90 @@ nonisolated enum RestoreSwap {
             }
         }
         return (insideTheWorkingFolder(folder, coursesDirectoryURL: coursesDirectoryURL), everythingMoved)
+    }
+
+    /// Moves an item of the set-aside copy to the same path in the restored
+    /// course, never over anything and only into a folder that is there.
+    /// True when it moved.
+    static func putBackIntoTheCourse(_ inside: String, from aside: URL, courseURL: URL) -> Bool {
+        let destination: URL = absolute(inside, in: courseURL)
+        let parent: URL = destination.deletingLastPathComponent()
+        var status: stat = stat()
+        if lstat(parent.path, &status) != 0 || (status.st_mode & S_IFMT) != S_IFDIR {
+            return false
+        }
+        if itemExists(at: destination) {
+            return false
+        }
+        do {
+            try FileManager.default.moveItem(at: absolute(inside, in: aside), to: destination)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Whether the archive made first holds this file of the set-aside copy
+    /// as it is now: its listing carries the path (Unicode-normalised) with
+    /// the same size and a recorded time within `zipTimeRoundingSeconds` of
+    /// the file's content time, and neither the file's creation nor its
+    /// content time is at or after `archiveBegan` (a page saved in place in
+    /// the moments after zip read it keeps its size and can land in the
+    /// same two-second step).
+    ///
+    /// Decided by what the archive HOLDS, not by a clock alone: a file
+    /// moved, copied or dragged in after the zip's scan keeps its old dates
+    /// but is not in the listing, so it is kept. What still escapes: a file
+    /// replaced at the same path, before the archive began's clock says so,
+    /// by another of the very same size whose content time is within two
+    /// seconds of the old one's (`knownLimits`).
+    static func heldByTheArchive(
+        _ inside: String,
+        values: URLResourceValues?,
+        listing: ArchiveListing?,
+        archiveBegan: Date?
+    ) -> Bool {
+        guard let listing, let entry = listing.file(at: inside) else {
+            return false
+        }
+        guard let size = values?.fileSize, UInt64(size) == entry.size else {
+            return false
+        }
+        guard let changed = values?.contentModificationDate else {
+            return false
+        }
+        guard let recorded = entry.recordedTime, abs(recorded.timeIntervalSince(changed)) <= zipTimeRoundingSeconds else {
+            return false
+        }
+        if let archiveBegan {
+            let made: Date = values?.creationDate ?? Date.distantPast
+            if made >= archiveBegan || changed >= archiveBegan {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Whether a path inside the course is one of `folders` or inside one.
+    static func isInside(_ inside: String, anyOf folders: [String]) -> Bool {
+        for folder in folders {
+            if inside == folder || inside.hasPrefix(folder + "/") {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// The archive a record names, in the course's backups folder, where
+    /// `CourseArchiver` writes it, or nil.
+    static func archiveNamed(in record: Record, coursesDirectoryURL: URL) -> URL? {
+        guard let name = record.archive else {
+            return nil
+        }
+        return coursesDirectoryURL
+            .appendingPathComponent("_backups")
+            .appendingPathComponent(record.course)
+            .appendingPathComponent(name)
     }
 
     /// After a way back: every file inside the backup's items that went
@@ -1211,14 +1552,6 @@ nonisolated enum RestoreSwap {
             attempt += 1
         }
         return url
-    }
-
-    /// Whether a path inside a folder has a part starting with a dot.
-    static func isHidden(_ inside: String) -> Bool {
-        for part in inside.split(separator: "/") where part.hasPrefix(".") {
-            return true
-        }
-        return false
     }
 
     /// Removes a tree, clearing Finder's Locked flag and making folders

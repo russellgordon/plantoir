@@ -1822,7 +1822,7 @@ nonisolated enum ActivityTrail {
     /// Why a restore that worked kept files (`courseRestoreKeptFiles`).
     enum KeptBecause: String, Equatable, Sendable {
         case noArchive = "no archive was made of what was in the course folder, so all of it is kept"
-        case notInTheArchive = "the archive made first may not hold them (changed while it was made, or a kind backups leave out)"
+        case notInTheArchive = "the archive made first does not hold them as they are (added or changed while it was made, a kind backups leave out, or an archive that could not be read)"
     }
 
     /// The words for `courseRestoreKeptFiles`: why, and where. A path,

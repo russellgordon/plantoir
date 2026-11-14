@@ -56,8 +56,10 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         }
         defer { RestoreSwap.letGo(hold) }
         var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let putBack: [String] = (testCase["deeperPutBack"] as? [String]) ?? []
         if !deeper.isEmpty {
-            // What the course should be is the backup's; the deeper items are
+            // What the course should be is the backup's, with the deeper
+            // items put back (Russell's ruling, 2026-11-14); the rest are
             // judged by keptIn below.
             for path in deeper.keys {
                 live[path] = nil
@@ -73,12 +75,21 @@ final class RestoreWholeCourseContractTests: XCTestCase {
                 moves.append(move)
             }
         )
+        // As the door runs it: the course archived first, when there is one
+        // (with no archive over a folder that is there, the engine keeps the
+        // old copy whole: keptFolders).
+        var archive: (url: URL, began: Date)? = nil
+        if RestoreSwap.itemExists(at: fixture.courseURL) {
+            archive = try fixture.archiveTheCourse()
+        }
         var thrown: Error?
         do {
             try WholeCourseRestore.restore(
                 fromZipAt: fixture.zipURL,
                 courseCode: "ICS3U",
                 coursesDirectoryURL: fixture.coursesDirectoryURL,
+                archiveURL: archive?.url,
+                archiveBegan: archive?.began,
                 beforeTheSwap: { (_: URL) throws in
                     if fault["refusedBeforeTheSwap"] as? Bool == true {
                         throw CourseRestorer.Problem.refused("REFUSED BEFORE THE SWAP")
@@ -110,7 +121,11 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         case "asItWas":
             XCTAssertEqual(now, live, "\(name): the course is not as it was")
         case "theBackup":
-            XCTAssertEqual(now, fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"]), "\(name): the course is not the backup's")
+            var expected: [String: Data] = fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"])
+            for path in putBack {
+                expected[path] = deeper[path]
+            }
+            XCTAssertEqual(now, expected, "\(name): the course is not the backup's")
         case "mix":
             XCTAssertNotEqual(now, live, name)
             XCTAssertNotEqual(now, fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"]), name)
@@ -124,7 +139,11 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         }
         XCTAssertEqual(fixture.somethingWasKept(), try XCTUnwrap(testCase["kept"] as? Bool, name), "\(name): kept")
         if testCase["keptIn"] as? String == "notInTheArchive" {
-            XCTAssertEqual(try fixture.keptIn(folderStartingWith: RestoreSwap.notInTheArchiveName("ICS3U") + " "), deeper, "\(name): keptIn")
+            var keptAside: [String: Data] = deeper
+            for path in putBack {
+                keptAside[path] = nil
+            }
+            XCTAssertEqual(try fixture.keptIn(folderStartingWith: RestoreSwap.notInTheArchiveName("ICS3U") + " "), keptAside, "\(name): keptIn")
         }
         let staging: String = try XCTUnwrap(testCase["staging"] as? String, name)
         XCTAssertEqual(fixture.leftInRestoring() == 0, staging == "removed", "\(name): staging")
@@ -188,6 +207,113 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         XCTAssertEqual(fixture.trailText().contains(leftLine), trail == "course restore left as it was", "\(name): trail")
         for line in fixture.trailText().components(separatedBy: "\n") where line.contains("a whole-course restore") {
             XCTAssertEqual(LogRedactor.redacting(line), line, "\(name): the trail line passes the redactor unchanged")
+        }
+    }
+
+    // MARK: - Functions: what the archive holds (round four)
+
+    /// Every `keptFolders.notInTheArchiveCases` case: faultFixture's course,
+    /// the act, the archive made as `CourseArchiver` makes it, the restore,
+    /// and exactly the paths the case names found in the kept folder.
+    @MainActor
+    func testEveryNotInTheArchiveCase() throws {
+        let kept: [String: Any] = try XCTUnwrap(try RestoreWholeCourseContractTests.block()["keptFolders"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(kept["notInTheArchiveCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 11, "notInTheArchiveCases has shrunk")
+        XCTAssertEqual(kept["leftOutNamesMadeAgain"] as? [String], RestoreSwap.leftOutNamesMadeAgain)
+        for testCase in cases {
+            try runNotInTheArchiveCase(testCase)
+        }
+    }
+
+    @MainActor
+    private func runNotInTheArchiveCase(_ testCase: [String: Any]) throws {
+        let name: String = try XCTUnwrap(testCase["name"] as? String)
+        let act: String = try XCTUnwrap(testCase["act"] as? String, name)
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let course: URL = fixture.courseURL
+        var everyFile: [String: Data] = try WholeCourseFixture.snapshot(of: course)
+        everyFile[".git/HEAD"] = nil
+        let outside: URL = fixture.rootURL.appendingPathComponent("Downloads")
+        func oldDated(_ text: String, before moment: Date) throws -> URL {
+            let source: URL = outside.appendingPathComponent(UUID().uuidString)
+            try WholeCourseFixture.write(text, to: source)
+            let hourBefore: Date = moment.addingTimeInterval(-3_600)
+            try FileManager.default.setAttributes([.modificationDate: hourBefore, .creationDate: hourBefore], ofItemAtPath: source.path)
+            return source
+        }
+        func moveIn(_ source: URL, to inside: String) throws {
+            let destination: URL = course.appendingPathComponent(inside)
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            XCTAssertEqual(rename(source.path, destination.path), 0, "\(name): \(inside)")
+        }
+        // Acts BEFORE the archive.
+        switch act {
+        case "deeperLeftOutName":
+            try WholeCourseFixture.write("ref: refs/heads/sample\n", to: course.appendingPathComponent("section1/Sample App/.git/HEAD"))
+        case "deeperLeftOutNameWhereTheBackupHasItsFolder":
+            try WholeCourseFixture.write("ref: refs/heads/class\n", to: course.appendingPathComponent("section1/All Classes/.git/HEAD"))
+        case "deeperMadeAgainName":
+            try WholeCourseFixture.write("finder\n", to: course.appendingPathComponent("section1/.DS_Store"))
+        case "addOnLeftOutOnPurpose":
+            let addOn: URL = course.appendingPathComponent(".obsidian/plugins/tikzjax")
+            try WholeCourseFixture.write("add-on\n", to: addOn.appendingPathComponent("main.js"))
+            try WholeCourseFixture.write("marker\n", to: addOn.appendingPathComponent(ObsidianFigureAddOns.markerName))
+        case "hiddenEditedAfterTheArchive":
+            try WholeCourseFixture.write("{\"days\": 4}\n", to: course.appendingPathComponent(".internal/timetable/section1.json"))
+        default:
+            break
+        }
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        // Acts AFTER the archive.
+        switch act {
+        case "nothing", "deeperLeftOutName", "deeperLeftOutNameWhereTheBackupHasItsFolder", "deeperMadeAgainName", "addOnLeftOutOnPurpose":
+            break
+        case "editInPlaceAfterTheArchive":
+            try WholeCourseFixture.write("LIVE concept, edited after the archive\n", to: course.appendingPathComponent("Concepts/Unit 1/Concept 1.md"))
+        case "movedInWithOldDates":
+            try moveIn(try oldDated("moved in\n", before: archive.began), to: "Concepts/Dropped.md")
+        case "folderMovedInWithOldDates":
+            let folder: URL = outside.appendingPathComponent("Unit 9")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for index in 1...2 {
+                let page: URL = try oldDated("lesson \(index)\n", before: archive.began)
+                XCTAssertEqual(rename(page.path, folder.appendingPathComponent("Lesson \(index).md").path), 0, name)
+            }
+            try moveIn(folder, to: "section1/Unit 9")
+        case "movedToTheTopWithOldDates":
+            try moveIn(try oldDated("a handout\n", before: archive.began), to: "Handout.md")
+        case "replacedBySameSizeWithOldDates":
+            try moveIn(try oldDated("XXXX front page\n", before: archive.began), to: "index.md")
+        case "hiddenEditedAfterTheArchive":
+            try WholeCourseFixture.write("{\"days\": 5}\n", to: course.appendingPathComponent(".internal/timetable/section1.json"))
+        case "archiveUnreadable":
+            try Data("not a zip".utf8).write(to: archive.url)
+        default:
+            XCTFail("\(name): unknown act \(act)")
+        }
+        let before: [String: Data] = try WholeCourseFixture.snapshot(of: course)
+
+        try WholeCourseRestore.restore(
+            fromZipAt: fixture.zipURL, courseCode: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL,
+            archiveURL: archive.url, archiveBegan: archive.began
+        )
+
+        let found: [String: Data] = try fixture.keptIn(folderStartingWith: RestoreSwap.notInTheArchiveName("ICS3U") + " ")
+        if testCase["kept"] as? String == "everyFile" {
+            XCTAssertEqual(found, everyFile, name)
+            return
+        }
+        let paths: [String] = try XCTUnwrap(testCase["kept"] as? [String], name)
+        var expected: [String: Data] = [:]
+        for path in paths {
+            expected[path] = before[path]
+        }
+        XCTAssertEqual(found, expected, name)
+        let restored: [String: Data] = try WholeCourseFixture.snapshot(of: course)
+        for path in (testCase["inTheCourse"] as? [String]) ?? [] {
+            XCTAssertEqual(restored[path], before[path], "\(name): \(path) put back where it was")
         }
     }
 
@@ -414,6 +540,7 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         XCTAssertEqual(RestoreWholeCourseWording.confirmArchived, try filled("confirmArchived"))
         XCTAssertEqual(RestoreWholeCourseWording.confirmKeptWithItsBackups(course: "ICS3U"), try filled("confirmKeptWithItsBackups"))
         XCTAssertEqual(RestoreWholeCourseWording.confirmNoCourseFolder(course: "ICS3U"), try filled("confirmNoCourseFolder"))
+        XCTAssertEqual(RestoreWholeCourseWording.keptFoldersTake(size: "3.4 MB"), try filled("keptFoldersTake", size: "3.4 MB"))
 
         // The joins, as wording.joins says.
         XCTAssertEqual(
@@ -577,11 +704,36 @@ struct WholeCourseFixture {
         return expected
     }
 
-    /// Whether anything was moved under `courses/_backups/ICS3U/`.
+    /// Whether any folder was kept under `courses/_backups/ICS3U/` (an
+    /// archive made first is a zip beside them, not a kept folder).
     func somethingWasKept() -> Bool {
         let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
         let names: [String] = (try? FileManager.default.contentsOfDirectory(atPath: shelf.path)) ?? []
-        return !names.isEmpty
+        for name in names where BackupSizes.isFolder(shelf.appendingPathComponent(name)) {
+            return true
+        }
+        return false
+    }
+
+    /// The archive the door makes first, as `CourseArchiver` makes it: the
+    /// course as it is now, zipped with the app's own arguments and
+    /// exclusions (`CourseArchiver.archiveRules`) into
+    /// `courses/_backups/ICS3U/`, and the moment it began.
+    func archiveTheCourse() throws -> (url: URL, began: Date) {
+        let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        try FileManager.default.createDirectory(at: shelf, withIntermediateDirectories: true)
+        let archive: URL = RestoreSwap.unusedURL(shelf.appendingPathComponent("ICS3U_2026-11-14_031500.zip"))
+        let began: Date = Date()
+        var arguments: [String] = ["-r", "-q", "-X", archive.path, "ICS3U", "-x"]
+        arguments.append(contentsOf: CourseArchiver.archiveRules(forFolderAt: courseURL).zipExclusions)
+        let zip: Process = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.arguments = arguments
+        zip.currentDirectoryURL = coursesDirectoryURL
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0, "the archive was made")
+        return (url: archive, began: began)
     }
 
     /// Every file kept under `courses/_backups/ICS3U/`, by its path inside
@@ -608,6 +760,16 @@ struct WholeCourseFixture {
             }
         }
         return all
+    }
+
+    /// The name of the one kept folder under `courses/_backups/ICS3U/`
+    /// whose name starts with `prefix`, or nil.
+    func keptFolderName(startingWith prefix: String) -> String? {
+        let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        for name in ((try? FileManager.default.contentsOfDirectory(atPath: shelf.path)) ?? []).sorted() where name.hasPrefix(prefix) {
+            return name
+        }
+        return nil
     }
 
     /// How many entries `courses/.internal/restoring` holds.

@@ -93,6 +93,32 @@ final class BackupSpaceTests: XCTestCase {
         XCTAssertEqual(model.sizeDescription(of: item), BackupSizes.description(ofBytes: 4096))
     }
 
+    /// The folders a restore KEPT beside the backups (#909 round four) are
+    /// the teacher's own files using their disk, so the size the sidebar
+    /// shows counts them; they are never listed as backups, and the
+    /// backups' own total stays what it was. MUST FAIL on 66f645649, where
+    /// a kept folder was in no size at all.
+    func testFoldersARestoreKeptAreCountedInTheSidebarsSize() async throws {
+        let root: URL = try makeWorkingFolder()
+        let zip: URL = try makeBackup(named: "ICS3U_backup_2026-09-01_120000.zip", course: "ICS3U", bytes: 1000, in: root)
+        let shelf: URL = zip.deletingLastPathComponent()
+        let kept: URL = shelf.appendingPathComponent("ICS3U not in the archive 2026-11-14_031500/section1/App/.git")
+        try FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
+        try Data(repeating: 7, count: 250).write(to: kept.appendingPathComponent("pack"))
+        let setAside: URL = root.appendingPathComponent("courses/_backups/Files a restore set aside 2026-11-14_031500/as-it-was")
+        try FileManager.default.createDirectory(at: setAside, withIntermediateDirectories: true)
+        try Data(repeating: 7, count: 50).write(to: setAside.appendingPathComponent("page.md"))
+        let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        model.chooseWorkspace(at: root)
+
+        await model.measureBackupSizes()
+
+        XCTAssertEqual(model.backupItems.count, 1, "a kept folder is never listed as a backup")
+        XCTAssertEqual(model.backupSpace.totalBytes, 1000, "the backups' own total")
+        XCTAssertEqual(model.backupSpace.keptFolderBytes, 300)
+        XCTAssertEqual(model.backupSpace.bytesTaken, 1300, "what the sidebar shows beside Backups")
+    }
+
     /// A backup not measured yet makes the total INCOMPLETE rather than
     /// quietly smaller, so nothing shows a number that is wrong.
     func testATotalMissingABackupIsNotComplete() throws {

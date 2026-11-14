@@ -116,6 +116,11 @@ struct AllBackupsView: View {
                 Text("These backups take \(BackupSizes.description(ofBytes: space.totalBytes)).")
                     .font(.title3)
                     .accessibilityIdentifier("allBackupsTotal")
+                if space.keptFolderBytes > 0 {
+                    Text(RestoreWholeCourseWording.keptFoldersTake(size: BackupSizes.description(ofBytes: space.keptFolderBytes)))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("allBackupsKeptFolders")
+                }
                 if space.unsizedCount > 0 {
                     Text(unsizedLine(space.unsizedCount))
                         .foregroundStyle(.secondary)

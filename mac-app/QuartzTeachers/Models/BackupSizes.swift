@@ -59,6 +59,89 @@ nonisolated enum BackupSizes {
         return sizes
     }
 
+    /// The logical size of every folder a restore KEPT in the backups folder
+    /// (`keptFolders`), keyed by its path: what a teacher's disk truly holds
+    /// beside the backups, counted in the size the sidebar shows (#909
+    /// round four). Measured on the same thread rule as `measure`.
+    @concurrent
+    static func measureKeptFolders(in coursesDirectoryURL: URL) async -> [String: Int64] {
+        var sizes: [String: Int64] = [:]
+        for folderURL in BackupSizes.keptFolders(in: coursesDirectoryURL) {
+            sizes[folderURL.path] = BackupSizes.logicalSize(ofFolder: folderURL)
+        }
+        return sizes
+    }
+
+    /// Every folder a restore kept: each folder inside a course's backups
+    /// folder (`courses/_backups/<CODE>/<name> <stamp>`: a stop's, the
+    /// newcomers', a set-aside section's, what was replaced or not in the
+    /// archive), and the two kinds a settle keeps in `courses/_backups/`
+    /// itself (`keptAtTheTopPrefixes`). Never a zip; never a course's own
+    /// backups folder. Nothing here is listed as a backup or pruned.
+    static func keptFolders(in coursesDirectoryURL: URL) -> [URL] {
+        let fileManager: FileManager = FileManager.default
+        let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups")
+        var folders: [URL] = []
+        guard let names = try? fileManager.contentsOfDirectory(atPath: shelf.path) else {
+            return folders
+        }
+        for name in names.sorted() where !name.hasPrefix(".") {
+            let entry: URL = shelf.appendingPathComponent(name)
+            if !BackupSizes.isFolder(entry) {
+                continue
+            }
+            var keptAtTheTop: Bool = false
+            for prefix in keptAtTheTopPrefixes where name.hasPrefix(prefix) {
+                keptAtTheTop = true
+            }
+            if keptAtTheTop {
+                folders.append(entry)
+                continue
+            }
+            for inner in ((try? fileManager.contentsOfDirectory(atPath: entry.path)) ?? []).sorted() where !inner.hasPrefix(".") {
+                let kept: URL = entry.appendingPathComponent(inner)
+                if BackupSizes.isFolder(kept) {
+                    folders.append(kept)
+                }
+            }
+        }
+        return folders
+    }
+
+    /// The names a settle gives what it keeps in `courses/_backups/` itself
+    /// (`RestoreSettle.settleOne`, a folder with no record or no course).
+    static let keptAtTheTopPrefixes: [String] = ["Files a restore set aside ", "A course restore from another computer "]
+
+    /// Whether a URL is a folder, not following a link.
+    static func isFolder(_ url: URL) -> Bool {
+        var status: stat = stat()
+        if lstat(url.path, &status) != 0 {
+            return false
+        }
+        return (status.st_mode & S_IFMT) == S_IFDIR
+    }
+
+    /// Every regular file's logical size under a folder added together,
+    /// never following a link.
+    static func logicalSize(ofFolder folderURL: URL) -> Int64 {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        guard let walker = FileManager.default.enumerator(at: folderURL, includingPropertiesForKeys: keys, options: []) else {
+            return 0
+        }
+        var total: Int64 = 0
+        while let entry = walker.nextObject() as? URL {
+            let values: URLResourceValues? = try? entry.resourceValues(forKeys: Set(keys))
+            if values?.isSymbolicLink == true {
+                walker.skipDescendants()
+                continue
+            }
+            if values?.isRegularFile == true, let size = values?.fileSize {
+                total += Int64(size)
+            }
+        }
+        return total
+    }
+
     /// Reads the thread from a SYNCHRONOUS context, which is the honest place
     /// to ask: `Thread.isMainThread` is unavailable from an async function.
     static func noteTheThread() {
@@ -84,11 +167,16 @@ nonisolated enum BackupSizes {
 /// What the backups take, per course and in total — the numbers the Backups
 /// header and the All Backups pane show.
 ///
-/// Counts backups only. Archives and the setup wizard's automatic zips share
-/// `_backups/`, but they are not in the Backups list, cannot be deleted from
-/// it, and are never offered for deletion there — so counting them would
-/// state a total the teacher cannot act on. `BackupItem.from` decides what a
-/// backup is, as it does everywhere else.
+/// Counts backups, and beside them the folders a restore kept
+/// (`keptFolderBytes`, #909 round four). Archives and the setup wizard's
+/// automatic zips share `_backups/`, but they are not in the Backups list,
+/// cannot be deleted from it, and are never offered for deletion there — so
+/// counting them would state a total the teacher cannot act on.
+/// `BackupItem.from` decides what a backup is, as it does everywhere else. A
+/// kept folder is not a backup and is never listed as one or pruned, but it
+/// is the teacher's own files using their disk until they delete it, and a
+/// course with a nested `.git` makes one on every restore, so the sidebar's
+/// size counts it (`bytesTaken`) and All Backups says how much of that it is.
 struct BackupSpace: Equatable {
 
     // MARK: - Types
@@ -118,15 +206,27 @@ struct BackupSpace: Equatable {
     /// `unsizedCount` says how many were left out.
     let isComplete: Bool
 
+    /// What the folders restores kept take, added together.
+    var keptFolderBytes: Int64 = 0
+
     /// How many backups a FINISHED measurement could not size — a zip deleted
     /// in Finder between listing and measuring, or one that cannot be read.
     /// They are left out of the total and said so beside each one, rather
     /// than leaving "Working out…" up for a measurement that has ended.
     let unsizedCount: Int
 
+    // MARK: - Computed properties
+
+    /// What the sidebar shows beside Backups: the backups and the folders
+    /// restores kept, which are both the teacher's disk.
+    var bytesTaken: Int64 {
+        return totalBytes + keptFolderBytes
+    }
+
     // MARK: - Functions
 
-    /// The space `items` take, from sizes keyed by `BackupItem.id`.
+    /// The space `items` take, from sizes keyed by `BackupItem.id`, and the
+    /// kept folders', from `keptFolderSizes`.
     ///
     /// `measured` is every backup a finished measurement LOOKED at, whether or
     /// not it could size it; a backup in it with no size is unsized rather than
@@ -134,7 +234,8 @@ struct BackupSpace: Equatable {
     static func of(
         _ items: [BackupItem],
         sizes: [String: Int64],
-        measured: Set<String>? = nil
+        measured: Set<String>? = nil,
+        keptFolderSizes: [String: Int64] = [:]
     ) -> BackupSpace {
         var bytesByCourse: [String: Int64] = [:]
         var countByCourse: [String: Int] = [:]
@@ -169,11 +270,16 @@ struct BackupSpace: Equatable {
                 bytes: bytesByCourse[code] ?? 0
             ))
         }
+        var keptBytes: Int64 = 0
+        for size in keptFolderSizes.values {
+            keptBytes += size
+        }
         return BackupSpace(
             courses: courses,
             totalBytes: totalBytes,
             totalCount: items.count,
             isComplete: measuredCount == items.count,
+            keptFolderBytes: keptBytes,
             unsizedCount: unsizedCount
         )
     }

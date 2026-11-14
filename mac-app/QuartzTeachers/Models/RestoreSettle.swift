@@ -29,10 +29,16 @@ nonisolated enum RestoreSettleRule {
     }
 
     /// What the teacher is told about it, as a wording key, or nothing.
+    /// The last two are said by a settle that FINISHES a restore and keeps
+    /// files doing it, the sentence the restore itself says
+    /// (`confirmKeptWithItsBackups` promises the teacher is told where);
+    /// they come from what the settle did, not from `decide`.
     enum Saying: String, Equatable, Sendable {
         case didNotFinish
         case stoppedPartWay
         case setAsideFilesKept
+        case keptWhatWasInTheFolder
+        case keptWhatTheArchiveMayNotHold
     }
 
     /// Everything the rule asks.
@@ -532,10 +538,20 @@ nonisolated enum RestoreSettle {
             if !finished.tidied {
                 releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
             }
+            // What it kept is said, once, at this reading: the promise the
+            // confirmation made ("you are told where") is the restore's,
+            // whichever process finishes it (the round-three review's
+            // INCOMPLETE 2: a settle kept the folder and said nothing).
             let keptAt: String? = finished.keptWhatWasReplacedAt ?? finished.keptWhatTheArchiveMayNotHoldAt
+            var says: RestoreSettleRule.Saying? = nil
+            if finished.keptWhatWasReplacedAt != nil {
+                says = .keptWhatWasInTheFolder
+            } else if finished.keptWhatTheArchiveMayNotHoldAt != nil {
+                says = .keptWhatTheArchiveMayNotHold
+            }
             return Settled(
                 course: record.course, backup: record.backup, from: source(of: record), found: foundName, action: .finish,
-                says: nil, keptAt: keptAt, holdsSomethingToOpen: keptAt != nil, newcomersKeptAt: nil
+                says: says, keptAt: keptAt, holdsSomethingToOpen: keptAt != nil, newcomersKeptAt: nil
             )
         case .putBack:
             guard var record else {

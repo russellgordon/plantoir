@@ -239,7 +239,7 @@ struct SidebarView: View {
                             Text("Backups")
                             Spacer()
                             if workspace.backupSpace.isComplete {
-                                Text(BackupSizes.description(ofBytes: workspace.backupSpace.totalBytes))
+                                Text(BackupSizes.description(ofBytes: workspace.backupSpace.bytesTaken))
                                     .foregroundStyle(.secondary)
                                     .accessibilityIdentifier("backupsTotal")
                             }

@@ -423,6 +423,12 @@ class WorkspaceModel {
     /// could not size reads as unsized rather than as still being measured.
     var backupsMeasured: Set<String> = []
 
+    /// What each folder a restore kept in the backups folder takes, in
+    /// bytes, keyed by its path (`BackupSizes.keptFolders`), measured with
+    /// the backups (#909 round four). Counted in the sidebar's size, never
+    /// listed as a backup.
+    var keptFolderSizes: [String: Int64] = [:]
+
     /// How many measurements have been started, so one that finishes after a
     /// newer one never overwrites it — a total that never shrinks after a
     /// delete, or sizes for zips that are gone, is what that race looks like.
@@ -3730,7 +3736,7 @@ class WorkspaceModel {
 
     /// What the backups take, per course and in total.
     var backupSpace: BackupSpace {
-        return BackupSpace.of(backupItems, sizes: backupSizes, measured: backupsMeasured)
+        return BackupSpace.of(backupItems, sizes: backupSizes, measured: backupsMeasured, keptFolderSizes: keptFolderSizes)
     }
 
     /// "15.9 MB" for the Size column, `AssistWording.backupSizeCouldNotBeReadShort`
@@ -3761,9 +3767,14 @@ class WorkspaceModel {
     /// is awaited, and the one that was started last is the one that counts.
     func startMeasuringBackupSizes() {
         let measurement: (number: Int, fileURLs: [URL]) = beginMeasuringBackupSizes()
+        let courses: URL? = coursesDirectoryURL
         Task { @MainActor [weak self] in
             let sizes: [String: Int64] = await BackupSizes.measure(measurement.fileURLs)
-            self?.finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs)
+            var kept: [String: Int64] = [:]
+            if let courses {
+                kept = await BackupSizes.measureKeptFolders(in: courses)
+            }
+            self?.finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs, keptFolders: kept)
         }
     }
 
@@ -3772,7 +3783,11 @@ class WorkspaceModel {
     func measureBackupSizes() async {
         let measurement: (number: Int, fileURLs: [URL]) = beginMeasuringBackupSizes()
         let sizes: [String: Int64] = await BackupSizes.measure(measurement.fileURLs)
-        finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs)
+        var kept: [String: Int64] = [:]
+        if let courses = coursesDirectoryURL {
+            kept = await BackupSizes.measureKeptFolders(in: courses)
+        }
+        finishMeasuringBackupSizes(measurement.number, sizes: sizes, lookedAt: measurement.fileURLs, keptFolders: kept)
     }
 
     /// Numbers a new measurement and says which files it covers.
@@ -3787,7 +3802,12 @@ class WorkspaceModel {
 
     /// Stores a measurement's answer, unless a newer one has been started.
     /// `lookedAt` is every file it was asked about, sized or not.
-    func finishMeasuringBackupSizes(_ number: Int, sizes: [String: Int64], lookedAt fileURLs: [URL] = []) {
+    func finishMeasuringBackupSizes(
+        _ number: Int,
+        sizes: [String: Int64],
+        lookedAt fileURLs: [URL] = [],
+        keptFolders: [String: Int64] = [:]
+    ) {
         if number != backupSizeMeasurementsStarted {
             return
         }
@@ -3797,6 +3817,7 @@ class WorkspaceModel {
         }
         backupsMeasured = lookedAtPaths
         backupSizes = sizes
+        keptFolderSizes = keptFolders
     }
 
     /// What deleting an archive would leave behind, so the confirmation

@@ -51,7 +51,9 @@ final class RestoreRecoveryTests: XCTestCase {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
         let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        _ = try StagedRestore.make(fixture, phase: .done, movesMade: Int.max)
+        // Archived first, as the door does: the archive holds every file of
+        // the old copy, so nothing is kept and nothing is said.
+        _ = try StagedRestore.make(fixture, phase: .done, movesMade: Int.max, archived: true)
 
         let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
 
@@ -60,6 +62,7 @@ final class RestoreRecoveryTests: XCTestCase {
             fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"])
         )
         XCTAssertEqual(said, [])
+        XCTAssertFalse(fixture.somethingWasKept())
         XCTAssertEqual(fixture.leftInRestoring(), 0, "the old copy and the staging folder are removed")
     }
 
@@ -304,7 +307,10 @@ final class RestoreRecoveryTests: XCTestCase {
     /// keep. The record says to keep what was replaced, so the next
     /// reading keeps it, every file byte for byte, and removes nothing.
     /// MUST FAIL on db38ed112, whose settle passed no keep: 45 of 45 files
-    /// were removed in the harness.
+    /// were removed in the harness. Since round four the settle SAYS where
+    /// (`keptWhatWasInTheFolder`), once: the confirmation promised "you are
+    /// told where". MUST FAIL on 66f645649, whose settle said nothing (the
+    /// round-three review's INCOMPLETE 2).
     @MainActor
     func testACrashBeforeTheKeepIsKeptAtTheNextReading() throws {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
@@ -316,7 +322,12 @@ final class RestoreRecoveryTests: XCTestCase {
 
         let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
 
-        XCTAssertEqual(said, [])
+        let keptName: String = try XCTUnwrap(fixture.keptFolderName(startingWith: "ICS3U as it was before restoring again "))
+        XCTAssertEqual(said, [
+            RestoreWholeCourseWording.keptWhatWasInTheFolder(course: "ICS3U", keptAt: "courses/_backups/ICS3U/" + keptName)
+        ])
+        XCTAssertTrue(fixture.trailText().contains(ActivityTrail.KeptBecause.noArchive.rawValue), fixture.trailText())
+        XCTAssertEqual(WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL), [], "said once")
         XCTAssertEqual(
             try WholeCourseFixture.snapshot(of: fixture.courseURL),
             fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"]),
@@ -403,6 +414,33 @@ final class RestoreRecoveryTests: XCTestCase {
         XCTAssertEqual(fixture.leftInRestoring(), 0)
     }
 
+    /// Round four: a settle that finishes a restore and keeps files the
+    /// archive does not hold says where, once
+    /// (`keptWhatTheArchiveMayNotHold`). Here a page arrived in the course
+    /// after the archive was made, and the crash came between `done` and
+    /// the keep. MUST FAIL on 66f645649, whose settle kept it and said
+    /// nothing.
+    @MainActor
+    func testASettleThatKeepsWhatTheArchiveDoesNotHoldSaysWhere() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let staged: StagedRestore = try StagedRestore.make(fixture, phase: .done, movesMade: Int.max, archived: true)
+        let arrived: URL = staged.stagingURL.appendingPathComponent("as-it-was/Concepts/Arrived after the archive.md")
+        try WholeCourseFixture.write("arrived\n", to: arrived)
+
+        let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+
+        let keptName: String = try XCTUnwrap(fixture.keptFolderName(startingWith: "ICS3U not in the archive "))
+        XCTAssertEqual(said, [
+            RestoreWholeCourseWording.keptWhatTheArchiveMayNotHold(course: "ICS3U", keptAt: "courses/_backups/ICS3U/" + keptName)
+        ])
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
+            ["Concepts/Arrived after the archive.md": Data("arrived\n".utf8)]
+        )
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
     /// The same way back with nothing written: the backup's own files,
     /// unpacked from a zip made a moment ago (whose times can be two
     /// seconds ahead), are never taken for a teacher's.
@@ -443,9 +481,16 @@ struct StagedRestore {
         writtenAt: Date = Date(),
         from source: RestoreSwap.Source = RestoreSwap.Source.backups,
         owner: String? = nil,
-        extraRecordKeys: [String: Any] = [:]
+        extraRecordKeys: [String: Any] = [:],
+        archived: Bool = false
     ) throws -> StagedRestore {
         let fileManager: FileManager = FileManager.default
+        // As the door makes it, before anything moves: the course archived
+        // into its backups folder, named in the record with its moment.
+        var archive: (url: URL, began: Date)? = nil
+        if archived {
+            archive = try fixture.archiveTheCourse()
+        }
         let staging: URL = RestoreSwap.restoringFolder(fixture.coursesDirectoryURL).appendingPathComponent(UUID().uuidString)
         let unpacked: URL = staging.appendingPathComponent("backup")
         try fileManager.createDirectory(at: unpacked, withIntermediateDirectories: true)
@@ -459,17 +504,20 @@ struct StagedRestore {
             coursesDirectoryURL: fixture.coursesDirectoryURL,
             keptInPlace: WholeCourseRestore.keptInPlace
         )
-        let record: RestoreSwap.Record = RestoreSwap.Record(
+        var record: RestoreSwap.Record = RestoreSwap.Record(
             course: "ICS3U",
             backup: fixture.zipURL.lastPathComponent,
             from: source,
-            archive: nil,
+            archive: archive?.url.lastPathComponent,
             phase: phase,
             moves: moves,
             computer: computer,
             owner: try owner ?? StagedRestore.goneOwner(),
             writtenAt: RestoreSettle.momentText(writtenAt)
         )
+        if let archive {
+            record.archiveBegan = RestoreSwap.momentTextRoundedDown(archive.began)
+        }
         try RestoreSwap.writeRecord(record, to: staging.appendingPathComponent(RestoreSwap.recordName), flushes: false)
         if !extraRecordKeys.isEmpty {
             // Written as keys of the file, as file-formats.json -> restoreRecord

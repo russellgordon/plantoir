@@ -183,7 +183,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/ReferenceTreeCopier.swift": (5, "waitsFor: U4"),
         "Models/ReferenceZipSource.swift": (6, "waitsFor: U4"),
         "Models/RestoreSettle.swift": (13, "waitsFor: U5 (#909: the settle at a folder's reading of a whole-course restore that did not finish, its claim, its way back and what it keeps; U5's recovery calls it per course first)"),
-        "Models/RestoreSwap.swift": (23, "waitsFor: U5 (#909: the staged whole-course restore, its record, swap, way back and tidying, and what it keeps rather than removes; U5's undo of a restore is a staged restore of the archive through it)"),
+        "Models/RestoreSwap.swift": (24, "waitsFor: U5 (#909: the staged whole-course restore, its record, swap, way back and tidying, what it keeps rather than removes, and a deeper .git put back where it was; U5's undo of a restore is a staged restore of the archive through it)"),
         "Models/ScheduledDeploy.swift": (37, "notAStep: held for Russell (M10): whether setting or cancelling a deploy for later is a step; the deploy when it runs is not (rulings 17 and 18). launchd jobs and the scripts they run, outside every course"),
         "Models/ScheduledPublishOutcome.swift": (5, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/ScheduledPublishWatcher.swift": (1, "notAStep: a scheduled run's outcome record, a world record"),

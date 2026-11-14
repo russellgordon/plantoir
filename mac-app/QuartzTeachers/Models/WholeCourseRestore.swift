@@ -294,11 +294,12 @@ enum WholeCourseRestore {
     /// the set-aside copy before it is deleted; no door passes one today,
     /// and U5's plan reads the archive instead (the plan review, M8).
     ///
-    /// `keepsWhatWasReplaced` keeps the set-aside copy in the backups
-    /// folder instead, recorded first (the fix review's I-a): the door
-    /// passes it when no archive was made of a course folder that is there.
-    /// `archiveBegan` is when the archive made first began, so the files of
-    /// the set-aside copy written after it are kept.
+    /// With no `archiveURL` over a course folder that is there, the engine
+    /// keeps the set-aside copy whole in the backups folder (the fix
+    /// review's I-a), deciding it under its own hold (round four).
+    /// `archiveBegan` is when the archive made first began: with the
+    /// archive's own listing it decides which files of the set-aside copy
+    /// the archive holds, and the rest are kept.
     @discardableResult
     static func restore(
         fromZipAt zipURL: URL,
@@ -307,7 +308,6 @@ enum WholeCourseRestore {
         coursesDirectoryURL: URL,
         archiveURL: URL? = nil,
         archiveBegan: Date? = nil,
-        keepsWhatWasReplaced: Bool = false,
         beforeTheSwap: @escaping (URL) throws -> Void = { (_: URL) throws in },
         hooks: RestoreSwap.Hooks = RestoreSwap.Hooks.real,
         keepingWhatWasReplaced: ((URL) -> Void)? = nil
@@ -355,8 +355,8 @@ enum WholeCourseRestore {
                 afterTheCommit(courseURL: courseURL)
             },
             keepingWhatWasReplaced: keepingWhatWasReplaced,
-            keepsWhatWasReplaced: keepsWhatWasReplaced,
-            archiveBegan: archiveBegan
+            archiveBegan: archiveBegan,
+            leftOutOnPurpose: leftOutOnPurpose(courseURL: courseURL)
         )
         do {
             let restored: RestoreSwap.Restored = try RestoreSwap.restore(
@@ -381,6 +381,23 @@ enum WholeCourseRestore {
             noteLeftAsItWas(error, courseCode: courseCode, backupFileName: backupFileName)
             throw error
         }
+    }
+
+    /// The folders inside the course an archive made of it now leaves out
+    /// on purpose, as paths inside it: Plantoir's own Obsidian add-ons
+    /// (`ObsidianFigureAddOns.backupExclusions`, by the same marker), which
+    /// the next pass puts back. Recorded so the restore and a settle remove
+    /// them with the old copy rather than keeping 12.9 MB of them as files
+    /// the archive does not hold.
+    static func leftOutOnPurpose(courseURL: URL) -> [String] {
+        let pluginsURL: URL = courseURL
+            .appendingPathComponent(ObsidianAddOns.settingsFolderName)
+            .appendingPathComponent("plugins")
+        var folders: [String] = []
+        for name in ObsidianFigureAddOns.plantoirAddOnFolders(inPluginsAt: pluginsURL) {
+            folders.append(ObsidianAddOns.settingsFolderName + "/plugins/" + name)
+        }
+        return folders
     }
 
     // MARK: - Functions: the trail
@@ -601,6 +618,20 @@ enum WholeCourseRestore {
                     section: 0
                 )
             }
+            // A settle that finished a restore and kept files writes the
+            // line the restore itself writes for what it kept.
+            if outcome.action == .finish, let keptAt = outcome.keptAt {
+                var why: ActivityTrail.KeptBecause = ActivityTrail.KeptBecause.notInTheArchive
+                if outcome.says == .keptWhatWasInTheFolder {
+                    why = ActivityTrail.KeptBecause.noArchive
+                }
+                ActivityTrail.note(
+                    .courseRestoreKeptFiles,
+                    ActivityTrail.courseRestoreKeptFilesLine(keptAt: keptAt, why: why),
+                    course: outcome.course ?? "",
+                    section: 0
+                )
+            }
             if let sentence = sentence(for: outcome, coursesDirectoryURL: coursesDirectoryURL) {
                 said.append(sentence)
             }
@@ -659,6 +690,14 @@ enum WholeCourseRestore {
         case .setAsideFilesKept:
             if let keptAt = outcome.keptAt, outcome.holdsSomethingToOpen {
                 sentence = RestoreWholeCourseWording.setAsideFilesKept(keptAt: keptAt)
+            }
+        case .keptWhatWasInTheFolder:
+            if let keptAt = outcome.keptAt {
+                sentence = RestoreWholeCourseWording.keptWhatWasInTheFolder(course: course, keptAt: keptAt)
+            }
+        case .keptWhatTheArchiveMayNotHold:
+            if let keptAt = outcome.keptAt {
+                sentence = RestoreWholeCourseWording.keptWhatTheArchiveMayNotHold(course: course, keptAt: keptAt)
             }
         case nil:
             sentence = nil

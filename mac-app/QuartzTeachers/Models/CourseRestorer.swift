@@ -278,7 +278,11 @@ enum CourseRestorer {
     /// the copy where it is for the next reading, and a crash after the
     /// restore is finished from the record. Until then it was a closure the
     /// engine ran and ignored the result of, and a settle ran none: 45 of
-    /// 45 files were removed in each case. Returns where it kept files.
+    /// 45 files were removed in each case. Since round four the ENGINE
+    /// decides it (no archive and a folder that is there), under its hold,
+    /// in the step that writes the moves: decided here, a moment earlier, a
+    /// folder made in between had its page removed (the round-three
+    /// review). Returns where it kept files.
     @discardableResult
     static func restoreBackup(
         _ item: BackupItem,
@@ -289,7 +293,6 @@ enum CourseRestorer {
         hooks: RestoreSwap.Hooks = RestoreSwap.Hooks.real
     ) throws -> RestoreSwap.Restored {
         let destination: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
-        let keepsWhatWasReplaced: Bool = archiveURL == nil && RestoreSwap.itemExists(at: destination)
         if !FileManager.default.fileExists(atPath: destination.path) {
             // The course is not there, so this is an arrival: by its school
             // year (#572 plan review H2). A restore IN PLACE keeps the
@@ -304,7 +307,6 @@ enum CourseRestorer {
             coursesDirectoryURL: coursesDirectoryURL,
             archiveURL: archiveURL,
             archiveBegan: archiveBegan,
-            keepsWhatWasReplaced: keepsWhatWasReplaced,
             beforeTheSwap: beforeTheSwap,
             hooks: hooks
         )

@@ -113,9 +113,16 @@ nonisolated enum RestoreWholeCourseWording {
     /// After a restore that worked, when files of the course as it was may
     /// not be in the archive made first (the third case).
     static func keptWhatTheArchiveMayNotHold(course: String, keptAt: String) -> String {
-        return "Some files that were in \(course) may not be in the copy that moved to Archived, because they changed "
-             + "while that copy was being made or are of a kind backups leave out. They are kept in the folder "
+        return "Some files that were in \(course) may not be in the copy that moved to Archived, because they were added "
+             + "or changed while that copy was being made or are of a kind backups leave out. They are kept in the folder "
              + "\"\(keptAt)\" inside your working folder."
+    }
+
+    /// Under All Backups' total, when restores have kept folders beside the
+    /// backups (#909 round four): the sidebar's size counts them too, so
+    /// the two numbers are told apart.
+    static func keptFoldersTake(size: String) -> String {
+        return "Folders that restores kept beside them take a further \(size), counted in the size beside Backups."
     }
 
     /// The confirmation's last word on what happens to the course as it is,

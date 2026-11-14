@@ -6599,6 +6599,20 @@ confirmation's paragraph on what happens to the course as it is now is in
 the contract, one of three by what truly happens (`confirmArchived`,
 `confirmKeptWithItsBackups`, `confirmNoCourseFolder`).
 
+Round four (2026-11-14) adds, as data: whether a file is in the archive is
+read from the archive's own central directory (path, size, recorded time;
+`keptFolders.notInTheArchive` and `notInTheArchiveCases`), so Windows owes a
+zip directory reader (`System.IO.Compression.ZipArchive` lists entries
+without unpacking them; its `LastWriteTime` is the recorded local time);
+the record's `leftOutOnPurpose`; the engine, not the door, decides
+`keepsWhatWasReplaced`; a deeper `.git` and the other deeper left-out names
+are put back into the restored course when they can be (Russell's ruling);
+a settle that keeps files says `keptWhatWasInTheFolder` or
+`keptWhatTheArchiveMayNotHold`; and the size beside Backups counts kept
+folders (`backups.keptFoldersCounted`, `wording.keptFoldersTake`).
+`documentation/09-mac-app.md` → "Round four" says what was measured and
+rejected.
+
 **A whole course put back leaves `course restored from a backup`** — since
 step 0 of v2.0.0 (2026-11-13), the gap the mac's #572 closed on its side:
 until then a whole-course restore from Backups (Restore…) or from Archived

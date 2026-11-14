@@ -50,8 +50,10 @@ final class CourseRestorerStagedTests: XCTestCase {
         // As the door runs it, with the course archived first: without an
         // archive the old copy is kept rather than removed (the
         // implementation review's I1), and this is about the removal.
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
         try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
         )
 
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
@@ -143,43 +145,70 @@ final class CourseRestorerStagedTests: XCTestCase {
         try WholeCourseFixture.write("finder\n", to: fixture.courseURL.appendingPathComponent("section1/.DS_Store"))
         let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
 
-        // As the door runs it, with the course archived first (the zip stands
-        // in for the archive) and the archive begun well after every file
-        // above, so only their names can make them kept.
+        // As the door runs it, with the course archived first, after every
+        // file above, so only their names can make them kept.
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
         try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL,
-            archiveBegan: Date().addingTimeInterval(5)
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
         )
 
-        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
+        // Russell's ruling (2026-11-14): put back where it was when the
+        // restored course has its folder (Concepts/Unit 1 is the backup's
+        // too); kept aside when it does not (section1/Sample App is not).
+        var restored: [String: Data] = fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit)
+        restored["Concepts/Unit 1/out/result.txt"] = Data("output\n".utf8)
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), restored)
         var expected: [String: Data] = [:]
-        for (path, text) in deeper {
+        for (path, text) in deeper where !path.hasPrefix("Concepts/") {
             expected[path] = Data(text.utf8)
         }
         XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), expected)
         XCTAssertEqual(fixture.leftInRestoring(), 0)
     }
 
-    /// The third case's other half: a page saved while the archive was
-    /// being made may be in it as it was before, so it is kept. MUST FAIL
-    /// on db38ed112.
+    /// Russell's ruling on #909 (2026-11-14): a `.git` deeper inside the
+    /// course, in neither the backup nor the archive, is PUT BACK where it
+    /// was in the restored course, not kept aside. MUST FAIL on 66f645649
+    /// (and on the mutant with `putsDeeperLeftOutNamesBack` false), which
+    /// kept it in "<CODE> not in the archive".
+    @MainActor
+    func testADeeperGitIsPutBackWhereItWas() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let git: String = "section1/All Classes/.git/HEAD"
+        try WholeCourseFixture.write("ref: refs/heads/class\n", to: fixture.courseURL.appendingPathComponent(git))
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(
+            try String(contentsOf: fixture.courseURL.appendingPathComponent(git), encoding: .utf8), "ref: refs/heads/class\n"
+        )
+        XCTAssertFalse(fixture.somethingWasKept(), "put back, so nothing is kept aside")
+        XCTAssertEqual(
+            try String(contentsOf: fixture.courseURL.appendingPathComponent("section1/All Classes/Unit 1, Day 1.md"), encoding: .utf8),
+            "BACKUP class\n"
+        )
+    }
+
+    /// The third case's other half: a page saved after zip read it is in
+    /// the archive as it was before, so it is kept. MUST FAIL on
+    /// db38ed112.
     @MainActor
     func testAPageSavedAfterTheArchiveBeganIsKept() throws {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
-        let archiveBegan: Date = Date().addingTimeInterval(-1)
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
         let page: URL = fixture.courseURL.appendingPathComponent("Concepts/Unit 1/Concept 1.md")
         try WholeCourseFixture.write("LIVE concept, saved while the archive was made\n", to: page)
-        for path in ["course_config.json", ".obsidian/app.json", "index.md", "section1/All Classes/Unit 1, Day 1.md"] {
-            let older: Date = archiveBegan.addingTimeInterval(-60)
-            try FileManager.default.setAttributes(
-                [.modificationDate: older, .creationDate: older], ofItemAtPath: fixture.courseURL.appendingPathComponent(path).path
-            )
-        }
 
         try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL,
-            archiveBegan: archiveBegan
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
         )
 
         XCTAssertEqual(
@@ -215,11 +244,186 @@ final class CourseRestorerStagedTests: XCTestCase {
         ), fixture.trailText())
 
         RestoreSwap.letGo(hold)
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
         try CourseRestorer.restoreBackup(
-            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
         )
         XCTAssertEqual(
             try String(contentsOf: fixture.courseURL.appendingPathComponent("index.md"), encoding: .utf8), "BACKUP front page\n"
+        )
+    }
+
+    /// Round four, INCOMPLETE 1 of the round-three review: a file that
+    /// ARRIVES after the zip's scan keeps its old dates (moved, `cp -p`,
+    /// Finder's copy, a folder dragged in), so a rule of times alone found
+    /// it in neither the archive nor a kept folder. Whether a file is in
+    /// the archive is now read from the archive's own listing (path, size,
+    /// recorded time). Each arrival below is dated an hour before the
+    /// archive, and a page is replaced at its path by another of the same
+    /// size and old dates. MUST FAIL on 66f645649, which lost all five.
+    @MainActor
+    func testFilesThatArriveWithOldDatesAfterTheArchiveAreKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        let hourBefore: Date = archive.began.addingTimeInterval(-3_600)
+        let outside: URL = fixture.rootURL.appendingPathComponent("Downloads")
+        var arrivals: [String: Data] = [:]
+        func arrive(_ text: String, at inside: String) throws {
+            let source: URL = outside.appendingPathComponent(UUID().uuidString)
+            try WholeCourseFixture.write(text, to: source)
+            try FileManager.default.setAttributes([.modificationDate: hourBefore, .creationDate: hourBefore], ofItemAtPath: source.path)
+            let destination: URL = fixture.courseURL.appendingPathComponent(inside)
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            // rename(2): over a page that is there, a plain replace, as `mv` does.
+            XCTAssertEqual(rename(source.path, destination.path), 0, inside)
+            arrivals[inside] = Data(text.utf8)
+        }
+        try arrive("moved in from Downloads\n", at: "Concepts/Dropped.md")
+        try arrive("a handout dragged to the top\n", at: "Handout.md")
+        // A folder of old pages moved in whole.
+        let folder: URL = outside.appendingPathComponent("Unit 9")
+        for index in 1...2 {
+            let page: URL = folder.appendingPathComponent("Lesson \(index).md")
+            try WholeCourseFixture.write("lesson \(index)\n", to: page)
+            try FileManager.default.setAttributes([.modificationDate: hourBefore, .creationDate: hourBefore], ofItemAtPath: page.path)
+            arrivals["section1/Unit 9/Lesson \(index).md"] = Data("lesson \(index)\n".utf8)
+        }
+        try FileManager.default.moveItem(at: folder, to: fixture.courseURL.appendingPathComponent("section1/Unit 9"))
+        // The same size as the page it replaces ("LIVE front page\n").
+        try arrive("XXXX front page\n", at: "index.md")
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), arrivals)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// Round four: a HIDDEN file changed after the archive began is the
+    /// teacher's too (the timetable, Obsidian's settings), kept by the same
+    /// rule. MUST FAIL on 66f645649, which left every hidden file out of
+    /// the rule (the round-three review: the timetable edit was lost).
+    @MainActor
+    func testAHiddenFileChangedAfterTheArchiveIsKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let timetable: URL = fixture.courseURL.appendingPathComponent(".internal/timetable/section1.json")
+        try WholeCourseFixture.write("{\"days\": 4}\n", to: timetable)
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        try WholeCourseFixture.write("{\"days\": 5, \"edited\": true}\n", to: timetable)
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
+            [".internal/timetable/section1.json": Data("{\"days\": 5, \"edited\": true}\n".utf8)]
+        )
+    }
+
+    /// Round four: whether the old copy is kept whole is decided by the
+    /// ENGINE, under its hold, in the step that writes the moves, not by
+    /// the door a moment before (the round-three review forced a gap: no
+    /// folder at the door, one page in it at the engine, the page lost).
+    /// With no archive over a folder that is there, every file is kept.
+    /// MUST FAIL on 66f645649, whose engine took the door's word (false).
+    @MainActor
+    func testTheEngineKeepsTheFolderWholeWhenNoArchiveWasMade() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        live[".git/HEAD"] = nil
+
+        try WholeCourseRestore.restore(
+            fromZipAt: fixture.zipURL, courseCode: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U as it was before restoring again "), live)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// Plantoir's own Obsidian add-ons are left out of an archive on
+    /// purpose and put back by the next pass: removed with the old copy,
+    /// never kept as files the archive does not hold (12.9 MB a restore).
+    @MainActor
+    func testAddOnsLeftOutOfTheArchiveOnPurposeAreNotKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let addOn: URL = fixture.courseURL.appendingPathComponent(".obsidian/plugins/tikzjax")
+        try WholeCourseFixture.write("add-on\n", to: addOn.appendingPathComponent("main.js"))
+        try WholeCourseFixture.write("marker\n", to: addOn.appendingPathComponent(ObsidianFigureAddOns.markerName))
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertFalse(fixture.somethingWasKept(), "nothing kept: the archive holds every other file as it is")
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// An archive whose listing cannot be read holds nothing that is
+    /// known: every file of the old copy is kept, none removed.
+    @MainActor
+    func testAnArchiveThatCannotBeReadKeepsEveryFile() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        live[".git/HEAD"] = nil
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+        try Data("not a zip".utf8).write(to: archive.url)
+        XCTAssertNil(RestoreSwap.ArchiveListing.read(archive.url))
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: archive.url,
+            archiveBegan: archive.began
+        )
+
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), live)
+    }
+
+    /// The listing is read from the central directory: every file's path
+    /// inside the course, in Unicode's composed form, with its size.
+    @MainActor
+    func testTheArchiveListingReadsPathsAndSizes() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let decomposed: String = "Concepts/Cafe\u{0301}.md"
+        try WholeCourseFixture.write("accent\n", to: fixture.courseURL.appendingPathComponent(decomposed))
+        let archive: (url: URL, began: Date) = try fixture.archiveTheCourse()
+
+        let listing: RestoreSwap.ArchiveListing = try XCTUnwrap(RestoreSwap.ArchiveListing.read(archive.url))
+
+        XCTAssertEqual(listing.file(at: "index.md")?.size, UInt64("LIVE front page\n".utf8.count))
+        XCTAssertEqual(listing.file(at: "Concepts/Caf\u{00E9}.md")?.size, 7, "found in either Unicode form")
+        XCTAssertNil(listing.file(at: ".git/HEAD"), "left out by the archive")
+        XCTAssertTrue(listing.holdsAnything(at: "section1/All Classes"))
+        let recorded: Date = try XCTUnwrap(listing.file(at: "index.md")?.recordedTime)
+        let changed: Date = try XCTUnwrap(
+            try fixture.courseURL.appendingPathComponent("index.md").resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate
+        )
+        XCTAssertLessThanOrEqual(abs(recorded.timeIntervalSince(changed)), RestoreSwap.zipTimeRoundingSeconds)
+    }
+
+    /// The two lists of names a backup leaves out are together exactly
+    /// `CourseArchiver.excludedFromArchives`.
+    func testTheNamesLeftOutAreTheArchivesNames() {
+        var names: Set<String> = Set(RestoreSwap.leftOutNamesKeptAtAnyDepth)
+        for name in RestoreSwap.leftOutNamesMadeAgain {
+            names.insert(name)
+        }
+        XCTAssertEqual(names, Set(CourseArchiver.excludedFromArchives))
+        XCTAssertEqual(
+            RestoreSwap.leftOutNamesKeptAtAnyDepth.count + RestoreSwap.leftOutNamesMadeAgain.count,
+            CourseArchiver.excludedFromArchives.count
         )
     }
 
