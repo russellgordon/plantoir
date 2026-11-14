@@ -2020,13 +2020,14 @@ cut to it (#481).** Windows is catching up from 1.4.5 to the mac's 1.7.1 in
 batches, and an entry may name work a LATER BATCH owns, on the milestone that
 work shipped in on the mac — `Owed(area, issue, milestone, reason, keys…)`, with
 `V150` … `V171` spelled exactly as the GitHub milestone titles.
-`NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` reads
-`<Version>` from `Plantoir/Plantoir.csproj` and fails for any entry whose
-milestone is not LATER than it — so setting 1.7.1 turns every v1.5.0–v1.7.1
-entry still there red, while an entry owed by a genuinely later release
-survives the cut. It is "later than this build", not "empty at the cut", on
-purpose; a milestone that is not a version fails, because it cannot be
-compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
+`NamedGapLedgerTests` read `<Version>` from `Plantoir/Plantoir.csproj` and
+failed for any entry whose milestone was not LATER than it — so setting 1.7.1
+turned every v1.5.0–v1.7.1 entry still there red, while an entry owed by a
+genuinely later release survived the cut. (Since #862, 2026-11-13, the
+ordinary suite compares with the last release Windows SHIPPED instead, and
+`publish.ps1 -Sign` with `<Version>`: "The ledger's two baselines", below.)
+It is "later than", not "empty at the cut", on purpose; a milestone that is
+not a version fails, because it cannot be compared. Batch 1 (2026-10-15) also wired four more lists into the ledger, in
 the same shape as the ones below: `toolchain.json` → `pins` with a
 `windowsRuntimeContains` (`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins`
 — the contract-agrees-with-itself check still runs for every pin; pagedjs
@@ -2045,9 +2046,9 @@ mac 1.7.2's sixteen plan-table sentences (#524), held open against #548 on
 2026-10-16, landed with #548's plan table that day ("The plan as a table",
 below); `NamedGapLedgerTests.TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion`
 keeps the rule exercised on made-up entries meanwhile. Since 2026-11-13 it
-holds the v2.0.0 run's entries: step 0 held 86, and later pieces add and
-close entries, so the count is read from `NamedGapLedger.cs`, not from here
-("Step 0 of v2.0.0" and the sections after it, below).
+holds the v2.0.0 run's entries ("Step 0 of v2.0.0", below; count them in
+`NamedGapLedger.cs` itself, since a number written here goes stale with
+every piece that lands).
 
 **From 2026-09-30 to the v1.4.0 cut the ledger was the parity milestone's
 BURN-DOWN LIST** (Russell: no Windows release before parity, so an entry could
@@ -2091,6 +2092,129 @@ three helpers with no key by design, and the issue asked for the file to be
 the list, not for a second allow-list); searching the whole codebase for each
 sentence's text (a sentence built inline from pieces cannot be found by its
 text, and a text search would call a stale copy present).
+
+### The ledger's two baselines: the last Windows release, and the cut (#862, 2026-11-13)
+
+**What changed.** Russell ruled on 2026-11-13 that test builds say the release
+being built (#861 on the mac, #862 here), so `<Version>` in
+`Plantoir/Plantoir.csproj` is 2.0.0 on `dev` and is raised when work on a
+release starts (`RELEASING.md` → "When the number is raised"). The ledger's
+rule compared every entry with `<Version>`, so the raise alone turned all 116
+entries owed by v2.0.0 red (measured: the old `NamedGapLedgerTests` against a
+2.0.0 csproj, `Failed: 1, Passed: 3`, 116 entries named), though every one of
+them is work the run in progress is allowed to have open. So the rule now has
+two baselines, one fact:
+
+- **Every run** —
+  `NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease`
+  compares with the last release Windows SHIPPED, read exactly as the deploy
+  of plantoir.app reads it since #861 (`website/windows_feed.py` →
+  `shipped_version` and `version_refusal`): `website/site.json`'s Windows
+  card's `pinned`, else its `version`, and `website/updates/windows.xml`'s
+  newest item (the highest `sparkle:version`, wherever it sits, the
+  enclosure's attribute first and the element when the attribute is missing
+  or empty). Versions are compared as `windows_feed.version_key` compares
+  them (`NamedGapLedgerTests.VersionKey` / `CompareVersions`: numbers part by
+  part, a part that is not a number is -1, trailing zeros dropped, the shorter
+  first when one starts the other), so the two readers reach the same answer
+  even on a hand-edited feed; the first review found three inputs where they
+  did not (a prerelease newest, a four-part version, an empty attribute beside
+  the element) and all three are cases now. Python's order puts "2.0.0-rc1"
+  ABOVE "2.0.0", kept because agreeing is the point; the generator writes
+  plain numbers. A value whose first part is not a number is refused, since
+  it would sort below every milestone. When the two disagree the higher is
+  used, and `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped` fails for the
+  disagreement itself, as the deploy refuses it. **That fact is red during a
+  cut, between committing the new feed and moving `site.json`'s version line
+  (in either order), and that is correct**: it is the state the deploy refuses
+  (`RELEASING.md` → "The update feed (Windows)").
+  `TheBaselineIsReadFromThePinTheVersionLineAndTheNewestItem` proves the
+  readers on made-up files: a pinned card (a mac-only cut), an unpinned one, a
+  feed whose newest item is neither first nor spelt the same way, the three
+  inputs above, and the switch below.
+- **The cut** — `publish.ps1` runs the same fact with
+  `PLANTOIR_LEDGER_BASELINE=build`, which compares with `<Version>`, through
+  `Invoke-TestRun` and `Get-TestRunOutcome` (the totals, never the exit code),
+  before the signing preflight and before anything is built. With `-Sign` any
+  run that is not `Passed` is a refusal; without it, a warning and the
+  unsigned bundle is built anyway; `-CheckLedgerOnly` enforces the check and
+  stops. The refusal names the failing tests and words its remedy by verdict
+  (first review, M1): owed entries are listed with "build each, or move its
+  issue"; every other failing ledger test is shown with its message, owed
+  entries or not (for the site-and-feed fact: the feed or `site.json`'s line
+  has moved ahead of the other, so restore the PREVIOUS release's feed, as
+  `RELEASING.md` → "The update feed (Windows)" says, or put the line back if
+  it moved first); a run with no result shows its build errors. The whole
+  transcript is kept in `%TEMP%\plantoir-publish-ledger-check-<pid>.txt`, one
+  per run, and two lines before the run say what the wait is and where that
+  file is. Any other value of the switch is an error, so a misspelling at the
+  cut cannot quietly fall back to the lenient baseline.
+  `InstallerRunningWorkTests.PublishRefusesASignedCutWhileTheLedgerOwesThisRelease`
+  reads the order and the enforcing branch out of the script, and that
+  `$enforceLedger` is assigned once and the check sits inside no block (a
+  wrapping `if (-not $Sign)` or a later `$enforceLedger = $false` turned it
+  red, measured). It catches the check DRIFTING out of reach, not deliberate
+  sabotage: the second review made it unreachable five other ways (a
+  `$script:` assignment, a `trap`, a forged verdict, a here-string,
+  `Set-Variable`) and it stayed green, which is the limit of reading a
+  script; the behavioural proof is `publish.ps1 -CheckLedgerOnly`, in no
+  suite.
+- **A `<Version>` the cut cannot compare is refused**: blank, `v2.0.0` or any
+  value whose first part is not a number would sort below every milestone, so
+  `NamedGapLedgerTests.BuildVersionIn` throws on it, with the same guard the
+  last-release reader has (second review, L1: before it, a blank `<Version>`
+  gave `-CheckLedgerOnly` exit 0 "nothing owed" with 116 entries owed;
+  measured after, exit 1, "cannot be compared with a milestone").
+- **An unsigned bundle is never installed over a real copy**: it carries the
+  release-in-progress number, and the update check offers only a newer
+  version, so that copy would never be offered the real release of the same
+  number (first review, M2; read from `AppUpdater.cs`, not measured by an
+  install). `publish.ps1`'s header and `RELEASING.md` say so.
+
+**Why the cut is where it is.** The old rule needed a person to re-run the
+suite after the version was set (`RELEASING.md` said so); the new check sits
+in the one command every Windows release runs. The ordinary suite stays a
+backstop: once the cut adds its item to `windows.xml`, the baseline is that
+release, and a leftover entry is red in every run after it. An entry owed by
+v2.0.0 survives a mac-only 2.0.0 cut, because Windows shipped nothing in it
+(its card is pinned, its feed unchanged), and is stopped at the Windows
+catch-up by `publish.ps1 -Sign`.
+
+**Measured** on this PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200), with `<Version>` 2.0.0: the filtered ledger tests green with the
+switch unset (6 of 6); with `PLANTOIR_LEDGER_BASELINE=build`,
+`EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease` red naming 116
+entries; `publish.ps1 -CheckLedgerOnly` exit 1 in 118 s (most of it building
+the test project), saying "116 ledger entries are owed by this release or an
+earlier one" and listing them; the same with `<Version>` set to 1.9.9 in a
+scratch edit, exit 0 ("PASSED - 6 passed"). After the review's fixes: with
+`<Version>` 1.9.9 and a 2.0.0 item added to a scratch copy of the feed,
+exit 1 naming `TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped`, its message,
+and the restore-the-feed remedy; with a planted syntax error in a test file,
+exit 1 with the `error CS1525` line and "did not run to a result". The
+unsigned path's warning was not run end to end (it would build a 1.2 GB
+bundle); the source test reads it. A warm `-CheckLedgerOnly` took 7.7 s
+(the reviewer's measurement).
+
+**Rejected.** Comparing with `<Version>` in every run (the ledger would be red
+for the whole of every release). Reading `site.json` alone (its `version` is
+the joint line and moves at a mac-only cut while Windows ships nothing; the pin
+says that, the feed too) or the feed alone (the shared design is #861's
+`shipped_version`, and one reader per question is the point). Enforcing the
+check on every `publish.ps1` run (the unsigned bundle is the documented local
+test build, and `website/shots/capture_windows.py` makes one, both while the
+release's work is open). Reading `NamedGapLedger.cs` with a PowerShell regex
+in `publish.ps1` (a second reader of C# source that drifts the day a milestone
+constant is renamed). A second fact that is skipped unless the switch is set
+(it would add a skip to every run, and a cut check that reports "skipped" when
+its switch did not take is green having run nothing).
+
+**For the trail.** Nothing new: the app's opening line already carries the
+version, and says 2.0.0. The `updated from … to …, by hand` line is written
+whenever the version the app last opened as differs, so on a PC with an
+installed 1.9.3 beside a 2.0.0 test build each switch between them writes one
+(it did the same between 1.8.7 and 1.8.6 on 2026-10-31). No behaviour change
+was asked for, so none was made.
 
 ### Step 0 of v2.0.0: what the ledger holds and how each entry ends (#787, 2026-11-13)
 

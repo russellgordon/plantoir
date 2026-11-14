@@ -4,11 +4,25 @@ Builds the Windows release bundle: publish, optionally sign, package.
     powershell -File publish.ps1              # unsigned bundle (local testing)
     powershell -File publish.ps1 -Sign        # signed bundle (real releases)
     powershell -File publish.ps1 -WithoutAssistantEngine   # a developer's bundle with no llama\ (never with -Sign)
+    powershell -File publish.ps1 -CheckLedgerOnly          # only the named-gap check -Sign makes, then stop
+
+Before anything is built it runs NamedGapLedgerTests against <Version> (the
+release being built, not the last one shipped). With -Sign or
+-CheckLedgerOnly an entry owed by this release or an earlier one REFUSES the
+run; without them it is a warning, because an unsigned bundle is a test build
+made while that release's work is still open (#862).
+
+Never install an unsigned bundle over a real copy of Plantoir. Since #862 it
+carries the number of the release being BUILT (2.0.0 while v2.0.0 is in
+progress), and the update check offers only a NEWER version, so that copy
+would never be offered the real release of the same number.
 
 Output lands in windows-app\dist\PlantoirSetup.exe and Plantoir-win-x64.zip
 with SHA-256 printed for the release notes. The version comes from ONE place:
-<Version> in Plantoir\Plantoir.csproj — bump it there, tag the repo to
-match (v<version>), and this script names everything else accordingly.
+<Version> in Plantoir\Plantoir.csproj — raised on dev when work on a release
+starts (RELEASING.md -> "When the number is raised"), checked at the cut, the
+repo tagged to match (v<version>), and this script names everything else
+accordingly.
 
 Signing uses Azure Artifact Signing (a.k.a. Trusted Signing) via the
 `sign` dotnet tool and expects a prior `az login`. See the signing
@@ -21,6 +35,9 @@ param(
     # A developer's build with no assistant engine (no Vendor\llama). Refused
     # together with -Sign: a signed bundle without llama\ is what 1.9.0 shipped.
     [switch]$WithoutAssistantEngine,
+    # Run only the named-gap ledger check, enforced as -Sign enforces it, and
+    # stop: how the refusal is proved without a signing login or a build.
+    [switch]$CheckLedgerOnly,
     [string]$SigningEndpoint = "https://eus.codesigning.azure.net",
     [string]$SigningAccount  = "plantoir-signing",
     [string]$SigningProfile  = "plantoir-public",
@@ -29,6 +46,119 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+
+# ---- The named-gap ledger: nothing owed by this release may still be open --
+# Since #862 the ordinary suite compares the ledger with the last release
+# Windows SHIPPED (site.json and updates/windows.xml), because <Version> is
+# raised on dev when work on a release starts and every entry owed by that
+# release is allowed while the work is open. So the cut is checked HERE, in
+# the one command every Windows release runs: the same fact, with
+# PLANTOIR_LEDGER_BASELINE=build, compares each entry with <Version>.
+# Enforced only with -Sign (and -CheckLedgerOnly): an unsigned bundle is the
+# documented local test build, and website/shots/capture_windows.py makes one
+# too, both while the release's work is still open. Judged by the totals
+# (TestRunOutcome.ps1), never the exit code. Rejected: reading
+# NamedGapLedger.cs with a regex here (a second reader of C# source, which
+# drifts the first time a milestone constant is renamed).
+. "$PSScriptRoot\TestRunOutcome.ps1"
+
+# The failing tests of a `dotnet test` transcript: each "Failed <name> [..]"
+# with the lines of its "Error Message:" (up to "Stack Trace:"). So a refusal
+# for any reason but an owed entry still says WHICH test and WHY (#862 review
+# M1: a feed regenerated before a rebuild failed the site-and-feed fact, and
+# the refusal named nothing).
+function Get-FailedTests([string]$transcript) {
+    $failures = @()
+    $current = $null
+    $inMessage = $false
+    foreach ($line in ($transcript -split "`r?`n")) {
+        if ($line -match '^\s+Failed (\S+) \[') {
+            if ($current) { $failures += $current }
+            $current = [pscustomobject]@{ Name = $Matches[1]; Message = @() }
+            $inMessage = $false
+            continue
+        }
+        if ($null -eq $current) { continue }
+        if ($line -match '^\s+Error Message:\s*$') { $inMessage = $true; continue }
+        if ($line -match '^\s+(Stack Trace|Standard Output Messages):\s*$') { $inMessage = $false; continue }
+        if ($inMessage -and $line.Trim()) { $current.Message += $line.Trim() }
+    }
+    if ($current) { $failures += $current }
+    ,$failures
+}
+
+$enforceLedger = $Sign -or $CheckLedgerOnly
+# One log per run (the process id in its name), so two runs never overwrite
+# each other's transcript (#862 fixes review L4).
+$ledgerLog = Join-Path ([IO.Path]::GetTempPath()) "plantoir-publish-ledger-check-$PID.txt"
+Write-Host "Checking the named-gap ledger against this build's <Version> (NamedGapLedgerTests)..." -ForegroundColor Green
+Write-Host "  This builds and runs the ledger's tests: about two minutes from a cold build, seconds when warm."
+Write-Host "  The whole output of this run is kept in $ledgerLog"
+$baselineBefore = $env:PLANTOIR_LEDGER_BASELINE
+$env:PLANTOIR_LEDGER_BASELINE = 'build'
+try {
+    $ledgerRun = $null
+    Invoke-TestRun -DotnetArguments @('test', 'Plantoir.Tests\Plantoir.Tests.csproj', '--nologo',
+                                      '--filter', 'FullyQualifiedName~NamedGapLedgerTests') -Result ([ref]$ledgerRun) | Out-Null
+} finally {
+    $env:PLANTOIR_LEDGER_BASELINE = $baselineBefore
+}
+Set-Content -LiteralPath $ledgerLog -Value $ledgerRun.Output -Encoding UTF8
+$ledgerOutcome = Get-TestRunOutcome -Output $ledgerRun.Output -ExitCode $ledgerRun.ExitCode
+if ($ledgerOutcome.Verdict -ne 'Passed') {
+    $owedLines = @($ledgerRun.Output -split "`r?`n" |
+                   Where-Object { $_ -match ' is owed by #\d+ on | names the milestone ' } |
+                   ForEach-Object { $_.Trim() })
+    $failedTests = Get-FailedTests $ledgerRun.Output
+    # The live output is not shown (Out-Null above), so "look further up" in
+    # the NoResult summary points at nothing: the build errors are inlined
+    # below instead, and the whole transcript is in the log.
+    $summary = $ledgerOutcome.Summary -replace 'Look further up for a build error',
+                                               'Its build errors are below; the whole output is in the log named above'
+    $ledgerMessage = "The named-gap ledger is not clear for this build. $summary"
+    if ($failedTests.Count -gt 0) {
+        $ledgerMessage += "`nFailing: " + (($failedTests | ForEach-Object { $_.Name }) -join ', ')
+    }
+    # Every failing test except the owed-entries fact, with its message: shown
+    # whether or not entries are owed too (#862 fixes review L5).
+    $otherFailures = @($failedTests | Where-Object { $_.Name -notlike '*.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease' })
+    foreach ($failure in $otherFailures) {
+        $ledgerMessage += "`n$($failure.Name):`n  " + (@($failure.Message | Select-Object -First 4) -join "`n  ")
+    }
+    $feedRemedy = ""
+    if (@($otherFailures | Where-Object { $_.Name -like '*.TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped' }).Count -gt 0) {
+        $feedRemedy = " The site-and-feed test means website/updates/windows.xml or site.json's version line has " +
+                      "moved ahead of the other. During a cut, a rebuild after the feed was generated: restore the " +
+                      "PREVIOUS release's feed (git checkout <previous release's commit> -- website/updates/windows.xml " +
+                      "website/updates/windows.xml.signature), run this again, and generate the feed afresh " +
+                      "(RELEASING.md -> `"The update feed (Windows)`"). If site.json moved first, put its line back " +
+                      "until the feed is made."
+    }
+    if ($owedLines.Count -gt 0) {
+        $ledgerMessage += "`n$($owedLines.Count) ledger entries are owed by this release or an earlier one:`n  " +
+                          ($owedLines -join "`n  ")
+        $remedy = "A signed release cannot be cut over them: build each, or move its issue and entry to a " +
+                  "later milestone with Russell's say-so (contracts/README.md -> `"Named gaps`")."
+        if ($otherFailures.Count -gt 0) {
+            $remedy += " Another of the ledger's own tests failed as well: read its message above." + $feedRemedy
+        }
+    } elseif ($ledgerOutcome.Verdict -eq 'Failed') {
+        $remedy = "No entry is owed: another of the ledger's own tests failed, so read its message above." + $feedRemedy
+    } else {
+        $buildErrors = @($ledgerRun.Output -split "`r?`n" | Where-Object { $_ -match ': error [A-Z]+\d+' } |
+                         ForEach-Object { $_.Trim() } | Select-Object -Unique -First 10)
+        if ($buildErrors.Count -gt 0) { $ledgerMessage += "`n  " + ($buildErrors -join "`n  ") }
+        $remedy = "No entry is owed: the ledger check did not run to a result. Fix what stopped it " +
+                  "(the whole output is in $ledgerLog) and run this again."
+    }
+    if ($enforceLedger) {
+        throw "$ledgerMessage`n$remedy"
+    }
+    Write-Warning "$ledgerMessage`n$remedy`nThis unsigned bundle is built anyway; publish.ps1 -Sign refuses it."
+} else {
+    Write-Host "Named-gap ledger: nothing owed by this build. $($ledgerOutcome.Summary)" -ForegroundColor Green
+}
+if ($CheckLedgerOnly) { return }
 
 # ---- The assistant's engine (llama\): refused when missing ----------------
 # The signed 1.9.0 shipped with NO llama\ folder: Plantoir.csproj includes

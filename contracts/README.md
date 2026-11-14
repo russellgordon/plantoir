@@ -253,21 +253,32 @@ back on its own.
 **During the catch-up to mac 1.7.1, an entry may name work a LATER BATCH of
 that catch-up owns, on the milestone that work shipped in on the mac** (v1.5.0,
 v1.6.0, v1.7.0, v1.7.1 — 2026-10-15, #481). Each entry carries its own
-milestone, and the cut is held to it by a test rather than by memory:
-`NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanThisBuild` reads
-`<Version>` from `windows-app/Plantoir/Plantoir.csproj` and fails for any entry
-whose milestone is not LATER than that version. Setting the version to 1.7.1
-therefore turns every v1.5.0–v1.7.1 entry still in the ledger red, while an
-entry owed by a genuinely later release rightly survives the cut — the rule is
-"later than this build", not "empty at the cut". A milestone that is not a
-version fails, because it cannot be compared. `RELEASING.md` re-runs the suite
-AFTER the version is set, since a run before the bump compares against the old
-version and passes with entries left. **Since 2026-11-13 the ledger holds the
-Windows v2.0.0 run's entries, every one on v2.0.0** (how many is read from
-`NamedGapLedger.cs` itself, never from prose: pieces of the run add and close
-entries all day) — step 0 of that run
-([#787](https://github.com/russellgordon/plantoir/issues/787)) held 86 open,
-holding
+milestone, and the cut is held to it by a test rather than by memory. Until
+2026-11-13 `NamedGapLedgerTests` read `<Version>` from
+`windows-app/Plantoir/Plantoir.csproj` and failed for any entry whose milestone
+was not LATER than that version. Since #861 and #862 that number names the
+release being BUILT and is raised on `dev` when work on a release starts
+(`RELEASING.md` → "When the number is raised"), so the rule has two
+baselines. In every run,
+`NamedGapLedgerTests.EveryEntryIsOwedByAMilestoneLaterThanTheLastWindowsRelease`
+compares each entry with the last release Windows SHIPPED, read as the deploy
+of plantoir.app reads it (`website/site.json`'s Windows pin, else its version
+line, and `website/updates/windows.xml`'s newest item, which must agree),
+never with the csproj: an entry owed by the release in progress is allowed
+while its work is open, and one owed by a release Windows has shipped is red.
+At the cut, `publish.ps1 -Sign` runs the same fact with
+`PLANTOIR_LEDGER_BASELINE=build`, against `<Version>`, and refuses to build a
+signed installer while any entry is not later than the release being cut. An
+entry owed by v2.0.0 therefore survives a mac-only 2.0.0 cut (Windows shipped
+nothing in it) and stays owed until the Windows catch-up, where
+`publish.ps1 -Sign` stops it; once that cut adds its item to the feed, the
+ordinary suite is red for it too. The rule is "later than", not "empty at the
+cut": an entry owed by a genuinely later release rightly survives. A
+milestone that is not a version fails, because it cannot be compared. **Since 2026-11-13 the ledger holds
+entries on v2.0.0 only** (count them in
+`windows-app/Plantoir.Tests/NamedGapLedger.cs`, the one place that says how
+many; a number written here was wrong within the day) — step 0 of the Windows v2.0.0 run
+([#787](https://github.com/russellgordon/plantoir/issues/787)) held open
 every red the mac's v2.0.0 work brought that a later piece of the same run
 builds, each against its own open `windows` issue, and wired twelve more
 lists into the ledger, the launcher runner's rows among them
