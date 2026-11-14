@@ -795,11 +795,11 @@
      "anchor": "publish-pages",
      "title": "Show or hide pages for a section",
      "question": "How do I let one class see a page and keep it from another?",
-     "about": "Section > Publish Pages and Hide Pages (list, Continue, plan, Publish or Hide) and Undo Last Change in this window.",
+     "about": "Section > Publish Pages and Hide Pages (the pages grouped by unit and folder, each group with a box for all of it; Continue, plan, Publish or Hide) and Undo Last Change in this window.",
      "steps": [
       "Select the section",
       "Section > Publish Pages… (or Hide Pages…)",
-      "Tick the pages in the list (columns Page, Folder, Date) and press Continue",
+      "Tick the pages in the list (columns Page, Folder, Date), or tick a unit's or a folder's box to tick every page under it the search shows (a dash means only some are ticked), and press Continue",
       "Read the plan, then press Publish (or Hide)",
       "Section > Publish Class for a Date… does a whole class at once (link publish-class-for-date)",
       "Section > Undo Last Change takes back the last change made from the Section menu in this window (not the assistant's, not another window's)",
@@ -807,7 +807,7 @@
      ],
      "pictures": [
       {
-       "shows": "The Publish Pages sheet with its list of hidden pages, two of them ticked",
+       "shows": "The Publish Pages sheet with its hidden pages grouped by unit and folder: one unit open, two of its classes ticked and its box showing a dash",
        "labels": [
         "Page",
         "Find a page",

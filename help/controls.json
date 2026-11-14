@@ -85,6 +85,20 @@
    },
    "windows": null
   },
+  "pageGroupOtherClasses": {
+   "label": "Other classes",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/Assist/AssistWording.swift"
+   },
+   "windows": null
+  },
+  "pageGroupAllClasses": {
+   "label": "All classes",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Models/Assist/AssistWording.swift"
+   },
+   "windows": null
+  },
   "findAPage": {
    "label": "Find a page",
    "mac": {

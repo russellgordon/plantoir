@@ -7023,7 +7023,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 
 | Item | What it opens | The tool it runs |
 |---|---|---|
-| Publish Pages… | a searchable table of the hidden pages to tick, classes first (#608), then the plan as a table (#524), the pages already visible folded under it (#622) | `plan_publish_pages`, then `publish_pages` |
+| Publish Pages… | a searchable table of the hidden pages to tick (#608), grouped by unit and folder with a box for each group since #900, then the plan as a table (#524), the pages already visible folded under it (#622) | `plan_publish_pages`, then `publish_pages` |
 | Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
 | Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan as a table (#524) | `plan_publish_class_on`, then `publish_class_on` |
 | Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
@@ -7701,6 +7701,99 @@ grow again to a multi-line answer); a fixed answer height. Start of Year
 keeps grow-only — its result stages were not part of this. The trail is
 unchanged: this is how the answer is shown, not what Publish does. Windows
 owes both as one `windows` issue (its plan sheet uses the same keys).
+
+#### v2.0.0: the picker is a tree of checkboxes, so a unit is one tick (#900)
+
+Russell's ruling on #900: "a hierarchical series of checkboxes, allowing an
+entire unit of pages to be turned on or off at once". The first stage of
+Publish Pages… and Hide Pages… keeps its columns (Page, Folder, Date), its
+search and its two steps; only the list became a tree. The plan, the call,
+the write, the undo step and the trail event are the existing ones.
+
+**The grouping is a contract.** `PageTickTree`
+(`Models/PageTickTree.swift`, `nonisolated`, no files, no main actor) builds
+the groups from the pages the sheet OFFERS, once, when the rows are set:
+units by number (`UnitDay(pageTitle:naming:)` on the page's FILE name, the
+course's word and scheme), then one group for the classes outside any unit
+(`menuPageGroupOtherClasses`, "Field Trip", and a page left as "Unit 4, Day 3"
+by an unfinished rename to Module), or for a numbered course one group for
+every class (`menuPageGroupAllClasses`; a club's twins say meetings), then
+the other pages under their Folder column's path split on "/", nested,
+subfolders before pages. The rule and fourteen cases are
+`contracts/class-planning.json` → `pagesToTick`, run by
+`PageTickTreeTests.testEveryCaseIsTheContracts`. A group's box is read over
+the SHOWN pages under it (on, off, mixed); a click on an off or mixed box
+ticks every shown page under it, a click on an on box clears them, and a
+page the search hides is never changed by a group's box. A unit's box covers
+its class pages only (Russell's ruling on #900): the pages its classes link
+to are the plan's and the links checklist's, as before. A ticked page the
+search hides stays ticked and is sent, and `menuTickedButNotShown` says how
+many under the table.
+
+**The call is unchanged, and that is the safety argument.** Continue sends
+`tickedRows`, the sheet's ticked pages in `pageRows` order, exactly as before
+the tree. A unit's box only decides which names are in `ticked`. MEASURED
+standalone (the old sheet's `binding(for:)` and `tickedRows` and
+`SectionVerbs.call` copied beside the new tree, 300 generated pages): 222 tick
+sets, each a mix of group clicks and single ticks against the same pages
+ticked one by one in a shuffled order, 888 calls (publish and hide, plan and
+write) compared byte for byte, 0 differ. One `publish_pages` call is one
+shadow step on #899's list, so a unit's box is ONE undo step holding every
+page (`PageTickTreeTests.testAUnitsBoxWritesWhatTickingItsPagesOneByOneWrote`,
+through the real menu runner, compares every page's bytes and the step).
+
+**The control.** SwiftUI's `Table(of:selection:columns:rows:)` with
+`DisclosureTableRow(_:isExpanded:)` and a recursive `PageTickTableRows`
+under `@TableRowBuilder` (the plan review's amendment 23: the
+`Table(_:children:)` form has no expansion binding, so the search could not
+open the groups it shows). A group's box is `GroupTickBox`, an AppKit
+checkbox with `allowsMixedState` whose state the model SETS on every update
+and whose action calls `SectionVerbSheetModel.click(group:)`, then draws the
+model's answer over AppKit's own off, on, mixed cycle, so the framework never
+decides what is ticked (amendment 24). Row ids are an enum
+(`PageTickTree.RowID.group` / `.page`), so a folder group "section1/Notes"
+and a page "section1/Notes" cannot collide (amendment 25). Space on a
+selected group does what its box does; Right and Left open and close a group
+(the outline view's own keys). VoiceOver hears the group's name and the
+checkbox's state from AppKit, and `menuPageGroupTickedCount` ("5 of 12
+ticked") as the value's description. The table's height counts every page
+AND every group, up to twelve rows (amendment 26), so opening a group or
+typing never moves the sheet. Groups start folded
+(`PageTickTree.groupsStartFolded`, a question for Russell); while the search
+has text every group it shows is open, and clearing it puts back the groups
+that were open before. The trail line's counts gain ", N by a group's box"
+when a group's box ticked N of the ticked pages (`activityTrail.mustRecord` →
+`ran from a menu`), so a report of pages published unmeant can be read.
+
+**Measured, 300 and 3,000 generated pages, standalone, `-O`, one core,
+median of 21:** building the tree once 1.33 ms and 13.87 ms; drawing its rows
+0.02 ms and 0.11 ms; drawing them for a search 0.18 ms and 2.34 ms; every top
+group's state 0.02 ms and 0.23 ms. The build is once per sheet, on the main
+actor, beside the section graph read that opens the sheet there today, which
+reads every page's file and is not changed by this piece (the largest real
+sheet is about 320 pages, SPH3U). Sabotage of the copied tree against the
+cases: a click that never clears fails 12 checks, units left unsorted 1, a
+unit read with the word "Unit" in a Module course 1.
+
+**Not measured tonight** (no app run, no test host): that the mixed dash is
+drawn and that the outline's own keys reach the rows in the real sheet, and
+what VoiceOver says. `PageTickTreeTests.testTheDrawnBoxIsMixedAndAClickTicksEveryPage`
+and the updated `PageTablesSheetTests` assert the first two off screen; the
+third is a listen by hand.
+
+**REJECTED.** `Toggle(sources:isOn:)`, the plan's control: it typechecks in
+a hierarchical table cell, but which way a click on a mixed box goes is the
+framework's, and a wrong guess publishes some pages while the box says all.
+`List` with `DisclosureGroup` (loses the Folder and Date columns #608 chose).
+A full `NSOutlineView` bridge (more code for what `Table` does, kept as the
+fallback if the drawn table fails on the bench). A unit's box that also ticks
+the pages its classes link to (Russell). A box read over hidden pages too (it
+would read mixed with every visible page ticked, and a click would change
+pages out of view). A unit read from the shown title (a frontmatter title
+can say anything; the planners read the file name). "group:"-prefixed string
+ids (a collision made unlikely rather than impossible). Moving the section
+graph read off the main actor in this piece (it changes when the sheet can
+first draw, and is its own change).
 
 ### Classes dated after the next class, at Deploy (#475)
 

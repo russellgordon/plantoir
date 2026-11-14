@@ -1549,7 +1549,9 @@ nonisolated enum ActivityTrail {
         /// Deploying…. Carries where
         /// it is in the menus, how it ended (carried out, changed nothing,
         /// cancelled at the plan, rebuilt or not) and counts — never a page's
-        /// title. Not "section menu item": Help is not in the Section menu
+        /// title; since #900 Publish Pages… and Hide Pages… add ", N by a
+        /// group's box" when a unit's or a folder's box ticked N of them.
+        /// Not "section menu item": Help is not in the Section menu
         /// (the plan review's note 11). Without it a change made from the
         /// menu is a change nobody can say who made: the assistant's own line
         /// is written by the conversation, which the menu does not have.
