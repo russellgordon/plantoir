@@ -1903,11 +1903,14 @@ STUB
   fi
   st_stop
 
+  # The page count is read from rendered_rows.json -> pages, never typed
+  # here (12 since #674 added the Simulation page; 11 before).
+  st_pages=$(rendered_pages | wc -l | tr -d ' ')
   ps_start 404:2
   plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
   RS_TARGETS=("netlify|$PS_URL|0")
   out=$(rs_run)
-  if printf '%s\n' "$out" | grep -q "✅ Netlify serves the rendered check's 11 pages (HTTP 200)" \
+  if printf '%s\n' "$out" | grep -q "✅ Netlify serves the rendered check's $st_pages pages (HTTP 200)" \
      && printf '%s\n' "$out" | grep -q "^MEASURED Netlify, answered on retry (#762), the rendered check's pages: 1 page(s) needed asking again, 2 retries in all" \
      && grep -q 'Rendered-Check/Quiz needed 2 retries' "$ST_DIR/said.txt"; then
     ok "a fixture page that answers 404 twice is asked again before the browsers, the way the files are, and counted"
@@ -1919,7 +1922,7 @@ STUB
   plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"
   RS_TARGETS=("netlify|$PS_URL|0")
   out=$(rs_run)
-  if printf '%s\n' "$out" | grep -q "❌ Netlify: 1 of the rendered check's 11 pages did not answer 200" \
+  if printf '%s\n' "$out" | grep -q "❌ Netlify: 1 of the rendered check's $st_pages pages did not answer 200" \
      && printf '%s\n' "$out" | grep -q 'Rendered-Check/Quiz answered HTTP 404'; then
     ok "a fixture page that never answers is a failure that names it"
   else

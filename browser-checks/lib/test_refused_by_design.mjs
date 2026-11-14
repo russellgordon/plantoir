@@ -99,6 +99,20 @@ judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM, CHROMIUM])
 expect("counted: a page reloaded once with three lines in the badge's wording fails", judged.failures.length === 1 && judged.setAside.length === 0 && /^3 refusal lines .* account for 2 /.test(judged.failures[0]), JSON.stringify(judged))
 judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM])
 expect("counted: a page reloaded once with one line in the badge's wording, where it was sent the badge twice, fails", judged.failures.length === 1 && judged.setAside.length === 0 && /^1 refusal lines .* account for 2 .*was not seen/.test(judged.failures[0]), JSON.stringify(judged))
+// A page with a frame of the site's own (a PhET simulation's copy, #674):
+// the checker lists the frame's document first and the page's last. A
+// stand-in edge that added the badge to both (2026-11-14, both engines) gave
+// two lines, one from each document, which both are set aside for.
+const SIM_OWN = "window.phet={chipper:{}}"
+const SIM = `<html><head><script>${SIM_OWN}</script></head><body></body></html>`
+const SIM_WITH_BADGE = SIM.replace("<head>", `<head><script>${BADGE}</script>`)
+const SIM_POLICY = POLICY.replace(";", ` '${hashOf(SIM_OWN)}';`)
+sorted = sortRefusedScripts({ documents: [{ policy: SIM_POLICY, received: SIM_WITH_BADGE, served: SIM }, { policy: SIM_POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [OWN_ONE, OWN_TWO] })
+judged = judgeRefusals(NETLIFY, sorted, [WEBKIT, WEBKIT])
+expect("counted: the badge in a page and in its own simulation's frame is two scripts, and their two lines are set aside", sorted.injectedPerDocument.join() === "1,1" && judged.failures.length === 0 && judged.setAside.length === 2, JSON.stringify(judged))
+sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SIM_WITH_BADGE, served: SIM }, { policy: SIM_POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [] })
+judged = judgeRefusals(NETLIFY, sorted, [WEBKIT, WEBKIT])
+expect("a simulation's own script that its frame's policy does not list is the site's, and fails", sorted.own.length === 1 && judged.failures.length === 1 && /own inline script/.test(judged.failures[0]), JSON.stringify(judged))
 const AT = " (https://example.netlify.app/Rendered-Check/Quiz)"
 let counted = refusalMessages([WEBKIT + AT], [WEBKIT])
 expect("counted: WebKit's one refusal, recorded in the console with its address and again in the refused list, is one message", counted.messages.length === 1 && counted.twinOf.get(WEBKIT) === WEBKIT + AT, JSON.stringify(counted.messages))

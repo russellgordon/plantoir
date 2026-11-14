@@ -354,7 +354,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], sitePaths: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [], indexWaitsGaveUp: 0 }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], sitePaths: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [], frameDocuments: [], indexWaitsGaveUp: 0 }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -366,6 +366,7 @@ async function openContext(browser, engine, origin, pageName) {
   })
   await context.addInitScript(PAGE_WATCH)
   const siteHost = new URL(origin).host
+  record.siteHost = siteHost
   const allowed = new Set(ROWS.thirdPartyHostsToday.hosts)
   const embedHosts = new Set(pageName === "Embeds" ? (ROWS.rows.find((row) => row.name === "embeds")?.allowedFrames ?? []) : [])
   record.embedHosts = embedHosts
@@ -503,11 +504,29 @@ function watchPage(page, record) {
   // Each document the page was sent (its first load, a row's reload or its
   // next page), as the browser received it with its policy, for the refusals
   // the site's policy makes on purpose (rendered_rows.json -> refusedByDesign).
+  // A frame's document from the site's own host (a PhET simulation's copy in
+  // static/phet/, #674) is one too, kept apart: Netlify's edge may add its
+  // badge to it as it does to a page, and the policy refuses it there the
+  // same way. Measured 2026-11-14 against a stand-in edge that adds a script
+  // to every document (both engines): one more refusal in the badge's
+  // wording, from the frame, which the page's own documents could not
+  // account for, so the clean-page row failed the Simulation page. Whether
+  // real Netlify adds it to a frame's document is not yet measured; with
+  // none added, the frame's document counts 0 and changes nothing.
   page.on("response", (response) => {
     const request = response.request()
-    if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) return
-    record.documents.push(Promise.all([response.text(), response.headerValue("content-security-policy")])
-      .then(([body, policy]) => ({ url: response.url(), body, policy: policy ?? "" }), () => null))
+    if (!request.isNavigationRequest()) return
+    let own = false
+    try {
+      own = request.frame() !== page.mainFrame() && new URL(response.url()).host === record.siteHost
+    } catch {
+      own = false
+    }
+    if (request.frame() !== page.mainFrame() && !own) return
+    const pending = Promise.all([response.text(), response.headerValue("content-security-policy")])
+      .then(([body, policy]) => ({ url: response.url(), body, policy: policy ?? "" }), () => null)
+    if (own) record.frameDocuments.push(pending)
+    else record.documents.push(pending)
   })
   // Said by, or about, something a teacher's embed asked for (a provider's
   // own script, an advert it could not reach, its own document): the
@@ -1519,7 +1538,9 @@ async function readRefusals(page, record) {
   const entries = byDesignFor(ROWS.refusedByDesign, options.host)
   if (entries.length === 0) return null
   const documents = []
-  for (const pending of record.documents) {
+  // The site's own frames' documents first, so the last is still the page's
+  // own last document, whose policy judges the scripts it holds now.
+  for (const pending of [...record.frameDocuments, ...record.documents]) {
     const received = await pending
     let served = null
     if (received) {

@@ -5128,9 +5128,13 @@ clone), applies one sabotage, serves the copy and runs that page's rows in
 both engines; it passes only when the aimed row FAILS with its own reason's
 words and every other row on the page passes, except those the sabotage's
 `alsoRed` names (a missing file is also a console error, so the clean-page
-row is named there, with its reason). All forty sabotages run on every gate
-(the keys one in Chromium only, below), three at a time, each in a browser
-of its own.
+row is named there, with its reason). Every sabotage in `rendered_rows.json`
+runs on every gate (the keys one in Chromium only, below) except one, three at
+a time, each in a browser of its own: forty-six sabotages since #597's second
+half and #674 (counted with `len(sabotages)` on the merged tree, 2026-11-14:
+forty on `dev`, 597b's two and PhET's four), of which `embeds refused` runs on
+deployed sites only, so verify.sh's `--expect-red all` runs forty-five and
+says the forty-sixth in a NOTE line.
 
 Two things made that reliable, both measured 2026-11-13:
 
@@ -5444,6 +5448,19 @@ was written).
 - Each simulation adds about 21 hashes (about 1 KB) to the policy a Netlify
   publish sends with every file of the site (documentation/07). Whether
   Netlify serves a long one whole is measured before this piece merges.
+- On a deployed site the rendered check meets the Simulation page like any
+  other fixture page (`rendered_rows.json` → `pages`), and verify-deploy.sh's
+  build downloads the simulation from PhET as a teacher's first build does:
+  nothing plants the dev cache's copy there. Measured 2026-11-14 on a stand-in
+  for Netlify's edge (the simulation's own copy and a page holding its frame,
+  served by `site_server.mjs` under the publish's `_headers`, an inline script
+  added to every document a browser was sent), headless Chromium 155 and
+  WebKit 2359: the simulation started under the policy (French, one screen,
+  `yotta` false, on an isolated page), and the only refusal was the added
+  script, once in the page and once in the frame. Before the checker counted
+  a site's own frame's document, that second line failed the clean-page row
+  ("2 refusal lines ... account for 1"); `refusedByDesign` is unchanged. Whether
+  real Netlify adds its badge to a frame's document is not measured yet.
 
 ## E. Summary: what is *not* customized
 
