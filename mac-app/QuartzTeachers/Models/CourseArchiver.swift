@@ -292,6 +292,30 @@ enum CourseArchiver {
         ".DS_Store",
     ]
 
+    /// What every zip of a course folder leaves out, as `zip -x` arguments
+    /// and as the names that put a file out wherever they appear in its
+    /// path. The whole zip (`archive`) and the small backup that keeps Media
+    /// once (`SharedMediaStore.writeSmallBackup`, #785) both take it from
+    /// here, so the two cannot come to hold different courses.
+    nonisolated static func archiveRules(forFolderAt folderURL: URL) -> SharedMediaStore.ArchiveRules {
+        var exclusions: [String] = []
+        var names: Set<String> = []
+        for name in excludedFromArchives {
+            exclusions.append("*/\(name)/*")
+            exclusions.append("*/\(name)")
+            names.insert(name)
+        }
+        // Plantoir's own Obsidian add-ons for diagrams and graphs (#495):
+        // 12.9 MB per course that the next pass puts back, on any Mac whose
+        // answer is yes. Only the folders carrying Plantoir's marker — the
+        // teacher's own add-ons are theirs and are kept — and the list stays,
+        // so a restored course has them listed when they come back.
+        for pattern in ObsidianFigureAddOns.backupExclusions(forFolderAt: folderURL) {
+            exclusions.append(pattern)
+        }
+        return SharedMediaStore.ArchiveRules(zipExclusions: exclusions, namesLeftOut: names)
+    }
+
     /// The same backup as `backUpCourse`, for a caller that has a FOLDER
     /// rather than a loaded course — without the pruning, which a caller that
     /// wants it does back on its own actor.
@@ -400,18 +424,7 @@ enum CourseArchiver {
         // output is many times the size of the course itself.
         var arguments: [String] = ["-r", "-q", "-X", archiveURL.path, folderURL.lastPathComponent]
         arguments.append("-x")
-        for name in excludedFromArchives {
-            arguments.append("*/\(name)/*")
-            arguments.append("*/\(name)")
-        }
-        // Plantoir's own Obsidian add-ons for diagrams and graphs (#495):
-        // 12.9 MB per course that the next pass puts back, on any Mac whose
-        // answer is yes. Only the folders carrying Plantoir's marker — the
-        // teacher's own add-ons are theirs and are kept — and the list stays,
-        // so a restored course has them listed when they come back.
-        for pattern in ObsidianFigureAddOns.backupExclusions(forFolderAt: folderURL) {
-            arguments.append(pattern)
-        }
+        arguments.append(contentsOf: archiveRules(forFolderAt: folderURL).zipExclusions)
 
         let zipper: Process = Process()
         zipper.executableURL = URL(fileURLWithPath: "/usr/bin/zip")

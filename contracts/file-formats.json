@@ -1695,6 +1695,82 @@
       }
     ]
   },
+  "sharedMediaStore": {
+    "note": "The shared Media store a working folder's small backups keep their Media files in (#785). Written and read by both apps, because a working folder in a synced drive is used by both: a small backup either one makes must restore on the other, and a sweep on either must never delete what the other's backups need. The mac's SharedMediaStore, SharedMediaList and SharedMediaHold (mac-app/QuartzTeachers/Models/SharedMedia/). The RULES (which backups are small, the sweep, the restore) are course-management.json -> backups.sharedMedia. AUTHORED; edit as text.",
+    "directory": "courses/_backups/.shared-media/ inside the working folder: hidden, so the mac's backup listing skips it and Windows' FindBackups finds nothing in it that parses; inside _backups, so it travels with the working folder and is left out of every deploy (deploy.py's /_backups/).",
+    "layout": {
+      ".lock": "An empty file. Taken SHARED by a backup being written, a restore and an Undo list being written; EXCLUSIVELY and without waiting by a sweep, which deletes nothing when it cannot have it. The mac uses flock (LOCK_SH, LOCK_EX | LOCK_NB); Windows uses an exclusive open of the same file. The lock guards ONE computer's processes from each other. Whether a mac's flock and Windows' exclusive open exclude each other on a shared or synced volume is not known and must not be relied on: between two computers the guards are the lists' own moments, the pending list kept a day after its backup finishes, and the sweep's fourteen-day wait once a second computer has written (course-management.json -> backups.sharedMedia.sweepRule).",
+      "files/<aa>/<sha256>": "The bytes of one Media file, named by its SHA-256 in 64 lower-case hex digits, in a folder named by the first two. Never changed after it is moved into place. Written under a temporary name .incoming-<uuid> in the same folder, checked against the checksum after writing, flushed, then renamed. A name that is neither is never deleted by a sweep, except .incoming-… after its day.",
+      "lists/backup-<zip name>.json": "A copy of a small backup's list (below), so a sweep need not open every zip. Written whole (a temporary .writing-<uuid> beside it, then renamed). The list inside the zip is the record when the two disagree.",
+      "lists/undo-<step id>.json": "A step on the Undo list that keeps store files (#899): {format, kind: undo, id, writtenAt, host, sha256: [checksums]}. step id is letters, digits, -, _ and ., not starting with a dot; #899 writes <computer id>-<seq>.",
+      "pending/<uuid>.json": "A small backup being written: {format, kind: pending, id, writtenAt, host, pid, sha256: [...]}, written before any file is copied. When the backup finishes it is rewritten with finishedAt (the moment it finished) and KEPT for a day after that, then removed by a sweep: it names every file the backup relies on, old ones included, and is the first file a sync service can carry to another computer.",
+      "sweep-<computer>.json": "One computer's own sweep record: {format, computer, unneededSince: {\"<aa>/<name>\": moment}, sharedWithAnotherComputer: true once any sign of another computer has been seen, listsFirstSeen: {\"<list file>\": moment} for every pending list and backup list without its zip that another computer wrote, and for any list dated more than a day ahead of this computer's clock}. Each computer reads and writes only its own; another computer's record being there is itself a sign the store is shared. An unreadable one is an empty one."
+    },
+    "computer": "A stable identifier of the computer: the mac's hardware UUID (gethostuuid), Windows' MachineGuid. A process id in a pending list means something only on the computer named here.",
+    "moments": "Every moment is UTC in ISO 8601 with milliseconds, 2026-11-13T18:38:00.000Z; read without milliseconds too.",
+    "smallBackupZip": "courses/_backups/<CODE>/<name>_shared-media.zip (course-management.json -> backups.sharedMedia.nameCases): the course folder exactly as a whole backup's zip holds it, with its top-level folder listed as exactly Media left out, and the list at the zip's ROOT as .plantoir-backup.json, beside the course folder rather than inside it. That file is also the marker a restore door must check (restoreRule). Written under .writing-<uuid>.zip in the same folder, tested (unzip -t), and renamed refusing an existing name.",
+    "list": {
+      "fields": {
+        "format": "1. A reader refuses any other number, and a sweep that meets one deletes nothing.",
+        "kind": "backup",
+        "course": "The course code the backup is of.",
+        "backup": "The zip's file name.",
+        "writtenAt": "When the backup was written, by its computer's clock.",
+        "host": "The computer that wrote it.",
+        "media": "Every file of the Media folder: path (Media/… with / between parts; no empty, . or .. part, no backslash), sha256, size in bytes, modified (put back on the restored file), mode (permission bits, 420 for 0644; Windows writes 420 and ignores what it reads). The path is the name EXACTLY as the folder's listing gave it, byte for byte in UTF-8: never normalised to either Unicode form (a precomposed café.png is caf\\xc3\\xa9, a decomposed one cafe\\xcc\\x81, and the two are different files to the website builder, which reads the course from Linux), and with the case the listing gave. A restore creates that exact byte sequence. A reader compares paths by their bytes, never by a comparison that treats the two forms or two cases as equal, and splits them on the / BYTE: a / or a backslash followed by a combining mark is one grapheme, so a split or search by grapheme reads Media/\u0308Bild.png as one part and misses a backslash (#785 fix review, N1). A writer reads its list back and decodes it before the backup is given its name, so a list the reader would refuse is never published.",
+        "folders": "Every folder of the Media folder, Media itself included, with its mode, so empty folders come back."
+      },
+      "example": {
+        "format": 1,
+        "kind": "backup",
+        "course": "ICS3U",
+        "backup": "ICS3U_backup_2026-11-13_183800_assistant-section1_shared-media.zip",
+        "writtenAt": "2026-11-13T18:38:00.000Z",
+        "host": "6F1C2A6E-2B7D-4C1A-9E55-0A1B2C3D4E5F",
+        "media": [
+          {
+            "path": "Media/diagrams/cell.png",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 48213,
+            "modified": "2026-10-02T14:05:11.000Z",
+            "mode": 420
+          },
+          {
+            "path": "Media/unit 2/map.jpg",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 1048576,
+            "modified": "2026-09-18T09:00:00.000Z",
+            "mode": 420
+          }
+        ],
+        "folders": [
+          {
+            "path": "Media",
+            "mode": 493
+          },
+          {
+            "path": "Media/diagrams",
+            "mode": 493
+          },
+          {
+            "path": "Media/unit 2",
+            "mode": 493
+          },
+          {
+            "path": "Media/empty for now",
+            "mode": 493
+          }
+        ]
+      },
+      "unsafeExamples": [
+        "Media/../course_config.json",
+        "/etc/hosts",
+        "Media//x.png",
+        "Media\\x.png",
+        "Pages/x.png"
+      ]
+    }
+  },
   "referenceShelf": {
     "note": "#572's third piece: the arrangement of the Reference Courses shelf - the groups a teacher made, which reference course is in which, and what the group for courses with no school year is called. The rules it serves are shared-rules.json -> referenceCourses.groups. The mac's ReferenceShelf (reading, encoding, pruning) and ReferenceShelfStore (the lock, the atomic write, the acts); Windows owes the reader and the writer (#572c's windows issue).",
     "path": "courses/.internal/reference-shelf.json, beside profile.json, timetable/ and activity/.",

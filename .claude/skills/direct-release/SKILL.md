@@ -78,6 +78,20 @@ success is worse than one that refuses.
 
 Small pieces may share one planner and one plan reviewer.
 
+**Batch small related issues** (Russell, 2026-11-13: "record batching as a
+standard strategy"). Small issues that touch the same file, the same contract
+block or the same kind of thing go through as ONE batch: one issue branch
+named for the first issue, one implementer who writes a short plan first, one
+commit per issue, one review, one sweep, one gate. The gate sets the pace, so
+seven small issues gated one by one cost seven gate runs. A batch is never
+held by its hardest member: the implementer leaves out any issue that turns
+out not to be small or needs a ruling, says why, and carries on. Large or
+risky pieces (a new feature, the publishing path, anything with a ruling
+pending) stay separate. Each issue still gets its own closing comment and,
+where owed, its own note for the other platform. Look for batches when
+opening a run and whenever follow-up issues pile up, and stack reviewed
+pieces at the gate, several to a run.
+
 ## The common brief
 
 Keep one file that every agent reads first, so each prompt names only the
