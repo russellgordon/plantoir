@@ -250,16 +250,53 @@ public class LastViewedPagesTests : IDisposable
         Assert.Empty(Directory.GetFiles(_folder, "*.tmp"));
     }
 
+    /// <remarks>
+    /// #916: this wrote all 503 entries through <see cref="LastViewedPages.Remember"/>
+    /// and ignored what each call returned. One write in 503 refused on a busy
+    /// PC (the rename onto the file, while something else holds it: a scanner
+    /// reading the file just written is the usual one) leaves one entry fewer,
+    /// so only P1 and P2 are pushed out and P3 survives — exactly the
+    /// <c>Actual: "P3"</c> one gate met at the second assertion, and what this
+    /// test fails with when a write is forced to fail (measured 2026-11-14 by
+    /// holding the file open for one call). The time stamps were never the
+    /// cause: each is a minute apart and injected. So the 500 that are already
+    /// remembered are SEEDED into the file in one write by the test, oldest
+    /// first, which also proves the order is read from the stamps rather than
+    /// from the file; only the three that push the oldest out go through
+    /// <see cref="LastViewedPages.Remember"/>, and each must say it wrote.
+    /// </remarks>
     [Fact]
     public void OnlyTheNewestAreKept()
     {
         var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        for (int section = 1; section <= LastViewedPages.Keep + 3; section++)
-            LastViewedPages.Remember(@"C:\Courses", "ICS3U", section, "P" + section, start.AddMinutes(section));
+        var seeded = new List<object>();
+        for (int section = 1; section <= LastViewedPages.Keep; section++)
+            seeded.Add(new { folder = @"C:\Courses", course = "ICS3U", section, path = "P" + section,
+                             noted = start.AddMinutes(section).ToString("yyyy-MM-ddTHH:mm:ssZ") });
+        File.WriteAllText(LastViewedPages.FilePath, Newtonsoft.Json.JsonConvert.SerializeObject(new { pages = seeded }));
+        Assert.Equal("P1", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
+
+        for (int section = LastViewedPages.Keep + 1; section <= LastViewedPages.Keep + 3; section++)
+            Assert.True(RememberWithRetries(@"C:\Courses", "ICS3U", section, "P" + section, start.AddMinutes(section)),
+                $"Remembering section {section} wrote nothing, five times over; the eviction below cannot be judged without it.");
         Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 1));
         Assert.Null(LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 3));
         Assert.Equal("P4", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", 4));
         Assert.Equal("P503", LastViewedPages.PageFor(@"C:\Courses", "ICS3U", LastViewedPages.Keep + 3));
+    }
+
+    /// <summary>
+    /// A write refused for a moment is tried again, up to five times: this test
+    /// is about which entries are KEPT, not about a busy disk (#916).
+    /// </summary>
+    private static bool RememberWithRetries(string folder, string course, int section, string path, DateTime now)
+    {
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            if (LastViewedPages.Remember(folder, course, section, path, now)) return true;
+            Thread.Sleep(200);
+        }
+        return false;
     }
 }
 
