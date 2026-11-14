@@ -17,6 +17,7 @@ namespace Plantoir.Tests;
 /// but the slow one (<see cref="DeployedFolderReadersTests"/>), walked from the
 /// JSON; where it listens; and that it stops and frees its port.
 /// </summary>
+[Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderServerTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "plantoir-deployed-server-" + Guid.NewGuid().ToString("N"));
@@ -342,6 +343,7 @@ public sealed class NetworkAddressFactAttribute : FactAttribute
 /// <c>secondsToTakeAPiece</c>. 200 MB because Windows' loopback can take several
 /// MB per connection into its buffers before a send blocks.
 /// </summary>
+[Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderReadersTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "plantoir-deployed-readers-" + Guid.NewGuid().ToString("N"));

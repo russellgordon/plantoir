@@ -8,6 +8,20 @@ using Plantoir.Core.Models;
 namespace Plantoir.Tests;
 
 /// <summary>
+/// The deployed folder's tests that hold the server to WALL-CLOCK deadlines
+/// (10 s for the headers, 30 s for a piece, an answer within seconds). Run
+/// alone, after the parallel classes: in the full suite on this PC, with
+/// 3,900 tests sharing the thread pool, an answer to a plain GET did not
+/// arrive within 20 s and the header deadline fired late (2026-11-14, the
+/// first full run of 889a), which measures the run's load, not the server.
+/// </summary>
+[Xunit.CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class DeployedFolderTimings
+{
+    public const string Name = "Deployed folder timings";
+}
+
+/// <summary>
 /// Shared by the deployed folder's tests (#889, the mac's #850): the contract
 /// block, a folder built from a resolution case's <c>files</c>, a raw HTTP/1.1
 /// client over a real socket, and the disk seam that follows a case's links by

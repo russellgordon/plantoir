@@ -17,6 +17,7 @@ namespace Plantoir.Tests;
 /// <see cref="DeployedFolderShows"/> and memory of ports, so nothing here
 /// touches the app's settings or another test's shows.
 /// </summary>
+[Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderShowsTests : IDisposable
 {
     private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-shows-" + Guid.NewGuid().ToString("N"));

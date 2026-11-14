@@ -13482,7 +13482,14 @@ force-killed leaves nothing to clean up: Windows closes its sockets with it.
   dropped (`APortAnotherProgramHoldsOnEveryAddressIsPassedOver`); the
   newcomer refused instead of making room (`AConnectionPastTheMaximumMakesRoom`
   and the readers test); no send deadline (the readers test: 63 readers
-  still open at 47 s). And one fault the tests found in the first version:
+  still open at 47 s). **Under the full suite's load** (3,925 tests sharing
+  the thread pool) the first full run failed three of these wall-clock tests:
+  a plain GET unanswered within 20 s, the header deadline not closed by
+  15 s, the readers reset at 42.8 s instead of by 40. Alone each passes
+  with time to spare, so the server, registry and readers classes run in
+  their own collection with parallelism off (`DeployedFolderTimings`). Not
+  measured: whether the app's own thread pool can be starved like that with
+  a teacher at work; nothing seen suggests it. And one fault the tests found in the first version:
   a request that found the folder gone stopped the show from inside its own
   answer, so the browser got a reset instead of the 404; the folder going is
   now reported after the answer has gone.
