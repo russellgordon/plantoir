@@ -450,7 +450,7 @@ public sealed class DeployedFolderShows
         foreach (var handler in handlers.GetInvocationList().Cast<Action<DeployedFolderHappening>>())
         {
             try { handler(happening); }
-            catch { }
+            catch (Exception e) { NoteDropped(nameof(Happened) + " (" + happening.GetType().Name + ")", e); }
         }
     }
 
@@ -460,8 +460,22 @@ public sealed class DeployedFolderShows
         foreach (var handler in handlers.GetInvocationList().Cast<Action>())
         {
             try { handler(); }
-            catch { }
+            catch (Exception e) { NoteDropped(nameof(Changed), e); }
         }
+    }
+
+    /// <summary>
+    /// Where a subscriber's dropped exception is written: the diagnostic log
+    /// (the app sets it to <c>App.LogDiagnostic</c>), never the trail, so a
+    /// fault in a handler is findable (the fixes review's L-a). Null: said
+    /// nowhere.
+    /// </summary>
+    public static Action<string>? Diagnostic { get; set; }
+
+    private static void NoteDropped(string eventName, Exception e)
+    {
+        try { Diagnostic?.Invoke($"deployed folder: a {eventName} subscriber threw {e.GetType().Name}: {e.Message}"); }
+        catch { }
     }
 
     private static bool IsSection(Show show, string courseCode, int sectionNumber, string workingFolder) =>

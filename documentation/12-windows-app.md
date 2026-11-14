@@ -14083,6 +14083,21 @@ entries removed; and the UI tests, through a browser seam that never opens a
 real browser. No `--serve-deployed-folder` flag: the crawl runs against the
 in-process server.
 
+Also owed by 889b, from the surface above and the fixes review:
+
+- **Once at start-up**, `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))`, and
+  `DeployedFolderShows.Diagnostic = App.LogDiagnostic`. Without the first,
+  ports are remembered for the session only.
+- **Marshal both events** (`Changed`, `Happened`) to the dispatcher before
+  touching a control: they arrive on a listener's thread when a folder goes
+  or a listener ends. A handler that throws is dropped and written to the
+  diagnostic log; it does not end the app, but its redraw is lost.
+- **The fixes review's L-c, to build:** the press that STARTED a show stops
+  it when the browser refuses only if no other press has joined it; a press
+  handed a show re-checks `ShowFor` afterwards, so it never opens the
+  address of a show that was stopped meanwhile.
+
 ## Undo and Redo: the journal Windows owes (#899, piece U1)
 
 The mac's journal core is described in `documentation/09-mac-app.md` →

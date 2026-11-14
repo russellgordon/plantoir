@@ -22,7 +22,7 @@ namespace Plantoir.Tests;
 [Collection(SharedActivityState.Name)]
 public sealed class DeployedFolderOfferTests : IDisposable
 {
-    private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-offer-" + Guid.NewGuid().ToString("N"));
+    private readonly string _base = RunOwnedTempFolders.Create("plantoir-dfolder-offer-");
 
     public void Dispose() => ReferenceFixtures.Remove(_base);
 
@@ -326,7 +326,7 @@ public sealed class DeployedFolderOfferTests : IDisposable
 [Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderLauncherFolderTests : IDisposable
 {
-    private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-launcher-" + Guid.NewGuid().ToString("N"));
+    private readonly string _base = RunOwnedTempFolders.Create("plantoir-dfolder-launcher-");
 
     public void Dispose() => ReferenceFixtures.Remove(_base);
 

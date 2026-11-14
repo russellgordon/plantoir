@@ -20,7 +20,7 @@ namespace Plantoir.Tests;
 [Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderShowsTests : IDisposable
 {
-    private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-shows-" + Guid.NewGuid().ToString("N"));
+    private readonly string _base = RunOwnedTempFolders.Create("plantoir-dfolder-shows-");
     private readonly string _workingFolder;
     private readonly List<DeployedFolderHappening> _happened = [];
     private readonly DeployedFolderShows _shows;
@@ -209,6 +209,8 @@ public sealed class DeployedFolderShowsTests : IDisposable
         var outcome = await Open(folder);
         _shows.Changed += () => throw new InvalidOperationException("a redraw off its dispatcher");
         _shows.Happened += _ => throw new InvalidOperationException("a trail write that failed");
+        var diagnostics = new List<string>();
+        DeployedFolderShows.Diagnostic = line => { lock (diagnostics) diagnostics.Add(line); };
         int after = 0;
         _shows.Changed += () => Interlocked.Increment(ref after);
         Directory.Delete(folder, recursive: true);
@@ -235,6 +237,15 @@ public sealed class DeployedFolderShowsTests : IDisposable
         // Still here: a process that had died would not reach this line.
         Thread.Sleep(500);
         Assert.False(Environment.HasShutdownStarted);
+        // Each dropped exception is in the diagnostic log, named by its event
+        // (the fixes review's L-a); the trail is never where it goes.
+        DeployedFolderShows.Diagnostic = null;
+        lock (diagnostics)
+        {
+            Assert.Contains(diagnostics, l => l.StartsWith("deployed folder: a Changed subscriber threw InvalidOperationException", StringComparison.Ordinal));
+            Assert.Contains(diagnostics, l => l.StartsWith("deployed folder: a Happened (Stopped) subscriber threw InvalidOperationException", StringComparison.Ordinal));
+        }
+        Assert.DoesNotContain(Happened(), h => h.TrailLine.Contains("threw", StringComparison.Ordinal));
     }
 
     /// <summary>The review's L3: the app's settings are written only on the UI thread, and a port remembered before the hand-over is kept.</summary>

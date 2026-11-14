@@ -20,7 +20,7 @@ namespace Plantoir.Tests;
 [Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderServerTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "plantoir-deployed-server-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = RunOwnedTempFolders.Create("plantoir-dfolder-server-");
 
     public DeployedFolderServerTests()
     {
@@ -391,7 +391,7 @@ public sealed class NetworkAddressFactAttribute : FactAttribute
 [Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderReadersTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "plantoir-deployed-readers-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = RunOwnedTempFolders.Create("plantoir-dfolder-readers-");
 
     public void Dispose() => ReferenceFixtures.Remove(_root);
 
@@ -408,6 +408,11 @@ public sealed class DeployedFolderReadersTests : IDisposable
         var readers = new List<Socket>();
         try
         {
+            // Two clocks, so neither bound is tight (the fixes review's L-d):
+            // each reader's deadline starts when IT asks, between the two.
+            // The floor is checked on the earlier, before the first connect;
+            // the contract's ceiling on the later, once every place is taken.
+            var sinceTheFirstAsked = Stopwatch.StartNew();
             for (int i = 0; i < DeployedFolderServer.MaximumConnections; i++)
             {
                 var reader = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { ReceiveBufferSize = 4096 };
@@ -430,8 +435,11 @@ public sealed class DeployedFolderReadersTests : IDisposable
             int left = DeployedFolderServer.MaximumConnections - 1;
             DeployedFolderServerTests.WaitFor(() => server.OpenConnections < left, TimeSpan.FromSeconds(within + 5));
             double first = clock.Elapsed.TotalSeconds;
+            double firstSinceAsking = sinceTheFirstAsked.Elapsed.TotalSeconds;
             Assert.True(server.OpenConnections < left, $"no stalled reader closed after {first:F1} s");
-            Assert.InRange(first, DeployedFolderServer.SecondsToTakeAPiece - 1, within);
+            Assert.True(firstSinceAsking >= DeployedFolderServer.SecondsToTakeAPiece - 1,
+                        $"a reader was closed {firstSinceAsking:F1} s after the first asked, before the piece deadline");
+            Assert.True(first <= within, $"the first stalled reader was closed {first:F1} s after every place was taken");
 
             // And then every one of them, so none holds a place for good.
             DeployedFolderServerTests.WaitFor(() => server.OpenConnections == 0, TimeSpan.FromSeconds(30));

@@ -19,7 +19,7 @@ namespace Plantoir.Tests;
 [Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderResolutionTests : IDisposable
 {
-    private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-" + Guid.NewGuid().ToString("N"));
+    private readonly string _base = RunOwnedTempFolders.Create("plantoir-dfolder-cases-");
 
     public void Dispose() => ReferenceFixtures.Remove(_base);
 
