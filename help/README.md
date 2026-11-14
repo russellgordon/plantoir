@@ -395,8 +395,17 @@ header.
    fails, naming the page, the line, the pin and the sentence now there, when
    the sentence at that position does not start with the pin, and when the
    pin also opens a different sentence at the same place in the list (give
-   more words). A token with no position may carry a pin and is checked the
-   same way. The reason: on 2026-11-14 two pieces inserted failure cases
+   more words). When the pin does not open the sentence, the check says
+   where in the list the sentence that does open with it now is, or, when
+   none does, that the pin is mistyped or the sentence was reworded. A pin
+   is at least three words (`PIN_FLOOR_WORDS`), or the whole sentence when
+   that is shorter: every pin on the pages on 2026-11-14 met that, and a
+   one-letter pin would pass a case replaced in place by another that opens
+   with the same letter. The neighbours compared are those of the innermost
+   list only; a shift of an outer list (another request's `steps[k]`) is
+   caught by the pin itself unless that request's step opens the same way,
+   which on 2026-11-14 happened only where the two sentences are identical.
+   A token with no position may carry a pin and is checked the same way. The reason: on 2026-11-14 two pieces inserted failure cases
    into `contracts/app-rules.json`, every later case moved along by one or
    two, and ten sentences on the deploy-failed page showed another failure's
    words while every check passed. The entries in `controls.json` were never

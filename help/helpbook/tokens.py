@@ -138,6 +138,9 @@ def resolve_key_path(document: Any, key_path: str) -> Any:
 # Not `|`, which would split a table cell the token sits in.
 PIN_SEPARATOR = "~"
 INDEX_IN_KEY_PATH = re.compile(r"\[\d+\]")
+# The fewest words a pin may have, unless it is the whole sentence (#952
+# review): every pin on the pages on 2026-11-14 met it.
+PIN_FLOOR_WORDS = 3
 
 
 def split_pin(argument: str) -> Tuple[str, Optional[str]]:
@@ -223,7 +226,11 @@ class Registries:
         wrong sentence. So such a token carries a pin, the opening words of the
         sentence it expects, and the pin must open that sentence and no other
         sentence at the same place in the list. A token with no position may
-        carry a pin too; it is checked the same way."""
+        carry a pin too; it is checked the same way.
+
+        A pin is at least PIN_FLOOR_WORDS words long, or the whole sentence
+        when that is shorter. A one-letter pin still catches an insertion, but
+        not a case replaced in place by one that opens with the same letter."""
         positions: List[Any] = list(INDEX_IN_KEY_PATH.finditer(reference))
         if pin is None:
             if len(positions) == 0:
@@ -232,13 +239,32 @@ class Registries:
                     "as {{say:" + reference + " ~ <opening words>}}, so a case inserted before it fails the build")
         if pin == "":
             return "has an empty pin: write the opening words of the sentence it expects after the ~"
+        neighbours: List[Tuple[str, str]] = self.pin_neighbours(reference, positions)
         if not value.startswith(pin):
-            return ("expects a sentence opening " + repr(pin) + " but now reads " + repr(value)
-                    + ": the list has changed, so point the token at the sentence the page means")
+            problem: str = "expects a sentence opening " + repr(pin) + " but now reads " + repr(value)
+            for other_reference, other in neighbours:
+                if other.startswith(pin):
+                    return (problem + ": the list has changed, and the sentence the pin opens is now at "
+                            + other_reference.split("#", 1)[1] + ", so point the token there")
+            return (problem + ": no sentence at that place in the list opens with the pin, so either the pin "
+                    "is mistyped or the sentence was reworded; correct the pin to the opening words the page means")
+        if len(pin.split()) < PIN_FLOOR_WORDS and pin != value:
+            return ("has a pin, " + repr(pin) + ", that is too short: a pin is the sentence's first "
+                    + str(PIN_FLOOR_WORDS) + " words or more, or the whole sentence when it is shorter")
+        for other_reference, other in neighbours:
+            # Two items that read the same sentence are the same sentence.
+            if other != value and other.startswith(pin):
+                return ("has a pin, " + repr(pin) + ", that also opens " + other_reference.split("#", 1)[1]
+                        + ": give more of the sentence's opening words")
+        return None
+
+    def pin_neighbours(self, reference: str, positions: List[Any]) -> List[Tuple[str, str]]:
+        """The sentence at the same place in every OTHER item of the innermost
+        list the reference names, as (reference, sentence). Empty for a
+        reference with no position."""
+        neighbours: List[Tuple[str, str]] = []
         if len(positions) == 0:
-            return None
-        # The same place in every other item of the innermost list: the pin
-        # must tell this sentence from each of them.
+            return neighbours
         last = positions[-1]
         list_path: str = reference[:last.start()]
         rest: str = reference[last.end():]
@@ -246,9 +272,9 @@ class Registries:
         try:
             items: Any = self.contract_value(list_path)
         except KeyError:
-            return None
+            return neighbours
         if not isinstance(items, list):
-            return None
+            return neighbours
         index: int = 0
         while index < len(items):
             if index != own_index:
@@ -257,12 +283,10 @@ class Registries:
                     other: Any = self.contract_value(other_reference)
                 except KeyError:
                     other = None
-                # Two items that read the same sentence are the same sentence.
-                if isinstance(other, str) and other != value and other.startswith(pin):
-                    return ("has a pin, " + repr(pin) + ", that also opens " + other_reference.split("#", 1)[1]
-                            + ": give more of the sentence's opening words")
+                if isinstance(other, str):
+                    neighbours.append((other_reference, other))
             index += 1
-        return None
+        return neighbours
 
     def swift_texts(self) -> List[Tuple[Path, str]]:
         if self._swift_texts is None:
