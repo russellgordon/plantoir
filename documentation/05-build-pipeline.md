@@ -1785,8 +1785,8 @@ bring; such a build shows its rows on the next build instead.
 
 Until #128 a course had ONE coverage map, built from ONE folder, and its
 expectation pages had to be named like `A1.1`. A course keeping both an
-`Ontario Curriculum` and a `College Board Curriculum` folder (every LCS course
-has both) got a map from Ontario only, while Course Settings and "Folders
+`Ontario Curriculum` and a `College Board Curriculum` folder (every course made with the
+terminology switch the wizard offered until #891 has both) got a map from Ontario only, while Course Settings and "Folders
 Plantoir uses" named College Board — and College Board's pages, named `1.A`,
 were never expectations to the build at all (#90, measured on this Mac
 2026-09-06). Now every curriculum folder the course DECLARES that holds an
@@ -1804,7 +1804,7 @@ ONE folder: the alphabetically first top-level folder whose name mentions
 piece), and only if there is none, the first holding any expectation page.
 That preference is the fix for the implementation review's finding 1,
 measured: with the widened code rule and a plain alphabetical scan, a scratch
-LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
+two-curricula course whose `College Board Curriculum` held `1.A` pages had Ontario's map
 silently replaced by College Board's under the same title, because `College`
 sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
 pages, nothing declared) holds it byte for byte to what 92a7099a built. The scan is a FALLBACK, never additive:
@@ -1820,8 +1820,8 @@ folder the scan found — is always `Curriculum Coverage`; every other map is
 (`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
 its address and every link to it, byte for byte (the goldens in
 `test_coverage_maps.py` were captured from origin/dev 92a7099a before any edit:
-a `Curriculum/` course and the LCS default, Ontario with pages and College
-Board empty), and a course that declares a second folder later gets a SECOND
+a `Curriculum/` course and a two-curricula course, Ontario with pages and
+College Board empty), and a course that declares a second folder later gets a SECOND
 page rather than two renamed ones. Only a non-primary title is written quoted
 in the page's frontmatter, because a folder's name can carry a colon.
 
@@ -1911,7 +1911,7 @@ SHARED folders on disk for expectation pages
 (`CurriculumFolderRule.foldersWithPages`): while the map is on only the LAST
 folder with a map is refused, the others ask first
 (`removeCurriculumFolderWithItsMapConfirmation`), and a folder with no pages is
-an ordinary folder — on the LCS default, Ontario (which holds the map) is the
+an ordinary folder — on a two-curricula course, Ontario (which holds the map) is the
 one refused, where the by-name rule used to protect the empty College Board.
 While no folder holds a page they fall back to the single by-name folder, so
 an empty new course is protected exactly as before. Both apps OFFER to declare
@@ -1936,8 +1936,8 @@ the first tick never drops the map the scan found. A rename of any of them mater
 - A per-map switch: one switch covers every map; a teacher who wants one map
   fewer unticks the folder.
 - Bulk-migrating existing configs, and dropping the legacy key's READ.
-- A health finding for "a curriculum folder with no pages": every LCS course
-  not teaching AP would be nagged on day one.
+- A health finding for "a curriculum folder with no pages": every two-curricula
+  course not teaching AP would be nagged on day one.
 - `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
 
 **Known limits.** A code in two folders counts on both maps (matching is by

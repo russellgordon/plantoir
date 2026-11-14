@@ -1592,8 +1592,9 @@ final class SharedRulesContractTests: XCTestCase {
         // The floor is the count as it stands, not a round number below it:
         // a floor four cases down lets four be deleted without a word, in a
         // check whose whole purpose is to notice that. Raise it with the list.
+        // (17 until #891 removed the terminology switch and its two cases.)
         XCTAssertGreaterThanOrEqual(
-            cases.count, 17,
+            cases.count, 15,
             "wizard.skeletonToggle has lost cases. The list is the acceptance list for both "
             + "apps; a case removed here is a behaviour neither suite checks any more."
         )
@@ -1602,7 +1603,6 @@ final class SharedRulesContractTests: XCTestCase {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let given: [String: Any] = try XCTUnwrap(testCase["given"] as? [String: Any])
             let code: String = (given["courseCode"] as? String) ?? defaultCode
-            let usesLCSTerminology: Bool = given["usesLCSTerminology"] as? Bool ?? false
             let family: SkeletonCatalog.Family = try XCTUnwrap(
                 SkeletonCatalog.family(forCode: code), "No skeleton family for \(code)"
             )
@@ -1633,7 +1633,7 @@ final class SharedRulesContractTests: XCTestCase {
                 case "turnOff":
                     skeletonIsWanted = false
                     lists = WizardStructure.restoringDefaults(
-                        in: lists, adopted: snapshot, usesLCSTerminology: usesLCSTerminology
+                        in: lists, adopted: snapshot
                     )
                     snapshot = nil
                 case "typeAnotherCode":
@@ -1659,7 +1659,7 @@ final class SharedRulesContractTests: XCTestCase {
                     // the toggle would have.
                     takesExampleContent = true
                     lists = WizardStructure.restoringDefaults(
-                        in: lists, adopted: snapshot, usesLCSTerminology: usesLCSTerminology
+                        in: lists, adopted: snapshot
                     )
                     snapshot = nil
                 default:
@@ -1732,23 +1732,18 @@ final class SharedRulesContractTests: XCTestCase {
         let toggle: [String: Any] = try SharedRulesContractTests.skeletonToggleRules()
         let vocabulary: [String: Any] = try XCTUnwrap(toggle["lists"] as? [String: Any])
         let factory: [String: Any] = try XCTUnwrap(vocabulary["factory"] as? [String: Any])
-        let lcs: [String: Any] = try XCTUnwrap(vocabulary["lcs"] as? [String: Any])
 
         XCTAssertEqual(factory["sharedFolders"] as? [String], WizardDefaults.sharedFolders)
         XCTAssertEqual(factory["sharedFiles"] as? [String], WizardDefaults.sharedFiles)
         XCTAssertEqual(factory["perSectionFolders"] as? [String], WizardDefaults.perSectionFolders)
         XCTAssertEqual(factory["perSectionFiles"] as? [String], WizardDefaults.perSectionFiles)
-        XCTAssertEqual(lcs["sharedFolders"] as? [String], WizardDefaults.lcsSharedFolders)
-        XCTAssertEqual(lcs["sharedFiles"] as? [String], WizardDefaults.lcsSharedFiles)
-        // BOTH per-section slots, not just the folders: the note says this set
-        // carries two arrays rather than four, and an authored
-        // `lcs.perSectionFiles` would otherwise sit here unread and unnoticed.
-        XCTAssertNil(
-            lcs["perSectionFolders"],
-            "Neither per-section list has an LCS variant — the terminology switch rewrites only "
-            + "the two shared ones, and a variant written here would be a rule the apps do not have."
-        )
-        XCTAssertNil(lcs["perSectionFiles"], "Same rule, the other per-section list.")
+        // The terminology switch's second set of lists went with the switch
+        // (#891); a set authored back in would be a rule the apps do not have.
+        var setNames: [String] = []
+        for key in vocabulary.keys where key != "note" {
+            setNames.append(key)
+        }
+        XCTAssertEqual(setNames, ["factory"], "The contract's lists name a set the wizard does not have")
     }
 
     // MARK: - What a teacher reads on the Marks control
@@ -3525,21 +3520,13 @@ final class SharedRulesContractTests: XCTestCase {
             return familyList
         case "skeletonReversed":
             return familyList.reversed()
-        case "factory", "lcs":
+        case "factory":
             let set: [String: Any] = try XCTUnwrap(
                 vocabulary[symbol] as? [String: Any], "\(caseName): no \(symbol) lists in the contract"
             )
             return try XCTUnwrap(
                 set[slot] as? [String],
                 "\(caseName): the contract has no \(symbol) list for \(slot), so the symbol means nothing here"
-            )
-        case "lcsFlippedFromSkeleton":
-            let factory: [String: Any] = try XCTUnwrap(vocabulary["factory"] as? [String: Any])
-            let lcs: [String: Any] = try XCTUnwrap(vocabulary["lcs"] as? [String: Any])
-            return WizardDefaults.switchingFactoryItems(
-                in: familyList,
-                toFactory: try XCTUnwrap(lcs[slot] as? [String]),
-                fromFactory: try XCTUnwrap(factory[slot] as? [String])
             )
         default:
             XCTFail("\(caseName): unknown list symbol \"\(symbol)\" for \(slot)")

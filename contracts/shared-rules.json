@@ -718,8 +718,8 @@
           "prefix": "PLANTOIR_CLOUDFLARE_REMADE:",
           "shape": "PLANTOIR_CLOUDFLARE_REMADE: <course>/<section> <project name> <address>, the course's one permitted space written +",
           "examples": [
-            "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
-            "PLANTOIR_CLOUDFLARE_REMADE: AP+CALC/2 ap-calc-s2-2026-gordon ap-calc-s2-2026-gordon-7x2.pages.dev"
+            "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-quillfeather ics4u-s1-2026-quillfeather.pages.dev",
+            "PLANTOIR_CLOUDFLARE_REMADE: AP+CALC/2 ap-calc-s2-2026-quillfeather ap-calc-s2-2026-quillfeather-7x2.pages.dev"
           ],
           "why": "Printed by the shared scripts/deploy.py (remake_pages_project_if_gone's caller), which runs inside the website builder on the mac and natively on Windows, so neither can write the host's trail itself. Read by the app the same way as PLANTOIR_LEFTOVER_STOPPED and in the same two places on the mac: ScriptRunner from a run it started (the Deploy button, the assistant's deploy), ScheduledDeploy from a publish launchd ran. Machinery, so the console leaves it out (transcriptStripping.machineLines); the console says it in words on the line before. A marker that is not this shape — a path, anything with a space where a name should be — records nothing."
         },
@@ -11311,7 +11311,7 @@
           "why": "#378: work ended because its owner had gone, for the trail's 'left-over work stopped'."
         },
         {
-          "line": "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
+          "line": "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-quillfeather ics4u-s1-2026-quillfeather.pages.dev",
           "hidden": true,
           "why": "2026-09-30: a section's Cloudflare project made again, for the trail's 'cloudflare project made again'. Printed by the shared deploy.py, so on both platforms."
         },
@@ -11402,39 +11402,32 @@
     "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
     "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test.",
     "skeletonToggle": {
-      "rule": "A skeleton is OFFERED for a course code when a family exists for its prefix AND the teacher is not taking the example content written for that code. One question, in one function — SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:) on the mac, SkeletonCatalog.HasSkeleton on Windows — because three surfaces ask it: the toggle's own visibility, what the structure editor adopts, and the use_skeleton key in course_config.json. A code with ready-made pages therefore has a skeleton too, and gets it the moment those pages are turned down.\n\nAnd then: the structure editor must show what will actually be created, in BOTH directions. Turning \"Start from a <subject> skeleton\" ON adopts that subject's five lists. Turning it OFF puts the defaults back — the LCS variants for the two SHARED lists when the terminology switch is on, the plain defaults for the two per-section lists, which have no LCS variant — for each list still EQUAL to what the adoption put there, and leaves every other list exactly as the teacher left it. The marks pool is the one exception to that last clause, and why is in (4) below: a pool the teacher ticked is kept, but narrowed to the folders the course will actually have, since a pool naming a folder that has just left the editor is a silent loss of marks rather than a choice. With no adoption to compare against, nothing changes at all.\n\nThe example-content toggle moves the editor exactly as the skeleton toggle does, in both directions: turning example content OFF adopts (the skeleton it has just revealed), turning it back ON restores. A teacher who changes their mind must get the file they would have got without changing it.",
-      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate. (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) The LCS switch REWRITES the two shared lists, so flipping it after an adoption leaves them unequal to the snapshot and they stay as the switch left them, while the per-section lists still go back. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (The wizard's pool is the only net: since GitHub issue #192 setup_course.py writes a saved pool back as it was rather than reconciling it again — gradedFolders.rerunningSetup — so a wizard that wrote something untrue would leave it in the file.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.\n\nA fifth consequence, added 2026-09-21 with the first half of the rule above (GitHub issue #248). Both apps asked \"is there example content for this code?\" rather than \"is the teacher taking it?\", so for all 38 codes with a payload the toggle was never shown, nothing was ever adopted, and use_skeleton was written false whatever the teacher chose. MEASURED by driving the real scripts/setup_course.py through a pty: ICS4U created that way holds 18 .md files; the same code with use_skeleton true holds 47, and the tree and the config are byte-identical to what ICS2O — same family, no payload — has always got. The Python needed no change at all, find_skeleton_dir having never looked at payloads; the whole fault was the two apps, which is exactly the shape of drift this file exists to catch, and it stood for five weeks (091a23dc, 2026-08-13) because nothing here asked the question in the teacher's terms. REJECTED while fixing it: a third \"empty folders\" sentence covering all three situations at once, which would have reworded what ~1,900 codes read; and anything retroactive for courses already created this way — Russell's call, 2026-09-21, having deleted and remade the one course it affected.\n\nA sixth consequence, 2026-09-22 (GitHub issue #251), and it REVERSES a rejection recorded here the day before. #248 also rejected a curriculum-pages toggle for a skeleton that ships a Curriculum folder, on the ground that the fixed and control runs produce identical trees, so adding one would make a payload code behave unlike its own family. Half of that is still right: for the ~1,900 codes with no payload there is nothing to include, and the toggle decides nothing. It was wrong for the 38 that HAVE one — the expectations written for their code exist, the teacher declined the lessons rather than the curriculum, and behaving like its own family is precisely what makes their course wrong. So a payload code that declines its ready-made pages now gets the subject's skeleton WITH the payload's curriculum expectations installed into it, and the three curriculum answers written as they are for a payload course. MEASURED: ICS4U went from 2 curriculum pages — a generic index and a placeholder expectation called A1.1 reading \"DELETE THIS PAGE\" — to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O, which has no payload, stayed at 2. The key that says so is expectSavedIncludeCurriculumPages on the payload cases below.",
+      "rule": "A skeleton is OFFERED for a course code when a family exists for its prefix AND the teacher is not taking the example content written for that code. One question, in one function — SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:) on the mac, SkeletonCatalog.HasSkeleton on Windows — because three surfaces ask it: the toggle's own visibility, what the structure editor adopts, and the use_skeleton key in course_config.json. A code with ready-made pages therefore has a skeleton too, and gets it the moment those pages are turned down.\n\nAnd then: the structure editor must show what will actually be created, in BOTH directions. Turning \"Start from a <subject> skeleton\" ON adopts that subject's five lists. Turning it OFF puts the defaults back for each list still EQUAL to what the adoption put there, and leaves every other list exactly as the teacher left it. The marks pool is the one exception to that last clause, and why is in (4) below: a pool the teacher ticked is kept, but narrowed to the folders the course will actually have, since a pool naming a folder that has just left the editor is a silent loss of marks rather than a choice. With no adoption to compare against, nothing changes at all.\n\nThe example-content toggle moves the editor exactly as the skeleton toggle does, in both directions: turning example content OFF adopts (the skeleton it has just revealed), turning it back ON restores. A teacher who changes their mind must get the file they would have got without changing it.",
+      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate (three since #891). (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) Until 2.0.0 a terminology switch rewrote the two shared lists, so flipping it after an adoption left them unequal to the snapshot; the switch was removed in #891, with its two cases. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (The wizard's pool is the only net: since GitHub issue #192 setup_course.py writes a saved pool back as it was rather than reconciling it again — gradedFolders.rerunningSetup — so a wizard that wrote something untrue would leave it in the file.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.\n\nA fifth consequence, added 2026-09-21 with the first half of the rule above (GitHub issue #248). Both apps asked \"is there example content for this code?\" rather than \"is the teacher taking it?\", so for all 38 codes with a payload the toggle was never shown, nothing was ever adopted, and use_skeleton was written false whatever the teacher chose. MEASURED by driving the real scripts/setup_course.py through a pty: ICS4U created that way holds 18 .md files; the same code with use_skeleton true holds 47, and the tree and the config are byte-identical to what ICS2O — same family, no payload — has always got. The Python needed no change at all, find_skeleton_dir having never looked at payloads; the whole fault was the two apps, which is exactly the shape of drift this file exists to catch, and it stood for five weeks (091a23dc, 2026-08-13) because nothing here asked the question in the teacher's terms. REJECTED while fixing it: a third \"empty folders\" sentence covering all three situations at once, which would have reworded what ~1,900 codes read; and anything retroactive for courses already created this way — Russell's call, 2026-09-21, having deleted and remade the one course it affected.\n\nA sixth consequence, 2026-09-22 (GitHub issue #251), and it REVERSES a rejection recorded here the day before. #248 also rejected a curriculum-pages toggle for a skeleton that ships a Curriculum folder, on the ground that the fixed and control runs produce identical trees, so adding one would make a payload code behave unlike its own family. Half of that is still right: for the ~1,900 codes with no payload there is nothing to include, and the toggle decides nothing. It was wrong for the 38 that HAVE one — the expectations written for their code exist, the teacher declined the lessons rather than the curriculum, and behaving like its own family is precisely what makes their course wrong. So a payload code that declines its ready-made pages now gets the subject's skeleton WITH the payload's curriculum expectations installed into it, and the three curriculum answers written as they are for a payload course. MEASURED: ICS4U went from 2 curriculum pages — a generic index and a placeholder expectation called A1.1 reading \"DELETE THIS PAGE\" — to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O, which has no payload, stayed at 2. The key that says so is expectSavedIncludeCurriculumPages on the payload cases below.",
       "whoRunsIt": "The mac runs every case below in SharedRulesContractTests as of 2026-09-18; WizardStructureTests covers what the cases cannot reach — the pieces the rule is assembled from, and a scan proving the toggle is WIRED, since a control with no handler was the original bug and no test that calls the handler itself can see one. Nothing on Windows reads this key yet — their suite stays GREEN until it is wired in, and as of 2026-09-21 their behaviour is NO LONGER the one described here: SkeletonCatalog.HasSkeleton returns false for any code with example content, and their own SkeletonCatalogTests.HasSkeletonReturnsFalseWhenExampleContentExists asserts that against itself and passes. So what Windows owes is the behaviour AND the test, and the seam to run the cases against (their restore lives inside the private NewCourseDialog.RestoreGenericStructure). The line that WILL go red on their side is ContractTests.SharedRules_ActivityTrailEvents_Exist, over the \"course created\" event added to activityTrail.mustRecord in the same piece — deliberately, because an unrun case is a request nobody reads and a red suite naming the issue is one somebody answers.",
       "courseCode": "SNC4M",
       "otherCourseCode": "AMU3M",
       "lists": {
-        "note": "Two of the five slots cannot tell one answer from another for most codes, which is worth knowing before reading a green run as coverage: every bundled family ships per_section_folders of exactly [\"All Classes\"], which is also the factory default, so only perSectionFILES proves the per-section half of a restore; and every family declares graded_folders of [\"Tasks\"] except MATHEMATICS ([\"Thinking Tasks\", \"Tasks\"]), so a marks-pool expectation means nothing unless its case uses a mathematics code. The cases below that carry courseCode MPM1D are there for exactly that reason. A third thing not to read as coverage: in a runner that resolves the skeleton symbol through the same catalog an adoption copies from, a turnOn case's four list expectations prove that the adoption FIRED rather than what it copied — which is why the MPM1D adoption case spells its marks pool out. The factory values of the five lists follow, so a case can say \"the defaults\" without either app retyping them. BOTH suites must assert these arrays EQUAL their own WizardDefaults constants — that is what stops the vocabulary drifting away from the thing it names, and without it a case could pass against a contract that no longer describes the product. The per-section lists have NO LCS variant, the terminology switch rewriting only the two shared ones, so \"lcs\" carries two arrays rather than four. scripts/setup_course.py keeps its own copies for the command-line wizard and they are deliberately NOT pinned here: the Python's shared-folder lists also carry \"Media\", which both apps leave out because the toolchain manages that folder itself, so an equality test would be asserting a difference that is correct.",
+        "note": "Two of the five slots cannot tell one answer from another for most codes, which is worth knowing before reading a green run as coverage: every bundled family ships per_section_folders of exactly [\"All Classes\"], which is also the factory default, so only perSectionFILES proves the per-section half of a restore; and every family declares graded_folders of [\"Tasks\"] except MATHEMATICS ([\"Thinking Tasks\", \"Tasks\"]), so a marks-pool expectation means nothing unless its case uses a mathematics code. The cases below that carry courseCode MPM1D are there for exactly that reason. A third thing not to read as coverage: in a runner that resolves the skeleton symbol through the same catalog an adoption copies from, a turnOn case's four list expectations prove that the adoption FIRED rather than what it copied — which is why the MPM1D adoption case spells its marks pool out. The factory values of the five lists follow, so a case can say \"the defaults\" without either app retyping them. BOTH suites must assert these arrays EQUAL their own WizardDefaults constants — that is what stops the vocabulary drifting away from the thing it names, and without it a case could pass against a contract that no longer describes the product. Until #891 (2.0.0) a second set of shared lists stood beside these for a terminology switch; it went with the switch. scripts/setup_course.py keeps its own copies for the command-line wizard and they are deliberately NOT pinned here: the Python's shared-folder lists also carry \"Media\", which both apps leave out because the toolchain manages that folder itself, so an equality test would be asserting a difference that is correct.",
         "factory": {
           "sharedFolders": ["Concepts", "Discussions", "Examples", "Exercises", "Ontario Curriculum", "Portfolios", "Recaps", "Setup", "Style", "Tasks", "Tutorials"],
           "sharedFiles": ["Extra Help.md", "Learning Goals.md"],
           "perSectionFolders": ["All Classes"],
           "perSectionFiles": ["Private Notes.md", "Scratch Page.md", "Key Links.md"]
-        },
-        "lcs": {
-          "sharedFolders": ["Concepts", "Discussions", "Examples", "Exercises", "Ontario Curriculum", "College Board Curriculum", "Portfolios", "Recaps", "Setup", "Style", "Tasks", "Tutorials"],
-          "sharedFiles": ["SIC Drop-In Sessions.md", "Grove Time.md", "Learning Goals.md"]
         }
       },
       "symbols": {
         "note": "What a list value in a case's given or expect means. A literal array means itself — used for a teacher's own edit, which belongs to nobody's constants.",
         "factory": "The lists.factory array for that slot.",
-        "lcs": "The lists.lcs array for that slot. Valid for the two SHARED lists only.",
         "skeleton": "The family's own array for that slot, resolved through each app's SkeletonCatalog from support/skeletons/<family>/manifest.json for courseCode — NEVER a literal copy here, because the skeletons are GENERATED (.claude/skills/example-content/generate_skeletons.py writes ~1,950 pages across 50 families) and a copy would be a fixture nobody regenerates. In the gradedFolders slot it means what an adoption sets: the manifest's own graded_folders where it names any, and otherwise the historical rule over the family's own folders — SkeletonCatalog.adoptedGradedFolders on the mac, SkeletonCatalog.AdoptedGradedFolders on Windows.",
-        "skeletonReversed": "The same family array, reversed. Stands for a list a teacher emptied and typed back in a different order: the same names, so a dirty flag would call it untouched, and a different value, so this rule leaves it alone.",
-        "lcsFlippedFromSkeleton": "What the terminology switch leaves behind when it is flipped ON over the family's own list — switchingFactoryItems(in: skeleton, toFactory: lcs, fromFactory: factory) on the mac, SwitchingFactoryItems on Windows. Valid for the two SHARED lists only. Computed rather than written out, so a change to a generated skeleton cannot rot the case."
+        "skeletonReversed": "The same family array, reversed. Stands for a list a teacher emptied and typed back in a different order: the same names, so a dirty flag would call it untouched, and a different value, so this rule leaves it alone."
       },
-      "howToRunACase": "Start with given.lists, a snapshot of what an adoption of given.courseCode (or the courseCode above) would set when given.hasSnapshot is true and no snapshot otherwise, the terminology switch at given.usesLCSTerminology, and the toggle itself ON, which is where a new wizard opens. Apply each step in order, each step regardless of what the one before it left the toggle at — a case may open with turnOn on a fixture that has no snapshot, which is a state a real wizard reaches only by other means and is written this way to say what an adoption does from the factory defaults. turnOn adopts unless the teacher's shared folders say the list has been edited (SkeletonCatalog.structureToAdopt / StructureToAdopt, which is the rule that predates this one), recording a fresh snapshot when it does. turnOff restores as the rule above says and then forgets the snapshot. typeAnotherCode is the teacher editing the course-code field to otherCourseCode — a code in a different family — which adopts only while the toggle is ON: the guard in adoptSkeletonStructure / AdoptSkeletonStructure, without which a teacher who declined the skeleton and then corrected a typo in the code is given it back. Be honest about what that case proves: a runner implements the guard itself, so the case pins the RULE and not your app's wiring — deleting the guard from the product leaves it green. Each platform owes its own check that its real adopt entry point reads the toggle (the mac's is a source scan in WizardStructureTests). Compare all five lists with expect. Build each case's fixture on its own: a cache shared between cases would let one case's adoption answer another's.\n\ngiven.takesExampleContent is where the example-content toggle starts, and ABSENT MEANS TRUE — which is where a new wizard opens and which leaves every case written before 2026-09-21 meaning exactly what it meant. A runner must tolerate its absence rather than require it. It is the second half of every adoption question: a case whose courseCode has ready-made pages still resolves a family by prefix, since the prefix map knows nothing about payloads, but nothing is adopted for it WHILE takesExampleContent is true — and everything is adopted for it once that is false, which is the whole of issue #248.\n\nTwo more steps, the two halves of the example-content toggle. declineExampleContent sets takesExampleContent to FALSE and then adopts for given.courseCode (not otherCourseCode — this is the same course, being offered its subject's shape instead of its ready-made pages) reading the same skeletonIsWanted guard turnOn and typeAnotherCode read: a teacher who declined the skeleton and then declined the example content must not have the skeleton handed back. takeExampleContent sets it to TRUE and then restores exactly as turnOff restores, forgetting the snapshot. Three states they reach together are worth saying out loud, because both apps must write the same file in each: a list the teacher EDITED after declining is left alone by the restore, so it travels into a course that is taking ready-made pages (harmless — setup_course.py's example branch overrides the structure and reconciles the marks pool, MEASURED — but the two apps must agree on it); flipping the terminology switch between the two leaves the two shared lists as the switch left them, by consequence (2) above; and a second decline after the skeleton was declined adopts NOTHING, the teacher's choice being remembered, with noStartingContentNote on screen.\n\nexpectSavedUseSkeleton, where a case carries it, is what course_config.json must say after the steps — the rule itself, hasSkeleton(courseCode, takingExampleContent) AND skeletonIsWanted. It is the assertion that fails against an app asking only whether example content EXISTS.\n\nexpectSavedIncludeCurriculumPages, where a case carries it, is what course_config.json must say about the curriculum pages — and ABSENT MEANS NOT ASSERTED, so a runner must tolerate its absence rather than require it, exactly as it does given.takesExampleContent. The rule behind it is curriculumPagesOffered: the code has a payload, that payload declares a curriculum folder, AND either the teacher is taking the payload or a skeleton is offered and wanted. It is written for issue #251, where a teacher who declined the ready-made pages and kept the subject's skeleton was given a Curriculum folder holding the skeleton's generic index and one placeholder expectation called A1.1 — so the curriculum coverage map, built from those pages, had one fake cell to colour. MEASURED by driving the real setup_course.py: ICS4U went from 2 curriculum pages to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O — which has no payload — stayed at 2. An app that writes false here never runs the launcher's new branch, whatever its interface shows, and the course comes out exactly as broken with every gate green.",
+      "howToRunACase": "Start with given.lists, a snapshot of what an adoption of given.courseCode (or the courseCode above) would set when given.hasSnapshot is true and no snapshot otherwise, and the toggle itself ON, which is where a new wizard opens. Apply each step in order, each step regardless of what the one before it left the toggle at — a case may open with turnOn on a fixture that has no snapshot, which is a state a real wizard reaches only by other means and is written this way to say what an adoption does from the factory defaults. turnOn adopts unless the teacher's shared folders say the list has been edited (SkeletonCatalog.structureToAdopt / StructureToAdopt, which is the rule that predates this one), recording a fresh snapshot when it does. turnOff restores as the rule above says and then forgets the snapshot. typeAnotherCode is the teacher editing the course-code field to otherCourseCode — a code in a different family — which adopts only while the toggle is ON: the guard in adoptSkeletonStructure / AdoptSkeletonStructure, without which a teacher who declined the skeleton and then corrected a typo in the code is given it back. Be honest about what that case proves: a runner implements the guard itself, so the case pins the RULE and not your app's wiring — deleting the guard from the product leaves it green. Each platform owes its own check that its real adopt entry point reads the toggle (the mac's is a source scan in WizardStructureTests). Compare all five lists with expect. Build each case's fixture on its own: a cache shared between cases would let one case's adoption answer another's.\n\ngiven.takesExampleContent is where the example-content toggle starts, and ABSENT MEANS TRUE — which is where a new wizard opens and which leaves every case written before 2026-09-21 meaning exactly what it meant. A runner must tolerate its absence rather than require it. It is the second half of every adoption question: a case whose courseCode has ready-made pages still resolves a family by prefix, since the prefix map knows nothing about payloads, but nothing is adopted for it WHILE takesExampleContent is true — and everything is adopted for it once that is false, which is the whole of issue #248.\n\nTwo more steps, the two halves of the example-content toggle. declineExampleContent sets takesExampleContent to FALSE and then adopts for given.courseCode (not otherCourseCode — this is the same course, being offered its subject's shape instead of its ready-made pages) reading the same skeletonIsWanted guard turnOn and typeAnotherCode read: a teacher who declined the skeleton and then declined the example content must not have the skeleton handed back. takeExampleContent sets it to TRUE and then restores exactly as turnOff restores, forgetting the snapshot. Three states they reach together are worth saying out loud, because both apps must write the same file in each: a list the teacher EDITED after declining is left alone by the restore, so it travels into a course that is taking ready-made pages (harmless — setup_course.py's example branch overrides the structure and reconciles the marks pool, MEASURED — but the two apps must agree on it); and a second decline after the skeleton was declined adopts NOTHING, the teacher's choice being remembered, with noStartingContentNote on screen.\n\nexpectSavedUseSkeleton, where a case carries it, is what course_config.json must say after the steps — the rule itself, hasSkeleton(courseCode, takingExampleContent) AND skeletonIsWanted. It is the assertion that fails against an app asking only whether example content EXISTS.\n\nexpectSavedIncludeCurriculumPages, where a case carries it, is what course_config.json must say about the curriculum pages — and ABSENT MEANS NOT ASSERTED, so a runner must tolerate its absence rather than require it, exactly as it does given.takesExampleContent. The rule behind it is curriculumPagesOffered: the code has a payload, that payload declares a curriculum folder, AND either the teacher is taking the payload or a skeleton is offered and wanted. It is written for issue #251, where a teacher who declined the ready-made pages and kept the subject's skeleton was given a Curriculum folder holding the skeleton's generic index and one placeholder expectation called A1.1 — so the curriculum coverage map, built from those pages, had one fake cell to colour. MEASURED by driving the real setup_course.py: ICS4U went from 2 curriculum pages to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O — which has no payload — stayed at 2. An app that writes false here never runs the launcher's new branch, whatever its interface shows, and the course comes out exactly as broken with every gate green.",
       "cases": [
         {
           "name": "off, with nothing touched since the adoption",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff"],
@@ -11442,21 +11435,9 @@
           "why": "The plain case, and the one the bug got wrong. The marks pool is the historical rule read off the restored folders, which is what a brand-new course has always opened with. This is also the case a list edited and edited BACK exactly lands in — the data cannot carry that history, and that is the point: the rule asks what is on screen, not what happened to it."
         },
         {
-          "name": "off, with the terminology switch on",
-          "given": {
-            "hasSnapshot": true,
-            "usesLCSTerminology": true,
-            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
-          },
-          "steps": ["turnOff"],
-          "expect": {"sharedFolders": "lcs", "sharedFiles": "lcs", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
-          "why": "Restoring means restoring what a new course would have opened with NOW, which for a teacher who turned the terminology switch on before typing a code is the LCS set. The two per-section lists have no LCS variant and go back to the plain defaults, which is the half most easily missed."
-        },
-        {
           "name": "off, after the shared folders were edited",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff"],
@@ -11464,21 +11445,9 @@
           "why": "List by list, not all-or-nothing. An earlier version of this on Windows asked one question of the shared folders and replaced all five lists on the answer, which discarded an edited file list. The marks pool is re-inferred over what the editor actually ends up with — the teacher's own folders plus the restored per-section ones — so it cannot name a folder that is no longer there."
         },
         {
-          "name": "off, after the terminology switch was flipped",
-          "given": {
-            "hasSnapshot": true,
-            "usesLCSTerminology": true,
-            "lists": {"sharedFolders": "lcsFlippedFromSkeleton", "sharedFiles": "lcsFlippedFromSkeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
-          },
-          "steps": ["turnOff"],
-          "expect": {"sharedFolders": "lcsFlippedFromSkeleton", "sharedFiles": "lcsFlippedFromSkeleton", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
-          "why": "The trap worth knowing: the switch rewrote the two shared lists, so they no longer equal the snapshot and the restore must leave them exactly as they are — including the skeleton's own folders that the switch carried across. The per-section lists it never touched still go back. An implementation that re-snapshotted on the terminology flip would silently restore these two as well, and the teacher would watch their College Board folder disappear."
-        },
-        {
           "name": "off, with a list put back in a different order",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeletonReversed", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff"],
@@ -11489,7 +11458,6 @@
           "name": "off, with nothing ever adopted",
           "given": {
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOff"],
@@ -11500,7 +11468,6 @@
           "name": "on, from the factory defaults",
           "given": {
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn"],
@@ -11511,7 +11478,6 @@
           "name": "on, over lists the teacher has edited",
           "given": {
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn"],
@@ -11522,7 +11488,6 @@
           "name": "off, then on, then off again",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff", "turnOn", "turnOff"],
@@ -11534,7 +11499,6 @@
           "given": {
             "courseCode": "MPM1D",
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn"],
@@ -11546,7 +11510,6 @@
           "given": {
             "courseCode": "MPM1D",
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": ["Thinking Tasks"]}
           },
           "steps": ["turnOff"],
@@ -11557,7 +11520,6 @@
           "name": "off, then a different course code typed",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff", "typeAnotherCode"],
@@ -11570,7 +11532,6 @@
             "courseCode": "ADA1O",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn", "turnOff"],
@@ -11585,7 +11546,6 @@
             "courseCode": "ADA1O",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent"],
@@ -11600,7 +11560,6 @@
             "courseCode": "ADA1O",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent", "turnOff"],
@@ -11615,7 +11574,6 @@
             "courseCode": "MCV4U",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent", "takeExampleContent"],
@@ -11630,7 +11588,6 @@
             "courseCode": "MCV4U",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent"],
@@ -11775,12 +11732,11 @@
         "College Board Curriculum",
         "Curriculum"
       ],
-      "fillRule": "A field moves only while it still holds the value the OTHER choice would have put there — the words of `course` when ticking, of `club` when unticking — so a teacher's own typing survives the box going off and on. The class folder keeps its PLACE in the per-section list and `classFolder` follows it. Ticking removes every `curriculumFolders` name from the shared folders; unticking puts the terminology's factory curriculum folder back at its factory position. A skeleton's folders already adopted for the code are given up BEFORE the fill (the skeleton toggle's own restore rule), and adoption does nothing while the box is ticked.",
+      "fillRule": "A field moves only while it still holds the value the OTHER choice would have put there — the words of `course` when ticking, of `club` when unticking — so a teacher's own typing survives the box going off and on. The class folder keeps its PLACE in the per-section list and `classFolder` follows it. Ticking removes every `curriculumFolders` name from the shared folders; unticking puts the factory curriculum folder back at its factory position. A skeleton's folders already adopted for the code are given up BEFORE the fill (the skeleton toggle's own restore rule), and adoption does nothing while the box is ticked.",
       "cases": [
         {
           "name": "ticking the box fills a club's words and takes the curriculum folder out",
           "isClub": true,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11828,7 +11784,6 @@
         {
           "name": "unticking it puts a course's words and the curriculum folder back",
           "isClub": false,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11876,7 +11831,6 @@
         {
           "name": "a teacher's own words survive the box going off",
           "isClub": false,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11925,7 +11879,6 @@
         {
           "name": "a heading the teacher typed stays when the box goes off, while the club's own words leave",
           "isClub": false,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11974,7 +11927,6 @@
         {
           "name": "the class folder keeps its place in the list",
           "isClub": true,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -12756,7 +12708,7 @@
         "why": "The build counts every class folder when working out what a course teaches, so the sheet names every one."
       },
       {
-        "name": "an LCS course whose two curriculum folders both have maps",
+        "name": "a course with Ontario and College Board curriculum folders, both with maps",
         "perSectionFolders": [
           "All Classes"
         ],
@@ -12784,7 +12736,7 @@
         "why": "#128. Every map page is named, the primary's first, so a teacher knows every page name they must not write."
       },
       {
-        "name": "the LCS default: the folder named is the one holding the map",
+        "name": "a two-curricula course: the folder named is the one holding the map",
         "perSectionFolders": [
           "All Classes"
         ],
@@ -12894,11 +12846,11 @@
     "removeCurriculumFolderWithItsMapConfirmation": {
       "title": "Remove “{name}”?",
       "message": "This folder holds curriculum expectations with a coverage map of their own. Removing it takes that map off your website.",
-      "why": "Asked, rather than refused, when the coverage map is on and the course has ANOTHER curriculum folder with a map (#128): the course keeps a map, so removing this one is allowed, but it is not a small thing. It does not promise that another map stays - the plan's first draft did, and on the default LCS course (College Board empty) that sentence was false in both directions."
+      "why": "Asked, rather than refused, when the coverage map is on and the course has ANOTHER curriculum folder with a map (#128): the course keeps a map, so removing this one is allowed, but it is not a small thing. It does not promise that another map stays - the plan's first draft did, and on a two-curricula course as the wizard used to make it (College Board empty) that sentence was false in both directions."
     },
     "curriculumFoldersResolution": {
       "note": "Which curriculum folders a course has, for the build's maps and for what both apps protect and name (#128). DECLARED names come first: curriculum_folders, in order, then the legacy curriculum_folder if it is not already there (null, empty, non-string and path-like entries dropped; repeats compared ignoring letter case). `mapped` is the build's answer: every declared folder among `folders` that holds an expectation page (`withPages`, found in any letter case, the LIST's spelling kept), in declared order - or, when none does, the ONE folder the old scan finds: the alphabetically first whose name mentions 'curriculum' and holds a LETTER-FIRST page (`A1.1`, the only shape before #128), and only when none does, the first holding any expectation page. `withLetterFirstPages`, when a case gives it, names the folders among `withPages` holding a letter-first page; absent, every folder in `withPages` does. `resolved` is what the apps protect and name: `mapped` when it is not empty, otherwise the single folder the old by-name rule gives - the first declared name in the list, else the alphabetically first name mentioning 'curriculum' - so a course whose folders are still empty is protected exactly as before. `titles` is curriculumRules.coveragePageTitles over `mapped`. The build reads the merged tree on disk; the apps read the course folder's SHARED folders on disk (withPages); the wizard, which has no disk yet, treats the payload's declared folder as holding pages when curriculum pages are being installed.",
-      "why": "Replaces curriculumFolderResolution, deleted rather than kept beside this: its Ontario/College Board case asserted the tie #90 described - the apps protecting College Board while the build mapped Ontario - and a case kept alive describes a rule that no longer exists while passing. Deciding from pages on disk is the plan review's finding 1: on the default LCS course College Board is empty, and a by-name rule protected it and told a teacher removing Ontario that another map would remain. Maps only for DECLARED folders, not every folder whose name mentions 'curriculum' (Russell's ruling on #128): an archived copy of a revised curriculum kept beside the current one would otherwise gain a second, overlapping map. Both apps OFFER to declare such a folder (curriculumFoldersOffer); neither declares one silently.",
+      "why": "Replaces curriculumFolderResolution, deleted rather than kept beside this: its Ontario/College Board case asserted the tie #90 described - the apps protecting College Board while the build mapped Ontario - and a case kept alive describes a rule that no longer exists while passing. Deciding from pages on disk is the plan review's finding 1: on a two-curricula course as the wizard used to make it, College Board is empty, and a by-name rule protected it and told a teacher removing Ontario that another map would remain. Maps only for DECLARED folders, not every folder whose name mentions 'curriculum' (Russell's ruling on #128): an archived copy of a revised curriculum kept beside the current one would otherwise gain a second, overlapping map. Both apps OFFER to declare such a folder (curriculumFoldersOffer); neither declares one silently.",
       "cases": [
         {
           "name": "legacy key only",
@@ -13002,7 +12954,7 @@
           ]
         },
         {
-          "name": "the LCS default: nothing declared, only Ontario holds pages",
+          "name": "a two-curricula course: nothing declared, only Ontario holds pages",
           "curriculumFolder": null,
           "curriculumFolders": null,
           "folders": [
@@ -13052,7 +13004,7 @@
           ]
         },
         {
-          "name": "the LCS course of #90: nothing declared, College Board holds 1.A pages",
+          "name": "the two-curricula course of #90: nothing declared, College Board holds 1.A pages",
           "curriculumFolder": null,
           "curriculumFolders": null,
           "folders": [
@@ -13271,7 +13223,7 @@
     },
     "curriculumFolderProtection": {
       "rule": "For a shared folder in curriculumFoldersResolution's `resolved` list: (1) while the coverage map is on and it is the ONLY resolved folder, it is blocked - curriculumFolderBlockedByCoverageSetting in Course Settings, curriculumFolderBlockedByCoverageMap in the wizard; (2) in the wizard, while curriculum pages are being installed, the payload's declared folder is blocked by curriculumFolderBlockedByCurriculumPages; (3) while the map is on and another resolved folder remains, removing it asks first, with removeCurriculumFolderWithItsMapConfirmation; (4) with the map off it asks with removeCurriculumFolderConfirmation. A folder not in `resolved` is not a curriculum folder here, and the other rules (the marks pool) decide.",
-      "why": "Only the LAST folder with a map is refused, because only removing that one takes the course's last map away. Before #128 exactly one folder was ever protected, chosen by name - on an LCS course, College Board, while Ontario, whose pages the map was built from, could be removed without a word.",
+      "why": "Only the LAST folder with a map is refused, because only removing that one takes the course's last map away. Before #128 exactly one folder was ever protected, chosen by name - on a two-curricula course, College Board, while Ontario, whose pages the map was built from, could be removed without a word.",
       "cases": [
         {
           "name": "the only folder, map on (settings)",
@@ -13300,7 +13252,7 @@
           "sentence": "curriculumFolderBlockedByCoverageMap"
         },
         {
-          "name": "the LCS default: Ontario holds the map, so Ontario is the one refused",
+          "name": "a two-curricula course: Ontario holds the map, so Ontario is the one refused",
           "surface": "settings",
           "resolved": [
             "Ontario Curriculum"
@@ -13313,7 +13265,7 @@
           "sentence": "curriculumFolderBlockedByCoverageSetting"
         },
         {
-          "name": "the LCS default: College Board, empty, is an ordinary folder",
+          "name": "a two-curricula course: College Board, empty, is an ordinary folder",
           "surface": "settings",
           "resolved": [
             "Ontario Curriculum"
@@ -13429,7 +13381,7 @@
       "why": "Russell's ruling on #128: maps only for DECLARED folders, and the apps OFFER to declare one rather than deciding for the teacher. Showing the folder the build maps today as ticked, even on a course that declared nothing, is what stops the first tick from quietly dropping that map: declaring only College Board would otherwise end the fallback that found Ontario. Rejected: ticking every folder whose name mentions the curriculum by default (the by-name guess this piece removes from the build, back by another route), and a checkbox on every shared folder (one choice buried in a dozen that are not curriculum at all).",
       "cases": [
         {
-          "name": "LCS default, nothing declared, Ontario holds the map",
+          "name": "a two-curricula course, nothing declared, Ontario holds the map",
           "folders": [
             "Concepts",
             "Ontario Curriculum",
@@ -13538,7 +13490,7 @@
           ]
         },
         {
-          "name": "a new LCS course from scratch: nothing ticked for the teacher",
+          "name": "a new two-curricula course from scratch: nothing ticked for the teacher",
           "folders": [
             "Ontario Curriculum",
             "College Board Curriculum"
@@ -16608,7 +16560,7 @@
         "treeEntries": "A plain string is a file (content 'something'); one ending '/' is an empty folder; {\"file\": path, \"changed\": \"YYYY-MM-DD\"} is a file last changed that day; {\"file\": path, \"text\": \"...\"} is a file with that content; {\"link\": path, \"to\": null} is a link whose target does not exist, and {\"link\": path, \"to\": \"<path in the tree>\"} one that resolves. Links are NAMES to every rule here and are never followed, which is why the dangling and the resolving forms must produce identical outcomes.",
         "recognition": {
           "rule": "A PAGE FOLDER is a real folder named 'Thread <digits>' (any case, one space) holding at least one .md file DIRECTLY inside it. An OLDER CLASS FOLDER is a real folder that (a) has a real .obsidian folder, (b) has at least one page folder, (c) holds no course_config.json, and (d) whose name does not end in ' Shared'. Accepted: a class folder itself (offered alone, ticked); a folder whose children include at least one class folder (the 'Class Website' folder); and a folder with a child named exactly 'Class Website' that is such a folder (the course folder above it). The shared folder chosen by mistake - a folder named '... Shared' beside class folders - is refused with its own sentence. Anything else is refused noCoursesThere, exactly as before. Every entry is asked about WITHOUT following a link: a child that is a link is never a class folder and never a shared folder.",
-          "why": "(a) AND (b), because each alone admits a real folder that is not a class. Measured on the real folders: the course folders above (ICS3U/, ICS4U/, ICD2O/) have Thread N folders of the teacher's PLANNING - subfolders, 0 pages directly inside any of them - and no .obsidian; ICD2O-LCS-LDPS-Collaboration has .obsidian and no Thread folder. All six real class folders pass, with 12 to 17 pages directly in each Thread folder.",
+          "why": "(a) AND (b), because each alone admits a real folder that is not a class. Measured on the real folders: the course folders above (ICS3U/, ICS4U/, ICD2O/) have Thread N folders of the teacher's PLANNING - subfolders, 0 pages directly inside any of them - and no .obsidian; ICD2O-JHC-MWPS-Collaboration has .obsidian and no Thread folder. All six real class folders pass, with 12 to 17 pages directly in each Thread folder.",
           "tickedWhenOpened": "A class folder chosen on its own: that one. A folder of them: only those NAMED like a class (CODE-YYYY-YY or CODE-Sn-YYYY-YY, the year's two halves consecutive), and of several sections of one course in one school year only the LOWEST section. The others are offered unticked. Ticking S1 and S2 of 2023-24 together opened the sheet with S2 already in trouble under 'You already have a ICS3U kept for reference from 2023-24' - false, since nothing was kept yet, and advice ('Choose a different school year') that is wrong for a second section. S2 is a second import (Russell, decision 1), and the sheet says so beside it with wording.olderLayoutAnotherSectionOfTheSameCourse.",
           "cases": [
             {
@@ -16704,7 +16656,7 @@
               "refusal": "noCoursesThere"
             },
             {
-              "name": "a folder with .obsidian and no Thread folder (ICD2O-LCS-LDPS-Collaboration)",
+              "name": "a folder with .obsidian and no Thread folder (ICD2O-JHC-MWPS-Collaboration)",
               "tree": ["Collaboration/.obsidian/app.json", "Collaboration/Home.md", "Collaboration/Images/a.png"],
               "choose": "Collaboration",
               "expect": "refused",
@@ -16941,7 +16893,7 @@
             {"folder": "ICS4U-2023-24", "code": "ICS4U", "startingYear": 2023, "section": null, "looksLikeAClass": true},
             {"folder": "ics3u-s2-2023-24", "code": "ICS3U", "startingYear": 2023, "section": 2, "looksLikeAClass": true},
             {"folder": "ICD2O-Exemplars", "code": "ICD2O", "startingYear": null, "section": null, "looksLikeAClass": false},
-            {"folder": "ICD2O-LCS-LDPS-Collaboration", "code": "ICD2O", "startingYear": null, "section": null, "looksLikeAClass": false},
+            {"folder": "ICD2O-JHC-MWPS-Collaboration", "code": "ICD2O", "startingYear": null, "section": null, "looksLikeAClass": false},
             {"folder": "ICS3U-S1-2023-25", "code": "ICS3U", "startingYear": null, "section": 1, "looksLikeAClass": false},
             {"folder": "ICS3U-2024-25 Shared", "code": "ICS3U", "startingYear": 2024, "section": null, "looksLikeAClass": false},
             {"folder": "ICS3UX-2023-24", "code": null, "startingYear": 2023, "section": null, "looksLikeAClass": false},
@@ -17250,7 +17202,7 @@
         "today": "2026-09-23",
         "treeEntries": "As olderLayout.treeEntries, plus: {\"link\": path, \"text\": \"<link text>\"} is a link whose text is exactly that (relative, as the real ones are: ./source-ics3u/s1/index.md); {\"alias\": path, \"to\": \"<path in the tree>\"} is a Finder shortcut (an alias file made with bookmarkData(options: .suitableForBookmarkFile) + writeBookmarkData) to that entry, {\"alias\": path, \"to\": null} one whose target was a folder that was then deleted, and \"thenLock\": \"<path in the tree>\" makes that folder unreadable (mode 000) after the shortcut is made - the shape of a refused Documents permission. Shortcuts are made after every file and link.",
         "recognition": {
-          "rule": "A WEBSITE FOLDER is a real folder holding a real folder quartz/, which holds a regular file quartz.config.ts and a real folder content/. Its COURSE PAGES FOLDER is the ONE real folder directly in content/ named source-<code> (any case), <code> five characters of the Ontario shape (olderLayout.codeAndYear's rule), holding at least one real s<digits> folder. A website folder with no course pages folder is not a course and is left out of every list (Math Club - Russell, 2026-09-23); with two, its row says checkoutLayoutMoreThanOneCourse. A SHORTCUT is an entry that Finder marks as an alias (isAliasFileKey) AND that lstat calls a regular file: a symbolic link also answers isAliasFileKey true, and resolving one follows it, so a link is NEVER a shortcut. Resolved with [.withoutUI, .withoutMounting]; when that fails, the bookmark's STORED path and kind are read without resolving and the stored path asked about with lstat: a stored FILE is 'leadsToAFile', EACCES/EPERM 'couldNotBeOpened', a path under /Volumes whose disk is not mounted 'diskNotConnected', anything else 'gone'. Tried in this order: (1) a shortcut chosen on its own - to a website folder: that one; one that leads nowhere or to a file: refused with its sentence; (2) a website folder, or its quartz/ or quartz/content/ folder: that one; (3) anything else inside a website folder's quartz/, found by walking the chosen path's ancestors: a later section's pages (content/source-<code>/s<M> or content/vault-<code>-s<M>, M not 1) refused checkoutLayoutOnlyTheFirstSection, anything else refused checkoutLayoutChooseTheWholeFolder - never resolved upward; (4) the CANDIDATES in the chosen folder (website folders, shortcuts leading to one, and shortcuts to a FOLDER that cannot be read through - a shortcut to a file is passed over as a file is) and in each of its children: readable candidates directly inside AND in a child, or in two or more children, refused checkoutLayoutChooseOneCourseAtATime; directly inside only, that folder; in exactly one child only, that child; only unreadable shortcuts, that folder (or the one child holding them), each shown with its reason. Looking at a child's candidates means listing the child's entries: a real folder among them is asked whether it is a website folder (lstat of its quartz/quartz.config.ts and quartz/content, and of content/source-*/s<N>), and a shortcut among them is RESOLVED (without a dialog and without mounting). (5) Only when all of that found nothing: the chosen folder's grandchildren - a folder two levels down holding a SHORTCUT that leads to a website folder (the school year's folder in iCloud, LCS/2024-25, whose Old ICS3U/Class Websites holds S1 and S2) - refused checkoutLayoutChooseACourseFolderInside, never imported from; the first such shortcut ends the look. At that depth only shortcuts are asked about, never the folders beside them, so a broad folder chosen by mistake does not become a look inside every folder three levels down. Nothing: nil, and noCoursesThere exactly as before. Every entry is asked about WITHOUT following a link, and nothing deeper than that is looked at.",
+          "rule": "A WEBSITE FOLDER is a real folder holding a real folder quartz/, which holds a regular file quartz.config.ts and a real folder content/. Its COURSE PAGES FOLDER is the ONE real folder directly in content/ named source-<code> (any case), <code> five characters of the Ontario shape (olderLayout.codeAndYear's rule), holding at least one real s<digits> folder. A website folder with no course pages folder is not a course and is left out of every list (Math Club - Russell, 2026-09-23); with two, its row says checkoutLayoutMoreThanOneCourse. A SHORTCUT is an entry that Finder marks as an alias (isAliasFileKey) AND that lstat calls a regular file: a symbolic link also answers isAliasFileKey true, and resolving one follows it, so a link is NEVER a shortcut. Resolved with [.withoutUI, .withoutMounting]; when that fails, the bookmark's STORED path and kind are read without resolving and the stored path asked about with lstat: a stored FILE is 'leadsToAFile', EACCES/EPERM 'couldNotBeOpened', a path under /Volumes whose disk is not mounted 'diskNotConnected', anything else 'gone'. Tried in this order: (1) a shortcut chosen on its own - to a website folder: that one; one that leads nowhere or to a file: refused with its sentence; (2) a website folder, or its quartz/ or quartz/content/ folder: that one; (3) anything else inside a website folder's quartz/, found by walking the chosen path's ancestors: a later section's pages (content/source-<code>/s<M> or content/vault-<code>-s<M>, M not 1) refused checkoutLayoutOnlyTheFirstSection, anything else refused checkoutLayoutChooseTheWholeFolder - never resolved upward; (4) the CANDIDATES in the chosen folder (website folders, shortcuts leading to one, and shortcuts to a FOLDER that cannot be read through - a shortcut to a file is passed over as a file is) and in each of its children: readable candidates directly inside AND in a child, or in two or more children, refused checkoutLayoutChooseOneCourseAtATime; directly inside only, that folder; in exactly one child only, that child; only unreadable shortcuts, that folder (or the one child holding them), each shown with its reason. Looking at a child's candidates means listing the child's entries: a real folder among them is asked whether it is a website folder (lstat of its quartz/quartz.config.ts and quartz/content, and of content/source-*/s<N>), and a shortcut among them is RESOLVED (without a dialog and without mounting). (5) Only when all of that found nothing: the chosen folder's grandchildren - a folder two levels down holding a SHORTCUT that leads to a website folder (the school year's folder in iCloud, JHC/2024-25, whose Old ICS3U/Class Websites holds S1 and S2) - refused checkoutLayoutChooseACourseFolderInside, never imported from; the first such shortcut ends the look. At that depth only shortcuts are asked about, never the folders beside them, so a broad folder chosen by mistake does not become a look inside every folder three levels down. Nothing: nil, and noCoursesThere exactly as before. Every entry is asked about WITHOUT following a link, and nothing deeper than that is looked at.",
           "why": "Measured on Russell's folders: every shape of them - the shortcut folder, Old ICS3U, 2024-25, ICS3U, S1, S1/quartz, quartz/content, source-ics3u, vault-ics3u-s2, Math Club - returned nothing from the first two routes, so this route can never take a folder either of them reads. The children are counted rather than any folder NAME trusted: 2024-25 holds ICS3U/ and ICS4U/ (several courses) while Old ICS3U holds exactly one child of shortcuts (Class Websites) beside planning folders and a shortcut to a PDF.",
           "section": "The section a website folder built is, first, the one its front page's link TEXT names - content/index.md -> [./]source-<code>/s<N>/index.md with s<N> present (read with destinationOfSymbolicLink, never followed; S2's own publish script rewrote exactly these links to make S2's site); then the folder's own name S<N> when s<N> is present; then the only s<N> there is; otherwise the row says checkoutLayoutWhichSection. Measured: the front page and the name agree in 5 of 5 real website folders. Only section 1 comes across: a later section chosen on its own is REFUSED checkoutLayoutOnlyTheFirstSection, and in a folder of them it is SHOWN with that sentence, unticked.",
           "codeAndYear": "The code is the course pages folder's <code>, upper-cased. The year is the first of the website folder, its parent and its grandparent whose name is exactly YYYY-YY (consecutive) or carries -YYYY-YY as #254's names do, when it is one the sheet offers; otherwise the pages that will be copied propose one (schoolYearProposed). The row's name (course_name) is '<CODE> S1'.",
@@ -18070,7 +18022,7 @@
               "why": "Two children hold website folders. #254's olderLayoutChooseOneCourseAtATime names 'the Class Website folder', which is false here."
             },
             {
-              "name": "the school year's folder in iCloud, one level above the courses (LCS/2024-25)",
+              "name": "the school year's folder in iCloud, one level above the courses (JHC/2024-25)",
               "tree": [
                 "Documents/2024-25/ICS3U/S1/quartz/quartz.config.ts",
                 "Documents/2024-25/ICS3U/S1/quartz/content/source-ics3u/shared/Concepts/Lists.md",
@@ -18080,14 +18032,14 @@
                   "link": "Documents/2024-25/ICS3U/S1/quartz/content/index.md",
                   "text": "./source-ics3u/s1/index.md"
                 },
-                "LCS/2024-25/Old ICS3U/Thread 1/notes.txt",
-                "LCS/2024-25/Math Club/November Reports.txt",
+                "JHC/2024-25/Old ICS3U/Thread 1/notes.txt",
+                "JHC/2024-25/Math Club/November Reports.txt",
                 {
-                  "alias": "LCS/2024-25/Old ICS3U/Class Websites/S1",
+                  "alias": "JHC/2024-25/Old ICS3U/Class Websites/S1",
                   "to": "Documents/2024-25/ICS3U/S1"
                 }
               ],
-              "choose": "LCS/2024-25",
+              "choose": "JHC/2024-25",
               "expect": "refused",
               "refusal": "checkoutLayoutChooseACourseFolderInside",
               "refusalFolder": "2024-25",
@@ -18096,13 +18048,13 @@
             {
               "name": "a school year's folder whose only shortcuts two levels down lead nowhere",
               "tree": [
-                "LCS/2024-25/ICD2O/Thread 1/notes.txt",
+                "JHC/2024-25/ICD2O/Thread 1/notes.txt",
                 {
-                  "alias": "LCS/2024-25/ICD2O/Class Website/ICD2O-S2-Website",
+                  "alias": "JHC/2024-25/ICD2O/Class Website/ICD2O-S2-Website",
                   "to": null
                 }
               ],
-              "choose": "LCS/2024-25",
+              "choose": "JHC/2024-25",
               "expect": "refused",
               "refusal": "noCoursesThere",
               "why": "Only a shortcut that LEADS to a website folder makes the folder a school year's; one that leads nowhere two levels down is not looked into further (choosing ICD2O shows it, with its reason)."
@@ -22638,7 +22590,7 @@
         {
           "name": "printing settings, with an unknown blank and an unknown place (#454)",
           "set": {
-            "print_school_name": "Lakefield College School",
+            "print_school_name": "Juniper Hollow Collegiate",
             "print_blanks": ["class_number", "seat"],
             "print_school_name_at": "top",
             "print_course_code_at": "none"
@@ -28510,10 +28462,10 @@
       "blankJoin": "     ",
       "cases": [
         { "name": "nothing set", "folder": "ICS3U", "settings": { "course_code": "ICS3U" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
-        { "name": "a school name", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School" }, "expect": { "topLeft": "Lakefield College School", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
-        { "name": "both at the bottom", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School", "print_school_name_at": "footer_left" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "Lakefield College School · ICS3U" } },
-        { "name": "both at the top", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School", "print_course_code_at": "header_left" }, "expect": { "topLeft": "Lakefield College School · ICS3U", "topRight": "Name ________________________     Date ____________", "bottomLeft": "" } },
-        { "name": "neither printed", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School", "print_school_name_at": "none", "print_course_code_at": "none" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "" } },
+        { "name": "a school name", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Juniper Hollow Collegiate" }, "expect": { "topLeft": "Juniper Hollow Collegiate", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
+        { "name": "both at the bottom", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Juniper Hollow Collegiate", "print_school_name_at": "footer_left" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "Juniper Hollow Collegiate · ICS3U" } },
+        { "name": "both at the top", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Juniper Hollow Collegiate", "print_course_code_at": "header_left" }, "expect": { "topLeft": "Juniper Hollow Collegiate · ICS3U", "topRight": "Name ________________________     Date ____________", "bottomLeft": "" } },
+        { "name": "neither printed", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Juniper Hollow Collegiate", "print_school_name_at": "none", "print_course_code_at": "none" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "" } },
         { "name": "no blanks", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_blanks": [] }, "expect": { "topLeft": "", "topRight": "", "bottomLeft": "ICS3U" } },
         { "name": "blanks of null are the default", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_blanks": null }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" }, "why": "The build reads a null print_blanks as absent (print_settings._blanks), so the paper prints Name and Date; an app reading it as no blanks draws a sketch the paper contradicts (Windows #496's plan review H3, 2026-10-15). An empty list is no blanks; null is not a list." },
         { "name": "blanks in any order, an unknown one and a repeat", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_blanks": ["class_number", "name", "seat", "name"] }, "expect": { "topLeft": "", "topRight": "Name ________________________     Class # ______", "bottomLeft": "ICS3U" } },
@@ -28521,7 +28473,7 @@
         { "name": "a course kept for reference prints the code a teacher reads", "folder": "ICS4U-2025", "settings": { "course_code": "ICS4U", "kept_for_reference": true }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS4U" } },
         { "name": "a course code in small letters prints in capitals", "folder": "ics3u", "settings": {}, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
         { "name": "a school name of only spaces is none", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "   " }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
-        { "name": "an unknown place is the default place", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield", "print_school_name_at": "top", "print_course_code_at": 7 }, "expect": { "topLeft": "Lakefield", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } }
+        { "name": "an unknown place is the default place", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Juniper", "print_school_name_at": "top", "print_course_code_at": 7 }, "expect": { "topLeft": "Juniper", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } }
       ]
     },
     "pageLabels": {
@@ -28571,7 +28523,7 @@
         { "title": "MVVM Review", "settingsText": "ICS3U", "part": "questions", "footer": "MVVM Review · ICS3U" },
         { "title": "MVVM Review", "settingsText": "ICS3U", "part": "answers", "footer": "MVVM Review — Answers · ICS3U" },
         { "title": "MVVM Review", "settingsText": "", "part": "questions", "footer": "MVVM Review" },
-        { "title": "", "settingsText": "Lakefield College School · ICS3U", "part": "answers", "footer": "Lakefield College School · ICS3U" },
+        { "title": "", "settingsText": "Juniper Hollow Collegiate · ICS3U", "part": "answers", "footer": "Juniper Hollow Collegiate · ICS3U" },
         { "title": "  ", "settingsText": "", "part": "questions", "footer": "" }
       ]
     },
@@ -40941,16 +40893,16 @@
           {
             "code": "MPM2D",
             "year": 2026,
-            "surname": "gordon",
+            "surname": "quillfeather",
             "suffix": "k3x9qa8m",
-            "name": "mpm2d-plans-2026-27-gordon-k3x9qa8m"
+            "name": "mpm2d-plans-2026-27-quillfeather-k3x9qa8m"
           },
           {
             "code": "AP CALC",
             "year": 2026,
-            "surname": "gordon",
+            "surname": "quillfeather",
             "suffix": "abcd1234",
-            "name": "ap-calc-plans-2026-27-gordon-abcd1234"
+            "name": "ap-calc-plans-2026-27-quillfeather-abcd1234"
           },
           {
             "code": "ICS3U",
@@ -40969,7 +40921,7 @@
           {
             "code": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP",
             "year": 2026,
-            "surname": "gordon",
+            "surname": "quillfeather",
             "suffix": "q1w2e3r4",
             "name": "abcdefghijklmnopqrstuvwxyzabcdefghi-plans-2026-27-q1w2e3r4"
           },
@@ -42472,6 +42424,44 @@
       "An assistant tool: adding a tool is a routing change, and this is one button.",
       "A separate, differently named menu item for the folder: Russell ruled one Open in Browser for both (2026-11-13).",
       "URLProtocol (serves only the app's own web views), SwiftNIO (a dependency for about 400 lines), and NetworkListener behind #available (macOS 26 only, two code paths)."
+    ]
+  },
+  "colourSchemePicker": {
+    "why": "#891 (v2.0.0, Russell 2026-11-13): the colour scheme that was stored under an id naming one school is KEPT and offered to everyone as “Grove Colours”. A course that already uses it must look exactly the same, and neither opening its settings nor re-running the command-line set-up may rewrite its colours. So support/colour_schemes.json holds TWO entries with the same name and colours: `grove-colours`, listed, which every new pick writes, and the old entry under its old id, marked `\"listed\": false` with `\"sameAs\": \"grove-colours\"`. Every reader that looks a scheme up by id (the build's website colours, the sharing card, the Coverage tab, the command-line picker's starting place) finds either id exactly as it did before, with no change to any of them. Only the PICKERS filter the list.",
+    "rule": "A picker for one section lists the schemes in the file's order: every listed scheme, and an unlisted scheme only when it is that section's own stored scheme. When it is, it takes the place of the listed scheme its `sameAs` names, so the name appears once and the section's own id is the one selected. Showing the list writes nothing. Picking the unlisted scheme again keeps its id; picking any other scheme writes that scheme's id.",
+    "data": "support/colour_schemes.json: an entry with no `listed` key is listed. An unlisted entry's `name` and `colors` equal those of the entry its `sameAs` names, pinned by scripts/test_grove_colours.py, so the two cannot drift apart.",
+    "cases": [
+      {
+        "name": "a section on the standard colours is offered every listed scheme",
+        "sectionScheme": "quartz-standard",
+        "selected": "quartz-standard"
+      },
+      {
+        "name": "a section that chose Grove Colours under its new id is offered every listed scheme",
+        "sectionScheme": "grove-colours",
+        "selected": "grove-colours"
+      },
+      {
+        "name": "a section stored under Grove Colours' old id sees Grove Colours once, in its place, selected",
+        "sectionSchemeIsTheUnlistedTwinOf": "grove-colours",
+        "twinTakesThePlaceOf": "grove-colours"
+      },
+      {
+        "name": "a section with no scheme chosen is offered every listed scheme",
+        "sectionScheme": "",
+        "selected": ""
+      },
+      {
+        "name": "a section whose stored id is in no entry is offered every listed scheme",
+        "sectionScheme": "a-scheme-that-is-not-in-the-file",
+        "selected": "a-scheme-that-is-not-in-the-file"
+      }
+    ],
+    "caseShape": "`sectionScheme` is the stored id; `sectionSchemeIsTheUnlistedTwinOf` instead names a listed id, and the stored id is the unlisted entry whose `sameAs` is that id (so the old id is written in one shipped file, the scheme list, and not here). The expected list is every listed scheme in file order, with the twin in the place of `twinTakesThePlaceOf` when that is given. `selected` is the id the picker shows chosen; for a twin case it is the twin's own id. In every case each scheme name appears at most once.",
+    "rejected": [
+      "Deleting the old entry: measured on a copy, the build, the sharing card and the Coverage tab then drew the default colours (False, False, False), and the command-line picker started at the first scheme, so Enter wrote quartz-standard.",
+      "Keeping only the old id and renaming it: every new course that picked Grove Colours would write the school's name into its settings.",
+      "One entry with the new id and a list of former ids read by every lookup: six readers on two platforms must agree, and a Windows build carrying the new scheme list before its code matched a former id would show the first scheme as chosen and write quartz-standard at the next touch. With two entries a lagging app can only show the name twice."
     ]
   }
 }

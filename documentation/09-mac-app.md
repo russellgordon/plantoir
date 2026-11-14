@@ -8798,7 +8798,7 @@ BC code no) and follows the code until the teacher touches it. Ticking it:
   noun `meeting`. A field moves only while it still holds the OTHER choice's
   word, so typing survives the box going off and on; the class folder keeps its
   place in the per-section list. Every curriculum folder leaves the shared
-  folders (and the LCS switch cannot bring one back while ticked).
+  folders.
 - gives up a skeleton already adopted for the code (CODING has adopted the
   general one by the time the box ticks itself) and makes adoption a no-op —
   `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` answers
@@ -10169,6 +10169,8 @@ other import ends in — so the marker, the neutralisation, the fifteen deploy
 refusals and the lock all apply unchanged. The rule itself is data:
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses.importing.olderLayout`, run by `OlderLayoutImportTests`.
+
+(The paths in this section are the real ones measured on this Mac and are kept as a record. Since #891 the contract's cases use invented names for the same shapes: `JHC/2024-25` and `ICD2O-JHC-MWPS-Collaboration`.)
 
 **What the real folders are**, measured read-only under
 `~/Library/Mobile Documents/com~apple~CloudDocs/Documents/LCS/2023-24/`:

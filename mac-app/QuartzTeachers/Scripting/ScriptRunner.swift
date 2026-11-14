@@ -1092,8 +1092,8 @@ class ScriptRunner {
     /// Splits a question into the wording to show and the default answer
     /// to offer, when the script named one in square brackets.
     ///
-    /// "Enter Netlify site name [ics3u-s3-2026-gordon]:" becomes
-    /// "Enter Netlify site name:" with "ics3u-s3-2026-gordon" waiting in
+    /// "Enter Netlify site name [ics3u-s3-2026-quillfeather]:" becomes
+    /// "Enter Netlify site name:" with "ics3u-s3-2026-quillfeather" waiting in
     /// the answer field, ready to accept or type over. That reads as a
     /// filled-in form rather than as instructions to follow.
     static func separateDefaultAnswer(from question: String) -> AskedQuestion {

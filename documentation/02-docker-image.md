@@ -242,7 +242,7 @@ The image is layered as follows (in order):
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
      formal and short names, so the wizard can auto-fill "ICS3U →
      Introduction to Computer Science, Grade 11".
-   - `colour_schemes.json` — 43 named colour schemes (a Quartz default, a
+   - `colour_schemes.json` — 43 named colour schemes (44 entries: Grove Colours is also kept under its older id, unlisted, #891) (a Quartz default, a
      dozen designed palettes, and one per MLB team), each defining the nine
      Quartz theme colours for light and dark mode.
    - `locales/` — all 27 Quartz locale files with teacher-oriented wording

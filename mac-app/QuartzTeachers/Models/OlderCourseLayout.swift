@@ -403,7 +403,7 @@ nonisolated enum OlderCourseLayout {
     /// Both conditions, because each alone admits a real folder that is not
     /// a class: the course folder above (`ICS3U/`) has `Thread N` folders of
     /// planning — subfolders, 0 pages directly inside — and no `.obsidian`;
-    /// `ICD2O-LCS-LDPS-Collaboration` has `.obsidian` and no `Thread N`.
+    /// `ICD2O-JHC-MWPS-Collaboration` has `.obsidian` and no `Thread N`.
     static func isOlderClassFolder(_ folderURL: URL) -> Bool {
         guard OlderCourseLayout.kind(of: folderURL) == S_IFDIR else {
             return false

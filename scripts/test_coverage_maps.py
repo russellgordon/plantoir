@@ -115,7 +115,7 @@ GOLDEN = {
         'backlinks': 'export default (() => {\n  function Backlinks() {\n    // CQ4T-STRUCTURAL-ANCHOR: do not remove; build_site.py rewrites this line\n    const structural = new Set<string>(["Curriculum Coverage", "Curriculum-Coverage", "Curriculum", "Curriculum"])\n    return null\n  }\n})\n',
         'sidebar': ['Private', 'Media', 'Curriculum Coverage.md'],
     },
-    'lcs': {
+    'two_curricula': {
         'page': '---\ntitle: Curriculum Coverage\npublish: true\ncreated: 2026-09-03T08:45:00.000-0400\nenableToc: true\n---\nEvery expectation in ICS3U, coloured by how many pages address it.\nThe map is built from this site\'s own links each time the site is built, so\nit cannot drift from the course.\n\n<div class="coverage-panel">\n<div class="coverage-map"><div class="coverage-strand"><div class="coverage-letter">A</div><div class="coverage-chips"><a class="internal coverage-chip coverage-chip-no" href="Ontario-Curriculum/A1.-Understanding">A1</a><a class="internal coverage-chip coverage-chip-yes" href="Ontario-Curriculum/A2.-Tools">A2</a></div><a class="internal coverage-cell coverage-1" href="Ontario-Curriculum/A1.1" aria-label="A1.1, addressed once"><span class="coverage-code">A1.1</span></a><a class="internal coverage-cell coverage-0" href="Ontario-Curriculum/A1.2" aria-label="A1.2, not yet addressed"><span class="coverage-code">A1.2</span></a><a class="internal coverage-cell coverage-1" href="Ontario-Curriculum/A2.1" data-assessed="true" aria-label="A2.1, addressed once, included in assessed work"><span class="coverage-code">A2.1</span></a></div><div class="coverage-strand"><div class="coverage-letter">B</div><div class="coverage-chips"><a class="internal coverage-chip coverage-chip-no" href="Ontario-Curriculum/B1.-Systems">B1</a></div><a class="internal coverage-cell coverage-0" href="Ontario-Curriculum/B1.1" aria-label="B1.1, not yet addressed"><span class="coverage-code">B1.1</span></a></div></div>\n<hr class="coverage-rule">\n<div class="coverage-legend">\n<div class="coverage-legend-row"><span class="coverage-key coverage-0"></span><span class="coverage-legend-label">Not yet addressed</span></div>\n<div class="coverage-legend-row"><span class="coverage-key coverage-1"></span><span class="coverage-legend-label">Addressed once</span></div>\n<div class="coverage-legend-row"><span class="coverage-key coverage-2"></span><span class="coverage-legend-label">Addressed twice</span></div>\n<div class="coverage-legend-row"><span class="coverage-key coverage-3"></span><span class="coverage-legend-label">Addressed three times</span></div>\n<div class="coverage-legend-row"><span class="coverage-key coverage-4"></span><span class="coverage-legend-label">Addressed four or more times</span></div>\n<div class="coverage-legend-row"><span class="coverage-key coverage-2" data-assessed="true"></span><span class="coverage-legend-label">Included in assessed work — the cell carries a ring</span></div>\n</div>\n</div>\n\nHover any cell to preview the expectation. The row of small chips under\neach strand letter is that strand\'s overall expectations: green when\nassessed work addresses them, red when nothing marked does.\n\n## Where this course stands\n\n| | |\n| --- | --- |\n| Specific expectations | 4 |\n| Not yet addressed | 2 |\n| Addressed by exactly one page | 2 |\n| Overall expectations with no assessed work | 2 |\n\n## What counts\n\nA page addresses an expectation when it **transcludes** it — when the\nexpectation\'s own wording appears on the page, under a *Curriculum\nconnection* heading. That is the deliberate form.\n\nA passing mention in prose does not count. A concept page can discuss an\nidea, and even link to the expectation behind it in a sentence, without\nclaiming to have addressed it — which is why the number here is usually\nlower than the backlinks count on the expectation\'s own page, and why it\nmeans more. If a page genuinely covers an expectation, put it in that\npage\'s *Curriculum connection* rather than leaving it as a mention.\n\n**Only pages this course teaches count.** The page carrying the\nconnection has to be reachable from a class page — linked from one\ndirectly, or from a page a class page links to. A page written in August\nand never put into a class has addressed nothing yet, and a page reached\nonly from Key Links is a reference, not a lesson.\n\n**Only published pages count.** A page marked `publish: false` is not on\nthe site yet, so it cannot have addressed anything — next week\'s lesson,\nwritten early, leaves the map exactly where it was until the day it is\npublished.\n\nAn expectation counts as **assessed** when one of those pages is in a\nfolder that counts for marks — **Tasks** for this course, which you\ncan change in Settings. Ontario asks that every overall expectation be\nevaluated for marks at least once; the chips under each strand letter\nanswer that, and the ring on a cell shows which specific expectations carry\nassessed work.\n\n## Reading it honestly\n\nRed is not failure — in September everything is red, and that is what the\nfirst months of a course look like. What matters is the direction of\ntravel, and whether anything is still red in May.\n\nA strand of red in the skills strand usually means something different:\nthose expectations are being met in every investigation without being\ncited by code. If that is the case here, it is worth citing a few of them\nwhere they genuinely apply rather than leaving the record silent.\n',
         'keyLinks': '---\ntitle: Key Links\n---\n- [[Ontario Curriculum/index|Curriculum expectations]]\n- [[Curriculum Coverage]]\n- [[College Board Curriculum/index|College Board Curriculum]]\n- [[Course Outline]]\n',
         'backlinks': 'export default (() => {\n  function Backlinks() {\n    // CQ4T-STRUCTURAL-ANCHOR: do not remove; build_site.py rewrites this line\n    const structural = new Set<string>(["Curriculum Coverage", "Curriculum-Coverage", "Ontario Curriculum", "Ontario-Curriculum"])\n    return null\n  }\n})\n',
@@ -384,7 +384,8 @@ class TwoMaps(unittest.TestCase):
 
 class OneMapIsUnchanged(unittest.TestCase):
     """T5: byte for byte what origin/dev wrote, for a Curriculum/ course and for
-    the LCS default (Ontario with pages, College Board empty, nothing declared)."""
+    a course with two curriculum folders (Ontario with pages, College Board
+    empty, nothing declared), the shape the wizard offered before 2.0.0."""
 
     def run_fixture(self, folder, second, configured, board_pages=()):
         with tempfile.TemporaryDirectory() as temp:
@@ -409,23 +410,23 @@ class OneMapIsUnchanged(unittest.TestCase):
     def test_a_curriculum_folder_course(self):
         self.assertEqual(self.run_fixture("Curriculum", None, ["Curriculum"]), GOLDEN["single"])
 
-    def test_the_lcs_default(self):
+    def test_a_two_curricula_course(self):
         self.assertEqual(self.run_fixture("Ontario Curriculum", "College Board Curriculum", []),
-                         GOLDEN["lcs"])
+                         GOLDEN["two_curricula"])
 
-    def test_the_lcs_default_with_college_board_pages_and_nothing_declared(self):
+    def test_a_two_curricula_course_with_college_board_pages_and_nothing_declared(self):
         # The #128 review's finding 1: College Board sorts first, and its `1.A`
         # pages are expectations now — the undeclared fallback must still pick
         # Ontario's letter-first pages, byte for byte what 92a7099a built.
         def with_board_pages(folder, second, configured):
             return self.run_fixture(folder, second, configured, board_pages=["1.A", "1.B"])
         self.assertEqual(with_board_pages("Ontario Curriculum", "College Board Curriculum", []),
-                         GOLDEN["lcs"])
+                         GOLDEN["two_curricula"])
 
-    def test_the_lcs_default_declared_in_the_order_the_apps_write(self):
+    def test_a_two_curricula_course_declared_in_the_order_the_apps_write(self):
         self.assertEqual(self.run_fixture("Ontario Curriculum", "College Board Curriculum",
                                           ["Ontario Curriculum", "College Board Curriculum"]),
-                         GOLDEN["lcs"])
+                         GOLDEN["two_curricula"])
 
 
 class NestedAndRepeated(unittest.TestCase):
