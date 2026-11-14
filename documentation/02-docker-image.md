@@ -237,6 +237,27 @@ The image is layered as follows (in order):
    neither baked nor mounted. It needs no Docker, so Windows'
    `PythonToolchainTests` runs it as well, and `verify.sh` runs it before the
    image build.
+
+   **Run directly on a Mac, the image's tests say so (#907).** Seven of those
+   tests need python-frontmatter (and the PyYAML it reads with), which a Mac's
+   own Python lacks: measured 2026-11-13 on Homebrew Python 3.14, two stopped
+   with `ModuleNotFoundError` and five ran with dozens of wrong counts,
+   because `build_site.py` reads pages without frontmatter when the module is
+   missing; all seven passed in a venv that has both. Each now opens with the
+   same block, between `# ---- runs in the image (#907) ----` and its end
+   marker: on a Mac (`sys.platform == "darwin"`) without the module it prints
+   one line naming the module and `verify.sh` and exits 77, the code
+   test harnesses use for "not run here", so a caller can tell it from a
+   failure (1). Anywhere else the block does nothing: in the image a missing
+   module is a fault in the image, and on Windows, whose fetched runtime
+   carries the modules, `PythonToolchainTests` must keep reading one as a
+   failure. `verify.sh` runs the seven only in the image and reads any exit
+   but 0 as a FAIL, 77 included. `scripts/test_image_only_tests_say_so.py`
+   holds the list, checks the block is the same in all seven and comes before
+   their imports, and runs it with the modules kept from the child. Rejected:
+   one shared guard module, which every one of the seven image runs would
+   then have to mount (or the Dockerfile bake, shipping test code); and
+   skipping the seven by name on a Mac, which a Windows run would inherit.
 10. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to

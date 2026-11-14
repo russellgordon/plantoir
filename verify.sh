@@ -675,6 +675,17 @@ else
   cat /tmp/verify_swift_windows_test.log
 fi
 
+# The seven shared tests this run takes into the image because they need
+# python-frontmatter say so when run directly on a Mac without it (#907): one
+# line and exit 77, while in the image and on Windows a missing module stays a
+# failure. Read here, on the host, with the modules kept from the child.
+if (cd scripts && python3 test_image_only_tests_say_so.py) >/tmp/verify_image_only_tests_say_so.log 2>&1; then
+  pass "the shared tests that need python-frontmatter open with one block: on a Mac without it, one line naming the module and verify.sh, exit 77; anywhere else a missing module stays a failure (scripts/test_image_only_tests_say_so.py, #907)"
+else
+  fail "a shared test that needs python-frontmatter does not say so on a Mac, or turns a missing module into something other than a failure elsewhere (scripts/test_image_only_tests_say_so.py, #907)"
+  cat /tmp/verify_image_only_tests_say_so.log
+fi
+
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
