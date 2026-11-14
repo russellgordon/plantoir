@@ -13288,13 +13288,18 @@ first too. Found by the shelf plan's review (B-H1), read and not measured then.
 **What it does now** (`Plantoir.Core/Models/StagedRestore.cs`, used by
 `RestoreBackup`, `RestoreSection` and `Restore` from Archived):
 
-1. The zip is unpacked into a hidden sibling of the course,
-   `courses\.plantoir-restoring-<FOLDER>-<pid>-<8 hex>\incoming\`. A sibling is
-   on the course's own volume, so every move after this is a rename, which
-   happens whole or not at all. The dot keeps it out of
-   `Workspace.DiscoverCourses`, the builds and Obsidian; the prefix is not
-   `ReferenceStaging.Prefix` (`.plantoir-importing-`), so neither sweep takes
-   the other's folder.
+1. The zip is unpacked into
+   `courses\.internal\restoring\<FOLDER>-<pid>-<8 hex>\incoming\`, where the
+   mac's one-section restore stages too (`course-management.json` →
+   `backups.restoreOneSection.filesOutsideTheSectionWhy`: "courses/.internal/
+   restoring/<id>/", the same volume). It is beside the course, so every move
+   after this is a rename, which happens whole or not at all, and inside a
+   dot folder, so `Workspace.DiscoverCourses`, the builds and Obsidian never
+   take it for a course. A restore that worked removes `restoring` and
+   `.internal` again when it leaves them empty (non-recursively, so a lease
+   written meanwhile is never taken). (The first version of this piece used
+   `courses\.plantoir-restoring-…`; it moved when #897 C's contract named the
+   place, 2026-11-14.)
 2. Checked: as many files on disk as the zip has file entries, and as many
    bytes. Counted, not looked up by name, because .NET writes an entry whose
    name Windows cannot hold (a Mac's `?` or `"`) with `_` in its place; a
@@ -13325,11 +13330,31 @@ first too. Found by the shelf plan's review (B-H1), read and not measured then.
    whose owner is no longer running (`WorkLease.OwnerIsAlive`; another window,
    `plantoir-mcp` or a restore still running is left alone): nothing aside,
    removed; `aside` or `in`, the old contents put back, then removed; `done`,
-   finished (old contents removed, the built sites discarded). Anything it
-   cannot make sense of is LEFT IN PLACE (litter, never loss), and an entry in
-   the course it did not put there is moved into `displaced\`, never deleted.
-   It writes a diagnostic line, not a trail line: no event names it (a
-   proposal in #873's closing comment).
+   finished (old contents removed, the built sites discarded). A folder with
+   no journal is NOT ours (a mac's staging folder, synced: two UUID folders,
+   the set-aside one holding the section's files directly) and is never
+   touched unless it is empty. Anything it cannot make sense of is LEFT IN
+   PLACE (litter, never loss), and an entry in the course it did not put
+   there is moved into `displaced\`, never deleted. When an in-process
+   putting back has run, the journal is rewritten to `aside` before anything
+   comes back, so a later recovery never reads "a name the zip had is the
+   zip's file" over an original already back: the first version did, and
+   would have deleted that original (found on re-reading, pinned by
+   `AWayBackThatDidNotFinishIsPutBackByTheNextLaunchWithoutLosingAnOriginal`,
+   red with the rewrite removed). It writes a diagnostic line, not a trail
+   line: no event names it (a proposal in #873's closing comment).
+
+   **A one-section restore whose way back did not finish** follows the
+   contract instead (`backups.restoreOneSection`, the mac's #897 C): the
+   set-aside files move to `courses\_backups\<CODE>\Section N before a restore
+   <stamp>` (or stay in the staging folder, said by that path, when the move
+   fails), the journal is marked `kept` so no launch touches them, `section
+   restore stopped part way` is written (`ActivityTrail`), and the assistant
+   window says `wording.stoppedPartWay` (or `stoppedPartWayNothingToOpen`)
+   WITHOUT its "Nothing was put back:" prefix
+   (`AssistSectionRestore.StoppedPartWay`; `StagedRestoreTrailTests`). A whole
+   course has no such sentence yet (#909), so it keeps the first failure's
+   dialog and the next launch's putting back.
 6. The reference lock is taken off before the swap and put back afterwards,
    whichever way it ended, asked of the settings as they then are. The record
    of a stopped rename of the unit word is cleared only once the course IS
@@ -13404,7 +13429,7 @@ letter, not touched):
   freshly written file on C:): 2 ms for 1 MB, 37 ms for 50 MB, 379 ms for
   470 MB, the size of a real course's backup with its Media.
 
-**Tests**: `StagedRestoreTests` (19). Red on the old code by copy-aside (the
+**Tests**: `StagedRestoreTests` (24) and `StagedRestoreTrailTests` (3). Red on the old code by copy-aside (the
 old `CourseRestorer.cs`, `CourseArchiver.cs` and `WorkspaceViewModel.cs` put
 in place, the tests that use only the public restore compiled against them):
 5 of 5 failed: a held file in the course, a held file in a section, the
@@ -13426,6 +13451,25 @@ for the recovery (the contract names none; proposed, not built).
 call, a kill leaves the backup's contents in place and the next launch
 finishes them, but no "course restored" line is written, and a section restore
 may not have put back the shared pages' keys. Recorded, not fixed.
+
+**Two questions from the mac's pieces, answered for Windows** (2026-11-14):
+- **#908 (a link loop hangs the whole backup on the mac).** Not on Windows,
+  measured: `ZipFolder` never descends a folder that is a reparse point, so
+  two junctions into each other are left out of the zip and the backup and
+  the restore both finish
+  (`TwoJunctionsIntoEachOtherNeitherHangTheBackupNorTheRestore`). The restore
+  never walks into a link either: the swap renames a link as a link, the
+  delete removes a link as a link, the cross-volume copy refuses one. The
+  other side of the same rule: a FOLDER link's contents are never in a
+  Windows backup (the mac's `zip -r` follows it), while a FILE link is read
+  through (`CreateEntryFromFile`), and an empty folder is not in a Windows
+  zip at all. Written down, not changed.
+- **#912 (small backups, `<name>_shared-media.zip`).** A small backup cannot
+  reach this restore: `BackupItem.From` refuses every `_shared-media` name,
+  so it is never listed or handed over, which is what #912 asks of Windows
+  until it can put the Media back. The restore does not check the
+  `.plantoir-backup.json` marker yet (#912's item 5 owes every unpack door
+  that check, with its sentence).
 
 ### The kept copies of geogebra.org sketches survive a restore and follow a rename (#805)
 

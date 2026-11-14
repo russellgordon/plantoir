@@ -243,6 +243,13 @@ public sealed partial class AssistWindow : Window
             notPutBack = AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
                                          Workspace.CoursesDirectory(_folder));
         }
+        catch (AssistSectionRestore.StoppedPartWay stopped)
+        {
+            // Something WAS changed, so "Nothing was put back:" would not be
+            // true (#873; the mac's window says it the same way).
+            Say("Assistant", stopped.Message);
+            return;
+        }
         catch (Exception error)
         {
             Say("Assistant", "Nothing was put back: " + error.Message);

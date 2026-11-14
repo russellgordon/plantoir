@@ -19,18 +19,20 @@ namespace Plantoir.Core.Models;
 /// move below is a rename, which either happens whole or not at all.</para>
 ///
 /// <para><b>The folder, and what the next launch does with it.</b>
-/// <c>courses\.plantoir-restoring-&lt;FOLDER&gt;-&lt;pid&gt;-&lt;8 hex&gt;</c>: a dot
-/// name, so <c>Workspace.DiscoverCourses</c>, the builds and Obsidian's file
-/// list never take it for a course, and a prefix nothing else uses
-/// (<see cref="ReferenceStaging.Prefix"/> is <c>.plantoir-importing-</c>).
-/// Inside it: <c>owner</c> (the process, as a lease body says it),
+/// <c>courses\.internal\restoring\&lt;FOLDER&gt;-&lt;pid&gt;-&lt;8 hex&gt;</c>: where
+/// the mac's one-section restore stages too (<c>course-management.json</c> →
+/// <c>backups.restoreOneSection.filesOutsideTheSectionWhy</c>, "courses/.internal/
+/// restoring/&lt;id&gt;/"), inside a dot folder, so <c>Workspace.DiscoverCourses</c>,
+/// the builds and Obsidian's file list never take it for a course. Inside it: <c>owner</c> (the process, as a lease body says it),
 /// <c>journal</c> (which step it reached), <c>incoming\</c> (the unpacked zip)
 /// and <c>aside\</c> (the course's own contents while the swap runs).
 /// <see cref="RecoverLeftovers"/> runs before the courses are listed and acts
-/// only on a folder whose owner is no longer alive: before the swap, or during
-/// it, it puts the old contents back and removes the folder; after the swap it
-/// finishes it (removes the old contents, discards the stale build). A folder it
-/// cannot make sense of is left where it is: litter, never loss.</para>
+/// only on a folder whose owner is no longer alive and that carries this
+/// code's journal (a mac's staging folder has none, and is never touched):
+/// before the swap, or during it, it puts the old contents back and removes
+/// the folder; after the swap it finishes it (removes the old contents,
+/// discards the stale build). A folder it cannot make sense of is left where
+/// it is: litter, never loss.</para>
 ///
 /// <para><b>The order of the swap</b>: every child of the live folder is
 /// renamed into <c>aside\</c>, then every child of the backup into the live
@@ -40,7 +42,9 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public static class StagedRestore
 {
-    public const string Prefix = ".plantoir-restoring-";
+    /// <summary>The folder every restore stages in, under <c>courses\</c>.</summary>
+    public static string RestoringDirectory(string coursesDirectory) =>
+        System.IO.Path.Combine(coursesDirectory, ".internal", "restoring");
 
     internal const string JournalName = "journal";
     internal const string OwnerName = "owner";
@@ -61,6 +65,8 @@ public static class StagedRestore
         public const string In = "in";
         /// <summary>The swap is complete; what is aside is the superseded course.</summary>
         public const string Done = "done";
+        /// <summary>A section's way back did not finish and what was aside was kept where a teacher can open it: never touched again.</summary>
+        public const string Kept = "kept";
     }
 
     /// <summary>
@@ -76,6 +82,9 @@ public static class StagedRestore
         /// <summary>A rename, or across volumes a copy that undoes itself when it cannot finish.</summary>
         public virtual void Move(string source, string target) => MoveEntry(source, target);
 
+        /// <summary>A move of putting back; a test fails it to make the way back not finish.</summary>
+        public virtual void MoveBack(string source, string target) => MoveEntry(source, target);
+
         public virtual void AfterStep(string phase, int movesSoFar) { }
 
         public virtual void Unpack(string archivePath, string into) => ZipFile.ExtractToDirectory(archivePath, into);
@@ -83,6 +92,13 @@ public static class StagedRestore
 
     /// <summary>Thrown only by a test's <see cref="Steps"/>: leaves the disk exactly as a kill would.</summary>
     internal sealed class StopHereForATest() : Exception("stopped where a kill would");
+
+    /// <summary>
+    /// A move failed AND putting everything back did not finish, so what is
+    /// aside holds things the live folder no longer has (the mac's
+    /// <c>WayBackDidNotFinish</c>). Carries the first failure.
+    /// </summary>
+    internal sealed class WayBackDidNotFinish(Exception first) : Exception(first.Message, first);
 
     /// <summary>One restore's hidden folder, made beside the course.</summary>
     internal sealed class Staging
@@ -103,9 +119,8 @@ public static class StagedRestore
 
         public static Staging Make(string coursesDirectory, string folderName)
         {
-            Directory.CreateDirectory(coursesDirectory);
-            string name = $"{Prefix}{folderName}-{Environment.ProcessId}-{Guid.NewGuid().ToString("N")[..8]}";
-            string path = System.IO.Path.Combine(coursesDirectory, name);
+            string name = $"{folderName}-{Environment.ProcessId}-{Guid.NewGuid().ToString("N")[..8]}";
+            string path = System.IO.Path.Combine(RestoringDirectory(coursesDirectory), name);
             Directory.CreateDirectory(path);
             var staging = new Staging(coursesDirectory, path);
             WriteDurably(System.IO.Path.Combine(path, OwnerName), WorkLease.LeaseBody(withStart: true));
@@ -128,12 +143,7 @@ public static class StagedRestore
         }
 
         /// <summary>Removes the folder; false when some of it would not go (left for the next launch).</summary>
-        public bool TryRemove()
-        {
-            try { CourseRestorer.DeleteTree(Path); }
-            catch { }
-            return !Directory.Exists(Path);
-        }
+        public bool TryRemove() => RemoveStaging(Path);
     }
 
     // ---- Unpacking and checking ------------------------------------------
@@ -269,11 +279,15 @@ public static class StagedRestore
             steps.AfterStep(Phase.Done, moves);
         }
         catch (StopHereForATest) { throw; }
-        catch
+        catch (Exception first)
         {
             bool whole = PutBack(staging, live, payload, movedIn, steps);
-            if (whole) staging.TryRemove();
-            throw;
+            if (whole)
+            {
+                staging.TryRemove();
+                throw;
+            }
+            throw new WayBackDidNotFinish(first);
         }
     }
 
@@ -304,6 +318,14 @@ public static class StagedRestore
                 catch { whole = false; }
             }
         }
+        // Nothing from the zip is left in the live folder (or what is left will
+        // be displaced below): from here a leftover must never be read as
+        // "names the journal lists as incoming came from the zip", because an
+        // original of the same name may already be back.
+        if (Directory.Exists(staging.Path))
+        {
+            try { staging.Record(Phase.Aside, live); } catch { }
+        }
 
         if (!Directory.Exists(staging.Aside)) return whole;
         foreach (string child in Directory.EnumerateFileSystemEntries(staging.Aside).ToList())
@@ -319,11 +341,77 @@ public static class StagedRestore
                     MoveEntry(there, System.IO.Path.Combine(displaced, name));
                     whole = false;
                 }
-                MoveEntry(child, there);
+                steps.MoveBack(child, there);
             }
             catch { whole = false; }
         }
         return whole;
+    }
+
+    // ---- A section whose way back did not finish (#897 C's rule) -----------
+
+    /// <summary>Where a stopped section restore kept what it set aside, and whether a teacher would find anything there.</summary>
+    /// <param name="Path">A path inside the working folder.</param>
+    internal sealed record SetAsideFiles(string Path, bool HoldsSomethingToOpen)
+    {
+        /// <summary>The path the teacher is told, or null when there is nothing there to open.</summary>
+        public string? PathToSay => HoldsSomethingToOpen ? Path : null;
+    }
+
+    /// <summary>
+    /// What a one-section restore does when putting back did not finish, by
+    /// the contract (<c>course-management.json</c> →
+    /// <c>backups.restoreOneSection.filesOutsideTheSectionWhy</c>; the mac's
+    /// <c>keepTheSetAsideFiles</c>): nothing is deleted; the set-aside files
+    /// move to <c>courses\_backups\&lt;CODE&gt;\Section N before a restore
+    /// &lt;stamp&gt;</c>, a folder File Explorer shows on the same volume, where
+    /// nothing reads a FOLDER (the backup and archive lists read zip names
+    /// only). When that move fails they stay in the staging folder and that
+    /// path is said. The journal is marked <see cref="Phase.Kept"/>, so the next
+    /// launch never touches them, and <c>section restore stopped part way</c>
+    /// is written with the course, the section and that path.
+    /// </summary>
+    internal static SetAsideFiles KeepTheSetAsideFiles(Staging staging, int sectionNumber, string courseCode)
+    {
+        string coursesDirectory = staging.CoursesDirectory;
+        string workingFolder = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(coursesDirectory)
+            .TrimEnd(System.IO.Path.DirectorySeparatorChar)) ?? coursesDirectory;
+        string kept = staging.Aside;
+        try
+        {
+            string shelf = CourseArchiver.BackupsDirectory(coursesDirectory, courseCode);
+            Directory.CreateDirectory(shelf);
+            // No comma: the sentence that names it puts punctuation after it.
+            string name = $"Section {sectionNumber} before a restore " +
+                          DateTime.Now.ToString(ArchivedItem.StampFormat, System.Globalization.CultureInfo.InvariantCulture);
+            string destination = System.IO.Path.Combine(shelf, name);
+            MoveEntry(staging.Aside, destination);
+            kept = destination;
+        }
+        catch { kept = staging.Aside; }
+        try { staging.Record(Phase.Kept, live: null); } catch { }
+        if (kept != staging.Aside && !Directory.Exists(System.IO.Path.Combine(staging.Path, DisplacedName)))
+            staging.TryRemove();
+
+        string keptAt = System.IO.Path.GetRelativePath(workingFolder, kept);
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.SectionRestoreStoppedPartWay,
+            Plantoir.Core.Scripting.ActivityTrail.SectionRestoreStoppedPartWayLine(keptAt), courseCode, sectionNumber);
+        return new SetAsideFiles(keptAt, HoldsAFileExplorerShows(kept));
+    }
+
+    /// <summary>Whether a folder holds a file whose path inside it has no part starting with a dot.</summary>
+    private static bool HoldsAFileExplorerShows(string folder)
+    {
+        try
+        {
+            foreach (string file in Directory.EnumerateFiles(folder, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0 }))
+            {
+                string relative = System.IO.Path.GetRelativePath(folder, file);
+                if (!relative.Split(System.IO.Path.DirectorySeparatorChar).Any(part => part.StartsWith('.'))) return true;
+            }
+        }
+        catch { return true; }   // cannot tell: say where it is
+        return false;
     }
 
     // ---- What the next launch does with a leftover ----------------------
@@ -332,11 +420,12 @@ public static class StagedRestore
     public enum Recovery { PutBack, Finished, Removed, LeftInPlace }
 
     /// <summary>
-    /// Every <c>.plantoir-restoring-*</c> folder of <paramref name="coursesDirectory"/>
-    /// whose owner is no longer running, dealt with by the step its journal
-    /// reached. Runs before the courses are listed. A folder whose owner is
-    /// alive (another window, <c>plantoir-mcp</c>, a restore still running) is
-    /// never touched. Costs one listing of <c>courses\</c> when there is none.
+    /// Every folder of <c>courses\.internal\restoring\</c> whose owner is no
+    /// longer running, dealt with by the step its journal reached. Runs before
+    /// the courses are listed. A folder whose owner is alive (another window,
+    /// <c>plantoir-mcp</c>, a restore still running) is never touched, and
+    /// neither is one with no journal (a mac's, or one made by something else)
+    /// unless it is empty. Costs one look for a folder when there is none.
     /// </summary>
     /// <param name="ownerIsAlive">The liveness question, given the owner file's text; the default asks this machine (<see cref="WorkLease.OwnerIsAlive"/>).</param>
     public static List<(string Folder, Recovery What)> RecoverLeftovers(string coursesDirectory, Func<string, bool>? ownerIsAlive = null)
@@ -345,8 +434,10 @@ public static class StagedRestore
         List<string> leftovers;
         try
         {
-            leftovers = new DirectoryInfo(coursesDirectory).EnumerateDirectories(Prefix + "*", ReferenceLock.Unfiltered)
-                .Where(d => d.Name.StartsWith(Prefix, StringComparison.Ordinal))
+            string restoring = RestoringDirectory(coursesDirectory);
+            if (!Directory.Exists(restoring)) return done;
+            if ((File.GetAttributes(restoring) & FileAttributes.ReparsePoint) != 0) return done;   // never followed
+            leftovers = new DirectoryInfo(restoring).EnumerateDirectories("*", ReferenceLock.Unfiltered)
                 .Select(d => d.FullName).ToList();
         }
         catch { return done; }
@@ -378,17 +469,27 @@ public static class StagedRestore
     private static Recovery RecoverOne(string coursesDirectory, string folder)
     {
         var (phase, liveRelative, incoming) = ReadJournal(folder);
+        if (phase is null)
+        {
+            // Not one of ours, or made and killed before its journal: only an
+            // EMPTY folder (or one holding just the owner file) is removed.
+            bool emptyButTheOwner = Directory.EnumerateFileSystemEntries(folder)
+                .All(entry => string.Equals(System.IO.Path.GetFileName(entry), OwnerName, StringComparison.Ordinal));
+            return emptyButTheOwner && Remove(folder) ? Recovery.Removed : Recovery.LeftInPlace;
+        }
+        if (phase == Phase.Kept) return Recovery.LeftInPlace;   // what it holds was told to the teacher; nothing here touches it
         string aside = System.IO.Path.Combine(folder, AsideName);
         bool asideHoldsAnything = Directory.Exists(aside) && Directory.EnumerateFileSystemEntries(aside).Any();
+        if (Directory.Exists(System.IO.Path.Combine(folder, DisplacedName))) return Recovery.LeftInPlace;
 
         // Nothing of the course ever moved: the folder is only an unpacked zip.
-        if (!asideHoldsAnything && phase is null or Phase.Unpacking or Phase.Placing or Phase.Aside)
+        if (!asideHoldsAnything && phase is Phase.Unpacking or Phase.Placing or Phase.Aside)
         {
             if (phase == Phase.Placing && liveRelative is not null)
                 DiscardBuiltSitesOf(coursesDirectory, liveRelative);
             return Remove(folder) ? Recovery.Removed : Recovery.LeftInPlace;
         }
-        if (phase is null || liveRelative is null) return Recovery.LeftInPlace;   // aside holds something and we cannot tell where it goes
+        if (liveRelative is null) return Recovery.LeftInPlace;   // aside holds something and we cannot tell where it goes
 
         string live = System.IO.Path.GetFullPath(System.IO.Path.Combine(coursesDirectory, liveRelative));
         if (!IsInside(coursesDirectory, live)) return Recovery.LeftInPlace;
@@ -433,8 +534,28 @@ public static class StagedRestore
     private static bool Remove(string folder)
     {
         try { ReferenceLock.Unlock(folder); } catch { }
+        return RemoveStaging(folder);
+    }
+
+    /// <summary>
+    /// Removes a staging folder, then <c>restoring</c> and <c>.internal</c>
+    /// when each is left EMPTY (a non-recursive delete, which refuses a folder
+    /// that is not: a lease written into <c>.internal\activity</c> meanwhile is
+    /// never taken with it), so a restore that worked leaves <c>courses\</c> as
+    /// it found it, as the mac's <c>removeStaging</c> does.
+    /// </summary>
+    private static bool RemoveStaging(string folder)
+    {
         try { CourseRestorer.DeleteTree(folder); } catch { }
-        return !Directory.Exists(folder);
+        bool gone = !Directory.Exists(folder);
+        string? parent = System.IO.Path.GetDirectoryName(folder);
+        for (int level = 0; gone && level < 2 && parent is not null; level++)
+        {
+            try { Directory.Delete(parent, recursive: false); }
+            catch { break; }
+            parent = System.IO.Path.GetDirectoryName(parent);
+        }
+        return gone;
     }
 
     private static void DiscardBuiltSitesOf(string coursesDirectory, string liveRelative)

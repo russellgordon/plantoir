@@ -92,14 +92,27 @@ public sealed class StagedRestoreTests : IDisposable
         File.WriteAllText(Path.Combine(CourseDir, "Unit 2", "Plan.md"), "unit two");
     }
 
+    private string Restoring => StagedRestore.RestoringDirectory(CoursesDir);
+
+    /// <summary>The restores' staging folders left in courses\.internal\restoring.</summary>
     private IEnumerable<string> Leftovers() =>
-        Directory.EnumerateDirectories(CoursesDir, StagedRestore.Prefix + "*");
+        Directory.Exists(Restoring) ? Directory.EnumerateDirectories(Restoring) : Enumerable.Empty<string>();
 
     /// <summary>A seam that fails the Nth move, or stops dead there as a kill would.</summary>
     private sealed class FailingSteps(int failAtMove, bool asAKill = false, int hresult = 0, bool killOnceSwapped = false) : StagedRestore.Steps
     {
         private int _moves;
         public List<(string From, string To)> Moves { get; } = new();
+
+        /// <summary>A child whose move back fails, once: the way back does not finish.</summary>
+        public string? FailTheMoveBackOf { get; init; }
+
+        public override void MoveBack(string source, string target)
+        {
+            if (FailTheMoveBackOf is { } name && Path.GetFileName(source) == name)
+                throw new IOException("injected on the way back");
+            base.MoveBack(source, target);
+        }
 
         public override void AfterStep(string phase, int movesSoFar)
         {
@@ -260,6 +273,34 @@ public sealed class StagedRestoreTests : IDisposable
     }
 
     [Fact]
+    public void TwoJunctionsIntoEachOtherNeitherHangTheBackupNorTheRestore()
+    {
+        // #908 on the mac: two links that loop made the whole backup's zip run
+        // without end. Windows' ZipFolder never descends a link, and the
+        // restore renames a link as a link, so both finish (measured here).
+        string a = Path.Combine(CourseDir, "Loop A");
+        string b = Path.Combine(CourseDir, "Loop B");
+        Directory.CreateDirectory(a);
+        Directory.CreateDirectory(b);
+        File.WriteAllText(Path.Combine(a, "page.md"), "a page");   // an empty folder is not in a zip
+        MakeJunction(Path.Combine(a, "to B"), b);
+        MakeJunction(Path.Combine(b, "to A"), a);
+        var clock = Stopwatch.StartNew();
+        var backup = BackUp();
+        long backedUp = clock.ElapsedMilliseconds;
+        using (var zip = ZipFile.OpenRead(backup.FilePath))
+            Assert.DoesNotContain(zip.Entries, e => e.FullName.Contains("to B") || e.FullName.Contains("to A"));
+        ChangeSinceTheBackup();
+
+        CourseRestorer.RestoreBackup(backup, CoursesDir);
+
+        Assert.True(clock.ElapsedMilliseconds < 30_000, $"backup {backedUp} ms, both {clock.ElapsedMilliseconds} ms");
+        Assert.True(Directory.Exists(a));
+        Assert.False(Directory.Exists(Path.Combine(a, "to B")));
+        Assert.Empty(Leftovers());
+    }
+
+    [Fact]
     public void AZipEntryThatWouldLandOutsideIsRefusedAndTheCourseIsAsItWas()
     {
         ChangeSinceTheBackup();
@@ -416,8 +457,8 @@ public sealed class StagedRestoreTests : IDisposable
             {
                 // What the next launch finds: one leftover, recognisable by name.
                 string leftover = Assert.Single(Leftovers());
-                Assert.StartsWith(StagedRestore.Prefix + "ICS3U-", Path.GetFileName(leftover));
-                Assert.DoesNotContain(Workspace.DiscoverCourses(_root), c => c.DirectoryPath.Contains(StagedRestore.Prefix));
+                Assert.StartsWith("ICS3U-", Path.GetFileName(leftover));
+                Assert.DoesNotContain(Workspace.DiscoverCourses(_root), c => c.DirectoryPath.Contains(".internal"));
 
                 // Its owner is alive: left alone.
                 Assert.Empty(StagedRestore.RecoverLeftovers(CoursesDir, _ => true));
@@ -456,7 +497,7 @@ public sealed class StagedRestoreTests : IDisposable
     [Fact]
     public void ALeftoverItCannotMakeSenseOfIsLeftWhereItIs()
     {
-        string leftover = Path.Combine(CoursesDir, StagedRestore.Prefix + "ICS3U-999999-deadbeef");
+        string leftover = Path.Combine(Restoring, "ICS3U-999999-deadbeef");
         Directory.CreateDirectory(Path.Combine(leftover, "aside"));
         File.WriteAllText(Path.Combine(leftover, "aside", "only copy.md"), "precious");
 
@@ -467,16 +508,55 @@ public sealed class StagedRestoreTests : IDisposable
     }
 
     [Fact]
-    public void OnlyFoldersWithTheExactPrefixAreLookedAt()
+    public void AMacsStagingFolderHasNoJournalAndIsNeverTouched()
     {
-        string teachers = Path.Combine(CoursesDir, ".plantoir-restoringXYZ");
-        string import = Path.Combine(CoursesDir, ReferenceStaging.Prefix + "ICS3U");
-        Directory.CreateDirectory(teachers);
-        Directory.CreateDirectory(import);
+        // The mac's one-section restore stages in the same place, as two
+        // folders named by a UUID, the set-aside one holding the section's
+        // files directly. A synced working folder can carry one here.
+        string macs = Path.Combine(Restoring, Guid.NewGuid().ToString().ToUpperInvariant());
+        Directory.CreateDirectory(Path.Combine(macs, "All Classes"));
+        File.WriteAllText(Path.Combine(macs, "All Classes", "Unit 1, Day 1.md"), "the only copy");
+        string empty = Path.Combine(Restoring, Guid.NewGuid().ToString().ToUpperInvariant());
+        Directory.CreateDirectory(empty);
 
-        Assert.Empty(StagedRestore.RecoverLeftovers(CoursesDir, _ => false));
-        Assert.True(Directory.Exists(teachers));
-        Assert.True(Directory.Exists(import));
+        var recovered = StagedRestore.RecoverLeftovers(CoursesDir, _ => false);
+
+        Assert.Equal("the only copy", File.ReadAllText(Path.Combine(macs, "All Classes", "Unit 1, Day 1.md")));
+        Assert.Contains(recovered, r => r.Folder == macs && r.What == StagedRestore.Recovery.LeftInPlace);
+        Assert.Contains(recovered, r => r.Folder == empty && r.What == StagedRestore.Recovery.Removed);
+    }
+
+    [Fact]
+    public void ARestoreThatWorkedLeavesNoInternalFolderItMade()
+    {
+        var backup = BackUp();
+        CourseRestorer.RestoreBackup(backup, CoursesDir);
+        Assert.False(Directory.Exists(Path.Combine(CoursesDir, ".internal")));
+    }
+
+    [Fact]
+    public void AWayBackThatDidNotFinishIsPutBackByTheNextLaunchWithoutLosingAnOriginal()
+    {
+        // The backup and the course share names (Learning Goals.md, Media,
+        // section1...). A move in fails; putting back then brings some
+        // originals back and fails on one. The next launch must finish
+        // putting back and must not take an original that is already back for
+        // one of the zip's.
+        var backup = BackUp();
+        ChangeSinceTheBackup();
+        var before = Snapshot(CourseDir);
+        int liveChildren = Directory.EnumerateFileSystemEntries(CourseDir).Count();
+        var steps = new FailingSteps(failAtMove: liveChildren + 3) { FailTheMoveBackOf = "Unit 2" };
+
+        Assert.ThrowsAny<IOException>(() => CourseRestorer.RestoreBackup(backup, CoursesDir, steps));
+        Assert.Single(Leftovers());
+        Assert.False(Directory.Exists(Path.Combine(CourseDir, "Unit 2")));
+
+        var recovered = StagedRestore.RecoverLeftovers(CoursesDir, _ => false);
+
+        Assert.Equal(StagedRestore.Recovery.PutBack, Assert.Single(recovered).What);
+        Assert.Equal(before, Snapshot(CourseDir));
+        Assert.Empty(Leftovers());
     }
 
     // ---- the backup on the disk, and the recovery before the list ---------

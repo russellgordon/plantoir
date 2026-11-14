@@ -10,6 +10,15 @@ public static class CourseRestorer
 {
     public sealed class RestoreException(string message) : Exception(message);
 
+    /// <summary>
+    /// A one-section restore whose way back did not finish: the section may
+    /// be a mix, nothing was deleted, and the message is
+    /// <see cref="OneSectionRestoreWording.StoppedPartWay"/> (or its
+    /// nothing-to-open form). Said WITHOUT the window's "Nothing was put back:"
+    /// prefix, which would not be true.
+    /// </summary>
+    public sealed class SectionRestoreStoppedPartWay(string message) : Exception(message);
+
     public static void Restore(ArchivedItem item, string coursesDirectory, IReadOnlyList<Course> courses)
     {
         if (item.SectionNumber is int section)
@@ -100,7 +109,15 @@ public static class CourseRestorer
 
             // Out with the current contents (hidden files included — the
             // backup carries its own .obsidian), in with the backup's.
-            StagedRestore.Swap(staging, destination, payload, steps);
+            try { StagedRestore.Swap(staging, destination, payload, steps); }
+            catch (StagedRestore.WayBackDidNotFinish stopped)
+            {
+                // A whole course has no contract sentence for this (#909 is
+                // open): the first failure is said, as before, and what is
+                // aside stays in the staging folder, whose journal lets the
+                // next launch put it back (StagedRestore.RecoverLeftovers).
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(stopped.InnerException!).Throw();
+            }
             swapped = true;
 
             // A restored course no longer holds what a stopped rename of its
@@ -189,11 +206,23 @@ public static class CourseRestorer
             if (!Directory.Exists(backedUpSection))
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
 
-            StagedRestore.Swap(staging, Path.Combine(courseDir, folderName), backedUpSection, steps);
+            try { StagedRestore.Swap(staging, Path.Combine(courseDir, folderName), backedUpSection, steps); }
+            catch (StagedRestore.WayBackDidNotFinish)
+            {
+                // The contract's rule for a one-section restore (#897 C): keep
+                // what was set aside where the teacher can open it, write the
+                // trail line, and say so. This route makes no archive first, so
+                // the sentence has no "in Archived" after it.
+                var kept = StagedRestore.KeepTheSetAsideFiles(staging, sectionNumber, item.CourseCode);
+                throw new SectionRestoreStoppedPartWay(kept.PathToSay is { } path
+                    ? OneSectionRestoreWording.StoppedPartWay(sectionNumber, path)
+                    : OneSectionRestoreWording.StoppedPartWayNothingToOpen(sectionNumber));
+            }
             notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode, sectionNumber);
         }
         catch (StagedRestore.StopHereForATest) { throw; }
+        catch (SectionRestoreStoppedPartWay) { throw; }   // what is kept is KeepTheSetAsideFiles' to say
         catch
         {
             if (Directory.Exists(staging.Path) && !Directory.Exists(staging.Aside)) staging.TryRemove();

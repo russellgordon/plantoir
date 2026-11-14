@@ -15,7 +15,14 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public static class AssistSectionRestore
 {
-    public sealed class Problem(string message) : Exception(message);
+    public class Problem(string message) : Exception(message);
+
+    /// <summary>
+    /// The restore stopped part way and could not put everything back
+    /// (#873, by <c>course-management.json</c> → <c>backups.restoreOneSection</c>):
+    /// the message is the whole sentence, said without "Nothing was put back:".
+    /// </summary>
+    public sealed class StoppedPartWay(string message) : Problem(message);
 
     public const string NothingToRestore =
         "This conversation hasn't changed anything yet, so there is nothing to put back.";
@@ -83,6 +90,7 @@ public static class AssistSectionRestore
             throw new Problem(UnreadableBackup(Path.GetFileName(backupPath)));
         int notPutBack;
         try { notPutBack = CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory); }
+        catch (CourseRestorer.SectionRestoreStoppedPartWay stopped) { throw new StoppedPartWay(stopped.Message); }
         catch (CourseRestorer.RestoreException error) { throw new Problem(error.Message); }
         catch (IOException error) { throw new Problem(error.Message); }
         catch (UnauthorizedAccessException error) { throw new Problem(error.Message); }

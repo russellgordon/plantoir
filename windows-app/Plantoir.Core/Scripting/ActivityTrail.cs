@@ -293,6 +293,16 @@ public static class ActivityTrail
         /// </summary>
         SectionRestored,
         /// <summary>
+        /// A one-section restore moved a file and then could not move every
+        /// file back, so the section may hold some files from the backup and
+        /// some as they were (#897 C, the mac's; on Windows the assistant
+        /// window's Restore Section N… since #873). Carries the course, the
+        /// section and where the set-aside files were kept, as a path inside
+        /// the working folder. Never a page.
+        /// <see cref="SectionRestoreStoppedPartWayLine"/>.
+        /// </summary>
+        SectionRestoreStoppedPartWay,
+        /// <summary>
         /// A whole course was put back, from one of its backups (Restore…) or
         /// from Archived: the code it shows, its folder, the zip's FILE NAME,
         /// what became of the course as it was first (the archive made of it,
@@ -857,6 +867,7 @@ public static class ActivityTrail
         Event.HowITeachPageWritten => "How I Teach page written",
         Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
+        Event.SectionRestoreStoppedPartWay => "section restore stopped part way",
         Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
@@ -996,6 +1007,11 @@ public static class ActivityTrail
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
     public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
         $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
+
+    /// <summary>The words for `section restore stopped part way`, the mac's <c>sectionRestoreStoppedPartWayLine</c> word for word.</summary>
+    public static string SectionRestoreStoppedPartWayLine(string keptAt) =>
+        "a section restore stopped part way and could not move every file back; the section may hold " +
+        "some files from the backup and some as they were; the files set aside are kept in " + keptAt;
 
     public static void NoteLaunch()
     {
