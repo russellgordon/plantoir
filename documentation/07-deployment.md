@@ -567,6 +567,21 @@ no inline script is added and no new hash is needed. Cloudflare Pages sets no
 policy. Not yet measured on the live hosts; `verify-deploy.sh` is where that
 is done before the release.
 
+**A PhET simulation's inline scripts are hashed too (#674).** A simulation
+is a single web page full of inline scripts, carried at
+`static/phet/<sim>/index.html`; `_collect_inline_script_policy` reads every
+built `.html`, so their hashes join the policy with no change to it. The
+cost, measured 2026-11-13: gas-properties adds 22 hashes, projectile-motion
+20, none shared, so each simulation adds about 1 KB to a header Netlify
+sends with EVERY file of the site; a site with gas-properties alone wrote a
+policy line of 1,247 characters. Netlify's limit on one `_headers` value was
+not found documented. It is measured at the release gate, with a test site
+carrying twenty simulations' worth of hashes fetched back whole; if Netlify
+refuses or cuts it, the fallback is to move each simulation's inline scripts
+into files beside it at build. No host is added: a simulation loads no
+script from another site (`phetFences.download.checks`), and the analytics
+script PhET's servers sometimes add is taken out before it is kept.
+
 (Until #494 the host list ended `https://cdn.jsdelivr.net`, because Quartz
 linked KaTeX's copy-tex script from there on every page. Since every site
 serves KaTeX itself (06 → C2-26), that script is `'self'` and the host falls
@@ -854,8 +869,10 @@ that test rather than shipping a silent regression.
 A page whose runnable code can ask for input, and that shows nothing from
 another website the headers would break, is sent
 `Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`; `static/pyodide/*` and
-`static/swift/*` get COEP (06 → I11 says why each, and what was measured).
+`Cross-Origin-Embedder-Policy: require-corp`; `static/pyodide/*`,
+`static/swift/*` and, since #674, `static/phet/*` (a PhET simulation's own
+file, which a frame on an isolated page opens only when it carries COEP
+too) get COEP (06 → I11 and S say why each, and what was measured).
 `deploy.py` writes them as ONE marked block in `public/_headers`
 (`isolation_headers.publish_headers`), replaced on every publish:
 

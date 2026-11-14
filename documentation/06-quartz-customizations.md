@@ -5212,6 +5212,105 @@ for a host as an entry in a list). Firefox (not asked for; `firefox-1543` is
 cached and the checker could add it by name). Screenshots to judge paint
 (blank in headless WebKit until `load`, #625).
 
+## S. PhET simulations (#674, v2.0.0)
+
+A ` ```phet ` fence becomes a card students tap to open a PhET simulation
+from the class site's own copy. The build's half (downloading, keeping, the
+stop) is documentation/05 → "PhET simulations: what the build does" and
+"Files downloaded when a page first uses them"; the contract is
+`contracts/shared-rules.json` → `phetFences`.
+
+### S1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/plantoirPhet.ts`: the transformer, wired straight
+  after GeoGebra's (`_wire_phet_transformer`, anchored on
+  `Plugin.PlantoirGeoGebra()`, idempotent), so the order is Figures,
+  GeoGebra, PhET, Quizzes on a new site and an old one alike
+  (`test_quartz_additions_wiring.py`).
+- `components/scripts/phet.inline.ts` and `components/styles/phet.scss`,
+  carried by `PlantoirMetaLine` as GeoGebra's are. Every style is under
+  `.pl-phet`; the script does nothing until a tap.
+- `cli/plantoirIsolation.mjs`: `ENGINE_FOLDERS` gains `static/phet`.
+
+### S2. Two stages, as GeoGebra's
+
+The markdown stage turns a fence the manifest knows into `<figure
+class="pl-figure pl-phet">` holding only a hidden figcaption (the
+description), an mdast node so the quiz reader sees a figure; a quiz reads
+it by that description alone, never its button or credit line
+(`plantoirQuizzes.ts`, as for a sketch). The html stage puts in the card:
+a box of the simulation's own shape holding its picture, the title in the
+page's language, the description, the button `words.site.open` with the
+gzipped size ("about 1 MB" for gas-properties), the print note and PhET's
+credit line. A fence the manifest does not know stays the code block it
+was.
+
+### S3. A tap
+
+The loader makes ONE frame in the picture's box, at `<root>/static/phet/
+<sim>/?yotta=false&allowLinks=false&locale=…&screens=…`, the box's shape
+being the picture's own (PhET's 600 px pictures are the whole simulation
+window, 600 by 394 for gas-properties) or else PhET's layout bounds,
+1024 by 618. A simulation scales itself to fit its box, so its logo stays
+in view (the licence's brand rule), and the frame takes the picture's place
+without moving anything below it (#756's lesson). The box says the
+simulation is opening, once, in a polite live region. The simulation shows
+when the frame's document has loaded AND is the simulation (its `phet`
+object is there); an error page, a school network's sign-in page or a
+minute with neither says `couldNotLoad` below it and the button works
+again. Quartz's page change replaces the body and the frame with it,
+which frees the simulation's memory; a frame that loads after its page has
+gone marks nothing. Nothing is fetched before a tap but the picture.
+
+### S4. Paper, dark theme
+
+A frame prints blank or cropped, so the print styles hide it and print the
+picture, opened or not, with the print note and the credit line as plain
+text. The card follows the theme; the simulation keeps its own colours
+(`colorProfile` is not a teacher's setting).
+
+### S5. Measured (2026-11-13, this Mac, headless Chromium 1243 and WebKit 2359, muted)
+
+On a site made with the real `phet.py` (from a copy planted as a build
+keeps it), the real transformer and the real loader, served by
+`browser-checks/lib/site_server.mjs` under the publish's own `_headers`
+(isolation, then Netlify's policy): the rendered check's `phet` row passed
+in both engines. A real press opened gas-properties 1.1.12 in 0.4 s
+(WebKit) and 0.6 s (Chromium) on a page isolated for live input; inside the
+frame the simulation read `yotta` and `allowLinks` false, `fr` and one
+screen; the frame was 758 by 497 inside its box; the own-host row saw
+nothing asked of any other host. Its four sabotages each turned it red for
+its own reason in both engines: the address without `yotta=false`
+(own-host red too: the simulation asked other hosts), the `/static/phet/*`
+header taken out (never opened; "This simulation couldn't be opened"), the
+box held at 120 px ("cropped: 758 x 118"), the credit line taken out. The
+full fixture build is verify.sh 6h-r's (Deferred to the gate on the day it
+was written).
+
+### S6. Rejected
+
+- Loading the simulation from phet.colorado.edu in the frame (what a pasted
+  frame does): four requests to PhET and Google from every student's
+  browser, and no simulation on a network that blocks PhET.
+- A frame on the page before a tap: a 3 MB file for every visitor of the
+  page, most of whom never open it.
+- `sandbox` on the frame: the simulation is the site's own file on the site's
+  own host, and with `allowLinks=false` nothing in it leaves the site.
+- Printing the frame: blank or cropped in both engines.
+- A height setting: the box takes the simulation's own shape.
+
+### S7. Known limits
+
+- The credit line is in English on every page, French courses included.
+- A simulation's sounds play after a student touches it (part of the
+  simulation; not ruled on). The rendered check holds every frame's audio
+  suspended.
+- In a self-check question's choices a simulation is not refused, as a
+  GeoGebra sketch is (`geogebraFences.quizzes`): a tap on its button may
+  also choose the answer.
+- Each simulation adds about 21 hashes (about 1 KB) to the policy a Netlify
+  publish sends with every file of the site (documentation/07).
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,
