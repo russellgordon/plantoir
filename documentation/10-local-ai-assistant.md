@@ -1710,7 +1710,11 @@ because `AssistAgent.boundToThisSection` writes the window's section into
 every call that declares one before the card is made, so the change is
 defensive: the card names the section `locate` resolves, and none when
 there is a choice. For the same reason the local model never meets
-`noSectionNamed`. Left as it is: the
+`noSectionNamed`. **On Windows (#885)** the SDK refused such a call while
+binding, with "An error occurred invoking '…'."; since #880's batch a call
+filter in `plantoir-mcp` (`MissingArguments`) says these four sentences and
+supplies a one-section course's section, with no schema byte moved
+(`12-windows-app.md` → "A call that names no section"). Left as it is: the
 outside-change gate's trail line (`noteDeclined`) still records section 0 for
 a call with no section; the caller's answer there is right (the course is
 being built), and the line is #879.
@@ -8363,6 +8367,19 @@ first-reply sentences side by side); placing it in Plan a Unit's message after
 the How I Teach sentence (it sits between that sentence and "After that, ask
 me…" and muddles the order of the first steps). NOT measured: whether each
 assistant says the sentence in its first reply as asked.
+
+**On Windows since #880's batch (#895, #856, #791's Windows half,
+2026-11-13).** Both Windows doors say the handouts sentence on every door
+and, on a Revise door, the reference-courses sentence (#856), in the order
+above. `OutsideGreetingContractTests` walks `greetingHandoutsCases`,
+`greetingReferenceCourses.cases` and `.listCases`, reads every key
+`greetingMustSay` names, and checks that no message the doors COMPOSE says
+a word in `printablePages.agentGuidance.held.words` (failing by name, #791,
+if that block is deleted before the words have a lasting home). One
+difference the mac need only know: Windows' `Open` reads the folder's
+courses at the click (`ReferenceCoursesToMention.ReadFor`), where the mac
+passes its sidebar's list; the sentence is the same.
+`12-windows-app.md` → "What an outside assistant is told when a door opens".
 
 ## Telling an outside assistant how the course is taught (#209)
 
