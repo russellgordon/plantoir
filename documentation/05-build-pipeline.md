@@ -2475,7 +2475,30 @@ build costs a minute, a reused stale one publishes last week's site.
    last built by every reader: no time a reader can see is later than the
    build's. A deploy, or Deploy pressed, while the build is still dated ahead
    rebuilds and closes the window. Recorded in `knownLimits` as a decision; a
-   fingerprint that needs no clock is a later piece.
+   fingerprint that needs no clock is a later piece
+   ([#800](https://github.com/russellgordon/plantoir/issues/800)).
+
+   **Re-measured for #800 on 2026-11-14** (stack11, Apple M4 Pro, APFS,
+   macOS 26.6), before anything was built for it: a build dated 2 s ahead,
+   then an edit, a deletion or a rename; asked at once both
+   `toolchain_paths.why_build_before_deploying` and deploy.sh's cut-out reader
+   say `clock`, asked 2.5 s later both reuse, three of three. What the later
+   piece can start from: a file and a folder stat'ed inside the website
+   builder (virtiofs bind mount) and on the host give the same size and the
+   same modification and change times to the nanosecond, but different
+   inodes (748865 inside, 381942590 outside), so a digest of the walk must
+   leave the inode out; BSD `stat -f %Fm` prints seconds and nine fractional
+   digits for every time, whole seconds included (`1767243600.000000000`),
+   which is Python's `st_mtime_ns` with a point in it, so deploy.sh can
+   compute the same text with no host Python. **Why #800 was not built in
+   the v2.0.0 batch with #829 and #904:** it is a writer (the build, inside
+   the builder) and five readers in four languages (toolchain_paths,
+   deploy.sh, the scheduled shell, `BuildFreshness` in Swift and in C#), with
+   a new case shape (real time passing the build's date) in two harnesses,
+   and Windows' #799, unmerged then, was rewriting the same walk
+   (`BuildFreshness.ChangedSince`, `test_build_freshness_reuse.py`). #799 has
+   no fingerprint of its own: it is this rule on Windows. #800's digest is to
+   be computed in that same walk, by each reader, after #799 lands.
 6. **Changed means strictly later.** A save at the very instant the build
    started reads as built, as before.
 
