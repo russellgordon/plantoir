@@ -1487,7 +1487,9 @@ take_the_ready_turn() {
   done
   printf '%s\n' "$$" > "$READY_TURN/pid"
   READY_TURN_IS_OURS=1
-  trap give_back_the_ready_turn EXIT
+  # The work leases a deploy.sh took before this (#829) are given back by
+  # this one trap too, since a later `trap … EXIT` replaces an earlier one.
+  trap 'give_back_the_ready_turn; if declare -F give_back_the_work_leases >/dev/null; then give_back_the_work_leases || true; fi' EXIT
 }
 
 give_back_the_ready_turn() {

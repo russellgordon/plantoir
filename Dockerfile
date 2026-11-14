@@ -299,6 +299,9 @@ COPY scripts/class_pages.py /opt/scripts/class_pages.py
 # A course's name, cleaned where it is read (#780): imported by build_site.py,
 # setup_course.py and social_card.py by bare name.
 COPY scripts/course_names.py /opt/scripts/course_names.py
+# The teacher's own domain for one destination of a section (#904): the one
+# Python reader of custom_domains, imported by build_site.py by bare name.
+COPY scripts/custom_domains.py /opt/scripts/custom_domains.py
 # Where a page's CODE is, so a link written inside code is not read as one
 # (#313) — imported by build_site.py and setup_course.py; the rule is
 # contracts/shared-rules.json → readingALink.whatIsCode.

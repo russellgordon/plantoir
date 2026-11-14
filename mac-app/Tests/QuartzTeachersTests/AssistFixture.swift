@@ -328,9 +328,10 @@ enum AssistFixture {
     @MainActor
     static func makeSectionNeedingReDating(
         withMarker: Bool = false,
+        surface: AssistToolRunner.Surface = .local,
         for testCase: XCTestCase
     ) throws -> Made {
-        let made: Made = try makeRunner(hasDeployedBefore: withMarker)
+        let made: Made = try makeRunner(hasDeployedBefore: withMarker, surface: surface)
         try keepScheduledPublishingInside(made.root, for: testCase)
 
         let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
