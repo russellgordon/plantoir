@@ -163,8 +163,7 @@ ready.
   that line up on quizzes and tests, and a settled shape for a lesson page.
   ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
 - **Guidance for writing tests.** Notes for an assistant working beside
-  Plantoir on writing a unit test with its solutions, marking guide and
-  practice test. ([#751](https://github.com/russellgordon/plantoir/issues/751))
+  Plantoir on writing a unit test with its solutions and practice test. ([#751](https://github.com/russellgordon/plantoir/issues/751))
 - **Grove Colours for everyone.** The colour scheme once named for one
   school is now called Grove Colours and is offered to every teacher, and a
   switch that only that school used is gone.
@@ -186,11 +185,6 @@ ready.
 
 ## Version 2.1
 
-- **Guidance for marking and report comments.** Notes for an assistant
-  working beside Plantoir on marking tests and coding assignments onto
-  feedback sheets, and on drafting report comments from the marks. Student
-  names stay on your computer.
-  ([#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
 - **plantoir.app shows off science**, alongside the maths and coding it
   already shows ([#485](https://github.com/russellgordon/plantoir/issues/485)).
 - **My Progress, settings and more.** A switch and the list of
