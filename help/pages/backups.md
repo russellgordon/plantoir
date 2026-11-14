@@ -5,6 +5,7 @@ covers:
 - mac-app/QuartzTeachers/Views/AllBackupsView.swift
 - mac-app/QuartzTeachers/Views/SidebarView.swift
 - mac-app/QuartzTeachers/Models/CourseArchiver.swift
+- mac-app/QuartzTeachers/Models/OneSectionRestore.swift
 - contracts/course-management.json
 - mac-app/Tests/Goldens/menu-bar.txt
 keywords:
@@ -14,6 +15,9 @@ keywords:
 - back up now
 - restore
 - restore from backup
+- restore one section
+- restore a section
+- one section
 - undo everything
 - go back
 - delete backup
@@ -22,7 +26,7 @@ keywords:
 - storage
 description: A backup is a copy of a whole course saved at one moment. You can make one, see the ones Plantoir made, restore one, and delete the ones you no longer need.
 ---
-A backup is a copy of a whole course, saved at one moment. You can make one whenever you like, and Plantoir makes some by itself. Restoring a backup puts the course back as it was at that moment.
+A backup is a copy of a whole course, saved at one moment. You can make one whenever you like, and Plantoir makes some by itself. Restoring a backup puts the course back as it was at that moment. Some backups can put back one section alone.
 
 ## Back up a course
 
@@ -87,6 +91,36 @@ alt: The question asked before a backup is restored, with the date and time of t
 
 Nothing is lost. The version you had moves to {{control:sidebarArchived}} in the sidebar, and the backup is kept. [Bring back a removed course](page:archive) says what you can do with what is listed there.
 
+## Restore one section
+
+A backup that Plantoir made before a change to one section can put back that section alone. This matters when you have worked on your other sections since. Restoring the whole course would take that work back too.
+
+For such a backup the question has two buttons in place of one:
+
+- **{{control:sidebarRestoreQuestionRestoreSectionButton}}**, where {N} is the number of the section. It puts back that section's pages, its settings on the pages every section shares, its class dates and its record of what was published. It leaves your other sections alone.
+- **{{control:sidebarRestoreQuestionRestoreWholeCourseButton}}** puts every section back, as the steps above do.
+
+Either way, the course as it is now moves to {{control:sidebarArchived}} first, and the backup is kept.
+
+After one section is restored, an alert says the section is back and gives the backup's date and time. It may add one of these:
+
+- A shared page made since the backup is now hidden from that section. The backup has no such page, so that section's students could not see it then.
+- A shared page kept the setting it has now, because Plantoir could not change the settings at the top of it.
+- The section still goes to the website address it has now. A restore never changes where students read a section.
+
+The website students read does not change until the section is next deployed.
+
+The question offers one section only when all of these are true:
+
+- Plantoir made the backup before a change to one section. A backup you made with {{menu:courseBackUpNow}} is of the whole course, and is restored whole.
+- The course still has that section.
+- The course is not kept for reference.
+- The course names its class pages and its folders as it did when the backup was made. A change to what units are called, or a renamed folder, means the section can only come back with the whole course.
+
+{{assistant}}
+A backup made before an assistant changed one section offers that section in the same way.
+{{/assistant}}
+
 ## Delete a backup
 
 1. Select the backup's row. In {{control:sidebarAllBackupsRow}} you can select several: hold Command or Shift as you click.
@@ -99,4 +133,9 @@ A deleted backup is gone for good. This is unlike removing a course, which only 
 
 - **{{menu:courseBackUpNow}} is greyed.** A copy of that course is already being saved. Wait until it has finished.
 - **{{menu:courseRestoreFromBackup}} or {{menu:courseDeleteBackup}} is greyed.** Select a backup's row in the sidebar first.
+- **The question has no button for one section.** The backup is of the whole course, or the course has changed in one of the ways listed under Restore one section. Restore the whole course, or leave things as they are.
+- **You pressed the button for one section and an alert says it cannot be put back on its own.** The course changed after the question opened. Nothing was changed and nothing was moved to {{control:sidebarArchived}}. The whole course can still be restored.
+- **An alert says the section is being changed right now.** Restore the section once that has finished.
+- **An alert says the section was left as it was.** The restore could not finish, and the alert gives the reason. Nothing in the section changed.
+- **An alert says the restore stopped part way.** The section may hold some files from the backup and some as they were. Nothing was deleted. The alert names the folder that holds the files set aside, and the course as it was is in {{control:sidebarArchived}}.
 - **A backup could not be made.** An alert says so.
