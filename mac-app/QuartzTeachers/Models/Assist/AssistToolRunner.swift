@@ -180,6 +180,11 @@ final class AssistToolRunner {
     /// one of these was written to the trail as "changed nothing".
     @ObservationIgnored private(set) var writesWithNoNewUndoEntry: Int = 0
 
+    /// Which conversation or session this runner is, for the app-wide undo
+    /// list's `madeBy` (#899): one runner is one window's conversation, one
+    /// `--mcp-stdio` process or one menu runner.
+    @ObservationIgnored private let undoSessionID: String = UUID().uuidString
+
     // MARK: - Computed properties
 
     /// The section of the change `undo_last_change` would take back next, or
@@ -190,6 +195,20 @@ final class AssistToolRunner {
             return nil
         }
         return (pending.courseCode, pending.sectionNumber)
+    }
+
+    /// Who the app-wide undo list says made a change from here
+    /// (`file-formats.json` → `undoJournal.stepKeys.madeBy`). An outside
+    /// assistant's client name is empty until the door names it (#884).
+    var undoMadeBy: String {
+        switch surface {
+        case .menu:
+            return "menu"
+        case .local:
+            return "builtInAssistant:" + undoSessionID
+        case .mcp:
+            return "outsideAssistant::" + undoSessionID
+        }
     }
 
     /// How many changes the undo list holds — so the Section menu can tell
@@ -2057,6 +2076,16 @@ final class AssistToolRunner {
         // refresh is a race they cannot see they are in.
         _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
 
+        // The app-wide list (#899), in SHADOW: written down before the
+        // write and closed after it, never offered while `undoJournalIsLive`
+        // is off, and never able to fail, slow or change this action
+        // (`UndoShadowPublish`). Today's history below is unchanged.
+        let undoJournal: UndoJournal = UndoJournalLocation.standardJournal()
+        let undoTicket: UndoShadowTicket? = await UndoShadowPublish.begin(
+            plan, forSection: sectionNumber, in: course,
+            workingFolderURL: workspace.workspaceURL, madeBy: undoMadeBy, journal: undoJournal
+        )
+
         let change: AssistChange
         var leftAlone: [String] = []
         do {
@@ -2066,6 +2095,7 @@ final class AssistToolRunner {
             change = applied.change
             leftAlone = applied.leftAlone
         } catch {
+            await UndoShadowPublish.finish(undoTicket, written: nil, forSection: sectionNumber, in: course, journal: undoJournal)
             // Not "Nothing was changed" (said here until #412): the write is
             // page by page, so pages before the one that failed are written —
             // and when one was, it is a write with no undo entry (#531).
@@ -2078,7 +2108,10 @@ final class AssistToolRunner {
                 sectionNumber: sectionNumber
             ))
         }
+        // Today's history first, so Undo Last Change knows of the write the
+        // moment it is made; the shadow list's close waits on its own task.
         history.record(change)
+        await UndoShadowPublish.finish(undoTicket, written: change, forSection: sectionNumber, in: course, journal: undoJournal)
 
         // The plan's declined pages are already on the card (`describe`);
         // one declined only at the write — edited in Obsidian since the card

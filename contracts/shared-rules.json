@@ -1351,6 +1351,18 @@
         "why": "#850. Each arrives as 'Open in Browser did nothing', and only the trail can say which."
       },
       {
+        "carries": "the action's key (publishPages, hidePages), the course and the section, and a word for why (the list was busy, could not be written, could not be saved to the disk, or what was written differed from what was recorded); and, while the list is switched off, that the change went ahead",
+        "event": "undo could not record a step",
+        "line": "ICS3U/1 · the undo list could not record publishPages: the list was busy. The change went ahead (the list is not in use yet).",
+        "why": "#899, piece U1. The list is written in shadow before it is ever offered, and a shadow failure must never touch the action (plan 4.9), so this line is the only trace of a step the list missed; when the list is live the same failure refuses the change before anything is written, and the line says nothing was changed. Never page text: the journal holds that, the trail does not."
+      },
+      {
+        "carries": "the course and the section, whether it was a change, an undo or a redo that stopped part way, and how many files were put back; when a file changed by hand since stopped recovery putting the whole step back, also how many files were in the way, and that the list was cleared",
+        "event": "undo rolled back",
+        "line": "ICS3U/1 · the undo list put back 2 files left part way by a change that stopped (or: …, found 1 file changed by hand since, and cleared the list)",
+        "why": "#899, piece U1. Recovery settles a step whose process died part way from the content of what it changed, and putting files back is the one thing it writes; a teacher who finds a publish half-gone after a crash needs this line to know it was put back on purpose, and that the list was cleared when a hand edit stood in the way. Counts only. Named in U1 but FIRST WRITTEN LIVE, at U7: while the switch is off recovery never writes into a working folder, so no file is put back and this line is not written; the shadow outcome is in the journal only."
+      },
+      {
         "event": "outside assistant set-up opened",
         "carries": "where Set Up an Assistant… was opened from: the Settings pane, the Help menu or Revise With.",
         "line": "opened Set Up an Assistant… (from {the Settings pane | the Help menu | Revise With})",
@@ -45066,5 +45078,1888 @@
       "Vimeo's title=0, byline=0 and portrait=0: the video's owner sets them in Vimeo's embed settings, which is Vimeo's default.",
       "Google Drive, Loom and Stream: each has its own sharing pitfalls, and #692 proposed Vimeo now and the rest later."
     ]
+  },
+  "undo": {
+    "note": "Undo and Redo: ONE list for the whole app, kept on disk (#899). The FORMAT is file-formats.json -> undoJournal; this is the RULE every process that writes it follows, and the cases both suites run. Piece U1 (the journal core) wrote the rule, the check, stack, step and recovery cases, and contracts/undo-traces.json; `laterPieces` names what each later piece adds. Everything is behind the switch (`undoJournalIsLive`, off): written in shadow, never offered, so Section > Undo Last Change and the built-in assistant's undo are unchanged until the switch flips (U7). Russell's rulings are the comments on #899; the Windows director's nine facts (W1 to W9) on the same issue bind this rule. Revised 2026-11-13 after two adversarial reviews of U1 (the director's rulings 1 to 15 on them). Revised again the same night for Russell's rulings 17 to 20 (a deploy and sharing unit plans are not on the list and clear nothing; Undo or Redo of something already deployed then offers to deploy; a refused Redo drops only the redo branch) and the director's rulings on the second reviews: whether a step was deployed is read from the published-pages record (`rule.deployed`), the format has one neutral `note` kind, a clearing takes a step in flight as a fixed rule, nothing stays in flight for ever, a line this version cannot read stops deletion only of what it could reference, and `knownLimits` names what is not fixed. Revised a third time on 2026-11-14 for the director's rulings on U1's third round: steps recorded in shadow are never offered (one clearing at the flip, `rule.shadow`), a `cleared` line clears whatever its reason says, an Undo refused for missing content clears the list and a Redo drops its redo, `rule.deployed` reads only where the section deploys now, a refused put-back is retried on a schedule, a closed step leaves no staged file, and a segment with no readable time is bounded. The journal's format did not change.",
+    "rule": {
+      "oneLock": "Every change to the list takes ONE exclusive lock shared by every process on the computer (the app and each outside-assistant process; a deploy set for later records nothing, rulings 17 and 18), reads the journal FRESH inside it (never from a copy held across the lock; a reader may keep what it has read and read on from where it stopped, as long as it checks that the bytes it read are still there), and holds it only for journal events, never while a change is applied. The one exception is recovery's repair of a dead process's step, made inside the lock so two processes cannot repair the same step. A waiter is queued fairly by the system and woken when the lock is free, never by polling on a timer; it waits a bounded time (2 seconds live; 50 milliseconds in shadow, and once a shadow wait has run out a process tries again only once, without waiting, until it next gets the lock). The mechanism is each platform's own (the mac: a blocking flock on undo/.lock on a thread of its own; Windows: a wait the system queues, such as LockFileEx on undo\\.lock without LOCKFILE_FAIL_IMMEDIATELY, or a named mutex keyed on the SHA-256 of the folder's canonical path, W3; an exclusive open retried on a timer is a poll, and polling on the mac gave up 663 of 1,600 begins with 8 processes at once); the contract names the rule.",
+      "readers": "A reader never treats a sharing violation or a busy lock as an unreadable list: it retries for a bounded time (2 seconds) and otherwise shows the last state it read. A good journal is never reset, moved aside or rewritten (W2).",
+      "appendOnly": "Nothing in undo/ is replaced in place. Events are appended, one per line; a blob is written under a temporary name and renamed onto a name that does not exist yet, with a rename that fails if the name exists. A reader counts only complete lines; a torn last line is ignored by readers and cut off by the next writer inside the lock (W2).",
+      "unknown": "What a version cannot read it KEEPS (file-formats.json -> undoJournal.unknown): a line, a step or an op it cannot read is never skipped as if absent, its step number is never reused, nothing it might name is deleted while it is kept (file-formats.json -> undoJournal.unknown.deleting), and while it stands at or above the head Undo and Redo are simply NOT AVAILABLE (greyed, plain \"Undo\", as ruling 10 has it for an unreachable folder): never undone past, never a reason to clear the list. An older outside-assistant process kept running across an app update is the everyday case (the reviews of U1).",
+      "writeAhead": "A step is written down BEFORE its change: under the lock, the next number (one more than the highest seq in ANY line, readable or not), its content blobs, and a begin line naming every op's expected state, made durable; then the change, outside the lock; then, under the lock, applied (with the redo branch dropped at that moment, so a step that is refused leaves Redo as it was). Undo (undoing, undone) and redo (redoing, redone) have the same shape. A process that dies leaves each file as it was before its step or as it was after it; recovery then settles the whole step: recoveryCases.",
+      "recovery": "Runs inside the lock before every new step, undo and redo (and, from U7, at every launch). For an unfinished event whose process is gone, judged FILE BY FILE by the content of what each op changed: every file where the work started -> failed (an undo or redo ends, the step back where it stood); every file where it was going -> completed; some of each -> what took effect is put back, rolledBack, one trail line; any file NEITHER (changed by hand since the process died) -> every file that can be verified is put back where the work started, the step is recorded `interrupted` naming the files in the way by path (never content), the whole list is CLEARED with reason `interrupted` (as ruling 13 clears for a refused step) and a trail line is written. The journal never says done or failed for a step that is half applied. While switched off (shadow) recovery never writes into a working folder: a step that partly took effect is recorded interrupted, and the list cleared. A step whose put-back cannot even be planned (content it needs is missing, measured with its blobs removed) can never be settled later either: it is closed the same way, `interrupted` (reason couldNotPutBack, naming the files left part way) and the list CLEARED. A swap refused because a file is in use (W5, the everyday case on Windows) is tried again on a bounded schedule that costs nothing on the ordinary path: at once at an Undo or a Redo, where the teacher is waiting for it; otherwise, per process, at its first lock, then one minute after a refusal, doubling, never more than an hour apart; and once the step is past the limits, pruning closes it (below). Measured before this rule (the core review of U1's second round): retried at every lock, a refused 300-page put-back cost each of the next 50 actions 187 to 255 ms, against 7 to 11 ms for a free page (the one figure every document cites for it). Rejected: once per process (a file held for a minute would wait for the next launch). A step closed interrupted leaves nothing of the journal's in a course: its staged files (file-formats.json -> undoJournal.stagedFiles) are removed when it is closed, and, when its folder cannot be reached then, by the first recovery in each process that reaches it (the director's ruling 6 on U1's third round). A step whose working folder cannot be reached, or that this version cannot read, is left unsettled while it is on the list, and Undo is NOT AVAILABLE while it is the newest (ruling 10); once it is past the limits, pruning closes it `interrupted` (reason unsettled, naming every file it names) with NO clearing, because nothing older than it is offered any more and a clearing would take every newer step (limits). So nothing stays in flight for ever: measured before this rule, one such step stopped all pruning (121 steps on the list, none pruned; the director's ruling 4 on U1's second reviews).",
+      "stagedThenSwapped": "An undo or redo checks EVERY op first and writes nothing if any is in the way (ruling 4); otherwise writes every new content BESIDE its target (same folder, a dot-file name), and only when all are written swaps them in, one rename each, re-reading each target first; a swap that cannot go in (a file in use, W5) reverses the swaps already made and names the file. Never a half-undone step.",
+      "contentNotTimes": "Whether a file has changed since is judged by the content of EXACTLY what the op changed: a front-matter entry byte for byte (carriage returns, comments and a byte-order mark kept; never Unicode-equivalence), a whole file by SHA-256. Never modification or creation times (ruling 4, W6).",
+      "linear": "Strictly linear (ruling 9): Undo acts only on the newest step offered that is not undone, then the one before it; Redo only on the most recently undone. A newer step still being made, undone or redone refuses both (anotherChangeIsUnderWay), unless its process is gone and its folder cannot be reached, when both are not available. Any new step, from any process, drops the redo branch when it takes effect. One list across every course and every working folder (ruling 5), and the newest step is undone with no question wherever it was made (ruling 11): stackCases 'rulings 5 and 11'.",
+      "clearing": "The whole list is CLEARED by one `cleared` line carrying its reason and, as its seq, the highest step number in the journal when it is written. A reader honours a `cleared` line WHATEVER its reason says, a reason it does not know included: it never checks the reason (stackCases 'a cleared line clears whatever its reason says'), so a later version can clear for a reason of its own; `clearReasons` are the reasons this version writes. This version clears in four cases: when Undo refuses the newest step because what it changed was changed by hand since, whether the check or the swap finds it (ruling 13: the page is named once, at the refusal); when Undo refuses the newest step because content it needs is missing from the list, which never comes back (refused once with its reason, then cleared as ruling 13 does: held question M9 on U1's second reviews, built as recommended behind one constant, UndoSwitch.undoRefusedForMissingContentClearsTheList; turned off, the newest step would be offered and refused on every try until it aged out, and nothing earlier could be undone); when recovery closes a step interrupted (recovery); and once, when the switch goes live (shadow). Every step done or undone at that point with a number up to the line's leaves the list, and so do lines a newer version wrote before it. A step another process has IN FLIGHT when the clearing is written (begun, undoing or redoing, with a number up to the line's) leaves the list too: its own applied, undone or redone, when it comes, records nothing undoable. That is one fixed rule for every clearing (the director's ruling 3 on U1's second reviews, replacing the constant held for Russell when a deploy still cleared). A REFUSED REDO clears nothing: whether what it changed was changed by hand or content it needs is missing, it is refused once with its reason, then the undone steps from it upward are `dropped` (reason redoRefused), so Redo has nothing and Undo still works for everything earlier, and the Redo is never offered and refused again (ruling 20). A refusal because a file is in use changes nothing on the list, to be tried again. WHAT IS COUNTED: what the app does to a course is a step (ruling 17: 'anything else done through the app is counted'). A DEPLOY (from the app, typed in Terminal, or a deploy set for later when it runs) and sharing or stopping sharing unit plans are NOT on the list and do NOT clear it: everything done before them can still be undone after them (rulings 17 and 18, which replaced 14 and 16). Whether SETTING or CANCELLING a deploy for later is a step is held for Russell (M10, raised by the Fable sweep of U1: the reserved `external` op names the LaunchAgent, and a rollover turns a schedule off): until he answers it is counted as not a step and clears nothing (the writer scan's ScheduledDeploy.swift entry says so), and the scan will be relabelled `waitsFor` if he rules it is one. Setting up an outside assistant is not on the list either: it changes no course and writes only outside every course (held question M8 on U1's second reviews, built as recommended; ruling 16 said so, and rulings 17 and 18 replaced it without naming it). The writer scan (UndoWriterScanTests) lists every file that writes, with which of these it is.",
+      "limits": "Judged when the list is OFFERED, not only at the next write (ruling 3): a step whose time is more than 30 days before the moment the list is judged at is not offered, and because the list is linear nothing older than it is either; then only the newest 50 are offered (rulings 3 and 5, counted across the app; done, undone and in-flight steps all count toward the 50). A step's time is its madeAt, or the latest madeAt before it in the list when that is later, so a clock set back for one step never makes it older than the steps before it. The moment the list is judged at is the clock, or the latest step time that is no more than a day ahead of the clock, when one is; a step time further ahead of the clock is not trusted, so a clock set forward and then put right brings the list back. On the DISK only one oldest run is ever pruned (never a step newer in sequence than one kept): past the newest 50, or more than 60 days old (30, and a grace of 30 so a wrong clock does not destroy the list), and nothing for age while the clock is behind any written time by more than a day. A dead process's step still in flight in that run is closed there (recovery), never a reason to stop. Content and old segments are deleted only when nothing kept can need them (file-formats.json -> undoJournal.unknown.deleting): a line this version cannot read keeps exactly the blobs whose names its text holds and its own segment, and that segment goes like any other once the newest time written in it (for a segment with no readable time, the newest time of the first later segment that has one) is more than 60 days before the clock (the director's ruling 5 on U1's second reviews; before it, one such line stopped all deletion for good).",
+      "shadow": "While `undoJournalIsLive` is off, a failure to write the list never blocks, slows noticeably or alters the action: the action goes ahead exactly as before, and one trail line (`undo could not record a step`) says so (plan 4.9). When live, a step whose begin cannot be written is refused before anything changes. Steps recorded in shadow are NEVER offered (the director's ruling 1 on U1's third round): a shadow list has gaps by design (most writers are journaled only from U3 to U6, and a shadow begin that misses its 50 millisecond wait is dropped: measured 579 and 986 of 1,600 with 8 processes at once), so when the switch goes live (U7) one `cleared` line with reason wentLive is written at the flip, before anything is offered, and the list starts empty (UndoJournal.clearTheListAsTheSwitchGoesLive; stackCases 'the switch going live'). Rejected: offering the shadow steps as they stand (the first Undo after the update could take back a publish from three weeks ago and leave the teacher's newest change, which nobody recorded, standing, and the content check passes whenever that page was not touched since); pruning them one by one (more lines for the same result).",
+      "deployed": "Whether a step's change has reached a website (ruling 19: when Undo or Redo takes back something already deployed, it happens and Plantoir then offers to deploy, U6) is READ FROM THE PUBLISHED-PAGES RECORD (file-formats.json -> publishedPagesRecord), never from the journal: every deploy path writes it (deploy.py after each Netlify or Cloudflare upload, deploy.sh and deploy.ps1 after a folder publish, so the app's button, a deploy set for later and a deploy typed in Terminal leave the same trace), and nothing a launcher does touches the journal. Its INPUTS: the pages the move changes, each with whether students can see it in the course before and after the move; whether the move also changes what a page says; every file of the section's published-pages folder; the destination types the section deploys to NOW (its primary and any additional: netlify, cloudflare, folder); and which of those have a site marker (file-formats.json -> firstDeployMarkers: courses/<CODE>/.netlify_sites/section<N>.json or .cloudflare_sites/section<N>.json; a folder keeps none). Only the fragments of a destination deployed to now are read: one the section no longer deploys to is never a reason to offer (its last fragment would stay the newest for good, since deploying elsewhere never refreshes it: the contract review of U1's second round, I1). For each destination read, the newest fragment by the moment in its own name (yyyyMMddTHHmmssZ-<destination>.json; any other file is not a fragment) says which pages that website shows. A move (an Undo or a Redo) OFFERS TO DEPLOY when, for some page whose visibility the move changes, some destination's newest fragment shows that page as the course has it BEFORE the move (so after it the two differ). CANNOT TELL, unless some destination already gives the offer: a destination with a site marker and no fragment (a section last deployed before the record existed, v1.4.1, or rolled over with the 'same website' answer, which moves every fragment aside and keeps the marker); a destination whose newest fragment cannot be read; a move that also changes what a page says without changing who can see it (the record holds which pages a site shows, not what they say). NO OFFER: every destination read already shows what the move leaves, or no destination deployed to now has a fragment or a site marker (never deployed there since the section began or rolled over). Pages are named as the record names them: an op's path courses/<CODE>/<place>.md is <place>. A place is compared with the record's after both are put in Unicode normalization form C (NFC), then code point for code point, so a name spelled decomposed on one side and composed on the other is one page on both platforms (measured by the contract review: Swift's Set matched them, Python's `in` and an ordinal C# compare did not). Content, not times: no time in the journal is read, so a clock that moved between a step and a deploy cannot mislead it (fragments are ordered among themselves by their own names; knownLimits.deployRecordClock, knownLimits.recordNotWritten). Rejected: a `deployed` event in the journal (it would be missing for every deploy the app did not start, and a v1 reader would stop at it as unknown); comparing a fragment's moment with a step's madeAt (two clocks, and the journal's clock is the one that moves); reading every destination's fragments (a destination left behind would offer for good). Answered by UndoWebsite.answer on the mac; the cases are deployedCases. What U6 does with cannotTell is the director's to settle (laterPieces.U6)."
+    },
+    "clearReasons": [
+      "changedSince",
+      "interrupted",
+      "contentMissing",
+      "wentLive"
+    ],
+    "laterPieces": {
+      "U2": "the remaining op kinds (file-formats.json -> undoJournal.opKinds.reserved), their checkCases rows, and running `recompute`. Recovery then re-derives a step's `recompute` files whenever it settles the step, in either direction (re-deriving is idempotent): rule.recovery judges a step by its content ops only, so a step that died after its swaps and before its re-derivation would otherwise be settled completed with its front page stale (the Fable sweep of U1, T5).",
+      "U3": "the daily page actions wired through the door, and the traces grown to about 120 through the real action code.",
+      "U4": "settings, renames, the wizard (New Course, Scripting/NewCourseCreator.swift), reference courses; steps with no course or no working folder (a preference).",
+      "U5": "the 785 store's undo lists and the Trash (ruling 12: Delete Backup and Delete Archive to the Trash, Undo brings them back): trashCases.",
+      "U6": "the offer to deploy after an Undo or a Redo takes back something a website shows (ruling 19, for a deploy and for shared unit plans alike: ruling 18), asked of rule.deployed (UndoWebsite.answer) after the move, with its own cases for when the offer is made and what a decline leaves; what cannotTell comes to (a move that changes what a page says, which no marker records) is the director's to settle first. A deploy, a deploy set for later and sharing unit plans write nothing to the list and clear nothing (rulings 17 and 18); no `outside` op and no `scheduledRun` maker.",
+      "U7": "the switch, and the one clearing at the flip (rule.shadow: reason wentLive, written once at the first launch with the switch on and before Undo is offered; how that launch knows it is the first is U7's to settle); recovery at every launch; reachCases (ruling 10's greyed plain 'Undo' in the menu, and ruling 11: a step in another course or window is done with no question, the menu names the course, and Plantoir shows it after); menuTitleCases; holdCases; the built-in assistant's 'undo that' as Edit > Undo (ruling 15, as given finally); the two-process test against the app binary; Open Recent as the second place a folder is looked for. Before Windows ships anything, U7 settles a process still in shadow after the flip (knownLimits.shadowProcessAfterTheFlip): either the shadow list is kept in a folder of its own (undo-shadow/, one line in UndoJournalLocation and one sentence in undoJournal.directory, the cheapest today), so a shadow process never touches the live list and the flip needs no first-launch test at all, or every shadow begin carries one optional step key that live readers treat as never offered. And the `undo rolled back` trail line, first written live here, names what stopped recovery: for reason couldNotPutBack it says content the step needs was missing, never that files were changed by hand (activityTrail.mustRecord's `line` corrected with it; the Fable sweep of U1, T11)."
+    },
+    "checkCases": [
+      {
+        "name": "the line as the step left it",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "body edited since, line untouched (a whole-file check refuses this; the line check must not)",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\nA paragraph written in Obsidian since.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "another key edited since",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1 (revised)\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "the line itself changed since: a comment added",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true # checked\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "the line already back",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "carriage returns kept on the line as left",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false\r",
+          "after": "publish: true\r",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\r\ntitle: Unit 1, Day 1\r\npublish: true\r\ncreated: 2026-09-08T07:00:00.000-0400\r\n---\r\n\r\nToday we start.\r\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "carriage returns taken out since: byte for byte, the line is not the one left",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false\r",
+          "after": "publish: true\r",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a byte-order mark before the fence: the step made the block, which is still as left",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": null,
+          "after": "publish: true",
+          "afterKey": null,
+          "createdTheBlock": true,
+          "path": "page.md"
+        },
+        "current": {
+          "bytesHex": "2d2d2d0a7075626c6973683a20747275650a2d2d2d0aefbbbf2d2d2d0a7469746c653a204461790a2d2d2d0a426f64792e0a"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "a key inserted where there was none, still there",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": null,
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "a key inserted where there was none, removed since by hand",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": null,
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "the key there twice: never a guess",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "the page is gone: a line op never reads a missing file as already back",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a folder where the page was",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "folder": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "the page is no longer UTF-8",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "bytesHex": "2d2d2d0a7075626c6973683a20747275650aff0a2d2d2d0a"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "unreadable front matter: the opening fence never closes",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Day\npublish: true\nBody with no closing fence.\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a legacy draft page: the step took the draft line out (one of its two line ops), still out",
+        "op": {
+          "kind": "editLine",
+          "key": "draft",
+          "before": "draft: true",
+          "after": null,
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "the same title in another Unicode form: equal to Swift's ==, not byte for byte",
+        "op": {
+          "kind": "editLine",
+          "key": "title",
+          "before": "title: Cafe",
+          "after": "title: Café",
+          "afterKey": null,
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Café\n---\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a value that runs on to indented lines, as left",
+        "op": {
+          "kind": "editLine",
+          "key": "tags",
+          "before": "tags:\n  - quiz",
+          "after": "tags:\n  - quiz\n  - review",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Day\ntags:\n  - quiz\n  - review\n---\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "whole file, as the step left it",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "new\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "whole file, as it was before",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "old\n"
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "whole file, changed since",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "new\nand more\n"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a page the step created, deleted since by hand: already back",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": null,
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "absent": true
+        },
+        "undo": "alreadyBack",
+        "redo": "canRedo"
+      },
+      {
+        "name": "a page the step created, now a folder",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": null,
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "folder": true
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "a page the step created, not UTF-8 any more",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": null,
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "bytesHex": "ff0a"
+        },
+        "undo": "changedSince",
+        "redo": "changedSince"
+      },
+      {
+        "name": "an op of a kind this version does not know: never guessed at, never a reason to clear",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "a",
+          "after": "b"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "an op whose path climbs out of the working folder",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "../elsewhere/page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "an editLine whose before is a number, not text",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": 3,
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "a recompute whose maintainer this version knows (the section's front page): readable, nothing to check",
+        "op": {
+          "kind": "recompute",
+          "maintainer": "sectionFrontPage",
+          "section": 1,
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      },
+      {
+        "name": "a recompute whose maintainer this version does not know: not readable, so its step is a barrier (never undone with the re-derivation skipped)",
+        "op": {
+          "kind": "recompute",
+          "maintainer": "aMaintainerNobodyKnows",
+          "section": 1,
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "notReadable",
+        "redo": "notReadable"
+      },
+      {
+        "name": "a known op with a key this version does not know: ignored and kept, the op undone by its own rule",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "onlyWhen": "aConditionNobodyKnows",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\n\nToday we start.\n"
+        },
+        "undo": "canUndo",
+        "redo": "alreadyRedone"
+      }
+    ],
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent). current is what is at the op's path now: text (UTF-8), absent, a folder, or raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, notReadable (undo); canRedo, alreadyRedone, changedSince, notReadable (redo). notReadable: the op is not one this version can read (undoJournal.unknown).",
+    "stackCases": [
+      {
+        "name": "three steps: the newest is the head",
+        "calls": [
+          "step",
+          "step",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "undo once",
+        "calls": [
+          "step",
+          "step",
+          "undo"
+        ],
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "undo twice: linear, the one before it next",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "redo puts back the most recently undone first",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "undo",
+          "redo"
+        ],
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a new step drops the redo branch",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          3
+        ]
+      },
+      {
+        "name": "nothing more to redo",
+        "calls": [
+          "step",
+          "undo",
+          "redo",
+          "redo"
+        ],
+        "expectLast": "nothingToRedo",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "nothing to undo on an empty list",
+        "calls": [
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": null,
+        "onTheList": []
+      },
+      {
+        "name": "ruling 13: undo refused because the line was changed by hand clears the whole list; the clearing's seq is the highest step number",
+        "calls": [
+          "step",
+          "step",
+          "undo",
+          "editTheLineByHand",
+          "undo"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 2
+      },
+      {
+        "name": "ruling 13: the list starts again with the next change",
+        "calls": [
+          "step",
+          "editTheLineByHand",
+          "undo",
+          "step"
+        ],
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          2
+        ],
+        "cleared": "changedSince"
+      },
+      {
+        "name": "ruling 17: a deploy is not on the list and does not cut it: everything before it can still be undone",
+        "calls": [
+          "step",
+          "step",
+          "deploy",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "ruling 17: a deploy writes nothing to the list, redo branch and all kept",
+        "calls": [
+          "step",
+          "undo",
+          "deploy"
+        ],
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ],
+        "linesWritten": 0
+      },
+      {
+        "name": "fifty steps kept, counted across the app: the two oldest of 52 leave",
+        "calls": [
+          "steps:52"
+        ],
+        "head": 52,
+        "redo": null,
+        "onTheListCount": 50,
+        "oldestOnTheList": 3
+      },
+      {
+        "name": "the oldest pruned, the next touched the same page, and it still undoes: every step carries its own before",
+        "calls": [
+          "steps:51",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 50,
+        "redo": 51,
+        "onTheListCount": 50,
+        "oldestOnTheList": 2
+      },
+      {
+        "name": "ruling 3, judged when OFFERED: a step made 31 days ago is not offered, with nothing written since",
+        "calls": [
+          "step:31daysAgo",
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "onTheDisk": [
+          1
+        ]
+      },
+      {
+        "name": "linear: nothing older than a step past thirty days is offered, while newer ones are",
+        "calls": [
+          "step:40daysAgo",
+          "step:31daysAgo",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          3
+        ],
+        "onTheDisk": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "a step past thirty days stays on the disk for a grace of thirty more",
+        "calls": [
+          "step:59daysAgo",
+          "step"
+        ],
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          2
+        ],
+        "onTheDisk": [
+          1,
+          2
+        ],
+        "physicallyPruned": []
+      },
+      {
+        "name": "and is deleted from the disk once past sixty",
+        "calls": [
+          "step:61daysAgo",
+          "step"
+        ],
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          2
+        ],
+        "onTheDisk": [
+          2
+        ],
+        "physicallyPruned": [
+          1
+        ]
+      },
+      {
+        "name": "a clock set back for one step never makes it older than the steps before it (core review W1)",
+        "calls": [
+          "step",
+          "step",
+          "clock:-73",
+          "step",
+          "clock:0",
+          "step",
+          "undo",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "name": "a clock set forward: the older steps are not offered while it is forward",
+        "calls": [
+          "step",
+          "step",
+          "clock:+49",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          3
+        ],
+        "onTheDisk": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "and come back when the clock is put right: nothing was deleted",
+        "calls": [
+          "step",
+          "step",
+          "clock:+49",
+          "step",
+          "clock:0"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          2,
+          3
+        ],
+        "onTheDisk": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "rulings 5 and 11: one list across courses and working folders, the newest undone first wherever it was made, with no question (the menu naming the course is U7's)",
+        "calls": [
+          "step",
+          "step@B",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "ruling 10: the newest step's working folder cannot be reached: Undo is not available, and nothing skips past it",
+        "calls": [
+          "step",
+          "step@B",
+          "moveFolder:B",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "ruling 10: available again the moment the folder is back",
+        "calls": [
+          "step",
+          "step@B",
+          "moveFolder:B",
+          "undo",
+          "restoreFolder:B",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a line from a newer version above the head: Undo and Redo are not available, nothing is cleared",
+        "calls": [
+          "step",
+          "step",
+          "foreignLine",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a newer version's line keeps its number: the next step does not reuse it",
+        "calls": [
+          "step",
+          "foreignLine",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          3
+        ]
+      },
+      {
+        "name": "a step holding an op this version cannot read, as the head: not available, never cleared, and its content is kept",
+        "calls": [
+          "step",
+          "foreignStep",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2,
+          3
+        ],
+        "blobKept": true
+      },
+      {
+        "name": "another version's step whose recompute names the section's front page: readable, and undone",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:theFrontPageMaintainer",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "another version's step whose recompute names a maintainer this version does not know: not available, never undone with the re-derivation skipped, never cleared",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:aMaintainerNobodyKnows",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "another version's step whose holds is a value this version does not know: not available, never undone under the wrong lease, never cleared",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:aHoldsNobodyKnows",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": 2,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "another version's step with a madeBy whose client name holds colons, a class and an action key this version does not know: open strings, readable, and undone",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:openStrings",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "another version's step whose editLine carries a key this version does not know: ignored and kept, undone by the editLine rule",
+        "calls": [
+          "step",
+          "stepFromAnotherVersion:aKeyOnAKnownOp",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": 1,
+        "redo": 2,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "a newer version's step this version cannot read at all keeps its content: nothing is deleted while the journal holds a line it cannot read",
+        "calls": [
+          "step",
+          "foreignBlobLine",
+          "step"
+        ],
+        "head": 3,
+        "redo": null,
+        "onTheList": [
+          1,
+          3
+        ],
+        "blobKept": true
+      },
+      {
+        "name": "ruling 13: a refused undo's clearing takes a newer version's lines with it",
+        "calls": [
+          "step",
+          "foreignLine",
+          "step",
+          "editTheLineByHand",
+          "undo",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": 4,
+        "onTheList": [
+          4
+        ],
+        "cleared": "changedSince",
+        "clearedSeq": 3
+      },
+      {
+        "name": "a step another process began while a refused undo was clearing the list leaves it when it finishes (the director's ruling 3: one rule for every clearing)",
+        "calls": [
+          "step",
+          "editTheLineByHand",
+          "undoWhileAStepBegins",
+          "finish:held"
+        ],
+        "expectLast": "changedSince",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "changedSince",
+        "clearedSeq": 2
+      },
+      {
+        "name": "a note line is passed over: it blocks nothing, clears nothing and takes no step number (the director's ruling 2)",
+        "calls": [
+          "step",
+          "note",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "ruling 20: a redo refused because the page was changed by hand drops only the redo",
+        "calls": [
+          "stepOn:p2",
+          "step",
+          "undo",
+          "editTheLineByHand",
+          "redo"
+        ],
+        "expectLast": "changedSince",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "ruling 20: and it is not offered and refused again",
+        "calls": [
+          "stepOn:p2",
+          "step",
+          "undo",
+          "editTheLineByHand",
+          "redo",
+          "redo"
+        ],
+        "expectLast": "nothingToRedo",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "ruling 20: Undo still works for everything earlier",
+        "calls": [
+          "stepOn:p2",
+          "step",
+          "undo",
+          "editTheLineByHand",
+          "redo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "ruling 10: a dead process's step whose folder cannot be reached waits for it while it is on the list",
+        "calls": [
+          "begin:dead@B",
+          "moveFolder:B",
+          "step",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "notAvailable",
+        "head": null,
+        "redo": null,
+        "onTheList": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "and once it is past the limits it is closed as interrupted and pruning goes on (the director's ruling 4)",
+        "calls": [
+          "begin:dead@B",
+          "moveFolder:B",
+          "steps:51"
+        ],
+        "head": 52,
+        "redo": null,
+        "onTheListCount": 50,
+        "oldestOnTheList": 3,
+        "interrupted": [
+          1
+        ],
+        "physicallyPruned": [
+          2
+        ]
+      },
+      {
+        "name": "a cleared line clears whatever its reason says, a reason no reader knows included (the director's ruling 1 on U1's third round)",
+        "calls": [
+          "step",
+          "step",
+          "cleared:aReasonNoReaderKnows",
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "aReasonNoReaderKnows",
+        "clearedSeq": 2
+      },
+      {
+        "name": "the switch going live writes one cleared line: steps recorded in shadow are never offered, and the list starts again with the next change",
+        "calls": [
+          "step",
+          "step",
+          "goLive",
+          "step",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 3,
+        "onTheList": [
+          3
+        ],
+        "cleared": "wentLive",
+        "clearedSeq": 2
+      },
+      {
+        "name": "an Undo refused because content it needs is missing is refused once with its reason, then the list is cleared (held question M9, built as ruling 13)",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "removeContent",
+          "undo"
+        ],
+        "expectLast": "contentMissing",
+        "head": null,
+        "redo": null,
+        "onTheList": [],
+        "cleared": "contentMissing",
+        "clearedSeq": 2
+      },
+      {
+        "name": "and it is not offered and refused again",
+        "calls": [
+          "step",
+          "wholeFileStep",
+          "removeContent",
+          "undo",
+          "undo"
+        ],
+        "expectLast": "nothingToUndo",
+        "head": null,
+        "redo": null,
+        "onTheList": []
+      },
+      {
+        "name": "ruling 20: a Redo refused because content it needs is missing drops only the redo",
+        "calls": [
+          "stepOn:p2",
+          "wholeFileStep",
+          "undo",
+          "removeContent",
+          "redo"
+        ],
+        "expectLast": "contentMissing",
+        "head": 1,
+        "redo": null,
+        "onTheList": [
+          1
+        ]
+      },
+      {
+        "name": "ruling 20: and Undo still works for everything earlier",
+        "calls": [
+          "stepOn:p2",
+          "wholeFileStep",
+          "undo",
+          "removeContent",
+          "redo",
+          "undo"
+        ],
+        "expectLast": "undone",
+        "head": null,
+        "redo": 1,
+        "onTheList": [
+          1
+        ]
+      }
+    ],
+    "stackCasesHow": "Each `step` flips the publish line of fixture page p1 of contracts/undo-traces.json in working folder A (publish: true when it does not read publish: true now, publish: false when it does); `stepOn:p2` does the same to fixture page p2; `step@B` does the same in a second working folder B, course TST2O; `steps:N` makes N steps; `step:<n>daysAgo` makes one with madeAt n days before the clock; `clock:<+n|-n|0>` sets the clock n days from now for every call after it, the final checks included; `undo` and `redo`; `editTheLineByHand` changes p1's publish line by hand; `deploy` does what a deploy does to a course (writes a fragment of the section's published-pages record) and nothing to the list; `note` appends one neutral `note` line (file-formats.json -> undoJournal.events.note) carrying keys a reader does not know; `moveFolder:B` and `restoreFolder:B` take folder B away and put it back; `foreignLine` appends one line of a newer version (v 2) with the next step number; `foreignStep` appends a readable begin and applied whose only op is a `move` (from, to, blobs naming a blob it put in content/); `foreignBlobLine` appends a begin and applied of a newer version (v 2) whose op names a blob it put in content/; `stepFromAnotherVersion:<variant>` is a `step` written by another version (its begin line written raw, the page flipped, then applied) carrying what this version does not write: `theFrontPageMaintainer` adds a `recompute` op whose maintainer is sectionFrontPage (the control), `aMaintainerNobodyKnows` the same with a maintainer no reader knows, `aHoldsNobodyKnows` a `holds` of workingFolder, `openStrings` a `madeBy` of outsideAssistant:A client: with colons:session-7, a `class` of Z and an `action.key` no reader knows, and `aKeyOnAKnownOp` an `onlyWhen` key on its editLine op (file-formats.json -> undoJournal.unknown); `cleared:<reason>` appends one `cleared` line with that reason and the highest seq, a reason no reader knows included; `goLive` is the one clearing at the flip of the switch (UndoJournal.clearTheListAsTheSwitchGoesLive); `wholeFileStep` flips p1's publish line AND adds a line to its body, so the step is one writeFile op whose content is a blob; `removeContent` takes the list's content/ folder away; `begin:held` writes a step's begin and changes nothing yet, `finish:held` makes its change and appends applied; `undoWhileAStepBegins` is an undo during which another process does `begin:held` after the undo has checked its ops and before it answers; `begin:dead@B` writes the begin of a step on folder B's page by a process that is gone, which changes nothing. head and redo are step numbers as OFFERED after the last call (null: none); onTheList is every step offered, oldest first; onTheDisk every step still on the list in the journal (offered or not); physicallyPruned the steps with a pruned line; interrupted the steps closed interrupted; cleared the reason of a clearing the case writes; clearedSeq that clearing's seq; linesWritten how many lines the `deploy` call added to the list; blobKept that the foreign step's blob is still in content/; expectLast what the last call came to.",
+    "stepCases": [
+      {
+        "name": "two pages, the second changed by hand since: nothing written, the second named",
+        "pages": 2,
+        "handEdit": "line of page 2",
+        "undo": "changedSince",
+        "named": "page 2",
+        "others": 0,
+        "files": "unchanged",
+        "phase": "cleared"
+      },
+      {
+        "name": "three pages, the first and third changed by hand: the first met is named, with one other",
+        "pages": 3,
+        "handEdit": "lines of pages 1 and 3",
+        "undo": "changedSince",
+        "named": "page 3",
+        "others": 1,
+        "files": "unchanged",
+        "phase": "cleared",
+        "why": "An undo checks ops in reverse order, so page 3 is met first."
+      },
+      {
+        "name": "a file in use at the second swap: the first swap reversed, the file named",
+        "pages": 2,
+        "handEdit": "none",
+        "fileInUseAtSwap": 1,
+        "undo": "fileIsInUse",
+        "named": "page 1",
+        "others": 0,
+        "files": "unchanged",
+        "phase": "done"
+      }
+    ],
+    "recoveryCases": [
+      {
+        "name": "a step dies after its begin is written",
+        "work": "step",
+        "stopAt": "afterBegin",
+        "files": "before",
+        "phase": "failed",
+        "head": null
+      },
+      {
+        "name": "a step dies before its first file is swapped in",
+        "work": "step",
+        "stopAt": "beforeSwap:0",
+        "files": "before",
+        "phase": "failed",
+        "head": null
+      },
+      {
+        "name": "a step dies with one of its two files swapped in: put back",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null
+      },
+      {
+        "name": "in shadow, the same death: recorded as interrupted, the list cleared, and the files left exactly as the action left them",
+        "work": "step",
+        "mode": "shadow",
+        "stopAt": "beforeSwap:1",
+        "files": "asLeft",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted"
+      },
+      {
+        "name": "a step dies with every file in but before applied: completed",
+        "work": "step",
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "an undo dies after undoing is written",
+        "work": "undo",
+        "stopAt": "afterUndoing",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "an undo dies with one of two files back: put forward again",
+        "work": "undo",
+        "stopAt": "beforeSwap:1",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "an undo dies with every file back but before undone: completed",
+        "work": "undo",
+        "stopAt": "beforeUndone",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "a redo dies after redoing is written",
+        "work": "redo",
+        "stopAt": "afterRedoing",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "a redo dies with one of two files in: put back",
+        "work": "redo",
+        "stopAt": "beforeSwap:1",
+        "files": "before",
+        "phase": "undone",
+        "head": null
+      },
+      {
+        "name": "a redo dies with every file in but before redone: completed",
+        "work": "redo",
+        "stopAt": "beforeRedone",
+        "files": "after",
+        "phase": "done",
+        "head": 1
+      },
+      {
+        "name": "the process is still running: left in flight, and Undo is refused",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "processAlive": true,
+        "files": "asLeft",
+        "phase": "begun",
+        "undo": "anotherChangeIsUnderWay"
+      },
+      {
+        "name": "a step dies part way and the page it had not reached is changed by hand: what took effect is put back, the step is interrupted naming that page, and the list is cleared (core review I1)",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "handEdit": "second",
+        "files": "firstBeforeSecondEdited",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "second"
+        ]
+      },
+      {
+        "name": "an undo dies part way and the page it had not reached is changed by hand: the undone page goes forward again, and the same",
+        "work": "undo",
+        "stopAt": "beforeSwap:1",
+        "handEdit": "first",
+        "files": "secondAfterFirstEdited",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "first"
+        ]
+      },
+      {
+        "name": "the folder of a dead process's step cannot be reached: left unsettled, and Undo is not available rather than under way (ruling 10)",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "moveFolderBeforeRecovery": true,
+        "files": "unchecked",
+        "phase": "begun",
+        "undo": "notAvailable"
+      },
+      {
+        "name": "a step dies part way and its content is then missing, so what took effect cannot be put back: closed as interrupted naming the page left part way, and the list cleared (the director's ruling 4)",
+        "work": "step",
+        "wholeFile": true,
+        "stopAt": "beforeSwap:1",
+        "contentRemovedBeforeRecovery": true,
+        "files": "asLeft",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "first"
+        ]
+      },
+      {
+        "name": "a file in use when recovery puts it back: left in flight, and put back at once by an Undo",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "fileInUseDuringRecovery": true,
+        "files": "asLeft",
+        "phase": "begun",
+        "undo": "nothingToUndo"
+      },
+      {
+        "name": "a step another process has in flight when recovery clears the list leaves it when it finishes (the director's ruling 3)",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "handEdit": "second",
+        "anotherStepInFlight": true,
+        "files": "firstBeforeSecondEdited",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "second"
+        ],
+        "stepInFlight": "cleared"
+      },
+      {
+        "name": "an undo of a step with a page now missing its content dies part way: closed as interrupted, the list cleared",
+        "work": "undo",
+        "wholeFile": true,
+        "stopAt": "beforeSwap:1",
+        "contentRemovedBeforeRecovery": true,
+        "files": "asLeft",
+        "phase": "interrupted",
+        "head": null,
+        "cleared": "interrupted",
+        "pathsNamed": [
+          "second"
+        ]
+      },
+      {
+        "name": "and on the ordinary path it is not tried again before its time: the next step pays nothing for it (the director's ruling 5 on U1's third round)",
+        "work": "step",
+        "stopAt": "beforeSwap:1",
+        "fileInUseDuringRecovery": true,
+        "files": "asLeft",
+        "phase": "begun",
+        "afterAnOrdinaryStep": "begun"
+      }
+    ],
+    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one).",
+    "deployedCases": [
+      {
+        "name": "never deployed: no fragment, no offer",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [],
+        "answer": "noOffer"
+      },
+      {
+        "name": "undo of a publish the website shows: offer",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Day 1",
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy"
+      },
+      {
+        "name": "undo of a publish never deployed since: the website already matches, no offer",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "noOffer"
+      },
+      {
+        "name": "the newest fragment of a destination is what it shows, not the union",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261110T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          },
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "noOffer"
+      },
+      {
+        "name": "a deploy whose second destination failed: the destination still showing the page gives the offer",
+        "destinations": ["netlify", "cloudflare"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": false,
+            "visibleAfter": true
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/index"
+            ]
+          },
+          {
+            "name": "20261112T090000Z-cloudflare.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy",
+        "why": "Undo of a hide: Netlify's newest shows the page hidden, as the course has it before the move, so after the move it differs. Cloudflare's newest is older and already shows it."
+      },
+      {
+        "name": "redo of a publish after its undo was deployed: offer",
+        "destinations": ["folder"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": false,
+            "visibleAfter": true
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-folder.json",
+            "places": [
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy"
+      },
+      {
+        "name": "redo of a publish the website still shows (its undo never deployed): no offer",
+        "destinations": ["folder"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": false,
+            "visibleAfter": true
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-folder.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          }
+        ],
+        "answer": "noOffer"
+      },
+      {
+        "name": "a page whose visibility the move does not change is not asked about",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": true
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          }
+        ],
+        "answer": "noOffer"
+      },
+      {
+        "name": "a move that changes what a page says, not who can see it: the markers cannot tell",
+        "destinations": ["netlify"],
+        "moves": [],
+        "changesMoreThanVisibility": true,
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          }
+        ],
+        "answer": "cannotTell"
+      },
+      {
+        "name": "and a visibility difference still gives the offer when there are other changes too",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "changesMoreThanVisibility": true,
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy"
+      },
+      {
+        "name": "a destination's newest fragment cannot be read: cannot tell",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261112T090000Z-netlify.json",
+            "places": [
+              "Section 1/index"
+            ]
+          },
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": null
+          }
+        ],
+        "answer": "cannotTell"
+      },
+      {
+        "name": "files that are not fragments are not read: a write in progress, a misnamed file",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": ".20261113T090000Z-netlify.json.4242.tmp",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          },
+          {
+            "name": "notes.json",
+            "places": [
+              "Section 1/Classes/Day 1"
+            ]
+          }
+        ],
+        "answer": "noOffer"
+      },
+      {
+        "name": "a page in the course's shared part is named by its place in the course folder",
+        "destinations": ["netlify"],
+        "moves": [
+          {
+            "path": "courses/TST1O/Shared/Unit 1/Reading.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Shared/Unit 1/Reading"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy"
+      },
+      {
+        "name": "a destination the section no longer deploys to is not read (the contract review's I1)",
+        "destinations": [
+          "cloudflare"
+        ],
+        "siteMarkers": [
+          "cloudflare"
+        ],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261020T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Day 1",
+              "Section 1/index"
+            ]
+          },
+          {
+            "name": "20261113T090000Z-cloudflare.json",
+            "places": [
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "noOffer"
+      },
+      {
+        "name": "a section deployed before the record existed (v1.4.1), or rolled over with the same website: a site marker and no fragment cannot tell",
+        "destinations": [
+          "netlify"
+        ],
+        "siteMarkers": [
+          "netlify"
+        ],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [],
+        "answer": "cannotTell"
+      },
+      {
+        "name": "a folder keeps no site marker: no fragment there is never deployed, no offer",
+        "destinations": [
+          "folder"
+        ],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [],
+        "answer": "noOffer"
+      },
+      {
+        "name": "one destination cannot be read and another gives the offer: offer",
+        "destinations": [
+          "netlify",
+          "cloudflare"
+        ],
+        "siteMarkers": [
+          "netlify",
+          "cloudflare"
+        ],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Day 1.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": null
+          },
+          {
+            "name": "20261113T090000Z-cloudflare.json",
+            "places": [
+              "Section 1/Classes/Day 1",
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy"
+      },
+      {
+        "name": "places are compared in Unicode normalization form C: a name composed in the step and decomposed in the record is one page",
+        "destinations": [
+          "netlify"
+        ],
+        "siteMarkers": [
+          "netlify"
+        ],
+        "moves": [
+          {
+            "path": "courses/TST1O/Section 1/Classes/Caf\u00e9.md",
+            "visibleBefore": true,
+            "visibleAfter": false
+          }
+        ],
+        "record": [
+          {
+            "name": "20261113T090000Z-netlify.json",
+            "places": [
+              "Section 1/Classes/Cafe\u0301",
+              "Section 1/index"
+            ]
+          }
+        ],
+        "answer": "offerToDeploy"
+      }
+    ],
+    "deployedCasesHow": "Each case is one move (an Undo or a Redo) of one section, asked of rule.deployed. moves: every page the move changes, by its op path inside the working folder, with whether students can see it in the course before and after the move (the build's own hide rule, worked out by the caller). changesMoreThanVisibility: the move also changes what some page says. record: every file in the section's published-pages folder, by name, with the places it lists (null: the file could not be read). destinations: the destination types the section deploys to NOW (netlify, cloudflare, folder), its primary and any additional. siteMarkers: those of them that have a site marker (file-formats.json -> firstDeployMarkers; absent: none). answer: offerToDeploy, noOffer or cannotTell.",
+    "traces": "contracts/undo-traces.json, generated by scripts/make_undo_traces.py (seeded, deterministic, with its own scripts/test_make_undo_traces.py) and replayed by both suites through each app's own journal and door. U1's traces are publish and hide only, set at the line with JournaledWrite.settingEntry's rule (which drops a leading byte-order mark, as today's publish does); U3 grows them to about 120 through the real action code.",
+    "knownLimits": {
+      "note": "What the list does NOT do, named so nobody takes it for a bug or re-measures it (the director's ruling 6 on U1's second reviews).",
+      "clockFarForward": "A clock set more than 60 days forward (the 30 days kept and the grace of 30), and then put right, loses the list: the step written while it is forward is trusted at that moment, so every older step is pruned and its content deleted in the same hold. Measured (U1 harness, core review): steps 1 to 5, step 6 with the clock a year ahead, the clock put right: one step offered. Up to 60 days forward and back loses nothing (stackCases 'a clock set forward' and 'and come back when the clock is put right').",
+      "deployRecordClock": "The fragments of the published-pages record are ordered by the moment in their own names, written by the deploying computer's clock: a clock set back between two deploys to one destination makes the older fragment read as the newer. The journal's own times are never compared with them.",
+      "recordNotWritten": "A deploy whose fragment was not written (a preview's .build-id replaced the publish build's before the record was written, or the write failed) leaves that destination's newest fragment older than its site: rule.deployed then answers from what the site showed before that deploy. deploy.py says so on its console when the write fails; a build id that does not match is passed over without a word.",
+      "lockHolderStopped": "A process that holds the lock and is stopped (not killed) makes each live wait that runs out leave one waiting thread and one open descriptor until the holder goes; bounded by the waits made (measured: 50 waits, 51 threads). Shadow waits try once after the first runs out.",
+      "putBackOverOneHandEdit": "A step that died with every file swapped in but before applied, with one page then changed by hand, is put back on every other page (measured: 299 of 300) and closed interrupted, as rule.recovery says: the journal never calls half a step done. For the UI review, not a change of rule.",
+      "shadowProcessAfterTheFlip": "A process still running a build with the switch off after the switch goes live (an outside-assistant session that outlives an update: on the mac that server is the app binary; or a build with the switch off run beside a live one on a developer's Mac) goes on writing shadow steps into the same list, and a live reader cannot tell them from live ones. Measured (the Fable sweep of U1, a standalone probe): after goLive and one live step, a shadow-mode step was recorded as step 3 and was the head the live app offered, and Undo took it back past a newer change the shadow process never recorded; a LIVE two-page step killed after its first swap, when the first process to take the lock was in shadow, was recorded interrupted (partlyTookEffect) and cleared, with one page published and the other not, both staged files left, and no trail line. Reaches a teacher only if a build with the switch off is released beside a live one; under ruling 2 none is. No v1 line changes for it: U7 settles it (laterPieces.U7).",
+      "stagedFilesOfAFolderAway": "A step closed interrupted while its working folder could not be reached has its staged files removed by the first recovery that reaches the folder again, for as long as the journal still holds the step's lines (until its segment goes, normally some 60 days). A folder away for longer keeps them: hidden dot files beside its pages, which Obsidian and the website builder pass over."
+    }
   }
 }
