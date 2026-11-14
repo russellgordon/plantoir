@@ -207,7 +207,7 @@ ready.
 
 ---
 
-## Version 2.3
+## Version 2.2
 
 - **"Revise with…" in more places.** Use the Claude and Codex desktop apps,
   not just their command-line versions
@@ -219,7 +219,7 @@ ready.
 
 ---
 
-## Version 2.5
+## Version 2.3
 
 - **More assistants for "Revise with…":** Google Gemini and Antigravity.
   Held for later, with no date.
