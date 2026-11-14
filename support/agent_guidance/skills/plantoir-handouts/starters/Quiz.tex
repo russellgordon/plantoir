@@ -17,6 +17,7 @@
 \usepackage{lastpage}
 \usepackage{needspace}
 \usepackage{array}
+\usepackage{collcell}     % the C column's minus-sign warning (below)
 \usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the handouts skill's section 9)
 \definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
 \newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}   % one heading-row height for tables side by side
@@ -35,11 +36,22 @@
 \newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
 \newlength{\valuecol}
 \newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
-\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
+% A C cell holding a minus sign prints a small red "use N" beside it, so a
+% centred column of negatives shows on the rendered page.
+\makeatletter
+\newcommand{\centredvalue}[1]{%
+  \begingroup\edef\x{\endgroup\noexpand\in@{\detokenize{$-}}{\detokenize{#1}}}\x
+  \ifin@\else\begingroup\edef\x{\endgroup\noexpand\in@{\detokenize{$ -}}{\detokenize{#1}}}\x\fi
+  \ifin@\llap{\tiny\sffamily\color{red}use N\ }\fi#1}
+\makeatother
+\newcolumntype{C}{>{\rowstrut{\valuepitch}\collectcell\centredvalue}w{c}{\valuecol}<{\endcollectcell}}
 \newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
 
 % ---------- Fill in ----------
-\newcommand{\schoolname}{School Name}   % print_school_name in the course's settings
+% The school's name comes ONLY from print_school_name in the course's
+% settings, or from the teacher in this conversation. Never a placeholder:
+% with no name, leave the braces empty and the corner prints nothing.
+\newcommand{\schoolname}{}
 \newcommand{\coursecode}{COURSE}        % the course code, in capitals
 \newcommand{\quiztitle}{Quiz Title}
 
@@ -75,7 +87,9 @@
 % Lay the corners out as the course's print settings do (the skill's sections 2
 % and 5): keep only the blanks print_blanks lists, and move or drop the school's
 % name and the course code as print_school_name_at and print_course_code_at say.
-\fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}\quad\fillblank{Class \#}{1.4cm}}
+% With no print_blanks list, Name and Date, as here; add
+% \quad\fillblank{Class \#}{1.4cm} when the list has class_number.
+\fancyhead[R]{\small\sffamily\color{gray}\fillblank{Name}{3.2cm}\quad\fillblank{Date}{2.2cm}}
 \fancyfoot[L]{\small\sffamily\color{gray}\doctitle\ $\cdot$ \coursecode}
 \fancyfoot[R]{\small\sffamily\color{gray}Page \thepage\ of \pageref{LastPage}}
 \setlength{\parindent}{0pt}
@@ -100,7 +114,14 @@
   {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
                   \setlength{\labelsep}{0.4em}\setlength{\itemsep}{1.2em}}}
   {\end{list}}
-\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+% \roomfor is needspace's test with a neutral break (the handout starter
+% says why: the package's \penalty-100 ends pages early on a ragged bottom).
+\makeatletter
+\newcommand{\roomfor}[1]{\par\penalty\z@\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\penalty-\@M\fi\endgroup}
+\makeatother
+\newcommand{\q}[2][5]{\roomfor{#1\baselineskip}\item[\textbf{#2.}]}
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 
