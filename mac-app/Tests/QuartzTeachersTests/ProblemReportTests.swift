@@ -335,6 +335,110 @@ final class ProblemReportTests: XCTestCase {
         XCTAssertTrue(trimmed.hasSuffix("line \(ProblemReportStore.mostActivityLines + 49)"), trimmed.suffix(20).description)
     }
 
+    // MARK: - How long redaction takes (#853)
+
+    /// Lines that once made some rule read the rest of the line again from
+    /// every place a match might start.
+    private static let slowShapes: [String] = [
+        "address characters",
+        "address characters and dots",
+        "a quoted -u value of colons with no closing quote",
+        "a dash and a run of u",
+        "addresses whose passwords hold a colon",
+        "a password of words with no @",
+        "a home folder followed by words",
+        "labels",
+    ]
+
+    /// One of `slowShapes`, about `length` characters long.
+    private func slowLine(_ shape: String, length: Int) -> String {
+        switch shape {
+        case "address characters":
+            return String(repeating: "a", count: length)
+        case "address characters and dots":
+            return String(repeating: "a.", count: length / 2)
+        case "a quoted -u value of colons with no closing quote":
+            return "curl -u '" + String(repeating: "a:", count: length / 2)
+        case "a dash and a run of u":
+            return "-" + String(repeating: "u", count: length)
+        case "addresses whose passwords hold a colon":
+            return String(repeating: "x://y:z ", count: length / 8)
+        case "a password of words with no @":
+            return "https://a:b " + String(repeating: "c ", count: length / 2)
+        case "a home folder followed by words":
+            return "/Users/a " + String(repeating: "b ", count: length / 2) + "x"
+        default:
+            return String(repeating: "token: ", count: length / 7)
+        }
+    }
+
+    /// The seconds the redactor takes over one line, the best of `tries`.
+    private func secondsToRedact(_ line: String, tries: Int) -> Double {
+        var best: Double = Double.greatestFiniteMagnitude
+        var attempt: Int = 0
+        while attempt < tries {
+            let start: Date = Date()
+            _ = LogRedactor.redacting(line)
+            let seconds: Double = Date().timeIntervalSince(start)
+            if seconds < best {
+                best = seconds
+            }
+            attempt += 1
+        }
+        return best
+    }
+
+    /// No rule takes longer than linear time, so a very long trail line
+    /// cannot hold up the write that waits for it. Before #853's second
+    /// round, a line of 100,000 address characters took more than 90
+    /// seconds in the email rule, and a quoted `-u` value full of colons
+    /// with no closing quote took about a minute in `userFlag` (measured).
+    ///
+    /// Bounded by GROWTH rather than by a number of seconds, so a slower
+    /// machine passes as well as a fast one: ten times the characters may
+    /// take at most `growthLimit` times as long, in the same run. Linear
+    /// work grows about ten times; the quadratic rules grew about a hundred.
+    /// Fifty sits between the two with room for a busy machine: on one
+    /// running another redactor's timings beside it, a linear rule's best
+    /// measured growth reached thirty-nine (2026-11-14, Apple M4 Pro).
+    func testNoRuleTakesLongerThanLinearTime() {
+        let growthLimit: Double = 50
+        let shorter: Int = 10_000
+        let longer: Int = 100_000
+        for shape in ProblemReportTests.slowShapes {
+            // The two lengths are timed in turn, up to three rounds, and the
+            // best of each counts, so a moment of load on the machine, or the
+            // first touch of a large string, is not read as a rule that grows
+            // too fast. The rounds stop at the first that is inside the limit.
+            let shortLine: String = slowLine(shape, length: shorter)
+            let longLine: String = slowLine(shape, length: longer)
+            var shortTime: Double = secondsToRedact(shortLine, tries: 3)
+            var longTime: Double = Double.greatestFiniteMagnitude
+            var round: Int = 0
+            while round < 3 && longTime > growthLimit * shortTime {
+                let longSeconds: Double = secondsToRedact(longLine, tries: 1)
+                if longSeconds < longTime {
+                    longTime = longSeconds
+                }
+                let shortSeconds: Double = secondsToRedact(shortLine, tries: 1)
+                if shortSeconds < shortTime {
+                    shortTime = shortSeconds
+                }
+                round += 1
+            }
+            let growth: Double = longTime / max(shortTime, Double.leastNonzeroMagnitude)
+            XCTAssertLessThanOrEqual(
+                growth, growthLimit,
+                "\(shape): \(shorter) characters took \(shortTime) s and \(longer) took \(longTime) s"
+            )
+            if growth > growthLimit {
+                // The first failure already says what is wrong, and a rule
+                // that grows this fast can take minutes over each later line.
+                break
+            }
+        }
+    }
+
     // MARK: - Two writers at once never lose a line (#238)
 
     /// Four writers in one process, all at once. A lock that belonged to the

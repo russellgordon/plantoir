@@ -516,8 +516,8 @@ final class SharedRulesContractTests: XCTestCase {
             }
         }
         XCTAssertEqual(
-            assembledCount, 10,
-            "#709 and #844's three (the Basic header, the address with a username and password in it, the tripwire that only a filled template passes) and #853's seven (two quoted Basic headers, two user flags, ftp, a slash and a space in a password)"
+            assembledCount, 12,
+            "#709 and #844's three (the Basic header, the address with a username and password in it, the tripwire that only a filled template passes), #853's seven (two quoted Basic headers, two user flags, ftp, a slash and a space in a password) and its second round's two (an address as the -u username, a -u after a home folder)"
         )
 
         // The header really is the base64 of the pair, so the Basic case is
@@ -551,6 +551,24 @@ final class SharedRulesContractTests: XCTestCase {
         filled = filled.replacingOccurrences(of: "{password}", with: password)
         filled = filled.replacingOccurrences(of: "{basic}", with: basic)
         return filled
+    }
+
+    /// The rules run in the order the contract names (#853 round 2). The
+    /// order decides what is left when two rules match the same text, and
+    /// in another order some of them leave a piece of a secret behind
+    /// (`problemReportRedaction.ruleOrder.why`), so it is checked by name
+    /// rather than trusted to stay as it was written.
+    func testTheRedactionRulesRunInTheContractsOrder() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportRedaction")
+        let ruleOrder: [String: Any] = try XCTUnwrap(section["ruleOrder"] as? [String: Any])
+        XCTAssertNotNil(ruleOrder["rule"] as? String)
+        XCTAssertNotNil(ruleOrder["why"] as? String)
+        let expected: [String] = try XCTUnwrap(ruleOrder["order"] as? [String])
+        var actual: [String] = []
+        for rule in LogRedactor.patternRules {
+            actual.append(rule.name)
+        }
+        XCTAssertEqual(actual, expected)
     }
 
     /// The phrases left behind are named in the contract rather than
