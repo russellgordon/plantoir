@@ -1908,7 +1908,8 @@ STUB
   st_stop
 
   # The page count is read from rendered_rows.json -> pages, never typed
-  # here (12 since #674 added the Simulation page; 11 before).
+  # here (13 since #679 added the Music page; 12 since #674 added the
+  # Simulation page; 11 before).
   st_pages=$(rendered_pages | wc -l | tr -d ' ')
   ps_start 404:2
   plan_reset; plan_step 1 0 "${GOOD_LINES[@]}"

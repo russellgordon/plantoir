@@ -891,6 +891,18 @@ else
   fail "PhET simulations or kept downloads (scripts/test_phet.py, #674)"
   cat /tmp/verify_phet_test.log
 fi
+# Tunes (#679): every musicFences case (fences, settings, sounds and the
+# directives the build writes, %% lines, descriptions, lines), the sounds
+# kept beside the simulations (keptDownloads, kind sounds) against a sound
+# server of the test's own, the stop and where it stands in the build, and
+# the folder problem. Stdlib only; its RealEngineTests SKIP here (no engine
+# on the host) and run in the image through check_music_rules_against_the_site.py.
+if (cd scripts && python3 test_music.py) >/tmp/verify_music_test.log 2>&1; then
+  pass "Tunes: the fences, settings, sounds and the directives the build writes, %% lines, descriptions, line numbers, the kept sounds and their pins, the build stopping before Quartz when a sound cannot be downloaded, the site's files and the folder problem - $(grep '^Ran ' /tmp/verify_music_test.log) (scripts/test_music.py, #679)"
+else
+  fail "Tunes (scripts/test_music.py, #679)"
+  cat /tmp/verify_music_test.log
+fi
 
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
@@ -1762,6 +1774,19 @@ else
   fail "a phetFences key or fence case reads differently through the site's own Markdown reader (scripts/check_phet_rules_against_the_site.py, #674)"
   cat /tmp/verify_phet_rules_site.log
 fi
+# #679: every musicFences fence case through the SITE's own Markdown reader
+# (count, line and key, as the build reads them), the sounds the image's own
+# abcjs says each musicFences.sounds.needed tune uses, and the engine file a
+# site carries against its pin.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_music_rules_against_the_site.py" /opt/scripts/check_music_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_music_rules_against_the_site.py \
+  >/tmp/verify_music_rules_site.log 2>&1; then
+  pass "every musicFences fence case holds through the site's own Markdown reader, and abcjs in the image names the sounds each needed case says (scripts/check_music_rules_against_the_site.py, #679)"
+else
+  fail "a musicFences case reads differently through the site's own reader, or abcjs in the image names other sounds (scripts/check_music_rules_against_the_site.py, #679)"
+  cat /tmp/verify_music_rules_site.log
+fi
 
 # #692: every videoEmbeds case through the SITE's own pipeline in Node: the
 # Markdown reader, PlantoirVideo, then Quartz's own OFM html plugins (its
@@ -2170,6 +2195,9 @@ check_baked scripts/geogebra.py           /opt/scripts/geogebra.py
 # PhET simulations (#674): the pass, and the folder every download is kept in.
 check_baked scripts/phet.py               /opt/scripts/phet.py
 check_baked scripts/kept_downloads.py     /opt/scripts/kept_downloads.py
+# Tunes (#679): the pass; its helper and the site's transformer, script and
+# styles are in the loop below (support/music, support/quartz).
+check_baked scripts/music.py              /opt/scripts/music.py
 # Runnable Swift (#493): plan and prepare; and (in the loop) the Swift image's
 # recipe, which the build hashes for its toolchain id, and the page's thread.
 check_baked scripts/swift_blocks.py       /opt/scripts/swift_blocks.py
@@ -2184,7 +2212,7 @@ check_baked scripts/my_progress.py        /opt/scripts/my_progress.py
 check_baked scripts/isolation_headers.py  /opt/scripts/isolation_headers.py
 while IFS= read -r addition; do
   check_baked "$addition" "/opt/$addition"
-done < <(find support/quartz support/agent_guidance support/figures support/gated support/swift -type f ! -name '.*' | sort)
+done < <(find support/quartz support/agent_guidance support/figures support/music support/gated support/swift -type f ! -name '.*' | sort)
 # The print engine itself, by the hash the pin carries (contracts/toolchain.json).
 PAGEDJS_PIN="$(python3 -c 'import json; print([p["fileSha256"] for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0])')"
 PAGEDJS_BAKED="$(docker run --rm "$DEV_TEST_IMAGE" sha256sum /opt/vendor/pagedjs/paged.min.js 2>/dev/null | cut -d' ' -f1)"
@@ -4239,6 +4267,33 @@ else
   cat /tmp/verify_phet_plant.log
 fi
 export PHET_COPY_MISSING
+# ---- #679: the sounds the skill's music example and the rendered check play ----
+# The repository carries no sound file, so the copies come from the dev cache
+# (fetched once, pinned by SHA-256 in contracts/toolchain.json:
+# browser-checks/lib/plant_sounds.py) and are planted where the build keeps
+# what its pages download: the builds below ask GitHub nothing. No copy and
+# no network: the skill's music example is left out and 6n's claim for it,
+# and the rendered check's music rows, are SKIPS by name;
+# PLANTOIR_REQUIRE_ENGINES makes it a failure.
+SOUNDS_COPY_MISSING=""
+if ! python3 browser-checks/lib/plant_sounds.py check >/dev/null 2>&1; then
+  python3 browser-checks/lib/plant_sounds.py fetch >/tmp/verify_sounds_fetch.log 2>&1 || true
+fi
+if ! python3 browser-checks/lib/plant_sounds.py check >/dev/null 2>&1; then
+  SOUNDS_COPY_MISSING="$(tail -1 /tmp/verify_sounds_fetch.log 2>/dev/null || echo 'no copy in the dev cache')"
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "the sounds for the skill's music example and the rendered check (#679): no copy on this Mac and none could be fetched ($SOUNDS_COPY_MISSING), and PLANTOIR_REQUIRE_ENGINES asks for every row"
+  else
+    skip "the sounds for the skill's music example and the rendered check (#679): no copy on this Mac and none could be fetched ($SOUNDS_COPY_MISSING); run python3 browser-checks/lib/plant_sounds.py fetch"
+  fi
+elif python3 browser-checks/lib/plant_sounds.py plant "${HOME%/}/Library/Application Support/Plantoir/builds/$(/bin/pwd -P | shasum -a 256 | cut -c1-8)" >/tmp/verify_sounds_plant.log 2>&1; then
+  pass "the sounds planted where the build keeps its downloads, from the dev cache, each SHA-256 the pinned one: the builds below ask GitHub nothing (browser-checks/lib/plant_sounds.py, #679)"
+else
+  SOUNDS_COPY_MISSING="they could not be planted"
+  fail "the sounds could not be planted where the build keeps its downloads (#679)"
+  cat /tmp/verify_sounds_plant.log
+fi
+export SOUNDS_COPY_MISSING
 # ---- #596: every example in the page-authoring skill, planted for the same build ----
 # The skill's examples are read from the skill ITSELF, so an example edited
 # there is the example built here: every ```markdown / ````markdown fence and
@@ -4283,6 +4338,9 @@ for number, text in enumerate(examples, start=1):
     if os.environ.get("PHET_COPY_MISSING") and "```phet" in text:
         # No copy of the simulation on this Mac (#674): a build of this
         # example would have to download it, and stops without the internet.
+        continue
+    if os.environ.get("SOUNDS_COPY_MISSING") and "```abc" in text:
+        # No copy of the sounds on this Mac (#679): the same.
         continue
     if text.startswith("---\n"):
         page = re.sub(r"^title: (.*)$", lambda m: f"title: {name} - {m.group(1)}", text, count=1, flags=re.M)
@@ -5887,6 +5945,10 @@ claims = [
      lambda a, p: 'class="pl-figure pl-phet"' in a and "static/phet/gas-properties/" in a
      and phet_credit_reads(a)
      and has_file("static/phet/gas-properties/index.html") and has_file("static/phet/gas-properties/ABOUT.txt")),
+    ("T:A scale to sing", "a tune drawn by the build, its Play button and the sounds' credit, the player and the flute sound in the site's own copy (#679)",
+     lambda a, p: a.count('class="pl-figure pl-music"') == 1 and 'class="abcjs-note ' in a and 'class="pl-music-play"' in a
+     and 'class="pl-music-credit"' in a and has_file("static/abcjs/abcjs-basic-min.js")
+     and has_file("static/abcjs/LICENSE.md") and has_file("static/abcjs/sounds/flute-mp3/G4.mp3")),
     ("file: Slope Angle Conjecture.ggb", "two GeoGebra sketches: a file found in Media and one from commands (#578)",
      lambda a, p: [spec.get("sketch") for spec in geogebra_specs(a)] == ["Media/Slope-Angle-Conjecture.ggb", None]
      and [line["text"] for line in geogebra_specs(a)[1].get("commands", [])] == ["f(x) = 2x + 1", "A = Point(f)"]
@@ -5916,6 +5978,10 @@ for number, text in enumerate(examples, start=1):
     if os.environ.get("PHET_COPY_MISSING") and "```phet" in text:
         # Left out of the build: no copy of the simulation on this Mac (#674).
         print(f"   example {number} ({what}) not built: no copy of PhET's simulation on this Mac")
+        continue
+    if os.environ.get("SOUNDS_COPY_MISSING") and "```abc" in text:
+        # Left out of the build: no copy of the sounds on this Mac (#679).
+        print(f"   example {number} ({what}) not built: no copy of the sounds on this Mac")
         continue
     body = article(slug)
     full = (public / f"{slug}.html").read_text(encoding="utf-8", errors="replace") if body is not None else ""
@@ -6561,6 +6627,19 @@ rendered_lines() {
 # on this Mac (PHET_COPY_MISSING, set before 6n) the page is taken out, and
 # the phet row, its sabotages and the every-page rows for that page are
 # SKIPS by name (rendered_features.mjs runPage does not open it).
+# The Music page's sounds (#679), the same way: planted from the dev cache,
+# or with no copy (SOUNDS_COPY_MISSING) the page taken out and its rows
+# SKIPS by name (PLANTOIR_RENDERED_NO_SOUNDS).
+rendered_sounds_copy() {
+  if [[ -n "${SOUNDS_COPY_MISSING:-}" ]]; then
+    rm -f "$RENDERED_DIR/courses/EXC2O/Rendered Check/Music.md"
+    export PLANTOIR_RENDERED_NO_SOUNDS="$SOUNDS_COPY_MISSING"
+    return 0
+  fi
+  unset PLANTOIR_RENDERED_NO_SOUNDS
+  mkdir -p "$RENDERED_BUILDS"
+  python3 browser-checks/lib/plant_sounds.py plant "$RENDERED_BUILDS"
+}
 rendered_phet_copy() {
   if [[ -n "${PHET_COPY_MISSING:-}" ]]; then
     rm -f "$RENDERED_DIR/courses/EXC2O/Rendered Check/Simulation.md"
@@ -6602,6 +6681,7 @@ elif ! run_check node browser-checks/lib/test_site_server.mjs >/tmp/verify_rende
   grep '^FAIL' /tmp/verify_rendered_server.log
 elif ! python3 browser-checks/lib/plant_rendered.py plant "$RENDERED_DIR/courses/EXC2O" >/tmp/verify_rendered_build.log 2>&1 \
      || ! rendered_phet_copy >>/tmp/verify_rendered_build.log 2>&1 \
+     || ! rendered_sounds_copy >>/tmp/verify_rendered_build.log 2>&1 \
      || ! (cd "$RENDERED_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) >>/tmp/verify_rendered_build.log 2>&1 \
      || [[ ! -f "$RENDERED_BUILDS/EXC2O/section1/public/Rendered-Check/Diagrams.html" ]]; then
   # A build that failed is a failure, never a skip: the rows never ran.
