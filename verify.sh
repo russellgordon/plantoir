@@ -686,6 +686,16 @@ else
   cat /tmp/verify_image_only_tests_say_so.log
 fi
 
+# No launcher a test runs writes the teacher's real trail (#738): every test
+# file that runs one imports launcher_test_trail, and deploy.sh's own
+# note_on_the_trail, run under a scratch HOME, writes into the helper's folder.
+if (cd scripts && python3 test_launcher_tests_keep_their_trail.py) >/tmp/verify_launcher_tests_trail.log 2>&1; then
+  pass "every test that runs a launcher keeps its trail in a temporary folder: each imports launcher_test_trail, and deploy.sh's own note_on_the_trail writes there and not into HOME, which it does with the redirect taken away (scripts/test_launcher_tests_keep_their_trail.py, #738)"
+else
+  fail "a test that runs a launcher could write the teacher's real trail (scripts/test_launcher_tests_keep_their_trail.py, #738)"
+  cat /tmp/verify_launcher_tests_trail.log
+fi
+
 # KaTeX served by the site itself (#494): the copy from Quartz's own package
 # and the latex.ts patch that links it; and (#455) the edits that wire
 # Plantoir's additions into a section's Quartz copy. Stdlib only.
@@ -1512,6 +1522,7 @@ echo ""
 echo "🔎 Checking the coverage map Plantoir shows for a section…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_coverage_tab.py" /opt/scripts/test_coverage_tab.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/launcher_test_trail.py" /opt/scripts/launcher_test_trail.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_deploy_non_interactive.py" /opt/scripts/test_deploy_non_interactive.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/preview.sh" /opt/preview.sh),readonly" \
@@ -1531,6 +1542,7 @@ echo ""
 echo "🔎 Checking the record of pages that have been published…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_published_pages_record.py" /opt/scripts/test_published_pages_record.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/launcher_test_trail.py" /opt/scripts/launcher_test_trail.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
   "$DEV_TEST_IMAGE" python3 /opt/scripts/test_published_pages_record.py >/tmp/verify_published_pages_record_test.log 2>&1; then
   pass "build_site.py, deploy.py, deploy.sh: the pages a publish put on a site are recorded, and only then (scripts/test_published_pages_record.py, #379)"
