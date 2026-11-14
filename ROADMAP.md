@@ -214,16 +214,11 @@ ready.
   ([#507](https://github.com/russellgordon/plantoir/issues/507)), and look into doing
   the same with GitHub Copilot's desktop app
   ([#784](https://github.com/russellgordon/plantoir/issues/784)).
+- **Possibly more assistants for "Revise with…":** a look at supporting
+  Google Gemini and Antigravity.
+  ([#508](https://github.com/russellgordon/plantoir/issues/508))
 - **Students choose their own colour scheme** on a published site
   ([#606](https://github.com/russellgordon/plantoir/issues/606)).
-
----
-
-## Version 2.3
-
-- **More assistants for "Revise with…":** Google Gemini and Antigravity.
-  Held for later, with no date.
-  ([#508](https://github.com/russellgordon/plantoir/issues/508))
 
 ---
 
