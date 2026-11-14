@@ -2022,6 +2022,43 @@
    "setup": "The preview of that page, after one preview with the internet; the simulation is not opened, so nothing plays",
    "windows": null,
    "raw": false
+  },
+  "subject-science-1": {
+   "page": "subject-science",
+   "shows": "SCH3U's page Combustion on the class website, with its chemical equations typeset",
+   "labels": [
+    "Chemical equations"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "SCH3U made from its ready-made course; the preview of Concepts, Combustion",
+   "windows": null,
+   "raw": false
+  },
+  "subject-science-2": {
+   "page": "subject-science",
+   "shows": "SPH3U's page The Doppler Effect on the class website, with its diagram",
+   "labels": [
+    "Diagram drawn from text"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "SPH3U made from its ready-made course; the preview of Concepts, The Doppler Effect",
+   "windows": null,
+   "raw": false
+  },
+  "subject-science-3": {
+   "page": "subject-science",
+   "shows": "SCH3U's page Solubility Rules on the class website, with its table",
+   "labels": [
+    "Reference",
+    "The rules"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "SCH3U's preview of Reference, Solubility Rules",
+   "windows": null,
+   "raw": false
   }
  }
 }

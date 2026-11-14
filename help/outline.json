@@ -3351,7 +3351,31 @@
       "subject-science-2",
       "subject-science-3"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "SCH3U's page Combustion on the class website, with its chemical equations typeset",
+       "labels": [
+        "Chemical equations"
+       ],
+       "scene": "subject-science-1"
+      },
+      {
+       "shows": "SPH3U's page The Doppler Effect on the class website, with its diagram",
+       "labels": [
+        "Diagram drawn from text"
+       ],
+       "scene": "subject-science-2"
+      },
+      {
+       "shows": "SCH3U's page Solubility Rules on the class website, with its table",
+       "labels": [
+        "Reference",
+        "The rules"
+       ],
+       "scene": "subject-science-3"
+      }
+     ]
     },
     {
      "anchor": "subject-computer-studies",
