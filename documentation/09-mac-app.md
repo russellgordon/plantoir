@@ -4166,8 +4166,9 @@ section where `include_my_progress` is off - `false`, or a per-section map
 read as `include_curriculum_coverage` is; checked against #545 as merged),
 wikilinks versus Markdown links
 (`[words](Page Name.md)` is not a link), `![[page]]`, footnotes, tags,
-Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo and
-PhET (the site's own `<iframe>` on one line), GeoGebra (since #578 the
+Media pictures and PDFs, YouTube and Vimeo (since #692 both in the picture
+form, `![words](Share address)`, documentation/06 S), PhET (the site's own
+`<iframe>` on one line), GeoGebra (since #578 the
 ` ```geogebra ` fence in all three ways — a `.ggb` beside the page, typed
 commands, or `material_id:` — and never a geogebra.org `<iframe>`, which
 the skill now says to replace with `material_id:` of the same id), `%%` notes, `publish:` and
@@ -4185,7 +4186,8 @@ asked again, as with every skill before it.
 ITSELF and planted as `Authoring Example NN` pages in the fixture build, with
 the pages they link to and the Media files they show; 6n reads each back as
 the feature it claims (a callout's `data-callout`, a folded one's
-`is-collapsed`, the YouTube `embed/` frame, the Media `<img>` and PDF frame
+`is-collapsed`, the YouTube and Vimeo players (since #692 the
+`youtube-nocookie.com` and `dnt=1` addresses, with their titles), the Media `<img>` and PDF frame
 resolving to files in `public/`, `publish: false` absent, ...). Every example
 must match exactly one claim and every claim one example, so an example added
 without a claim fails. An `Authoring Claims` page pins what the prose says

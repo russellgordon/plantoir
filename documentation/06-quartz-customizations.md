@@ -329,6 +329,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-30 | **The sidebar scrolls only itself (#611)** | `quartz/components/scripts/explorer.inline.ts` | `patch_explorer_scroll_in_sidebar_only` (marker `PLANTOIR-SIDEBAR-SCROLL`) replaces Quartz's one `activeElement.scrollIntoView({ behavior: "smooth" })` — which scrolled the PAGE as well as the sidebar, 300-600 px down a long page as it opened — with a scroll of the sidebar's own list: none when the current page's entry is inside a closed folder, none when it is already in view, otherwise `scrollTop` set once, at once, centring it. Every build, idempotent, run straight after C2-3's expand-on-navigate patch; a script of another shape warns and is left alone. `patches/explorer.inline.ts` keeps Quartz's line (A2 unchanged). Section O. |
 | C2-31 | **Font stacks quoted one family at a time, and the system-font choice on the system stack (#629)** | `quartz/util/theme.ts` | Quartz's `joinStyles` wrote `--bodyFont: "<choice>", <fallback>`, quoting the WHOLE choice, so the "System fonts" choice — stored as `"Helvetica, Arial"` by both apps and `setup_course.py` — became ONE family of that name, which no machine has. The browser fell through to the fallback's `system-ui`: Chrome's platform-font query (`CSS.getPlatformFontsForNode`, Chrome for Testing 155.0.8059.39, this Mac, 2026-10-22/23) reports `.SF NS` (San Francisco), so Helvetica was never shown. **Russell's ruling (2026-10-22): those sites keep looking as they do** — San Francisco on a Mac, Segoe UI on Windows. So `patch_font_variable_stacks` adds `cssFontStack`: each family is quoted on its own, CSS keywords (`serif`, `system-ui`, `-apple-system`…) are left bare, and the system choice gets Quartz's fallback ALONE (`system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, …`), which puts system-ui and Segoe UI ahead of Helvetica and Arial. Measured: the same query reports `.SF NS` for the old and the new stack. A single family comes out byte for byte as before, so a Google-font site's stylesheet does not change (`scripts/test_font_variables.py` runs the patched TypeScript under node and compares). Every build, idempotent, anchored on the three v4.5.0 lines (each must match once) and warning without editing anything otherwise; the helper is a RAW Python string, because `/["\\]/g` in an ordinary one loses a backslash and every course's build fails on an unterminated regular expression (caught in review; the test pins the text). **Rejected:** quoting each family with Helvetica first, as the planner first proposed — measured to render Helvetica, a visible change to every system-font site that Russell turned down; changing the STORED value (to `"system-ui, Helvetica, Arial"` or similar) — every existing `course_config.json`, the Windows catalogue, the contract cases in `shared-rules.json`, the mac goldens, `setup_course.py`'s detection, C2-19's filter and `social_card.py` all key on the literal, and old folders would still carry the old one, so the build is the one place that fixes all of them; Python writing the stacks as literals into `theme.ts` — typography lives in `quartz.config.ts` (C1-11, full rebuild only), so two sources could disagree; editing Quartz's `DEFAULT_SANS_SERIF`, which buys nothing. Not affected: the Google request (C2-19 already drops stacks), the printed page (#499's `print.scss` sets its own font variables), the social card. The label for the choice now says "System fonts (each device's own)" in the mac app and in `setup_course.py`, and the mac's font editor previews it in the system font rather than Helvetica. **Windows inherits the CSS free** (shared `build_site.py` against its bundled Quartz v4.5.0; a different `theme.ts` would only warn) and says the same label since #648 (`FontCatalog.PairingLabel`, `WorkspaceTests.SystemPairingLabel`). |
 | C2-32 | **```text wrap: a text block's lines wrap (#653)** | `quartz/plugins/transformers/textWrapRule.ts`, `codeRunner.ts`'s second markdown plugin, `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, every build) | A ```text fence with `wrap` in its info string is wrapped in `div.plantoir-text-wrap` at the markdown stage, on every page; on screen its lines wrap at the window's width with each line's number on its first row and `…` in the gutter on the rest; code fences never wrap and `wrap` after them is ignored silently; print and the handout are untouched. Every other block is byte for byte as before. No new wiring: the plugin rides `CodeRunnerFences`' place straight before `SyntaxHighlighting`. Section P says why and what was measured. |
+| C2-33 | **YouTube and Vimeo players from the picture form (#692)** | `quartz.config.ts`, `quartz/plugins/transformers/index.ts`, `quartz/plugins/transformers/plantoirVideo.ts` and `videoRules.js`, `quartz/components/styles/videos.scss` (installed with Plantoir's additions, carried into `index.css` by `PlantoirMetaLine.tsx`) | `_wire_video_transformer` puts `Plugin.PlantoirVideo()` straight BEFORE `Plugin.ObsidianFlavoredMarkdown(`, anchored and idempotent, so a section built before #692 gets it on its next build. Before OFM because OFM's own YouTube step replaces a picture's properties and the words in its brackets (the player's title) are lost. See S below. |
 
 #### Settings written inside a TypeScript string (#871)
 
@@ -5211,6 +5212,161 @@ course (above). A per-host or per-engine checker (the 2026-10-31 ruling asks
 for a host as an entry in a list). Firefox (not asked for; `firefox-1543` is
 cached and the checker could add it by name). Screenshots to judge paint
 (blank in headless WebKit until `load`, #625).
+
+## S. YouTube and Vimeo players from the picture form (#692, v2.0.0)
+
+A teacher writes the address the video site's Share button gives in the
+picture form, on its own line, and the class site shows the player:
+
+```markdown
+![Mitosis in three minutes](https://vimeo.com/76979871)
+![](https://vimeo.com/123456789/abcdef1234)
+![Slope in two minutes](https://www.youtube.com/watch?v=WUvTyaaNkzM&t=30)
+```
+
+Before #692 only YouTube had this form (Quartz's own `enableYouTubeEmbed`);
+Vimeo needed its `<iframe>` code pasted, and `![](https://vimeo.com/...)`
+was a broken picture. Every case is in `contracts/shared-rules.json` →
+`videoEmbeds`.
+
+### S1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/videoRules.js`: the rules, plain JavaScript with no
+  imports, shared by the transformer and the check. Which addresses, the
+  player address, the title, the fallback titles, the attributes and the
+  note.
+- `plugins/transformers/plantoirVideo.ts`: the html-stage transformer. An
+  `img` whose `src` the rules recognise becomes `<iframe class="external-embed
+  plantoir-video youtube|vimeo">` with `src`, `title`, `loading="lazy"`,
+  `allow`, `allowfullscreen`, `referrerpolicy` and `frameborder`.
+- `components/styles/videos.scss`: one rule, carried by
+  `PlantoirMetaLine.tsx` into the one `index.css` (as `pictures.scss` is).
+
+### S2. The order, and why
+
+Quartz runs every transformer's html plugins in the order the transformers
+are listed (`processors/parse.ts`, `createHtmlProcessor`). OFM's YouTube
+step sets `node.properties` to a new object, so after it the picture's
+`alt` is gone and there is nothing to make a title from. So the videos'
+transformer is wired straight BEFORE OFM (C2-33) and makes both hosts'
+players itself; OFM's step then finds no picture left to change. OFM's
+`rehype-raw` also runs after it, so pasted `<iframe>` code is still a raw
+node when the videos' transformer looks, and is never touched. A raw
+`<img src="https://www.youtube.com/...">` typed as HTML is the one shape the
+videos' transformer cannot see: OFM still makes its old `youtube.com`
+player from it, as before #692.
+
+### S3. Addresses and players
+
+- **YouTube**: every address OFM's `ytLinkRegex` and `ytPlaylistLinkRegex`
+  read (copied into `videoRules.js` unchanged, so an address that played
+  before still plays), plus `youtube.com/shorts/<id>`. The player is
+  `https://www.youtube-nocookie.com/embed/<id>`, with `list=` and with
+  `start=<seconds>` from `t=90`, `t=1m30s` or `start=90`.
+- **Vimeo**: `vimeo.com/<id>`, `vimeo.com/<id>/<hash>` (unlisted),
+  `vimeo.com/channels/<name>/<id>`, `vimeo.com/groups/<name>/videos/<id>`
+  and `player.vimeo.com/video/<id>?h=<hash>`. The player is
+  `https://player.vimeo.com/video/<id>?h=<hash>&dnt=1`: the hash FIRST,
+  because Vimeo's help says every other parameter goes after it
+  (help.vimeo.com, article 12426285089681, read 2026-11-13). A `#t=` start
+  time is kept as Vimeo's own `#t=<seconds>s`. Any other vimeo.com address
+  (a showcase, a profile) stays the picture, and the transformer prints
+  `plantoir: note:` with `videoEmbeds.notes.notAVideo`. That line reaches the
+  build's console only, not the Problems tab: no Python reads video
+  addresses, and the page itself shows the broken picture in a preview (plan
+  review S4, accepted).
+- **The title** is the words in the brackets, with an Obsidian width
+  (`|400`, `|400x300`) taken off, or `videoEmbeds.titles` when they are
+  empty.
+- **The referrer policy** is `strict-origin-when-cross-origin`, the one
+  Vimeo's own embed code carries (its oEmbed answer, 2026-11-13). A video its
+  owner limited to specific domains plays only when the player is told the
+  class site's address, and YouTube players are reported to refuse to play
+  when sent no referrer. It is a contract value with that reason so nobody
+  tightens it to `no-referrer`.
+- **Privacy**: Russell's ruling on #692 (2026-11-13): the privacy-enhanced
+  YouTube address and Vimeo's `dnt=1`; no tap before a player loads.
+
+### S4. The size
+
+Measured before the change (2026-11-13, the verify fixture's YouTube
+player, Chromium 1243 and WebKit 2359, every off-site request refused):
+650 x 366 at a 1300 px window and 358 x 201 at 390 px. Quartz's
+`.external-embed.youtube { width: 100%; aspect-ratio: 16 / 9 }` won over the
+player's `width="600px"`, so the player filled the column. Russell's size
+(2026-10-24) is 600 px wide at most, 16:9: `html body
+iframe.external-embed.plantoir-video { width: 600px; max-width: 100%;
+height: auto; aspect-ratio: 16 / 9 }`. The long selector is needed because
+Plantoir's styles come BEFORE `base.scss` in `index.css`, so the rule must
+win on specificity. Measured after (2026-11-13, a page built in
+`quartz-teacher:dev-test` from the skill's video example, Chrome for
+Testing 155 headless): 600 x 337.5 at 1300 px, 358 x 201.4 at 390 px. So a
+YouTube player that was 650 px wide on a laptop is now 600 px.
+
+### S5. The checks
+
+- `scripts/check_video_rules_against_the_site.py` (verify.sh, in the image):
+  every `videoEmbeds.cases` page through remark-parse, OFM's Markdown
+  plugins, remark-gfm, remark-rehype, then PlantoirVideo's and OFM's html
+  plugins, each bundled from its real source with the image's esbuild; and
+  the titles, attributes and note as `videoRules.js` has them. Must-fails
+  measured by copy-aside: `dnt=1` before `h=` (3 cases red), the Shorts
+  rule removed (1), the old `youtube.com` player address (7), OFM's plugins
+  before PlantoirVideo's (48 problems), and `origin/dev`'s transformers
+  (does not bundle).
+- `scripts/test_quartz_additions_wiring.py`: the transformer straight before
+  OFM, on a fresh section and on one wired before #692, and said and left
+  out when OFM's line has moved; the style rule exactly. Red on
+  `origin/dev`'s `build_site.py` (3 tests) and with the transformer wired
+  after OFM (2).
+- `browser-checks/video_players.mjs` (verify.sh, with Chrome for Testing):
+  the skill's video example as 6n built it, every request to another host
+  refused so nothing loads or plays. 600 px and 16:9 at 1300 px, the
+  column's width and 16:9 at 390 px, a title, `loading="lazy"`, the referrer
+  policy and a private address on each player; the pasted Vimeo player keeps
+  its own width. Asked of Chrome only: the planner measured the same layout
+  in WebKit, as `picture_heights.mjs` is asked of Chrome. verify.sh breaks a
+  copy of the site three ways and each must fail for its own reason: the
+  size rule out of `index.css` (650 px, measured), the title and `loading`
+  off (Quartz's own player's shape), the old `youtube.com` address.
+- verify.sh 6n: the skill's example builds as the three players, the pasted
+  Vimeo and PhET code unchanged, and no `www.youtube.com/embed/`.
+- The rendered check's `embeds` row (deployed sites only) has a short-form
+  Vimeo line on the Embeds page and brings each frame into view before it
+  waits, since a lazy player far below the window would never ask for its
+  document.
+- `codeRunnerBlocks.isolation.cases`: a page with a short-form player is a
+  `frame` page, never isolated.
+
+### S6. Rejected
+
+- A tap before a player loads (a card with the title and a Play button,
+  about one agent-hour more): offered on #692 and not chosen.
+- Running after OFM and patching its player: the title is already gone.
+- Turning OFM's `enableYouTubeEmbed` off: an edit to every section's
+  settings that buys nothing over leaving it to find no picture.
+- A per-video width: the size is ruled; `|400` is dropped from the title.
+- Vimeo's `title=0&byline=0&portrait=0`: the video's owner sets them.
+- A Vimeo showcase player: its embed address could not be verified.
+- Google Drive, Loom and Stream: each has its own sharing pitfalls; later,
+  if asked.
+- A Python scan for `notAVideo` feeding the Problems tab: no Python reads
+  video addresses today, and the broken picture is visible in the preview.
+
+### S7. Known limits
+
+- A school network that allows youtube.com and blocks
+  youtube-nocookie.com stops every YouTube video at school on the first
+  build after this ships, while the teacher's preview at home still plays.
+  Nothing tells the teacher. Help, the page-authoring skill and the release
+  notes say to ask the school's network team to allow youtube-nocookie.com.
+- Obsidian shows the Vimeo picture form as a player only with the community
+  add-on Simple Vimeo.
+- A video its owner limited to specific domains plays only on the domains
+  listed.
+- Not measured here: whether nocookie playlists play, Vimeo's answer for a
+  video that does not exist, and whether YouTube refuses a player sent no
+  referrer. The deployed `embeds` row reads each frame's status.
 
 ## E. Summary: what is *not* customized
 

@@ -378,7 +378,7 @@ def quiz_given_away(site: Path) -> str:
 
 
 def own_host_embeds_page(site: Path) -> str:
-    # The four planted embeds pointed at a page of the site's own (so the
+    # The five planted embeds pointed at a page of the site's own (so the
     # check needs no network here), then a frame and a request of another
     # host's beside them: the Embeds page is judged like any other, and only
     # frames on the embeds row's allowedFrames may come from elsewhere.

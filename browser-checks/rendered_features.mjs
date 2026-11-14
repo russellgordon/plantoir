@@ -992,13 +992,22 @@ ROW_CHECKS["geogebra keys"] = async ({ page }) => {
 
 ROW_CHECKS.embeds = async ({ page, record }) => {
   const frames = await page.evaluate(() => Array.from(document.querySelectorAll("article iframe")).map((frame) => frame.src))
-  if (frames.length < 4) return { fail: `the Embeds page holds ${frames.length} frames, not the four planted` }
+  if (frames.length < 5) return { fail: `the Embeds page holds ${frames.length} frames, not the five planted` }
   const answered = new Map()
   page.on("response", (response) => {
     const request = response.request()
     if (request.isNavigationRequest() && request.frame() !== page.mainFrame()) answered.set(request.url(), response.status())
   })
   await page.reload({ waitUntil: "load", timeout: 60000 })
+  // The players made from the picture form load lazily (#692), so each frame
+  // is brought into view in turn; a lazy frame far below the window would
+  // otherwise never ask for its document and read as "answered nothing".
+  await page.evaluate(async () => {
+    for (const frame of Array.from(document.querySelectorAll("article iframe"))) {
+      frame.scrollIntoView({ block: "center" })
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+  })
   // Until every frame's document has answered, with a ceiling, never a fixed wait.
   const answeredFor = (src) => { for (const url of answered.keys()) if (url.split("?")[0] === src.split("?")[0] || url.startsWith(src)) return true; return false }
   for (let tries = 0; tries < 200 && !frames.every(answeredFor); tries += 1) await pause(150)

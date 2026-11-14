@@ -547,7 +547,11 @@ policy built from what is really there:
 ```
 
 Only `script-src` is set, never `default-src` — nothing else about a page
-(images, fonts, styles, network requests) is restricted. This runs on the
+(images, fonts, styles, network requests) is restricted. Nor are frames: a
+YouTube or Vimeo player (#692, `youtube-nocookie.com` and
+`player.vimeo.com`, documentation/06 S) loads untouched by the policy, and a
+page holding one is never isolated (`codeRunnerBlocks.isolation`, reason
+`frame`). This runs on the
 Netlify path only, right after any production rebuild above and right
 before the delta-deploy manifest is built, so `_headers` rides along in the
 same SHA-1 manifest as every other file. It is deterministic build to build
