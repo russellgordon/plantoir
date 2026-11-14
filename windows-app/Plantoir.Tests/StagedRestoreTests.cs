@@ -294,6 +294,21 @@ public sealed class StagedRestoreTests : IDisposable
         Assert.Equal(0, (int)(File.GetAttributes(arrived) & FileAttributes.ReparsePoint));
     }
 
+    [Fact]
+    public void ANameWindowsCannotHoldDoesNotStopTheCheck()
+    {
+        // A Mac's backup can carry a name with '?' or '"' in it. .NET writes such
+        // an entry under a name with '_' in their place, so the check counts and
+        // sizes rather than looking each name up.
+        string zipPath = HandMadeBackup(("ICS3U/course_config.json", """{"course_code":"ICS3U","section_numbers":[1]}"""),
+                                        ("ICS3U/What next?.md", "a question"));
+
+        CourseRestorer.RestoreBackup(BackupItem.From(zipPath, "ICS3U")!, CoursesDir);
+
+        Assert.Equal("a question", File.ReadAllText(Assert.Single(Directory.GetFiles(CourseDir, "What next*.md"))));
+        Assert.Empty(Leftovers());
+    }
+
     // ---- through the seam: a step fails, or a kill lands between two -----
 
     [Fact]

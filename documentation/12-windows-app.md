@@ -13284,7 +13284,12 @@ first too. Found by the shelf plan's review (B-H1), read and not measured then.
    `Workspace.DiscoverCourses`, the builds and Obsidian; the prefix is not
    `ReferenceStaging.Prefix` (`.plantoir-importing-`), so neither sweep takes
    the other's folder.
-2. Checked: every file entry of the zip is on disk at its full length. The
+2. Checked: as many files on disk as the zip has file entries, and as many
+   bytes. Counted, not looked up by name, because .NET writes an entry whose
+   name Windows cannot hold (a Mac's `?` or `"`) with `_` in its place; a
+   lookup by name refused such a backup, measured
+   (`ANameWindowsCannotHoldDoesNotStopTheCheck`, a guard, passing on the old
+   code, which checked nothing). The
    unzip itself (`ZipFile.ExtractToDirectory`) is the guard against an entry
    that would land outside (`..\`, a rooted name): it refuses, kept as it was.
    Every failure here says the restore's existing "The archive could not be
@@ -13388,7 +13393,7 @@ letter, not touched):
   freshly written file on C:): 2 ms for 1 MB, 37 ms for 50 MB, 379 ms for
   470 MB, the size of a real course's backup with its Media.
 
-**Tests**: `StagedRestoreTests` (18). Red on the old code by copy-aside (the
+**Tests**: `StagedRestoreTests` (19). Red on the old code by copy-aside (the
 old `CourseRestorer.cs`, `CourseArchiver.cs` and `WorkspaceViewModel.cs` put
 in place, the tests that use only the public restore compiled against them):
 5 of 5 failed: a held file in the course, a held file in a section, the

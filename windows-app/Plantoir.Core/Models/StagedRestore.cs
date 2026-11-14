@@ -172,17 +172,33 @@ public static class StagedRestore
         return payload;
     }
 
-    /// <summary>Every file entry of the zip is on disk at its full length. The exception is the one .NET throws for bad data, so no new sentence is shown.</summary>
+    /// <summary>
+    /// As many files on disk as the zip has file entries, and as many bytes.
+    /// Counted rather than looked up by name, because .NET writes an entry
+    /// whose name Windows cannot hold (a Mac's <c>?</c> or <c>"</c>) under a
+    /// name with <c>_</c> in its place: a lookup refused those backups,
+    /// measured (<c>ANameWindowsCannotHoldDoesNotStopTheCheck</c>). The
+    /// exception is the one .NET throws for bad data, so no new sentence is
+    /// shown.
+    /// </summary>
     private static void CheckUnpacked(string archivePath, string unpacked)
     {
-        using var zip = ZipFile.OpenRead(archivePath);
-        foreach (var entry in zip.Entries)
+        long expectedFiles = 0, expectedBytes = 0;
+        using (var zip = ZipFile.OpenRead(archivePath))
+            foreach (var entry in zip.Entries)
+            {
+                if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\')) continue;
+                expectedFiles++;
+                expectedBytes += entry.Length;
+            }
+        long files = 0, bytes = 0;
+        foreach (var file in new DirectoryInfo(unpacked).EnumerateFiles("*", new EnumerationOptions
+                 { RecurseSubdirectories = true, AttributesToSkip = 0, IgnoreInaccessible = false }))
         {
-            if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\')) continue;
-            string onDisk = System.IO.Path.GetFullPath(System.IO.Path.Combine(unpacked, entry.FullName));
-            var file = new FileInfo(onDisk);
-            if (!file.Exists || file.Length != entry.Length) throw new InvalidDataException();
+            files++;
+            bytes += file.Length;
         }
+        if (files != expectedFiles || bytes != expectedBytes) throw new InvalidDataException();
     }
 
     // ---- Putting a folder that was not there into place --------------------
