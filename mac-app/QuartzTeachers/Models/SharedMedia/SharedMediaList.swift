@@ -311,7 +311,7 @@ nonisolated struct SharedMediaHold: Equatable, Sendable {
         /// after that only while the process that wrote it is still running
         /// on this computer.
         case pending
-        /// A step on the Undo list. Honoured for 31 days from `writtenAt`,
+        /// A step on the Undo list. Honoured for 61 days from `writtenAt`,
         /// by every computer that shares the working folder.
         case undo
     }
