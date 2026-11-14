@@ -2671,10 +2671,14 @@ section picks them up on its next build:
    edit to `quartz.layout.ts`, so nothing rewrites the wrapped line. A stale
    contract makes step 4 print a warning, never stop the build.
 
-The PDF itself needs no copying: Quartz's Assets emitter already copies every
-non-page file in `content/` (Media included, through the build's link to it)
-to the site at Quartz's slug of its path. Measured on a real course: 179 PDFs
-under `Media/`, `&` and spaces included, at exactly that slug.
+The PDF itself needs no copying: the site's file emitter copies a non-page
+file in `content/` (Media included, through the build's link to it) to the
+site at Quartz's slug of its path. Measured on a real course: 179 PDFs under
+`Media/`, `&` and spaces included, at exactly that slug. Since #901 it does so
+only when a page students can see uses the file, and a page's own PDF counts:
+`siteFilesRules.printPdfPath` is the one function the Print button and the
+emitter both read ("A site carries only the files its published pages use"
+below). So the PDF of a hidden answers page (#859) is not on the site.
 
 **Compatibility:** none of this changes a page that does not opt in — verify.sh
 plants one and checks it (06 → F, "Compatibility").
@@ -3022,7 +3026,8 @@ whole design:
    `blockNotPrepared`, the same choice the line makes) and the code the site
    read. The line itself is byte for byte what it was.
 2. **An emitter gathers.** `support/quartz/plugins/emitters/plantoirSiteSaid.ts`
-   (exported and put before `Plugin.Assets()` by `_wire_emitters_index` and
+   (exported and put before the assets line, `Plugin.Assets()` or since
+   #901 `Plugin.PlantoirAssets()`, by `_wire_emitters_index` and
    `_wire_site_said_emitter`, each with its own idempotency check, so a
    section wired for My Progress before #567 gets it) writes no file. On its
    FIRST emit in the process it gathers every page's blocks, pages in
@@ -3511,10 +3516,14 @@ on geogebra.org (`material_id:`, fetched once and kept — item 9).
    `private/a.ggb` left out, `Private/f.ggb` and `U/private/b.ggb`
    published), or with any part of its path starting with a dot (the file
    walk skips those). Said once as `fileNotFound`, never found here and then
-   missing on the site. **Nothing is copied:** Quartz's Assets emitter already publishes
-   every file under `content/` that is not a page, at `slugifyFilePath` of
-   its path, so the manifest records the path in `content/` and the
-   transformer makes the address with that same function. Measured on the
+   missing on the site. **Nothing is copied:** the site's file emitter
+   publishes a file under `content/` that is not a page at `slugifyFilePath`
+   of its path, so the manifest records the path in `content/` and the
+   transformer makes the address with that same function. Since #901 the
+   emitter carries a file only when a published page uses it, so the
+   transformer declares the sketch's file (`file.data.plantoirFiles`); the
+   sketch's address in `data-geogebra` is from the JSON's own `root`, never
+   from the page. Measured on the
    slope-angle sketch: 1,594,544 bytes on the site once, plus its 32,484-byte
    thumbnail — against 3,221,572 had it been copied into `static/` as well.
    **Rejected:** copying it (twice the bytes); taking the source out of
@@ -4655,6 +4664,160 @@ the measurements and what was rejected are in
 and sentences are in `contracts/app-rules.json` →
 `previewPorts.whenThePreviewNeverAppears`.
 
+## A site carries only the files its published pages use (#901)
+
+Russell's ruling, 2026-11-13: "We should only copy files into the built site
+that are linked from published pages." Until then Quartz's own Assets emitter
+copied EVERY file in `content/` that is not a page: every picture, PDF and
+video in Media, and every non-page file in the shared and per-section
+folders, went to every section's website, whether a published page used it
+or not. An answer key beside a hidden page, last year's test and a draft
+handout were all on the live site at a guessable address. The contract is
+`contracts/shared-rules.json` → `siteFiles`; this section is the why.
+
+### Measured
+
+On the 26 built sites on the owner's Mac (2026-11-14, `scripts/site_files.py`'s
+reader, counts only; a course file approximated as any file in `public/`
+that is not a page, not under `static/`, and not one of Quartz's own root
+files): **4,321 course files carried, 1,389 (32%) named by no built page.**
+Of those 1,389, 1,378 are mentioned nowhere in the site's text, so the
+check's mention-anywhere rule could take them out, and 11 are mentioned
+(usually a file name in a page's prose or the search index). The planner's
+reader found 1,387 of 4,306; the difference is GeoGebra's sketch address,
+which the planner resolved from the page and is from the site's root (plan
+review 901-2: all 12 sketch files on those sites are used). On the largest
+site, deleting one referenced file from a copy made the check report one
+hole, and repairing put it back and left none.
+
+### How a file is chosen: the emitter decides, from what Quartz resolved
+
+`support/quartz/plugins/emitters/plantoirAssets.ts` replaces `Plugin.Assets()`
+in every section's `quartz.config.ts`, in its place
+(`build_site._wire_site_files_emitter`, ALWAYS section, idempotent, marker
+`PLANTOIR-SITE-FILES`). The two emitters wired before the assets line
+(`_wire_progress_emitter`, `_wire_site_said_emitter`) accept either line
+(`_assets_anchor`), so a section swapped before a later emitter existed still
+takes it. The rules are in `siteFilesRules.ts` beside it, with no imports, so
+they run on their own. It walks `content/` with Assets' own glob (`**`, so a
+file with no extension is offered, which `ctx.allFiles`' `**/*.*` leaves
+out: plan review 901-4) and writes each file at Assets' own address
+(`slugifyFilePath`), so a carried file is exactly where it always was.
+
+A published page uses a file when:
+
+- **its tree names it.** The tree is the one Quartz built, after
+  `CrawlLinks`, so a wikilink resolves the way Quartz resolved it (shortest
+  path, two files with one name included) and nothing is reimplemented.
+  EVERY string a property holds is tried as an address from the page, not
+  only the four attributes Quartz rewrites, because raw HTML is in the tree
+  (`ofm.ts` runs `rehype-raw` first) and keeps the teacher's own address:
+  `<source src>`, `<track src>`, `poster`, `srcset`, `<object data>`,
+  `<embed src>`, SVG's `href`, `style="…url(…)"` and a `<style>` element's
+  `url(…)` (plan review 901-5). On the 27 sites none of the last group names
+  a course file today; the cases protect the future.
+- **Plantoir draws it outside the tree.** The Print button's PDF
+  (`printPdfPath`, the one function `PlantoirMetaLine.tsx` and the emitter
+  both use), a GeoGebra sketch (the transformer declares the file on
+  `file.data.plantoirFiles`, the declare rule a later feature follows), and
+  the footer (`quartz/plantoir_site_files.json`, written by the build on every
+  build, lists the footer's addresses; the emitter resolves them from every
+  page).
+- **it is always carried:** the root `favicon.ico` the build writes into
+  `content/`.
+
+A file reached only through a hidden page is not carried: Quartz renders a
+hidden page embedded in a published one as nothing. A file named only by
+another file (a teacher's HTML that loads its own script) is not carried
+either (0 such files on the 27 sites, plan review 901-9). A reference
+matches only letter for letter after decoding; a match by case or Unicode
+form is the teacher's own broken link on both sides (901-6: none of 530
+unmatched references matched that way).
+
+### The second reading, after the build
+
+`scripts/site_files.py` never trusts the emitter. It reads the BUILT site:
+every attribute of every built page, the same ways again in Python, resolved
+from the page's address, compared with the course's files (Assets' walk:
+not a page, no dotted names, not under `private`, `templates` or
+`.obsidian`, symlinks followed). It ports `slugifyFilePath`;
+`siteFiles.slugCases` are run through the port here and through Quartz's own
+function in the image, so the two cannot drift.
+
+- **A hole** (a page names a course file the site lacks) is PUT BACK and the
+  teacher is told, one line per file. Russell's ruling on #901: the build
+  goes on, the teacher is told, and a trail line is written. Rejected:
+  stopping the build; having no second check.
+- **An exposure** (a course file in the site no built page names) is counted
+  as `unreferenced`. One whose name the site's text never mentions is taken
+  out: a page cannot fetch a file whose name it does not contain, so taking
+  it out cannot make a hole. Mention-anywhere alone is too weak for a gate
+  (plan review 901-7: `contentIndex.json` holds every page's text), so the
+  gates fail on `unreferenced`, not on `takenOut`.
+- Every safety count above zero is a FAILURE in `verify.sh` and the tests,
+  and so is `assetsEmitter: "quartz"` (the swap could not be made, so Quartz's
+  own emitter ran and the check took off every unreferenced file instead:
+  plan review 901-8). In the field they keep a page whole.
+
+**Where it runs, and why there.** On a build for deploying,
+`_check_mirror_and_mark` runs the check on the container's `public/` after
+Quartz returns, BEFORE the mirror to the host and before
+`_mark_build_finished`; a check that raises prints a `plantoir: error:` line
+and leaves the build unmarked, so the next deploy builds again (plan review
+901-3). A preview cannot be fixed up mid-serve (901-1): Quartz runs its
+emitters at once, and the root `index.html` is written while files are still
+being copied, so a check at its first change would read late files as holes.
+So the section's `quartz/build.ts` writes `.plantoir-emit-done` beside
+`public/` once every emitter of the first build has finished
+(`patches/build.ts`, and `patch_quartz_build_done_marker` for a section
+copied before it), the build removes it before Quartz starts, and the
+preview's watcher mirrors and checks NOTHING until it appears. The check then
+runs once on the `public/` the server serves (Quartz's server reads from
+disk, so a put-back file is served) and the mirror follows. A `build.ts` that
+cannot be given the line skips the preview's check and says so once.
+
+### What a teacher reads, and the trail
+
+`siteFiles.words`, printed in the console: the first build of a section that
+leaves anything off says what changed and why, once, in a preview's own words
+on a preview (the live site keeps the files until the next deploy, 901-11);
+a later build says the count only when it changed; a put-back file is said
+on every build it happens. "First" is no `.site-files.json` beside the built
+site (`file-formats.json` → `siteFilesRecord`, counts only). Russell has not
+ruled on how often this is said (the plan's question 2); it is built as
+recommended, every sentence named in `siteFiles.words`.
+
+The build prints one `PLANTOIR_SITE_FILES:` line (counts only) and both apps
+write `site leaves off files no published page uses` from it when it is the
+first, the count changed, a safety count is above zero, or Quartz's own
+emitter ran (`SiteFilesReport` on the mac, from a run's console and a
+scheduled deploy's record, as `KeptDownloadsReport`). A deploy typed in
+Terminal writes no such line, as `PLANTOIR_DOWNLOADED:` writes none: the plan
+had `deploy.sh` write it, which would double every line for a deploy the app
+starts, and is listed under `siteFiles.knownLimits` instead.
+
+### Preview and deploy agree
+
+Both run the same emitter in the same Quartz build, and the check runs on
+both, so a preview shows exactly the files a deploy sends (ticked means
+included, #694). Removal reaches every host: the host mirror and a folder
+deploy use `--delete`, and Netlify's and Cloudflare's deploys are full
+manifests. Older deploys on both hosts can still hold a file a newer deploy
+leaves off; deleting them is piece 901c (Russell: both hosts).
+
+### Rejected
+
+The plan's table, kept in `siteFiles.rejected`: choosing the files in Python
+before Quartz (Python would have to resolve wikilinks as Quartz does, and
+taking files out of `content/` changes `allSlugs`); deleting from `public/`
+in Python after the build (a preview serves while it builds); `ignorePatterns`
+listing every unused file; walking only the Markdown tree (drops the Print
+button's PDFs and the sketches); refusing the build on a hole (ruled); a
+setting to keep the old behaviour. Quartz 5's own `publishAssets:
+"referenced"` is deferred to the move (#512); the cases name content paths
+and Quartz's addresses rather than this emitter, so they can judge that
+option, and its lower-case slugs, when the move comes.
+
 ## The “ — Edited” marker: knowing a section has changed since it published
 
 Russell asked for the thing Pages does — `Untitled 3 — Edited` in the title
@@ -5429,6 +5592,13 @@ does — diagnosis only); keeping it inside `public/` (every deploy route ships
 `public/`).
 
 ## `Media` is mirrored WHOLE, so a picture is uploaded before its page is
+
+**No longer true of the SITE since #901**, and kept for the record: the build
+tree still holds `Media` entire, but the site's file emitter now copies a
+file into `public/` only when a published page uses it ("A site carries only
+the files its published pages use (#901)" above), so a picture that arrives
+in `Media` is NOT on the site until a page that shows it is published. What
+follows describes the behaviour before #901.
 
 Every build copies the course's `Media` folder into the build tree entire —
 not the subset the published pages happen to name. So a picture that arrives

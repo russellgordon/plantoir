@@ -45082,7 +45082,164 @@
     "marker": {
       "prefix": "PLANTOIR_SITE_FILES:",
       "rule": "ONE line per build, after the check: {course, section, mode ('preview' or 'deploy'), carried, leftOff, leftOffBytes, putBack, putBackFailed, takenOut, unreferenced, firstTime, changed, assetsEmitter ('plantoir' or 'quartz')}. Counts only: never a file's or a page's name. Both apps read it from the console of a run they start and from a scheduled deploy's record, as PLANTOIR_DOWNLOADED:, and write the trail line (activityTrail.mustRecord: 'site leaves off files no published page uses'). The console a teacher reads leaves it out, by the one rule for every PLANTOIR_ line.",
-      "writtenWhen": "firstTime, or changed, or putBack, putBackFailed or takenOut above zero, or assetsEmitter 'quartz'"
+      "writtenWhen": "firstTime, or changed, or putBack, putBackFailed or takenOut above zero, or assetsEmitter 'quartz'",
+      "trailCases": [
+        {
+          "name": "the first build that leaves files off",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 12,
+            "leftOffBytes": 3400000,
+            "putBack": 0,
+            "putBackFailed": 0,
+            "takenOut": 0,
+            "unreferenced": 0
+          },
+          "previous": null,
+          "mode": "deploy",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":0,\"unreferenced\":0,\"firstTime\":true,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
+          "written": true,
+          "sentence": "the website leaves off 12 files no published page uses (0 put back, 0 taken out)"
+        },
+        {
+          "name": "a later build with the same count writes nothing",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 12,
+            "leftOffBytes": 3400000,
+            "putBack": 0,
+            "putBackFailed": 0,
+            "takenOut": 0,
+            "unreferenced": 0
+          },
+          "previous": {
+            "leftOff": 12
+          },
+          "mode": "deploy",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":0,\"unreferenced\":0,\"firstTime\":false,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
+          "written": false
+        },
+        {
+          "name": "a build whose count changed",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 9,
+            "leftOffBytes": 3400000,
+            "putBack": 0,
+            "putBackFailed": 0,
+            "takenOut": 0,
+            "unreferenced": 0
+          },
+          "previous": {
+            "leftOff": 12
+          },
+          "mode": "preview",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"preview\",\"carried\":40,\"leftOff\":9,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":0,\"unreferenced\":0,\"firstTime\":false,\"changed\":true,\"assetsEmitter\":\"plantoir\"}",
+          "written": true,
+          "sentence": "the website leaves off 9 files no published page uses (0 put back, 0 taken out)"
+        },
+        {
+          "name": "a build that put a file back",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 12,
+            "leftOffBytes": 3400000,
+            "putBack": 1,
+            "putBackFailed": 0,
+            "takenOut": 0,
+            "unreferenced": 0
+          },
+          "previous": {
+            "leftOff": 12
+          },
+          "mode": "deploy",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":1,\"putBackFailed\":0,\"takenOut\":0,\"unreferenced\":0,\"firstTime\":false,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
+          "written": true,
+          "sentence": "the website leaves off 12 files no published page uses (1 put back, 0 taken out)"
+        },
+        {
+          "name": "a build that took files out",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 12,
+            "leftOffBytes": 3400000,
+            "putBack": 0,
+            "putBackFailed": 0,
+            "takenOut": 2,
+            "unreferenced": 2
+          },
+          "previous": {
+            "leftOff": 12
+          },
+          "mode": "deploy",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":2,\"unreferenced\":2,\"firstTime\":false,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
+          "written": true,
+          "sentence": "the website leaves off 12 files no published page uses (0 put back, 2 taken out)"
+        },
+        {
+          "name": "a build that could not put a file back",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 12,
+            "leftOffBytes": 3400000,
+            "putBack": 0,
+            "putBackFailed": 1,
+            "takenOut": 0,
+            "unreferenced": 0
+          },
+          "previous": {
+            "leftOff": 12
+          },
+          "mode": "deploy",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":1,\"takenOut\":0,\"unreferenced\":0,\"firstTime\":false,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
+          "written": true,
+          "sentence": "the website leaves off 12 files no published page uses (0 put back, 0 taken out)"
+        },
+        {
+          "name": "a build that used Quartz's own emitter",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 12,
+            "leftOffBytes": 3400000,
+            "putBack": 0,
+            "putBackFailed": 0,
+            "takenOut": 5,
+            "unreferenced": 5
+          },
+          "previous": {
+            "leftOff": 12
+          },
+          "mode": "deploy",
+          "emitter": "quartz",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":12,\"leftOffBytes\":3400000,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":5,\"unreferenced\":5,\"firstTime\":false,\"changed\":false,\"assetsEmitter\":\"quartz\"}",
+          "written": true,
+          "sentence": "the website leaves off 12 files no published page uses, sorted after the build because the website builder's settings had changed shape (0 put back, 5 taken out)"
+        },
+        {
+          "name": "a first build that leaves nothing off",
+          "outcome": {
+            "carried": 40,
+            "leftOff": 0,
+            "leftOffBytes": 0,
+            "putBack": 0,
+            "putBackFailed": 0,
+            "takenOut": 0,
+            "unreferenced": 0
+          },
+          "previous": null,
+          "mode": "deploy",
+          "emitter": "plantoir",
+          "line": "PLANTOIR_SITE_FILES: {\"course\":\"SCH3U\",\"section\":2,\"mode\":\"deploy\",\"carried\":40,\"leftOff\":0,\"leftOffBytes\":0,\"putBack\":0,\"putBackFailed\":0,\"takenOut\":0,\"unreferenced\":0,\"firstTime\":true,\"changed\":false,\"assetsEmitter\":\"plantoir\"}",
+          "written": true,
+          "sentence": "the website leaves off 0 files no published page uses (0 put back, 0 taken out)"
+        }
+      ]
     },
     "slugCases": [
       [

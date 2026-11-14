@@ -197,6 +197,17 @@ class WhatIsSaid(unittest.TestCase):
         for key in payload:
             self.assertIn(key, RULES["marker"]["rule"])
 
+    def test_every_trail_case_is_the_line_the_build_prints(self):
+        """The apps read these lines (SiteFilesReportTests on the Mac), so the
+        build must print exactly them."""
+        cases = RULES["marker"]["trailCases"]
+        self.assertGreaterEqual(len(cases), 6)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                line = site_files.marker_line(case["outcome"], case["previous"], course="SCH3U", section=2,
+                                              mode=case["mode"], emitter=case["emitter"])
+                self.assertEqual(line, case["line"])
+
     def test_the_record_keeps_every_key_the_format_names_and_nothing_else(self):
         folder = Path(tempfile.mkdtemp(prefix="plantoir-site-files-record-"))
         try:

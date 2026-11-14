@@ -330,6 +330,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-31 | **Font stacks quoted one family at a time, and the system-font choice on the system stack (#629)** | `quartz/util/theme.ts` | Quartz's `joinStyles` wrote `--bodyFont: "<choice>", <fallback>`, quoting the WHOLE choice, so the "System fonts" choice — stored as `"Helvetica, Arial"` by both apps and `setup_course.py` — became ONE family of that name, which no machine has. The browser fell through to the fallback's `system-ui`: Chrome's platform-font query (`CSS.getPlatformFontsForNode`, Chrome for Testing 155.0.8059.39, this Mac, 2026-10-22/23) reports `.SF NS` (San Francisco), so Helvetica was never shown. **Russell's ruling (2026-10-22): those sites keep looking as they do** — San Francisco on a Mac, Segoe UI on Windows. So `patch_font_variable_stacks` adds `cssFontStack`: each family is quoted on its own, CSS keywords (`serif`, `system-ui`, `-apple-system`…) are left bare, and the system choice gets Quartz's fallback ALONE (`system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, …`), which puts system-ui and Segoe UI ahead of Helvetica and Arial. Measured: the same query reports `.SF NS` for the old and the new stack. A single family comes out byte for byte as before, so a Google-font site's stylesheet does not change (`scripts/test_font_variables.py` runs the patched TypeScript under node and compares). Every build, idempotent, anchored on the three v4.5.0 lines (each must match once) and warning without editing anything otherwise; the helper is a RAW Python string, because `/["\\]/g` in an ordinary one loses a backslash and every course's build fails on an unterminated regular expression (caught in review; the test pins the text). **Rejected:** quoting each family with Helvetica first, as the planner first proposed — measured to render Helvetica, a visible change to every system-font site that Russell turned down; changing the STORED value (to `"system-ui, Helvetica, Arial"` or similar) — every existing `course_config.json`, the Windows catalogue, the contract cases in `shared-rules.json`, the mac goldens, `setup_course.py`'s detection, C2-19's filter and `social_card.py` all key on the literal, and old folders would still carry the old one, so the build is the one place that fixes all of them; Python writing the stacks as literals into `theme.ts` — typography lives in `quartz.config.ts` (C1-11, full rebuild only), so two sources could disagree; editing Quartz's `DEFAULT_SANS_SERIF`, which buys nothing. Not affected: the Google request (C2-19 already drops stacks), the printed page (#499's `print.scss` sets its own font variables), the social card. The label for the choice now says "System fonts (each device's own)" in the mac app and in `setup_course.py`, and the mac's font editor previews it in the system font rather than Helvetica. **Windows inherits the CSS free** (shared `build_site.py` against its bundled Quartz v4.5.0; a different `theme.ts` would only warn) and says the same label since #648 (`FontCatalog.PairingLabel`, `WorkspaceTests.SystemPairingLabel`). |
 | C2-32 | **```text wrap: a text block's lines wrap (#653)** | `quartz/plugins/transformers/textWrapRule.ts`, `codeRunner.ts`'s second markdown plugin, `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, every build) | A ```text fence with `wrap` in its info string is wrapped in `div.plantoir-text-wrap` at the markdown stage, on every page; on screen its lines wrap at the window's width with each line's number on its first row and `…` in the gutter on the rest; code fences never wrap and `wrap` after them is ignored silently; print and the handout are untouched. Every other block is byte for byte as before. No new wiring: the plugin rides `CodeRunnerFences`' place straight before `SyntaxHighlighting`. Section P says why and what was measured. |
 | C2-33 | **YouTube and Vimeo players from the picture form (#692)** | `quartz.config.ts`, `quartz/plugins/transformers/index.ts`, `quartz/plugins/transformers/plantoirVideo.ts` and `videoRules.js`, `quartz/components/styles/videos.scss` (installed with Plantoir's additions, carried into `index.css` by `PlantoirMetaLine.tsx`) | `_wire_video_transformer` puts `Plugin.PlantoirVideo()` straight BEFORE `Plugin.ObsidianFlavoredMarkdown(`, anchored and idempotent, so a section built before #692 gets it on its next build. Before OFM because OFM's own YouTube step replaces a picture's properties and the words in its brackets (the player's title) are lost. See S below. |
+| C2-34 | **The site carries only the files its published pages use (#901)** | `quartz.config.ts`, `quartz/plugins/emitters/index.ts`, `quartz/plugins/emitters/plantoirAssets.ts` and `siteFilesRules.ts` (installed with Plantoir's additions), `quartz/build.ts`, `quartz/plantoir_site_files.json` | `_wire_site_files_emitter` swaps `Plugin.Assets(),` for `Plugin.PlantoirAssets(), // PLANTOIR-SITE-FILES` in place (a config of another shape is left alone and the build reports `assetsEmitter: "quartz"`, which every gate fails on). The emitter walks `content/` as Assets did and copies a file, at Assets' own address, only when a published page's tree, its Print button's PDF, a declared GeoGebra sketch, the footer or the always-carried list names it. `patch_quartz_build_done_marker` (marker `PLANTOIR-EMIT-DONE`) makes `build.ts` write `.plantoir-emit-done` after the first emit, for the preview's check. All ALWAYS and idempotent. Documentation 05, "A site carries only the files its published pages use (#901)". |
 
 #### Settings written inside a TypeScript string (#871)
 
@@ -3212,7 +3213,8 @@ and unit filter, the print check, the skill notes.
 | `support/quartz/components/scripts/progress.inline.ts`, `styles/progress.scss` | the student's browser | the totals and the tables, riding `PlantoirMetaLine` as the task boxes do |
 
 `build_site.py` wires the emitter (`_wire_emitters_index`,
-`_wire_progress_emitter`: straight before `Plugin.Assets()`), calls
+`_wire_progress_emitter`: straight before the assets line, `Plugin.Assets()`
+or since #901 `Plugin.PlantoirAssets()`), calls
 `_prepare_my_progress` right after `_visible_places`, and pins the page in the
 sidebar (`pin_my_progress_in_sidebar`) — all in the ALWAYS section, so an
 existing section gets it on its next build. `Dockerfile` bakes
@@ -3657,9 +3659,10 @@ plus a marker, and one CSS rule lets the shape do the rest:
   `src` is final. For each `<img>` whose src is not remote and not `data:`, it
   decodes the src, strips `?query` and `#hash`, joins it to the page's folder,
   tidies `.` and `..`, and looks it up among the course's own files by slug —
-  `ctx.allSlugs` zipped with `ctx.allFiles`, which is exactly where Quartz's
-  Assets emitter writes each file, so the lookup is the inverse of the
-  emit. The map is built once per list (a preview's rebuild replaces both
+  `ctx.allSlugs` zipped with `ctx.allFiles`, which is exactly where the
+  site's file emitter writes each file (Quartz's Assets until #901, and
+  Plantoir's since, at the same address), so the lookup is the inverse of
+  the emit. The map is built once per list (a preview's rebuild replaces both
   arrays, so the map follows). The size is cached by path, modification time
   and length.
 - **`support/quartz/plugins/transformers/pictureSizes.js`**, plain JS with no
@@ -4384,7 +4387,8 @@ sketch (about 4.5 MB)" — the sketch plus the engine's first load, so a
 student on a school network knows what a tap costs — a caption when the
 fence gives one, the commands in a `<details>` for a reader without scripts,
 and the attribution. The sketch's address is `slugifyFilePath` of its path
-in `content/`, the function Quartz's Assets emitter publishes it with, so
+in `content/`, the function the site's file emitter publishes it with
+(the transformer declares the file, so Plantoir's emitter carries it, #901), so
 the file is on the site once and the card names exactly that file
 (browser-checks/geogebra_applet.mjs counts the files with the sketch's
 SHA-256: one; must-fail with a second copy in `static/`: two). A fence the

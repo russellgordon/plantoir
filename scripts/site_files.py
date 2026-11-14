@@ -133,8 +133,18 @@ def course_files(content_dir: Path, ignore_patterns=DEFAULT_IGNORE_PATTERNS) -> 
     root = Path(content_dir)
     if not root.is_dir():
         return found
+    seen = set()
     for folder, folders, files in os.walk(root, followlinks=True):
         relative_folder = Path(folder).relative_to(root)
+        # A link back up the tree is walked once, never round and round.
+        try:
+            real = os.path.realpath(folder)
+        except OSError:
+            real = folder
+        if real in seen:
+            folders[:] = []
+            continue
+        seen.add(real)
         kept = []
         for name in sorted(folders):
             if not _is_ignored(relative_folder.parts + (name,), ignore_patterns):
