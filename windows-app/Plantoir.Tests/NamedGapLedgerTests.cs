@@ -68,11 +68,45 @@ public class NamedGapLedgerTests
     /// <summary>The switch that makes the rule compare with the release being built (set by <c>publish.ps1</c>).</summary>
     internal const string BaselineSwitch = "PLANTOIR_LEDGER_BASELINE";
 
-    private static Version ThisBuild()
+    private static string ThisBuild()
     {
         var project = XDocument.Load(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj"));
-        string text = project.Descendants("Version").Single().Value.Trim();
-        return Version.Parse(text);
+        return project.Descendants("Version").Single().Value.Trim();
+    }
+
+    // ---- Versions compared the way website/windows_feed.py compares them -----
+    // (#862 review L1). The deploy of plantoir.app decides what Windows shipped
+    // with `version_key` and `newest_item`; the ledger reads the same files and
+    // must not reach a different answer. So a version is its dotted parts as
+    // numbers, a part that is not a number counts as -1, trailing zeros are
+    // dropped ("1.9.3.0" is "1.9.3"), and two are compared part by part, the
+    // shorter first when one is the start of the other (Python's tuples). That
+    // ordering has a quirk kept on purpose, because agreeing is the point:
+    // "2.0.0-rc1" is (2, 0, -1), which is ABOVE "2.0.0" (2). The generator
+    // writes plain three-part numbers, so the quirk is only ever met by a
+    // hand-edited feed, and the rule then errs strict.
+
+    /// <summary><c>windows_feed.version_key</c>: "1.4.10" above "1.4.9"; a part that is not a number is -1.</summary>
+    internal static int[] VersionKey(string? text)
+    {
+        var parts = (text ?? "").Trim().Split('.')
+            .Select(part => part.Length > 0 && part.All(char.IsAsciiDigit) ? int.Parse(part) : -1)
+            .ToList();
+        while (parts.Count > 1 && parts[^1] == 0)
+            parts.RemoveAt(parts.Count - 1);
+        return parts.ToArray();
+    }
+
+    /// <summary>Python's tuple order over two <see cref="VersionKey"/>s.</summary>
+    internal static int CompareVersions(string? left, string? right)
+    {
+        int[] a = VersionKey(left), b = VersionKey(right);
+        for (int i = 0; i < Math.Min(a.Length, b.Length); i++)
+        {
+            if (a[i] != b[i])
+                return a[i].CompareTo(b[i]);
+        }
+        return a.Length.CompareTo(b.Length);
     }
 
     /// <summary>
@@ -80,7 +114,7 @@ public class NamedGapLedgerTests
     /// says: the Windows card's <c>pinned</c> when it has one, else the version
     /// line (<c>windows_feed.shipped_version</c>, #861).
     /// </summary>
-    internal static Version? ShippedPerTheSite(string siteJson)
+    internal static string? ShippedPerTheSite(string siteJson)
     {
         var site = System.Text.Json.Nodes.JsonNode.Parse(siteJson)!;
         string? version = site["version"]?.GetValue<string>();
@@ -92,36 +126,27 @@ public class NamedGapLedgerTests
                 version = pin;
             break;
         }
-        return Bare(version);
+        return string.IsNullOrEmpty(version) ? null : version;
     }
 
     /// <summary>
     /// The feed's newest item, the one the updater offers: the HIGHEST
     /// <c>sparkle:version</c> wherever it sits in the file
-    /// (<c>windows_feed.newest_item</c>), the enclosure's attribute first,
-    /// then the element.
+    /// (<c>windows_feed.newest_item</c>), the enclosure's attribute first and
+    /// the element when the attribute is missing OR EMPTY (Python's <c>or</c>).
     /// </summary>
-    internal static Version? NewestInTheFeed(string feedXml)
+    internal static string? NewestInTheFeed(string feedXml)
     {
         XNamespace sparkle = "http://www.andymatuschak.org/xml-namespaces/sparkle";
-        Version? newest = null;
+        string? newest = null;
         foreach (var item in XDocument.Parse(feedXml).Descendants("item"))
         {
-            string? text = (string?)item.Element("enclosure")?.Attribute(sparkle + "version")
-                           ?? (string?)item.Element(sparkle + "version");
-            var version = Bare(text);
-            if (version is not null && (newest is null || version > newest))
+            string? attribute = (string?)item.Element("enclosure")?.Attribute(sparkle + "version");
+            string version = (attribute is { Length: > 0 } ? attribute : (string?)item.Element(sparkle + "version") ?? "").Trim();
+            if (newest is null || CompareVersions(version, newest) > 0)
                 newest = version;
         }
-        return newest;
-    }
-
-    /// <summary>"1.9.3" as a three-part version; null for nothing or a malformed one.</summary>
-    private static Version? Bare(string? text)
-    {
-        if (!Version.TryParse((text ?? "").Trim(), out var version))
-            return null;
-        return new Version(version.Major, version.Minor, Math.Max(version.Build, 0));
+        return string.IsNullOrEmpty(newest) ? null : newest;
     }
 
     private static string CommittedSite => File.ReadAllText(Path.Combine(RepoRoot, "website", "site.json"));
@@ -133,17 +158,19 @@ public class NamedGapLedgerTests
     /// and <c>windows.xml</c>. When they disagree (they must not: the deploy
     /// refuses it) the HIGHER is used, so a half-made cut never lets an entry
     /// through; <see cref="TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped"/>
-    /// fails for the disagreement itself.
+    /// fails for the disagreement itself. A value whose FIRST part is not a
+    /// number ("v1.9.3", "") is refused: it would sort below every milestone
+    /// and let every entry through.
     /// </summary>
-    private static Version LastWindowsRelease()
+    private static string LastWindowsRelease()
     {
         var site = ShippedPerTheSite(CommittedSite);
         var feed = NewestInTheFeed(CommittedFeed);
-        if (site is null || feed is null)
+        if (site is null || feed is null || VersionKey(site)[0] < 0 || VersionKey(feed)[0] < 0)
             throw new InvalidOperationException(
-                $"Could not read the last Windows release: site.json says {site?.ToString() ?? "nothing"}, " +
-                $"updates/windows.xml offers {feed?.ToString() ?? "nothing"}.");
-        return site > feed ? site : feed;
+                $"Could not read the last Windows release: site.json says {site ?? "nothing"}, " +
+                $"updates/windows.xml offers {feed ?? "nothing"}.");
+        return CompareVersions(site, feed) > 0 ? site : feed;
     }
 
     /// <summary>
@@ -152,7 +179,7 @@ public class NamedGapLedgerTests
     /// <c>publish.ps1</c> sets). Any other value is refused rather than read
     /// as the default, so a misspelt switch at the cut cannot pass quietly.
     /// </summary>
-    internal static (Version Version, string Described) Baseline(string? switchValue)
+    internal static (string Version, string Described) Baseline(string? switchValue)
     {
         string value = switchValue ?? "";
         if (value.Length == 0)
@@ -182,34 +209,48 @@ public class NamedGapLedgerTests
         var feed = NewestInTheFeed(CommittedFeed);
         Assert.NotNull(site);
         Assert.NotNull(feed);
-        Assert.True(site == feed,
+        Assert.True(CompareVersions(site, feed) == 0,
             $"site.json says Windows last shipped in {site}, but updates/windows.xml offers {feed}. " +
             "The deploy of plantoir.app refuses this too: correct the feed or the pin at the cut " +
-            "(RELEASING.md → \"The update feed (Windows)\").");
+            "(RELEASING.md → \"The update feed (Windows)\"). Between committing a cut's feed and moving " +
+            "site.json's version line this is expected to be red.");
     }
 
     /// <summary>
     /// The readers on made-up files, so the cases that matter are proved
     /// whatever is committed today: an unpinned card, a pinned one (a mac-only
     /// cut), a feed whose newest item is neither its first nor spelled the
-    /// same way, and the switch's values.
+    /// same way, the three inputs on which this once disagreed with
+    /// <c>windows_feed.py</c> (#862 review L1), and the switch's values.
     /// </summary>
     [Fact]
     public void TheBaselineIsReadFromThePinTheVersionLineAndTheNewestItem()
     {
         const string unpinned = """{"version": "1.9.3", "downloads": [{"platform": "macOS", "pinned": "1.9.2"}, {"platform": "Windows", "pinned": null}]}""";
         const string pinned = """{"version": "2.0.0", "downloads": [{"platform": "macOS", "pinned": null}, {"platform": "Windows", "pinned": "1.9.3"}]}""";
-        Assert.Equal(new Version(1, 9, 3), ShippedPerTheSite(unpinned));
-        Assert.Equal(new Version(1, 9, 3), ShippedPerTheSite(pinned));
+        Assert.Equal("1.9.3", ShippedPerTheSite(unpinned));
+        Assert.Equal("1.9.3", ShippedPerTheSite(pinned));
 
-        const string feed = """
-            <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel>
-              <item><title>Plantoir 1.9.0</title><enclosure url="a" sparkle:version="1.9.0" /></item>
-              <item><title>Plantoir 1.10.1</title><sparkle:version>1.10.1</sparkle:version><enclosure url="b" /></item>
-              <item><title>Plantoir 1.9.3</title><enclosure url="c" sparkle:version="1.9.3" /></item>
-            </channel></rss>
-            """;
-        Assert.Equal(new Version(1, 10, 1), NewestInTheFeed(feed));
+        static string Feed(string items) =>
+            "<rss version=\"2.0\" xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\"><channel>" + items + "</channel></rss>";
+        Assert.Equal("1.10.1", NewestInTheFeed(Feed(
+            "<item><enclosure url=\"a\" sparkle:version=\"1.9.0\" /></item>" +
+            "<item><sparkle:version>1.10.1</sparkle:version><enclosure url=\"b\" /></item>" +
+            "<item><enclosure url=\"c\" sparkle:version=\"1.9.3\" /></item>")));
+        // What windows_feed.newest_item answers for each (measured by the review, Python 3.14, -I).
+        Assert.Equal("2.0.0-rc1", NewestInTheFeed(Feed(
+            "<item><enclosure url=\"a\" sparkle:version=\"1.9.3\" /></item>" +
+            "<item><enclosure url=\"b\" sparkle:version=\"2.0.0-rc1\" /></item>")));
+        Assert.Equal("1.9.3.1", NewestInTheFeed(Feed(
+            "<item><enclosure url=\"a\" sparkle:version=\"1.9.3\" /></item>" +
+            "<item><enclosure url=\"b\" sparkle:version=\"1.9.3.1\" /></item>")));
+        Assert.Equal("2.0.0", NewestInTheFeed(Feed(
+            "<item><enclosure url=\"a\" sparkle:version=\"1.9.3\" /></item>" +
+            "<item><sparkle:version>2.0.0</sparkle:version><enclosure url=\"b\" sparkle:version=\"\" /></item>")));
+        // version_key's order: numbers part by part, trailing zeros dropped.
+        Assert.True(CompareVersions("1.10", "1.9.9") > 0);
+        Assert.Equal(0, CompareVersions("1.9.3.0", "1.9.3"));
+        Assert.True(CompareVersions("1.9.3.1", "1.9.3") > 0);
 
         Assert.Equal(ThisBuild(), Baseline("build").Version);
         Assert.Equal(LastWindowsRelease(), Baseline(null).Version);
@@ -227,7 +268,7 @@ public class NamedGapLedgerTests
     [Fact]
     public void TheRuleStillCatchesAnEntryOwedByThisBuildOrByNoVersion()
     {
-        var build = new Version(1, 7, 1);
+        const string build = "1.7.1";
         NamedGapLedger.Entry Owed(string milestone) =>
             new(NamedGapLedger.ActivityTrailEvents, "an event", 1, milestone, "made up for this test");
         Assert.Empty(Problems(new[] { Owed("v1.8.0") }, build, "made up"));
@@ -275,18 +316,18 @@ public class NamedGapLedgerTests
     }
 
     private static System.Collections.Generic.List<string> Problems(
-        System.Collections.Generic.IEnumerable<NamedGapLedger.Entry> entries, Version baseline, string described)
+        System.Collections.Generic.IEnumerable<NamedGapLedger.Entry> entries, string baseline, string described)
     {
         return entries
             .Select(entry =>
             {
                 string milestone = entry.Milestone;
                 string bare = milestone.StartsWith('v') ? milestone[1..] : milestone;
-                if (!Version.TryParse(bare, out var owedBy))
+                if (!Version.TryParse(bare, out _))
                     return $"{entry.Area} → \"{entry.Key}\" (#{entry.Issue}) names the milestone " +
                            $"\"{milestone}\", which is not a version, so nothing can tell whether it is " +
                            "later than the baseline. Name the GitHub milestone the issue carries (\"v1.6.0\").";
-                if (owedBy <= baseline)
+                if (CompareVersions(bare, baseline) <= 0)
                     return $"{entry.Area} → \"{entry.Key}\" is owed by #{entry.Issue} on {milestone}, and " +
                            $"the baseline is {baseline}, {described}. A ledger entry may only hold open work a LATER " +
                            "release owns: build it, or move the issue (and this entry) to a later milestone " +

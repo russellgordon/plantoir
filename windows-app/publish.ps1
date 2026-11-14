@@ -12,6 +12,11 @@ release being built, not the last one shipped). With -Sign or
 run; without them it is a warning, because an unsigned bundle is a test build
 made while that release's work is still open (#862).
 
+Never install an unsigned bundle over a real copy of Plantoir. Since #862 it
+carries the number of the release being BUILT (2.0.0 while v2.0.0 is in
+progress), and the update check offers only a NEWER version, so that copy
+would never be offered the real release of the same number.
+
 Output lands in windows-app\dist\PlantoirSetup.exe and Plantoir-win-x64.zip
 with SHA-256 printed for the release notes. The version comes from ONE place:
 <Version> in Plantoir\Plantoir.csproj — raised on dev when work on a release
@@ -56,8 +61,36 @@ Set-Location $PSScriptRoot
 # NamedGapLedger.cs with a regex here (a second reader of C# source, which
 # drifts the first time a milestone constant is renamed).
 . "$PSScriptRoot\TestRunOutcome.ps1"
+
+# The failing tests of a `dotnet test` transcript: each "Failed <name> [..]"
+# with the lines of its "Error Message:" (up to "Stack Trace:"). So a refusal
+# for any reason but an owed entry still says WHICH test and WHY (#862 review
+# M1: a feed regenerated before a rebuild failed the site-and-feed fact, and
+# the refusal named nothing).
+function Get-FailedTests([string]$transcript) {
+    $failures = @()
+    $current = $null
+    $inMessage = $false
+    foreach ($line in ($transcript -split "`r?`n")) {
+        if ($line -match '^\s+Failed (\S+) \[') {
+            if ($current) { $failures += $current }
+            $current = [pscustomobject]@{ Name = $Matches[1]; Message = @() }
+            $inMessage = $false
+            continue
+        }
+        if ($null -eq $current) { continue }
+        if ($line -match '^\s+Error Message:\s*$') { $inMessage = $true; continue }
+        if ($line -match '^\s+(Stack Trace|Standard Output Messages):\s*$') { $inMessage = $false; continue }
+        if ($inMessage -and $line.Trim()) { $current.Message += $line.Trim() }
+    }
+    if ($current) { $failures += $current }
+    ,$failures
+}
+
 $enforceLedger = $Sign -or $CheckLedgerOnly
+$ledgerLog = Join-Path ([IO.Path]::GetTempPath()) 'plantoir-publish-ledger-check.txt'
 Write-Host "Checking the named-gap ledger against this build's <Version> (NamedGapLedgerTests)..." -ForegroundColor Green
+Write-Host "  This builds and runs the ledger's tests: about two minutes from a cold build, seconds when warm. Output: $ledgerLog"
 $baselineBefore = $env:PLANTOIR_LEDGER_BASELINE
 $env:PLANTOIR_LEDGER_BASELINE = 'build'
 try {
@@ -67,21 +100,41 @@ try {
 } finally {
     $env:PLANTOIR_LEDGER_BASELINE = $baselineBefore
 }
+Set-Content -LiteralPath $ledgerLog -Value $ledgerRun.Output -Encoding UTF8
 $ledgerOutcome = Get-TestRunOutcome -Output $ledgerRun.Output -ExitCode $ledgerRun.ExitCode
 if ($ledgerOutcome.Verdict -ne 'Passed') {
     $owedLines = @($ledgerRun.Output -split "`r?`n" |
                    Where-Object { $_ -match ' is owed by #\d+ on | names the milestone ' } |
                    ForEach-Object { $_.Trim() })
+    $failedTests = Get-FailedTests $ledgerRun.Output
     $ledgerMessage = "The named-gap ledger is not clear for this build. $($ledgerOutcome.Summary)"
+    if ($failedTests.Count -gt 0) {
+        $ledgerMessage += "`nFailing: " + (($failedTests | ForEach-Object { $_.Name }) -join ', ')
+    }
     if ($owedLines.Count -gt 0) {
         $ledgerMessage += "`n$($owedLines.Count) ledger entries are owed by this release or an earlier one:`n  " +
                           ($owedLines -join "`n  ")
+        $remedy = "A signed release cannot be cut over them: build each, or move its issue and entry to a " +
+                  "later milestone with Russell's say-so (contracts/README.md -> `"Named gaps`")."
+    } elseif ($ledgerOutcome.Verdict -eq 'Failed') {
+        foreach ($failure in $failedTests) {
+            $ledgerMessage += "`n$($failure.Name):`n  " + (@($failure.Message | Select-Object -First 4) -join "`n  ")
+        }
+        $remedy = "No entry is owed: another of the ledger's own tests failed, so read its message above. " +
+                  "If it is TheSiteAndTheFeedAgreeOnWhatWindowsLastShipped during a cut, website/updates/windows.xml " +
+                  "already carries an item site.json does not: the feed was generated before this rebuild. Restore " +
+                  "the committed feed first, then run this again (RELEASING.md -> `"The update feed (Windows)`")."
+    } else {
+        $buildErrors = @($ledgerRun.Output -split "`r?`n" | Where-Object { $_ -match ': error [A-Z]+\d+' } |
+                         ForEach-Object { $_.Trim() } | Select-Object -Unique -First 10)
+        if ($buildErrors.Count -gt 0) { $ledgerMessage += "`n  " + ($buildErrors -join "`n  ") }
+        $remedy = "No entry is owed: the ledger check did not run to a result. Fix what stopped it " +
+                  "(the whole output is in $ledgerLog) and run this again."
     }
     if ($enforceLedger) {
-        throw ("$ledgerMessage`nA signed release cannot be cut over them: build each, or move its issue and " +
-               "entry to a later milestone with Russell's say-so (contracts/README.md -> `"Named gaps`").")
+        throw "$ledgerMessage`n$remedy"
     }
-    Write-Warning "$ledgerMessage`nThis unsigned bundle is built anyway; publish.ps1 -Sign refuses it."
+    Write-Warning "$ledgerMessage`n$remedy`nThis unsigned bundle is built anyway; publish.ps1 -Sign refuses it."
 } else {
     Write-Host "Named-gap ledger: nothing owed by this build. $($ledgerOutcome.Summary)" -ForegroundColor Green
 }

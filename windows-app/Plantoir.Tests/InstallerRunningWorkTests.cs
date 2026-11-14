@@ -483,6 +483,32 @@ public sealed class InstallerRunningWorkTests
         Assert.True(check < publish.IndexOf("dotnet publish Plantoir\\Plantoir.csproj", StringComparison.Ordinal));
         Assert.True(publish.IndexOf("if ($CheckLedgerOnly) { return }", StringComparison.Ordinal)
                     < publish.IndexOf("$missingVendor = ", StringComparison.Ordinal));
+        // Reachable on every run (#862 review L3): the switch that enforces it
+        // is set once and never reassigned, and the run, its verdict and the
+        // refusal sit at the script's top level, inside no condition.
+        Assert.Single(Regex.Matches(publish, @"\$enforceLedger\s*="));
+        foreach (string line in new[] { "$enforceLedger = $Sign -or $CheckLedgerOnly",
+                                        "$env:PLANTOIR_LEDGER_BASELINE = 'build'",
+                                        "$ledgerOutcome = Get-TestRunOutcome",
+                                        "if ($ledgerOutcome.Verdict -ne 'Passed') {",
+                                        "if ($CheckLedgerOnly) { return }" })
+        {
+            int at = publish.IndexOf(line, StringComparison.Ordinal);
+            Assert.True(at >= 0, $"publish.ps1 no longer has: {line}");
+            Assert.True(BraceDepthAt(publish, at) == 0, $"publish.ps1 puts \"{line}\" inside a block, so it may not run.");
+        }
+    }
+
+    /// <summary>How many <c>{</c> are open at <paramref name="index"/> in a comment-stripped script.</summary>
+    private static int BraceDepthAt(string script, int index)
+    {
+        int depth = 0;
+        for (int i = 0; i < index; i++)
+        {
+            if (script[i] == '{') depth++;
+            else if (script[i] == '}') depth--;
+        }
+        return depth;
     }
 
     [Fact]
