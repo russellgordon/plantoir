@@ -44,6 +44,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
+
 SCRIPTS = Path(__file__).resolve().parent
 START = "# ---- runs in the image (#907) ----\n"
 END = "# ---- end of runs in the image ----\n"

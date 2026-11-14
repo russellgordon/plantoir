@@ -33,7 +33,6 @@ Pure stdlib. Run with:
     python3 scripts/test_deploy_tokens.py
 """
 
-import atexit
 import json
 import os
 import re
@@ -44,9 +43,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-_TRAIL_FOLDER = tempfile.mkdtemp(prefix="plantoir-test-trail-")
-os.environ["PLANTOIR_TRAIL_DIR"] = _TRAIL_FOLDER
-atexit.register(shutil.rmtree, _TRAIL_FOLDER, True)
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
