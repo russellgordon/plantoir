@@ -2378,7 +2378,24 @@
       "videos-1",
       "videos-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A page in Obsidian with a video's address on a line of its own, in the picture form",
+       "labels": [
+        "The video's address",
+        "What the video is"
+       ],
+       "scene": "videos-1"
+      },
+      {
+       "shows": "The same page on the class website, with the video's player",
+       "labels": [
+        "The player"
+       ],
+       "scene": "videos-2"
+      }
+     ]
     },
     {
      "anchor": "printing",

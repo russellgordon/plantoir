@@ -1970,6 +1970,31 @@
    "setup": "A test token from a second account, pasted in Change Token\u2026 after one section has been deployed with the first",
    "windows": null,
    "raw": false
+  },
+  "videos-1": {
+   "page": "videos",
+   "shows": "A page in Obsidian with a video's address on a line of its own, in the picture form",
+   "labels": [
+    "The video's address",
+    "What the video is"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A page of the example course with one YouTube line whose brackets say what the video is",
+   "windows": null,
+   "raw": false
+  },
+  "videos-2": {
+   "page": "videos",
+   "shows": "The same page on the class website, with the video's player",
+   "labels": [
+    "The player"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "The preview of that page; no video is played while the picture is taken",
+   "windows": null,
+   "raw": false
   }
  }
 }
