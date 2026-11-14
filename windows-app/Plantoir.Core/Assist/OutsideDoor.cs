@@ -175,6 +175,9 @@ public static class OutsideDoor
     /// words for "a unit plan for , and 1 more", so a single name still too
     /// long leaves the line over and the door refuses, as it does for an
     /// over-long course name. Null <paramref name="program"/> names them all.
+    /// The handouts and reference-courses sentences are in every candidate
+    /// and never cut (the contract has no words for a shorter list of
+    /// reference courses), so only plan names are dropped (#880).
     /// </summary>
     internal static IReadOnlyList<string> GreetingThatFits(string? program, Plantoir.Core.Models.UnitPlans.Reading? unitPlans,
                                                            Func<int, IReadOnlyList<string>> argumentsNaming)

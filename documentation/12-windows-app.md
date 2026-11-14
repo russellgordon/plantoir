@@ -2406,6 +2406,10 @@ assembly; restore by writing the bytes (or touch the file) instead.
 **A difference a teacher may meet today** (#885, not measured here): what
 `plantoir-mcp.exe` answers a call that leaves out `section` or `howMany` is
 the MCP SDK's binding of a non-nullable `int`; #885 says to measure it first.
+*(Measured and fixed since, in #880's batch: "A call that names no section
+(#885, the mac's #865)" below. The #895 six and the #885 four have left the
+ledger with it; the `FixWithGreetingCases` area and its hook stay, empty,
+for the next sentence the mac adds to Fix with's text.)*
 
 ### After the mac's #835 part 3, #855, #839 and #902: held by name again (#868, 2026-11-13)
 
@@ -13328,18 +13332,12 @@ and the three trail events, and turns the greeting's sentence on.
   wired**: `SidebarPane.ReviseWithClaude`/`ReviseWithCodex` pass no plans,
   so today's greeting is exactly what it was; 790b passes
   `UnitPlans.ToMention(course directory, kept for reference, today)`.
-- **Where #880's sentence goes.** `ClaudeCodeLauncher.Greeting` keeps its
-  sentences in a list: the plain greeting, then (marked in the code) the
-  reference-courses sentence of `outsideAgents.greetingReferenceCourses`
-  (#856, owned on Windows by #880), then the unit-plans sentence, joined by
-  one space, and the whole text's double quotes made apostrophes. Adding
-  #880's sentence is one `sentences.Add` before the unit plans' and changes
-  neither function's shape. Since the mac's #859 the plain greeting also
-  ends with `greetingHandoutsSentence`, BEFORE the reference-courses
-  sentence (`greetingReferenceCourses.where`; `greetingHandoutsCases` case 3
-  crosses all three); that is #895's on Windows, held by name in
-  `NamedGapLedger.FixWithGreetingCases`, and it is one more entry at the
-  front of the same list. Only Plan a Unit's message says it today (below).
+- **The greeting's sentences, in order.** `ClaudeCodeLauncher.Greeting`
+  keeps its sentences in a list: the plain greeting, `greetingHandoutsSentence`
+  (#895), the reference-courses sentence (#856), then the unit-plans
+  sentence, joined by one space, and the whole text's double quotes made
+  apostrophes. Built in #880's batch (2026-11-13): see "What an outside
+  assistant is told when a door opens (#895, #856, #791)" below.
 - **The guidance**: `AgentGuidanceTests.TheUnitPlanningSkillIsWrittenWithItsTemplateAndBothRootFilesNameIt`,
   every template file in both homes and each of the 19 fonts by byte count
   and SHA-256 (#790 item 4). A font with one byte appended turns it red.
@@ -13351,11 +13349,144 @@ and the three trail events, and turns the greeting's sentence on.
   the mac's #859 the message ends `{handouts}`, `greetingHandoutsSentence`
   verbatim (`ClaudeCodeLauncher.HandoutsSentence`, pinned to the contract by
   `PlanAUnitTests.TheWordsAreTheContracts`): #895's Plan a Unit part, built
-  here because nothing calls `PlanAUnit.OpeningMessage` until 790b, while
-  the Revise and Fix with doors' handouts sentence stays held for #895.
+  here because nothing calls `PlanAUnit.OpeningMessage` until 790b. The
+  Revise and Fix with doors say it too since #880's batch (below).
   `PlanningAssets.Refresh`: the `assets` mirror.
 - **The guard's Core**, `LocalSiteGuard.cs`, `LocalPageDecision.cs`,
   `PlanNavigation.cs`, `PlanInTheBrowser.cs`, below.
+
+### What an outside assistant is told when a door opens (#895, #856, #791)
+
+Built 2026-11-13 on `issue/880-what-an-outside-assistant-is-told`, Core
+only. The mac's reasoning for each sentence is in
+`documentation/10-local-ai-assistant.md` ("A sentence on every door:
+printed handouts (#859)" and the #856 paragraph); this is what Windows built.
+
+- **The handouts sentence on every door (#895).** The Revise greeting says
+  `greetingHandoutsSentence` straight after "…wait for me to agree.";
+  Fix with's message says it after `fixWith.fixGreeting.planFirst` and
+  before the closing (`FixWithAssistant.Compose`, `PlanFirst` already ends
+  in a space); Plan a Unit said it already (790a). The six
+  `fixWith.greetingCases` held for #895 are the contract's text exactly
+  now. Measured: the sentence is 239 characters, 240 with its space, and
+  every Fix case still names exactly the contract's `rowsNamed` on all
+  four door shapes (the longest case, 7 rows, is 6,321 characters; its
+  codex.cmd command line 6,831 of 8,029 on this PC's npm folder).
+- **The courses kept for reference on a Revise door (#856; #880 item 1).**
+  `ReferenceCoursesToMention.For(course, shelf, today)` makes the list
+  (`greetingReferenceCourses.eachCourse`: same SHOWN code ignoring case,
+  `"{folder} ({year})"` with `SchoolYear.Label` or `Other`, ordinal sort,
+  nothing for a course itself kept for reference) and `Sentence` fills
+  the template. The sentence goes after the handouts sentence and before
+  the unit-plans sentence.
+- **Read at the click, by the door: a Windows-only choice.** Each door's
+  `Open` calls `ReferenceCoursesToMention.ReadFor(folder, code, today)`,
+  which reads `Workspace.DiscoverCourses` and never throws: a folder that
+  cannot be read answers an empty list, so the sentence is dropped and
+  the door still opens. **The mac passes its sidebar's in-memory course
+  list instead**; the sentence is the same either way, so the mac need
+  only know this. Chosen because no caller can forget it (a third door's
+  `Open` calls the same function) and because it costs nothing beside
+  what `Open` already does: 32 ms for 40 courses (warm, mean of 10),
+  against 1.2–1.5 s for `Open` itself (ShellExecute plus its 400 ms
+  watch), Lenovo 20QES70500, i5-8365U. Rejected: passing
+  `Workspace.Courses` from `SidebarPane`'s two call sites, which 790b is
+  rewriting. An opening message (Fix with, Plan a Unit) replaces the
+  greeting, so the folder is not read for one.
+- **Nothing else moved.** `Greeting`, both `Prepare`s and both `Open`s
+  gained one TRAILING parameter each (`referenceCourses`, `today`), so
+  no call site changed. Proved by dump: every `greetingUnitPlansCases`
+  case and every `fixWith.greetingCases` case through both doors, with no
+  program, `claude.exe` and a `claude.cmd`/`codex.cmd` shim, argv and
+  trail line, 201 lines before and after: 198 differ only by the one
+  handouts sentence, 3 (the case with no rows) are identical. No trail
+  clause for either sentence: the contract's "assistant opened" `carries`
+  names one for unit plans only, and `greetingHandoutsSentenceWhy` rules
+  one out.
+- **Never cut.** The contract has no words for a shortened list of
+  reference courses, so both sentences are in every candidate
+  `OutsideDoor.GreetingThatFits` tries and only unit-plan names are
+  dropped from the end. A list too long for the command line then makes
+  the door REFUSE with its could-not-start sentence, which misleads for
+  this cause; accepted, because measured it needs 241 twenty-character
+  entries on codex.cmd with an 80-element emoji course name and six plans
+  (294 with a typical name and no plans) — hundreds of same-code courses
+  kept for reference.
+- **Tests.** `OutsideGreetingContractTests` walks `greetingHandoutsCases`
+  (3), `greetingReferenceCourses.cases` (4) and `.listCases` (10, in
+  memory and from disk) through every door in `agents` less those held by
+  name, a door key it does not map THROWING, so #884's Copilot door
+  inherits the cases by name. `EveryKeyTheGreetingMustSayIsSaid` reads
+  `greetingMustSay` (#791's Windows half): each `(greetingXxx` it names is
+  a key, a string key is said verbatim in every Revise greeting, the
+  handouts sentence in every Fix and Plan a Unit message too, and an entry
+  naming a key the test does not know FAILS. `NoGreetingOffersAHeldSkill`
+  applies `printablePages.agentGuidance.held.words` (proved first on its
+  `mustTrip`/`mustPass`) to every message the doors compose, and FAILS
+  naming #791 when `held.words` is gone, because #791's ruling is
+  permanent and that block is not. `OutsideGreetingOpenTests` drives both
+  real `Open`s against the stub `claude.exe` and `codex.cmd`, POLLING up to
+  15 s for each stub's output (a .NET Framework stub takes 1.1–1.5 s and
+  `Open` watches 400 ms) and opening one door at a time.
+
+### A call that names no section (#885, the mac's #865)
+
+Measured over stdio on this PC (2026-11-13, `plantoir-mcp.exe` x64 Debug
+built from the branch with and without the filter, scratch folder with
+MPM2D in sections 1 and 2, ICS3U in section 1, SNC2D in none): BEFORE,
+`list_curriculum_expectations`, `list_pages` and `deploy_section` with
+`course` only, `list_pages` on the one-section course, and the
+`add_classes` pair with no `unit` or no `howMany` all answered
+`An error occurred invoking '<tool>'.` with `isError` true. The SDK
+(ModelContextProtocol 2.2.0) refuses while binding the non-nullable `int`;
+nothing was planned or deployed, but nothing true was said. AFTER, the
+contract's sentences, and `list_pages` for ICS3U lists Section 1.
+
+- **A call filter, nothing a model is shown.** `MissingArguments.For`
+  runs in `Program.cs`'s call-tool filter, in the order the next bullets
+  give: the course (its own
+  refusal, `noCourseNamed` included), then `noSectionNamed` with the
+  course's "Sections 1 and 2", `noSectionNamedAndNoSections`, or the one
+  section SUPPLIED into the request and the filter's copy (so the
+  reference gate, the outside-change gate and `AfterCall` read it); then,
+  for `add_classes` and `plan_add_classes` only, `addClassesNeedsAUnit`
+  and `addClassesNeedsACount` (a count of 0 or less included). Another tool that requires `unit` keeps the
+  SDK's answer. A named section is untouched, one that is not there
+  included. What a tool requires is read off its own parameters by
+  reflection: 36 of the 43 tools require a section (`back_up_course`
+  among them on Windows; on the mac it is course-wide).
+- **Rejected: `int? section`.** It would change `tools/list`, which the
+  built-in assistant's window reads too (its surface is frozen), and the
+  generated `toolSchemas`, and #885 says not to move a schema. Measured:
+  `tools/list` is identical before and after (43 tools, compared as
+  parsed JSON, 45,899 characters).
+- **The built-in assistant never meets these answers**:
+  `AssistAgent.BoundToThisWindow` writes the window's course and section
+  into every call whose tool declares them, and its 13 local tools do not
+  include the `add_classes` pair (`MissingSectionTests.TheBuiltInAssistantNeverMeetsThem`).
+- **The order, as the mac's** (batch review M1): `Program.cs` asks
+  `MissingArguments.InFrontOfTheTool`, which SUPPLIES the one section
+  first, then asks `ReferenceWriteGate`, then `OutsideChangeGate`, and only
+  then says its own sentence. So a course kept for reference with no
+  section named gets the reference refusal for a writing tool, not a
+  question about a section it would refuse anyway, and a course whose
+  `course_config.json` cannot be read keeps the gate's fail-safe "cannot
+  tell" sentence (measured over stdio, the same answers as before the
+  filter). The first version of this piece said its refusal FIRST and got
+  both wrong. A reading tool on a reference course (`list_pages`) is not
+  gated, so it is asked which section.
+  `MissingSectionTests.TheServerSuppliesFirstThenAsksTheGatesThenTheFilter`
+  pins the order by source, and two behaviour tests pin both cases.
+- **A `howMany` of 0 or less** is asked for with `addClassesNeedsACount`,
+  as the mac's `addClassesQuestion` asks (before, Windows' tool answered
+  "Ask for at least one class.", measured over stdio). No contract case
+  covers 0, or any of these four keys; a case list for them would be the
+  mac's generated half to add.
+- **No trail line**: the contract's `activityTrail.mustRecord` names no
+  event for it and the mac writes none.
+- **Tests**: `MissingSectionTests` (pure, no stdio drive: a server left
+  behind would hold `Plantoir.Core.dll` open), its wiring pinned by the
+  source rule `TheServerAsksTheFilterFirst`.
 
 ### The guard: the folder served by the app itself, at an address that IS the path
 
