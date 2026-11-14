@@ -68,7 +68,7 @@ A representative example:
 | `show_section_marker.sections.section<N>` | bool | setup | build (page title + computed landing title) | Whether the header shows `S<N>` and the computed landing title carries ", Section N". The build also accepts several legacy shapes (plain bool, flat map, alternate key names). |
 | `show_grade_in_title.sections.section<N>` | bool (default `true`) | app (per-section settings) — the wizard never writes it, it only honours an existing value when generating a section's starting `index.md` title | build (computed landing title) | Whether the landing title leads with the grade ("Grade 11 …"). Deliberately literal — the switch alone decides; the app shows an orange warning when the name already contains the grade label. A legacy course-wide bool is honoured. |
 | `color_schemes.section<N>` | string | setup, either app's per-section settings | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 offered, 44 entries). **One scheme has two ids** (#891): Grove Colours is `grove-colours` for every new pick and, for courses that chose it before 2.0.0, the older id that named a school. The older entry is kept with `"listed": false` and `"sameAs": "grove-colours"`, the same name and the same colours, so a course that stores it looks the same and is never rewritten; the pickers show it only to a section whose own scheme it is, in Grove Colours' place (`shared-rules.json` → `colourSchemePicker`). It cannot be removed without rewriting those courses' files, which was ruled out. The section's social sharing card is drawn in this scheme too. A FLAT map, with no `sections` level. In `contracts/file-formats.json` → `courseConfigKeys` since 2026-09-29 (#373's plan): the mac read it by subscript, so the key count never saw it. |
-| `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
+| `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain; read through `custom_domains.for_destination`, #904) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`), never a folder's, which has no address. Any other shape is no domain (`customDomainReading`, #904). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
 | `prepopulate_example_content` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the ready-made payload for this course code. |
 | `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. Offered for a code whose prefix has a family AND whose teacher is NOT taking the ready-made payload, which is the 39 payload codes as well as the ~1,900 without one: both apps wrote `false` for a payload code whatever the teacher chose until 2026-09-21, so declining the ready-made pages gave empty folders ([#248](https://github.com/russellgordon/plantoir/issues/248); 18 pages against the skeleton's 47, measured on ICS4U). |
 | `include_curriculum_pages` | bool | setup | setup | Whether the curriculum pages written for this course code come with it — every expectation as its own page, and what the coverage map is built from. TWO starting points reach them since [#251](https://github.com/russellgordon/plantoir/issues/251) (2026-09-22): the teacher TAKING the payload gets its Curriculum folder, and the teacher who DECLINES the payload but keeps the subject's skeleton gets those same pages installed into the skeleton's Curriculum folder (ICS4U 2 pages to 61, MCMPR11 to 59 British Columbia standards, ICS2O — no payload — unchanged at 2). Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |
@@ -186,6 +186,44 @@ new. REJECTED: cleaning every one-line label a teacher types
 not choose; and escaping a double quote or a backslash in the `pageTitle`
 line, which is a different fault from a control character and is not in this
 piece. Windows plans its readers under #822.
+
+### A section's custom domain is read one way (#904)
+
+Since v2.0.0 ([#904](https://github.com/russellgordon/plantoir/issues/904)).
+`custom_domains.sections.section<N>` is read by one rule with cases,
+`contracts/file-formats.json` → `customDomainReading`: from a map, the
+value under the destination type asked for; from the older bare string, the
+string only when that type is the primary (`deploy_target`, Netlify when
+absent); `local_folder` never has a domain, because a folder has no site
+address; and any other shape (a list, a number, a map whose value is not a
+string, a `sections` that is not a map) is no domain rather than an error.
+The value comes back as stored, and trimming a scheme or a slash is the
+caller's (`clean_base_url`, `normalizedCustomDomain`).
+
+Readers: `scripts/custom_domains.py` → `for_destination` in the shared Python
+(`build_site.resolve_section_domain` asks it for the primary, the address a
+build bakes in; it is baked into the website builder beside `build_site.py`),
+and `CourseConfiguration.customDomain(forSection:destinationType:)` on the mac
+(`FileFormatsContractTests.testACustomDomainIsReadTheContractsWay`).
+`scripts/test_custom_domains.py` runs the cases on the host and
+`scripts/test_build_site_domain_resolution.py` the build's address in the
+image.
+
+Measured before the change, Python 3.14 on the mac and the website builder's
+Python: `resolve_section_domain` returned the bare string for a course whose
+primary is a folder, and RAISED `AttributeError` for an entry that was a list
+or a number, a map whose value was a number, and a `sections` that was a list;
+it is called with no `try` (`build_site.py`, where the baseUrl is patched), so
+each of those stopped the build. The four new build tests fail on the old file
+(2 failures, 6 errors) and pass on the new. The mac's reader handed a
+folder-primary course's bare string to its FOLDER leg (harmless, since a
+folder deploy announces no site address for the link to wear, and corrected
+for the rule's sake). On Windows' #799 branch, `deploy.py` gained its own
+`leg_custom_domain`, which already follows the rule; once #799 merges it is to
+call `custom_domains.for_destination` rather than keep a second copy.
+REJECTED: leaving the reader inside `build_site.py` for `deploy.py` to import
+(it pulls in the whole build and its `frontmatter` dependency to read one
+key), and moving it into `toolchain_paths.py` (it is not a path).
 
 ### Publishing destination
 

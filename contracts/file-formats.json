@@ -265,6 +265,31 @@
       "note": "Written by the WIZARD at course creation, not by the settings form. `setup_course.py` reads each as the default for a question it would otherwise ask — so an app that omits one leaves the Python to take its own default, and the teacher never gets the choice. All three are the TEACHER's answers, on both platforms: the wizard asks, the app writes `capabilityExists && teacherSaidYes`, and the Python's own default is a fallback that should never be the thing deciding."
     }
   },
+  "customDomainReading": {
+    "issue": "#904",
+    "rule": "The teacher's own domain for ONE destination type of one section is read from custom_domains.sections.section<N> (courseConfigKeys -> custom_domains): from a map, the value under that destination type; from the older bare string, the string, but only when that destination type is the course's primary (deploy_target, `netlify` when absent). A destination type with no address (`local_folder`) never has one, whatever the setting says. Any other shape (a list, a number, a map whose value is not a string, a `sections` or `custom_domains` that is not a map) is no domain, never an error. The value is returned as stored; trimming a scheme or a slash is the caller's.",
+    "readers": "custom_domains.for_destination in the shared Python (build_site.py asks it for the primary, the address a build bakes in; deploy.py's per-destination reader, `leg_custom_domain` on Windows' #799 branch, is to call it once #799 lands), CourseConfiguration.customDomain(forSection:destinationType:) on the mac (FileFormatsContractTests), and Windows' reader of the same key.",
+    "why": "Found by the fourth review of #799 on Windows (2026-11-13). build_site's own reader differed from deploy.py's and both apps' in two ways, measured with Python 3.14: a bare string was applied to a course whose primary is a folder, and a list or a number raised AttributeError, which stops the build (resolve_section_domain is called with no try). One rule, read by every reader from these cases, so the address a build bakes in and the address a deploy leg is built for cannot disagree over the same setting.",
+    "casesShape": "config is the course_config.json the case reads (only the keys that matter); the case asks for section 1 and destination; expect is what the reader returns, \"\" for no domain.",
+    "cases": [
+      {"name": "a map: the destination's own domain", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": {"netlify": "ics3u.school.ca", "cloudflare_pages": "ics3u-cf.school.ca"}}}}, "destination": "netlify", "expect": "ics3u.school.ca"},
+      {"name": "a map: the second destination's own domain", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": {"netlify": "ics3u.school.ca", "cloudflare_pages": "ics3u-cf.school.ca"}}}}, "destination": "cloudflare_pages", "expect": "ics3u-cf.school.ca"},
+      {"name": "a map naming only another destination: none", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": {"cloudflare_pages": "ics3u.school.ca"}}}}, "destination": "netlify", "expect": ""},
+      {"name": "the older bare string is the primary's", "config": {"deploy_target": "cloudflare_pages", "custom_domains": {"sections": {"section1": "ics3u.school.ca"}}}, "destination": "cloudflare_pages", "expect": "ics3u.school.ca"},
+      {"name": "the older bare string, no deploy_target: Netlify is the primary", "config": {"custom_domains": {"sections": {"section1": "ics3u.school.ca"}}}, "destination": "netlify", "expect": "ics3u.school.ca"},
+      {"name": "the older bare string is no other destination's", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": "ics3u.school.ca"}}}, "destination": "cloudflare_pages", "expect": ""},
+      {"name": "the older bare string, a folder primary: the folder has no address (#904)", "config": {"deploy_target": "local_folder", "custom_domains": {"sections": {"section1": "ics3u.school.ca"}}}, "destination": "local_folder", "expect": ""},
+      {"name": "the older bare string, a folder primary: nor is it a web destination's", "config": {"deploy_target": "local_folder", "custom_domains": {"sections": {"section1": "ics3u.school.ca"}}}, "destination": "netlify", "expect": ""},
+      {"name": "a folder never has a domain, even one written under its name", "config": {"deploy_target": "local_folder", "custom_domains": {"sections": {"section1": {"local_folder": "ics3u.school.ca"}}}}, "destination": "local_folder", "expect": ""},
+      {"name": "an entry that is a list: none, not an error (#904)", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": ["ics3u.school.ca"]}}}, "destination": "netlify", "expect": ""},
+      {"name": "an entry that is a number: none, not an error (#904)", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": 42}}}, "destination": "netlify", "expect": ""},
+      {"name": "a map whose value is a number: none", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section1": {"netlify": 42}}}}, "destination": "netlify", "expect": ""},
+      {"name": "sections that is a list: none", "config": {"deploy_target": "netlify", "custom_domains": {"sections": ["ics3u.school.ca"]}}, "destination": "netlify", "expect": ""},
+      {"name": "custom_domains that is a string: none", "config": {"deploy_target": "netlify", "custom_domains": "ics3u.school.ca"}, "destination": "netlify", "expect": ""},
+      {"name": "no entry for the section: none", "config": {"deploy_target": "netlify", "custom_domains": {"sections": {"section2": {"netlify": "ics3u.school.ca"}}}}, "destination": "netlify", "expect": ""},
+      {"name": "no custom_domains at all: none", "config": {"deploy_target": "netlify"}, "destination": "netlify", "expect": ""}
+    ]
+  },
   "datesAndTitles": {
     "writingCases": {
       "cases": [

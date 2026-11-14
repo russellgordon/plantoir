@@ -10,7 +10,10 @@ baseUrl baked into a single build (sitemap, RSS, social-card absolute
 URLs) can only ever be one value — so this reads the PRIMARY destination's
 own custom domain, matching what the "Live URL" link on a finished deploy
 has always pointed at. An older, single-string shape (written before a
-course could have more than one destination) is read as-is.
+course could have more than one destination) is read as the primary's, and
+since #904 never a folder's; the setting is read by
+custom_domains.for_destination (scripts/test_custom_domains.py runs its
+contract cases).
 
 Pure stdlib, no Docker and no network. Run with:
 
@@ -99,6 +102,55 @@ class ResolveSectionDomainTests(unittest.TestCase):
         }
         domain = build_site.resolve_section_domain(Path("."), config, 1)
         self.assertEqual(domain, "ics3u.school.ca")
+
+    # #904: build_site reads the setting through custom_domains.for_destination,
+    # the reader contracts/file-formats.json -> customDomainReading describes
+    # (scripts/test_custom_domains.py runs its cases); these are the two ways
+    # build_site's own reader used to differ, at the level of the address a
+    # build bakes in.
+
+    def test_a_folder_primarys_bare_string_is_no_address(self):
+        config = {
+            "deploy_target": "local_folder",
+            "custom_domains": {"sections": {"section1": "ics3u.school.ca"}},
+        }
+        domain = build_site.resolve_section_domain(Path("."), config, 1)
+        self.assertEqual(domain, "", "a folder has no site address (#904)")
+
+    def test_a_folder_primarys_bare_string_falls_through_to_a_marker(self):
+        config = {
+            "deploy_target": "local_folder",
+            "custom_domains": {"sections": {"section1": "ics3u.school.ca"}},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            course_dir = Path(tmp)
+            markers_dir = course_dir / ".netlify_sites"
+            markers_dir.mkdir()
+            (markers_dir / "section1.json").write_text(
+                json.dumps({"name": "ics3u-s1-2026-teacher"}), encoding="utf-8"
+            )
+            domain = build_site.resolve_section_domain(course_dir, config, 1)
+            self.assertEqual(domain, "ics3u-s1-2026-teacher.netlify.app")
+
+    def test_a_wrong_type_is_no_domain_and_no_error(self):
+        for entry in (["ics3u.school.ca"], 42, {"netlify": 42}, {"netlify": ["a.ca"]}):
+            with self.subTest(entry=entry):
+                config = {
+                    "deploy_target": "netlify",
+                    "custom_domains": {"sections": {"section1": entry}},
+                }
+                self.assertEqual(build_site.resolve_section_domain(Path("."), config, 1), "")
+        for custom in ("ics3u.school.ca", {"sections": ["ics3u.school.ca"]}, {"sections": 3}):
+            with self.subTest(custom=custom):
+                config = {"deploy_target": "netlify", "custom_domains": custom}
+                self.assertEqual(build_site.resolve_section_domain(Path("."), config, 1), "")
+
+    def test_a_scheme_and_a_slash_are_still_trimmed(self):
+        config = {
+            "deploy_target": "netlify",
+            "custom_domains": {"sections": {"section1": {"netlify": "https://ics3u.school.ca/"}}},
+        }
+        self.assertEqual(build_site.resolve_section_domain(Path("."), config, 1), "ics3u.school.ca")
 
 
 if __name__ == "__main__":

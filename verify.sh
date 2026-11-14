@@ -964,6 +964,17 @@ else
   cat /tmp/verify_course_names_test.log
 fi
 
+# A section's custom domain is read one way (GitHub #904): every case of
+# contracts/file-formats.json -> customDomainReading against
+# custom_domains.for_destination. Pure stdlib; build_site's use of it runs
+# against the real image further down (test_build_site_domain_resolution.py).
+if (cd scripts && python3 test_custom_domains.py) >/tmp/verify_custom_domains_test.log 2>&1; then
+  pass "a section's custom domain is read as the contract says, a folder never has one and a wrong type is none (scripts/test_custom_domains.py, #904)"
+else
+  fail "a section's custom domain is read as the contract says, a folder never has one and a wrong type is none (scripts/test_custom_domains.py, #904)"
+  cat /tmp/verify_custom_domains_test.log
+fi
+
 # A value from a course's settings is written into the site's TypeScript as an
 # escaped string (GitHub #871): every typescriptStrings case, and every writer
 # (title, locale, baseUrl, fonts, colours, footer) read back from its file and
@@ -2135,6 +2146,7 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
 check_baked scripts/section_problems.py   /opt/scripts/section_problems.py
 check_baked scripts/course_names.py       /opt/scripts/course_names.py
+check_baked scripts/custom_domains.py     /opt/scripts/custom_domains.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
