@@ -2602,10 +2602,15 @@ nonisolated enum AssistWording {
     /// section's website already has, and replace it (the implementation
     /// review's W1; the deploy path's fix is GitHub #915). Said in the sheet,
     /// in the plan and when it is done, which is why it is in the present.
+    /// Its last sentence is the way forward, and it is true as the name rule
+    /// stands: the name a new website gets carries the calendar year
+    /// (`RollOverFromTheMenu.cloudflareNameStem`), so from January the
+    /// kept names no longer match and the sheet offers a new website again.
     static let menuRollOverANewWebsiteWouldReuseItsAddress: String =
         "This section's website was started this calendar year, and a new website started now "
         + "would get the same address. It keeps deploying to the same website, so links students "
-        + "saved keep working."
+        + "saved keep working. A new website can be started for this section once the calendar "
+        + "year changes."
 
     /// No question: the section deploys only to a folder.
     static let menuRollOverDeploysToAFolder: String =
@@ -2636,6 +2641,30 @@ nonisolated enum AssistWording {
     static let rolloverDeploysToAFolderFromTheMenu: String =
         "This section deploys to a folder, so where it deploys is unchanged. Nothing goes out until "
         + "you deploy."
+
+    /// The finished line for a new website from the menu, in place of
+    /// `rolloverStartedANewWebsite`, whose last sentence says Plantoir will
+    /// ask what to call the new website. That is true of Netlify and untrue
+    /// of Cloudflare, which names a new website itself (`deploy.py`
+    /// `suggest_pages_name`; the Fable sweep's T1, as the implementation
+    /// review's W2 found for `menuRollOverNotDeployedYet`). The first two
+    /// sentences are the window's; the last is true on both hosts. A course
+    /// that now deploys only to a folder, whose marker an old web host left,
+    /// ends on `menuRollOverDeploysToAFolder` instead, since no website is
+    /// made for it (the sweep's T7).
+    static func rolloverStartedANewWebsiteFromTheMenu(keptAs: String, deploysToAFolder: Bool = false) -> String {
+        var ending: String = rolloverANewWebsiteIsMadeAtTheNextDeploy
+        if deploysToAFolder {
+            ending = menuRollOverDeploysToAFolder
+        }
+        return rolloverIsOnANewWebsite + " Last year's details are "
+             + "kept at \(keptAs), so you can go back to it. " + ending
+    }
+
+    /// The last sentence of that line, named so a test can find it in a
+    /// line whose kept file carries a timestamp.
+    static let rolloverANewWebsiteIsMadeAtTheNextDeploy: String =
+        "A new website is made the next time this section is deployed."
 
     /// Help ▸ Publishing and Deploying…: the difference, said to the teacher
     /// — `whatPublishingMeans` is the assistant's, and says "the teacher".

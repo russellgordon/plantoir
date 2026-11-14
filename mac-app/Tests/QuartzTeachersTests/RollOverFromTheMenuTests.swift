@@ -221,6 +221,45 @@ final class RollOverFromTheMenuTests: XCTestCase {
         }
     }
 
+    /// A new website from the menu on Cloudflare, rolled over from last
+    /// year's: the finished line promises no question about a name, which
+    /// Cloudflare never asks (the Fable sweep's T1). The window's line, run
+    /// on the same section, is its own sentence, unchanged. Red before: the
+    /// menu said the window's sentence, which says Plantoir will ask.
+    func testANewWebsiteFromTheMenuPromisesNoQuestionAboutItsName() async throws {
+        for surface in [AssistToolRunner.Surface.menu, AssistToolRunner.Surface.local] {
+            let made = try AssistFixture.makeSectionNeedingReDating(withMarker: false, surface: surface, for: self)
+            defer {
+                try? FileManager.default.removeItem(at: made.root)
+            }
+            _ = RollOverFromTheMenuTests.countCopies(of: made)
+            let course: Course = try RollOverFromTheMenuTests.deployingTo("cloudflare_pages", made.course)
+            let marker: URL = try RollOverFromTheMenuTests.writeCloudflareMarker(
+                named: "ics3u-s1-2025", file: "section1.json", in: course
+            )
+            if surface == .menu {
+                let september: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-09-08"))
+                XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: course, today: september).website, .asked)
+            }
+            let outcome: AssistToolOutcome = await made.runner.run(
+                call: SectionVerbs.rollOver(course: "ICS3U", section: 1, website: "new", planning: false)
+            )
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), "\(surface): the marker was not moved aside")
+            XCTAssertTrue(outcome.summary.contains(AssistWording.rolloverIsOnANewWebsite), outcome.summary)
+            if surface == .menu {
+                XCTAssertTrue(
+                    outcome.summary.contains(AssistWording.rolloverANewWebsiteIsMadeAtTheNextDeploy), outcome.summary
+                )
+                XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(outcome.summary), outcome.summary)
+            } else {
+                XCTAssertFalse(
+                    outcome.summary.contains(AssistWording.rolloverANewWebsiteIsMadeAtTheNextDeploy), outcome.summary
+                )
+            }
+        }
+        XCTAssertFalse(AssistWording.rolloverANewWebsiteIsMadeAtTheNextDeploy.contains("ask"), "Cloudflare asks for no name")
+    }
+
     /// "same" from the menu: every marker stays where it is.
     func testKeepingTheWebsiteFromTheMenuLeavesEveryMarker() async throws {
         let made = try AssistFixture.makeSectionNeedingReDating(withMarker: true, surface: .menu, for: self)
@@ -407,6 +446,11 @@ final class RollOverFromTheMenuTests: XCTestCase {
         // On Netlify the same record says nothing: its names are not by year.
         let onNetlify: Course = try RollOverFromTheMenuTests.deployingTo("netlify", course)
         XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: onNetlify, today: today).website, .notDeployedYet)
+        // The reuse sentence's way forward: from January a new website is
+        // started again (wording.menuRollOverANewWebsiteWouldReuseItsAddress).
+        let january: CalendarDay = try XCTUnwrap(CalendarDay(text: "2027-01-04"))
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: course, today: january).website, .notDeployedYet)
+        XCTAssertEqual(RollOverFromTheMenu.choice(forSection: 1, in: course, today: january).websiteSent, "new")
     }
 
     // MARK: - "Not on a website at the moment" (W2)

@@ -835,6 +835,13 @@ enum AssistContract {
                 stillPinned: ".netlify_sites/section1.json"
             ),
             "rolloverDeploysToAFolderFromTheMenu": AssistWording.rolloverDeploysToAFolderFromTheMenu,
+            "rolloverStartedANewWebsiteFromTheMenu": AssistWording.rolloverStartedANewWebsiteFromTheMenu(
+                keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json"
+            ),
+            "rolloverANewWebsiteIsMadeAtTheNextDeploy": AssistWording.rolloverANewWebsiteIsMadeAtTheNextDeploy,
+            "rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder": AssistWording.rolloverStartedANewWebsiteFromTheMenu(
+                keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json", deploysToAFolder: true
+            ),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),

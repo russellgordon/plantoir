@@ -4837,21 +4837,23 @@ final class AssistToolRunner {
                 // Section ▸ Roll Over to a New Year… (#897 piece B): the card
                 // also says the dates need nothing and what is set aside. What
                 // the model reads (`plan`) is the window's, byte for byte.
+                // On "new" the card says it as the other branch does ("It
+                // would also start…"), not in the window's imperative (the
+                // Fable sweep's T7).
                 if surface == .menu {
                     return AssistToolOutcome.planned(
                         already,
                         plan: websitePlan,
                         card: already + "\n\n"
-                            + menuRolloverPlanLines(websiteAnswer, asked.located, newWebsite: websitePlan)
+                            + menuRolloverPlanLines(
+                                websiteAnswer, asked.located, newWebsite: AssistToolRunner.menuRolloverStartsANewWebsite
+                            )
                     )
                 }
                 return AssistToolOutcome.planned(already, plan: websitePlan)
             }
             if isRollover, websiteAnswer == "new" {
-                let newWebsite: String =
-                    "\n\nIt would also start a new website for this section, so deploying it "
-                    + "no longer replaces last year's. Last year's details are kept, and any "
-                    + "deploy set to happen on its own is turned off."
+                let newWebsite: String = "\n\n" + AssistToolRunner.menuRolloverStartsANewWebsite
                 var card: String = asked.plan.describe(noun: asked.located.course.configuration.classNoun)
                     + newWebsite
                 if surface == .menu {
@@ -4894,12 +4896,13 @@ final class AssistToolRunner {
         var website: String = newWebsite
         if answer == "same" {
             website = AssistWording.menuRollOverPlanKeepsTheWebsite
-            // A course that deploys only to a folder keeps deploying to its
-            // folder, whatever marker an old web host left (the
-            // implementation review's M2).
-            if RollOverFromTheMenu.deploysOnlyToAFolder(located.course) {
-                website = AssistWording.menuRollOverDeploysToAFolder
-            }
+        }
+        // A course that deploys only to a folder keeps deploying to its
+        // folder, whatever marker an old web host left, on either answer:
+        // no website is kept or started for it (the implementation review's
+        // M2, and the Fable sweep's T7 for "new").
+        if RollOverFromTheMenu.deploysOnlyToAFolder(located.course) {
+            website = AssistWording.menuRollOverDeploysToAFolder
         }
         // A section with no website yet, or deploying only to a folder, or
         // whose new website would take this one's address, is told so rather
@@ -4925,6 +4928,16 @@ final class AssistToolRunner {
     static func menuRolloverRefusedWithoutACopy(_ course: Course) -> AssistToolOutcome {
         return AssistToolOutcome.refused(AssistWording.startOfYearNeedsABackup(course: course.code))
     }
+
+    /// The plan's line for a new website, after a re-date's card. The window
+    /// shows it after its re-date too, with the same bytes as before it was
+    /// named (what the model reads is unchanged); the menu also shows it
+    /// where the dates are already right, in place of the window's
+    /// imperative for that branch (the Fable sweep's T7).
+    static let menuRolloverStartsANewWebsite: String =
+        "It would also start a new website for this section, so deploying it "
+        + "no longer replaces last year's. Last year's details are kept, and any "
+        + "deploy set to happen on its own is turned off."
 
     /// The name of the ONE change a rollover from the menu records (#897
     /// piece B, the plan review's amendment 10): the re-date, the record set
@@ -5369,9 +5382,17 @@ final class AssistToolRunner {
             )
         }
 
+        // From the menu the last sentence is true on Cloudflare too, which
+        // asks for no name (the Fable sweep's T1); the window's is as it was.
         var said: String = AssistWording.rolloverStartedANewWebsite(
             keptAs: release.keptFiles.joined(separator: ", ")
         )
+        if fromTheMenu {
+            said = AssistWording.rolloverStartedANewWebsiteFromTheMenu(
+                keptAs: release.keptFiles.joined(separator: ", "),
+                deploysToAFolder: RollOverFromTheMenu.deploysOnlyToAFolder(course)
+            )
+        }
         // Some destinations released and others not: say so, rather than
         // letting the success sentence stand for the whole section.
         if release.somethingIsStillPinned {

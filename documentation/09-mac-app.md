@@ -7281,6 +7281,30 @@ says only what is true of all of them, and it is also the finished line where
 the window would say `rolloverHadNoWebsiteYet` (whose Cloudflare clause is the
 window's, frozen).
 
+**The finished line for a new website** (`rolloverStartedANewWebsiteFromTheMenu`,
+the Fable sweep's T1) is the window's `rolloverStartedANewWebsite` with its last
+sentence replaced by `rolloverANewWebsiteIsMadeAtTheNextDeploy`. The window's
+ends by saying Plantoir will ask what to call the new website, which is true of
+Netlify and false of Cloudflare, where `deploy.py` names the website itself. It
+is the clause W2 removed from the row above. A course that now deploys only to a
+folder, with a marker an old web host left, ends on `menuRollOverDeploysToAFolder`
+instead, in the finished line and in the plan for either answer (the sweep's T7),
+because no website is made for it. Where the dates are already right the plan's
+line for "new" is `AssistToolRunner.menuRolloverStartsANewWebsite`, the line the
+other branch shows ("It would also start…"), not the window's imperative; the
+window's plan bytes are unchanged. Pinned by
+`RollOverFromTheMenuTests.testANewWebsiteFromTheMenuPromisesNoQuestionAboutItsName`.
+The window's `rolloverCouldNotTurnOffTheScheduledPublish` carries the same
+clause and is not twinned yet.
+
+**The reuse sentence ends with the way forward**: a new website can be started
+once the calendar year changes. That is true as the name rule stands: the name
+carries the year, so from January the kept names no longer match, the section
+with its own marker is asked again, and one with only a set-aside record is sent
+"new" (`RollOverFromTheMenuTests.testASetAsideRecordFromThisYearCountsToo`). The
+only way to start it is another rollover, which sets aside the published-pages
+record again; the sentence names no menu item for that reason.
+
 The marker test is `DeployCommand.sectionIsPinned`, over the same URLs
 `releaseSite` walks (its legacy path is now `legacyMarkerURL`, shared), so the
 sheet and the release cannot disagree. The call carries only "new" or "same",
@@ -7307,11 +7331,11 @@ amendment 1; the window and an outside assistant are unchanged, and
   same fact. The window's path says so in `detail` and goes on, as #457 set
   it; the menu's errs toward refusing because it is the most consequential
   item on the menu. Pinned by
-  `RollOverFromTheMenuTests.testARolloverWithNoCopyIsRefusedBeforeAnythingChanges`.
+  `RollOverFromTheMenuSafetyTests.testARolloverWithNoCopyIsRefusedBeforeAnythingChanges`.
 - **The undo entry holds only the half of each marker's move that left the
   marker's place** (`AssistToolRunner.onlyTheHalvesMovedAway`; the review's
   I1, measured there and reproduced by
-  `RollOverFromTheMenuTests.testAnUndoAfterADeployNeverDeletesTheKeptMarker`).
+  `RollOverFromTheMenuSafetyTests.testAnUndoAfterADeployNeverDeletesTheKeptMarker`).
   With both halves recorded, a deploy between the rollover and Undo Last
   Change wrote a new marker in the place, Undo left that alone as edited, and
   DELETED the kept copy because it still matched, so last year's site id and

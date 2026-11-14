@@ -29362,11 +29362,12 @@
         "dates": "wording.menuRollOverDates: the first and last date on file",
         "datesAreOld": "wording.menuRollOverDatesAreOld, when the last date on file is before today",
         "goButton": "wording.menuRollOverButton",
-        "planLines": "after the re-date's card: for 'same' wording.menuRollOverPlanKeepsTheWebsite, for 'new' the window's own new-website line; wording.menuRollOverNotDeployedYet, wording.menuRollOverDeploysToAFolder or wording.menuRollOverANewWebsiteWouldReuseItsAddress in place of either where the website rule says so, and wording.menuRollOverDeploysToAFolder for 'same' on a course that deploys only to a folder whatever marker an old host left; then wording.menuRollOverPlanSetsTheRecordAside",
+        "planLines": "after the re-date's card: for 'same' wording.menuRollOverPlanKeepsTheWebsite, for 'new' the window's own new-website line; wording.menuRollOverNotDeployedYet, wording.menuRollOverDeploysToAFolder or wording.menuRollOverANewWebsiteWouldReuseItsAddress in place of either where the website rule says so, and wording.menuRollOverDeploysToAFolder for either answer on a course that deploys only to a folder whatever marker an old host left; where the dates are already right, 'new' is said as the other branch says it (It would also start...), not in the window's imperative; then wording.menuRollOverPlanSetsTheRecordAside",
         "finishedInPlaceOf": {
           "rolloverKeptTheSameWebsite": "wording.rolloverDeploysToAFolderFromTheMenu, for a course that deploys only to a folder; wording.menuRollOverANewWebsiteWouldReuseItsAddress, where a new website would reuse the address",
           "rolloverHadNoWebsiteYet": "wording.menuRollOverNotDeployedYet, which is true of Cloudflare (no name is asked) and of a course that also deploys to a folder",
-          "rolloverCouldNotStartANewWebsite": "wording.rolloverCouldNotStartANewWebsiteFromTheMenu"
+          "rolloverCouldNotStartANewWebsite": "wording.rolloverCouldNotStartANewWebsiteFromTheMenu",
+          "rolloverStartedANewWebsite": "wording.rolloverStartedANewWebsiteFromTheMenu, whose last sentence (wording.rolloverANewWebsiteIsMadeAtTheNextDeploy) is true on Cloudflare, which asks for no name (the Fable sweep's T1); for a course that deploys only to a folder it ends on wording.menuRollOverDeploysToAFolder instead (wording.rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder)"
         }
       },
       "cases": [
