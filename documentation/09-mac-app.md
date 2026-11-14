@@ -12026,11 +12026,11 @@ piece 785b moves the automatic backups onto it. The code is
   holds every file (`zipinfo` listing, plan review amendment 2), which must
   ask `pathsNotHeld(by:)` for Media. Windows' `CourseRestorer` and its import
   are the same doors there. A test should walk every caller of `unpack`.
-- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 35
+- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 36
   cases): anything unreadable stops it; needed is every checksum named by a
   small backup that is there (or its pre-macOS 14 `.icloud` placeholder,
   through its list copy), a list whose zip has not arrived and is under a day
-  old, an Undo list under 31 days old, a pending list of a backup being
+  old, an Undo list under 61 days old, a pending list of a backup being
   written (a day, or while its process runs on this computer), and a FINISHED
   backup's pending list for a day after it finished. Nothing is deleted until
   a sweep a day after this computer first found it unneeded still finds it
@@ -12078,7 +12078,12 @@ piece 785b moves the automatic backups onto it. The code is
   Undo calls `keepForUndo(stepID:checksums:writtenAt:)` with the backup's
   `list(ofBackupNamed:zipURL:).checksums`; when the step leaves the Undo list
   it calls `releaseForUndo(stepID:)`. Every computer's sweep honours the list
-  for 31 days by its own `writtenAt`. A reference replace that must not trust
+  for 61 days by its own `writtenAt`: one more than the 60 days the journal
+  keeps a step on the disk (30 offered and a grace of 30 for a clock set
+  wrong, `undo.rule.limits`). It was 31 when 785a merged, which covered what
+  is offered but not the grace, so a step offered again once a wrong clock
+  was put right could have lost its pictures (#899 U1's second core review;
+  changed when U1 merged `dev`, the director's ruling 11 on its third round). A reference replace that must not trust
   a zip's listing alone asks `pathsNotHeld(by:)`, which re-hashes each file.
 - **Measured** after the review's fixes (Apple M4 Pro, macOS 26, 2026-11-13,
   scratch folders and hidden disk images). The AVI1O example course
@@ -12144,7 +12149,7 @@ piece 785b moves the automatic backups onto it. The code is
   review, measured). Issue #908 owns the whole zip's loop; until it lands, a
   door that falls back must bound the whole zip or report the refusal.
 - **Known limits.** The two-computer race above. A clock set days forward
-  deletes for real while it is forward and can end an Undo list's 31 days
+  deletes for real while it is forward and can end an Undo list's 61 days
   early (review M2). Since macOS 14 iCloud Drive keeps an evicted file under
   its own name with no data on this disk, not as `.X.icloud`; reading such a
   zip's list downloads it under the sweep's lock or fails, and a failure keeps
@@ -12156,7 +12161,8 @@ piece 785b moves the automatic backups onto it. The code is
   Three more, measured by the pre-merge sweep (2026-11-13):
   - **An Undo list is counted from its own written moment only**, not from
     when another computer first saw it, so a computer whose clock runs
-    behind shortens it everywhere else. With B's clock two days behind, A
+    behind shortens it everywhere else (measured with the 31 days it then
+    had). With B's clock two days behind, A
     honoured B's Undo list until day 31.1 by A's clock (29.1 days after B
     wrote it) and deleted the pictures at day 45.2; with B's clock 40 days
     behind, A removed the list the first time it saw it and deleted the
@@ -17876,7 +17882,14 @@ then runs the lock, the read of the journal and the writes on a detached
 task the action waits for. A process's first read of the journal is a whole
 one, 100 to 300 ms and more at a year's steady 2 to 6 MB (the core review of
 the second round), and it was running on the main actor at the first
-publish after a launch.
+publish after a launch. A page's place in the working folder is worked out with every link
+resolved through its deepest folder that exists (`canonicalPath`):
+Foundation's `resolvingSymlinksInPath` resolves nothing in a path that does
+not exist, so a section whose front page was not there yet, reached through
+a linked folder, put the front page outside its own working folder and its
+`recompute` op went unrecorded (the second Mac's run of
+`UndoShadowPublishTests.testAPublishIsRecordedInShadow`, reproduced
+standalone with a linked root).
 
 `UndoWriterScanTests` lists every product file that writes files, with its
 count and why: the door, not a step, or the piece of #899 that will wire
@@ -17922,7 +17935,7 @@ the scan before counted 2. `DeployCommand`, `ScheduledDeploy` and
 `PlanSharing` no longer say they wait for U6: a deploy, set for later or
 not, and sharing unit plans are not counted (rulings 17 and 18), and
 `DeployCommand.releaseSite`, the rollover's "cut loose", is U4's with the
-rollover. 87 files write today.
+rollover. 87 files wrote on the branch; with `dev` merged (#785a and #897c), 90: `OneSectionRestore` (an `unzip -p` that only reads), and the shared Media store's `SharedMediaStore` and `SharedMediaFiles` (U5's).
 
 ### The U1 harness
 
@@ -17995,6 +18008,34 @@ leaving an unplannable step in flight (6 recovery checks red), a `note`
 read as a barrier (333 trace checks red), pruning stopping at a dead
 process's step (2 stack checks red); and the old code (56b2b23a9) on the
 stuck-step reproductions and the year above.
+
+**After the third round** (the director's rulings on the second fix reviews;
+the harness is under `u1/r3/` in the director's scratchpad for that round,
+run one process at a time while the director's gate held the Mac, with
+`origin/dev` 86ae77e53 merged): the 20 traces (612 calls), 27 check, 41
+stack, 20 recovery, 18 deployed and 3 step cases, the five core checks, two
+writers in one process, two PROCESSES and ten real `SIGKILL`s: 0 failures.
+The core reviewer's kill script: 36 kill cases at 18 points, each settled
+with nothing left beside a page and a second settle changing nothing, and
+60 random kills on 300 pages stable. A one-page shadow publish, first in a
+fresh process then read on: 12.8 then 5 to 6 ms at 106 KB, 50.8 then 5 to 6
+ms at 1.0 MB, 170.9 then 6 to 8 ms at 3.9 MB (a list of 20-page steps never
+reaches 5 MB: pruning deletes the old segment first). The year with an
+unreadable line on day 1: a peak of 9.95 MB on day 60, the barrier gone by
+day 90, then 2.1 to 5.6 MB in one or two segments, first reads 81 to 380
+ms, and the read-on fold equal to a whole read on all 365 days. The 8-process
+lock measurement was left for the second Mac (no artificial load on this
+one).
+
+Must-fail proofs for this round, each the new code with one fix out (the
+`u1/mustfail3/` folder): `rule.deployed` reading every destination (2
+deployed cases red), missing content refused for ever (10 stack checks), a
+refused put-back retried at every lock (1 recovery case), no tidying at
+close (the core check), the timeless segment kept (the core check), the
+shadow publish's old `relativePath` (a front page that does not exist yet,
+under a linked root, falls outside it: reproduced standalone, and red on the
+bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
+days (the 40-day sweep case), and the second round's scan (11 checks).
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
