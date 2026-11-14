@@ -30,6 +30,9 @@ public class PlanningTabUiTests
 {
     private const string Code = "SNC2D", Name = "Grade 10 Science", Empty = "SPH3U";
 
+    /// <summary>Typed into the footer box (letters only: no key the harness does not watch).</summary>
+    private const string FooterMark = "footermark";
+
     [UiFact]
     public void ThePlanningTabShowsThePlanAndKeepsSettingsOutOfReach()
     {
@@ -70,16 +73,24 @@ public class PlanningTabUiTests
             nameField.Focus();
             nameField.Text = Name + " edited";
             Thread.Sleep(300);
+            // The switch is made with the MULTI-LINE footer box holding the
+            // keyboard (#801 item 1: the mac's fault was a footer box that kept it).
+            var footer = Wait(app, "footerHtmlField");
+            footer.Focus();
+            Keyboard.Type(FooterMark);
+            Thread.Sleep(300);
+            Assert.Equal("footerHtmlField", app.Window.Automation.FocusedElement()?.AutomationId);
             planningTab.Patterns.SelectionItem.Pattern.Select();
             Assert.True(Retry.WhileFalse(() => app.FindOrNull("planningUnitPopup", TimeSpan.FromMilliseconds(300)) is { IsOffscreen: false },
                                          TimeSpan.FromSeconds(20)).Result, "the plan's bar never showed");
-            var settingsIds = new HashSet<string> { "courseNameField", "courseSettingsForm", "saveButton", "revertButton", "folderNotice" };
+            Assert.False(InsideTheSettingsForm(app, app.Window.Automation.FocusedElement()), "the keyboard stayed in the settings form");
             for (int press = 0; press < 30; press++)
             {
                 Keyboard.Type(VirtualKeyShort.TAB);
                 Thread.Sleep(80);
-                string focused = app.Window.Automation.FocusedElement()?.AutomationId ?? "";
-                Assert.DoesNotContain(focused, settingsIds);
+                var focused = app.Window.Automation.FocusedElement();
+                Assert.False(InsideTheSettingsForm(app, focused),
+                             $"Tab {press + 1} reached a setting: {focused?.AutomationId} ({focused?.ControlType})");
             }
             Assert.False(app.FindOrNull("courseSettingsForm", TimeSpan.FromMilliseconds(500)) is { IsOffscreen: false },
                          "the settings form is still drawn under Planning");
@@ -98,6 +109,9 @@ public class PlanningTabUiTests
                 return saved?.StartsWith(Name + " edited") == true;
             }, TimeSpan.FromSeconds(10)).Result, "Save on Planning wrote nothing");
             Assert.Equal(Name + " edited", saved);
+            // The footer box holds exactly what was typed while it had the keyboard: the "x" typed on Planning reached it not.
+            var footerSaved = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(config))?["footer_html"]?.ToString() ?? "";
+            Assert.EndsWith(FooterMark, footerSaved);
             Assert.StartsWith("Saved", Wait(app, "planningSaveStatus").Name);
             Assert.True(app.FindOrNull("planningUnitPopup", TimeSpan.FromSeconds(2)) is { IsOffscreen: false }, "a plain save stays on Planning");
 
@@ -161,11 +175,17 @@ public class PlanningTabUiTests
             Assert.Equal(PlanAUnit.ClaudeButtonTitle, claude.Name);
             Assert.Equal(PlanAUnit.CodexButtonTitle, codex.Name);
             Assert.True(claude.BoundingRectangle.Left < codex.BoundingRectangle.Left, "Claude's first");
+            // No GitHub Copilot door on Windows yet (#884): no button for it.
+            Assert.Null(app.FindOrNull("planAUnitWithCopilot", TimeSpan.FromSeconds(1)));
             claude.AsButton().Invoke();
             var plan = Arrived(output);
             Assert.Equal(PlanAUnit.OpeningMessage(Empty, "Physics"), plan[^1]);
 
             string trail = File.ReadAllText(Path.Combine(app.StateDirectory, "Logs", "activity.txt"));
+            // One line per appearance: Planning appeared once for each course,
+            // whatever activations, choices, Back and Reload came between.
+            Assert.Single(trail.Split('\n'), line => line.Contains(Code + " · opened the Planning tab: "));
+            Assert.Single(trail.Split('\n'), line => line.Contains(Empty + " · opened the Planning tab: "));
             Assert.Contains(PlanningTab.OpenedTrailText(Code, look.Choices), trail);
             Assert.Contains(PlanningTab.OpenedTrailText(Empty, Array.Empty<PlanningTab.Choice>()), trail);
             Assert.Contains(PlanInTheBrowser.TrailText(Code, PlanInTheBrowser.Kind.AllPlans), trail);
@@ -182,6 +202,19 @@ public class PlanningTabUiTests
     }
 
     // ---- Helpers ------------------------------------------------------------------
+
+    /// <summary>Whether <paramref name="element"/> is the settings form or anything inside it, by walking its ancestors.</summary>
+    private static bool InsideTheSettingsForm(DrivenApp app, AutomationElement? element)
+    {
+        var walker = app.Window.Automation.TreeWalkerFactory.GetRawViewWalker();
+        for (var at = element; at is not null; at = walker.GetParent(at))
+        {
+            string id = "";
+            try { id = at.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
+            if (id == "courseSettingsForm") return true;
+        }
+        return false;
+    }
 
     /// <summary>Two dated units long past (so none covers today and the tab starts on All Plans), each page a link at full size.</summary>
     private static void WritePlans(string course)

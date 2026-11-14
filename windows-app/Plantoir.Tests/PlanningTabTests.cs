@@ -12,7 +12,7 @@ namespace Plantoir.Tests;
 /// <c>tabCases</c>, <c>choiceCases</c> (choices and <c>startsOn</c>),
 /// <c>followsThePage</c>, <c>saveOnPlanning</c>, <c>words</c>, and the trail
 /// lines of "looked at a course's unit plans", each walked as data. The mac's
-/// twin is <c>PlanningTabTests.swift</c>. The tab that draws them is 790b.
+/// twin is <c>PlanningTabTests.swift</c>. The tab that draws them is <c>PlanningTabView</c> (790b).
 /// </summary>
 public sealed class PlanningTabTests : IDisposable
 {

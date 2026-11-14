@@ -8,8 +8,8 @@ namespace Plantoir.Tests;
 /// <see cref="LocalSiteGuard"/> (#801 item 3's Core; #811 reuses it): the
 /// address-to-path mapping both ways, names Windows reads as another file, the
 /// root resolved again at every call, and the request handler's answer read
-/// from ONE handle. What a real WebView2 does with these answers is 790b's
-/// headless harness; this is the guard alone.
+/// from ONE handle. What a real WebView2 does with these answers is
+/// <c>GuardedSiteTests</c> (790b); this is the guard alone.
 /// </summary>
 public sealed class LocalSiteGuardTests : IDisposable
 {

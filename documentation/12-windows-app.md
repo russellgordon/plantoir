@@ -3105,8 +3105,8 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `courses/<CODE>/.internal/planning/`, whose `plan.json` files the mac
   reads for the Revise doors' greeting and shows on the course page's
   Planning tab (Windows has the reader, the greeting's sentence and the
-  tab's rules in Core since 790a, and owes the tab and the call site that
-  turns the sentence on: #801, #820, and "Unit planning on Windows (#790,
+  tab's rules in Core since 790a, and since 790b the tab and the call site
+  that turns the sentence on: #801, #820, and "Unit planning on Windows (#790,
   #801, #820)" below); the held marking skill adds one more when it
   ships,
   `courses/<CODE>/.internal/marking/marking.json` (the two marking folders'
@@ -13246,7 +13246,9 @@ filled there). `PlanningTabTests.testTheWordsAreTheContracts` and
   Windows has no window-wide Undo to clear).
   **Rejected:** a `TabView` (the contract's `rejected` list, and it would
   move the web view between containers); detaching the settings form from
-  the tree (collapsing measured enough: `PlanningTabUiTests`); moving the
+  the tree (collapsing is expected to be enough, as WinUI takes a collapsed
+  element out of focus and the Tab order; `PlanningTabUiTests` checks it and
+  is written, not yet run); moving the
   header into a new page class (it would change every `as CourseSettingsView`
   the menus and nine tests use, for nothing a teacher sees).
 - **Course ▸ Save on Planning** (`saveOnPlanning`): live whenever the course
@@ -13264,8 +13266,9 @@ filled there). `PlanningTabTests.testTheWordsAreTheContracts` and
   `planningUnitPopup`, `planningBack`, `planningForward`, `planningReload`,
   `planningOpenInBrowser`, each named and tool-tipped with its `words`
   entry), the plan, and `planningShareBarSlot`, an empty `Auto` row for
-  #824's bar. With nothing to show, the bar goes and `planningEmpty` shows
-  `emptyTitle`, `emptyDescription` and one Plan a Unit button per assistant
+  #824's bar. With nothing to show, the bar goes and the empty offer shows
+  `emptyTitle` (`planningEmptyTitle`), `emptyDescription`
+  (`planningEmptyDescription`) and one Plan a Unit button per assistant
   installed, Claude's first (`planAUnitWithClaude`, `planAUnitWithCodex`;
   GitHub Copilot's stays held by name for #884); when the guarded view
   cannot be made, `cannotShowTitle` with `CannotShowDescription` filled
@@ -13360,7 +13363,7 @@ plan view (this PC).
 
 **`GuardedSiteTests` (in `Plantoir.Tests`, so the GATE runs it)** builds a
 plan folder with junctions, a 127.0.0.1 listener standing for the internet,
-and runs the probe three times (about 25 s on this PC; the probe exits
+and runs the probe four times (about 35 s on this PC; the probe exits
 leaving no `msedgewebview2.exe`, checked): the page's stylesheet, font,
 pictures, frame and a junction that stays inside are served; three ways out
 (`..` three folders up, a picture beside the planning folder, a junction to
@@ -13372,23 +13375,37 @@ refused and the page stays; a `target=_blank` link loads here and Back
 returns; a PDF of the plan is served as one; a `.zip` is not served and
 nothing downloads; Reload reads the disk again (a stylesheet changed
 between loads changes the computed colour, through the DevTools protocol);
-no file of the InPrivate profile's data folder names the plan's host; with
-the page's policy taken off, every kind of outside request (img, srcset,
-picture source, poster, `@import`, CSS `url()`, a frame's picture, icon,
-prefetch, object, embed) still arrives at the handler and is refused; and
+no file of the InPrivate profile's data folder names the plan's host or its
+course, in UTF-8 or UTF-16, and a file that cannot be read fails the test
+rather than passing as clean; a kind the page policy does not name is
+refused (above); with the page's policy taken off, every kind of outside
+request (img, srcset, picture source, poster, `@import`, CSS `url()`, a
+frame's picture, icon, prefetch, object, embed) still arrives at the handler
+and is refused; and
 **zero** connections reach the listener through the local pages'
 environment, against **some** through a plain one (a preconnect, a meta
 refresh), so the zero is the proxy's doing. The probe fails the test,
 never skips it, when it cannot run.
 
-**The page policy names each kind and has no `default-src`.** Measured
-with the probe: a page sent `Content-Security-Policy: default-src 'self'`
-raised no navigation at all for a link to the web clicked through the
-DevTools protocol (3 runs of 3); the same page with
-`GuardedSite.PlansContentSecurityPolicy` (script, object, base, form,
-worker, manifest and connect none; images, fonts, styles, frames and media
-from the host) raised it as a click. Whether a real mouse is stopped the
-same way was not measured. Sent on HTML only (790 plan review L3).
+**The page policy starts `default-src 'none'` and then names each kind a
+plan uses** (`LocalSiteGuard.PlansContentSecurityPolicy`: script, object,
+base, form, worker, manifest and connect none; images and fonts from the
+host or `data:`; styles from the host or inline; frames and media from the
+host), so a kind it does not name is refused: it fails closed.
+`GuardedSiteTests.AKindThePolicyDoesNotNameIsRefused` runs the policy with
+`img-src` taken out and the page's own picture is never asked for (made to
+fail: without `default-src 'none'` the picture was served). A prefetch is
+NOT held to a page policy by Chromium (measured: asked for either way), so
+it could not stand for an unnamed kind. **The first explanation was
+wrong.** 790b's first probe saw a clicked link raise no navigation under
+`default-src 'self'` and concluded that a `default-src` stops a click, so
+the first policy had none. 790b's implementation review (M1) measured with
+the same probe that the probe's links were placed by inline styles, which
+`default-src 'self'` drops (it has no `'unsafe-inline'` for styles), so the
+links collapsed and the click hit nothing; with `default-src 'self';
+style-src 'self' 'unsafe-inline'`, and with this policy, both a web link
+and a link inside the plan navigate. A page policy does not govern
+navigation. Sent on HTML only (790 plan review L3).
 
 **Not measured here:** a PDF DRAWN inline with scripts off (the probe sees
 the response, not the drawing; hand list), dark mode following the app
@@ -13398,12 +13415,21 @@ proxy Chromium does not resolve names itself).
 
 ### What the window's tests drive
 
+**Written, not yet run** (2026-11-14): both attempts stopped before the
+first click, because two Windows Defender Firewall prompts
+(`PickerHost.exe FirewallNotificationDialogServer`, opened at 22:22 and
+22:28 the night before, owner unknown) held the front of the desktop and
+need a person to answer. Nothing below is a measurement until that run is
+green.
+
 `PlanningTabUiTests` (`[UiFact]`, stubs `claude.exe` and an npm-shaped
 `codex.cmd` first on PATH, `--state-dir`, no real assistant, no browser
-started): the tabs' words; a name typed in the settings form, Planning
-chosen by UI Automation's `Select` (no click, so the keyboard is not moved
-first), 30 Tabs with no settings control ever focused and the form not
-drawn, a key typed, Course ▸ Save writing exactly what was typed and
+started) checks: the tabs' words; a name typed in the settings form and
+text typed in the multi-line footer box, Planning chosen by UI
+Automation's `Select` while the footer box has the keyboard (no click, so
+the keyboard is not moved first), 30 Tabs with the focused element never
+inside `courseSettingsForm` (its ancestors walked at each press) and the
+form not drawn, a key typed, Course ▸ Save writing exactly what was typed and
 `planningSaveStatus` saying so; the bar's words; the page on screen (a
 redirected run sets Reload's ItemStatus to the view's address, as the
 preview's neighbour button does); the web view under the tabs and inside
@@ -13412,7 +13438,9 @@ to a unit's page with the popup following; a click out of the folder
 refused; Back; another unit chosen from the popup; Revise With ▸ Claude…
 ending with `UnitPlans.GreetingSentence`; the empty offer's words and
 buttons, Claude's first, and Plan a Unit handing exactly
-`PlanAUnit.OpeningMessage`; and the trail lines, with no plan title on any.
+`PlanAUnit.OpeningMessage`; no Plan a Unit with GitHub Copilot button;
+and the trail lines, one "opened the Planning tab" line per appearance and
+no plan title on any.
 
 ## Sharing unit plans (#709): what Windows owes
 

@@ -9,7 +9,7 @@ namespace Plantoir.Tests;
 /// <c>app-rules.json</c> → <c>outsideAgents.planAUnit</c> (#801 item 5): the
 /// two buttons' titles, the opening message for every <c>messageCases</c>
 /// case, the trail line, and that both doors carry the message in place of the
-/// greeting with no unit-planning reminder. The buttons themselves are 790b.
+/// greeting with no unit-planning reminder. The buttons are <c>PlanningTabView</c>'s (790b).
 /// </summary>
 public sealed class PlanAUnitTests
 {

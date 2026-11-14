@@ -41,8 +41,8 @@ public class MachineWordContractTests
         ["app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]"] = filled =>
             PreviewPs1.Contains("Write-Host \"" + filled + "\"") ? null : "preview.ps1 does not print it word for word",
         // #801 (Russell, 2026-11-13): the Planning tab's three sentences that
-        // name the computer. The tab that shows them is 790b; the words are
-        // Core's, so they are said filled here already.
+        // name the computer. The tab that shows them is <c>PlanningTabView</c>
+        // (790b), which reads these same filled properties.
         ["shared-rules.json:unitPlanning.tab.words.cannotShowDescription"] = filled =>
             filled == PlanningTabWording.CannotShowDescription ? null : $"PlanningTabWording says \"{PlanningTabWording.CannotShowDescription}\"",
         ["shared-rules.json:unitPlanning.tab.words.openInBrowserCouldNotOpen"] = filled =>

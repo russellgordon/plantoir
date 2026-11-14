@@ -8,7 +8,8 @@
          (unitPlanning.tab.tabCases); with none, the bar is collapsed and the
          page is exactly the settings form it always was. Only the chosen
          tab is drawn: the other is COLLAPSED, so none of its controls can
-         take a key or be reached by Tab (measured: PlanningTabUiTests). -->
+         take a key or be reached by Tab (PlanningTabUiTests checks it; that
+         test is written and, on 2026-11-14, not yet run). -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

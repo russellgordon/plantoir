@@ -9,7 +9,7 @@ namespace Plantoir.Tests;
 /// planning folder made, and never a mirror through a link (the mac's
 /// <c>testTheRefreshLeavesALinkedPlanningFolderAlone</c>, rebuilt with
 /// junctions, plus the deeper links .NET's walk would follow). The tab that
-/// calls it is 790b.
+/// calls it is <c>PlanningTabView</c> (790b).
 /// </summary>
 public sealed class PlanningAssetsTests : IDisposable
 {

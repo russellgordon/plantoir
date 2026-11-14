@@ -954,6 +954,9 @@ public sealed partial class CourseSettingsView : UserControl
             PlaceholderText = "For example: This site is licensed under <a href=\"…\">CC BY 4.0</a>.",
         };
         footerBox.TextChanged += (_, _) => { Config.FooterHtml = footerBox.Text; MarkChanged(); };
+        // The multi-line box the mac's #708 fault was found in: PlanningTabUiTests
+        // switches to Planning while it has the keyboard (#801 item 1).
+        AutomationProperties.SetAutomationId(footerBox, "footerHtmlField");
         Form.Children.Add(footerBox);
 
         BuildPrintingSection();

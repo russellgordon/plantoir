@@ -87,13 +87,31 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
         // refuses it, and the proxy still lets nothing out.
         var outside = _runs.HandlerAlone.All.Where(line => line.StartsWith("REQ ") && line.Contains("127.0.0.1")).ToList();
         Assert.All(outside, line => Assert.StartsWith("REQ refused ", line));
-        var missing = new[] { "/img", "/srcset", "/source", "/poster", "/import.css", "/bg.png", "/frameimg", "/icon", "/prefetch" }
+        var missing = new[] { "/img", "/srcset", "/source", "/poster", "/import.css", "/bg.png", "/frameimg", "/icon", "/prefetch", "/object", "/embed" }
             .Where(kind => !outside.Any(line => line.Contains(":" + _runs.Port + kind + " ") || line.EndsWith(":" + _runs.Port + kind)))
             .ToList();
         Assert.True(missing.Count == 0, "never reached the handler: " + string.Join(", ", missing) + "\n" + string.Join("\n", outside));
         Assert.Equal(0, _runs.HandlerAloneConnections);
     }
 
+    /// <summary>
+    /// The page policy fails closed (790b implementation review M1): every
+    /// kind a plan uses today is named, so a kind it does NOT name is made by
+    /// running the shipped policy with <c>img-src</c> taken out; the page's
+    /// own picture, inside the plan, is then never even asked for, because
+    /// <c>default-src 'none'</c> stands for the missing directive. (Measured
+    /// first with a prefetch, which Chromium does not hold to a page policy:
+    /// it was asked for either way.)
+    /// </summary>
+    [Fact]
+    public void AKindThePolicyDoesNotNameIsRefused()
+    {
+        string picture = _runs.Plan.Address("unit-1/pic.png") + "?beside";
+        Assert.Contains(_runs.Proxied.All, line => line == "REQ served " + picture);
+        Assert.DoesNotContain(_runs.UnnamedKind.All, line => line.EndsWith(" " + picture));
+        Assert.Contains(_runs.UnnamedKind.All, line => line.StartsWith("DONE True 200"));
+        Assert.StartsWith("default-src 'none'; ", LocalSiteGuard.PlansContentSecurityPolicy);
+    }
     [Fact]
     public void TheLocalPagesEnvironmentReachesNoNetworkAndAPlainOneDoes()
     {
@@ -170,17 +188,26 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
     {
         // InPrivate, with a profile of its own (whatAPageMayRead: "no website
         // data kept between views"): the browser writes its empty databases,
-        // and not one file in the folder names the plan's host or folder.
+        // and not one file in the folder names the plan's host or its course,
+        // in UTF-8 or UTF-16. A file that cannot be read FAILS the test, by
+        // name: unread is not clean (790b implementation review L3).
         string folder = _runs.Plan.UserData("proxied");
         Assert.True(Directory.Exists(Path.Combine(folder, "EBWebView")), "the run made no user-data folder at " + folder);
-        var naming = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
-            .Where(file =>
-            {
-                try { return File.ReadAllText(file).Contains(LocalSiteGuard.PlansHost, StringComparison.OrdinalIgnoreCase); }
-                catch (IOException) { return false; }
-            })
+        var needles = new[] { LocalSiteGuard.PlansHost, "SNC2D" }
+            .SelectMany(text => new[] { System.Text.Encoding.UTF8.GetBytes(text), System.Text.Encoding.Unicode.GetBytes(text) })
             .ToList();
-        Assert.Empty(naming);
+        var naming = new List<string>();
+        var unread = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+        {
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(file); }
+            catch (IOException) { unread.Add(file); continue; }
+            catch (UnauthorizedAccessException) { unread.Add(file); continue; }
+            if (needles.Any(needle => bytes.AsSpan().IndexOf(needle) >= 0)) naming.Add(file);
+        }
+        Assert.True(unread.Count == 0, "could not be read, so not shown clean: " + string.Join(", ", unread));
+        Assert.True(naming.Count == 0, "names the plan: " + string.Join(", ", naming));
     }
 
     // ---- The runs ------------------------------------------------------------
@@ -190,12 +217,13 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
     {
         public PlanFixture Plan { get; }
         public int Port { get; }
-        public GuardProbe.Output Proxied { get; }
-        public GuardProbe.Output Plain { get; }
-        public GuardProbe.Output HandlerAlone { get; }
-        public int ProxiedConnections { get; }
-        public int HandlerAloneConnections { get; }
-        public int PlainConnections { get; }
+        public GuardProbe.Output Proxied { get; private set; } = null!;
+        public GuardProbe.Output Plain { get; private set; } = null!;
+        public GuardProbe.Output HandlerAlone { get; private set; } = null!;
+        public GuardProbe.Output UnnamedKind { get; private set; } = null!;
+        public int ProxiedConnections { get; private set; }
+        public int HandlerAloneConnections { get; private set; }
+        public int PlainConnections { get; private set; }
 
         private readonly TcpListener _listener;
         private int _accepted;
@@ -207,6 +235,18 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
             Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
             _ = AcceptForeverAsync();
             Plan = new PlanFixture(Port);
+            try { RunTheProbe(); }
+            catch
+            {
+                // xUnit never disposes a fixture whose constructor threw: tidy
+                // the folders now, or they stay in %TEMP% (review L4).
+                Dispose();
+                throw;
+            }
+        }
+
+        private void RunTheProbe()
+        {
 
             // First, before the run below changes plan.css on disk.
             HandlerAlone = GuardProbe.Run(Plan.PlanningFolder, "proxy", Plan.UserData("handler"), new[]
@@ -214,6 +254,14 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
                 "show=" + Plan.UnitPage, "title",
             }, csp: "none");
             HandlerAloneConnections = Interlocked.Exchange(ref _accepted, 0);
+
+            // The shipped policy with one kind it names taken out.
+            UnnamedKind = GuardProbe.Run(Plan.PlanningFolder, "proxy", Plan.UserData("unnamed"), new[]
+            {
+                "show=" + Plan.UnitPage,
+            }, csp: LocalSiteGuard.PlansContentSecurityPolicy.Replace("img-src 'self' data:; ", ""));
+            Assert.DoesNotContain("img-src", LocalSiteGuard.PlansContentSecurityPolicy.Replace("img-src 'self' data:; ", ""));
+            Interlocked.Exchange(ref _accepted, 0);
 
             string clicks = Plan.Folder("unit-1", "clicks.html");
             Proxied = GuardProbe.Run(Plan.PlanningFolder, "proxy", Plan.UserData("proxied"), new[]
@@ -409,7 +457,10 @@ public static class GuardProbe
     {
         get
         {
-            string bin = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.GuardProbe", "bin");
+            // The configuration this test assembly was built in, so a stale
+            // build of the other one is never the one measured (review L9).
+            string configuration = AppContext.BaseDirectory.Contains(@"\Release\", StringComparison.OrdinalIgnoreCase) ? "Release" : "Debug";
+            string bin = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.GuardProbe", "bin", configuration);
             var found = Directory.Exists(bin)
                 ? Directory.EnumerateFiles(bin, "Plantoir.GuardProbe.exe", SearchOption.AllDirectories)
                     .OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault()

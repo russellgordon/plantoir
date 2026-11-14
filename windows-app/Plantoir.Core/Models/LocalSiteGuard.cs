@@ -77,16 +77,27 @@ public sealed class LocalSiteGuard
     /// Chromium's viewer drawing it (790 plan review L3).
     /// </summary>
     /// <remarks>
-    /// Each kind named, and NO <c>default-src</c>: measured with
-    /// <c>Plantoir.GuardProbe</c> (WebView2 1.0.3179.45, this PC), a page sent
-    /// with <c>default-src 'self'</c> raised no navigation at all for a link to
-    /// the web clicked through the DevTools protocol (3 runs of 3), so the
-    /// click did nothing; the same page with these directives raised
-    /// <c>NavigationStarting</c> as a click. Whether a real mouse is stopped
-    /// the same way was not measured; the header is not worth the doubt.
+    /// <para><c>default-src 'none'</c> first, so a kind of request the policy
+    /// does not name (one that only falls back to <c>default-src</c>, such as
+    /// a prefetch, or a fetch directive Chromium adds later) is refused: the
+    /// policy fails closed. Then each kind a plan uses, named. Styles allow
+    /// <c>'unsafe-inline'</c>, because a plan's page may carry <c>style=</c>
+    /// attributes. Pinned by <c>GuardedSiteTests.AKindThePolicyDoesNotNameIsRefused</c>.</para>
+    ///
+    /// <para><b>What was measured, and what was first got wrong.</b> 790b's
+    /// first probe saw a clicked link raise no navigation under
+    /// <c>default-src 'self'</c> and concluded that a <c>default-src</c> stops
+    /// a click, so the first shipped policy had none. That was wrong (790b's
+    /// implementation review, M1, with the same probe): <c>default-src 'self'</c>
+    /// has no <c>'unsafe-inline'</c> for styles, the probe's links were placed
+    /// by inline styles, so they collapsed and the click at their old place hit
+    /// nothing. A page policy does not govern navigation: with
+    /// <c>default-src 'self'; style-src 'self' 'unsafe-inline'</c> both a web
+    /// link and a link inside the plan navigated, and with this policy too.</para>
     /// </remarks>
     public const string PlansContentSecurityPolicy =
-        "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; "
+        "default-src 'none'; "
+        + "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; "
         + "manifest-src 'none'; connect-src 'none'; img-src 'self' data:; font-src 'self' data:; "
         + "style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self'";
 
