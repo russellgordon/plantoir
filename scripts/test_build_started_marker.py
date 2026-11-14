@@ -103,9 +103,16 @@ class TheBuildNotesWhenItStarted(unittest.TestCase):
         marked = body.index("_mark_build_starting(host_output_dir)")
         read = body.index("with open(config_file")
         self.assertLess(marked, read)
-        # And the start becomes the site's only where the site was copied out.
-        finished = body.index("_mark_build_finished(host_output_dir)")
-        synced = body.index("if _sync_public_to_host(output_dir, host_output_dir):")
+        # And the start becomes the site's only where the site was copied out
+        # (#901: after the check of the site's files, inside one function the
+        # deploy's build calls).
+        self.assertIn("_check_mirror_and_mark(output_dir, host_output_dir", body)
+        finish = source[source.index("def _check_mirror_and_mark("):]
+        finish = finish[:finish.index("\ndef ")]
+        checked = finish.index("_check_the_site_files(")
+        synced = finish.index("_sync_public_to_host(output_dir, host_output_dir)")
+        finished = finish.index("_mark_build_finished(host_output_dir)")
+        self.assertLess(checked, synced)
         self.assertLess(synced, finished)
 
 

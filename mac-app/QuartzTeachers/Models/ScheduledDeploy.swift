@@ -3028,6 +3028,9 @@ enum ScheduledDeploy {
         // What this run's build downloaded for its pages, or why it stopped
         // without it, at an hour nobody was watching (#674).
         KeptDownloadsReport.noteOnTheTrail(from: text)
+        // Which course files this run's site leaves off, and anything the
+        // check after its build put back or took out (#901).
+        SiteFilesReport.noteOnTheTrail(from: text)
         // A How I Teach page kept off the website this run (#209) — the same
         // reader as the console's, for the same reason as the lines above.
         HowITeachKeptOffReport.noteOnTheTrail(from: text)

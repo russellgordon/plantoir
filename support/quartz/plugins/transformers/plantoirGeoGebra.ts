@@ -23,10 +23,12 @@
 // block it always was - the byte-identical guarantee for sites without
 // sketches rests on this.
 //
-// The sketch's FILE is published once, by Quartz's own Assets emitter, which
-// copies every file under content/ that is not a page to slugifyFilePath of
-// its path. The address is made here with that same function, so the two
-// cannot disagree (geogebraFences.files).
+// The sketch's FILE is published once, by the site's own emitter
+// (emitters/plantoirAssets.ts, #901), which copies a file under content/ to
+// slugifyFilePath of its path when a published page uses it; this transformer
+// declares the file (file.data.plantoirFiles) so it is carried. The address
+// is made here with that same function, so the two cannot disagree
+// (geogebraFences.files).
 
 import { Root as MdRoot, Code } from "mdast"
 import { Element, Root as HtmlRoot, ElementContent } from "hast"
@@ -145,6 +147,15 @@ function attribution(entry: Entry, words: Record<string, string>, links: Record<
   ]
 }
 
+// Content paths of the course's files this page uses that its tree does not
+// name as an address (#901, contracts/shared-rules.json -> siteFiles.
+// declareRule): the site's emitter (emitters/plantoirAssets.ts) carries them.
+declare module "vfile" {
+  interface DataMap {
+    plantoirFiles: string[]
+  }
+}
+
 export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
   name: "PlantoirGeoGebra",
   markdownPlugins() {
@@ -198,6 +209,11 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
           let sketch: string | null = null
           if (entry.source !== null && entry.source.kind === "file" && entry.source.contentPath) {
             sketch = slugifyFilePath(entry.source.contentPath as FilePath)
+            // The sketch's file is one this page uses (#901, siteFiles.declareRule):
+            // the site's emitter carries it whatever the tree's JSON says.
+            const declared = file.data.plantoirFiles ?? []
+            declared.push(entry.source.contentPath)
+            file.data.plantoirFiles = declared
           } else if (entry.source !== null && entry.source.kind === "material" && entry.source.storePath) {
             sketch = entry.source.storePath
           }

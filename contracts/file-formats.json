@@ -2173,6 +2173,22 @@
     },
     "olderMarkers": "A marker written before #833 has none of keysSince833 and reads as no remembered choices, nothing counted, and no password waiting. A marker holding only `documents` has no address and reads as not shared, to the bar and to deploy.sh's sticky protection alike."
   },
+  "siteFilesRecord": {
+    "note": "GitHub #901. What the last build of a section carried of the course's files, so the next build knows whether it is the first to leave files off and whether the count changed (shared-rules.json -> siteFiles.whenSaid). Counts only: never a file's or a page's name.",
+    "path": "<the section's built output>/.site-files.json, beside .visible-pages.json and public/ and never inside public/ - <CODE>/.merged_output/section<N>/ on macOS, PLANTOIR_BUILD_ROOT/<CODE>/section<N>/ on Windows. Hidden, so the freshness checks skip it.",
+    "writtenBy": "scripts/site_files.py (write_record), after the check, on every build whose site has a front page; written through a temporary file and renamed",
+    "keys": {
+      "buildId": "the build that wrote it, for diagnosis only",
+      "carried": "how many course files the site carries",
+      "leftOff": "how many it leaves off because no page students can see uses them",
+      "leftOffBytes": "their size on disk",
+      "putBack": "how many the check put back (a published page needed them)",
+      "putBackFailed": "how many it could not put back",
+      "takenOut": "how many it took out (no page named them and the site never mentioned them)",
+      "unreferenced": "how many no built page named, taken out or not"
+    },
+    "readers": "only scripts/site_files.py (read_record). A file that is missing or cannot be read is a first build."
+  },
   "undoJournal": {
     "note": "The list of changes for Undo and Redo (#899, piece U1): one for the whole app on each computer, appended to by the app and every outside-assistant process (the mac's --mcp-stdio, Windows' plantoir-mcp.exe), at the same moment; a deploy set for later records nothing (rulings 17 and 18). The RULE for writing it is shared-rules.json -> undo.rule; this is the format every one of them reads and appends, written so that a reader built from these words alone needs nothing else. Behind `undoJournalIsLive`, off: written in shadow, never offered. Revised 2026-11-13, before Windows starts, after two adversarial reviews: every object is open, and `unknown` says what a reader does with what it cannot read. Revised again the same night, after the two fix reviews and Russell's rulings 17 to 20: no clearing for a deploy or a share of unit plans, one neutral `note` event every reader passes over, a refused Redo drops only its redo (`dropped`, reason redoRefused), a dead process's step is never left in flight for ever, and an unreadable line keeps only what it could reference. Revised a third time on 2026-11-14 (the director's rulings on U1's third round): a `cleared` line clears whatever its reason says, a note's required keys are stated, and a segment with no readable time is bounded; nothing a v1 line holds changed. The same day, after the Fable sweep of U1, four sentences were added for a second reader, with cases for each: a `recompute` whose maintainer a reader does not know, and a `holds` it does not know, make the step one it cannot read; `madeBy`, `class` and `action.key` are open strings; a known op kind never gains a key that changes what undoing it does; and `madeBy` is split at its LAST colon. Still no byte a v1 line holds changed. Windows builds from this version.",
     "directory": "undo/ in the app's own folder: <home>/Library/Application Support/Plantoir/undo/ on the mac, under the home RealHome.forFiles answers (so it follows --state-dir, and the unit suite's throwaway home); %LOCALAPPDATA%\\Plantoir\\undo\\ on Windows (W4). NEVER in a working folder: one list spans every working folder, and a working folder may be synced between two computers. Only this computer reads its list.",

@@ -1801,6 +1801,29 @@ else
   cat /tmp/verify_video_rules_site.log
 fi
 
+# ---- The course's files a site carries (#901): the rules, where they run ----
+# siteFilesRules.ts and plantoirAssets.ts bundled with Quartz's own
+# FrontMatter, ObsidianFlavoredMarkdown, GitHubFlavoredMarkdown and
+# CrawlLinks: every slug, address and course case in siteFiles, each course
+# through the emitter at its first emit and at a rebuild, each that leaves a
+# file off proved to FAIL through Quartz's own Assets, and then
+# scripts/site_files.py's check over each built course, which must find no
+# hole and nothing unreferenced.
+echo ""
+echo "🔎 Checking which course files a site carries against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_site_files_rules_against_the_site.py" /opt/scripts/check_site_files_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_site_files_rules_against_the_site.py \
+  >/tmp/verify_site_files_rules_site.log 2>&1; then
+  pass "every siteFiles case holds in the site's own emitter over Quartz's own transformers, fails through Quartz's own Assets where it leaves a file off, and the check after the build agrees on every course (scripts/check_site_files_rules_against_the_site.py, #901)"
+  # The count, so a run shows what it held, not only that it passed (901a's
+  # Fable sweep).
+  grep -m1 "contract cases" /tmp/verify_site_files_rules_site.log | sed 's/^/   /'
+else
+  fail "a siteFiles case does not hold in the site's own code (scripts/check_site_files_rules_against_the_site.py, #901)"
+  cat /tmp/verify_site_files_rules_site.log
+fi
+
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
 # pictureSizes.js (the file the site's transformer imports) reads every
 # picture in scripts/fixtures/picture-sizes/ in Node; each answer must be
@@ -4460,6 +4483,41 @@ if grep -q '\[DEP[0-9]' /tmp/verify_main_build.log; then
   fail "The build printed a Node deprecation into the console: $(grep -o '\[DEP[0-9]*\][^(]*' /tmp/verify_main_build.log | sort -u | head -3 | tr '\n' ' ')(#640)"
 else
   pass "The build printed no Node deprecation into the console (#640)"
+fi
+
+# The course's files the main build carried (#901): one PLANTOIR_SITE_FILES:
+# line, Plantoir's emitter, and neither safety count above zero - a file a
+# page needed that the emitter left out, or one it carried that no page
+# names, is the emitter's fault, which the safety net must not hide. A build
+# that could not write the emitter's side file fails too
+# (siteFiles.sideFile.whenMissing), as every put-back does.
+if python3 - /tmp/verify_main_build.log contracts/shared-rules.json <<'SITEFILESPY'
+import json, re, sys
+said = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+words = json.load(open(sys.argv[2], encoding="utf-8"))["siteFiles"]["words"]
+if words["sideFileNotWritten"] in said:
+    print("   the build could not write the site's side file (siteFiles.words.sideFileNotWritten)")
+    sys.exit(1)
+lines = re.findall(r"PLANTOIR_SITE_FILES: (\{[^\r\n]*\})", said)
+if len(lines) != 1:
+    print(f"   the main build printed {len(lines)} PLANTOIR_SITE_FILES: lines, not one")
+    sys.exit(1)
+marker = json.loads(lines[0])
+wrong = []
+if marker.get("assetsEmitter") != "plantoir":
+    wrong.append(f"assetsEmitter {marker.get('assetsEmitter')}")
+for key in ("putBack", "putBackFailed", "unreferenced", "takenOut"):
+    if marker.get(key):
+        wrong.append(f"{key} {marker[key]}")
+if wrong:
+    print("   " + ", ".join(wrong))
+    sys.exit(1)
+print(f"   carried {marker['carried']}, left off {marker['leftOff']}")
+SITEFILESPY
+then
+  pass "the main build's site carries only the files its published pages use: Plantoir's emitter, nothing put back, nothing unreferenced, nothing taken out (#901)"
+else
+  fail "the main build's site files: see the line above (#901)"
 fi
 
 # -------------------- 6. Post-flight checks --------------------

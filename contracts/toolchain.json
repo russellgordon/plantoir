@@ -40,8 +40,8 @@
       "whyNotStock": "Stock Quartz unconditionally constructs og:image as https://${cfg.baseUrl}/static/og-image.png, which points to Jacky Zhao's site when baseUrl defaults to quartz.jzhao.xyz and generates invalid URLs when baseUrl is empty. The patch falls back to page-relative static/og-image.png when baseUrl is not configured. Stock Quartz also links its own quartz/static/icon.png as the favicon; the patch links Plantoir's icon set instead. If Head.tsx is ever re-derived against a newer Quartz, BOTH behaviours have to come with it — the favicon links are the half with no visible symptom during development, because a local preview looks identical either way."
     },
     {
-      "cannotBeDropped": "Without it fast rebuilds and quick retries fail with ENOTEMPTY errors on bind-mounted host filesystems.",
-      "does": "Cleans the output directory with retries and recursive fallback instead of crashing when rimraf encounters pending host directory unlinks.",
+      "cannotBeDropped": "Without it fast rebuilds and quick retries fail with ENOTEMPTY errors on bind-mounted host filesystems, and a preview never reads its built site for a file a page needs that was left out (#901).",
+      "does": "Cleans the output directory with retries and recursive fallback instead of crashing when rimraf encounters pending host directory unlinks. Since #901 it also writes .plantoir-emit-done beside public/ once every emitter of the first build has finished (shared-rules.json -> siteFiles.doneMarker), the moment a preview's check may read the site; build_site.py adds the same line to a section built before it (ALWAYS section, idempotent).",
       "file": "build.ts",
       "replaces": "quartz/build.ts",
       "whyNotStock": "Stock Quartz calls rimraf with a wildcard glob that crashes on virtiofs/Docker bind mounts with ENOTEMPTY when removing subdirectories. The patch adds retry options and a recursive fs.rm fallback."

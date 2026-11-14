@@ -158,9 +158,12 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(self.text("emitters").count('export { PlantoirSiteSaid } from "./plantoirSiteSaid"'), 1)
         self.assertEqual(config.count("Plugin.PlantoirSiteSaid(),"), 1)
         self.assertIn("      Plugin.ContentPage(),\n      Plugin.PlantoirProgress(),\n      Plugin.PlantoirSiteSaid(),\n"
-                      "      Plugin.Assets(),", config,
+                      "      Plugin.PlantoirAssets(), // PLANTOIR-SITE-FILES\n", config,
                       "My Progress's emitter (#545), then the one that says what the site found (#567), "
-                      "straight before Assets, at their indent")
+                      "straight before the assets line, at their indent; and Quartz's Assets swapped for "
+                      "Plantoir's in its place (#901)")
+        self.assertNotIn("Plugin.Assets()", config)
+        self.assertEqual(self.text("emitters").count('export { PlantoirAssets } from "./plantoirAssets"'), 1)
         layout = self.text("layout")
         self.assertIn("afterBody: [Component.CodeRunner()],", layout)
         self.assertIn("Component.PlantoirMetaLine(Component.ContentMeta())", layout)
@@ -201,7 +204,43 @@ class WiringTests(unittest.TestCase):
         self.assertEqual(emitters.count('export { PlantoirSiteSaid } from "./plantoirSiteSaid"'), 1)
         config = self.text("config")
         self.assertEqual(config.count("Plugin.PlantoirProgress("), 1)
-        self.assertIn("      Plugin.PlantoirProgress(),\n      Plugin.PlantoirSiteSaid(),\n      Plugin.Assets(),", config)
+        self.assertIn("      Plugin.PlantoirProgress(),\n      Plugin.PlantoirSiteSaid(),\n"
+                      "      Plugin.PlantoirAssets(), // PLANTOIR-SITE-FILES\n", config)
+
+    # ---- #901: Plantoir's emitter for the course's files ----------------------
+
+    def test_a_config_already_swapped_still_takes_an_emitter_added_later(self):
+        """The two emitters put before the assets line accept either line, or a
+        section swapped before they existed would never get them (#901)."""
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Assets(),\n", "      Plugin.PlantoirAssets(), // PLANTOIR-SITE-FILES\n", 1),
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertIn("      Plugin.PlantoirProgress(),\n      Plugin.PlantoirSiteSaid(),\n"
+                      "      Plugin.PlantoirAssets(), // PLANTOIR-SITE-FILES\n", config)
+        self.assertEqual(config.count("Plugin.PlantoirAssets("), 1)
+        self.assertEqual(build_site.assets_emitter_in(self.files["config"]), "plantoir")
+
+    def test_a_config_of_the_wrong_shape_keeps_quartzs_emitter_and_says_which_ran(self):
+        """Two assets lines: nothing is swapped, and the build is told it is
+        Quartz's own emitter that runs, which the check after the build and
+        every gate act on (siteFiles.check.gates)."""
+        self.files["config"].write_text(CONFIG.replace(
+            "      Plugin.Assets(),\n", "      Plugin.Assets(),\n      Plugin.Assets(),\n", 1),
+            encoding="utf-8")
+        build_site.wire_quartz_additions(self.output)
+        config = self.text("config")
+        self.assertEqual(config.count("Plugin.Assets(),"), 2)
+        self.assertNotIn("Plugin.PlantoirAssets(", config)
+        self.assertEqual(build_site.assets_emitter_in(self.files["config"]), "quartz")
+
+    def test_the_emitter_is_quartzs_until_the_swap_is_exported(self):
+        self.assertEqual(build_site.assets_emitter_in(self.files["config"]), "quartz")
+        build_site.wire_quartz_additions(self.output)
+        self.assertEqual(build_site.assets_emitter_in(self.files["config"]), "plantoir")
+        self.files["emitters"].write_text(EMITTERS_INDEX, encoding="utf-8")
+        self.assertEqual(build_site.assets_emitter_in(self.files["config"]), "quartz")
 
     def test_an_afterbody_that_already_holds_something_keeps_it(self):
         self.files["layout"].write_text(LAYOUT.replace("afterBody: [],", "afterBody: [Component.Comments()],"),

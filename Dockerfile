@@ -349,6 +349,11 @@ COPY scripts/my_progress.py /opt/scripts/my_progress.py
 # side file, and the site's emitter (plantoirSiteSaid.ts) runs it as a file
 # with the build's own Python (test_baked_modules.py).
 COPY scripts/site_said.py /opt/scripts/site_said.py
+# Which course files a built site carries (#901): build_site.py imports it by
+# bare name to check the finished site (a file a page needs is put back, one
+# no page names is taken out) and to write the side file the site's emitter
+# reads (test_baked_modules.py).
+COPY scripts/site_files.py /opt/scripts/site_files.py
 # A section's record of its problems (#717): the rows build_site.py writes
 # beside the built site, site_said.py adds the site's to and deploy.py a
 # refusal to. All three import it by bare name (test_baked_modules.py).

@@ -63,8 +63,8 @@ Everything I draft here (each question, each answer and each mark) is a suggesti
   subject, are left alone.
 - **The test, its solutions and its kit never go into the pages a class
   website is built from**: not into a course's folders, not into `Media`,
-  not onto a page. Everything there that is not a page is copied to the
-  class website. The one place under `courses/` where copies of the test's
+  not onto a page. A file there goes on the class website as soon as a
+  page students can see links to it. The one place under `courses/` where copies of the test's
   PDFs (each version's PDF and its solutions' PDF, never the Marking Guide
   or the kit) may go is a unit plan's own folder: each version's PDF into
   `courses/<CODE>/.internal/planning/<unit>/pdfs/`, and each solutions PDF
