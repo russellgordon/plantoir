@@ -58,7 +58,7 @@ One kind of problem can be cleared only by a deploy. For that kind the assistant
 
 ## While the session is open
 
-Plantoir holds the course, as it does for any session opened from Plantoir. [Revise a course with Claude or Codex](page:revise-with) says what waits meanwhile and how to end the session.
+Plantoir holds the course, as it does for any session opened from Plantoir. [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with) says what waits meanwhile and how to end the session.
 
 ## If it does not work
 

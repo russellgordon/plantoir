@@ -60,7 +60,7 @@ alt: The Planning tab with All Plans chosen in the Unit pop-up.
 
 ## Plan another unit
 
-The buttons on the empty tab are there only until the course has a plan to show. For the next unit, open the assistant with Revise With and ask it to plan a unit. In its first reply the assistant reminds you which units already have a plan. See [Revise a course with Claude or Codex](page:revise-with).
+The buttons on the empty tab are there only until the course has a plan to show. For the next unit, open the assistant with Revise With and ask it to plan a unit. In its first reply the assistant reminds you which units already have a plan. See [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with).
 
 ## Where the plan is kept
 
@@ -70,7 +70,7 @@ A section's Coverage tab shows what the course's pages reach. See [Curriculum ex
 
 ## While the session is open
 
-Plantoir holds the course while the assistant's session is open. [Revise a course with Claude or Codex](page:revise-with) says what waits meanwhile and how to end the session.
+Plantoir holds the course while the assistant's session is open. [Revise a course with Claude Code, Codex or GitHub Copilot](page:revise-with) says what waits meanwhile and how to end the session.
 
 ## If it does not work
 

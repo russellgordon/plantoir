@@ -194,6 +194,10 @@
    "mac": "Help \u25b8 Report a Problem\u2026",
    "windows": null
   },
+  "helpSetUpAnAssistant": {
+   "mac": "Help \u25b8 Set Up an Assistant\u2026",
+   "windows": null
+  },
   "plantoirCheckForUpdates": {
    "mac": "Plantoir \u25b8 Check for Updates\u2026",
    "windows": null,

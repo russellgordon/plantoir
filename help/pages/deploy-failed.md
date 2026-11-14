@@ -6,6 +6,7 @@ covers:
 - mac-app/QuartzTeachers/Views/Console/TaskProgressView.swift
 - contracts/app-rules.json
 - contracts/shared-rules.json
+- mac-app/QuartzTeachers/Models/DeployTokens/DeployTokenWording.swift
 keywords:
 - deploy failed
 - could not deploy
@@ -15,6 +16,9 @@ keywords:
 - deploy disabled
 - token
 - access token
+- token not saved
+- expired token
+- change token
 - internet
 - offline
 - Netlify
@@ -29,25 +33,29 @@ When a deploy does not finish, the section's window says what went wrong and wha
 Plantoir turns a failure it recognises into one sentence. Find yours here.
 
 - No internet connection:
-  {{say:app-rules#failureExplanations.cases[9].expect}}
+  {{say:app-rules#failureExplanations.cases[14].expect}}
 - Netlify asks you to wait. The time it names can differ:
-  {{say:app-rules#failureExplanations.cases[4].expect}}
+  {{say:app-rules#failureExplanations.cases[9].expect}}
 - No Netlify token is saved yet:
-  {{say:app-rules#failureExplanations.cases[7].expect}}
+  {{say:app-rules#failureExplanations.cases[12].expect}}
 - Netlify refused the token:
-  {{say:app-rules#failureExplanations.cases[8].expect}}
-- Cloudflare refused the token:
-  {{say:app-rules#failureExplanations.cases[11].expect}}
-- Plantoir could not reach Cloudflare to check the token. There is a sentence like it for Netlify:
   {{say:app-rules#failureExplanations.cases[13].expect}}
-- The website has not been made yet:
-  {{say:app-rules#failureExplanations.cases[15].expect}}
-- The section has no front page:
+- Cloudflare refused the token:
   {{say:app-rules#failureExplanations.cases[16].expect}}
+- Plantoir could not reach Cloudflare to check the token. There is a sentence like it for Netlify:
+  {{say:app-rules#failureExplanations.cases[18].expect}}
+- A token you pasted during this deploy was not saved. There are five such sentences, and each says the token was not saved. This is one:
+  {{say:app-rules#failureExplanations.cases[21].expect}}
+- A science simulation that a page uses has not been downloaded yet. The sentence names the section, the page and the simulation. See [Science simulations](page:phet). This is one:
+  {{say:app-rules#failureExplanations.cases[1].expect}}
+- The website has not been made yet:
+  {{say:app-rules#failureExplanations.cases[22].expect}}
+- The section has no front page:
+  {{say:app-rules#failureExplanations.cases[23].expect}}
 - The front page's settings cannot be read:
-  {{say:app-rules#failureExplanations.cases[19].expect}}
+  {{say:app-rules#failureExplanations.cases[25].expect}}
 - A deploy to a folder could not copy every page:
-  {{say:app-rules#failureExplanations.cases[3].expect}}
+  {{say:app-rules#failureExplanations.cases[8].expect}}
 
 {{picture:deploy-failed-2}}
 alt: A deploy that failed, in the section's window, with the sentence that says what went wrong and what to do.
@@ -56,10 +64,25 @@ When Plantoir does not recognise what went wrong, it adds no sentence of its own
 
 ## A token that was refused
 
-Deploy again, and paste a new token when Plantoir asks for one. These pages say where a token comes from:
+A service refuses a token that has expired, was deleted, or was turned off. Make a new token on the service's website. Then give it to Plantoir in one of two ways:
+
+- Deploy again, and paste the new token when Plantoir asks for one.
+- Choose {{menu:settings}}, open the {{control:plantoirSettingsDeployingPane}} pane, and press {{control:deployTokensChangeToken}}. The pane also says whether each saved token still works. See [See, change or remove a deploy token](page:deploy-tokens).
+
+These pages say where a token comes from:
 
 - [Put your site online with Cloudflare Pages](page:cloudflare)
 - [Set up Netlify](page:netlify)
+
+## A token that was not saved
+
+Plantoir checks a token you paste during a deploy before it saves it. When the check fails, the deploy stops and the token is not saved. There are five reasons:
+
+- **Nothing was pasted.** Copy the token from the service's page, deploy again, and paste it.
+- **A space or a line break is inside what was pasted.** More than the token was copied. Copy the token alone.
+- **A character that no token has is in what was pasted**, such as a curly quote. The token was copied from a document that changed it. Copy the token again from the service's own page.
+- **The token cannot reach this section's website.** The section was deployed before with a token from another account. Paste a token from that account. If the old website was deleted on purpose, save the new token in the {{control:plantoirSettingsDeployingPane}} pane instead, with {{control:deployTokensChangeToken}}.
+- **Plantoir could not reach the service to check the token against this section's website.** Try again in a few minutes, when this {{machine}} is online.
 
 ## A missing front page
 

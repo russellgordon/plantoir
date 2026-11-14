@@ -269,6 +269,19 @@
    "windows": null,
    "raw": false
   },
+  "add-next-class-3": {
+   "page": "add-next-class",
+   "shows": "The Add Class sheet with its three ways, the first chosen",
+   "labels": [
+    "The three ways",
+    "Add"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A course with units and at least one class page in the section, so no way is greyed",
+   "windows": null,
+   "raw": false
+  },
   "publish-pages-1": {
    "page": "publish-pages",
    "shows": "The Publish Pages sheet with its list of hidden pages, two of them ticked",
@@ -1926,6 +1939,124 @@
    "expectText": [],
    "awaiting_capture": true,
    "setup": "GitHub's public documentation page, not signed in.",
+   "windows": null,
+   "raw": false
+  },
+  "deploy-tokens-1": {
+   "page": "deploy-tokens",
+   "shows": "The Deploying pane of Plantoir's settings, with its Netlify part and its Cloudflare Pages part, each connected",
+   "labels": [
+    "Status line",
+    "Change Token\u2026",
+    "Remove Token",
+    "Check Again"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "Test tokens saved for both services; the Cloudflare token made with an end date more than 30 days away",
+   "windows": null,
+   "raw": false
+  },
+  "deploy-tokens-2": {
+   "page": "deploy-tokens",
+   "shows": "The question asked when a new token cannot reach some class websites",
+   "labels": [
+    "The sections",
+    "Keep My Old Token",
+    "Use the New Token"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A test token from a second account, pasted in Change Token\u2026 after one section has been deployed with the first",
+   "windows": null,
+   "raw": false
+  },
+  "videos-1": {
+   "page": "videos",
+   "shows": "A page in Obsidian with a video's address on a line of its own, in the picture form",
+   "labels": [
+    "The video's address",
+    "What the video is"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A page of the example course with one YouTube line whose brackets say what the video is",
+   "windows": null,
+   "raw": false
+  },
+  "videos-2": {
+   "page": "videos",
+   "shows": "The same page on the class website, with the video's player",
+   "labels": [
+    "The player"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "The preview of that page; no video is played while the picture is taken",
+   "windows": null,
+   "raw": false
+  },
+  "phet-1": {
+   "page": "phet",
+   "shows": "A phet block as typed in Obsidian",
+   "labels": [
+    "sim:",
+    "alt:"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A science page of a ready-made course with one phet block naming gas-properties",
+   "windows": null,
+   "raw": false
+  },
+  "phet-2": {
+   "page": "phet",
+   "shows": "A simulation's card on the class website, before it is opened",
+   "labels": [
+    "The simulation's picture",
+    "Open the simulation",
+    "PhET's credit line"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "The preview of that page, after one preview with the internet; the simulation is not opened, so nothing plays",
+   "windows": null,
+   "raw": false
+  },
+  "subject-science-1": {
+   "page": "subject-science",
+   "shows": "SCH3U's page Combustion on the class website, with its chemical equations typeset",
+   "labels": [
+    "Chemical equations"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "SCH3U made from its ready-made course; the preview of Concepts, Combustion",
+   "windows": null,
+   "raw": false
+  },
+  "subject-science-2": {
+   "page": "subject-science",
+   "shows": "SPH3U's page The Doppler Effect on the class website, with its diagram",
+   "labels": [
+    "Diagram drawn from text"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "SPH3U made from its ready-made course; the preview of Concepts, The Doppler Effect",
+   "windows": null,
+   "raw": false
+  },
+  "subject-science-3": {
+   "page": "subject-science",
+   "shows": "SCH3U's page Solubility Rules on the class website, with its table",
+   "labels": [
+    "Reference",
+    "The rules"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "SCH3U's preview of Reference, Solubility Rules",
    "windows": null,
    "raw": false
   }

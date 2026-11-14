@@ -62,7 +62,7 @@ alt: The Deploying part of a course's settings, with Deploy to set to Cloudflare
 2. The first time this {{machine}} deploys to Cloudflare, a sheet titled {{control:connectToCloudflareSheetTitle}} opens. It lists the steps for making a token on Cloudflare's website, and has a link named {{control:connectToCloudflareSheetLink}}. Follow its steps in your browser. Two of them decide whether the token works:
    {{say:app-rules#credentialRequests.requests[1].steps[3]}}
    {{say:app-rules#credentialRequests.requests[1].steps[4]}}
-3. Cloudflare shows the token once. Copy it, paste it into the {{control:connectToCloudflareSheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this computer, and Plantoir does not ask for it again.
+3. Cloudflare shows the token once. Copy it, paste it into the {{control:connectToCloudflareSheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this {{machine}}. Plantoir does not ask for it again while that token is saved and Cloudflare accepts it. [See, change or remove a deploy token](page:deploy-tokens) says where to look at it later.
 
 {{picture:cloudflare-3}}
 alt: The Connect to Cloudflare sheet, with its steps, the Cloudflare token field and the Continue button.
@@ -83,7 +83,7 @@ Later deploys of this section ask nothing. [Deploy a section](page:deploy) descr
 ## If it does not work
 
 - **An alert titled {{control:cannotDeployYet}} appears.** No Account ID is saved, or the one saved cannot be an Account ID. Press {{control:openSettings}}, paste the ID, and deploy again.
-- **The token stops working months later.** A token made with an end date expires on that date, and nothing on screen says why deploys have stopped. When you make the token, set its end date to after the end of your school year, or give it none.
+- **The token stops working months later.** A token made with an end date expires on that date. Plantoir shows the date in the {{control:plantoirSettingsDeployingPane}} pane of its settings. It also shows a warning above the section's website when the date is less than 30 days away, and after it. Make a new token, with an end date after the end of your school year or with none, and change it in that pane. See [See, change or remove a deploy token](page:deploy-tokens).
 - **One file is too large.** Cloudflare has a limit on the size of any one file:
   {{say:app-rules#publishingDestinations.sentences.cloudflareSizeNote}}
 - **Something else went wrong.** See [A deploy did not work](page:deploy-failed).

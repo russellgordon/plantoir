@@ -260,10 +260,24 @@
    },
    "windows": null
   },
-  "addNextClassTitle": {
-   "label": "Add next class",
+  "addClassWayNextInThisUnit": {
+   "label": "As the next class in the unit under way",
    "mac": {
-    "say": "assist-wording#wording.menuAddNextClassTitle"
+    "say": "assist-wording#wording.menuAddClassNextInThisUnit"
+   },
+   "windows": null
+  },
+  "addClassWayInANewUnit": {
+   "label": "In a new unit, as its first class",
+   "mac": {
+    "say": "assist-wording#wording.menuAddClassInANewUnit"
+   },
+   "windows": null
+  },
+  "addClassWayAsACopy": {
+   "label": "As a copy of a class in this section",
+   "mac": {
+    "say": "assist-wording#wording.menuAddClassAsACopy"
    },
    "windows": null
   },
