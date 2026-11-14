@@ -35,8 +35,8 @@ every page, caption and alt text is written by Fable from a fact sheet
    passes. A label the app shows (no full stop) is never checked when typed,
    so always name a button or label with `{{control:}}` and a menu with
    `{{menu:}}`: a typed label goes stale silently. **A sentence named by its
-   place in a list** (`cases[14]`) is written with the opening words it
-   expects after a `~`: `{{say:app-rules#failureExplanations.cases[14].expect
+   place in a list** (`cases[16]`) is written with the opening words it
+   expects after a `~`: `{{say:app-rules#failureExplanations.cases[16].expect
    ~ Your computer couldn't reach the}}`. When a case is added to the list
    before it, the build stops and says so, rather than showing the wrong
    sentence.
@@ -389,8 +389,8 @@ header.
 
 9. **A sentence named by its position carries a pin** (`pin_problem` in
    `helpbook/tokens.py`, #952). A `{{say:}}` token whose key path holds a
-   list position (`cases[14]`) is written with the opening words of the
-   sentence it expects: `{{say:app-rules#failureExplanations.cases[14].expect
+   list position (`cases[16]`) is written with the opening words of the
+   sentence it expects: `{{say:app-rules#failureExplanations.cases[16].expect
    ~ Your computer couldn't reach the}}`. The pin is not shown; the check
    fails, naming the page, the line, the pin and the sentence now there, when
    the sentence at that position does not start with the pin, and when the
