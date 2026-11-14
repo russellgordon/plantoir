@@ -120,13 +120,17 @@ public sealed class UnitPlansGreetingTests : IDisposable
         Assert.Equal(TrailLineOf("codex", "SNC2D"), codex.TrailText);
     }
 
-    /// <summary>No reading at all (the call site of 790a, and a reference course) is today's greeting exactly.</summary>
+    /// <summary>
+    /// No reading at all (the call site of 790a, and a reference course) is
+    /// the greeting with nothing about unit planning: since #895 it ends with
+    /// <c>greetingHandoutsSentence</c>, which follows the plan-first sentence.
+    /// </summary>
     [Fact]
     public void NoReadingIsTheGreetingAsItWas()
     {
         var claude = ClaudeCodeLauncher.Prepare(Config, "SNC2D", "Science", unitPlans: null, openingMessage: null);
         Assert.Equal(ClaudeCodeLauncher.Greeting("SNC2D", "Science"), claude.Arguments[^1]);
-        Assert.EndsWith("wait for me to agree.", claude.Arguments[^1]);
+        Assert.EndsWith("wait for me to agree. " + OutsideAgents()["greetingHandoutsSentence"]!.ToString(), claude.Arguments[^1]);
         Assert.Equal(TrailLineOf("claude", "SNC2D"), claude.TrailText);
     }
 

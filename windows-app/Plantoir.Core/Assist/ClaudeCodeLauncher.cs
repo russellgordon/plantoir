@@ -253,11 +253,12 @@ public static class ClaudeCodeLauncher
         "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
 
     /// <summary>
-    /// <c>outsideAgents.greetingHandoutsSentence</c> (the mac's #859 piece A).
-    /// Said today only at the end of Plan a Unit's message
-    /// (<see cref="PlanAUnit.OpeningMessage"/>, <c>planAUnit.courseIsNamedAs</c>);
-    /// the Revise greeting and Fix with…'s message do not carry it yet: that is
-    /// #895, held by name in <c>NamedGapLedger.FixWithGreetingCases</c>.
+    /// <c>outsideAgents.greetingHandoutsSentence</c> (the mac's #859 piece A),
+    /// said on every door straight after the plan-first sentence: in the
+    /// Revise <see cref="Greeting"/>, after <c>fixWith.fixGreeting.planFirst</c>
+    /// in Fix with…'s message (<see cref="FixWithAssistant"/>), and as Plan a
+    /// Unit's <c>{handouts}</c> (<see cref="PlanAUnit.OpeningMessage"/>). Since
+    /// #895 on Windows; until then only Plan a Unit said it.
     /// </summary>
     internal const string HandoutsSentence =
         "In your first reply, also tell me in one sentence that you can make printed handouts, worksheets and quizzes "
@@ -272,18 +273,15 @@ public static class ClaudeCodeLauncher
     /// (<c>greetingCarriesNoDoubleQuotes</c>), a plan's name included.
     /// </summary>
     /// <remarks>
-    /// The order is <c>greetingReferenceCourses.where</c> then
-    /// <c>greetingUnitPlans.where</c>: the reference-courses sentence (#856,
-    /// owned on Windows by #880 and not said here yet) goes BETWEEN the plain
-    /// greeting and the unit-plans sentence, as its own entry in
-    /// <c>sentences</c>, so adding it changes neither function's shape.
+    /// The order is the plain greeting, <see cref="HandoutsSentence"/> (#895),
+    /// <c>greetingReferenceCourses.where</c>, then <c>greetingUnitPlans.where</c>
+    /// (last), each its own entry in <c>sentences</c>.
     /// </remarks>
     internal static string Greeting(string courseCode, string courseName,
                                     Plantoir.Core.Models.UnitPlans.Reading? unitPlans = null,
                                     int mostNamed = Plantoir.Core.Models.UnitPlans.MostUnitsNamed)
     {
-        var sentences = new List<string> { PlainGreeting(courseCode, courseName) };
-        // #880: greetingReferenceCourses' sentence is added here, before the unit plans'.
+        var sentences = new List<string> { PlainGreeting(courseCode, courseName), HandoutsSentence };
         if (unitPlans is not null) sentences.Add(Plantoir.Core.Models.UnitPlans.GreetingSentence(unitPlans.Plans, mostNamed));
         return string.Join(" ", sentences).Replace("\"", "'");
     }

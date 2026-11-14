@@ -237,7 +237,10 @@ public static class FixWithAssistant
             ["{occasion}"] = occasion == "deploy" ? "deploy" : "preview",
             ["{section}"] = section,
         });
+        // greetingHandoutsSentence straight after planFirst, before the closing
+        // (#895, the mac's #859 piece A). PlanFirst ends with its own space.
         string ending = AfterTheRows + ClaudeCodeLauncher.HowITeachSentence + PlanFirst
+                        + ClaudeCodeLauncher.HandoutsSentence + " "
                         + Fill(ClosingFor(rows), new() { ["{section}"] = section });
 
         var named = new List<string>();
