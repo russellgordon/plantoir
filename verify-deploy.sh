@@ -861,9 +861,16 @@ print_rendered_result() {
 # at all is a failure that says so, never a pass. The #892 shape is named:
 # a second deploy that printed "Updating Quartz baseUrl to …" built for
 # another host's address. Rejected: judging the settle deploy (its build is
-# the extra build per host the owner accepted on #799).
-judge_second_deploy() {  # judge_second_deploy <label> <netlify|cloudflare> <logfile>
-  local label="$1" host="$2" text built uploaded=""
+# the extra build per host the owner accepted on #799). A second deploy that
+# exited other than 0 is a failure whatever its log said, since a log can say
+# "Netlify requires 0 file(s)" and then fail (597b fix review MINOR 1).
+judge_second_deploy() {  # judge_second_deploy <label> <netlify|cloudflare> <logfile> <its exit code>
+  local label="$1" host="$2" rc="${4:-0}" text built uploaded=""
+  if [ "$rc" != 0 ]; then
+    no "$label: a second deploy with nothing changed EXITED $rc, so it is not judged a pass whatever its log said"
+    SECOND_DEPLOY_RESULTS+=("$label: EXITED $rc - the second deploy failed")
+    return
+  fi
   text=$(tr -d '\r' <"$3" 2>/dev/null)
   built=$(printf '%s\n' "$text" | grep -aE '^🔁 |Rebuilding site for production|rebuilding for production' | head -1)
   case "$host" in
@@ -892,7 +899,7 @@ judge_second_deploy() {  # judge_second_deploy <label> <netlify|cloudflare> <log
   fi
 }
 run_second_deploys() {
-  local host entry found label
+  local host entry found label settled rc
   for host in "${RENDER_HOSTS[@]}"; do
     label=$(render_label "$host")
     found=""
@@ -907,15 +914,24 @@ run_second_deploys() {
     case "$host" in
       netlify)    set_destination "netlify" "" ""
                   : >"$WORK/again-$host-settle.log"; : >"$WORK/again-$host.log"
-                  measure_deploy "$label, settling before the second deploy" "$WORK/again-$host-settle.log" "$COURSE" "$SECTION" --target netlify
-                  measure_deploy "$label, a second deploy with nothing changed" "$WORK/again-$host.log" "$COURSE" "$SECTION" --target netlify ;;
+                  measure_deploy "$label, settling before the second deploy" "$WORK/again-$host-settle.log" "$COURSE" "$SECTION" --target netlify; settled=$?
+                  if [ "$settled" = 0 ]; then
+                    measure_deploy "$label, a second deploy with nothing changed" "$WORK/again-$host.log" "$COURSE" "$SECTION" --target netlify; rc=$?
+                  fi ;;
       cloudflare) set_destination "cloudflare_pages" "" ""
                   : >"$WORK/again-$host-settle.log"; : >"$WORK/again-$host.log"
-                  measure_deploy "$label, settling before the second deploy" "$WORK/again-$host-settle.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT"
-                  measure_deploy "$label, a second deploy with nothing changed" "$WORK/again-$host.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" ;;
+                  measure_deploy "$label, settling before the second deploy" "$WORK/again-$host-settle.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT"; settled=$?
+                  if [ "$settled" = 0 ]; then
+                    measure_deploy "$label, a second deploy with nothing changed" "$WORK/again-$host.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT"; rc=$?
+                  fi ;;
       *)          skip "$label: no second-deploy check for this host yet"; continue ;;
     esac
-    judge_second_deploy "$label" "$host" "$WORK/again-$host.log"
+    if [ "$settled" != 0 ]; then
+      no "$label: the deploy that settles the site before the second one EXITED $settled, so the second deploy was not run"
+      SECOND_DEPLOY_RESULTS+=("$label: NOT JUDGED - the settling deploy exited $settled")
+      continue
+    fi
+    judge_second_deploy "$label" "$host" "$WORK/again-$host.log" "$rc"
   done
 }
 
@@ -927,9 +943,48 @@ run_second_deploys() {
 # (a sharing card cannot find it; the build writes an absolute one for a
 # deployed site), and so is none. A Cloudflare site naming a Netlify one is
 # #892's shape, and is named.
-judge_og_image() {  # judge_og_image <label> <site address> <front page file>
-  local label="$1" site_host og og_host
+#
+# The host expected is the leg's CUSTOM DOMAIN when course_config.json
+# records one for that destination, since deploy.py builds each leg for
+# its custom domain when one is set (origin/issue/799-reuse-the-last-build,
+# scripts/deploy.py -> leg_custom_domain; #799's third review). The rule is
+# contracts/file-formats.json -> custom_domains: custom_domains.sections.
+# section<N>.<leg's type> (netlify, cloudflare_pages), and the OLDER bare
+# string is the primary destination's (deploy_target, Netlify when absent)
+# and no other leg's. Implemented here rather than imported, so the harness
+# does not depend on the code it judges (597b fix review INCOMPLETE 1).
+# Without one, the expected host is the service's own, the host fetched.
+# Known limit, older than this check: url_from_log finds only *.netlify.app
+# and *.pages.dev, so a Netlify site served only on its attached custom
+# domain is not fetched at all.
+leg_custom_domain() {  # leg_custom_domain <course_config.json> <section> <netlify|cloudflare_pages> -> the domain's host, or ""
+  python3 -I - "$1" "$2" "$3" 2>/dev/null <<'LEGDOMAIN'
+import json, re, sys
+path, section, leg_type = sys.argv[1:4]
+try:
+    with open(path, encoding="utf-8") as handle:
+        config = json.load(handle)
+except (OSError, ValueError):
+    sys.exit(0)
+if not isinstance(config, dict):
+    sys.exit(0)
+domains = config.get("custom_domains")
+sections = domains.get("sections") if isinstance(domains, dict) else None
+entry = sections.get(f"section{section}") if isinstance(sections, dict) else None
+value = None
+if isinstance(entry, dict):
+    value = entry.get(leg_type)
+elif isinstance(entry, str) and (config.get("deploy_target") or "netlify") == leg_type:
+    value = entry
+if isinstance(value, str):
+    value = re.sub(r"^https?://", "", value.strip(), flags=re.IGNORECASE).rstrip("/")
+    print(value.split("/")[0])
+LEGDOMAIN
+}
+judge_og_image() {  # judge_og_image <label> <site address> <front page file> [<netlify|cloudflare_pages> [<course_config.json> <section>]]
+  local label="$1" site_host og og_host custom=""
   site_host="${2#*://}"; site_host="${site_host%%/*}"
+  [ -n "${4:-}" ] && custom=$(leg_custom_domain "${5:-$CONFIG}" "${6:-$SECTION}" "$4")
   og=$(grep -aoE '<meta[^>]*property="og:image"[^>]*>' "$3" 2>/dev/null | head -1 | sed -nE 's/.*content="([^"]*)".*/\1/p')
   if [ -z "$og" ]; then
     no "$label's front page carries no og:image, so a shared link shows no picture"
@@ -940,7 +995,15 @@ judge_og_image() {  # judge_og_image <label> <site address> <front page file>
     *) no "$label's og:image is not an absolute address ($og), so a sharing card cannot find it"; return ;;
   esac
   og_host="${og#*://}"; og_host="${og_host%%/*}"
-  if [ "$og_host" = "$site_host" ]; then
+  if [ -n "$custom" ]; then
+    if [ "$og_host" = "$custom" ]; then
+      ok "$label's og:image is on the custom domain course_config.json records for this destination ($og_host)"
+    elif [ "$og_host" = "$site_host" ]; then
+      no "$label's og:image names the service's own host ($og_host), not the custom domain course_config.json records for this destination ($custom)"
+    else
+      no "$label's og:image is on another host ($og_host), not the custom domain course_config.json records for this destination ($custom)"
+    fi
+  elif [ "$og_host" = "$site_host" ]; then
     ok "$label's og:image is on its own host ($og_host)"
   elif [ "${og_host%.netlify.app}" != "$og_host" ] && [ "${site_host%.pages.dev}" != "$site_host" ]; then
     no "$label's og:image names the Netlify site ($og_host), not its own ($site_host): #892's shape, fixed on origin/issue/799-reuse-the-last-build"
@@ -1450,6 +1513,13 @@ READ
   else
     no "the own-host row's expected failures: $(grep -v '^OK: ' "$ST_DIR/expected.txt" | head -3)"
   fi
+  # A refused frame inside a teacher's embed is the embed's, in the console
+  # half as in the request half (597b fix review MINOR 2).
+  if node "$SCRIPT_REPO/browser-checks/lib/test_frame_refusals.mjs" >"$ST_DIR/refusals.txt" 2>&1; then
+    ok "a refused frame's console line: $(grep -c '^OK: ' "$ST_DIR/refusals.txt") cases, one inside an embed set aside in both engines' wording, the page's own kept (browser-checks/lib/test_frame_refusals.mjs)"
+  else
+    no "a refused frame's console line: $(grep -v '^OK: ' "$ST_DIR/refusals.txt" | head -3)"
+  fi
   # A site whose fixture pages answer 200, or 404 for one of them for the
   # first K requests; and a stub in the checker's place that says what its
   # plan says, call by call, and writes down how it was called.
@@ -1710,11 +1780,11 @@ STUB
   st_stop
 
   hdr "Self-test — a second deploy with nothing changed (#892), and the sharing card (#799)"
-  sd_case() {  # sd_case <host> <want: pass|fail> <wanted words> <what it shows> <log lines...>
+  sd_case() {  # sd_case <host> <want: pass|fail> <wanted words> <what it shows> <log lines...>; SD_RC is the deploy's exit code
     local host="$1" want="$2" words="$3" what="$4"; shift 4
     printf '%s\r\n' "$@" >"$ST_DIR/again.log"
     local said
-    said=$( (SECOND_DEPLOY_RESULTS=(); judge_second_deploy "case" "$host" "$ST_DIR/again.log"; printf 'RESULT %s\n' "${SECOND_DEPLOY_RESULTS[0]}") )
+    said=$( (SECOND_DEPLOY_RESULTS=(); judge_second_deploy "case" "$host" "$ST_DIR/again.log" "${SD_RC:-0}"; printf 'RESULT %s\n' "${SECOND_DEPLOY_RESULTS[0]}") )
     if { [ "$want" = pass ] && printf '%s\n' "$said" | grep -q '✅'; } || { [ "$want" = fail ] && printf '%s\n' "$said" | grep -q '❌'; }; then
       if printf '%s\n' "$said" | grep -q -- "$words"; then ok "$what"; else no "$what: said $said"; fi
     else
@@ -1733,11 +1803,13 @@ STUB
     "✨ Success! Uploaded 3 files (209 already uploaded)"
   sd_case netlify fail "NOT JUDGED" "a deploy that said nothing about its upload is not a pass" \
     " Deploying to Netlify…"
+  SD_RC=1 sd_case netlify fail "EXITED 1" "a second deploy that uploaded nothing and then exited 1 fails, whatever its log said" \
+    " Netlify requires 0 file(s)" " No file uploads needed (all content already present on Netlify)." "❌ Delta deploy failed"
 
-  og_case() {  # og_case <want: pass|fail> <wanted words> <what> <site> <og:image or "">
+  og_case() {  # og_case <want: pass|fail> <wanted words> <what> <site> <og:image or ""> [<leg type> <course_config.json>]
     printf '<html><head>%s</head><body></body></html>\n' "${5:+<meta property=\"og:image\" content=\"$5\"/>}" >"$ST_DIR/og.html"
     local said
-    said=$(judge_og_image "case" "$4" "$ST_DIR/og.html")
+    said=$(judge_og_image "case" "$4" "$ST_DIR/og.html" "${6:-}" "${7:-$ST_DIR/no-config.json}" 1)
     if { [ "$1" = pass ] && printf '%s' "$said" | grep -q '✅'; } || { [ "$1" = fail ] && printf '%s' "$said" | grep -q '❌'; }; then
       if printf '%s' "$said" | grep -q -- "$2"; then ok "$3"; else no "$3: said $said"; fi
     else
@@ -1749,6 +1821,23 @@ STUB
   og_case fail "on another host" "an og:image on any other host fails" "https://ada1o-s1.netlify.app" "https://ada1o-s1.pages.dev/static/og-image.png"
   og_case fail "not an absolute address" "a relative og:image fails" "https://ada1o-s1.netlify.app" "./static/og-image.png"
   og_case fail "carries no og:image" "a front page with no og:image fails" "https://ada1o-s1.netlify.app" ""
+  # The leg's custom domain, by contracts/file-formats.json -> custom_domains.
+  printf '%s\n' '{"deploy_target": "netlify", "custom_domains": {"sections": {"section1": {"cloudflare_pages": "https://class.example.org/"}}}}' >"$ST_DIR/og-domain.json"
+  printf '%s\n' '{"deploy_target": "cloudflare_pages", "custom_domains": {"sections": {"section1": "class.example.org"}}}' >"$ST_DIR/og-bare-primary.json"
+  printf '%s\n' '{"deploy_target": "netlify", "custom_domains": {"sections": {"section1": "class.example.org"}}}' >"$ST_DIR/og-bare-other.json"
+  printf '%s\n' '{"deploy_target": "cloudflare_pages"}' >"$ST_DIR/og-none.json"
+  og_case pass "on the custom domain" "a site with a custom domain recorded for its destination passes when its og:image names that domain" \
+    "https://ada1o-s1.pages.dev" "https://class.example.org/static/og-image.png" cloudflare_pages "$ST_DIR/og-domain.json"
+  og_case fail "names the service's own host" "a site with a custom domain recorded fails when its og:image names the service's own host" \
+    "https://ada1o-s1.pages.dev" "https://ada1o-s1.pages.dev/static/og-image.png" cloudflare_pages "$ST_DIR/og-domain.json"
+  og_case pass "on the custom domain" "the older bare-string domain is the primary destination's" \
+    "https://ada1o-s1.pages.dev" "https://class.example.org/static/og-image.png" cloudflare_pages "$ST_DIR/og-bare-primary.json"
+  og_case pass "on its own host" "the older bare-string domain is no other destination's, so that leg expects its own host" \
+    "https://ada1o-s1.pages.dev" "https://ada1o-s1.pages.dev/static/og-image.png" cloudflare_pages "$ST_DIR/og-bare-other.json"
+  og_case pass "on its own host" "a domain recorded for one destination is never another's: the Netlify leg expects its own host" \
+    "https://ada1o-s1.netlify.app" "https://ada1o-s1.netlify.app/static/og-image.png" netlify "$ST_DIR/og-domain.json"
+  og_case fail "on another host" "with no custom domain recorded, an og:image naming another site's host fails" \
+    "https://ada1o-s1.pages.dev" "https://ada1o-other.pages.dev/static/og-image.png" cloudflare_pages "$ST_DIR/og-none.json"
 
   NS_PLAIN_FIRST=10
 
@@ -2129,7 +2218,7 @@ PY
 # minute later. That is the host propagating, not a fault, so this polls rather
 # than failing on the first try. It reports how long it waited, because a
 # propagation time that starts creeping up is worth seeing.
-check_url() {  # check_url <label> <url>
+check_url() {  # check_url <label> <url> <netlify|cloudflare_pages>
   local code waited=0
   for _ in $(seq 1 40); do
     code=$(curl -s -o "$WORK/fetched.html" -w "%{http_code}" --max-time 20 "$2" 2>/dev/null)
@@ -2147,7 +2236,7 @@ check_url() {  # check_url <label> <url>
     else
       ok "$1 carries no live-reload client"
     fi
-    judge_og_image "$1" "$2" "$WORK/fetched.html"
+    judge_og_image "$1" "$2" "$WORK/fetched.html" "$3"
   else
     no "$1 answered HTTP $code ($2)"
   fi
@@ -2390,7 +2479,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
     && ok "publish to Netlify exited 0" || no "publish to Netlify failed"
   NETLIFY_URL=$(url_from_log "$WORK/deploy-netlify.log")
   [ -n "$NETLIFY_URL" ] && wait_for_new_address "Netlify" "$NETLIFY_URL"
-  [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" || no "no Netlify address in the output"
+  [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" netlify || no "no Netlify address in the output"
   [ -n "$NETLIFY_URL" ] && check_engine "Netlify" "$NETLIFY_URL/"
   [ -n "$NETLIFY_URL" ] && check_page_links "Netlify" "$NETLIFY_URL/" netlify
   render_target netlify "$NETLIFY_URL" "$LEG_FAIL_START"
@@ -2411,7 +2500,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
   [ -n "$CF_URL" ] && wait_for_new_address "Cloudflare Pages" "$CF_URL"
   [ -n "$CF_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare Pages" "$CF_URL" "$WORK/cf-alone"
-  [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
+  [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" cloudflare_pages || no "no Cloudflare address in the output"
   [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
   [ -n "$CF_URL" ] && check_page_links "Cloudflare Pages" "$CF_URL/" cloudflare
   render_target cloudflare "$CF_URL" "$LEG_FAIL_START"
@@ -2643,8 +2732,8 @@ if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   snapshot_cloudflare_upload "Cloudflare (paired with Netlify)" "$WORK/pair-nc2.log" "$WORK/cf-with-netlify"; CF_SNAPPED=$?
   C_URL=$(url_from_log "$WORK/pair-nc2.log")
   [ -n "$C_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare (paired with Netlify)" "$C_URL" "$WORK/cf-with-netlify"
-  [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" || no "no Netlify address"
-  [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
+  [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" netlify || no "no Netlify address"
+  [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" cloudflare_pages || no "no Cloudflare address"
   [ -n "$N_URL" ] && check_engine "Netlify (of the pair)" "$N_URL/"
   [ -n "$C_URL" ] && check_engine "Cloudflare (of the pair)" "$C_URL/"
   [ -n "$N_URL" ] && check_page_links "Netlify (of the pair)" "$N_URL/" netlify
@@ -2663,7 +2752,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
   : >"$WORK/pair-nf2.log"
   run_deploy "$WORK/pair-nf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
-  [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" || no "no Netlify address"
+  [ -n "$N_URL" ] && check_url "Netlify (of the pair)" "$N_URL" netlify || no "no Netlify address"
   [ -n "$N_URL" ] && check_page_links "Netlify (of the pair)" "$N_URL/" netlify
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
   check_no_marker_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
@@ -2688,7 +2777,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   run_deploy "$WORK/pair-cf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
     && ok "leg 2 (folder) exited 0" || no "leg 2 (folder) failed"
   [ -n "$C_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare (paired with a folder)" "$C_URL" "$WORK/cf-with-folder"
-  [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" || no "no Cloudflare address"
+  [ -n "$C_URL" ] && check_url "Cloudflare (of the pair)" "$C_URL" cloudflare_pages || no "no Cloudflare address"
   [ -n "$C_URL" ] && check_page_links "Cloudflare (of the pair)" "$C_URL/" cloudflare
   check_folder "folder (of the pair)" "$FOLDER_TARGET/section$SECTION"
   check_engine_folder "the folder (of the pair)" "$FOLDER_TARGET/section$SECTION"

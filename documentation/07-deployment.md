@@ -2865,6 +2865,43 @@ both with the new. It is the sabotage "embeds refused" now, run with
 row runs on deployed hosts only, so verify.sh's local `--expect-red all`
 prints a NOTE for it).
 
+**The failed frame document is what catches frame-ancestors, so keep it**
+(597b fix review MINOR 3). The two signs are not redundant. Measured on
+2026-11-13 with headless Chrome for Testing 155 and WebKit 2359 against
+local servers: for a frame refused by `X-Frame-Options`, and for one refused
+by `Content-Security-Policy: frame-ancestors 'none'` or `'self'`, the
+frame's document answers 200 and then fails in both engines
+(`net::ERR_BLOCKED_BY_RESPONSE` in Chromium, `cancelled` in WebKit), and
+that failed request is a frame of the page itself. The "Refused to display"
+line appears for `X-Frame-Options` only. For frame-ancestors, Chromium says
+"Framing '<origin>/' violates the following Content Security Policy
+directive" and WebKit says "Refused to load <url> because it does not
+appear in the frame-ancestors directive", and the check's pattern matches
+neither. GeoGebra's refusal is the frame-ancestors shape. So the failed
+document is the half that fails the embeds row on every refusal in both
+engines, and removing it as a duplicate of the console line would let a
+frame-ancestors refusal pass.
+
+**A refused frame inside an embed is the embed's own, in both halves**
+(597b fix review MINOR 2). The request half counts only a frame whose parent
+is the page. The console half must skip the same frames, because a refused
+frame nested inside an allowed one logs "Refused to display" to the page's
+console in both engines (measured as above), with no location that names
+the frame: WebKit gives none, Chromium gives `chrome-error://chromewebdata/`.
+So the checker records, as each frame is asked for, whether its parent is
+the page or a frame inside an embed, and `browser-checks/lib/frame_refusals.mjs`
+matches the address the line names against the two lists. WebKit names the
+full address; Chromium only the origin. An origin that only an embed's inner
+frames used is the embed's, and so is one used both by the page's own frames
+and by an embed's inner frames, since the request half judges the page's own
+frame either way. A line naming an address the page never asked for stays
+the page's, which is the direction that fails. Measured on the same local
+servers: the nested refusal read as the embed's and the top-level one as
+the page's, in both engines. A provider's own inner frames therefore cannot
+turn a run red. Rejected: dropping the console half altogether, since for
+`X-Frame-Options` its line is the one that says why the frame was refused in
+the row's failure.
+
 **The Embeds fixture's geogebra.org frame had gone.** The same run failed
 the embeds row in both engines with "www.geogebra.org answered 410": the
 fixture used `https://www.geogebra.org/material/iframe/id/ju3f2kbg`, and
@@ -2925,8 +2962,11 @@ nothing changed, judged from the launcher's own lines: no deploy.sh "🔁"
 build reason and no deploy.py "Rebuilding site for production…"; Netlify's
 "No file uploads needed" (or "Netlify requires 0 file"), Cloudflare's
 "Uploaded 0 files". A log with no upload line is a failure that says it
-could not be judged. A second deploy that printed "Updating Quartz baseUrl
-to …" is named as #892's shape. **On today's `dev` this is RED for
+could not be judged. A second deploy that exited other than 0 is a failure
+whatever its log said (597b fix review MINOR 1: a log can say "Netlify
+requires 0 file(s)" and then fail), and a settling deploy that exited other
+than 0 is a failure that leaves the second one unrun. A second deploy that
+printed "Updating Quartz baseUrl to …" is named as #892's shape. **On today's `dev` this is RED for
 Cloudflare** on the test course, which carries both records, until
 `origin/issue/799-reuse-the-last-build` merges; it is reported by name and
 not weakened. Cost: two more deploys a host, a minute or two each.
@@ -2938,6 +2978,23 @@ address on that site's own host, judged per site (ruled on #799: with two
 web hosts each site carries its own address). Missing or relative is a
 failure; a Cloudflare site whose `og:image` names a Netlify one is named as
 #892's shape, red today for the same course until the #799 branch merges.
+
+The host expected is the leg's custom domain when `course_config.json`
+records one for that destination (597b fix review INCOMPLETE 1). On the #799
+branch, `deploy.py` builds each leg for `leg_custom_domain(…)` or else the
+service's own host, while the Cloudflare leg still prints its `pages.dev`
+address, so judging against the fetched host alone was a false red for every
+section with a custom domain. The rule is the contract's,
+`contracts/file-formats.json` → `custom_domains`:
+`custom_domains.sections.section<N>.<leg's type>` (`netlify`,
+`cloudflare_pages`), and the older bare string is the primary destination's
+(`deploy_target`, Netlify when absent) and no other leg's. The harness
+implements it in `leg_custom_domain` rather than importing `deploy.py`, so
+it does not judge code with that code. With a custom domain recorded, an
+`og:image` on the service's own host fails, named as such. Known limit,
+older than this check: `url_from_log` reads only `*.netlify.app` and
+`*.pages.dev`, so a Netlify site served only on a custom domain Netlify has
+attached is not fetched at all.
 
 **Not on the list, and why.** The folder destination: a deployed folder is
 served by Plantoir itself since #850, and verify.sh crawls one through the
@@ -2961,7 +3018,12 @@ never ran"; a re-run that fails again is the host's failure with both runs
 printed; expected failures off their pinned count fail the host; and the
 second deploy's and the sharing card's judgements, six and five cases; and
 a host serving an earlier deployment (no run mark) reads FAILED though
-the browsers passed. 54 passed. Proved
+the browsers passed. Since the fix review: a second deploy that uploaded
+nothing and then exited 1 fails; the sharing card against a recorded custom
+domain (on it passes, on the service's own host fails, the bare string the
+primary's and no other leg's, a domain for one destination never another's)
+and with none recorded (another site's host fails), six cases; and the node
+test of `frame_refusals.mjs`, ten cases. 62 passed. Proved
 must-fail on copies of the script: with a plain run asking once, with a
 leg's failures ignored, with the section running over the legs' entries
 instead of the list, and with a skip read as a pass, the matching cases fail

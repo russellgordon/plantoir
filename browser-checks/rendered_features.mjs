@@ -60,6 +60,7 @@ import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { outsidePins, pinnedButNotAsked, sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
+import { whoseRefusal } from "./lib/frame_refusals.mjs"
 import { startSiteServer } from "./lib/site_server.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -350,7 +351,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [] }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [] }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -407,6 +408,18 @@ async function openContext(browser, engine, origin, pageName) {
       return route.continue()
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return route.continue()
+    // Which frames the page asked for: its own (a child of the page) and
+    // those inside an embed, so a "Refused to display" line can be told
+    // apart (lib/frame_refusals.mjs, 597b fix review MINOR 2). Asked before
+    // either engine logs the refusal, which follows the frame's response.
+    try {
+      if (request.isNavigationRequest() && request.frame().parentFrame() !== null) {
+        if (request.frame().parentFrame().parentFrame() === null) record.ownFrames.push(request.url())
+        else record.nestedFrames.push(request.url())
+      }
+    } catch {
+      // A worker's request has no frame, and is no frame's document.
+    }
     // When the page last asked for anything: the quiet period before the
     // judging waits on it (fixes review F3).
     record.lastRequestAt = Date.now()
@@ -493,12 +506,19 @@ function watchPage(page, record) {
   page.on("console", (message) => {
     const text = message.text()
     const at = message.location()?.url ?? ""
-    // A frame the provider refuses to be shown in (X-Frame-Options or
-    // frame-ancestors): students see a blank box. Never the embed's own
+    // A frame the provider refuses to be shown in (X-Frame-Options): students
+    // see a blank box. A frame of the page itself is never the embed's own
     // business: the embeds row fails on it and the clean-page row keeps the
     // line (597b review finding 1, measured: the frame's navigation answers
-    // 200 in both engines, then this line in both).
+    // 200 in both engines, then this line in both). A refused frame INSIDE an
+    // embed is set aside and counted, as the request half below sets it
+    // aside (597b fix review MINOR 2). This line does not carry
+    // frame-ancestors in either engine; the failed document below does.
     const refused = /Refused to display '([^']+)' in a frame/.exec(text)
+    if (refused && whoseRefusal(refused[1], record.ownFrames, record.nestedFrames) === "embed") {
+      record.embedLines += 1
+      return
+    }
     if (refused) {
       record.frameRefusals.push({ url: refused[1], why: text.slice(0, 200) })
       record.console.push(text)

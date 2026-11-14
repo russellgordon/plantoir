@@ -617,8 +617,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > failure too. After the rendered check, each host is deployed once more
    > to settle and then a SECOND time with nothing changed, which must build
    > nothing and upload nothing ("A second deploy with nothing changed, per
-   > host", #892), and each leg's live front page must name its own host in
-   > `og:image` (#799). Until `origin/issue/799-reuse-the-last-build` merges,
+   > host", #892; a deploy that exits other than 0 fails it), and each leg's
+   > live front page must name its own host in `og:image` (#799), or the
+   > custom domain `course_config.json` records for that destination when
+   > there is one. Until `origin/issue/799-reuse-the-last-build` merges,
    > Cloudflare is red on both for a course carrying both records, and the
    > line says so by name (#892): that red is real. The cold
    > visits in Safari's engine (#625: typed cold, from the front page, Python
@@ -644,8 +646,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > answered on retry, an expected failure that stopped, an old Node, a
    > checker that could not run, a re-run that fails again, expected
    > failures off their pinned count, and the second deploy's and the
-   > sharing card's judgements (#892, #799), and a host serving an earlier
-   > deployment. It reads 54 passed, 0 failed on
+   > sharing card's judgements (#892, #799, a custom domain included), a
+   > refused frame inside an embed set aside, and a host serving an earlier
+   > deployment. It reads 62 passed, 0 failed on
    > the mac (about 2 minutes), and 13 passed, 0 failed on Windows until
    > Windows has #869's, #762's, #597's and #892's cases.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
