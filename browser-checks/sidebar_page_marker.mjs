@@ -40,10 +40,10 @@
 //   node browser-checks/sidebar_page_marker.mjs <chrome> <fixture page url> <folder page url> \
 //        <folder name> <nested folder name> <long page title>
 
-import { spawn } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, pageUrl, folderPageUrl, folderName, nestedFolderName, longTitle] = process.argv.slice(2)
 const nestedPath = folderName + "/" + nestedFolderName
@@ -59,7 +59,7 @@ const LEAST_CONTRAST = 3
 const TOLERANCE = 0.5
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-sidebar-marker-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1512,900",
   "--use-mock-keychain", "--password-store=basic",

@@ -32,6 +32,8 @@ import page_visibility
 import page_features
 import figures
 import geogebra
+import kept_downloads
+import phet
 import swift_blocks
 import section_problems
 import site_said
@@ -1794,13 +1796,16 @@ def _wire_list_page_toc(layout_ts: Path) -> None:
 def _wire_transformers_index(index_ts: Path) -> None:
     """Export the figures transformer (#485 E1), the runnable code's (#455),
     the self-check quizzes' (#563), the task boxes' (#519), the picture
-    sizes' (#612) and the GeoGebra sketches' (#578) beside Quartz's own."""
+    sizes' (#612), the GeoGebra sketches' (#578), the PhET simulations'
+    (#674) and the videos' (#692) beside Quartz's own."""
     text = index_ts.read_text(encoding="utf-8")
     changed = False
     for name, module in (("PlantoirFigures", "./plantoirFigures"), ("CodeRunnerFences", "./codeRunner"),
                          ("PlantoirQuizzes", "./plantoirQuizzes"), ("PlantoirTasks", "./plantoirTasks"),
                          ("PlantoirPictureSizes", "./plantoirPictureSizes"),
-                         ("PlantoirGeoGebra", "./plantoirGeoGebra")):
+                         ("PlantoirGeoGebra", "./plantoirGeoGebra"),
+                         ("PlantoirPhet", "./plantoirPhet"),
+                         ("PlantoirVideo", "./plantoirVideo")):
         if f"export {{ {name} }}" in text:
             continue
         if not text.endswith("\n"):
@@ -1919,6 +1924,31 @@ def _wire_geogebra_transformer(config_ts: Path) -> None:
     config_ts.write_text(text, encoding="utf-8")
 
 
+def _wire_phet_transformer(config_ts: Path) -> None:
+    """Put the PhET simulations' transformer (#674) straight AFTER the
+    GeoGebra sketches' and so before the self-check quizzes', as GeoGebra's
+    is placed and for its reason (a simulation in a question is a finished
+    figure when the quiz transformer packages the question). Anchored on
+    PlantoirGeoGebra, which every site wired since #578 has, and wired after
+    it in wire_quartz_additions, so the order is Figures, GeoGebra, PhET,
+    Quizzes on a fresh site and an old one alike. Idempotent."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirPhet(" in text:
+        return
+    anchor = "Plugin.PlantoirGeoGebra(),"
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
+        return
+    at = text.index(anchor) + len(anchor)
+    line_start = text.rfind("\n", 0, text.index(anchor)) + 1
+    indent = text[line_start:text.index(anchor)]
+    if indent.strip():
+        print("⚠️ Could not add the science simulations: the site's settings have changed shape.")
+        return
+    text = text[:at] + "\n" + indent + "Plugin.PlantoirPhet()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
 def _wire_tasks_transformer(config_ts: Path) -> None:
     """Put the task boxes' transformer (#519) straight AFTER the self-check
     quizzes': it works at the html stage, and must find every quiz already
@@ -1964,6 +1994,33 @@ def _wire_picture_sizes_transformer(config_ts: Path) -> None:
         print("⚠️ Could not reserve the pictures' space on the site's pages: the site's settings have changed shape.")
         return
     text = text[:at] + "\n" + indent + "Plugin.PlantoirPictureSizes()," + text[at:]
+    config_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_video_transformer(config_ts: Path) -> None:
+    """Put the videos' transformer (#692) straight BEFORE
+    ObsidianFlavoredMarkdown. Quartz runs every transformer's html plugins in
+    the order they are listed, and OFM's own YouTube step replaces a
+    picture's properties, losing the words in its brackets (the player's
+    title). Running first, the videos' transformer turns YouTube and Vimeo
+    pictures into players itself, and OFM's YouTube step finds none left.
+    Anchored on OFM, so a section wired before #692 gets it in the same
+    place as a fresh one. Without that anchor the videos are left to
+    Quartz's own YouTube step, as before #692."""
+    text = config_ts.read_text(encoding="utf-8")
+    if "Plugin.PlantoirVideo(" in text:
+        return
+    anchor = "Plugin.ObsidianFlavoredMarkdown("
+    if text.count(anchor) != 1:
+        print("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.")
+        return
+    at = text.index(anchor)
+    line_start = text.rfind("\n", 0, at) + 1
+    indent = text[line_start:at]
+    if indent.strip():
+        print("⚠️ Could not add the YouTube and Vimeo players: the site's settings have changed shape.")
+        return
+    text = text[:line_start] + indent + "Plugin.PlantoirVideo(),\n" + text[line_start:]
     config_ts.write_text(text, encoding="utf-8")
 
 
@@ -2309,11 +2366,17 @@ def wire_quartz_additions(output_dir: Path) -> None:
     the transformers index, and its script and styles ride the Print
     button's component), the GeoGebra sketches' one (#578: its transformer
     straight after the figures' and so before the quizzes'; export, script
-    and styles ride as the quizzes' do), the task boxes' one (#519: its transformer after
+    and styles ride as the quizzes' do), the PhET simulations' one (#674:
+    its transformer straight after GeoGebra's; export, script and styles
+    ride the same way), the task boxes' one (#519: its transformer after
     the quizzes'; export, script and styles ride as the quizzes' do), the
     picture sizes' one (#612: its transformer after the task boxes'; its
     export rides the transformers index, and its one style rule rides the
-    Print button's component in pictures.scss), My
+    Print button's component in pictures.scss), the videos' one (#692: its
+    transformer straight before ObsidianFlavoredMarkdown, so the player keeps
+    the picture's words as its title; its export rides the transformers
+    index and its one style rule rides the Print button's component in
+    videos.scss), My
     Progress's two (#545: its emitter exported beside Quartz's and put
     before Assets; its script and styles ride as the quizzes' do), the
     emitter that says which runnable blocks the site showed as plain code
@@ -2337,8 +2400,10 @@ def wire_quartz_additions(output_dir: Path) -> None:
         (output_dir / "quartz.config.ts", _wire_figures_transformer),
         (output_dir / "quartz.config.ts", _wire_quizzes_transformer),
         (output_dir / "quartz.config.ts", _wire_geogebra_transformer),
+        (output_dir / "quartz.config.ts", _wire_phet_transformer),
         (output_dir / "quartz.config.ts", _wire_tasks_transformer),
         (output_dir / "quartz.config.ts", _wire_picture_sizes_transformer),
+        (output_dir / "quartz.config.ts", _wire_video_transformer),
         (output_dir / "quartz.config.ts", _wire_code_runner_transformer),
         (output_dir / "quartz" / "plugins" / "emitters" / "index.ts", _wire_emitters_index),
         (output_dir / "quartz.config.ts", _wire_progress_emitter),
@@ -2507,6 +2572,71 @@ def _prepare_geogebra(content_root: Path, output_dir: Path, course_dir: Path, fu
         shutil.rmtree(output_dir / "quartz" / geogebra.WORKSPACE, ignore_errors=True)
         shutil.rmtree(output_dir / "quartz" / "static" / geogebra.THUMBNAILS, ignore_errors=True)
         return {"counts": {geogebra.ENGINE: 0}, "problems": [], "notes": [], "sketches": 0, "shown": 0}
+
+
+def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config: dict,
+                  course_code: str, section_number) -> dict:
+    """
+    PhET simulations (#674; scripts/phet.py), ALWAYS: every phet fence
+    (```phet and ~~~phet, with or without spaces before the language, so the
+    pages are found by the word `phet` alone) on the pages students can see, by the gate's own
+    visibility rule, read, its simulation found among the copies this
+    computer keeps (keptDownloads: the working folder's builds folder,
+    .downloaded/phet) or downloaded from PhET now and kept, and handed to the
+    site's transformer. Answers phet.prepare's outcome; when that says
+    `stop`, the caller STOPS the build before Quartz runs (phetFences.stop,
+    Russell's ruling of 2026-11-13).
+
+    A fault in this pass ITSELF (an answer of a shape nobody foresaw, a full
+    disk) also stops the build when any page students can see shows a
+    simulation (phetFences.stop.passFails, reason notReady): carrying on
+    would make a site that says it built and shows a code block where the
+    page promises a simulation, the fault the ruling's stop exists to
+    prevent. With no simulation on any such page the build carries on, as
+    nothing is missing.
+    """
+    def list_pages():
+        return phet.pages_students_see(
+            content_root, _is_draft,
+            lambda page: _place_in_the_course(page, content_root),
+            _vault_source_of, skip=_is_media_name)
+
+    try:
+        pages = list_pages()
+        kept_root = kept_downloads.root_for(course_dir)
+        return phet.prepare(pages, output_dir, kept_root,
+                            course_locale=(config.get("locale") or "en-US"),
+                            course=course_code, section=section_number)
+    except Exception as error:
+        # The plain reason only (a full disk says so in the system's own
+        # words), never a path and never Python's name for the fault: the
+        # console is the teacher's, and goes into problem reports.
+        if isinstance(error, OSError) and error.strerror:
+            print(f"⚠️ Could not prepare the science simulations ({error.strerror}).")
+        else:
+            print("⚠️ Could not prepare the science simulations.")
+        shutil.rmtree(output_dir / "quartz" / phet.WORKSPACE, ignore_errors=True)
+        shutil.rmtree(output_dir / "quartz" / "static" / phet.SITE_FOLDER, ignore_errors=True)
+        places = phet.places_after_a_failed_pass(list_pages, content_root)
+        stop = None
+        if places is None or places:
+            stop = {"reason": "notReady", "missing": places or []}
+        return {"counts": {phet.KIND: 0}, "problems": [], "notes": [], "simulations": 0, "shown": 0,
+                "downloaded": [], "fromBefore": [], "bytes": 0, "seconds": 0.0, "stop": stop}
+
+
+def _stop_for_phet(outcome: dict, course_code: str, section_number) -> None:
+    """
+    The stop phetFences.stop rules (#674): a simulation a page shows is not
+    on this computer and could not be downloaded. Says which, on which page,
+    in the words the apps lift (keptDownloads.stop), prints the marker the
+    trail reads, and exits 1 before Quartz runs, so the site built last
+    stays as it was and no site is made without the simulation.
+    """
+    print()
+    for line in phet.stop_lines(outcome, course_code, section_number):
+        print(line)
+    sys.exit(1)
 
 
 def _count_runner_pages(content_root: Path) -> dict:
@@ -6233,7 +6363,8 @@ def patch_mermaid_pie_colours(mermaid_ts_path: Path):
     and its legend swatch with it.
 
     The palette is SOLVED at render time rather than hardcoded, because
-    Plantoir ships 43 colour schemes and each has a light and a dark mode.
+    Plantoir ships 43 colour schemes (44 entries since #891: Grove Colours
+    is kept under its old id too) and each has a light and a dark mode.
     Fixed blend fractions tuned against one scheme failed 74 of those 86
     combinations — some slices came out barely distinguishable from the
     label text. Instead: build a pool of tints of the scheme's own colours,
@@ -8397,7 +8528,7 @@ def _find_curriculum_folders(content_root: Path, configured: list) -> list:
         return found
     # The fallback keeps its pre-#128 answer: a folder holding a LETTER-FIRST
     # code (`A1.1`, the only shape there was) is preferred, and only when none
-    # does is a folder of other codes taken. Without this a scratch LCS course
+    # does is a folder of other codes taken. Without this a scratch two-curricula course
     # whose College Board folder has `1.A` pages silently swapped its Ontario
     # map for College Board's under the same title, because `College Board…`
     # sorts before `Ontario…` (measured on the #128 implementation review).
@@ -10529,6 +10660,16 @@ def build_section_site(
     figures_here = _prepare_figures(content_root, output_dir, course_dir, full_rebuild)
     # GeoGebra sketches (#578), ALWAYS, for the same reason.
     geogebra_here = _prepare_geogebra(content_root, output_dir, course_dir, full_rebuild)
+    # PhET simulations (#674), ALWAYS. The one pass here that can STOP a
+    # build: a simulation a page shows that is neither kept nor downloadable
+    # now (phetFences.stop). Before any check is said and before Quartz, so a
+    # stopped build changes nothing.
+    phet_here = _prepare_phet(content_root, output_dir, course_dir, config, course_code, section_number)
+    if phet_here.get("stop"):
+        _stop_for_phet(phet_here, course_code, section_number)
+    downloaded_marker = phet.downloaded_line(phet_here, course_code, section_number)
+    if downloaded_marker is not None:
+        print(downloaded_marker)
     # Runnable code (#455), ALWAYS: which language engines this site carries.
     runner_pages_here = _count_runner_pages(content_root)
     # Runnable Swift (#493), ALWAYS: the programs the launcher compiled, into
@@ -10578,6 +10719,8 @@ def build_section_site(
         "quiz_problems": quiz_problems_here,
         # GeoGebra sketches that cannot be shown (#578).
         "geogebra_problems": geogebra.health_finding_facts(geogebra_here),
+        # PhET simulations that cannot be shown (#674).
+        "phet_problems": phet.health_finding_facts(phet_here),
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)

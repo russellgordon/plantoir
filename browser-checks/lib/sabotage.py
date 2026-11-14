@@ -378,7 +378,7 @@ def quiz_given_away(site: Path) -> str:
 
 
 def own_host_embeds_page(site: Path) -> str:
-    # The four planted embeds pointed at a page of the site's own (so the
+    # The five planted embeds pointed at a page of the site's own (so the
     # check needs no network here), then a frame and a request of another
     # host's beside them: the Embeds page is judged like any other, and only
     # frames on the embeds row's allowedFrames may come from elsewhere.
@@ -391,6 +391,47 @@ def own_host_embeds_page(site: Path) -> str:
     path.write_text(changed.replace("<article", frame + "<article", 1), encoding="utf-8")
     add_script(site, "Embeds", "embeds-fetch.js", "fetch('https://example.com/plantoir-rendered-embeds-fetch', { mode: 'no-cors' }).catch(() => {})\n")
     return f"{count} embeds pointed at the site, a frame and a request of example.com's added"
+
+
+def embeds_refused(site: Path) -> str:
+    # The YouTube frame (since #692 the www.youtube-nocookie.com player,
+    # either address is read) pointed at the video's watch page, which YouTube
+    # refuses to be framed in (X-Frame-Options: SAMEORIGIN): the frame's
+    # document answers 200 and students see a blank box (597b review
+    # finding 1). A teacher pasting the address from the address bar makes
+    # exactly this. Needs the network: the embeds row runs on deployed sites,
+    # or with --site and --host netlify.
+    path = page_file(site, "Embeds")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'(<iframe[^>]*\ssrc=")https://www\.youtube(?:-nocookie)?\.com/embed/([A-Za-z0-9_-]+)(")', r"\1https://www.youtube.com/watch?v=\2\3", text)
+    if count == 0:
+        raise SystemExit("sabotage: the Embeds page has no YouTube frame")
+    path.write_text(changed, encoding="utf-8")
+    return "the YouTube frame pointed at the video's watch page, which refuses to be framed"
+
+
+def own_host_off_its_pin(site: Path) -> str:
+    # A host the list names, asked from a page and for a path it is not
+    # pinned to (597b review finding 2): cdnjs for another library, from the
+    # Quiz page.
+    add_script(site, "Quiz", "off-pin.js",
+               "fetch('https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js', { mode: 'no-cors' }).catch(() => {})\n")
+    return "cdnjs asked for another library from the Quiz page"
+
+
+def embeds_unknown_video(site: Path) -> str:
+    # #692: the short-form Vimeo player pointed at a video that does not
+    # exist. player.vimeo.com answers 404 for it (curl, 2026-11-13, id
+    # 9999999999 with dnt=1; the real 22439234 answers 200), so the embeds
+    # row must name that frame. Before the row matched a frame's answer in
+    # full, the pasted player's 200 could answer for a short-form player.
+    path = page_file(site, "Embeds")
+    text = path.read_text(encoding="utf-8")
+    changed = text.replace("https://player.vimeo.com/video/22439234?dnt=1", "https://player.vimeo.com/video/9999999999?dnt=1")
+    if changed == text:
+        raise SystemExit("sabotage: the Embeds page has no short-form Vimeo player")
+    path.write_text(changed, encoding="utf-8")
+    return "the short-form Vimeo player pointed at a video that does not exist"
 
 
 def own_host_late(site: Path) -> str:
@@ -452,6 +493,45 @@ def graph_invisible(site: Path) -> str:
     return "the graph's curves stroked with nothing"
 
 
+def phet_tracking(site: Path) -> str:
+    # The card's data-phet holds the frame's address as JSON in an
+    # attribute (&quot; for its quotes); the fixed settings are taken out of
+    # it, leaving PhET's defaults.
+    path = page_file(site, "Simulation")
+    text = path.read_text(encoding="utf-8")
+    # However the page writes the & inside the attribute (raw, &amp; or &#x26;).
+    changed, count = re.subn(r"\?yotta=false(?:&amp;|&#x26;|&#38;|&)allowLinks=false(?:&amp;|&#x26;|&#38;|&)", "?", text)
+    if count == 0:
+        raise SystemExit("sabotage: the Simulation page's card has no yotta=false&allowLinks=false")
+    path.write_text(changed, encoding="utf-8")
+    return f"yotta=false&allowLinks=false taken out of {count} card(s)"
+
+
+def phet_isolation(site: Path) -> str:
+    headers = site / "_headers"
+    text = headers.read_text(encoding="utf-8")
+    changed = re.sub(r"(?m)^/static/phet/\*\n(?:[ \t]+[^\n]*\n)+", "", text)
+    if changed == text:
+        raise SystemExit("sabotage: the site's _headers has no /static/phet/* rule")
+    headers.write_text(changed, encoding="utf-8")
+    return "the /static/phet/* rule taken out of _headers"
+
+
+def phet_cropped(site: Path) -> str:
+    add_style(site, "Simulation", ".pl-phet .pl-phet-stage { aspect-ratio: auto !important; height: 120px !important; overflow: hidden !important; }")
+    return "the simulation's box held at 120 px high"
+
+
+def phet_credit(site: Path) -> str:
+    path = page_file(site, "Simulation")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'<p class="pl-phet-attribution">.*?</p>', "", text, flags=re.DOTALL)
+    if count == 0:
+        raise SystemExit("sabotage: the Simulation page has no credit line")
+    path.write_text(changed, encoding="utf-8")
+    return f"{count} credit line(s) taken out"
+
+
 def cold_visit(site: Path) -> str:
     if not (site / "index.css").is_file():
         raise SystemExit("sabotage: the site has no index.css")
@@ -491,6 +571,7 @@ DOERS = {
     "katex wrong face": katex_wrong_face,
     "quiz given away": quiz_given_away,
     "own host embeds page": own_host_embeds_page,
+    "embeds unknown video": embeds_unknown_video,
     "own host late": own_host_late,
     "own host lazy": own_host_lazy,
     "own host media": own_host_media,
@@ -499,7 +580,13 @@ DOERS = {
     "tikz empty": tikz_empty,
     "handout answers open": handout_answers_open,
     "graph invisible": graph_invisible,
+    "phet tracking": phet_tracking,
+    "phet isolation": phet_isolation,
+    "phet cropped": phet_cropped,
+    "phet credit": phet_credit,
     "cold visit": cold_visit,
+    "embeds refused": embeds_refused,
+    "own host off its pin": own_host_off_its_pin,
 }
 
 

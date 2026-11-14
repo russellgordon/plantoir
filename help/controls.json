@@ -932,13 +932,6 @@
    },
    "windows": null
   },
-  "newCourseSheetUseLCSSpecificTerminology": {
-   "label": "Use LCS-specific terminology",
-   "mac": {
-    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
-   },
-   "windows": null
-  },
   "newCourseSheetFoldersAndFiles": {
    "label": "Folders and files",
    "mac": {
@@ -1503,6 +1496,76 @@
    "label": "Deploying",
    "mac": {
     "file": "mac-app/QuartzTeachers/Views/Settings/PlantoirSettingsView.swift"
+   },
+   "windows": null
+  },
+  "deployTokensNetlifySection": {
+   "label": "Netlify",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.sectionHeaderNetlify"
+   },
+   "windows": null
+  },
+  "deployTokensChangeToken": {
+   "label": "Change Token…",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.changeButton"
+   },
+   "windows": null
+  },
+  "deployTokensRemoveToken": {
+   "label": "Remove Token",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.removeButton"
+   },
+   "windows": null
+  },
+  "deployTokensCheckAgain": {
+   "label": "Check Again",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.checkAgainButton"
+   },
+   "windows": null
+  },
+  "deployTokensCheckAndSave": {
+   "label": "Check and Save",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.changeConfirm"
+   },
+   "windows": null
+  },
+  "deployTokensKeepMyOldToken": {
+   "label": "Keep My Old Token",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.keepOldToken"
+   },
+   "windows": null
+  },
+  "deployTokensUseTheNewToken": {
+   "label": "Use the New Token",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.useNewToken"
+   },
+   "windows": null
+  },
+  "deployTokensDontSaveIt": {
+   "label": "Don't Save It",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.dontSaveNewToken"
+   },
+   "windows": null
+  },
+  "deployTokensRemoveConfirm": {
+   "label": "Remove",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.removeConfirm"
+   },
+   "windows": null
+  },
+  "deployTokenEndOpenSettings": {
+   "label": "Open Settings…",
+   "mac": {
+    "say": "shared-rules#deployTokens.words.openSettingsButton"
    },
    "windows": null
   },
@@ -2220,10 +2283,17 @@
    },
    "windows": null
   },
+  "problemsTabKindScienceSimulation": {
+   "label": "Science simulation",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[15].label"
+   },
+   "windows": null
+  },
   "problemsTabKindFileTooLarge": {
    "label": "File too large",
    "mac": {
-    "say": "shared-rules#sectionProblems.kinds[15].label"
+    "say": "shared-rules#sectionProblems.kinds[16].label"
    },
    "windows": null
   },

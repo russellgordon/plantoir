@@ -44,6 +44,12 @@ import figuresScript from "./scripts/figures.inline"
 import geogebraStyle from "./styles/geogebra.scss"
 // @ts-ignore
 import geogebraScript from "./scripts/geogebra.inline"
+// PhET simulations (#674) ride along for the same reason: every style is
+// under .pl-phet, and the script does nothing until a student taps a
+// simulation's button.
+import phetStyle from "./styles/phet.scss"
+// @ts-ignore
+import phetScript from "./scripts/phet.inline"
 // The sidebar's page marker (#515) rides along for the same reason: Quartz
 // writes ONE index.css for every page, so a style any component carries
 // reaches the sidebar of every page, folder and tag pages included. It changes
@@ -54,6 +60,10 @@ import sidebarPageMarkerStyle from "./styles/sidebarPageMarker.scss"
 // (Quartz's own base.scss lays an off-screen picture out at zero height, and
 // Safari then pushes the text down mid-scroll). Changes no page's HTML.
 import picturesStyle from "./styles/pictures.scss"
+// YouTube and Vimeo players (#692) ride along for the same reason: one rule
+// sizes every player the video transformer writes (600 px wide at most,
+// 16:9). Every style is under the transformer's own class.
+import videosStyle from "./styles/videos.scss"
 // Self-check quizzes (#563) ride along for the same reason as the figures:
 // every content page might hold one. Every style is under a .plantoir-quiz
 // class and the script returns at once on a page with no quiz (ruling Q2:
@@ -246,8 +256,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle, geogebraStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, videosStyle, figuresStyle, geogebraStyle, phetStyle, sidebarPageMarkerStyle, picturesStyle, quizStyle, tasksStyle, progressStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, geogebraScript, quizScript, tasksScript, progressScript, headingAnchorScript)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript, geogebraScript, phetScript, quizScript, tasksScript, progressScript, headingAnchorScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

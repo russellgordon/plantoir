@@ -44,6 +44,7 @@ Pure stdlib, no Docker, no network. Run with:
 """
 
 import os
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import re
 import stat
 import subprocess

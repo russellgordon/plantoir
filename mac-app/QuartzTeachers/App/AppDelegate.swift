@@ -237,6 +237,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // must start nothing once the quit goes ahead, whether it ends now
         // or waits on a set-aside update (#793, the 793b fix review's LOW 2).
         SectionCoverage.shared.abandonEveryRefresh()
+        // And a repair's Preview Again still waiting for its stop (#813).
+        PreviewAgainPresses.shared.abandonEvery()
         AppDelegate.letEverythingGo()
 
         if updateAtQuit == .setAside {

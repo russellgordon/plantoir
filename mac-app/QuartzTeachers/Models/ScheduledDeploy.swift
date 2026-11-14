@@ -1424,7 +1424,7 @@ enum ScheduledDeploy {
         }
         let scriptURL: URL = workspaceURL.appendingPathComponent(DeployCommand.scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
-            return "This working folder is missing a piece it needs (\(DeployCommand.scriptName)), so there is nothing to schedule."
+            return "This working folder is missing a piece it needs, so there is nothing to schedule."
         }
 
         // Written now so the job on disk is runnable on its own (an older
@@ -3015,6 +3015,9 @@ enum ScheduledDeploy {
         // A section's Cloudflare project made again by this run's publish
         // (2026-09-30): its address may have changed while nobody watched.
         CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
+        // The Cloudflare token's end date this run's deploy read (#696), so
+        // the section's Deploy screen can warn before it ends.
+        DeployTokenEndReport.remember(from: text, source: .scheduledDeploy)
         // A scheduled run is started by Plantoir itself, so it carries the
         // app's helpers folder and can install from it, or create the
         // website builder, while nobody is watching (#312).
@@ -3022,6 +3025,9 @@ enum ScheduledDeploy {
         // A scheduled run's build gets Swift ready too, the first time a
         // course with Swift blocks is published that way (#635).
         SwiftGotReadyReport.noteOnTheTrail(from: text)
+        // What this run's build downloaded for its pages, or why it stopped
+        // without it, at an hour nobody was watching (#674).
+        KeptDownloadsReport.noteOnTheTrail(from: text)
         // A How I Teach page kept off the website this run (#209) — the same
         // reader as the console's, for the same reason as the lines above.
         HowITeachKeptOffReport.noteOnTheTrail(from: text)

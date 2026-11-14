@@ -345,6 +345,42 @@ def geogebra_finding(facts: dict, course: str, section, table: dict, most: int =
     )
 
 
+def phet_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
+    """
+    ONE finding for every PhET simulation this build cannot show (#674),
+    never one per simulation: geogebra_finding's shape, the reason through
+    phetFences.words.reasons (scripts/phet.py reason_sentence). A simulation
+    that could not be DOWNLOADED is not here: the build stopped instead
+    (keptDownloads.stop).
+    """
+    import phet  # here, not at the top: phet imports this module
+    entry = table["phetSimulationsNotReady"]
+    problems = facts.get("phet_problems") or []
+    said = contracts.section(CONTRACT_FILE, "phetFences", "words")
+    named = []
+    for problem in problems[:most]:
+        fill = {"page": problem.get("page", ""), "block": problem.get("block", 1),
+                "reason": phet.reason_sentence(problem, said)}
+        if problem.get("line") is not None:
+            fill["line"] = problem["line"]
+            piece = entry["simulationLine"]
+        else:
+            piece = entry["simulationLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(problems) > most:
+        named.append(filled(entry["andMore"], {"count": len(problems) - most}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        "simulations": "; ".join(named),
+    }
+    return finding(
+        "phetSimulationsNotReady", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def swift_finding(facts: dict, course: str, section, table: dict, windows=None, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every runnable Swift block this build has no program
@@ -634,6 +670,11 @@ def findings(facts: dict, course: str, section) -> list:
                                "file", "name", "value", "id", "megabytes"
                                where they apply}], each a GeoGebra sketch
                                that cannot be shown (#578)
+    * `phet_problems`        — [{"page": place, "block": n, "line": n or None,
+                               "reason": phetFences.words.reasons key, "name",
+                               "value", "sim", "near", "language" where they
+                               apply}], each a PhET simulation that cannot be
+                               shown (#674)
     """
     table = _checks_by_name()
     found = []
@@ -715,6 +756,10 @@ def findings(facts: dict, course: str, section) -> list:
     # (#578). From build_site.py, beside the figures' and the quizzes'.
     if facts.get("geogebra_problems"):
         found.append(shortenable(geogebra_finding, facts, course, section, table))
+    # After everything above, so the existing examples keep their order
+    # (#674). From build_site.py, beside GeoGebra's.
+    if facts.get("phet_problems"):
+        found.append(shortenable(phet_finding, facts, course, section, table))
 
     return found
 

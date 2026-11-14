@@ -918,7 +918,7 @@
       },
       {
         "expectRequest" : "teacherSurname",
-        "prompt" : "Please enter letters only for your last name (e.g., 'Gordon'):"
+        "prompt" : "Please enter letters only for your last name (e.g., 'Quillfeather'):"
       },
       {
         "expectRequest" : "siteName",
@@ -1044,7 +1044,7 @@
           "Name it something you will recognise later, such as “Class websites”.",
           "Give it one permission, chosen from the three dropdowns: Account, then Cloudflare Pages, then Edit.",
           "Under “Account Resources”, choose “Include” and then your own account by name. A token that names no account cannot deploy anything, and what you get back if you skip this does not mention accounts at all.",
-          "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. An expired token stops your deploys working, with nothing on screen to say why.",
+          "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. An expired token stops your deploys working. Plantoir shows the end date in Settings and warns you on the Deploy screen for the last 30 days before it.",
           "Choose “Continue to summary”, then “Create Token”.",
           "Copy the long code Cloudflare shows you — it is only shown once — and paste it below."
         ],
@@ -1081,14 +1081,14 @@
         "title" : "Where to find your Account ID"
       },
       {
-        "explanation" : "Your surname is used to create a clear, recognizable web address for your students and families (such as mcv4u-s1-2026-gordon), and to prevent naming conflicts with other classes. It is saved on this computer and only asked once.",
+        "explanation" : "Your surname is used to create a clear, recognizable web address for your students and families (such as mcv4u-s1-2026-quillfeather), and to prevent naming conflicts with other classes. It is saved on this computer and only asked once.",
         "fieldLabel" : "Surname",
         "isSecret" : false,
         "linkAddress" : "",
         "linkTitle" : "",
         "name" : "teacherSurname",
         "steps" : [
-          "Type your surname below using letters only (for example, “Gordon”).",
+          "Type your surname below using letters only (for example, “Quillfeather”).",
           "It will be combined with course codes and the school year to name your class websites."
         ],
         "title" : "Teacher Surname"
@@ -1101,8 +1101,8 @@
         "linkTitle" : "",
         "name" : "siteName",
         "steps" : [
-          "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-gordon)",
-          "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. lcs-mcv4u-s1-2026-gordon)",
+          "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-quillfeather)",
+          "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. jhc-mcv4u-s1-2026-quillfeather)",
           "Use only lowercase letters, numbers, and hyphens."
         ],
         "title" : "Choose a Website Address"
@@ -1116,7 +1116,7 @@
         "name" : "siteNameConflict",
         "steps" : [
           "Add a number suffix (such as -01, pre-filled below).",
-          "Or add your school's initials (e.g. lcs-mcv4u-s1-2026-gordon).",
+          "Or add your school's initials (e.g. jhc-mcv4u-s1-2026-quillfeather).",
           "Use only lowercase letters, numbers, and hyphens."
         ],
         "title" : "Website Address Already Taken"
@@ -1443,6 +1443,31 @@
   "failureExplanations" : {
     "cases" : [
       {
+        "expect" : "SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu. Not downloaded yet: “gas-properties” on “Unit 3/Gas Laws”.",
+        "output" : "⚠️ Could not prepare the science simulations (No space left on device).\n\n❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose “Report a Problem…” from the Help menu.\n   “gas-properties” on “Unit 3/Gas Laws”\nPLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}",
+        "why" : "#674 keptDownloads.stop, notReady (phetFences.stop.passFails): the PhET pass itself failed (here a full disk) on a section whose pages show a simulation, so the build stopped rather than make a site with the simulation missing. The first line LIFTED, then which page uses which; the warning line above it is not the stop and is never read here."
+      },
+      {
+        "expect" : "SPH3U Section 1 was not built: this computer could not reach PhET to download a science simulation that its pages use for the first time. Connect to the internet, then build again. Not downloaded yet: “gas-properties” on “Unit 3/Gas Laws”.",
+        "output" : "❌ SPH3U Section 1 was not built: this computer could not reach PhET to download a science simulation that its pages use for the first time. Connect to the internet, then build again.\n   “gas-properties” on “Unit 3/Gas Laws”\nPLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"offline\"}",
+        "why" : "#674 keptDownloads.stop, one simulation, offline: a build that stopped because a page uses a PhET simulation this computer has not downloaded and could not download now. The first line LIFTED, then which page uses which, from the indented lines (keptDownloads.stop.explained), so the teacher reads the page and the simulation as the ruling asks; the marker line under them is the trail's and is never read here."
+      },
+      {
+        "expect" : "SPH3U Section 1 was not built: this computer could not reach PhET to download 2 science simulations that its pages use for the first time. Connect to the internet, then build again. Not downloaded yet: “gas-properties” on “Unit 3/Gas Laws”; “projectile-motion” on “Unit 1/Motion”; “gas-properties” on “Unit 3/Review”.",
+        "output" : "❌ SPH3U Section 1 was not built: this computer could not reach PhET to download 2 science simulations that its pages use for the first time. Connect to the internet, then build again.\n   “gas-properties” on “Unit 3/Gas Laws”\n   “projectile-motion” on “Unit 1/Motion”\n   “gas-properties” on “Unit 3/Review”\nPLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":2,\"reason\":\"offline\"}",
+        "why" : "#674 keptDownloads.stop, three on three pages, offline (one simulation twice): a build that stopped because a page uses a PhET simulation this computer has not downloaded and could not download now. The first line LIFTED, then which page uses which, from the indented lines (keptDownloads.stop.explained), so the teacher reads the page and the simulation as the ruling asks; the marker line under them is the trail's and is never read here."
+      },
+      {
+        "expect" : "SPH3U Section 1 was not built: this computer could not reach PhET to download 11 science simulations that its pages use for the first time. Connect to the internet, then build again. Not downloaded yet: “sim-1” on “Unit 1/Lesson”; “sim-2” on “Unit 2/Lesson”; “sim-3” on “Unit 3/Lesson”; “sim-4” on “Unit 4/Lesson”; “sim-5” on “Unit 5/Lesson”; “sim-6” on “Unit 6/Lesson”; “sim-7” on “Unit 7/Lesson”; “sim-8” on “Unit 8/Lesson”; “sim-9” on “Unit 9/Lesson”; “sim-10” on “Unit 10/Lesson”; and 1 more.",
+        "output" : "❌ SPH3U Section 1 was not built: this computer could not reach PhET to download 11 science simulations that its pages use for the first time. Connect to the internet, then build again.\n   “sim-1” on “Unit 1/Lesson”\n   “sim-2” on “Unit 2/Lesson”\n   “sim-3” on “Unit 3/Lesson”\n   “sim-4” on “Unit 4/Lesson”\n   “sim-5” on “Unit 5/Lesson”\n   “sim-6” on “Unit 6/Lesson”\n   “sim-7” on “Unit 7/Lesson”\n   “sim-8” on “Unit 8/Lesson”\n   “sim-9” on “Unit 9/Lesson”\n   “sim-10” on “Unit 10/Lesson”\n   and 1 more\nPLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":11,\"reason\":\"offline\"}",
+        "why" : "#674 keptDownloads.stop, eleven, offline: ten named and one more: a build that stopped because a page uses a PhET simulation this computer has not downloaded and could not download now. The first line LIFTED, then which page uses which, from the indented lines (keptDownloads.stop.explained), so the teacher reads the page and the simulation as the ruling asks; the marker line under them is the trail's and is never read here."
+      },
+      {
+        "expect" : "SPH3U Section 1 was not built: a science simulation that its pages use for the first time did not arrive from PhET as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this. Not downloaded yet: “gas-properties” on “Unit 3/Gas Laws”.",
+        "output" : "❌ SPH3U Section 1 was not built: a science simulation that its pages use for the first time did not arrive from PhET as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this.\n   “gas-properties” on “Unit 3/Gas Laws”\nPLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"damaged\"}",
+        "why" : "#674 keptDownloads.stop, one that arrived as something else: a build that stopped because a page uses a PhET simulation this computer has not downloaded and could not download now. The first line LIFTED, then which page uses which, from the indented lines (keptDownloads.stop.explained), so the teacher reads the page and the simulation as the ruling asks; the marker line under them is the trail's and is never read here."
+      },
+      {
         "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings say something other than true or false. Nothing was deployed.",
         "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings say something other than true or false. Nothing was deployed.",
         "why" : "The launcher's OTHER reference refusal, and it matters for the same population as the one below: the app reads a course with an odd marker value as ORDINARY, so a teacher can set it to deploy on its own - and at half six the launcher refuses, the app is closed, and without this case the app shows the generic 'did not finish' while the real reason sits in a log nobody opens. Two lines, joined, because the launcher prints them as two. It said 'Nothing was published.' until v1.4.4 (#443), when it moved to DEPLOYED with every other launcher line that meant a deploy - Russell's words rule of 2026-10-03; deploy.ps1 and Windows' ReferenceRefusalTests moved with it under #441, in Windows v1.4.4."
@@ -1495,7 +1520,7 @@
       },
       {
         "expect" : "Cloudflare did not accept that token. Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
-        "output" : " Netlify requires 3 file(s) for this deploy.\n✅ Delta deploy created (production).\n Deploy ID: 6716a2f0c3e1b40008d2c9a1\n Site URL: https://ics3u-s1-2026-gordon.netlify.app\n\n✅ Deploy complete.\n🕒 Host timezone offset: -0400\n⚠️ The saved Cloudflare token no longer works, so it has been cleared.\n\nConnect to Cloudflare.\n\nCloudflare hosts this section's website for free, and it needs to know that\nthe deploys are coming from you. It does that with an API token — a long\ncode that acts like a password made just for this app. Creating one takes\nabout two minutes, and you will not be asked again: it is saved securely on\nthis computer.\n\n  1. Open this page:  https://dash.cloudflare.com/profile/api-tokens\n     (Sign in if you are asked to.)\n  2. Choose \"Create Token\", then \"Create Custom Token\".\n  3. Name it something you will recognise later, such as \"Class websites\".\n  4. Give it ONE permission, chosen from the three dropdowns:\n     Account  ->  Cloudflare Pages  ->  Edit\n  5. Under \"Account Resources\", choose \"Include\" and then your own account\n     by name. A token that names no account cannot deploy anything, and\n     what you get back if you skip this does not mention accounts at all.\n  6. Under \"TTL\", set the end date to after the end of your school year —\n     next July is a safe choice — or leave it with no end date. An expired\n     token stops your deploys working, with nothing to say why.\n  7. Choose \"Continue to summary\", then \"Create Token\".\n  8. Copy the long code Cloudflare shows you — it is only shown once — and\n     paste it below. Nothing appears as you paste; that is normal.\n\nPaste Cloudflare token: \n❌ Cloudflare did not accept that token.\n   Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
+        "output" : " Netlify requires 3 file(s) for this deploy.\n✅ Delta deploy created (production).\n Deploy ID: 6716a2f0c3e1b40008d2c9a1\n Site URL: https://ics3u-s1-2026-quillfeather.netlify.app\n\n✅ Deploy complete.\n🕒 Host timezone offset: -0400\n⚠️ The saved Cloudflare token no longer works, so it has been cleared.\n\nConnect to Cloudflare.\n\nCloudflare hosts this section's website for free, and it needs to know that\nthe deploys are coming from you. It does that with an API token — a long\ncode that acts like a password made just for this app. Creating one takes\nabout two minutes, and you will not be asked again: it is saved securely on\nthis computer.\n\n  1. Open this page:  https://dash.cloudflare.com/profile/api-tokens\n     (Sign in if you are asked to.)\n  2. Choose \"Create Token\", then \"Create Custom Token\".\n  3. Name it something you will recognise later, such as \"Class websites\".\n  4. Give it ONE permission, chosen from the three dropdowns:\n     Account  ->  Cloudflare Pages  ->  Edit\n  5. Under \"Account Resources\", choose \"Include\" and then your own account\n     by name. A token that names no account cannot deploy anything, and\n     what you get back if you skip this does not mention accounts at all.\n  6. Under \"TTL\", set the end date to after the end of your school year —\n     next July is a safe choice — or leave it with no end date. An expired\n     token stops your deploys working, with nothing to say why.\n  7. Choose \"Continue to summary\", then \"Create Token\".\n  8. Copy the long code Cloudflare shows you — it is only shown once — and\n     paste it below. Nothing appears as you paste; that is normal.\n\nPaste Cloudflare token: \n❌ Cloudflare did not accept that token.\n   Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
         "why" : "GitHub #695. The transcript Russell met on 2026-10-27, re-captured 2026-11-01 by driving the real deploy.sh through a terminal in a scratch folder (the Netlify leg's lines in front are deploy.py's own prints, since that leg needs a real site): the Netlify leg of a Netlify + Cloudflare deploy finished, the saved Cloudflare token was refused and cleared, the 'Connect to Cloudflare' steps were shown, and the token pasted was refused too. The window said only 'Something went wrong'. The launcher's two lines are LIFTED and joined, as the 'cannot tell' refusal is, rather than reworded: they already are the sentence a teacher acts on. The whole transcript is the case so that it also pins that nothing earlier in it fires another explanation (the heredoc, the Netlify leg's success lines), which is what makes the order of the checks safe on both platforms without writing that order down. Asking again in the sheet instead of failing is #696."
       },
       {
@@ -1512,6 +1537,16 @@
         "expect" : "Plantoir could not reach Netlify to check the saved token, so this section was not deployed there. The token is still saved. Check that this computer is online, then try again in a few minutes.",
         "output" : "🕒 Host timezone offset: -0400\n❌ Plantoir could not reach Netlify to check the saved token, so this section was not deployed there.\n   The token is still saved. Check that this computer is online, then try again in a few minutes.",
         "why" : "GitHub #716, Netlify's saved token: the same rule and the same two lines, so the two destinations behave alike. Captured 2026-11-01 the same way."
+      },
+      {
+        "expect" : "That token cannot reach this section's existing Netlify website, so it was not saved as your token. It may belong to another Netlify account: paste one from the account this section was deployed with. If the website was deleted on purpose, save the token with Change Token… in Plantoir ▸ Settings ▸ Deploying.",
+        "output" : "🕒 Host timezone offset: -0500\n\nConnect to Netlify.\n\nPaste Netlify token: \n❌ That token cannot reach this section's existing Netlify website, so it was not saved as your token.\n   It may belong to another Netlify account: paste one from the account this section was deployed with. If the website was deleted on purpose, save the token with Change Token… in Plantoir ▸ Settings ▸ Deploying.",
+        "why" : "GitHub #696, the second ruling and review MUST 1: a token pasted at a deploy is tried against the section's own website before it is saved, and a token from another account is refused. Before #696 the deploy went on and deploy.py made a new site at a new address. The two lines are shared-rules.json -> deployTokens.deployTimeRefusals.lines.tokenCannotReachSite, lifted and joined (FailureExplainer.tokenNotSavedMarker); scripts/test_deploy_tokens.py runs the launcher for every key."
+      },
+      {
+        "expect" : "What was pasted has a space or a line break inside it, so it was not saved as your token. Copy the token again from Cloudflare's page, and paste only the token itself.",
+        "output" : "Paste Cloudflare token: \nWhat was pasted has a space or a line break inside it, so it was not saved as your token.\nCopy the token again from Cloudflare's page, and paste only the token itself.",
+        "why" : "GitHub #696, the paste rule (deployTokens.paste), in deploy.ps1's shape: no cross and no indent. One sentence for both launchers."
       },
       {
         "expect" : "This website hasn't been built yet. Preview it once, then deploy.",
@@ -4141,16 +4176,85 @@
     "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
     "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",
     "greetingIsTheSameForEveryAgent" : true,
+    "greetingMustNotSay" : {
+      "expressions" : [
+        "\\bmark(?:s|ing)?\\b(?!\\s+(?:(?:a|the|this|that|each|every|one|your)\\s+)?pages?\\b)",
+        "\\bgrad(?:e|es|ed|ing)\\b(?!\\s*\\d)",
+        "\\bclass(?:['’]s)?\\s+results?\\b",
+        "\\bresults?\\s+(?:for|of|from)\\s+(?:the|a|my|our|this|your|each|every)\\s+(?:whole\\s+)?class(?:es)?\\b",
+        "\\breport[\\s-]+cards?\\b",
+        "\\bcomments?\\b"
+      ],
+      "mustMatch" : [
+        "I can add up the marks.",
+        "I can help with grading.",
+        "I can write their grades.",
+        "I can grade it for you.",
+        "I can look at the class’s results.",
+        "I can sum up the class's result.",
+        "I can look at results for the class.",
+        "I can look at results for my class.",
+        "I can look at the results of our classes."
+      ],
+      "mustNotMatch" : [
+        "Pages marked for publishing stay as they are.",
+        "Write pages in Markdown.",
+        "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir.",
+        "A benchmark test of the build.",
+        "Publishing only marks a page for inclusion.",
+        "Mark the pages you want published."
+      ],
+      "why" : "Russell, 2026-11-13, in the full ruling on #750 (restated on #791): the greeting an assistant gives when it opens from Plantoir never mentions marking, results for a whole class, or the comments written on a report; those are offered only in context, by the skill in use. Each expression is matched without regard to case in every greeting greetingMustSayHow builds, on every door, so the first catches mark, marks and marking as whole words and leaves marked, Markdown and marking a page alone (the project's word for publishing one, the Fable sweep of #791), the second catches grade, grades, graded and grading but not a grade level such as Grade 11 in a course's name, the third takes a class's result with either apostrophe, and the fourth takes results for, of or from a class or classes in the greeting's own voice (my, our, this) as well as the, a, your, each and every. mustMatch sentences must each be caught by some expression and mustNotMatch sentences by none; they are chosen so that scripts/test_held_skills.py, which reads them too, finds no offer in them. Written as regular expressions, as printablePages.agentGuidance.held.words is, and for the same reason: scripts/test_held_skills.py reads every string in this file, and a rule naming what must not be offered is not an offer. This rule is not the hold: it stays when the held skills come back."
+    },
     "greetingMustSay" : [
-      "the course it is about, by code, and its name when that differs",
-      "that the plantoir tools are the way to do anything to do with this course",
-      "that the session should start by listing the course's sections",
-      "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
-      "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)",
-      "when courses with the same code are kept for reference, that they are there to read and build on and are never deployed or changed (greetingReferenceCourses, verbatim)",
-      "that in its first reply the assistant says in one sentence that it can make printed handouts, worksheets and quizzes with their answer keys as PDFs, and where its guide is (greetingHandoutsSentence, verbatim), straight after the plan-first sentence, on every door",
-      "on a Revise door, last: that in its first reply the assistant says in one sentence that it can help plan a unit, or reminds the teacher which units have a plan and that they are on the course's Planning tab, without describing them (greetingUnitPlans)"
+      {
+        "key" : "greetingOpening",
+        "says" : "the course it is about, by code, and its name when that differs",
+        "where" : "first"
+      },
+      {
+        "key" : "greetingToolsSentence",
+        "says" : "that the plantoir tools are the way to do anything to do with this course",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingSectionsSentence",
+        "says" : "that the session should start by listing the course's sections",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingPlanFirstSentence",
+        "says" : "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingHowITeachSentence",
+        "says" : "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)",
+        "where" : "contains"
+      },
+      {
+        "key" : "greetingReferenceCourses",
+        "says" : "when courses with the same code are kept for reference, that they are there to read and build on and are never deployed or changed (greetingReferenceCourses, verbatim)",
+        "where" : "whenReferenceCourses"
+      },
+      {
+        "key" : "greetingHandoutsSentence",
+        "says" : "that in its first reply the assistant says in one sentence that it can make printed handouts, worksheets and quizzes with their answer keys as PDFs, and where its guide is (greetingHandoutsSentence, verbatim), straight after the plan-first sentence, on every door",
+        "where" : "afterPlanFirst"
+      },
+      {
+        "key" : "greetingUnitPlans",
+        "says" : "on a Revise door, last: that in its first reply the assistant says in one sentence that it can help plan a unit, or reminds the teacher which units have a plan and that they are on the course's Planning tab, without describing them (greetingUnitPlans)",
+        "where" : "last"
+      }
     ],
+    "greetingMustSayHow" : "GitHub #791: each entry is checked against the greeting each Revise door really sends (prepareSession on every door in outsideAgents.agents, the greeting read off the command line the script starts the assistant with), in three variants: a course whose name differs from its code with no reference courses and nothing said about unit plans; the same course with one reference course and no unit plan yet; and a course whose name is its code. 'key' names the contract key whose text is checked. where: 'first' - the greeting starts with greetingOpening's withName (or withoutName, when the name is empty or is the code), {course} and {courseName} filled, then a space; 'contains' - the key's sentence is in the greeting; 'afterPlanFirst' - greetingPlanFirstSentence, a space, then the key's sentence; 'whenReferenceCourses' - with reference courses, the sentence greetingReferenceCourses makes is in the greeting, and without them its first words ('I also keep earlier') are not; 'last' - with unit plans told (none yet), the greeting ends with a space and greetingUnitPlans.none, and without them it ends with greetingHandoutsSentence (or the reference-courses sentence). Until #791 the entries were prose that no suite read (707a review L9).",
+    "greetingOpening" : {
+      "why" : "GitHub #791. The greeting's first sentence names the course by its code, and by its name in brackets when it has one that is not the code. The name is trimmed of white space at its ends first.",
+      "withName" : "I'm a teacher working on {course} ({courseName}) in Plantoir.",
+      "withoutName" : "I'm a teacher working on {course} in Plantoir."
+    },
+    "greetingPlanFirstSentence" : "Before changing anything, use the matching plan tool first and show me what it says, in plain words, and wait for me to agree.",
     "greetingReferenceCourses" : {
       "cases" : [
         {
@@ -4444,6 +4548,8 @@
       "where" : "After greetingHandoutsSentence, which itself comes straight after the sentence that asks for the plan tool and agreement (it ends 'wait for me to agree.'), with one space before it, and before greetingUnitPlans' sentence when that is said (#859 put the handouts sentence in front of this one, so the plain greeting already carries it and casesHow did not change). {course} is the course's code as the greeting names it; {courses} the list joined by separator. The whole greeting's double quotes become apostrophes as greetingCarriesNoDoubleQuotes says.",
       "why" : "GitHub #856. The mac has said this since v1.3.0 (decision (s): the Revise doors are not offered on a course kept for reference, and a live course's session is told they exist instead), but no contract carried it, so the Windows greeting lacked the sentence and no test on either side noticed. Written here as the mac says it, byte for byte: the greeting reaches an outside assistant, not the local model, and nothing the local model is shown moved (scripts/test_tool_surface_digest.py). It promises nothing Plantoir does: the session reads the courses with its own file tools and the read tools it already has."
     },
+    "greetingSectionsSentence" : "Start by listing its sections so we both know what's there.",
+    "greetingToolsSentence" : "Use the plantoir tools for anything to do with this course.",
     "greetingUnitPlans" : {
       "joinedAs" : "One name alone; two as 'A and B'; three to mostUnitsNamed as 'A, B and C'; past mostUnitsNamed, the first mostUnitsNamed joined by ', ' and then more, with {n} the rest.",
       "more" : ", and {n} more",

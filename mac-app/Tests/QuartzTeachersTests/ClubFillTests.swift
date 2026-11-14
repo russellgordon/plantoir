@@ -120,8 +120,7 @@ final class ClubFillTests: XCTestCase {
             let expected: ClubFillFields = try fields(from: try XCTUnwrap(testCase["expect"] as? [String: Any]))
             let filled: ClubFillFields = ClubFill.applying(
                 isClub: try XCTUnwrap(testCase["isClub"] as? Bool),
-                to: given,
-                usesLCSTerminology: testCase["usesLCSTerminology"] as? Bool ?? false
+                to: given
             )
             XCTAssertEqual(filled, expected, name)
         }
@@ -230,8 +229,7 @@ final class ClubFillTests: XCTestCase {
                 perSectionFolders: ["Resources", "All Classes"],
                 classFolder: "All Classes", unitWord: "Unit",
                 frontPageHeading: "Most Recent Class", noun: .class
-            ),
-            usesLCSTerminology: false
+            )
         )
         let wizard: NewCourseWizardView = NewCourseWizardView(
             courseCode: "CODING",

@@ -95,6 +95,16 @@ Beyond the actions, the app owns delivery and resources:
   of its two implementations (`BuildOutputLocation.swift`), the three
   launchers are the other, for a teacher at the command line and for a
   publish scheduled with launchd.
+  The builds folder also holds `.downloaded/`, what the folder's pages
+  downloaded the first time they used it (a PhET simulation, #674), which
+  every course shares; when the app reads a folder's courses it sweeps away
+  the builds of courses that are gone (`discardBuildsForMissingCourses`) and
+  keeps that folder, as it keeps `working-folder.txt`
+  (`BuildOutputLocation.keptDownloadsFolderName`,
+  `buildOutputLocation.keptDownloadsSurviveTheSweep`). Its trail lines come
+  from the build's `PLANTOIR_DOWNLOADED:` line (`KeptDownloadsReport`), and
+  a build that stopped without one is worded by `FailureExplainer`
+  (documentation/05, "Files downloaded when a page first uses them").
 
 ## A blank window: when a child claims a size the window cannot give
 
@@ -1741,7 +1751,9 @@ that build keeps its wait and ⌘Q still knows about it, and its map settles
 the refresh. `CoverageTabTests.testEverySequenceCase`
 runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
 test holds open, no window and no delay. A repair's Preview Again
-(`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
+(`rebuildAfterRepair`) had the same stop-then-start shape and now takes the
+same treatment (#813, "A repair's Preview Again" under "⌘Q while something is
+under way").
 A preview serving when the refresh is pressed starts again at the page last
 viewed (below).
 
@@ -2710,13 +2722,205 @@ build, which would make EVERY later ⌘Q ask about a preview nobody is building:
   so that one is ended by the silence check itself, guarded by
   `PreviewReachability.theSameRunEndedByItself` — never unconditionally, since
   after a new run has started the wait belongs to it. `end()` is
-  idempotent, and the object ends only the record it began (the window's
+  idempotent, and the object ends only the CLAIM it began (the window's
   `folderThisSectionWorksIn` is also written by a deploy, so rebuilding the
-  record from it at the end could name the wrong folder).
-- **The assistant's no-window rebuild** (`AssistToolchainWork.rebuildPreview`,
-  `--build-only`) records around its run, ended by a `defer` on every return.
-  NOT in `ScriptRunner`: a publish's own `--build-only` wears the same
-  launcher's name and is already counted as the publish.
+  record from it at the end could name the wrong folder; and since #812 the
+  record is held by claim, below).
+- **The assistant's no-window rebuild** (`AssistSiteWork.rebuildPreview`,
+  `--build-only`) holds its own claim around its run, ended by a `defer` on
+  every return. NOT in `ScriptRunner`: a publish's own `--build-only` wears
+  the same launcher's name and is already counted as the publish.
+
+**One claim per start, and a second start that does nothing (#812).** Until
+#812 `CourseActivity` kept ONE record per section, and every ending removed
+it. A second start could come into `startPreview` while the first was still
+waiting for an old stop to finish: the toolbar button reads Preview, not Stop,
+until the run has begun, so a second press reached it, and so did Section ▸
+Preview, the assistant (whose `isPreviewRunning()` is false then) and Course
+Settings. Its `begin` ended the first start's record (a new wait ends the old
+one), the first start's own lease refused it with
+`PreviewLeases.Problem.sectionAlreadyPreviewed`'s sentence about ANOTHER
+window, and the refusal ended the record it had just written. The first start
+then built with nothing recorded and ⌘Q quit through it without asking.
+Measured on `dev` fcd0a51c5 by compiling the real `PreviewBuildWait` with
+copies of the real record functions and driving `startPreview`'s order: after
+the second press the record count was 0 while the first start went on. The
+same measurement found two more ways to the same state: a press in another
+window on the section (it joined the one record, was refused by the first
+window's lease, and its `end()` removed the first window's record), and the
+assistant's no-window rebuild beside a window's start (whichever ended first
+removed the other's record; the window was left waiting with no record).
+
+Two changes, each the real dependency rather than a timing:
+
+- **Claims.** `CourseActivity.beginPreviewBuildClaim` returns one claim per
+  start and `endPreviewBuild(_:)` ends that claim only;
+  `activePreviewBuilds` is the distinct records, so the quit question and
+  every reader are unchanged. `PreviewBuildWait` and the assistant's rebuild
+  hold claims. The by-section `beginPreviewBuild` and `endPreviewBuild` stay,
+  with their old meaning, for tests. This is the shape Windows has had from
+  the start (its `BeginPreviewBuild` returns a token per start).
+- **A start already under way.** `PreviewStartRecords.aStartIsUnderWay` is
+  asked FIRST in `startPreview`: the window's wait has begun and it holds its
+  own lease, which is true while it waits for a stop and while it builds.
+  Then nothing is written, no lease is asked for, no alert is shown, and the
+  trail says `preview already starting`. A preview that is SHOWING is not
+  "already starting" (its wait is over), so a start asked for then goes on as
+  before. `PreviewStartRecords.begin` records and takes the lease in the
+  load-bearing order (#156, M2) and on a refusal ends its own claim.
+
+The rule and its cases are `quittingWhileWorkIsUnderWay.previewBuildRecord`
+(`pressCases`, eleven since the review below), run by `PreviewBuildRecordTests`
+through the real objects; with the claim ending every claim on its record and
+`aStartIsUnderWay` answering false (the old meaning, the must-fail copies)
+five of the first nine fail. REJECTED: greying the Preview button during the stop (one way in of
+four, and the other window and the assistant still end the record); a ticket
+inside one `PreviewBuildWait` so a refusal ends only its own wait (the second
+`begin` has already ended the first's claim by then, and the refusal still
+names another window); any delay or retry (the first start is the one the
+teacher asked for).
+
+**A run that never started, a parked start that no longer belongs (#812's
+review).** The implementation review replayed every interleaving of the
+window's preview steps to depth 6 (about 20 million sequences, a `swiftc`
+harness around the real `CourseActivity`, `PreviewBuildWait`,
+`PreviewLeases`, `PreviewStartRecords` and `PreviewAgainPresses`) and found
+one path where Preview now did nothing and said nothing. `ScriptRunner.run`
+has five early returns that record a `launchProblem` and leave the runner
+not running (the launcher missing from the folder, a pseudo-terminal it
+could not open, a process that would not launch, the folder's tools still
+being copied or having failed to copy, Plantoir closing). Three of them clear the exit code first,
+and the other two leave whatever an earlier run left, which on a window that
+has not run yet is nothing.
+The wait's first phase looked only for an exit code, so it ran its full ten
+minutes with the wait, the record and the lease held. On `dev` that was
+already ten minutes of quit asking about a build nobody was running; with
+`aStartIsUnderWay` it also swallowed every later Preview in the window, with
+only `preview already starting` on the trail. The wait's first phase now
+asks `PreviewStartRecords.howTheRunStands`, which answers `.couldNotStart`
+when the runner is not running and has a launch problem (asked before the
+exit code, since a run that did start always clears the problem and an exit
+code beside it is an earlier run's). The window then ends the wait, hands
+the lease back, writes `preview could not start` with the sentence, and
+shows that sentence under "Cannot Preview Yet". The console shows the same
+sentence (`TaskConsoleView` puts `launchProblem` above the transcript), but
+the console is not always on screen, and a Preview press that produced
+nothing visible is the fault this fixes. Two `pressCases` pin it, "a run that could not start" and "a
+run that could not start, then a press"; with `howTheRunStands` answering
+the old meaning both fail.
+
+Raising the sentence in an alert made one old wording wrong. Two of the five
+returns, the pseudo-terminal that would not open and the process that would
+not launch, said "Could not get started:" followed by the system's own
+description of the error. Measured on a copy of `PseudoTerminalError`
+compiled under the module name `QuartzTeachers`, that reads "The operation
+couldn’t be completed. (QuartzTeachers.PseudoTerminalError error 0.)", which
+names the app's module and error type and gives nothing to act on (rule 1).
+Both returns now give `ScriptRunner.couldNotGetStarted`, whose remedy is the
+one the launchers already give when the website builder will not start
+(`app-rules.json` → `hostBlockClash.saysWhenAStartIsRefused`), and keep the
+system's description in `launchProblemDetail`, which no teacher reads. A
+section window's preview writes it to the trail (`preview could not start`
+adds it after the sentence, and the trail redacts it on the way in); a
+deploy, a set-up or the assistant's rebuild that meets the same failure
+shows the sentence and keeps the description nowhere, which is a follow-up
+of its own. `ScriptRunnerLaunchProblemTests` walks every launch
+problem, meeting the launch failure for real through `ScriptRunner.shell`
+pointed at a program that is not there, and finds no machinery word in any
+of them.
+
+The fifth sentence had the same fault in a smaller way. The launcher missing
+from the folder was reported as "missing a piece it needs (preview.sh)", and
+once that sentence reached the alert it named a piece of the machinery by its
+file (rule 1). It is now `ScriptRunner.folderIsMissingAPiece`, with no file
+name, and the name goes to `launchProblemDetail` ("the working folder has no
+preview.sh"), so the trail still says which piece. The scheduled deploy's
+own refusal for a missing `deploy.sh` dropped its bracket the same way. The
+test's list of machinery words now also refuses ".sh", ".ps1", ".py",
+"launcher" and "script" without regard to case; with the old sentence it is
+red on ".sh". Rejected: keeping the name in the sentence because it helps a
+problem report (the trail carries it for exactly that, and the teacher can
+do nothing with a file name).
+
+Rejected: giving `PseudoTerminalError` a `LocalizedError` sentence
+(the process launch failure's description, "The file “bash” doesn’t exist.",
+would still reach the alert), and a `FailureExplainer` match (it reads a
+run's output, and these runs have none; its rule for what it does not
+recognise is to say nothing, which an alert cannot do).
+
+The same harness confirmed two older faults, both on `dev` as well, and both
+were a few lines inside `startPreview`'s guard after
+`PreviewStopper.waitForStopsToFinish`, so they were fixed here through
+`PreviewStartRecords.theStartStillBelongs`. First, #793's guard compared
+leases by value: a repair's stop released the first start's lease, the
+repair's own start took a lease equal in every field (same port), and both
+starts reached `previewRunner.run`, two waits then driving one runner (4,764
+sequences at depth 5). Each start now carries its own id
+(`previewStartID`), and only the window's latest start may run. Second, a
+start parked in that wait during a quit that waits on an update set aside
+resumed after `letEverythingGo` (which stops running runners and leaves a
+parked start alone) and could launch a preview while the app was leaving.
+The guard now asks `WorkspaceModel.isTerminating`, which a quit never takes
+back, and a start stopped by it hands back its own wait and lease.
+
+Measured with that harness carried forward (`812-fixes`, the quit modelled
+as `letEverythingGo` does it), depth 5, 579,194 sequences without launch
+failures and 813,615 with them. The fixed branch: quit silent during a
+build 0, quit asking with nothing building 0, a teacher's Preview doing
+nothing without a word 0, a start from a page that had gone 0, a launcher
+after the quit 0, two starts reaching the launcher 0. The same harness with
+the view logic as dc9f75ce1 had it: quit asking with nothing building
+26,480, a silent Preview 1,672, a launcher after the quit 14,272, two
+starts reaching the launcher 5,032. What is left is the follow-up the
+review named and that predates the branch: a served preview that ends on
+its own (a deploy elsewhere closes it, or the builder's server ends) keeps
+its lease until Stop, so the next Preview is refused with the sentence
+about another window (24 sequences). It is its own issue.
+
+REJECTED: making `ScriptRunner.run` set `lastExitCode` on every early
+return. It would end the wait, but as an ordinary failed run with no word
+for a transcript that is empty, and every other reader of `lastExitCode`
+(the deploy runner, the health findings) would see an exit code for a
+process that never existed. A fixed timeout for the first phase was
+rejected for the reason any delay is.
+
+**A repair's Preview Again (#813).** The button after a repair
+(`rebuildAfterRepair`) awaited `stopPreviewAndWait()` and then called
+`startPreview()` whatever had happened during the stop. A switch of section or
+course, the window closing, or a quit waiting on an update set aside, all
+during the stop, left the start to run on a page that had gone: it took a lease
+and started a serve that nothing would stop, and the section then read as
+previewed in another window. It now takes #793's treatment for Make the Map
+Again. The press is recorded AT ONCE, before the Task, as a token for the
+page (`previewAgainOwner`) in `PreviewAgainPresses`; `onDisappear` abandons
+the page's press first; `AppDelegate.finishTerminating` abandons every press,
+beside `SectionCoverage.abandonEveryRefresh()`; and
+`PreviewAgainPresses.carryOut` starts only if the token survives the stop.
+A second Preview Again replaces the token, so only the later press starts. A
+press that starts nothing writes `preview again abandoned`, and its reason is
+exact: a replaced press is remembered in `PreviewAgainPresses.replaced` until
+it finishes, because the later press can finish first and clear its own
+entry, and the review found the earlier press then said its page had gone
+(`carryOut` answers `.replaced` or `.abandoned`;
+`PreviewBuildRecordTests.testAReplacedPressSaysItWasReplaced`).
+
+The token lives in a record nothing else writes, which is #813's own note:
+#793's first token sat in the section's Coverage entry and the next reading
+of the record, which the old run's end always brings, wiped it, so nothing
+started. A Preview the teacher presses during the stop is the build: the
+repair's start then meets `aStartIsUnderWay` (#812) and does nothing, and
+that build keeps its record. Quitting during the stop is not asked about,
+since nothing is being built yet, which is how Make the Map Again behaves in
+the same position. The ten cases, with each event arriving inside the stop
+(the old run's end, another page leaving, leaving, quitting, a second press,
+the teacher's own Preview), are
+`quittingWhileWorkIsUnderWay.previewBuildRecord.previewAgainCases`, run by
+`PreviewBuildRecordTests.testEveryPreviewAgainCase` through the real
+`carryOut`; with `stillHolds` answering true (the old unconditional start, the
+must-fail copy) five of the ten fail, the three where the page leaves or the
+app quits among them, each ending with a build recorded that nothing stops.
+REJECTED: the token in the Coverage entry or any record a reading rewrites
+(above); asking at quit during the stop (nothing is building).
 
 **REJECTED, after it was built: ending the record from `.onChange(of:
 isWaitingForServer)`.** The first cut kept the flag as plain `@State` and ended
@@ -2751,9 +2955,10 @@ of 2026-09-20 named "a publish or preview".
 **Known, and in the safe direction:** the outer ten-minute bound in
 `waitForPreviewServer` ends the wait while a very slow first-ever
 build may still be running, which ends the record early — a quit then goes
-unasked, which is what happened for every preview before #232. A window's
-build and an assistant rebuild of the SAME section at once share one record,
-and whichever ends first clears it; same direction.
+unasked, which is what happened for every preview before #232. (A window's
+build and an assistant rebuild of the SAME section at once used to share one
+record, whichever ended first clearing it; since #812 each holds its own
+claim.)
 
 **Still REJECTED: asking about a preview that is merely open**, for the lease
 reason above.
@@ -4168,7 +4373,11 @@ of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
   preferences, the section's fingerprint) until the section's words change
   or the file goes. Both answers are a trail line, `asked before adding
   guidance to a file`. A file is never appended to without a yes; the skills
-  are written either way.
+  are written either way. The sheet's explanation (`words.askFound`) names
+  Claude Code, Codex and GitHub Copilot as assistants that read the file,
+  since [#887](https://github.com/russellgordon/plantoir/issues/887) (it named
+  the first two until then, though #783's trial had measured that Copilot
+  reads both root files and both skill homes); `words.askFoundWhy` says why.
 
 **It never holds the folder back** (implementation review S1). The first
 version counted a guidance failure in the toolchain copy's outcome, so a
@@ -4277,8 +4486,9 @@ section where `include_my_progress` is off - `false`, or a per-section map
 read as `include_curriculum_coverage` is; checked against #545 as merged),
 wikilinks versus Markdown links
 (`[words](Page Name.md)` is not a link), `![[page]]`, footnotes, tags,
-Media pictures and PDFs, YouTube (`![](watch address)`), Vimeo and
-PhET (the site's own `<iframe>` on one line), GeoGebra (since #578 the
+Media pictures and PDFs, YouTube and Vimeo (since #692 both in the picture
+form, `![words](Share address)`, documentation/06 T), PhET (since #674 the
+` ```phet ` fence, documentation/06 S), GeoGebra (since #578 the
 ` ```geogebra ` fence in all three ways — a `.ggb` beside the page, typed
 commands, or `material_id:` — and never a geogebra.org `<iframe>`, which
 the skill now says to replace with `material_id:` of the same id), `%%` notes, `publish:` and
@@ -4296,7 +4506,8 @@ asked again, as with every skill before it.
 ITSELF and planted as `Authoring Example NN` pages in the fixture build, with
 the pages they link to and the Media files they show; 6n reads each back as
 the feature it claims (a callout's `data-callout`, a folded one's
-`is-collapsed`, the YouTube `embed/` frame, the Media `<img>` and PDF frame
+`is-collapsed`, the YouTube and Vimeo players (since #692 the
+`youtube-nocookie.com` and `dnt=1` addresses, with their titles), the Media `<img>` and PDF frame
 resolving to files in `public/`, `publish: false` absent, ...). Every example
 must match exactly one claim and every claim one example, so an example added
 without a claim fails. An `Authoring Claims` page pins what the prose says
@@ -7950,6 +8161,59 @@ payload 2 ms (both kinds); 2,000 generated pages 43 ms inside the suite. The
 plan's "about 10 ms" was the warm figure; the review measured 40–51 ms for
 2,000 pages and 228 ms for 9,790. Both triggers run it off the main actor.
 
+**The suite's check of that speed is relative to the Mac running it (#905).**
+`testTheScanOfTwoThousandPagesIsQuick` used to assert under 5 s, a figure
+chosen on the M4 Pro; on a second Mac (M4, 16 GB, Xcode 27.0) it took 8.05 s
+while the rest of the suite ran, so a gate failed by hardware and the figure
+said nothing about what a teacher's Mac would meet. Three tests replace it,
+and none names a number of seconds.
+
+- `testTheScanOfTwoThousandPagesReadsEachPageOnce` pins the walk and the
+  reads with no clock. The scan takes both its doors to a page as
+  parameters, `isEvicted` and `readPage` (default
+  `ObsidianFigureAddOns.readPage`), and the test counts both: every one of
+  2,000 pages asked of once and read once, nothing in `.trash` and no file
+  that is not a page.
+- `testTheScanReadsPagesOnlyThroughItsReader` reads the scan's own source
+  and fails if its body reads a page any other way (`contentsOf`,
+  `FileHandle`, `InputStream`, `mmap`, `fopen`, `read(`). Without it, a
+  second read that went around `readPage` would not be counted.
+- `testTheScanIsQuickAndGrowsNoFasterThanThePages` times the scan and plain
+  reading of the same pages (`readEveryPage`, the least any scan that reads
+  them must cost) on 500 pages and on 4,000 in the same run, in five
+  interleaved rounds, keeping the fastest of each. The 500-page pair is
+  timed `smallCourseTimingsPerRound` (4) times in each round, because
+  reading 500 pages takes about 10 ms. On 4,000 pages the scan must
+  cost under `scanCostsAtMostThisManyReads` (10) reads, and its cost per
+  read there must be under `perPageCostGrowsAtMost` (2.5) times its cost
+  per read on 500 pages.
+
+Measured standalone at -Onone on the M4 Pro (12 cores). With one timing of
+the 500-page pair per round, 5 of 75 runs under 12 or 24 busy loops failed
+the growth bound (growth up to 6.51), and a quadratic scan passed it in 1 of
+8. Every failing run had a low 500-page ratio: a burst of load had caught all
+five small reads, so the denominator of the growth figure was too small and
+the scan itself was not slow. With four timings per round: 55 runs under 24
+busy loops and 148 under 6 (half the cores, while a `verify.sh` run went
+on beside them, load average 20 to 44) all passed, growth 0.58 to 1.98;
+0 of 100 failed with no busy loops (load average 9 to 18 from other work,
+growth 0.71 to 1.12). A scan that kept a list of the pages it had read and
+searched it for each page failed every run: 8 of 8 under 24 loops (growth
+3.40 to 6.45), 21 of 21 under 6 (2.96 to 4.68), and 20 of 20 with none
+(2.71 to 3.94). Sabotaged copies that read each page two, three or five
+times through `readPage` fail the read count,
+and one that read each page a second time with `Data(contentsOf:)` fails the
+source check. What the tests do not pin: a slower scan whose cost is still
+linear in the pages, up to ten reads' worth (today's measured 1.0 to 1.5
+with no busy loops and up to 2.2 with them);
+and growth too small to show between 500 and 4,000 pages. Rejected: a wider
+fixed limit, which would pass a slow Mac and a slow scan alike; timing one
+size against plain reading, which cannot see growth (the first version of
+this change did that, and the quadratic scan above passed it at 2,000
+pages); a growth bound tighter than 2.5, which the loaded baseline came
+within 0.6 of (1.98); and a 1,000-page small course in place of repeated
+timing, which the review offered as an alternative and nobody measured.
+
 **Backups and reference copies.** `CourseArchiver` adds `zip -x
 <course>/.obsidian/plugins/<id>/*` for each folder carrying the marker,
 worked out at zip time (`ObsidianFigureAddOns.backupExclusions`); the
@@ -9012,7 +9276,7 @@ BC code no) and follows the code until the teacher touches it. Ticking it:
   noun `meeting`. A field moves only while it still holds the OTHER choice's
   word, so typing survives the box going off and on; the class folder keeps its
   place in the per-section list. Every curriculum folder leaves the shared
-  folders (and the LCS switch cannot bring one back while ticked).
+  folders.
 - gives up a skeleton already adopted for the code (CODING has adopted the
   general one by the time the box ticks itself) and makes adoption a no-op —
   `SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:numbered:)` answers
@@ -10383,6 +10647,8 @@ other import ends in — so the marker, the neutralisation, the fifteen deploy
 refusals and the lock all apply unchanged. The rule itself is data:
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses.importing.olderLayout`, run by `OlderLayoutImportTests`.
+
+(The paths in this section are the real ones measured on this Mac and are kept as a record. Since #891 the contract's cases use invented names for the same shapes: `JHC/2024-25` and `ICD2O-JHC-MWPS-Collaboration`.)
 
 **What the real folders are**, measured read-only under
 `~/Library/Mobile Documents/com~apple~CloudDocs/Documents/LCS/2023-24/`:
@@ -14143,6 +14409,359 @@ storing the base64 of the example pair, which the issue first suggested. It
 is still a stored pair to a scanner that does not read the words, and the
 test that builds it is four lines.
 
+**Four more credential shapes, and a two-word account (#853, #876).**
+Measured on 2026-11-13 by compiling `LogRedactor.swift` from `dev` alone and
+feeding it each shape (invented values only, assembled from `example-user`
+and `example-password`):
+
+| Shape | Before | Rule now |
+|---|---|---|
+| `"Authorization": "Basic …"` (JSON), `'Authorization': 'Basic …'` (Python) | left whole | `basicAuthHeader` reads quotes round the name and the value, and `=` as well as `:` |
+| `curl -u user:pass`, `--user user:pass`, `--user 'user:pass word'` | left whole | `userFlag`, new: a value holding a colon after `-u` or `--user`, a quoted value to its closing quote |
+| `ftp://user:pass@plans.example`, `sftp://…` | the username stayed (`ftp://example-user:[removed: email address]/`) | `urlUserinfo` reads any scheme |
+| a password with a raw `/` or a space | the username and part of the password stayed | `urlUserinfo` takes a `/`, and single spaces unless the password starts with a digit |
+| `Authorization: Basic [removed: token]` redacted again | `… [removed: token] token]` | `basicAuthHeader` leaves a placeholder alone, as #780 made the label rules do; `userFlag` leaves one alone that stands by itself, and since the second round reads one inside a value |
+| `/Users/First Last/…`, `C:\Users\First Last\…` | `/Users/person Last/…`: the second word of the name stayed | several words are taken when they run on to a separator, a quote, a colon or the end of the line |
+| `/users/name/…`, `c:\users\name\…` | left whole | the home-folder rules ignore case and keep the prefix as written |
+
+The issue also named `HTTPS://` and a lowercase `basic` as case-sensitive.
+Measured, both were already redacted: `urlUserinfo` and `basicAuthHeader`
+have carried `(?i)` since #709. The home-folder rules were the
+case-sensitive ones.
+
+**Who can print these today.** Nothing in the product. `deploy.sh` sends
+its Bearer headers with `curl -fsS -H`, which never echoes a header;
+`scripts/share_plan.py` adds the Basic header through `urllib`, whose errors
+carry the status and not the header; nothing uses `curl -u`, an `ftp://`
+address or a git remote. These rules stand behind a tool's debug output (a
+dump of request headers is the likeliest, which is why the quoted header
+came first) and behind text a teacher typed that a tool echoed. The
+launchers' own trail lines (`note_on_the_trail`, written to
+`PLANTOIR_TRAIL_DIR` when the app hands one over) are fixed sentences
+carrying a course code, a section and fixed phrases, never console text or
+a path, and no script writes `activity.txt`. So the launchers need no
+redactor of their own; that is a reason, not an oversight.
+
+**False redactions, measured** on an invented 99-line trail: the 66 example
+lines of `activityTrail.mustRecord` and 33 invented console lines (Quartz,
+wrangler, docker, npm, colima, made-up paths and addresses). Against the old
+redactor the new one changed only the intended lines and these:
+
+- `http://localhost:8081/@scope/pkg` becomes `http://[removed: token]@scope/pkg`.
+  A password that starts with a digit and holds a slash is still taken, so a
+  port followed by a path with an `@` in it goes too. Kept as the cost.
+- A one-word account followed by words loses those words whenever they run
+  on to a `/`, a quote, a colon or the end of the line, since they cannot be
+  told from the rest of a two-word name (how far that reaches, measured, is
+  under "The second round" below). No line in the trail has that shape: a
+  path there always runs on with a `/`. Every string literal in the mac test
+  target that holds a path, an address or a header (223) was run through
+  both redactors as well; the two that changed are test messages and an
+  artificial launcher marker that no test redacts.
+- `docker exec -u 501:20` loses the user and group. No launcher runs it.
+
+REJECTED: letting any password hold spaces. The first draft did, and
+`http://localhost:8081 ready; questions to helpdesk@school.example` lost
+everything from `localhost:` to the address. A port is the commonest thing
+after a colon in this product's output, so a password that starts with a
+digit may not hold a space (the KEPT "Preview at" case in
+`problemReportRedaction.cases`). Also rejected: stopping `basicAuthHeader`
+at a quote rather than at white space. Base64 holds no quote, so no more of
+a credential would be removed, and it would have moved the expectation of
+#709's existing case on both platforms. Also rejected for now: redacting the
+real account name literally, read from the home folder at run time. It
+would close the first gap below, but no shared case could test it, since
+each machine's name differs.
+
+**Still missed, named.** A two-word account followed by words and then
+another path on the same line (`/Users/First Last and /Users/…`): the first
+word goes and the second stays, as before #876, because the words do not
+run on to a separator. A password that starts with a digit and holds a
+space. (An apostrophe in an account name was on this list until the second
+round below.)
+
+**The second round (#853 round 2): rule order, three more shapes, and
+linear time.** The batch's review (Opus, 2026-11-13) found a password left
+behind in the likeliest `-u` value of all, and the release director's
+ruling asked for the rule order to be tested for every pair of rules rather
+than case by case.
+Measured by compiling `LogRedactor.swift` alone with a small driver, every
+value invented.
+
+*The order.* `curl -u name@school.example:password` was written
+`curl -u [removed: email address]:password`: the email rule ran first, and
+its placeholder hid the value from `userFlag`. A harness then built, for
+each of the 78 pairs of rules (the twelve pattern rules and the
+40-character run), lines that both rules of the pair match: each rule's own
+shape nested in the other's value where it could legally stand there, and
+the two shapes side by side with a space, a colon and a space, a comma, a
+semicolon or a tab between them (two values glued with nothing between are
+one run of characters, which no rule can be said to own, so it builds none).
+A line leaks when any four characters of a secret survive. With the rules as
+they stood, 442 of 2,944 such lines leaked through the whole redactor. Two
+of the leaks were real shapes on `dev` as well as on the branch:
+`token: Bearer abc…` (`labelledSecret` took the word `Bearer` as its value
+and wrote the token out) and the `-u` address above. Others came from
+#876's further words of a name, which ran on to any colon:
+`/Users/sample token: abc` lost its label (`/Users/person: abc`), and
+`/Users/sample then curl -u name:password` wrote the password out.
+
+What changed, each a contract case: the order is now `urlUserinfo`, the two
+home-folder rules, `basicAuthHeader`, `bearerHeader`, `labelledSecret`,
+`netlifyToken`, the three account rules, `userFlag`, `emailAddress`
+(`problemReportRedaction.ruleOrder`, checked by name by
+`SharedRulesContractTests.testTheRedactionRulesRunInTheContractsOrder`, and
+since the third round by behaviour as well, below). The
+three label rules never take another rule's label as their value (`Bearer`
+or `Basic` and a word, an `Authorization` header, a `token:` label with a
+space and a value after it, an account flag or label with its identifier;
+the third round, below, changed `Basic` and the account placeholder).
+`userFlag` reads a placeholder inside a value and refuses only one that
+stands alone. The email rule takes an address whose name another rule
+already took (`[removed: token]@school…`), except after `://`. A further
+word of a name ends at a colon only when white space or the end of the line
+follows it, and a word that starts with a dash or holds another rule's label
+is never a further word of a name (the third round narrowed the second
+condition to a word that would start another rule's match: "How far a
+home-folder name reaches", below). After all of it, 0 of 3,149 lines leak through the
+whole redactor.
+
+Run as a pair alone in the other order, 51 lines in 14 pair-orders still
+leak, and each is a place where the shipping order is the safe one. Two
+examples: the email rule first takes `password@host.example` out of
+`https://name:password@host.example` and leaves the name, which is why
+`urlUserinfo` runs first; `labelledSecret` first takes `/Users/First` out of
+`password=/Users/First Last/x` and leaves `Last`, which is why the
+home-folder rules run before it. REJECTED: making every pair safe in either
+order. Each rule would have to read every other rule's shapes, and the one
+attempt measured (letting `urlUserinfo` read the email rule's placeholder as
+a password) made the KEPT `Preview at http://localhost:8081` case lose
+everything up to the address on a second pass. The order is pinned in the
+contract instead, so a platform that runs the rules in another order fails
+its suite rather than leaking.
+
+*Three more shapes.* A Windows path with doubled backslashes, the way Python
+prints one in a dict or an exception (`'C:\\Users\\First Last\\…'`),
+was left whole, before #876 and after it; the Windows rule reads one or two
+backslashes now. An apostrophe followed by a letter is part of a name, so
+`/Users/First O'Last/…` goes whole: before, the rule stopped at the
+apostrophe and left everything after it, the most identifying part. Any other
+quote still ends a name (`HOME='/Users/First Last'`). A hyphenated name and a
+name with a letter outside ASCII were already taken whole; each has a case
+now as a pin. A carriage return ends a name as the end of a line does, for
+Windows: .NET documents that its multiline `$` matches before `\n` only,
+so a console line ending in `\r\n` would have ended the name at its first
+word there. On the mac this was already right, since ICU's `$` matches
+before a carriage return (measured); on .NET it is unmeasured, since there
+is no .NET on this Mac.
+
+*Two over-redactions fixed.* A username holds no `[`, `]`, `?` or `#`
+(none may stand in one unencoded), so `Preview at http://[::1]:8081 is
+ready; write to helpdesk@school.example` and
+`obsidian://open?vault=Teaching:Unit 1 then ask teacher@school.example`
+keep everything but the address; before, both lost everything from the
+scheme to the address. Both are KEPT cases. Still a cost, and named:
+`See https://plantoir.app:help for details or write help@plantoir.app`
+loses everything from `plantoir.app` to the address, which is the price of
+a password with spaces in it. `-menu 10:30` loses its time (`-u` may close
+a run of short flags, and `-menu` looks like one). Only a space or a tab
+may sit between `-u` and its value now, so a flag at the end of one line no
+longer takes the start of the next when a whole report is redacted at once.
+
+*How far a home-folder name reaches, stated truly.* The first word after
+`/Users/` (or `C:\Users\`) always goes. Further words go with it when the
+run of words ends at a `/` (or a backslash), a quote, a colon followed by
+white space, or the end of the line, and none of the further words starts
+with a dash or would start another rule's match: a label word (`token`,
+`secret`, `password`, `api key`) followed by `=` or `:`, or `Bearer`,
+`Authorization` or `Account` not followed by a letter (the third round;
+before, a word that held any of them anywhere stopped the name, so
+`/Users/First Secretan/…` kept `Secretan`). So a one-word account followed by ordinary
+words loses those words up to the next such end: `home directory
+/Users/sample does not exist. Error: mount failed` is written
+`home directory /Users/person: mount failed`, `cd /Users/sample && ls
+Documents and ICS3U/Unit-1` is written `cd /Users/person/Unit-1`, and
+`/Users/sample isn't writable` loses everything after the name. An address
+no longer ends the run (`/Users/sample is 92% full; see https://…` keeps
+its words, a KEPT case; before, it read `/Users/person://…`, a different
+path). On the invented 200-line trail the review built, the dev and branch
+redactors differ on three lines, all costs already named above. REJECTED:
+capping a name at two or three words, which would shorten the reach. An
+account name of more words would then leave its last words on the trail,
+and a miss is not traded for a tidier line.
+
+*Linear time.* A trail line is redacted before the app writes it, so a slow
+rule holds up the write. Timed on one line of 100,000 characters with no
+match, each rule alone, one run each (Apple M4 Pro, with other timings running
+beside it, so read the orders of magnitude rather than the digits):
+
+| Line of 100,000 characters | Rule | `dev` | before this round | now |
+|---|---|---|---|---|
+| `a` repeated | `emailAddress` | 223.5 s | 140.6 s | 0.067 s |
+| `curl -u '` then `a:` repeated, no closing quote | `userFlag` | (no rule) | 91.8 s | 0.002 s |
+| the same with `"` | `userFlag` | (no rule) | 53.8 s | 0.002 s |
+| `x://y:z ` repeated | `urlUserinfo` | 0.001 s | 10.8 s | 0.006 s |
+| `https://a:b ` then `c ` repeated, no `@` | `urlUserinfo` | 0.001 s | 0.007 s | 0.011 s |
+
+Every rule, on 26 such lines at 10,000 and at 100,000 characters (the best
+of three), now grows by at most 10.7 times, which is linear.
+
+The email rule could start a match at every character of a long run of
+address characters and read the rest of the run again from each; it now
+starts only where such a run starts, which takes every address it took
+before. `userFlag`'s quoted value reads to its first colon only, its flag is
+read atomically up to its first `u`, and a further word of a spaced password
+holds no colon, so one address cannot run on into the next.
+`ProblemReportTests.testNoRuleTakesLongerThanLinearTime` bounds the growth
+rather than the seconds: on eight lines that were slow, ten times the
+characters may take at most fifty times as long, in the same run. Three
+numbers set that bound, measured by the batch's fix review (Opus,
+2026-11-14, a Debug build on one core, the load average 10.5 to 16.5 from
+other work and none added): the largest growth over 40 runs of all eight
+lines was 12.5; the limit is 50; and the email rule as it stood on `dev`, a
+quadratic rule, grew 103. So the limit catches a purely quadratic rule with
+a factor of two to spare. It would miss a rule whose quadratic part is under
+about 40% of its cost at 10,000 characters, which is inherent to a bound on
+growth. How far the growth spreads on a heavily loaded machine is not
+measured yet; it is deferred to the second Mac. REJECTED: a limit in
+seconds, which a slower machine or a busy one would fail.
+
+*Still missed after the second round, named* (the review's list; none is
+printed by the product today): `curl -U` and `--proxy-user`; an
+`Authorization: Token …` or `Digest …` header; `Cookie:` and `Set-Cookie:`
+lines; a JSON `"password": "…"` or `"token": "…"`, where the quote between
+the label and the colon defeats `labelledSecret`; a JSON-escaped address
+(`https:\/\/name:…@`), whose username stays; a password with a double
+space or a tab in it; a Basic value on the line after its header when lines
+are redacted one at a time (a whole report redacted at once catches it); a
+UNC path, `\\server\Users\First Last\…`. The JSON label and the UNC
+path are worth a follow-up issue.
+
+**The third round (#853 round 3): `Basic` after any label, a second pass
+that changes nothing, a surname, and the order pinned by behaviour.** The
+batch's fix review (Opus, 2026-11-14) found one credential shape the second
+round handed to nobody, and that no contract case failed when the rules ran
+in another order. Each change below is a contract case, proven red on the
+round-two patterns; measured with the same standalone drivers, every value
+invented.
+
+*`Basic` after any label.* The second round stopped all three label rules
+taking `Basic` and a word as their value, on the grounds that the rule that
+owns `Basic` would take what follows. But `basicAuthHeader` owns it only
+after `Authorization`, so `password: Basic xq7Kp2mZ`, `token: Basic …` and
+`api_key: Basic …` went through whole (`dev` took only the word `Basic`).
+`labelledSecret` now takes `Basic` and the word after it together, and reads
+`Basic` atomically, `(?>(?:Basic\s+)?)`, so a second pass over
+`password: Basic [removed: token]` cannot give up the `Basic` and take it
+as the value. A new case. The two header rules still refuse `Basic` and a
+word, so `Bearer Basic xq7Kp2mZ` is left to nobody; no product line has
+that shape, and it is named here rather than fixed. (The refusals were
+checked before `Basic`, which let the word after it through unchecked; the
+fourth round, below, checks them after it.)
+
+*A second pass that changes nothing.* The label rules refused an account
+flag or label followed by its 16-character identifier, but not once
+`accountFlag` had replaced the identifier: the second pass then took
+`--account` or `Account` as the value, and `password: --account <id>`
+became `password: [removed: token] [removed: account id]`. Over the
+review's 30,009 generated lines, 1,012 changed on a second pass, all this
+shape. Each refusal now reads the placeholder too, and 12 lines change,
+every one a three-deep nest inside an address's password
+(`https://name:token=Account ID: <id>@host`). Two new `redactedAgainCases`.
+
+*A surname that holds a label word.* A further word of a name was refused
+when it held `token`, `secret`, `password`, `api key`, `Bearer`,
+`Authorization` or `Account` anywhere, so `/Users/First Secretan/…` kept
+`Secretan` (and `Tokenfield`, `Accountly` the same). A word is now refused
+only when it would start another rule's match: a label word followed by
+`=` or `:`, or `Bearer`, `Authorization` or `Account` not followed by a
+letter. `/Users/name token: abc` and `/Users/First api-token: abc` still
+keep their labels. A new case.
+
+*The order, pinned by behaviour.* The fix review compiled the patterns in
+Windows' current order and every case passed: the second round's pattern
+changes had closed the two leaks `ruleOrder.why` gave as coming from the
+order, in any order. So every order one move away from the shipping one (a
+rule taken out and put back elsewhere, 121 orders) was run over the
+review's 30,009 lines: 107 change some line, 70 leave a piece of a secret
+the shipping order removes, and 14 change nothing. The contract's cases
+failed 2 of the 121. Most of the 70 differ only on shapes no trail prints;
+the realistic lines found are a token read from a file in a two-word home
+folder, `Reading the token: /Users/First Last/Library/token.txt` and its
+Windows twin. With a label rule ahead of the home-folder rule, the label
+rule takes `/Users/First` and `Last/Library/token.txt` is written out.
+They are `ruleOrder.cases`, each with the one move (`wrongOrder`) under
+which it must come out differently; with them the cases fail 19 of the 121
+orders. `SharedRulesContractTests.testEachRuleOrderCaseDependsOnTheOrder`
+runs each case in the shipping order and in its wrong one, through
+`LogRedactor.redacting(_:applyingInOrder:)`, the loop the app itself uses.
+The name check stays, because it is the only check on the other 102 orders.
+
+*Measured again after the changes.* The pair harness: 3,149 lines, none
+leaking through the whole redactor, and the same 51 lines in 14 pair-orders
+as before when a pair runs alone in the other order. The three-rule corpus:
+the same 1,436 leaking lines as the round-two file (all nested, none side
+by side), and 12 lines that change on a second pass, from 1,012. The 300
+invented trail lines: identical to `dev`'s. Every string under
+`activityTrail.mustRecord` (845 strings in 194 entries, 69 of which carry
+a `line`), as written and with its placeholders filled with invented
+values: one changes, a `why` that holds a 40-character identifier, as on
+`dev`. The linear-time test, standalone, 40 runs on one core: the
+largest growth 10.6, against the limit of 50. `Basic ` repeated after a
+label, `--account ` repeated after a label, one 100,000-character word
+after a home folder, and a home folder followed by about 11,000 words each
+holding `secretan` all grew 8.4 to 9.3 times.
+
+*A named known limit: nesting.* A secret nested inside another rule's
+value, in a shape no product line has, can still leave a piece behind, and
+no order fixes every such shape. One example: an address whose password is
+itself a `-u` value, `https://name:-u 'other:secret'@host`, keeps `name`,
+because a further word of a password may not hold a colon (the price of
+the linear-time fix). The three-rule corpus finds 1,436 such lines, every
+one nested and none side by side.
+
+**The fourth round (#853 round 4): a label, `Basic`, and another label.**
+The batch's final sweep (Fable, 2026-11-14) found a leak the third round
+made. `labelledSecret` checked its refusals before `Basic`, so the word
+after `Basic` was taken without them. Measured, invented values:
+
+| Line | Round 3 | `dev` | Now |
+|---|---|---|---|
+| `password: Basic token: abcdefgh12345` | `password: [removed: token] abcdefgh12345` | `password: [removed: token] token: [removed: token]` | `password: Basic token: [removed: token]` |
+| `password: Basic --account <id>` | `password: [removed: token] <id>` | `password: [removed: token] --account [removed: account id]` | `password: Basic --account [removed: account id]` |
+| `password: Basic Account ID: <id>` | `password: [removed: token] ID: <id>` | `password: [removed: token] Account ID: [removed: account id]` | `password: Basic Account ID: [removed: account id]` |
+| `password: Basic Basic abc123` | `password: [removed: token] abc123` | `password: [removed: token] Basic abc123` | `password: [removed: token]` |
+
+`labelledSecret` now reads `Basic` first, as many times as it is written,
+`(?>(?:Basic\s+)*)`, and checks the placeholder and its refusals after it,
+so the outer label leaves an inner label to take its own value, as it does
+for `token: Bearer …`. Two new cases and one new `redactedAgainCases` entry
+(`password: Basic token: [removed: token]`, which round 3 turned into
+`password: [removed: token] [removed: token]`), all three red on round 3's
+file. The generated corpus cannot build this shape (its `Basic` always
+carries `Authorization`), which is why the third round's measurements
+missed it.
+
+REJECTED: the sweep's candidate, which kept the refusals before `Basic` and
+repeated the whole list after it. It gives the same output as the pattern
+above on every line measured (the 30,009 corpus lines and 110 probes; only
+`Basic Basic …` differs, from the `*`), because no refusal can match text
+that starts with `Basic` and a space. One list is shorter for Windows to
+copy and for the next reader to check.
+
+Measured again after the change: all 50 cases, 15 redacted-again cases and
+both order cases pass, and in Windows' current order they all pass too
+(only the name check tells that order from the pinned one). The 30,009
+corpus lines come out exactly as round 3 wrote them (1,436 leaking, all
+nested; 12 changing on a second pass). The pair harness: 3,149 lines, none
+leaking through the whole redactor, and the same 51 lines in 14 pair-orders
+when a pair runs alone. The 300 invented trail lines: identical to `dev`'s.
+The 845 strings under `activityTrail.mustRecord`, and the 71 `line` entries
+of #696's branch: none rewritten that `dev` leaves alone. The linear-time
+harness, 20 runs on one core: the largest growth 10.6, against 50.
+`password: ` followed by `Basic ` repeated, and `password: Basic token: `
+repeated, grew 8.7 and 9.3 times from 10,000 to 100,000 characters.
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
@@ -14158,6 +14777,26 @@ withheld from a report unless they tick the box that includes it — and the
 box only appears if there is anything to include. The events that must be
 recorded are contract data (`activityTrail`), pinned by a test, so a new
 feature cannot ship without deciding what it leaves behind.
+
+**A line about a course with no section named says the course alone, since
+2026-11-14** ([#879](https://github.com/russellgordon/plantoir/issues/879)):
+"ICS3U · declined …", never "ICS3U/0 · declined …". Every line about one
+course goes through `ActivityTrail.place(course:section:)`, which writes
+`{course}/{section} · ` for a section, `{course} · ` when the section is 0 or
+less, and nothing when there is no course either; the cases are
+`activityTrail.lineShape.placeCases`, run by `ActivityTrailPlaceTests`. The
+line it was found on is an outside assistant's change that named no section,
+declined while the course was being built elsewhere
+(`AssistToolRunner.outsideChangeHeldBack` reads a missing section as 0, and
+the course is what that change is about, so the sentence already said "the
+course"). Measured across the app's callers: that is the one place a missing
+section reaches the trail as 0 in use; `ScriptRunner`'s "the preview closed"
+line defaults to 0 only when its own arguments do not parse, and every other
+caller passes a section it has located. The fix is in the one function rather
+than at the call site, so a caller added later cannot bring "/0" back.
+Rejected: a sentence such as "(no section was named)" appended to the decline,
+which repeats what "the course" already says, and changing the call site
+alone, which leaves the next caller to remember.
 
 **Making a course leaves a line saying what it started FROM, since
 2026-09-21** — `course created`, "created ICS4U from the computer studies
@@ -16656,7 +17295,7 @@ Keychain never comes into it, because the real launcher never runs.
 
 | Layer | Covered? |
 |---|---|
-| The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`:110-136`). Opt-in, real credentials, real sites — deliberately. |
+| The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`drive_launcher`, its patterns read from `contracts/app-rules.json` → `credentialPrompts` by `launcher_answers` since 2026-11-13). Opt-in, real credentials, real sites — deliberately. |
 | The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Covered since #154** by `NewSiteDialogUITests`, with a stubbed `deploy.sh` whose prompts are read from `contracts/app-rules.json`. In the UI target, which is part of no gate. |
 | A publish with a genuinely invalid saved token | **The launcher's half is covered since #716**: `scripts/test_deploy_token_refusal.py` runs `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed and pins which answers clear the token. The app's half — the window with a real refused token in the real Keychain — is still **not automatable**, for the Keychain reason above; its sentence is a `failureExplanations` case (#695). |
 
@@ -16671,9 +17310,14 @@ way now**, and the second row — the DIALOG — was uncovered on both until
 #154 covered it on the mac.
 
 Two things from that work are worth knowing here rather than being rediscovered.
-Windows carries **no `(y/n)` catch-all**, which this side's `expect` block does:
-nothing in the Windows publish path asks one, and a rule that says yes to
-whatever is asked is a bet that nobody adds a destructive question. And its
+Windows carried **no `(y/n)` catch-all**, which this side's `expect` block
+did until 2026-11-13: nothing in either publish path asks one, and a rule
+that says yes to whatever is asked is a bet that nobody adds a destructive
+question. It was removed when the first deployed run of #597's second half
+showed a loose pattern answering the wrong line ("last name.*: " matched
+deploy.py's "Saved teacher last name …" confirmation and typed the surname
+as the site name); every pattern is now one of the contract's questions
+(documentation/07-deployment.md → "What the first real run showed"). And its
 harness **audits itself afterwards** — it re-reads which prompts were answered
 and fails the run if any is not one `deploy.py` actually asks, which is worth
 copying here, because a rule matching a prompt it was not written for has
@@ -17300,6 +17944,107 @@ this is the app's half.
   course title is left alone, and `urlUserinfo`, before the email rule, which
   would otherwise take a `user:password@host` for an address and leave the
   username behind.
+
+## Settings ▸ Deploying: the tokens (#696)
+
+Plantoir ▸ Settings ▸ Deploying has a **Netlify** section above the
+**Cloudflare Pages** one (Russell, 2026-10-27: Netlify in its own section).
+Each shows a status line, **Change Token…**, **Remove Token** and **Check
+Again**. The launcher half, the rules and what was measured and rejected are
+in `documentation/07-deployment.md` → "Deploy tokens in Settings, and a token
+checked before it is saved (#696)"; the words are
+`DeployTokenWording`, pinned key by key to `deployTokens.words`.
+
+- **`DeployTokenPanel`** (`Models/DeployTokens/`, `@Observable`, one per
+  destination) runs `deploy.sh --token …` in the first open window's working
+  folder through `DeployTokenLauncher.run` and reads its one line of JSON
+  (`DeployTokenAnswer`). With no window open the line says to open a working
+  folder. The app never reads or writes the token store; the pasted token is
+  written into the launcher's standard input BEFORE it starts and the pipe
+  closed, so a launcher that exits without reading it cannot make the write
+  fail with a broken pipe.
+- **The status line** reads `statusConnected`, or for Cloudflare with an
+  end date `statusConnectedEndsOn` (the instant's date in the Mac's time
+  zone); under 30 days it is `statusConnectedEndsSoon`, in orange. Refused, expired, turned off, cannot use the account above, could
+  not be checked and not connected each have their own sentence, and so do
+  two the implementation review asked for: a token still accepted after its
+  end date has passed (`statusConnectedEnded`, M1), and a launcher that gave
+  no answer at all (`notAnswered`, `statusNotAnswered`, M2), which used to say
+  "It is still saved" when nothing was known. Opening the pane checks both
+  tokens. A changed Account ID checks Cloudflare's again when the change is
+  noted: Return in the field, Use This ID in its help sheet, or the pane
+  closing (`noteTheChange()`). Until then the token's status line is the one
+  read before the change; Check Again asks at once (the Fable sweep's T5).
+  A check never clears a token.
+- **Change Token…** opens the deploy's own `CredentialRequestSheet`, with the
+  same steps, in a settings mode: its own title, Check and Save, a spinner
+  while the launcher checks, and the reason under the field when nothing was
+  saved (`sheetProblem`). It closes only when a token is saved. **Cancel
+  waits while the token is being checked** (review W2): the button is
+  disabled, the sheet cannot be dismissed (`interactiveDismissDisabled`), and
+  `DeployTokenPanel.cancelChange` does nothing while `isSaving`. Before the
+  fix, Cancel closed the sheet while the save ran on, and the token was saved
+  and the trail said "changed" though the teacher had cancelled. A Help
+  button at the sheet's foot opens Help's `deploy-tokens` page (a stub in
+  `help/outline.json` until the Help writer writes it; owed before the
+  cut). When the new
+  token cannot reach some of the folder's class websites the sheet stays open
+  behind an alert naming them (a course's shared unit plans as "MPM2D unit
+  plans for 2026", `placeUnitPlans`), with Keep My Old Token (the default:
+  Return chooses it, and Escape does nothing, because `.cancel` and
+  `.defaultAction` on one alert button give it Return only, as #832 measured
+  in `QuestionKeysTests`) and Use the New Token, which saves it with
+  `--use-anyway`. When no token was saved before the change the first button
+  says Don't Save It instead, and the trail says a new token was not saved
+  rather than writing `keptOld` (review M7). Before the pane's first check has
+  answered nothing is known, and it says Don't Save It, which is true either
+  way (the fix review's M-c). The pasted token is held in memory
+  only while that alert is open.
+- **Remove Token** asks first and says a deploy set for later will not run.
+- **The end date travels to the Deploy screen** through
+  `AppSettings.cloudflareTokenEndsOn`, written by every Settings check and by
+  `DeployTokenEndReport` from a deploy's `PLANTOIR_TOKEN_ENDS:` line (read in
+  `ScriptRunner` and from a scheduled run's log, each naming itself as the
+  source). `DeployTokenEndReport.keep` writes the trail line when the kept
+  date changes and only then. `DeployTokenEndNoticeView`
+  shows the warning above a section's site when the course deploys to
+  Cloudflare Pages and the date is under 30 days away or past, with Open
+  Settings…; Course Settings' Cloudflare part shows the same sentence. No
+  request is made when either opens.
+- **The trail** has five events: `deploy token changed in Settings`,
+  `deploy token removed in Settings`, `deploy token change refused in
+  Settings` (with the problem key), `old deploy token kept in Settings`
+  (with a count) and `Cloudflare token end date learned` (the date and what
+  read it, review I4). None carries the token, the Account ID, a site's name
+  or an address. **Every line reaches the disk as it was written**
+  (`DeployTokenTests.testEveryTrailLineReachesTheDiskUnchanged`): the trail
+  is redacted on the way in, and the first `keptOld` wording put a colon
+  straight after "token", so `LogRedactor`'s `labelledSecret` rule took the
+  next word for a secret and the problem report carried "[removed: token]"
+  in a line that holds none (the Fable sweep's F1). Measured with the
+  redactor compiled alone: 4 of 58 filled lines changed on that wording, 0
+  on the new one, and the same against #853's reworked redactor. The test
+  hands each filled line to the redactor itself rather than restating its
+  patterns, so a later rule that would rewrite one of these lines fails it.
+  Rejected: exempting these lines from redaction, which would make the trail
+  writer trust its callers.
+- **Shared words, filled here.** `DeployTokenWording.filled` puts in the
+  Mac's word for the computer (`MachineWord`) and the Mac's path to these
+  settings for `{deployingSettings}` in every sentence, so the contract's
+  words name no platform (review W5).
+- **Off the undo list on purpose.** Saving and removing a token are not
+  undoable (#899's ruling): nothing here is recorded for Undo.
+
+Measured: a standalone build of `DeployTokenAnswer.swift` and
+`DeployTokenWording.swift` against the contract (scratchpad
+`measure/696/swift`) runs the 12 end-date and 5 marker cases and the words
+key by key with no failure. `DeployTokenTests` runs the same through XCTest
+and the pane's model through a stand-in launcher, including Cancel during a
+save (a stand-in that waits until the test releases it), Don't Save It,
+the end date's trail line, the Cloudflare-only warning
+(`SectionDetailView.deployTokenEndWarning(destinations:…)`), the
+placeholders, and the contract's own forbidden-word list for every sentence;
+it was compiled by `build-for-testing` and is the director's to run.
 
 ## A deployed folder opened in the browser (#850)
 

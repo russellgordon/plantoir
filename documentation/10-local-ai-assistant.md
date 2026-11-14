@@ -8345,6 +8345,73 @@ points the session at is `plantoir-unit-planning`, written into the working
 folder like the others (`documentation/09-mac-app.md` → "Unit planning
 (#707)").
 
+### What the Revise greeting must say, checked (#791)
+
+`app-rules.json` → `outsideAgents.greetingMustSay` lists what the Revise
+doors' greeting must say. Until 2026-11-14 it was eight sentences of prose
+that no suite on either platform read (707a review L9), so a greeting that
+dropped one stayed green. Since
+[#791](https://github.com/russellgordon/plantoir/issues/791) each entry is
+`{key, says, where}`: `key` names the contract text it is about, `says` keeps
+the prose, and `where` is one of five checks that `greetingMustSayHow`
+defines (`first`, `contains`, `afterPlanFirst`, `whenReferenceCourses`,
+`last`). The four sentences that had no key gained one: `greetingOpening`
+(the course by code, and by name in brackets when the name differs),
+`greetingToolsSentence`, `greetingSectionsSentence` and
+`greetingPlanFirstSentence`. The mac builds the greeting from named
+constants for each (`ClaudeCodeLauncher.openingWithNameTemplate`,
+`toolsGreetingSentence`, `sectionsGreetingSentence`,
+`planFirstGreetingSentence`), and the bytes are unchanged:
+`greetingHandoutsCases` compares whole greetings and did not move.
+
+`AppRulesContractTests.testEveryDoorsGreetingSaysWhatTheContractSays` runs
+`prepareSession` for each of the three doors in `outsideAgents.agents`, in
+three variants (a name that differs from the code; a reference course and no
+unit plan yet; a name that is the code), and reads the greeting off the line
+the script starts the assistant with, at the position the door's `arguments`
+give `{greeting}`. It checks every entry, and every expression of
+`greetingMustNotSay` (matched without regard to case): Russell's ruling on
+#750 (2026-11-13) that the greeting never mentions marking, class results or
+report card comments, which are offered only in context by the skill in use.
+They are regular expressions, as the held skills' words are, because
+`scripts/test_held_skills.py` reads every string in `app-rules.json` and a
+plain list of those words would read to it as an offer. The rule is not the
+hold, and stays when the held skills come back. The expressions carry their own
+cases, `mustMatch` and `mustNotMatch`, run by
+`AppRulesContractTests.testTheGreetingsForbiddenExpressionsCatchTheirCases`.
+After the batch review (2026-11-14) they take mark, marks and marking as whole
+words, so "marked" (publishing's own word) and "Markdown" pass; grade, grades,
+graded and grading, but not a grade level such as Grade 11 in a course's name;
+and a class's result with a straight or a curly apostrophe, or results for the
+class. Measured with `NSRegularExpression` on the cases: the four expressions
+before the review missed five `mustMatch` sentences and caught two
+`mustNotMatch` ones; the six after it miss and catch none, and none of them
+matches any of the 15 whole greetings in `app-rules.json`'s greeting cases.
+After the Fable sweep (2026-11-14) the first leaves marking a page alone
+("marks a page", "Mark the pages", the project's word for publishing one),
+and the fourth takes results for, of or from a class or classes in the
+greeting's own voice (my, our, this) as well as the, a, your, each and every.
+Four cases were added, two each way; with `NSRegularExpression` the
+expressions before the sweep missed both new `mustMatch` sentences and caught
+both new `mustNotMatch` ones, and the expressions after it miss and catch
+none. Neither change catches any of the 1,040 other strings under
+`outsideAgents`. Still passing, by choice: "marked the tests" (marked as a
+whole word is left to publishing), "markbook" and "gradebook" (no greeting
+says them), and "Comment out code" is still caught.
+`\bcomments?\b` was left as it was: it goes further than the ruling, which
+names report card comments, and no greeting says the word. A `where` the suite does not
+know fails, so a new kind of entry proposed from either side turns the other
+red until it is implemented.
+
+Rejected: matching the prose itself (a sentence cannot be checked against a
+description of it); a whole-text case per door (`greetingHandoutsCases`
+already does that for one door's builder, and an extra copy of the same
+paragraph would be one more thing to keep in step when a sentence changes);
+and checking the Fix with and Plan a Unit messages here, which replace the
+greeting and have their own whole-text cases. The built-in assistant's
+surface did not move (`scripts/test_tool_surface_digest.py`): the greeting
+reaches outside assistants only.
+
 ### A sentence on every door: printed handouts (#859)
 
 Russell ruled on 2026-11-13 that an outside assistant opened from Plantoir

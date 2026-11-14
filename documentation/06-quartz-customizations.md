@@ -329,6 +329,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-30 | **The sidebar scrolls only itself (#611)** | `quartz/components/scripts/explorer.inline.ts` | `patch_explorer_scroll_in_sidebar_only` (marker `PLANTOIR-SIDEBAR-SCROLL`) replaces Quartz's one `activeElement.scrollIntoView({ behavior: "smooth" })` — which scrolled the PAGE as well as the sidebar, 300-600 px down a long page as it opened — with a scroll of the sidebar's own list: none when the current page's entry is inside a closed folder, none when it is already in view, otherwise `scrollTop` set once, at once, centring it. Every build, idempotent, run straight after C2-3's expand-on-navigate patch; a script of another shape warns and is left alone. `patches/explorer.inline.ts` keeps Quartz's line (A2 unchanged). Section O. |
 | C2-31 | **Font stacks quoted one family at a time, and the system-font choice on the system stack (#629)** | `quartz/util/theme.ts` | Quartz's `joinStyles` wrote `--bodyFont: "<choice>", <fallback>`, quoting the WHOLE choice, so the "System fonts" choice — stored as `"Helvetica, Arial"` by both apps and `setup_course.py` — became ONE family of that name, which no machine has. The browser fell through to the fallback's `system-ui`: Chrome's platform-font query (`CSS.getPlatformFontsForNode`, Chrome for Testing 155.0.8059.39, this Mac, 2026-10-22/23) reports `.SF NS` (San Francisco), so Helvetica was never shown. **Russell's ruling (2026-10-22): those sites keep looking as they do** — San Francisco on a Mac, Segoe UI on Windows. So `patch_font_variable_stacks` adds `cssFontStack`: each family is quoted on its own, CSS keywords (`serif`, `system-ui`, `-apple-system`…) are left bare, and the system choice gets Quartz's fallback ALONE (`system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, …`), which puts system-ui and Segoe UI ahead of Helvetica and Arial. Measured: the same query reports `.SF NS` for the old and the new stack. A single family comes out byte for byte as before, so a Google-font site's stylesheet does not change (`scripts/test_font_variables.py` runs the patched TypeScript under node and compares). Every build, idempotent, anchored on the three v4.5.0 lines (each must match once) and warning without editing anything otherwise; the helper is a RAW Python string, because `/["\\]/g` in an ordinary one loses a backslash and every course's build fails on an unterminated regular expression (caught in review; the test pins the text). **Rejected:** quoting each family with Helvetica first, as the planner first proposed — measured to render Helvetica, a visible change to every system-font site that Russell turned down; changing the STORED value (to `"system-ui, Helvetica, Arial"` or similar) — every existing `course_config.json`, the Windows catalogue, the contract cases in `shared-rules.json`, the mac goldens, `setup_course.py`'s detection, C2-19's filter and `social_card.py` all key on the literal, and old folders would still carry the old one, so the build is the one place that fixes all of them; Python writing the stacks as literals into `theme.ts` — typography lives in `quartz.config.ts` (C1-11, full rebuild only), so two sources could disagree; editing Quartz's `DEFAULT_SANS_SERIF`, which buys nothing. Not affected: the Google request (C2-19 already drops stacks), the printed page (#499's `print.scss` sets its own font variables), the social card. The label for the choice now says "System fonts (each device's own)" in the mac app and in `setup_course.py`, and the mac's font editor previews it in the system font rather than Helvetica. **Windows inherits the CSS free** (shared `build_site.py` against its bundled Quartz v4.5.0; a different `theme.ts` would only warn) and says the same label since #648 (`FontCatalog.PairingLabel`, `WorkspaceTests.SystemPairingLabel`). |
 | C2-32 | **```text wrap: a text block's lines wrap (#653)** | `quartz/plugins/transformers/textWrapRule.ts`, `codeRunner.ts`'s second markdown plugin, `quartz/components/styles/codeLines.scss` (installed with Plantoir's additions, every build) | A ```text fence with `wrap` in its info string is wrapped in `div.plantoir-text-wrap` at the markdown stage, on every page; on screen its lines wrap at the window's width with each line's number on its first row and `…` in the gutter on the rest; code fences never wrap and `wrap` after them is ignored silently; print and the handout are untouched. Every other block is byte for byte as before. No new wiring: the plugin rides `CodeRunnerFences`' place straight before `SyntaxHighlighting`. Section P says why and what was measured. |
+| C2-33 | **YouTube and Vimeo players from the picture form (#692)** | `quartz.config.ts`, `quartz/plugins/transformers/index.ts`, `quartz/plugins/transformers/plantoirVideo.ts` and `videoRules.js`, `quartz/components/styles/videos.scss` (installed with Plantoir's additions, carried into `index.css` by `PlantoirMetaLine.tsx`) | `_wire_video_transformer` puts `Plugin.PlantoirVideo()` straight BEFORE `Plugin.ObsidianFlavoredMarkdown(`, anchored and idempotent, so a section built before #692 gets it on its next build. Before OFM because OFM's own YouTube step replaces a picture's properties and the words in its brackets (the player's title) are lost. See S below. |
 
 #### Settings written inside a TypeScript string (#871)
 
@@ -4944,20 +4945,25 @@ works when a student's press reaches it, in **Chrome for Testing and in
 Playwright's WebKit build** (Safari's engine), and that the page reported
 nothing and asked nothing of a host it should not. This piece (597a) runs it
 locally in `verify.sh`; the second half of #597 runs the same file against
-the deployed test sites on every host in a list.
+the deployed test sites on every host in a list, where the hosts the site
+still asks today are counted expected failures and the cold visit takes
+#625's two routes as well (documentation/07-deployment.md → "Rendered in two
+browsers, on the deployed sites (#597)").
 
 **The pieces.**
 
 | File | What it is |
 |---|---|
 | `browser-checks/rendered_features.mjs` | the checker: `--site <folder>` serves a built site itself, `--base <url/> --host <name>` reads a deployed one; `--expect-red <sabotage>\|all` proves the rows see |
-| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host. Data both platforms run |
-| `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
+| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host, `refusedByDesign`. Data both platforms run |
+| `browser-checks/fixtures/rendered/` | twelve Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor, Simulation) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
+| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, sent to browsers only) from the site's own script refused; `test_refused_by_design.mjs` beside it |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
+| `browser-checks/lib/plant_phet.py` | `fetch` downloads the Simulation page's PhET simulation once into the dev cache (`PLANTOIR_PHET_CACHE`, else `~/Library/Caches/Plantoir-dev/phet`), refusing a file whose SHA-256 is not the one `rendered_rows.json` pins; `plant` puts it where a build keeps its downloads, so the fixture build asks PhET nothing (#674). Run `fetch` once per Mac: with no copy the Simulation page is left out and its rows are SKIPS by name, and with `PLANTOIR_REQUIRE_ENGINES` set a missing copy is a FAILURE |
 
 **The rows** are `rendered_rows.json` → `rows`, each with the words it passes
 on: mermaid (drawn, and drawn again after the site's own dark-mode button),
@@ -4965,7 +4971,7 @@ katex, tikz, graph, python (Run, then a line typed live where the host
 isolates the page), swift, quiz (the contract's words), tasks, progress,
 geogebra, geogebra drag, geogebra reset, geogebra keys (#807's three: the
 drag, the reset and keys while lines run), embeds (deployed sites only),
-pdf, print, copy (#759), heading anchor (#604, ported from
+phet (#674), pdf, print, copy (#759), heading anchor (#604, ported from
 `heading_anchor.mjs`), and on every page fonts, clean page and own host;
 cold visit (#625) in WebKit only. Presses are Playwright's own, which wait
 for the element to be visible, still and topmost at its centre and then
@@ -4987,7 +4993,50 @@ Waits are on the state asked about, with a ceiling.
   any page through, implementation review H1; measured: a frame from
   example.com on the Quiz page was green in both engines). The Embeds page is
   judged like every other: until the fixes review (F2) the own-host row
-  skipped it, so that rule decided nothing.
+  skipped it, so that rule decided nothing. On a deployed site (`--base`)
+  the `thirdPartyHostsToday` hosts still go through the router, but each is
+  an EXPECTED line rather than allowed, and a listed host no page asked is
+  a failure (`browser-checks/lib/expected_failures.mjs`, #597's second half).
+- **A teacher's embed's own console is set aside** (#597's second half,
+  measured 2026-11-13 on the Embeds page under `--base`): a console line
+  that names, or comes from, a request an embed made, a page error thrown
+  by an embed's own script (the first address its stack names), and an
+  embed's own failed request are counted in the clean-page row's line and
+  not judged; the embeds row judges the frames themselves. Without it the
+  row failed both engines on YouTube's advert requests, Vimeo's and PhET's
+  fullscreen checks and GeoGebra reaching for the page.
+- **A refusal the site's policy makes on purpose is set aside, by what it
+  is, never by its words alone** (#597's second half, the first deployed
+  run, 2026-11-13). Netlify adds its badge as an inline script on a page's
+  way to a browser, and the policy `netlify_badge.py` writes refuses it by
+  design, one refusal a page in both engines. `rendered_rows.json` →
+  `refusedByDesign` names the host and the two engines' wordings, and
+  `browser-checks/lib/refused_by_design.mjs` sets a line aside only on a page
+  holding a refused inline script that is in some document the page was
+  sent, as the browser received it, and in no document fetched again at the
+  same address without a browser's User-Agent; the site's own refused
+  script, or one its scripts made, fails the row, so a policy that lost a
+  hash is still red. The refusals are counted page by page: at most one
+  such script a document (`refusedScriptsPerDocument`) and exactly one
+  message for each (`linesPerRefusedScript`, WebKit's two records of one
+  message counted once), so a second injected script, a refusal more than
+  the scripts account for, or one fewer fails the page and names the count
+  (597b fix review, d1; measured on a stand-in edge: Tasks 3, Embeds 2,
+  every other page 1, in both engines). What is set aside is an EXPECTED
+  line of the clean-page row, with each page's count, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
+  documentation/07-deployment.md has the measurements.
+- **A row that takes the page elsewhere waits for the page's own index
+  request first.** Quartz fetches `static/contentIndex.json` as a page loads
+  and nothing catches it, so a reload that cancels it makes WebKit throw
+  "TypeError: Load failed" into the page (measured with 0.5 s of latency;
+  the first deployed run's Cloudflare red). The tasks reload, the progress
+  row's next page and the embeds reload each wait on the page's `fetchData`
+  promise first (`untilTheIndexHasArrived`, 30 s ceiling,
+  `browser-checks/lib/index_wait.mjs`), the real dependency rather than a
+  fixed sleep or a network-idle guess. Reaching the ceiling is never silent
+  (597b fix review, d2): the row's line says so with a count, the checker
+  prints a `NOTE: index wait` line for it, and `verify-deploy.sh` carries
+  that line into its Result block.
 - **Until the page is quiet.** Before a page is judged it is scrolled to its
   end a window at a time, so what loads only below the fold is asked for,
   then held until it has asked for nothing for a second and at least 5 s
@@ -5080,9 +5129,13 @@ clone), applies one sabotage, serves the copy and runs that page's rows in
 both engines; it passes only when the aimed row FAILS with its own reason's
 words and every other row on the page passes, except those the sabotage's
 `alsoRed` names (a missing file is also a console error, so the clean-page
-row is named there, with its reason). All forty sabotages run on every gate
-(the keys one in Chromium only, below), three at a time, each in a browser
-of its own.
+row is named there, with its reason). Every sabotage in `rendered_rows.json`
+runs on every gate (the keys one in Chromium only, below) except one, three at
+a time, each in a browser of its own: forty-six sabotages since #597's second
+half and #674 (counted with `len(sabotages)` on the merged tree, 2026-11-14:
+forty on `dev`, 597b's two and PhET's four), of which `embeds refused` runs on
+deployed sites only, so verify.sh's `--expect-red all` runs forty-five and
+says the forty-sixth in a NOTE line.
 
 Two things made that reliable, both measured 2026-11-13:
 
@@ -5211,6 +5264,413 @@ course (above). A per-host or per-engine checker (the 2026-10-31 ruling asks
 for a host as an entry in a list). Firefox (not asked for; `firefox-1543` is
 cached and the checker could add it by name). Screenshots to judge paint
 (blank in headless WebKit until `load`, #625).
+
+### A check ended from outside ends what it started (#906)
+
+The sixteen checks that drive Chrome over its debugging port start it
+through `browser-checks/lib/own_processes.mjs` (`spawnBrowser`), not a plain
+`spawn`. Before #906 a check ended its Chrome only in its own `finish()`, so
+a check stopped from outside left the browser running with no parent.
+**Measured** (M4 Pro, Chrome for Testing 155, 2026-11-13): `maths_offline.mjs`
+from `dev`, given SIGTERM while it ran, left 11 Chrome processes running
+3 s later; the same check through the helper left 0 after SIGTERM, SIGINT
+and SIGHUP alike (exits 143, 130, 129). `rendered_features.mjs` is left as it
+is: Playwright's `launch` ends its browsers on those three signals by its own
+defaults (`handleSIGINT`, `handleSIGTERM`, `handleSIGHUP`), which this piece
+read in its documentation and did not measure.
+
+The helper answers a normal exit, `process.exit()`, an uncaught error and
+the three signals by ending the children Node has not yet seen end, and only
+those: a process the check did not start is never sent anything
+(`test_own_processes.mjs` keeps a bystander running beside a killed check).
+SIGKILL cannot be answered; measured, a check killed that way leaves its
+Chrome. So every browser a check starts carries
+`--plantoir-check-of=<checkout>` (Chrome keeps a switch it does not know on
+its command line and ignores it), and `node browser-checks/lib/own_processes.mjs
+leftovers` names a process carrying this checkout's mark whose parent is gone.
+The checkout is written with `encodeURI`, so the mark holds no space: written
+plainly, the mark of a checkout `/x/plantoir` was the start of the mark of a
+checkout `/x/plantoir two`, and one would have named the other's leftovers.
+`verify.sh` prints that line before its browser checks, with the `kill` that
+ends them, and ends them only with `PLANTOIR_END_LEFTOVER_BROWSERS=1`, since
+the run did not start them. It prints the line again under the summary,
+whether the run passed or failed, because the last lines are the ones read.
+Ended that way, a real Chrome's twelve processes took about 9 s to go under
+load (3 s unloaded). Without `node` the self-test is a SKIP line by name, and
+without Chrome for Testing its real-Chrome case is a SKIP line of its own, so
+the summary's count of SKIPs includes it.
+
+A signal to `verify.sh` alone reaches the browser check it is running. Only
+the browser checks go through `run_check`: during any other step (the image
+build, the Docker runs of the Python tests) a signal still waits for that step
+to end, as it did before. Bash runs a
+trap only after its foreground child ends, so before this a TERM to
+`verify.sh` waited for the check to finish by itself (measured with a 6 s
+child: the trap ran 6 s later), and with no trap at all bash exited at once
+and left the check running with no parent. Every browser check in
+`verify.sh` now runs through `run_check`, which starts it in the background and waits on it, so
+the signal interrupts the wait at once; `stop_for_signal` passes the signal
+on to that one pid and to nothing else, waits for the check to end (it then
+ends its own Chrome, above), and exits 129, 130 or 143. An INT is passed on
+as TERM, because a command bash starts in the background with no job
+control ignores INT. `scripts/test_verify_lock.py` holds it: the check gone,
+a process the run started some other way still running, for each of the
+three signals; a foreground `run_check`, a trap that passes nothing on, and
+one that signals every child of the run each turn it red. `verify.sh`'s own
+page server (`python3 -m http.server`) is ended by its EXIT trap as well, so
+a run stopped part way leaves neither behind. A SIGKILL to `verify.sh`
+cannot be answered: the check and the page server run on, and a check that
+is then killed the same way leaves its browser for the next run's leftover
+line to name.
+
+**Rejected.** Starting each browser in a process group of its own and ending
+the group, as the issue first proposed: a browser in the check's own group
+already receives a signal sent to the whole group, SIGKILL included, so
+detaching it would make the one case nothing can answer worse, and ending
+Chrome's main process already ends its helpers (all of them gone within 3 s,
+measured). Ending leftovers by name (`pkill -f Chrome`): it would end a
+browser some other checkout or person started.
+
+## S. PhET simulations (#674, v2.0.0)
+
+A ` ```phet ` fence becomes a card students tap to open a PhET simulation
+from the class site's own copy. The build's half (downloading, keeping, the
+stop) is documentation/05 → "PhET simulations: what the build does" and
+"Files downloaded when a page first uses them"; the contract is
+`contracts/shared-rules.json` → `phetFences`.
+
+### S1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/plantoirPhet.ts`: the transformer, wired straight
+  after GeoGebra's (`_wire_phet_transformer`, anchored on
+  `Plugin.PlantoirGeoGebra()`, idempotent), so the order is Figures,
+  GeoGebra, PhET, Quizzes on a new site and an old one alike
+  (`test_quartz_additions_wiring.py`).
+- `components/scripts/phet.inline.ts` and `components/styles/phet.scss`,
+  carried by `PlantoirMetaLine` as GeoGebra's are. Every style is under
+  `.pl-phet`; the script does nothing until a tap.
+- `cli/plantoirIsolation.mjs`: `ENGINE_FOLDERS` gains `static/phet`.
+
+### S2. Two stages, as GeoGebra's
+
+The markdown stage turns a fence the manifest knows into `<figure
+class="pl-figure pl-phet">` holding only a hidden figcaption (the
+description), an mdast node so the quiz reader sees a figure; a quiz reads
+it by that description alone, never its button or credit line
+(`plantoirQuizzes.ts`, as for a sketch). The html stage puts in the card:
+a box of the simulation's own shape holding its picture, the title in the
+page's language, the description, the button `words.site.open` with the
+gzipped size ("about 1 MB" for gas-properties), the print note and PhET's
+credit line. A fence the manifest does not know stays the code block it
+was. The manifest is keyed by `figures.key_of` in the build and
+`figureRules.keyOf` on the site's mdast code value, GeoGebra's rule reused;
+`phetFences.keys` holds the same fence at the top of a page, in a callout,
+in a list item, with tildes, with Windows line endings and in a quiz's
+explanation, run by `test_phet.py` and, through the site's own Markdown
+reader in Node, by `scripts/check_phet_rules_against_the_site.py`
+(verify.sh, beside GeoGebra's check). The plan named that check and the
+first implementation left it out; the implementation review found the gap
+(a callout fence the two read differently would build as "ready" and show
+as code, with no folder problem), and it was put back.
+
+**In a self-check question** (`phetFences.quizzes`), as for a sketch: a
+simulation works in the question and in the explanation, and one inside a
+choice makes the quiz `simulationInAChoice` (a folder problem and a
+not-ready quiz), found by `quizzes.py` and by the site's `modelOf`
+(`holdsSimulation`: a `plantoirPhet` node, or a ` ```phet ` code block the
+build could not show) alike. A choice is a click target, so a tap on the
+simulation would pick it, and the shuffle moves the choices, which would
+reload a simulation a student had open. The cases are
+`quizCallouts.recognise`'s `aSimulationInAChoice`,
+`aSimulationInACalloutInAChoice` and `aSimulationInTheQuestion`, which
+verify.sh 6k plants with the others. Must-fail: `quizzes.py` from before the
+check gives the two refusals as working questions.
+
+### S3. A tap
+
+The loader makes ONE frame in the picture's box, at `<root>/static/phet/
+<sim>/?yotta=false&allowLinks=false&locale=…&screens=…`, the box's shape
+being the picture's own (PhET's 600 px pictures are the whole simulation
+window, 600 by 394 for gas-properties) or else PhET's layout bounds,
+1024 by 618. A simulation scales itself to fit its box, so its logo stays
+in view (the licence's brand rule), and the frame takes the picture's place
+without moving anything below it (#756's lesson). The box says the
+simulation is opening, once, in a polite live region. The simulation shows
+when the frame's document has loaded AND is the simulation (its `phet`
+object is there); an error page, a school network's sign-in page or a
+minute with neither says `couldNotLoad` below it and the button works
+again. Quartz's page change replaces the body and the frame with it,
+which frees the simulation's memory; a frame that loads after its page has
+gone marks nothing. Nothing is fetched before a tap but the picture.
+
+### S4. Paper, dark theme
+
+A frame prints blank or cropped, so the print styles hide it and print the
+picture, opened or not, with the print note and the credit line as plain
+text. The card follows the theme; the simulation keeps its own colours
+(`colorProfile` is not a teacher's setting).
+
+### S5. Measured (2026-11-13, this Mac, headless Chromium 1243 and WebKit 2359, muted)
+
+On a site made with the real `phet.py` (from a copy planted as a build
+keeps it), the real transformer and the real loader, served by
+`browser-checks/lib/site_server.mjs` under the publish's own `_headers`
+(isolation, then Netlify's policy): the rendered check's `phet` row passed
+in both engines. A real press opened gas-properties 1.1.12 in 0.4 s
+(WebKit) and 0.6 s (Chromium) on a page isolated for live input; inside the
+frame the simulation read `yotta` and `allowLinks` false, `fr` and one
+screen; the frame was 758 by 497 inside its box; the own-host row saw
+nothing asked of any other host. Its four sabotages each turned it red for
+its own reason in both engines: the address without `yotta=false`
+(own-host red too: the simulation asked other hosts), the `/static/phet/*`
+header taken out (never opened; "This simulation couldn't be opened"), the
+box held at 120 px ("cropped: 758 x 118"), the credit line taken out. The
+full fixture build is verify.sh 6h-r's (Deferred to the gate on the day it
+was written).
+
+### S6. Rejected
+
+- Loading the simulation from phet.colorado.edu in the frame (what a pasted
+  frame does): four requests to PhET and Google from every student's
+  browser, and no simulation on a network that blocks PhET.
+- A frame on the page before a tap: a 3 MB file for every visitor of the
+  page, most of whom never open it.
+- `sandbox` on the frame: the simulation is the site's own file on the site's
+  own host, and with `allowLinks=false` nothing in it leaves the site.
+- Printing the frame: blank or cropped in both engines.
+- A height setting: the box takes the simulation's own shape.
+
+### S7. Known limits
+
+- The credit line is in English on every page, French courses included.
+- A simulation's sounds play after a student touches it (part of the
+  simulation; not ruled on). The rendered check holds every frame's audio
+  suspended.
+- Each simulation adds about 21 hashes (about 1 KB) to the policy a Netlify
+  publish sends with every file of the site (documentation/07). Whether
+  Netlify serves a long one whole is measured before this piece merges.
+- On a deployed site the rendered check meets the Simulation page like any
+  other fixture page (`rendered_rows.json` → `pages`), and verify-deploy.sh's
+  build downloads the simulation from PhET as a teacher's first build does:
+  nothing plants the dev cache's copy there. Measured 2026-11-14 on a stand-in
+  for Netlify's edge (the simulation's own copy and a page holding its frame,
+  served by `site_server.mjs` under the publish's `_headers`, an inline script
+  added to every document a browser was sent), headless Chromium 155 and
+  WebKit 2359: the simulation started under the policy (French, one screen,
+  `yotta` false, on an isolated page), and the only refusal was the added
+  script, once in the page and once in the frame. Before the checker counted
+  a site's own frame's document, that second line failed the clean-page row
+  ("2 refusal lines ... account for 1"); `refusedByDesign` is unchanged. Whether
+  real Netlify adds its badge to a frame's document is not measured yet.
+
+## T. YouTube and Vimeo players from the picture form (#692, v2.0.0)
+
+A teacher writes the address the video site's Share button gives in the
+picture form, on its own line, and the class site shows the player:
+
+```markdown
+![Mitosis in three minutes](https://vimeo.com/76979871)
+![](https://vimeo.com/123456789/abcdef1234)
+![Slope in two minutes](https://www.youtube.com/watch?v=WUvTyaaNkzM&t=30)
+```
+
+Before #692 only YouTube had this form (Quartz's own `enableYouTubeEmbed`);
+Vimeo needed its `<iframe>` code pasted, and `![](https://vimeo.com/...)`
+was a broken picture. Every case is in `contracts/shared-rules.json` →
+`videoEmbeds`.
+
+### T1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/videoRules.js`: the rules, plain JavaScript with no
+  imports, shared by the transformer and the check. Which addresses, the
+  player address, the title, the fallback titles, the attributes and the
+  note.
+- `plugins/transformers/plantoirVideo.ts`: the html-stage transformer. An
+  `img` whose `src` the rules recognise becomes `<iframe class="external-embed
+  plantoir-video youtube|vimeo">` with `src`, `title`, `loading="lazy"`,
+  `allow`, `allowfullscreen`, `referrerpolicy` and `frameborder`.
+- `components/styles/videos.scss`: one rule, carried by
+  `PlantoirMetaLine.tsx` into the one `index.css` (as `pictures.scss` is).
+
+### T2. The order, and why
+
+Quartz runs every transformer's html plugins in the order the transformers
+are listed (`processors/parse.ts`, `createHtmlProcessor`). OFM's YouTube
+step sets `node.properties` to a new object, so after it the picture's
+`alt` is gone and there is nothing to make a title from. So the videos'
+transformer is wired straight BEFORE OFM (C2-33) and makes both hosts'
+players itself; OFM's step then finds no picture left to change. OFM's
+`rehype-raw` also runs after it, so pasted `<iframe>` code is still a raw
+node when the videos' transformer looks, and is never touched. A raw
+`<img src="https://www.youtube.com/...">` typed as HTML is the one shape the
+videos' transformer cannot see: OFM still makes its old `youtube.com`
+player from it, as before #692.
+
+### T3. Addresses and players
+
+- **YouTube**: every address OFM's `ytLinkRegex` and `ytPlaylistLinkRegex`
+  read (copied into `videoRules.js` unchanged, so an address that played
+  before still plays), plus `youtube.com/shorts/<id>`. The player is
+  `https://www.youtube-nocookie.com/embed/<id>`, with `list=` and with
+  `start=<seconds>` from `t=90`, `t=1m30s` or `start=90`.
+- **Vimeo**: `vimeo.com/<id>`, `vimeo.com/<id>/<hash>` (unlisted),
+  `vimeo.com/channels/<name>/<id>`, `vimeo.com/groups/<name>/videos/<id>`
+  and `player.vimeo.com/video/<id>?h=<hash>`. The player is
+  `https://player.vimeo.com/video/<id>?h=<hash>&dnt=1`: the hash FIRST,
+  because Vimeo's help says every other parameter goes after it
+  (help.vimeo.com, article 12426285089681, read 2026-11-13). A `#t=` start
+  time is kept as Vimeo's own `#t=<seconds>s`. Any other vimeo.com address
+  (a showcase, a profile) stays the picture, and the transformer prints
+  `plantoir: note:` with `videoEmbeds.notes.notAVideo`. That line reaches the
+  build's console only, not the Problems tab: no Python reads video
+  addresses, and the page itself shows the broken picture in a preview (plan
+  review S4, accepted).
+- **The title** is the words in the brackets, with an Obsidian width
+  (`|400`, `|400x300`) taken off, or `videoEmbeds.titles` when they are
+  empty.
+- **The referrer policy** is `strict-origin-when-cross-origin`, the one
+  Vimeo's own embed code carries (its oEmbed answer, 2026-11-13). A video its
+  owner limited to specific domains plays only when the player is told the
+  class site's address, and YouTube players are reported to refuse to play
+  when sent no referrer. It is a contract value with that reason so nobody
+  tightens it to `no-referrer`.
+- **Privacy**: Russell's ruling on #692 (2026-11-13): the privacy-enhanced
+  YouTube address and Vimeo's `dnt=1`; no tap before a player loads.
+
+### T4. The size
+
+Measured before the change (2026-11-13, the verify fixture's YouTube
+player, Chromium 1243 and WebKit 2359, every off-site request refused):
+650 x 366 at a 1300 px window and 358 x 201 at 390 px. Quartz's
+`.external-embed.youtube { width: 100%; aspect-ratio: 16 / 9 }` won over the
+player's `width="600px"`, so the player filled the column. Russell's size
+(2026-10-24) is 600 px wide at most, 16:9: `html body
+iframe.external-embed.plantoir-video { width: 600px; max-width: 100%;
+height: auto; aspect-ratio: 16 / 9 }`. The long selector is needed because
+Plantoir's styles come BEFORE `base.scss` in `index.css`, so the rule must
+win on specificity. Measured after (2026-11-13, a page built in
+`quartz-teacher:dev-test` from the skill's video example, Chrome for
+Testing 155 headless): 600 x 337.5 at 1300 px, 358 x 201.4 at 390 px. So a
+YouTube player that was 650 px wide on a laptop is now 600 px.
+
+### T5. The checks
+
+- `scripts/check_video_rules_against_the_site.py` (verify.sh, in the image):
+  every `videoEmbeds.cases` page through remark-parse, OFM's Markdown
+  plugins, remark-gfm, remark-rehype, then PlantoirVideo's and OFM's html
+  plugins, each bundled from its real source with the image's esbuild; and
+  the titles, attributes and note as `videoRules.js` has them. Must-fails
+  measured by copy-aside: `dnt=1` before `h=` (3 cases red), the Shorts
+  rule removed (1), the old `youtube.com` player address (7), OFM's plugins
+  before PlantoirVideo's (48 problems), and `origin/dev`'s transformers
+  (does not bundle).
+- `scripts/test_quartz_additions_wiring.py`: the transformer straight before
+  OFM, on a fresh section and on one wired before #692, and said and left
+  out when OFM's line has moved; the style rule exactly. Red on
+  `origin/dev`'s `build_site.py` (3 tests) and with the transformer wired
+  after OFM (2).
+- `browser-checks/video_players.mjs` (verify.sh 6h-v, in Chrome for Testing
+  and Playwright's WebKit). Playwright's driver and WebKit come from
+  Plantoir's browsers cache (`PLANTOIR_BROWSERS_CACHE`, else
+  `~/Library/Caches/Plantoir-dev/browsers`), the driver held to
+  `package-lock.json`'s version as the rendered check holds it. Chrome for
+  Testing is the path verify.sh passes (`PRINT_CHROME`: `PLANTOIR_CHROME`,
+  else the cached copy); the check does not search for it itself. An
+  engine that is not there is a SKIP by name, and a FAIL under
+  `PLANTOIR_REQUIRE_ENGINES`, as is no Node 22. Every exit of the check is
+  caught, since verify.sh runs under `set -euo pipefail`, and the
+  sabotages run only after a clean pass, as 6h-r's do; a sabotage run whose
+  log does not name the same engines is a failure. What it checks:
+  the skill's video example as 6n built it, every request to another host
+  refused so nothing loads or plays. 600 px and 16:9 at 1300 px, the
+  column's width and 16:9 at 390 px, a title, `loading="lazy"`, the referrer
+  policy and a private address on each player; the pasted Vimeo player keeps
+  its own width. Measured 2026-11-13: 600 x 337.5 at 1300 px and 358 x
+  201.38 at 390 px in both engines. verify.sh breaks a copy of the site
+  three ways and each must fail for its own reason in every engine that
+  ran: the
+  size rule out of `index.css` (650 px, measured), the title and `loading`
+  off (Quartz's own player's shape), the old `youtube.com` address.
+- verify.sh 6n: the skill's example builds as the three players, the pasted
+  Vimeo code unchanged, no `www.youtube.com/embed/`, and no PhET `<iframe>`
+  (since #674 the skill's PhET example is a ` ```phet ` fence, with its own
+  claim).
+- The rendered check's `embeds` row (deployed sites only) has a short-form
+  Vimeo line on the Embeds page, for a different video (22439234) from the
+  pasted player (76979871). The row brings each frame into view before it
+  waits, since a lazy player far below the window would never ask for its
+  document. It files each frame's answer under the address the frame was
+  given (the first request of a redirect chain, without its `#` part) and
+  matches it in FULL, query included; the last response of a chain wins.
+  It passes when every frame's own document answered 2xx. Until the
+  implementation review (finding 1) it matched on the address before its
+  `?`, so the pasted player's 200 answered for a short-form player of the
+  same video that never asked for its own. Its sabotage `embeds unknown
+  video` points the short-form player at id 9999999999, which
+  player.vimeo.com answers 404 (curl, 2026-11-13; 22439234 and 76979871
+  answer 200). It carries the row's `hosts`, as 597b's `embeds refused`
+  does, so verify.sh's local `--expect-red all` prints a NOTE for it and a
+  run by name with a deployed host's rows (`--site <public> --host netlify
+  --expect-red 'embeds unknown video'`) proves it; verify-deploy.sh runs
+  neither sabotage by name yet. Since #692 the Embeds page's YouTube frame
+  is the `www.youtube-nocookie.com` player, and `embeds refused` reads
+  either address when it points the frame at the watch page. Measured 2026-11-13 with every embed
+  frame's document fulfilled by a stub in the router (200, or 404 for
+  9999999999) and `--pretend-offline`: the plain row green in Chrome for
+  Testing and WebKit ("all 5 frames' documents answered 2xx"), and the
+  sabotage red for its own reason in BOTH engines in 2 s ("…9999999999?dnt=1
+  answered 404"; first by the fix review, then reproduced). An earlier probe
+  of the implementer's, outside the rendered check, stalled in WebKit; that
+  was the probe, not the row, whose every wait has a ceiling. On the old
+  same-video fixture with the short-form player's request never answered,
+  the OLD row passed and the new one said "answered nothing". Only the run
+  against the real player.vimeo.com is left to a networked run.
+- `codeRunnerBlocks.isolation.cases`: a page with a short-form player is a
+  `frame` page, never isolated.
+
+### T6. Rejected
+
+- A tap before a player loads (a card with the title and a Play button,
+  about one agent-hour more): offered on #692 and not chosen.
+- Running after OFM and patching its player: the title is already gone.
+- Turning OFM's `enableYouTubeEmbed` off: an edit to every section's
+  settings that buys nothing over leaving it to find no picture.
+- A per-video width: the size is ruled; `|400` is dropped from the title.
+- Vimeo's `title=0&byline=0&portrait=0`: the video's owner sets them.
+- A Vimeo showcase player: its embed address could not be verified.
+- Google Drive, Loom and Stream: each has its own sharing pitfalls; later,
+  if asked.
+- A Python scan for `notAVideo` feeding the Problems tab: no Python reads
+  video addresses today, and the broken picture is visible in the preview.
+
+### T7. Known limits
+
+- A school network that allows youtube.com and blocks
+  youtube-nocookie.com stops every YouTube video at school on the first
+  build after this ships, while the teacher's preview at home still plays.
+  Nothing tells the teacher. The page-authoring skill says to ask the
+  school's network team to allow youtube-nocookie.com; Help's page on videos
+  (#839) and the release notes owe the same sentence.
+- Obsidian shows the Vimeo picture form as a player only with the community
+  add-on Simple Vimeo.
+- A video its owner limited to specific domains plays only on the domains
+  listed.
+- The YouTube rule is Quartz's own `ytLinkRegex`, copied unchanged, and it
+  is not limited to YouTube's addresses. A picture whose path has a folder
+  ending in `v` and an 11-character file name (`Media/Dev/diagram.png`, as
+  `![](...)` or `![[...]]`) becomes a player for a video that does not
+  exist (measured 2026-11-13). OFM did the same before #692, to
+  youtube.com, and would still do it after PlantoirVideo; a follow-up.
+- Three addresses still show a broken picture, as before #692:
+  `youtube.com/live/<id>` (what Share gives for a live stream or premiere;
+  no player and no note), `vimeo.com/showcase/<sid>/video/<id>` (one video
+  in a showcase; the note), and `vimeo.com/manage/videos/<id>` (the address
+  in the owner's browser after an upload; the note). A YouTube player
+  address's `end=` and a playlist's `index=` are dropped. A follow-up.
+- Not measured here: whether nocookie playlists play, and whether YouTube
+  refuses a player sent no referrer. Vimeo answers 404 for a video that
+  does not exist (above). The deployed `embeds` row reads each frame's own
+  status; it cannot tell a Vimeo error page that answers 200 from a video.
 
 ## E. Summary: what is *not* customized
 

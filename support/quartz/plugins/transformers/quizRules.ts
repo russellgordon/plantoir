@@ -38,6 +38,8 @@ export type QuizModel = {
   // boxed list's choices: refused, because a choice is a click target - a
   // drag on a point would pick it - and the shuffle moves the choices.
   sketchInAChoice?: boolean
+  // A PhET simulation inside an item of the first boxed list (#674).
+  simulationInAChoice?: boolean
 }
 
 export type QuizKind = "single" | "multiple" | "short" | "fill"
@@ -268,6 +270,9 @@ export function verdict(model: QuizModel): Verdict {
   }
   if (hasChoices && model.sketchInAChoice) {
     return problem("sketchInAChoice")
+  }
+  if (hasChoices && model.simulationInAChoice) {
+    return problem("simulationInAChoice")
   }
   if (hasChoices) {
     if (model.choices.length === 1) {

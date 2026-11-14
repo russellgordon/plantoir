@@ -1785,8 +1785,8 @@ bring; such a build shows its rows on the next build instead.
 
 Until #128 a course had ONE coverage map, built from ONE folder, and its
 expectation pages had to be named like `A1.1`. A course keeping both an
-`Ontario Curriculum` and a `College Board Curriculum` folder (every LCS course
-has both) got a map from Ontario only, while Course Settings and "Folders
+`Ontario Curriculum` and a `College Board Curriculum` folder (every course made with the
+terminology switch the wizard offered until #891 has both) got a map from Ontario only, while Course Settings and "Folders
 Plantoir uses" named College Board — and College Board's pages, named `1.A`,
 were never expectations to the build at all (#90, measured on this Mac
 2026-09-06). Now every curriculum folder the course DECLARES that holds an
@@ -1804,7 +1804,7 @@ ONE folder: the alphabetically first top-level folder whose name mentions
 piece), and only if there is none, the first holding any expectation page.
 That preference is the fix for the implementation review's finding 1,
 measured: with the widened code rule and a plain alphabetical scan, a scratch
-LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
+two-curricula course whose `College Board Curriculum` held `1.A` pages had Ontario's map
 silently replaced by College Board's under the same title, because `College`
 sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
 pages, nothing declared) holds it byte for byte to what 92a7099a built. The scan is a FALLBACK, never additive:
@@ -1820,8 +1820,8 @@ folder the scan found — is always `Curriculum Coverage`; every other map is
 (`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
 its address and every link to it, byte for byte (the goldens in
 `test_coverage_maps.py` were captured from origin/dev 92a7099a before any edit:
-a `Curriculum/` course and the LCS default, Ontario with pages and College
-Board empty), and a course that declares a second folder later gets a SECOND
+a `Curriculum/` course and a two-curricula course, Ontario with pages and
+College Board empty), and a course that declares a second folder later gets a SECOND
 page rather than two renamed ones. Only a non-primary title is written quoted
 in the page's frontmatter, because a folder's name can carry a colon.
 
@@ -1911,7 +1911,7 @@ SHARED folders on disk for expectation pages
 (`CurriculumFolderRule.foldersWithPages`): while the map is on only the LAST
 folder with a map is refused, the others ask first
 (`removeCurriculumFolderWithItsMapConfirmation`), and a folder with no pages is
-an ordinary folder — on the LCS default, Ontario (which holds the map) is the
+an ordinary folder — on a two-curricula course, Ontario (which holds the map) is the
 one refused, where the by-name rule used to protect the empty College Board.
 While no folder holds a page they fall back to the single by-name folder, so
 an empty new course is protected exactly as before. Both apps OFFER to declare
@@ -1936,8 +1936,8 @@ the first tick never drops the map the scan found. A rename of any of them mater
 - A per-map switch: one switch covers every map; a teacher who wants one map
   fewer unticks the folder.
 - Bulk-migrating existing configs, and dropping the legacy key's READ.
-- A health finding for "a curriculum folder with no pages": every LCS course
-  not teaching AP would be nagged on day one.
+- A health finding for "a curriculum folder with no pages": every two-curricula
+  course not teaching AP would be nagged on day one.
 - `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
 
 **Known limits.** A code in two folders counts on both maps (matching is by
@@ -3630,6 +3630,301 @@ commands on the same page 40 ms; after Quartz's page change 253–259 ms;
 cross-origin isolated the same; 0 refusals, 0 requests off the site. The
 slope-angle sketch (1.6 MB, with its picture): 698–769 ms, 18 requests,
 10,644,945 bytes (4,473,431 compressed).
+
+## Files downloaded when a page first uses them (#674, v2.0.0)
+
+Some of what a class site carries is too large to put in the website
+builder and is not Plantoir's to ship: a PhET simulation (#674, 2.6 to
+4.8 MB each, 127 of them) and, with #679, the sounds a tune names (about
+2 MB each, 128 of them, 239 MB in all). Russell's rulings of 2026-11-13
+(on #674, and on #679 for sounds) are the same for both: downloaded to the
+teacher's computer on the first build whose pages use one, kept, copied
+into the site from there, and a build with no internet that needs one it
+does not have STOPS. `scripts/kept_downloads.py` is that rule, once, for
+every kind; the contract is `contracts/shared-rules.json` → `keptDownloads`
+and `scripts/test_phet.py` runs every case.
+
+1. **Where: `.downloaded/<kind>/` in the working folder's builds folder.**
+   `~/Library/Application Support/Plantoir/builds/<folder id>/.downloaded/`
+   on a Mac, `%LOCALAPPDATA%\Plantoir\builds\<folder id>\.downloaded\`
+   on Windows, beside the courses' built sites. `root_for(course_dir)` finds
+   it from the build's own layout: `PLANTOIR_BUILD_ROOT` when it is set
+   (Windows), else the folder the course's `.merged_output` link points into
+   (the Mac), else, for a course whose `.merged_output` is still a real
+   folder, inside it, so nothing is written among the teacher's notes. One
+   copy serves every course and section of the working folder: a simulation
+   used by SNC1W and SPH3U is downloaded once (measured in
+   `test_one_download_serves_two_pages_and_two_courses`: the second course's
+   build asks nothing). The Mac's website builder reads it at the same
+   absolute path through the builds folder's mount, so nothing new is
+   mounted and the folder is under the home folder, which is all the Colima
+   VM can see.
+   - **Rejected: per course**, as `.geogebra-cache` is. Each course would
+     download the same file, and the clears that keep `.geogebra-cache` name
+     one folder in five launchers and two apps (#789); a folder beside the
+     courses is cleared by none of them.
+   - **Rejected: a folder for the whole computer** under Application
+     Support. The Mac's builder sees only its two mounts, and a mount cannot
+     be added to a builder that exists without making it again.
+   - **Rejected: inside the course or the working folder.** It would sync to
+     the teacher's cloud drive, be backed up, show in Obsidian, and travel
+     with a copied folder.
+   - **Rejected: in the image.** A site uses a handful of 127 simulations
+     or 128 sounds, and PhET's files are not Plantoir's to ship (ruling).
+2. **An entry** is `<kind>/<name>/<version>/`: the files and `kept.json`
+   (each file's SHA-256 and size, where it came from, when, and what the kind
+   keeps, such as a simulation's titles by language). It is written into a
+   hidden folder beside it and **renamed into place**, so two sections built
+   at once (#835b) never read half of one; the second to finish throws its
+   copy away and uses the first's. A name or version is lower-case letters,
+   digits, dots, dashes and underscores, so a download can never name a path
+   outside the folder.
+3. **Pinned, and checked every time.** Every file's SHA-256 and size are
+   checked against `kept.json` every time an entry is used (a 3 MB
+   simulation takes a few milliseconds); an entry that fails is thrown away
+   and counts as not downloaded. A kind whose hashes are known in advance
+   passes them (#679: `contracts/toolchain.json` → `pins`) and a download
+   that does not match is refused before anything is kept. PhET publishes no
+   checksum (measured: no header, no file), so a simulation is pinned by the
+   version PhET's metadata names and the SHA-256 of what was checked and
+   kept; from then on every build uses that copy byte for byte.
+4. **Never refreshed on its own; pruned when unused.** A site must not
+   change under a teacher mid-unit, and a build must not need the internet
+   once it has what its pages use. Every build that uses an entry touches
+   its `kept.json`; one untouched for 90 days (`figures.PRUNE_DAYS`, the
+   rule diagrams and GeoGebra's copies follow) goes. Known limits: a newer
+   PhET version reaches a site only after the kept one is pruned or its
+   folder removed by hand; a course left unbuilt over the summer (close to
+   90 days) needs the internet for its first build in September, and may get
+   a newer version; and the copies belong to ONE working folder on ONE
+   computer, since the builds folder is named by a hash of the working
+   folder's path, so a working folder moved or renamed, copied to a new
+   computer, or opened on the other platform starts with nothing kept, and
+   its next build that shows a simulation needs the internet, or stops.
+   Help says to preview once with the internet after moving a working folder
+   or changing computers. Rejected: keeping the copies inside the working
+   folder so they travel with it (they would sync to the teacher's cloud
+   drive and show in Obsidian; `keptDownloads.where.rejected`).
+5. **Asking** (`Fetcher`). https only, to the kind's own hosts; a redirect
+   anywhere else is refused, so a school's sign-in page is not followed. A
+   body larger than 20 MB, or shorter than its `Content-Length`, is refused
+   (GeoGebra's lesson: `read(n)` returns short, and a cut-off chunked body
+   raises `IncompleteRead`, which is not an `OSError`). Each failure is
+   sorted: `notFound` for 404 or 410, `offline` for everything else; whether
+   what came is what was asked for (`damaged`) is the kind's own check.
+   **`Accept: */*`, never `text/html`**, measured 2026-11-13 against
+   phet.colorado.edu: with `Accept: text/html` (curl's and a browser's
+   user agent alike), and with Python's urllib, which sends no Accept, the
+   simulation came back with a Cloudflare Web Analytics script added before
+   `</body>` (`static.cloudflareinsights.com/beacon.min.js`); with `*/*`
+   none of six requests did. The file is cleaned anyway (PhET's item 4).
+6. **The stop** (`keptDownloads.stop`). A build whose pages students can see
+   use something of a kind that is not kept and cannot be downloaded now
+   stops before Quartz runs, exit 1, with nothing written to the site, so the
+   site built last stays as it was. It prints `❌` and the first line for the
+   reason (it begins with the course code, so both apps' failure
+   explanations lift it), then one indented line per place it is used
+   (`“gas-properties” on “Unit 3/Gas Laws”`), at most ten and then
+   `and N more`, then the marker. The apps turn the lines into one sentence
+   (`app-rules.json` → `failureExplanations`, five cases). A preview stops,
+   a deploy stops, and a scheduled deploy stops at its hour with nobody
+   there (`scheduledPublishStopped`'s line records it), which is why Help
+   says to preview once after adding a simulation, before scheduling.
+
+   **A fault in the pass itself stops too** (`notReady`,
+   `phetFences.stop.passFails`). An answer of a shape nobody foresaw that
+   slips past the checks, a full disk, a folder that cannot be written: when
+   any page students can see shows a simulation, the build stops with
+   `keptDownloads.stop.first.notReady` (which ends with the Help menu's
+   Report a Problem item, `help/menu-paths.json` → `helpReportAProblem`,
+   in the form the app's other sentences already give it), naming each
+   simulation and page it can still find. When the visibility rule itself is
+   what failed, every Markdown file of the course is read as text for its
+   fences; when even that cannot be told, it stops naming nothing (`{what}`
+   is then the kind's several with no number). With no simulation on any
+   such page the build carries on, since nothing is missing. The console
+   line before it gives the plain reason only (a full disk's own words),
+   never a path and never Python's name for the fault: any other fault
+   prints the line with no reason in brackets (the fix review measured
+   `AttributeError` and its kind reaching the console). Found by the implementation review: until then the pass
+   caught every error, printed one console line and let the build make a
+   site with every phet block left as code, exit 0, which is the fault the
+   ruling's stop exists to prevent, reached by another road. GeoGebra's
+   catch-all, which the code had copied, is right for GeoGebra, whose ruling
+   is the opposite one. The answer shape the review measured reaching it
+   (`projects` holding a string) is now `damaged` in `PhetSite.metadata`
+   itself (`phetFences.stop` case "PhET answers in a shape nobody
+   foresaw"). Rejected: a folder problem in place of the stop (the site
+   would still build without the simulation), and reusing `damaged` (its
+   sentence tells a teacher with a full disk to reconnect).
+7. **The marker** `PLANTOIR_DOWNLOADED:` (`keptDownloads.marker`), one line
+   per kind per build, only when something was downloaded or the build
+   stopped: counts, bytes, seconds and a reason, never a page or a file of
+   the teacher's. Both apps read it into the trail as `files for the site
+   downloaded` and `files for the site could not be downloaded`
+   (`KeptDownloadsReport` on the Mac). It is one of
+   `machineLineLength.bounded`.
+8. **What #679 calls, unchanged** (`keptDownloads.forTheMusicPiece`): a
+   kind `sounds` in `keptDownloads.kinds`;
+   `kept_downloads.Fetcher(<its hosts>)` to download;
+   `kept_downloads.Store(kept_downloads.root_for(course_dir), "sounds")`,
+   `.put(name, version, files, expected=<the pinned SHA-256s>)` and
+   `.get(name, version, expected=...)`; `.prune(now)` once its pass is
+   done, as `phet.prepare` does; and when a sound is missing and cannot be
+   downloaded, `kept_downloads.stop_lines("sounds", ...)` then
+   `kept_downloads.marker_line(...)`, printed before `sys.exit(1)` as
+   `build_site._stop_for_phet` does. One more table gains the kind: each
+   app's words for a kind (`KeptDownloadsReport.kindWords` on the Mac, its
+   counterpart on Windows), because
+   `KeptDownloadsReportTests.testTheWordsAreTheContracts` holds that table's
+   keys to `keptDownloads.kinds`. Not the folder, not the apps' sweep
+   exception, not the trail events and not the failure explanation change.
+9. **The apps' sweep keeps it.** `BuildOutputLocation.discardBuildsForMissingCourses`
+   removes every entry of a working folder's builds folder that is not a
+   course or `working-folder.txt`; since #674 it keeps `.downloaded` too
+   (`buildOutputLocation.keptDownloadsSurviveTheSweep`, two cases), or the
+   next build would need the internet again, or stop. Windows owes the same
+   in `BuildOutputLocation.cs` (its `windows` issue). The sweeps that remove
+   a WHOLE builds folder (a working folder that is gone, #722; a second
+   spelling's copy, #189) take it with them, which is right.
+
+## PhET simulations: what the build does (#674, v2.0.0)
+
+A teacher writes a ` ```phet ` fence naming a simulation (`sim:
+gas-properties`, or its address on phet.colorado.edu) and students get a
+card with the simulation's picture, its title, the teacher's description
+(`alt:`) and a button; a tap opens it in place from the class site's own
+copy (06 → S). The split is GeoGebra's: **Python prepares and Quartz
+places.** `scripts/phet.py` does everything that can fail; the contract is
+`contracts/shared-rules.json` → `phetFences`.
+
+1. **When.** ALWAYS section, straight after GeoGebra's pass and BEFORE the
+   folder checks (`build_site._prepare_phet`). It is the one pass that can
+   stop a build (item 6), and stops before anything is said or wired.
+2. **Which pages.** One scan for the word `phet` anywhere in the page's
+   text, which also finds `phet.colorado.edu` for the pasted-frame note
+   (item 8); `simulations_on_page` then reads each kept page exactly. The
+   gate's own visibility rule, as figures and GeoGebra. Rejected: a scan per
+   fence opener (` ```phet `, `~~~phet`), as GeoGebra's. CommonMark lets
+   spaces stand between a fence and its language, the site reads ` ``` phet `
+   as a simulation, and the opener scans skipped that page, so it deployed
+   with no simulation and nothing said so (measured by the fix review,
+   2026-11-13). `phetFences.fences.cases` carries both spaced shapes, and
+   `FenceTests` checks that the scan keeps every case with a simulation.
+   GeoGebra has the same gap; it is a follow-up issue, not this piece.
+3. **Reading a fence** (`read_fence`, `phetFences.settings`, eleven cases).
+   Every line is `key: value`; the keys are `sim`, `alt`, `locale`,
+   `screens`; anything else is left out with a note. `sim` takes the name or
+   an address (`simNames`, eleven cases). `locale` is any of `fr`, `fr-CA`,
+   `fr_CA` and is written as PhET writes it. `screens` is distinct whole
+   numbers from 1. Rejected: `height:` (a simulation scales itself to its
+   box, and the box has the simulation's own shape), and every other of
+   PhET's public settings (the ruling: a page may set only the language and
+   the screens).
+4. **The language** (`phetFences.locale`, seven cases): the fence's, else
+   the course's (`course_config.json` → `locale`), against the simulation's
+   own languages: that language and region, else the language, else English
+   with a note. ONE all-languages file per simulation (the director's
+   direction, 2026-11-13), so a language change never downloads anything.
+   Measured 2026-11-13: 127 HTML simulations, 121 with French.
+5. **Finding the copy, or downloading it** (`phetFences.download`). A kept
+   simulation needs nothing (0 requests, measured in the "kept, and no
+   internet" case). Otherwise: the metadata for that one simulation (8,316
+   bytes, 0.09 to 0.14 s on this Mac's line), which names its project, its
+   current version and its title in each language; the all-languages file AT
+   THAT VERSION (`/sims/html/<sim>/<version>/<sim>_all.html`, an address
+   that stays downloadable: `natural-selection/1.5.4` answered 200 while
+   1.5.17 was current); its 600 px picture (none is not an error). What came
+   is **cleaned** of what PhET's servers add on the way
+   (`download.removedOnTheWay`: the analytics script of item 5 above;
+   measured, gas-properties 1.1.12 came as 3,046,765 bytes with it and
+   3,046,404 without, and with it taken out the two are byte for byte the
+   same, SHA-256 `11440b2a…fc34f24`), then **checked**: a web page, at most
+   20 MB, holding PhET's licence line, the production marker and PhET's own
+   brand (a PhET-iO build carries another; the words `phet-io` appear 11 to
+   65 times in ordinary builds and are not a test), and no script from
+   another site. Then kept (`keptDownloads.entries`). Sizes measured
+   2026-11-13: gas-properties 3,046,404 bytes (986,328 gzipped, the size the
+   button names), projectile-motion 4,759,792 (1,367,293); a picture
+   124,133. Times: 0.14 s for gas-properties on this Mac's line; a school
+   line was not measured.
+6. **The stop** (`phetFences.stop`, eight cases; `keptDownloads.stop`). Not
+   kept, and PhET cannot be reached (no answer, a refusal, a timeout, a
+   server error, a redirect elsewhere, a cut-off body): the build stops,
+   `offline`. Not kept, and what came is not a simulation (a captive portal's
+   sign-in page): stops, `damaged`, nothing kept. **This is the opposite of
+   GeoGebra's choice**, where a geogebra.org sketch that cannot be fetched is
+   a folder problem and the page shows its lines. The reason is Russell's
+   ruling of 2026-11-13: a site that says it built and shows no simulation
+   where the page promises one is the fault this prevents; no stand-in card.
+7. **A wrong name is a folder problem, not a stop**
+   (`phetSimulationsNotReady`, `simulationNotFound`): the internet was
+   there, the next build will not fix a misspelling, and the Problems tab
+   names the page and line, with up to three close names from PhET's whole
+   list (asked only then). The fence stays the code block it was. A wrong
+   name is only PhET's own answer for one, an `error` with no projects
+   (measured for a misspelt name); an empty answer of any other shape (`{}`,
+   `null`, no projects, a project naming no such simulation) is `damaged`
+   and stops, since reading it as a misspelling would deploy the page
+   without its simulation under a Problems row that blames the teacher
+   (the fix review's finding, 2026-11-13). The other
+   problems (`simulationNotNamed`, `simulationNotUnderstood`,
+   `screensNotUnderstood`, `localeNotUnderstood`) are read from the fence
+   alone. None is repairable.
+8. **A pasted PhET frame** (an `<iframe>` from phet.colorado.edu, which the
+   page-authoring guidance taught until #674) keeps working; the build says
+   on a `plantoir: note:` line that it reports to PhET and Google from every
+   student's browser and that a phet block shows the site's own copy.
+   Rejected: rewriting it (the teacher's HTML), or adding `yotta=false` to
+   it (it would still load from PhET).
+9. **What the site gets** (`phetFences.siteCarries`). For each simulation a
+   page shows: `quartz/static/phet/<sim>/index.html` (the kept file byte for
+   byte; `index.html` so every host answers `/static/phet/<sim>/` with no
+   redirect), `screenshot.png`, and `ABOUT.txt` (title, version, PhET's
+   credit line, the licence and terms addresses, where and when it came
+   from). The folder is emptied of simulations no page shows and removed
+   when none is, so a site with no simulation carries none. The manifest,
+   `quartz/plantoir-phet/manifest.json`, is by page then fence key (each
+   entry: the simulation, its title in the page's language, the
+   description, the address query, the folder, the picture and its size, the
+   button's size). **For #901** (a site carries only what pages link to): a
+   simulation is linked by its card, a `figure.pl-phet` whose `data-phet`
+   names `static/phet/<sim>/` and whose `<img>` names the picture; #901 must
+   keep the folder while any built page holds such a card.
+10. **The address** (`phetFences.address`): the frame's query always starts
+    `yotta=false&allowLinks=false`, then `locale=`, then `screens=`. Measured
+    2026-11-13 in headless Chromium 1243 and WebKit 2359 with every request
+    off the test host refused: PhET's defaults ask four other addresses as a
+    simulation opens (Google Tag Manager, two of PhET's `yotta` reports and
+    an `http://` update check); `yotta=false` stops all four. A case that
+    drops either fixed setting fails both suites.
+11. **Isolation.** `static/phet` is one of
+    `codeRunnerBlocks.isolation.engineFolders`, so every file in it carries
+    COEP `require-corp` on a publish whose page is isolated for live input,
+    and in the preview (`plantoirIsolation.mjs`'s `ENGINE_FOLDERS`, which a
+    test compares with the contract). Measured by the planner and again here:
+    with no header the frame never opens on an isolated page, in either
+    engine; with it, it opens.
+12. **Netlify's policy** needs no change: `netlify_badge.py` hashes the
+    inline scripts of every built page, the simulation's included. Measured
+    on a site with gas-properties: 22 hashes and a policy line of 1,247
+    characters, sent with every file of the site. Each simulation adds about
+    21 hashes (none shared between gas-properties and projectile-motion,
+    measured by the planner). Whether Netlify takes a long header whole is
+    measured before this piece merges with a credentialed test site
+    (documentation/07): twenty simulations' worth, 421 hashes, a
+    22,766-character line; the
+    fallback, if it does not, is to move each simulation's inline scripts
+    into files beside it.
+13. **Image.** `scripts/` and `support/` change, so every working folder
+    makes its builder again once; no layer and no download are added to the
+    image.
+
+Windows inherits all of it (the Python runs in its runtime's Python, which
+already fetches geogebra.org sketches). It owes the sweep exception, the
+trail lines from the marker, the failure explanation cases, the Problems
+tab's label, and one real first download measured on the PC (its `windows`
+issue).
 
 ## Self-check quizzes: what the build does (#563, v1.8.0)
 

@@ -18,7 +18,12 @@ struct ColourSchemePickerView: View {
                 if selectedSchemeID.isEmpty {
                     Text(CourseSettingsWording.colourSchemeNoneChosen).tag("")
                 }
-                ForEach(ColourSchemeCatalog.schemes) { scheme in
+                // Listed schemes, and the section's own scheme when it is
+                // one kept only for courses that chose it earlier (#891).
+                ForEach(ColourSchemeCatalog.schemesToList(
+                    forSectionSchemeID: selectedSchemeID,
+                    in: ColourSchemeCatalog.schemes
+                )) { scheme in
                     Text(scheme.name).tag(scheme.id)
                 }
             }

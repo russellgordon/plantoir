@@ -71,8 +71,8 @@ ready.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
 - **See, change or remove a saved Netlify or Cloudflare token** in
   Settings ▸ Deploying. ([#696](https://github.com/russellgordon/plantoir/issues/696))
-- **Vimeo videos embed like YouTube ones**, from a plain link, with a
-  privacy-friendly player. ([#692](https://github.com/russellgordon/plantoir/issues/692))
+- **Vimeo videos embed like YouTube ones**, from the address the Share
+  button gives, and both use the video site's privacy setting. ([#692](https://github.com/russellgordon/plantoir/issues/692))
 - **Backups that take far less space.** The backups Plantoir makes on its
   own stop keeping a fresh copy of every picture, video and PDF each time.
   Backups you make yourself, and everything you have today, stay as they
