@@ -2259,10 +2259,19 @@ the MCP SDK's binding of a non-nullable `int`; #885 says to measure it first.
 At about 22:15 EST the mac merged four more pieces into `dev` (fcd0a51c5):
 #835's third part (a build, preview or deploy holds its own SECTION: a work
 lease's sixth line), #855 (Set Up an Assistant…), Help's first 86 pages
-(#839) and #902. A full suite on fcd0a51c5 read BASELINE_TOTALS (this PC, a
-Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200). The same method
-as the two sections above: nothing a teacher sees today differs, and every
-red is held by name against the open `windows` issue that builds it.
+(#839) and #902. A full suite on fcd0a51c5 read `Failed: 5, Passed: 3710,
+Skipped: 1, Total: 3716` (32 min 28 s on this PC, a Lenovo 20QES70500,
+i5-8365U, 16 GB, Windows 11 Pro 26200, with other agents' suites running).
+Three reds were the mac's requests, sorted below. Two were clocks
+(`PythonToolchainTests` on `test_starting_content_prompts.py` and
+`test_no_stored_credentials.py`, each stopped at the runner's 180 s). Run
+alone afterwards, they passed in 116 s and 193 s, the second already over
+the limit with one other suite running. One repository scan in the second
+file took 57.9 s over 15,274 files, `help/` is not among its costliest
+files, and the merge grew the repository by 0.6% in bytes, so the merge did
+not cause it (see "A red that is a clock", above). The same method as the
+two sections above: nothing a teacher sees today differs, and every red is
+held by name against the open `windows` issue that builds it.
 
 **Held, 11 entries, all v2.0.0.** #868 (1): `wording.sectionIsBeingBuiltElsewhere`
 (`AssistWordingKeys`), the sentence for a hold on ONE section, which no
@@ -2281,7 +2290,20 @@ decided as the contract says), and the entry count must equal the held cases
 met; at least twelve of the thirteen cases are asserted exactly. The two
 other #855 quit cases pass as they are: a set-up while the system ends the
 session expects no question, and a set-up beside a deploy asks for the
-deploy. PROVED_QUIT
+deploy.
+
+**Proved** by mutation over the five hooked tests (17 tests, about 7 s a
+round), restoring each file by writing its bytes back. Entries for things
+this app already has ("an outside assistant is being set up while the Mac
+logs out", which it decides as the contract does; the event `app opened`;
+the key `sectionIsBeingDeployed`) each failed with the closed message. A
+`QuitCases` entry for "nothing is happening" failed as naming no set-up. An
+entry the contract lacks failed with the withdrawn message in each of the
+three areas. Taking out every entry this piece added brought back the three
+baseline reds. For the section-case test, a `FirstInTheWay` that let every
+contract case through failed its unsafe half (and the declining cases), and
+one that let a lone preview through failed its narrowing half on "a
+sibling's preview elsewhere: allowed".
 
 **What a six-line lease does to today's reader, measured.** `WorkLease.cs`
 reads lines 1 to 4 by index and never the sixth, so a lease naming sections
