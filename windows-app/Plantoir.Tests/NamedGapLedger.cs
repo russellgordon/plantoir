@@ -287,6 +287,10 @@ internal static class NamedGapLedger
     private const string Reason868Sections = "a build, preview or deploy holding only its own section (a work lease's sixth line, the mac's #835 part 3) is #868's piece of v2.0.0; until it lands every Windows lease holds the whole course and a lease's sixth line is read as course-wide, so no hold here is ever on one section and the course-wide sentence is the true one";
     private const string Reason903 = "setting up Claude Code, Codex or GitHub Copilot from Settings (the mac's #855) is #903's piece of v2.0.0; Windows has no set-up yet, so none can be under way, recorded or quit through";
 
+    // #911's held-by-name piece (2026-11-14): the mac's #897 C and #785a merged into dev.
+    private const string Reason911 = "a one-section restore staged so that a failure part way moves everything back, and says when moving back failed too (the mac's #897 C), is #911's piece of v2.0.0; until it lands Windows' section restore is not staged, so it has no 'stopped part way' outcome to record, and its trail lines are unchanged";
+    private const string Reason912 = "small backups that keep each Media file once in courses/_backups/.shared-media (the mac's #785a) are #912's piece of v2.0.0; until it lands Windows writes no small backup, sweeps nothing and lists no _shared-media name (BackupItem.From refuses every one), so none of these three can happen here";
+
     /// <summary>
     /// The outside doors the contract names that this app does not have,
     /// checked both ways (<see cref="GapsIn(string, IEnumerable{string}, IEnumerable{string})"/>):
@@ -425,6 +429,15 @@ internal static class NamedGapLedger
              "outside assistant set up", "outside assistant could not be set up", "outside assistant set-up settled",
              "outside assistant sign-in opened", "outside assistant sign-in checked", "outside assistant removed"),
         Owed(QuitCases, 903, V200, Reason903, "an outside assistant is being set up"),
+
+        // ---- #911's held-by-name piece (2026-11-14): what the mac's #897 C
+        // (Restore from Backup… puts back one section, staged) and #785a (the
+        // shared Media store for small backups) brought. Their case lists
+        // (backups.restoreOneSection, backups.sharedMedia, file-formats.json →
+        // sharedMediaStore) have no reader here yet, so they are unrun, not red.
+        Owed(ActivityTrailEvents, 911, V200, Reason911, "section restore stopped part way"),
+        Owed(ActivityTrailEvents, 912, V200, Reason912,
+             "backup kept its Media files once", "shared backup Media swept", "backup Media not found"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")

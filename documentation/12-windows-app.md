@@ -2336,6 +2336,67 @@ they neither run nor fail here; wiring them in is #886's first piece.
 already says them. #835's `returningToASectionMidDeploy.heldElsewhere`
 cases and `helpForASection` have no Windows reader yet (#868 owes them).
 
+### After the mac's #897 C and #785a: held by name a third time (#911, #912, 2026-11-14)
+
+At about 01:50 EST the mac merged #897's piece C (Restore from Backup… can put
+back ONE section, staged so a failure part way moves everything back) and
+#785's first piece (small automatic backups keep each Media file once in
+`courses/_backups/.shared-media/`; nothing on the mac calls it yet) into `dev`
+(eae674222..86ae77e53). The diff touches no file under `scripts/` and no
+launcher, so nothing Windows runs today changed. Its contract changes are
+four new `activityTrail.mustRecord` events, the widened `section restored`
+entry, `course-management.json` → `backups.restoreOneSection` and
+`backups.sharedMedia`, `file-formats.json` → `sharedMediaStore`, a reworded
+`backups.mediaIsAlwaysIncludedWhy`, and two `help/controls.json` entries with
+`"windows": null`. Only the four events turned anything red here, all in
+`ContractTests.SharedRules_ActivityTrailEvents_Exist`. Windows reads
+`course-management.json` and `file-formats.json` by key, so the new blocks are
+unrun rather than red. No Windows test reads the `why` or the `carries` of
+`section restored`.
+
+**Held, 4 entries, all v2.0.0, all `ActivityTrailEvents`.** #911 (1):
+`section restore stopped part way`. Windows' section restore is not staged
+yet, so it has no "stopped part way" outcome to record. #912 (3):
+`backup kept its Media files once`, `shared backup Media swept` and
+`backup Media not found`. Windows writes no small backup and sweeps nothing.
+No new area was needed, so the existing area's own closed, withdrawn and
+removal checks cover these entries.
+
+**What a teacher sees today is unchanged, measured.** No small backup is
+written by either app yet. A folder the mac shares later will hold
+`_backups/.shared-media/`. `FindBackups` and `FindArchivedItems` list only
+top-level files of each `_backups/<dir>`, and the store's top-level files
+(`.lock`, `sweep-<computer>.json`) parse as neither. All seven
+`backups.sharedMedia.nameCases` were run through today's `BackupItem.From`
+and `ArchivedItem.From` (a probe on the built `Plantoir.Core.dll`). Every
+name with `readByOlderVersions: false` was unlisted, the two whole names
+were listed, and none read as an archive. So a Windows build never lists a
+small backup it cannot restore (#912's owed item 1). None of the recursive
+deletes in `Plantoir.Core`, `Plantoir` and `Plantoir.Mcp` targets
+`_backups` (they remove a restore's temp staging, a copy's leases, the
+Obsidian add-ons and a reference staging folder), so nothing here can delete
+the store either (owed item 2).
+
+**What bears on #873's staged whole-course restore.** The contract names the
+one-section staging folder `courses/.internal/restoring/<id>/` and the
+stopped-part-way folder `courses/_backups/<CODE>/Section N before a restore
+<stamp>`. Neither is a case list. They appear only in
+`backups.restoreOneSection`'s prose and in the `carries` of `section restore
+stopped part way`. The contract says the whole-course restore is staged on
+neither platform yet. So #873's own staging name binds nothing here. #911's
+section route is where those two folders apply, and the trail line it owes
+names them.
+
+**Filtered totals after the hold**, over `ContractTests`, `NamedGapLedger`,
+`Backups`, `Restore`, `SubjectMenus`, `QuitConfirmation`, `AssistSurface`,
+`AssistCardCommand`, `WorkLease` and `FileFormats`: `Passed!  - Failed:     0,
+Passed:   680, Skipped:     0, Total:   680` (before it: `Failed: 1`, the trail
+test). The other classes that walk `mustRecord` (`AgentGuidanceTests`,
+`BuildMachineLinesTests`, `PrintablePagesTests`, `ReclaimedProcessesTests`,
+`ActivityTrailWiringTests`, `DoorCourseHoldTests`, `SectionRestoreTests`,
+`CourseBackupTests`) passed, 123 of 123. `scripts/test_held_skills.py`, which
+reads `help/`, passed in 9 s.
+
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
 `PythonToolchainTests` runs every `scripts/test_*.py` here, so a shared test
