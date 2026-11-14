@@ -2759,16 +2759,80 @@ Two changes, each the real dependency rather than a timing:
   before. `PreviewStartRecords.begin` records and takes the lease in the
   load-bearing order (#156, M2) and on a refusal ends its own claim.
 
-The rule and nine cases are `quittingWhileWorkIsUnderWay.previewBuildRecord`
-(`pressCases`), run by `PreviewBuildRecordTests` through the real objects;
-with the claim ending every claim on its record and `aStartIsUnderWay`
-answering false (the old meaning, the must-fail copies) five of the nine
-fail. REJECTED: greying the Preview button during the stop (one way in of
+The rule and its cases are `quittingWhileWorkIsUnderWay.previewBuildRecord`
+(`pressCases`, eleven since the review below), run by `PreviewBuildRecordTests`
+through the real objects; with the claim ending every claim on its record and
+`aStartIsUnderWay` answering false (the old meaning, the must-fail copies)
+five of the first nine fail. REJECTED: greying the Preview button during the stop (one way in of
 four, and the other window and the assistant still end the record); a ticket
 inside one `PreviewBuildWait` so a refusal ends only its own wait (the second
 `begin` has already ended the first's claim by then, and the refusal still
 names another window); any delay or retry (the first start is the one the
 teacher asked for).
+
+**A run that never started, a parked start that no longer belongs (#812's
+review).** The implementation review replayed every interleaving of the
+window's preview steps to depth 6 (about 20 million sequences, a `swiftc`
+harness around the real `CourseActivity`, `PreviewBuildWait`,
+`PreviewLeases`, `PreviewStartRecords` and `PreviewAgainPresses`) and found
+one path where Preview now did nothing and said nothing. `ScriptRunner.run`
+has five early returns that record a `launchProblem` and leave the runner
+not running (the launcher missing from the folder, a pseudo-terminal it
+could not open, a process that would not launch, the folder's tools still
+being copied, Plantoir closing). Three of them clear the exit code first,
+and the other two leave whatever an earlier run left, which on a window that
+has not run yet is nothing.
+The wait's first phase looked only for an exit code, so it ran its full ten
+minutes with the wait, the record and the lease held. On `dev` that was
+already ten minutes of quit asking about a build nobody was running; with
+`aStartIsUnderWay` it also swallowed every later Preview in the window, with
+only `preview already starting` on the trail. The wait's first phase now
+asks `PreviewStartRecords.howTheRunStands`, which answers `.couldNotStart`
+when the runner is not running and has a launch problem (asked before the
+exit code, since a run that did start always clears the problem and an exit
+code beside it is an earlier run's). The window then ends the wait, hands
+the lease back, writes `preview could not start` with the sentence, and
+shows that sentence under "Cannot Preview Yet", since once the wait is over
+the console may not be showing (a run that never launched leaves an empty
+transcript). Two `pressCases` pin it, "a run that could not start" and "a
+run that could not start, then a press"; with `howTheRunStands` answering
+the old meaning both fail.
+
+The same harness confirmed two older faults, both on `dev` as well, and both
+were a few lines inside `startPreview`'s guard after
+`PreviewStopper.waitForStopsToFinish`, so they were fixed here through
+`PreviewStartRecords.theStartStillBelongs`. First, #793's guard compared
+leases by value: a repair's stop released the first start's lease, the
+repair's own start took a lease equal in every field (same port), and both
+starts reached `previewRunner.run`, two waits then driving one runner (4,764
+sequences at depth 5). Each start now carries its own id
+(`previewStartID`), and only the window's latest start may run. Second, a
+start parked in that wait during a quit that waits on an update set aside
+resumed after `letEverythingGo` (which stops running runners and leaves a
+parked start alone) and could launch a preview while the app was leaving.
+The guard now asks `WorkspaceModel.isTerminating`, which a quit never takes
+back, and a start stopped by it hands back its own wait and lease.
+
+Measured with that harness carried forward (`812-fixes`, the quit modelled
+as `letEverythingGo` does it), depth 5, 579,194 sequences without launch
+failures and 813,615 with them. The fixed branch: quit silent during a
+build 0, quit asking with nothing building 0, a teacher's Preview doing
+nothing without a word 0, a start from a page that had gone 0, a launcher
+after the quit 0, two starts reaching the launcher 0. The same harness with
+the view logic as dc9f75ce1 had it: quit asking with nothing building
+26,480, a silent Preview 1,672, a launcher after the quit 14,272, two
+starts reaching the launcher 5,032. What is left is the follow-up the
+review named and that predates the branch: a served preview that ends on
+its own (a deploy elsewhere closes it, or the builder's server ends) keeps
+its lease until Stop, so the next Preview is refused with the sentence
+about another window (24 sequences). It is its own issue.
+
+REJECTED: making `ScriptRunner.run` set `lastExitCode` on every early
+return. It would end the wait, but as an ordinary failed run with no word
+for a transcript that is empty, and every other reader of `lastExitCode`
+(the deploy runner, the health findings) would see an exit code for a
+process that never existed. A fixed timeout for the first phase was
+rejected for the reason any delay is.
 
 **A repair's Preview Again (#813).** The button after a repair
 (`rebuildAfterRepair`) awaited `stopPreviewAndWait()` and then called
@@ -2783,7 +2847,12 @@ the page's press first; `AppDelegate.finishTerminating` abandons every press,
 beside `SectionCoverage.abandonEveryRefresh()`; and
 `PreviewAgainPresses.carryOut` starts only if the token survives the stop.
 A second Preview Again replaces the token, so only the later press starts. A
-press that starts nothing writes `preview again abandoned`.
+press that starts nothing writes `preview again abandoned`, and its reason is
+exact: a replaced press is remembered in `PreviewAgainPresses.replaced` until
+it finishes, because the later press can finish first and clear its own
+entry, and the review found the earlier press then said its page had gone
+(`carryOut` answers `.replaced` or `.abandoned`;
+`PreviewBuildRecordTests.testAReplacedPressSaysItWasReplaced`).
 
 The token lives in a record nothing else writes, which is #813's own note:
 #793's first token sat in the section's Coverage entry and the next reading

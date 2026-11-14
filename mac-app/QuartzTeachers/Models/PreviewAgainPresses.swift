@@ -28,6 +28,18 @@ import Foundation
 @MainActor
 final class PreviewAgainPresses {
 
+    // MARK: - Types
+
+    /// How a press's steps after its checks came out.
+    enum Ending: Equatable {
+        /// The press still held after the stop, so the start was asked for.
+        case started
+        /// The page went away, or the app was quitting.
+        case abandoned
+        /// A later Preview Again of the same page took its place.
+        case replaced
+    }
+
     // MARK: - Stored properties
 
     static let shared: PreviewAgainPresses = PreviewAgainPresses()
@@ -45,12 +57,21 @@ final class PreviewAgainPresses {
     /// id: the token of its latest press.
     private(set) var underWay: [UUID: UUID] = [:]
 
+    /// Presses a later press of the same view took the place of, until each
+    /// is finished. Kept apart from `underWay` because the later press can
+    /// finish first and clear its own entry, and the earlier press must
+    /// still say it was replaced rather than abandoned (#812's review).
+    private(set) var replaced: Set<UUID> = []
+
     // MARK: - Functions
 
     /// A Preview Again was pressed in the section view `owner`. Returns this
     /// press's token, which replaces any earlier press of that view.
     func press(owner: UUID) -> UUID {
         let token: UUID = UUID()
+        if let earlier = underWay[owner] {
+            replaced.insert(earlier)
+        }
         underWay[owner] = token
         return token
     }
@@ -66,6 +87,7 @@ final class PreviewAgainPresses {
         if underWay[owner] == token {
             underWay[owner] = nil
         }
+        replaced.remove(token)
     }
 
     /// The section view `owner` is going away: its press starts nothing.
@@ -80,7 +102,7 @@ final class PreviewAgainPresses {
 
     /// The press's steps after its checks: stop a preview that is up and
     /// wait for the stop, then start only if the press still holds. Answers
-    /// whether the start was asked for.
+    /// how the press came out.
     ///
     /// A press that no longer holds writes a trail line saying why nothing
     /// started, so "I pressed Preview Again and nothing came up" has an
@@ -97,21 +119,24 @@ final class PreviewAgainPresses {
         previewIsRunning: Bool,
         stop: () async -> Void,
         start: () -> Void
-    ) async -> Bool {
+    ) async -> Ending {
         if previewIsRunning {
             await stop()
         }
         if !store.stillHolds(token, owner: owner) {
+            let ending: Ending
             let line: String
-            if store.underWay[owner] != nil {
+            if store.replaced.contains(token) {
+                ending = .replaced
                 line = PreviewAgainPresses.replacedLine
             } else {
+                ending = .abandoned
                 line = PreviewAgainPresses.abandonedLine
             }
             ActivityTrail.note(.previewAgainAbandoned, line, course: courseCode, section: sectionNumber)
-            return false
+            return ending
         }
         start()
-        return true
+        return .started
     }
 }

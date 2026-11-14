@@ -96,6 +96,11 @@
         "why": "Issue #813: a repair's Preview Again stops a preview that is up and starts it again, and since #813 the start runs only if the press still holds after the stop (quittingWhileWorkIsUnderWay.previewBuildRecord.previewAgainCases). A press that starts nothing shows nothing either, so this line is the only answer to 'I pressed Preview Again and nothing came up'."
       },
       {
+        "carries": "the course code and the section, and the sentence the teacher was shown about why the preview could not start",
+        "event": "preview could not start",
+        "why": "Issue #812's review: when a section window's preview never starts (the runner records why and is not running, sometimes with no exit code), the window ends its wait, hands back its record and its lease, and shows that sentence as a refusal (quittingWhileWorkIsUnderWay.previewBuildRecord.pressCases, \"a run that could not start, then a press\"). It used to wait ten minutes in silence, and every later Preview in the window did nothing, so this line is the record of what the teacher was told."
+      },
+      {
         "carries": "the launcher and its arguments, redacted",
         "event": "task started",
         "why": "What was actually asked for, as against what the teacher believes they asked for."
@@ -14801,9 +14806,9 @@
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
     "previewBuildRecord": {
-      "rule": "A preview build is recorded by CLAIM: each start that records one (a section window's start, the assistant's rebuild with no window) holds its own claim on the section's record and ends only that claim, so the record lasts while any start of the section is still building, and whatCountsAsUnderWay counts each section once however many claims it has. A start asked for while the same window's own start is still under way (its wait for the page has begun and it holds its own preview lease, which is the case while it waits for an old stop to finish and while it builds) does nothing at all: nothing is recorded, no lease is asked for, no refusal is shown, and a trail line says so (activityTrail.mustRecord: preview already starting). A start refused by a lease ends its own claim and nobody else's (issue #812).",
+      "rule": "A preview build is recorded by CLAIM: each start that records one (a section window's start, the assistant's rebuild with no window) holds its own claim on the section's record and ends only that claim, so the record lasts while any start of the section is still building, and whatCountsAsUnderWay counts each section once however many claims it has. A start asked for while the same window's own start is still under way (its wait for the page has begun and it holds its own preview lease, which is the case while it waits for an old stop to finish and while it builds) does nothing at all: nothing is recorded, no lease is asked for, no refusal is shown, and a trail line says so (activityTrail.mustRecord: preview already starting). A start refused by a lease ends its own claim and nobody else's (issue #812). A run that never started (the runner is not running and has recorded a launch problem, which a run that did start always clears, whatever exit code an earlier run left) ends its start as any run's end does, and the teacher is shown the runner's sentence (activityTrail.mustRecord: preview could not start).",
       "why": "The mac kept one record per section, and every ending removed it. A second start, by a second press during the old stop, from Section > Preview, or from the assistant (which saw no running preview yet), ended the first start's record and was refused by the first start's own lease, and the first start then built with nothing recorded: quitting went ahead without asking, which whatCountsAsUnderWay says it must not. The same happened through another window on the section, and between a window and the assistant's rebuild. Measured 2026-11-13 on dev fcd0a51c5 by compiling the real PreviewBuildWait with copies of the real record functions: after a second press the record count was 0 while the first start went on to build. Windows records per start already (CourseActivity.BeginPreviewBuild returns one token per start) and writes the record after the lease, so a refused press there ends nothing.",
-      "pressCasesHow": "Section 1 of ICS3U in one working folder. Steps, in order: A.start and B.start (window A or B asks for a preview: if its own start is under way nothing happens and alreadyStarting counts it; otherwise its build is recorded and a preview lease taken, and a refused lease ends that window's own claim and counts in refusals); A.runEnds and B.runEnds (that window's start ends, however it ends: its wait ends and its lease is handed back); assistant.begins and assistant.ends (the assistant's rebuild with no window records the build and ends it; it takes no preview lease). expect.records is how many sections a quit would ask about at the end, and aIsWaiting whether window A is still waiting for its page.",
+      "pressCasesHow": "Section 1 of ICS3U in one working folder. Steps, in order: A.start and B.start (window A or B asks for a preview: if its own start is under way nothing happens and alreadyStarting counts it; otherwise its build is recorded and a preview lease taken, and a refused lease ends that window's own claim and counts in refusals); A.runEnds and B.runEnds (that window's start ends, however it ends: its wait ends and its lease is handed back); A.couldNotStart (window A's run never started: the runner is not running, has no exit code and has recorded a launch problem; the window treats that as the run having ended, so its wait ends and its lease is handed back, and it shows the runner's sentence, which counts in refusals); assistant.begins and assistant.ends (the assistant's rebuild with no window records the build and ends it; it takes no preview lease). expect.records is how many sections a quit would ask about at the end, and aIsWaiting whether window A is still waiting for its page.",
       "pressCases": [
         {
           "name": "one start",
@@ -14937,6 +14942,35 @@
             "aIsWaiting": false
           },
           "why": "Every claim ended, so quitting asks about nothing."
+        },
+        {
+          "name": "a run that could not start",
+          "steps": [
+            "A.start",
+            "A.couldNotStart"
+          ],
+          "expect": {
+            "records": 0,
+            "refusals": 1,
+            "alreadyStarting": 0,
+            "aIsWaiting": false
+          },
+          "why": "Issue #812's review. A run that never started is an ending: the window ends its wait and hands back its record and lease, and shows the runner's sentence as a refusal. The wait used to look only for an exit code, which some of these runs never set, so it held the record for ten minutes and quitting asked about a build nobody was running."
+        },
+        {
+          "name": "a run that could not start, then a press",
+          "steps": [
+            "A.start",
+            "A.couldNotStart",
+            "A.start"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 1,
+            "alreadyStarting": 0,
+            "aIsWaiting": true
+          },
+          "why": "Issue #812's review. After a run that could not start, the next press starts again. Before this, the first start still looked under way, so the press did nothing at all and said nothing: on the old one-record design it had at least raised a refusal."
         }
       ],
       "previewAgainRule": "A repair's Preview Again (the button in the dialog after a repair) is recorded AT ONCE, before anything is awaited, as a token for the section page that pressed it, in a record nothing else writes. A preview that is up is stopped and the stop waited for; then the section's preview starts only if the press still holds. Leaving the page (a switch of section or course, the window closing) abandons its press, quitting abandons every press, and a later Preview Again of the same page replaces it. A press that starts nothing writes a trail line (activityTrail.mustRecord: preview again abandoned). Quitting during the stop is not asked about, since nothing is being built yet (issue #813).",

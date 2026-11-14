@@ -93,6 +93,12 @@ nonisolated enum ActivityTrail {
         /// page went away or the app was quitting before the old preview had
         /// stopped, or a later Preview Again took its place (#813).
         case previewAgainAbandoned = "preview again abandoned"
+        /// A section window's preview never started: the runner recorded why
+        /// and was not running. The wait, the record and the lease are
+        /// handed back at once and the teacher is shown the runner's own
+        /// sentence (#812's review). Until then the window waited ten
+        /// minutes in silence and every later Preview in it did nothing.
+        case previewCouldNotStart = "preview could not start"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"

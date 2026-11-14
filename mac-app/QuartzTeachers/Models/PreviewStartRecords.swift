@@ -32,7 +32,73 @@ enum PreviewStartRecords {
         case refused(String)
     }
 
+    /// Where a start's run stands while the window waits for its server to
+    /// be announced.
+    enum RunStanding: Equatable {
+        /// Still going, or not yet heard from.
+        case underWay
+        /// It ran and it has ended, with an exit code.
+        case ended
+        /// It never started: the runner recorded why (a launch problem) and
+        /// is not running. The sentence is the runner's own.
+        case couldNotStart(String)
+    }
+
     // MARK: - Functions
+
+    /// Where the run stands, from what the runner says of itself.
+    ///
+    /// A run that never started is an ending too (#812's review). The
+    /// runner's early returns (a missing launcher, a pseudo-terminal it
+    /// could not open, a process that would not launch, the folder's tools
+    /// still being copied) record a launch problem, leave it not running,
+    /// and some of them leave no exit code at all. The wait used to look
+    /// only for the exit code, so it went on for its full ten minutes with
+    /// the lease and the record held: quitting asked about a build nobody
+    /// was running, and every later Preview in the window did nothing,
+    /// because a start still looked under way.
+    static func howTheRunStands(isRunning: Bool, lastExitCode: Int32?, launchProblem: String?) -> RunStanding {
+        if isRunning {
+            return .underWay
+        }
+        // Asked before the exit code: a run that did start clears the
+        // launch problem, so one recorded now is about this start, and an
+        // exit code beside it is an earlier run's.
+        if let problem = launchProblem {
+            return .couldNotStart(problem)
+        }
+        if lastExitCode != nil {
+            return .ended
+        }
+        return .underWay
+    }
+
+    /// Whether a start parked while old stops finished is still the
+    /// window's own when it resumes, and so may run its launcher.
+    ///
+    /// Three ways it is not. The window's lease is no longer this start's
+    /// (it was stopped, or the view went away: #793). A later start of the
+    /// same window took a lease equal to this one in every field, which a
+    /// comparison of leases alone cannot see, so each start carries its own
+    /// id and only the latest may run (the review of #812 measured both
+    /// reaching the launcher). Or the quit has gone ahead and is waiting on
+    /// an update set aside: nothing new may begin then, as #793 and #813
+    /// already settled for the Coverage refresh and Preview Again.
+    static func theStartStillBelongs(
+        heldLease: PreviewLeases.Lease?,
+        lease: PreviewLeases.Lease,
+        heldStart: UUID?,
+        start: UUID,
+        appIsQuitting: Bool
+    ) -> Bool {
+        if appIsQuitting {
+            return false
+        }
+        if heldLease != lease {
+            return false
+        }
+        return heldStart == start
+    }
 
     /// Whether this window already has a start of its own under way: its
     /// wait is going and it holds its own lease. That is the start the
