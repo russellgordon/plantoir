@@ -746,7 +746,7 @@
      "about": "Section > Add Class…: the next class in this unit, in a new unit, or a copy of a class; the page made, numbered and dated, unpublished, backed up first, undoable.",
      "steps": [
       "Select the section (it needs class dates on file: link class-dates)",
-      "Section > Add Class…",
+      "Section > Add Class… (also in the section row's right-click menu)",
       "Plantoir saves a copy of the course to Backups, then makes the page, numbered and dated from the class dates",
       "The new page arrives unpublished: open it in Obsidian and write it",
       "Publish it when it is written (Publish Pages… or Publish Class for a Date…); Section > Undo Last Change takes the new page away again"

@@ -6804,11 +6804,15 @@ all. They are Section menu items now, in two groups after Open in Browser:
 Help ▸ Publishing and Deploying… says what the two words mean, in an alert of
 its own, with or without a window (`publishingAndDeployingExplained` — said
 to the teacher; the assistant's `whatPublishingMeans` says "the teacher").
-The section row's context menu carries Publish Pages…, Hide Pages… and
-Publish Class for a Date…, and selects the row first. It carried Add Next
-Class too, until #897 replaced that item with Add Class…. Whether Add Class…
-goes on the row's menu is held for Russell (M2 on #897); today it is in the
-menu bar only.
+The section row's context menu carries Publish Pages…, Hide Pages…, Publish
+Class for a Date… and Add Class…, and selects the row first. Add Class… took
+Add Next Class's place there in #897 (Russell ruled it on 2026-11-13, after
+the piece first went to the gate with the menu bar only); it sends the same
+request as the menu bar's item, so `performVerb` opens the same sheet. The
+three ways are not items of their own on that menu (rejected by the same
+ruling, `subjectMenus.addClassSheet.rejected`). No test or contract case
+covers the row's menu, so the line is checked by reading
+`SidebarView.sectionRowMenu`.
 
 **One entry point, the tool's own.** Each item builds its `AssistToolCall` in
 code (`SectionVerbs`) and runs it through `AssistToolRunner.run(call:)` — the
@@ -6949,11 +6953,21 @@ testTheCommittedCasesMatchTheToolSurface` for every byte). The menu's copy
   fails (the plan review's amendment 6); the menu's does not;
 - **is one undo entry** with no "before", so Undo Last Change deletes it.
 
-**A working folder opened through a link** (a cloud folder linked into the
-home folder): the class folders are listed with links in their ancestors
-resolved, so a path compared in two spellings never matched and every copy was
-refused (the implementation review's finding 8, measured;
-`DuplicateAsNextClassTests.testACourseReachedThroughALinkCanBeCopied`). Both the sheet
+**A course reached through a link**: the class folders are listed with links
+in their ancestors resolved, so a path compared in two spellings never matched
+and every copy was refused (the implementation review's finding 8, measured).
+The test (`DuplicateAsNextClassTests.testACourseReachedThroughALinkCanBeCopied`)
+makes the COURSE folder the link. Measured 2026-11-13 on macOS 26.6 with
+Xcode 27: listing a working folder reached through a link already gives its
+courses their resolved spelling (`/var/…/link/courses/ICS3U` comes back as
+`/private/var/…/root/courses/ICS3U`), so a linked working folder puts both
+sides in one spelling and the old comparison passed too; the test's first
+fixture, which linked the working folder, asserted the course kept the link's
+spelling, failed on the second Mac, and by the listing measured here would
+fail on this one too. A course folder that is itself
+a link keeps its name in the listing while its pages are listed at the
+target, and there the old comparison found no page (measured standalone, the
+old and new comparisons side by side). Both the sheet
 (`SectionVerbs.coursePath`) and the runner compare the page's FOLDER in its
 `FolderIdentity.canonicalPath` spelling, as the rest of the app compares
 folders, and its file name as it is, so a page that is itself a link is still

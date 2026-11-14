@@ -1770,11 +1770,10 @@ struct SidebarView: View {
             sectionVerbItem("Publish Pages…", .publishPages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
             sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
-            // Add Next Class was the fourth item here until #897 replaced it
-            // with Section ▸ Add Class…, which is in the menu bar only for
-            // now: whether it goes here too is held for Russell (M2 on
-            // #897). Putting it here would be one `sectionVerbItem` line:
-            // the request reaches `performVerb`.
+            // #897: Add Class… is here as well as in the Section menu, in the
+            // place Add Next Class had (Russell, 2026-11-13 night). The
+            // request reaches `performVerb`, which opens the same sheet.
+            sectionVerbItem("Add Class…", .addClass, course: course, sectionNumber: sectionNumber, row: row)
             Divider()
         }
         // One item or the other, never a

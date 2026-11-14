@@ -293,10 +293,21 @@ final class DuplicateAsNextClassTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: record.path), "the sheet cleared the record")
     }
 
-    /// The implementation review's finding 8: a working folder opened
-    /// through a link. The class folders are listed with the link resolved,
-    /// so a comparison of the two spellings found no page and every copy was
+    /// The implementation review's finding 8: a course reached through a
+    /// link. The class folders are listed with the link resolved, so a
+    /// comparison of the two spellings found no page and every copy was
     /// refused. Both sides are now in the disk's own spelling.
+    ///
+    /// The link is the COURSE folder, `courses/ICS3U`, and not the working
+    /// folder. Measured 2026-11-13 on macOS 26.6 with Xcode 27: listing a
+    /// working folder reached through a link already resolves the link in
+    /// the course's own spelling (`/var/…/link/courses/ICS3U` is listed as
+    /// `/private/var/…/root/courses/ICS3U`), so a linked WORKING folder gives
+    /// both sides one spelling and proves nothing, and the old assertion
+    /// that the course kept the link's spelling failed on every Mac. A
+    /// course folder that is itself a link keeps its name in the listing
+    /// while its pages are listed at the link's target, which is the
+    /// mismatch the fix is for, on any Mac.
     func testACourseReachedThroughALinkCanBeCopied() async throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {
@@ -304,19 +315,27 @@ final class DuplicateAsNextClassTests: XCTestCase {
         }
         try DuplicateAsNextClassTests.rememberTimetable(["2026-09-08", "2026-09-10"], in: made.course)
         try DuplicateAsNextClassTests.writeClass("Unit 1, Day 1", on: "2026-09-08", in: made.course)
-        let link: URL = FileManager.default.temporaryDirectory.appendingPathComponent("assist-link-\(UUID().uuidString)")
-        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: made.root)
+        let elsewhere: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("assist-linked-course-\(UUID().uuidString)")
+        try FileManager.default.moveItem(at: made.course.directoryURL, to: elsewhere)
         defer {
-            try? FileManager.default.removeItem(at: link)
+            try? FileManager.default.removeItem(at: elsewhere)
         }
+        try FileManager.default.createSymbolicLink(at: made.course.directoryURL, withDestinationURL: elsewhere)
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
-        workspace.chooseWorkspace(at: link)
+        workspace.chooseWorkspace(at: made.root)
         var found: Course? = nil
         for candidate in workspace.courses where candidate.code == "ICS3U" {
             found = candidate
         }
-        let linked: Course = try XCTUnwrap(found)
-        XCTAssertTrue(linked.directoryURL.path.hasPrefix(link.path), "the course was not reached through the link")
+        let linked: Course = try XCTUnwrap(found, "the course reached through the link was not listed")
+        // The fixture, not the listing: the course's folder is the link, so
+        // it resolves somewhere other than inside the folder it is listed in.
+        let listedIn: String = FolderIdentity.canonicalPath(linked.directoryURL.deletingLastPathComponent().path)
+        XCTAssertNotEqual(
+            FolderIdentity.canonicalPath(linked.directoryURL.path), listedIn + "/" + linked.directoryURL.lastPathComponent,
+            "the course was not reached through the link"
+        )
         let runner: AssistToolRunner = AssistToolRunner(
             workspace: workspace, siteWork: StubSiteWork(),
             today: { return CalendarDay(year: 2026, month: 9, day: 8)! },

@@ -2493,9 +2493,16 @@ nonisolated enum AssistWording {
     }
 
     /// A copy asked for after the section's class dates went missing.
+    /// The menu item is titled Class Dates… in every course, a club
+    /// included, and a club's sentences never say "class"
+    /// (`ClubNounTests.testEveryMeetingKeyHasItsClassTwin`), so a club is
+    /// pointed at the Section menu without the item's title.
     static func menuNeedsClassDatesFirst(noun: ClassNoun = .class) -> String {
-        return "This section has no \(noun.singular) dates on file, so nothing was copied. Add them "
-             + "with Section ▸ Class Dates…, then try again."
+        let firstSentence: String = "This section has no \(noun.singular) dates on file, so nothing was copied."
+        if noun == .meeting {
+            return firstSentence + " Add them from the Section menu, then try again."
+        }
+        return firstSentence + " Add them with Section ▸ Class Dates…, then try again."
     }
 
     /// The third way: a copy of one of this section's classes.
