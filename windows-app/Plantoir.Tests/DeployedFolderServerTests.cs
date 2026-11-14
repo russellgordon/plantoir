@@ -164,6 +164,51 @@ public sealed class DeployedFolderServerTests : IDisposable
     }
 
     [Fact]
+    public void TheListenersOwnEndpointIsTheLoopbackAddress()
+    {
+        using var server = Start();
+        var listener = (TcpListener)typeof(DeployedFolderServer).GetField("_listener", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(server)!;
+        var endpoint = (IPEndPoint)listener.LocalEndpoint;
+        Assert.Equal(IPAddress.Loopback, endpoint.Address);
+        Assert.Equal(AddressFamily.InterNetwork, endpoint.AddressFamily);
+        Assert.Equal(server.Port, endpoint.Port);
+        // Exclusivity is held from outside, by a second bind that is refused
+        // (ItListensOnTheLoopbackAddressAloneAndExclusively).
+    }
+
+    /// <summary>
+    /// A source rule on the server's file: it binds ONE listener, to
+    /// <c>IPAddress.Loopback</c>, and names no wildcard or prefix form a
+    /// later edit could slip in. A listen on anything but 127.0.0.1 puts
+    /// Windows Defender Firewall's prompt in front of the teacher, naming the
+    /// program (measured on this PC, 2026-11-13: two prompts raised by binds
+    /// to 0.0.0.0 while this piece was measured). <c>IPAddress.Any</c> may
+    /// appear only where another program's listener is RECOGNISED, never bound.
+    /// </summary>
+    [Fact]
+    public void TheServerBindsTheLoopbackAddressAndNothingElse()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Core", "Models", "DeployedFolderServer.cs"));
+        var codeLines = source.Split('\n').Where(line => !line.TrimStart().StartsWith("//")).Select(line => line.Split(" // ")[0]);
+        string code = string.Join('\n', codeLines);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"new TcpListener\("));
+        Assert.Contains("new TcpListener(IPAddress.Loopback, port)", code);
+        foreach (string forbidden in new[] { "IPv6Any", "IPv6Loopback", "DualMode", "HttpListener", "\"localhost\"", "\"+\"", "\"*\"", "0.0.0.0", "TcpListener.Create", "IPAddress.Parse", ".Bind(" })
+            Assert.DoesNotContain(forbidden, code);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"IPAddress\.Any"));
+        Assert.Contains("endpoint.Address.Equals(IPAddress.Any)", code);
+
+        // Nor may these tests bind one: the 22:28 prompt came from a first
+        // version of a test here that did.
+        var testsFolder = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Tests");
+        foreach (string file in Directory.EnumerateFiles(testsFolder, "DeployedFolder*.cs"))
+        {
+            string text = File.ReadAllText(file);
+            Assert.DoesNotMatch(@"TcpListener\(\s*IPAddress\.(Any|IPv6Any)|\.Bind\(\s*new IPEndPoint\(\s*IPAddress\.(Any|IPv6Any)|DualMode\s*=\s*true", text);
+        }
+    }
+
+    [Fact]
     public void APortAnotherProgramHoldsOnEveryAddressIsPassedOver()
     {
         // Measured on this PC: Windows lets a bind to 127.0.0.1 succeed over

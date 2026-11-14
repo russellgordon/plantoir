@@ -135,7 +135,7 @@ public sealed class DeployedFolderServer : IDisposable
                 continue;
             }
             var server = new DeployedFolderServer(listener, port, resolver, onFolderGone, onEnded);
-            _ = Task.Run(server.AcceptLoop);
+            StartThread(server.AcceptLoop, "Plantoir deployed folder " + port);
             return new StartResult(server, tried > 0);
         }
         return new StartResult(null, tried > 0);
@@ -190,6 +190,19 @@ public sealed class DeployedFolderServer : IDisposable
 
     public void Dispose() => Stop();
 
+    /// <summary>
+    /// Every listener and connection has a THREAD of its own, with blocking
+    /// calls and socket timeouts, rather than tasks on the thread pool: in the
+    /// full suite on this PC, with the pool starved by 3,900 tests, an answer
+    /// to a plain GET did not arrive within 20 s and the 10 s header deadline
+    /// fired late (2026-11-14). A deadline that is a socket timeout fires on
+    /// time whatever else the process is doing. At most 64 connections, so at
+    /// most 65 threads a show, each a background thread (none keeps the
+    /// process alive).
+    /// </summary>
+    private static void StartThread(Action work, string name) =>
+        new Thread(() => work()) { IsBackground = true, Name = name }.Start();
+
     // ---- Connections ------------------------------------------------------------------
 
     private sealed class Connection(Socket socket, int arrival)
@@ -218,36 +231,37 @@ public sealed class DeployedFolderServer : IDisposable
         }
 
         /// <summary>Closes after the answer has gone: no more is sent, what the peer still sends is read and dropped for a moment so it sees the answer rather than a reset.</summary>
-        public async Task CloseAfterAnswerAsync()
+        public void CloseAfterAnswer()
         {
             if (Volatile.Read(ref _closed) != 0) return;
             try
             {
                 Socket.Shutdown(SocketShutdown.Send);
-                using var drain = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                Socket.ReceiveTimeout = 2000;
                 var scratch = new byte[4096];
                 int total = 0;
-                while (total < 65536)
+                var clock = Stopwatch.StartNew();
+                while (total < 65536 && clock.Elapsed < TimeSpan.FromSeconds(2))
                 {
-                    int read = await Socket.ReceiveAsync(scratch, SocketFlags.None, drain.Token);
+                    int read = Socket.Receive(scratch);
                     if (read == 0) break;
                     total += read;
                 }
             }
-            catch (Exception e) when (e is SocketException or ObjectDisposedException or OperationCanceledException) { }
+            catch (Exception e) when (e is SocketException or ObjectDisposedException) { }
             if (Interlocked.Exchange(ref _closed, 1) != 0) return;
             try { Socket.Close(); } catch (Exception e) when (e is SocketException or ObjectDisposedException) { }
         }
     }
 
-    private async Task AcceptLoop()
+    private void AcceptLoop()
     {
         while (true)
         {
             Socket socket;
             try
             {
-                socket = await _listener.AcceptSocketAsync(_stopping.Token);
+                socket = _listener.AcceptSocket();
             }
             catch (Exception) when (_stopping.IsCancellationRequested)
             {
@@ -287,7 +301,7 @@ public sealed class DeployedFolderServer : IDisposable
                 _connections.Add(connection);
             }
             makingRoom?.Reset();
-            _ = Task.Run(() => ServeConnection(connection));
+            StartThread(() => ServeConnection(connection), "Plantoir deployed folder connection");
         }
     }
 
@@ -298,7 +312,7 @@ public sealed class DeployedFolderServer : IDisposable
 
     private static readonly byte[] EndOfHead = "\r\n\r\n"u8.ToArray();
 
-    private async Task ServeConnection(Connection connection)
+    private void ServeConnection(Connection connection)
     {
         var buffer = new List<byte>(4096);
         var chunk = new byte[16384];
@@ -317,22 +331,23 @@ public sealed class DeployedFolderServer : IDisposable
                 {
                     if (buffer.Count > MaximumRequestLineBytes && IndexOf(buffer, "\r\n"u8.ToArray(), 0) < 0)
                     {
-                        await AnswerAndClose(connection, 414);
+                        AnswerAndClose(connection, 414);
                         return;
                     }
-                    if (buffer.Count > MaximumRequestLineBytes + MaximumHeaderBytes) { await AnswerAndClose(connection, 431); return; }
+                    if (buffer.Count > MaximumRequestLineBytes + MaximumHeaderBytes) { AnswerAndClose(connection, 431); return; }
                     long remaining = deadline - Stopwatch.GetTimestamp();
                     if (remaining <= 0) { connection.Reset(); return; }
                     int read;
-                    using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token))
+                    try
                     {
-                        timeout.CancelAfter(TimeSpan.FromSeconds((double)remaining / Stopwatch.Frequency));
-                        try { read = await connection.Socket.ReceiveAsync(chunk, SocketFlags.None, timeout.Token); }
-                        catch (Exception e) when (e is OperationCanceledException or SocketException or ObjectDisposedException)
-                        {
-                            connection.Reset();
-                            return;
-                        }
+                        // The deadline IS the socket's timeout: a real one, kept by the system.
+                        connection.Socket.ReceiveTimeout = (int)Math.Max(1, remaining * 1000 / Stopwatch.Frequency);
+                        read = connection.Socket.Receive(chunk);
+                    }
+                    catch (Exception e) when (e is SocketException or ObjectDisposedException)
+                    {
+                        connection.Reset();
+                        return;
                     }
                     if (read == 0) { connection.Reset(); return; }
                     connection.Touch();
@@ -352,22 +367,22 @@ public sealed class DeployedFolderServer : IDisposable
                 string text = Encoding.Latin1.GetString(head);
                 string[] lines = text.Split("\r\n");
                 int requestLineBytes = lines[0].Length;
-                if (requestLineBytes > MaximumRequestLineBytes) { await AnswerAndClose(connection, 414); return; }
-                if (head.Length - requestLineBytes > MaximumHeaderBytes) { await AnswerAndClose(connection, 431); return; }
-                if (Parse(lines) is not { } parsed) { await AnswerAndClose(connection, 400); return; }
+                if (requestLineBytes > MaximumRequestLineBytes) { AnswerAndClose(connection, 414); return; }
+                if (head.Length - requestLineBytes > MaximumHeaderBytes) { AnswerAndClose(connection, 431); return; }
+                if (Parse(lines) is not { } parsed) { AnswerAndClose(connection, 400); return; }
 
                 Interlocked.Increment(ref _requests);
                 bool folderGone = !_resolver.FolderIsThere() && Interlocked.Exchange(ref _folderGoneReported, 1) == 0;
                 using var answer = _resolver.Answer(parsed.Request, Port);
                 if (answer.Status == 404) Interlocked.Increment(ref _notFound);
                 if (!parsed.KeepsAlive) answer.ClosesTheConnection = true;
-                bool sent = await Send(connection, answer);
+                bool sent = Send(connection, answer);
                 // Told AFTER the answer has gone: the show it ends stops this
                 // server, which would otherwise reset the very connection the
                 // browser is waiting on (found by ARequestThatFindsTheFolderGoneStopsItUntilDismissed).
-                if (folderGone && _onFolderGone is { } gone) _ = Task.Run(gone);
+                if (folderGone && _onFolderGone is { } gone) StartThread(gone, "Plantoir deployed folder gone");
                 if (!sent) { connection.Reset(); return; }
-                if (answer.ClosesTheConnection) { await connection.CloseAfterAnswerAsync(); return; }
+                if (answer.ClosesTheConnection) { connection.CloseAfterAnswer(); return; }
 
                 if (buffer.Count == 0)
                 {
@@ -377,7 +392,7 @@ public sealed class DeployedFolderServer : IDisposable
                 else deadline = Stopwatch.GetTimestamp() + Seconds(SecondsToSendTheHeaders);
             }
         }
-        catch (Exception e) when (e is SocketException or ObjectDisposedException or IOException or OperationCanceledException)
+        catch (Exception e) when (e is SocketException or ObjectDisposedException or IOException or InvalidOperationException)
         {
             connection.Reset();
         }
@@ -427,10 +442,10 @@ public sealed class DeployedFolderServer : IDisposable
         return new Parsed(request, keepsAlive);
     }
 
-    private async Task AnswerAndClose(Connection connection, int status)
+    private void AnswerAndClose(Connection connection, int status)
     {
         using var answer = DeployedFolderResolver.Refusal(status, closing: true);
-        if (await Send(connection, answer)) await connection.CloseAfterAnswerAsync();
+        if (Send(connection, answer)) connection.CloseAfterAnswer();
         else connection.Reset();
     }
 
@@ -447,7 +462,7 @@ public sealed class DeployedFolderServer : IDisposable
     }
 
     /// <summary>Sends one answer a piece at a time, each piece to be taken within <see cref="SecondsToTakeAPiece"/>. False when it could not be sent.</summary>
-    private async Task<bool> Send(Connection connection, DeployedFolderAnswer answer)
+    private bool Send(Connection connection, DeployedFolderAnswer answer)
     {
         byte[] head = HeadBytes(answer);
         if (answer.Data is { } data)
@@ -457,7 +472,7 @@ public sealed class DeployedFolderServer : IDisposable
             data.CopyTo(whole, head.Length);
             head = whole;
         }
-        if (!await SendPiece(connection, head)) return false;
+        if (!SendPiece(connection, head)) return false;
         if (answer.File is not { } file || answer.Length <= 0) return true;
 
         file.Seek(answer.Offset, SeekOrigin.Begin);
@@ -466,32 +481,38 @@ public sealed class DeployedFolderServer : IDisposable
         while (remaining > 0)
         {
             int wanted = (int)Math.Min(piece.Length, remaining);
-            int read = await file.ReadAsync(piece.AsMemory(0, wanted), _stopping.Token);
+            if (_stopping.IsCancellationRequested) return false;
+            int read = file.Read(piece, 0, wanted);
             // The file shrank while it was being sent: the length promised
             // cannot be kept, so the connection closes.
             if (read <= 0) return false;
-            if (!await SendPiece(connection, piece.AsMemory(0, read))) return false;
+            if (!SendPiece(connection, piece.AsSpan(0, read))) return false;
             remaining -= read;
         }
         return true;
     }
 
-    private async Task<bool> SendPiece(Connection connection, ReadOnlyMemory<byte> bytes)
+    /// <summary>
+    /// One piece, sent with the socket's own send timeout of
+    /// <see cref="SecondsToTakeAPiece"/>: a blocking send the reader does not
+    /// take in time fails, and the connection is reset (a socket whose send
+    /// timed out is not used again).
+    /// </summary>
+    private static bool SendPiece(Connection connection, ReadOnlySpan<byte> bytes)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token);
-        timeout.CancelAfter(TimeSpan.FromSeconds(SecondsToTakeAPiece));
         try
         {
+            connection.Socket.SendTimeout = SecondsToTakeAPiece * 1000;
             while (bytes.Length > 0)
             {
-                int sent = await connection.Socket.SendAsync(bytes, SocketFlags.None, timeout.Token);
+                int sent = connection.Socket.Send(bytes);
                 if (sent <= 0) return false;
                 bytes = bytes[sent..];
                 connection.Touch();
             }
             return true;
         }
-        catch (Exception e) when (e is OperationCanceledException or SocketException or ObjectDisposedException)
+        catch (Exception e) when (e is SocketException or ObjectDisposedException)
         {
             return false;
         }

@@ -13401,7 +13401,12 @@ is 414, headers over 16 KiB 431; 10 s to send the headers and 30 s idle
 between requests; each piece of an answer (256 KiB) must be taken within
 30 s or the connection is reset. Sockets are `NoDelay`: an answer is its
 head and then its body, and with Nagle the second send waited for the
-client's delayed acknowledgement of the first (measured below).
+client's delayed acknowledgement of the first (measured below). **Each
+listener and each connection has a thread of its own**, with blocking calls
+whose deadlines are the socket's own `ReceiveTimeout` and `SendTimeout`,
+rather than tasks on the thread pool: with the pool starved (the full suite,
+below), a task-based first version left a plain GET unanswered for 20 s and
+fired the 10 s header deadline late. At most 65 background threads a show.
 
 **The address.** `DeployedFolderAddress.CanonicalPath` is the folder's
 ON-DISK spelling (`GetFinalPathNameByHandle`, `\\?\` taken off), because the
@@ -13434,24 +13439,44 @@ force-killed leaves nothing to clean up: Windows closes its sockets with it.
 
 ### Measured (2026-11-13, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200)
 
-- **No firewall prompt for a loopback-only listener.** The server's and the
-  registry's test classes (34 tests, dozens of listeners) run from a COPY of
-  the test output, a `testhost.exe` path Windows Defender Firewall had never
-  seen: 585 rules before and after, no rule-added event (2097) in the
-  firewall's log during the run, no rule for that path or for
-  `Plantoir.exe`, and no new "Windows Security" prompt window. Read with
-  `Get-NetFirewallRule` and `Get-WinEvent` only; nothing added, nothing
-  elevated. The first run of the 76 resolution cases over sockets, from this
-  worktree's `testhost.exe` before it had any rule, raised none either.
+- **No firewall prompt for a loopback-only listener**, measured where a
+  prompt COULD appear: from a program path the firewall has never seen
+  (this worktree's own `testhost.exe` has a rule now, below, so a count
+  around it can no longer show a new prompt). `DeployedFolderProbe.exe`, a
+  console program of a few lines that starts the product's
+  `DeployedFolderServer` with the real block's candidates on a built site,
+  asks it for `/` and stops, copied to a newly named folder: it listened on
+  `127.0.0.1:41050` alone (`Get-NetTCPConnection` while it ran) and answered
+  200; `Get-NetFirewallApplicationFilter` listed 0 entries for its path
+  before and after, 585 rules before and after, no rule-added event (2097)
+  in the firewall's log, and the `PickerHost` processes the same two (the
+  prompts below). The same held for a copy of the test output at a new
+  path running the server's and the registry's 34 tests. Read with
+  `Get-NetTCPConnection`, `Get-NetFirewallRule`,
+  `Get-NetFirewallApplicationFilter` and `Get-WinEvent` only; nothing added,
+  nothing removed, nothing elevated. `TheListenersOwnEndpointIsTheLoopbackAddress`
+  reads the listener's own `LocalEndpoint`, and the source rule
+  `TheServerBindsTheLoopbackAddressAndNothingElse` allows one
+  `new TcpListener(IPAddress.Loopback, port)` in the server's file and no
+  wildcard, IPv6, dual-mode, `localhost`, prefix or `Bind` form (shown red
+  on a copy that bound `IPAddress.Any`, run alone so nothing listened), and
+  no `IPAddress.Any` bind in any of the deployed folder's test files.
 - **A listen on 0.0.0.0 DOES raise it, and this piece did so twice by
-  mistake** while measuring the pass-over above: once from Windows
-  PowerShell (22:22) and once from a first version of a unit test that bound
-  `IPAddress.Any` (22:28). Each put a "Windows Security" prompt on the
-  desktop and added a pair of inbound "Query User" BLOCK rules for that
-  program (`powershell.exe`; this worktree's `testhost.exe`). The test now
-  stands the other program in through `DeployedFolderServer.ActiveListeners`
-  and binds nothing but loopback. So: never bind anything but `127.0.0.1`
-  in a test here.
+  mistake**, neither from the product's listener: at 22:22, a hand
+  measurement in Windows PowerShell that bound
+  `[IPAddress]::Any` port 41399 to see whether a loopback bind could sit
+  beside it (the `powershell.exe` prompt and rules); at 22:28, a first
+  version of `APortAnotherProgramHoldsOnEveryAddressIsPassedOver` that
+  stood the other program in with a real `new TcpListener(IPAddress.Any, 0)`
+  (this worktree's `testhost.exe`; that version was never committed, the
+  first commit at 22:31 already had the stand-in). Each prompt's
+  `PickerHost` process started within two seconds of its pair of inbound
+  "Query User" BLOCK rules (TCP and UDP) in the firewall's log. Both
+  prompts are still on the desktop and the four rules are still there:
+  closing a prompt was refused to this session, and removing a rule needs
+  an administrator. The test now stands the other program in through
+  `DeployedFolderServer.ActiveListeners` and binds nothing. So: never bind
+  anything but `127.0.0.1` in a test here.
 - **The crawl** (`browser-checks/crawl_deployed_folder.py --url`, against
   the server started in-process by the opt-in `DeployedFolderCrawlMeasurement`,
   on copies of two sites built on this PC): ICS3U section 1, 399 pages,
@@ -13485,11 +13510,13 @@ force-killed leaves nothing to clean up: Windows closes its sockets with it.
   still open at 47 s). **Under the full suite's load** (3,925 tests sharing
   the thread pool) the first full run failed three of these wall-clock tests:
   a plain GET unanswered within 20 s, the header deadline not closed by
-  15 s, the readers reset at 42.8 s instead of by 40. Alone each passes
-  with time to spare, so the server, registry and readers classes run in
-  their own collection with parallelism off (`DeployedFolderTimings`). Not
-  measured: whether the app's own thread pool can be starved like that with
-  a teacher at work; nothing seen suggests it. And one fault the tests found in the first version:
+  15 s, the readers reset at 42.8 s instead of by 40; a second run, with
+  those classes alone, lost two answers of the resolution cases over a
+  socket (no answer in 20 s). That was the server's own work waiting for
+  pool threads, so the server moved to threads of its own (above), and the
+  server, registry and readers classes also run in their own collection
+  with parallelism off (`DeployedFolderTimings`). And one fault the tests
+  found in the first version:
   a request that found the folder gone stopped the show from inside its own
   answer, so the browser got a reset instead of the 404; the folder going is
   now reported after the answer has gone.
