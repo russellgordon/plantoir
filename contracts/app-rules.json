@@ -918,7 +918,7 @@
       },
       {
         "expectRequest" : "teacherSurname",
-        "prompt" : "Please enter letters only for your last name (e.g., 'Gordon'):"
+        "prompt" : "Please enter letters only for your last name (e.g., 'Quillfeather'):"
       },
       {
         "expectRequest" : "siteName",

@@ -6233,7 +6233,8 @@ def patch_mermaid_pie_colours(mermaid_ts_path: Path):
     and its legend swatch with it.
 
     The palette is SOLVED at render time rather than hardcoded, because
-    Plantoir ships 43 colour schemes and each has a light and a dark mode.
+    Plantoir ships 43 colour schemes (44 entries since #891: Grove Colours
+    is kept under its old id too) and each has a light and a dark mode.
     Fixed blend fractions tuned against one scheme failed 74 of those 86
     combinations — some slices came out barely distinguishable from the
     label text. Instead: build a pool of tints of the scheme's own colours,
@@ -8397,7 +8398,7 @@ def _find_curriculum_folders(content_root: Path, configured: list) -> list:
         return found
     # The fallback keeps its pre-#128 answer: a folder holding a LETTER-FIRST
     # code (`A1.1`, the only shape there was) is preferred, and only when none
-    # does is a folder of other codes taken. Without this a scratch LCS course
+    # does is a folder of other codes taken. Without this a scratch two-curricula course
     # whose College Board folder has `1.A` pages silently swapped its Ontario
     # map for College Board's under the same title, because `College Board…`
     # sorts before `Ontario…` (measured on the #128 implementation review).

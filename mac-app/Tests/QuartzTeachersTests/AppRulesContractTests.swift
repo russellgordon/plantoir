@@ -799,7 +799,7 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(CredentialRequest.matching("Paste your Cloudflare token:")?.name, "cloudflareToken")
         XCTAssertEqual(CredentialRequest.matching("Paste your Cloudflare Account ID:")?.name, "cloudflareAccountID")
         XCTAssertEqual(CredentialRequest.matching("First time setup... what is your last name? (letters only):")?.name, "teacherSurname")
-        XCTAssertEqual(CredentialRequest.matching("Please enter letters only for your last name (e.g., 'Gordon'):")?.name, "teacherSurname")
+        XCTAssertEqual(CredentialRequest.matching("Please enter letters only for your last name (e.g., 'Quillfeather'):")?.name, "teacherSurname")
         XCTAssertEqual(CredentialRequest.matching("Enter Netlify site name:")?.name, "siteName")
         XCTAssertEqual(CredentialRequest.matching("Choose a different Netlify site name (or 'q' to cancel):")?.name, "siteNameConflict")
     }

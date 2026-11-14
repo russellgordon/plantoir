@@ -101,7 +101,7 @@ class WrittenSettingsTests(unittest.TestCase):
         self.assertNotIn("where", written["words"], "the notes for maintainers do not ship")
 
     def test_the_file_carries_the_corners_and_the_rules(self):
-        settings = {"course_code": "ICS3U", "print_school_name": "Lakefield College School"}
+        settings = {"course_code": "ICS3U", "print_school_name": "Juniper Hollow Collegiate"}
         written = json.loads(print_settings.write(self.output, settings, "ICS3U").read_text(encoding="utf-8"))
         self.assertEqual(written["corners"], print_settings.compose(settings, "ICS3U"))
         rules = contracts.section("shared-rules", "printablePages", "answerCallouts")
