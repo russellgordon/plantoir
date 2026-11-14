@@ -1174,7 +1174,7 @@
           "listOnly": "only the list of plans",
           "none": "nothing to show yet, offered to plan a unit"
         },
-        "couldNotShowLine": "{course} · the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet on this Mac",
+        "couldNotShowLine": "{course} · the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet",
         "couldNotRefreshTheLookLine": "{course} · the Planning tab could not bring the plan's look up to date: {n} file(s) could not be copied",
         "why": "#708, the 708 implementation review M1: the brief's ruling asked for a line when the Planning tab is opened, and the tab's two failures (no page can be shown; the assets mirror failed) reached only the system log, so a report of 'the Planning tab is blank' found nothing. Once per appearance of the tab (not on every return to the window), and the mirror's failure once per appearance. No title: a plan's title is the teacher's own words (rule 5), and the count is what a report needs."
       },
@@ -12755,7 +12755,10 @@
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
           "shared-rules.json:appUpdates.wording.elsewhereWork",
           "shared-rules.json:coverageTab.tab.words.cannotShowDescription",
-          "shared-rules.json:coverageTab.tab.words.noObsidian"
+          "shared-rules.json:coverageTab.tab.words.noObsidian",
+          "shared-rules.json:unitPlanning.tab.words.cannotShowDescription",
+          "shared-rules.json:unitPlanning.tab.words.openInBrowserCouldNotOpen",
+          "shared-rules.json:unitPlanning.tab.words.openInBrowserNoBrowser"
         ],
         "rule": "A sentence outside specialNames that names the teacher's computer is written ONCE, with {machine} where the computer's name goes, and each app puts in its own word: the mac 'Mac', Windows 'PC'. The placeholder is the bare NOUN and the sentence keeps its own determiner ('on this {machine}', 'restarting your {machine}'), because every such sentence Windows had reworded kept the determiner and swapped only the noun - so filling it changes no sentence on either platform. usedIn names every string in contracts/ that carries the placeholder, as file:path with array positions in brackets; SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded walks every contract file and goes red when the two differ, so a reader on either side can drive its fill off this list.",
         "why": "GitHub #418 (DO 1) and #410 (DO 1, DO 2), decided by Russell 2026-10-03. Before it, Windows carried its own copy of each such sentence (appUpdates.windowsWording.elsewhereWorkOnWindows; previewPorts.whenNoBlockIsFree.sentenceOnWindows) or compared with a substitution of its own (#233's 'your PC'), and a reworded sentence on one side would leave the other copy standing. REJECTED: a separate Windows key per sentence (two copies of every sentence, which is the drift this replaces); 'this Mac'/'this PC' as the placeholder's value (the sentences say 'your Mac' as well as 'this Mac', and changing either to fit would reword a sentence teachers already read); reusing the keys list above, whose substitution is 'on your Mac' -> 'on this PC' and changes the determiner as well as the noun."
@@ -38817,16 +38820,16 @@
         "emptyDescription": "Plan a unit with an assistant: a calendar across your sections, lesson cards, each day's materials, assessment drafts and a curriculum correlation. Once it is built, the plan shows here.",
         "revertOnPlanning": "Revert works on the Settings tab, where the changes are shown.",
         "cannotShowTitle": "Unit Plans Can’t Be Shown",
-        "cannotShowDescription": "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough.",
+        "cannotShowDescription": "Plantoir could not get ready to show unit plans on this {machine}. Quitting Plantoir and opening it again may be enough.",
         "openInBrowser": "Open in Browser",
         "openInBrowserHelp": "Open this page in your web browser",
         "openInBrowserNothingToOpen": "There is no page to open in your browser yet.",
         "openInBrowserOutsideThePlan": "Only a page from this course’s unit plans can be opened in your browser.",
         "openInBrowserPageIsGone": "This page is no longer in the course’s unit plans. Reload to see what is there now.",
         "openInBrowserCouldNotOpenTitle": "Can’t Open in Your Browser",
-        "openInBrowserCouldNotOpen": "Your Mac could not open this page in your web browser.",
+        "openInBrowserCouldNotOpen": "Your {machine} could not open this page in your web browser.",
         "openInBrowserNotAPage": "Only a page of the plan or one of its PDFs can be opened in your browser.",
-        "openInBrowserNoBrowser": "No web browser is set on this Mac, so the page was not opened."
+        "openInBrowserNoBrowser": "No web browser is set on this {machine}, so the page was not opened."
       },
       "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. The share bar's words are unitPlanning.share.words (#709).",
       "saveOnPlanning": {
