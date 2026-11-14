@@ -3024,7 +3024,26 @@
       "phet-1",
       "phet-2"
      ],
-     "indexed": true
+     "indexed": true,
+     "pictures": [
+      {
+       "shows": "A phet block as typed in Obsidian",
+       "labels": [
+        "sim:",
+        "alt:"
+       ],
+       "scene": "phet-1"
+      },
+      {
+       "shows": "A simulation's card on the class website, before it is opened",
+       "labels": [
+        "The simulation's picture",
+        "Open the simulation",
+        "PhET's credit line"
+       ],
+       "scene": "phet-2"
+      }
+     ]
     },
     {
      "anchor": "circuits",

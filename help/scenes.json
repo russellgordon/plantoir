@@ -1995,6 +1995,33 @@
    "setup": "The preview of that page; no video is played while the picture is taken",
    "windows": null,
    "raw": false
+  },
+  "phet-1": {
+   "page": "phet",
+   "shows": "A phet block as typed in Obsidian",
+   "labels": [
+    "sim:",
+    "alt:"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "A science page of a ready-made course with one phet block naming gas-properties",
+   "windows": null,
+   "raw": false
+  },
+  "phet-2": {
+   "page": "phet",
+   "shows": "A simulation's card on the class website, before it is opened",
+   "labels": [
+    "The simulation's picture",
+    "Open the simulation",
+    "PhET's credit line"
+   ],
+   "expectText": [],
+   "awaiting_capture": true,
+   "setup": "The preview of that page, after one preview with the internet; the simulation is not opened, so nothing plays",
+   "windows": null,
+   "raw": false
   }
  }
 }

@@ -23,6 +23,8 @@ keywords:
 - missing front page
 - missing Media folder
 - file too large
+- science simulation
+- PhET
 description: The Problems tab lists what a section's last preview or deploy found wrong and names the page of each problem. Two kinds have a repair button.
 ---
 A section's {{control:problemsTab}} tab lists what its last preview or deploy found wrong. It names the page of each problem and says what to change. The tab is in the section's window only while that last preview or deploy found at least one problem.
@@ -94,6 +96,7 @@ The other kinds have no button:
 - {{control:problemsTabKindSelfCheckQuestion}}
 - {{control:problemsTabKindRunnableCode}}
 - {{control:problemsTabKindGeoGebraSketch}}
+- {{control:problemsTabKindScienceSimulation}}
 - {{control:problemsTabKindFileTooLarge}}
 
 1. Read the row and change the page it names, usually in Obsidian.
@@ -101,9 +104,10 @@ The other kinds have no button:
 
 A problem leaves the list when a preview or deploy no longer finds it. Nothing else removes a row.
 
-Two kinds have more to say:
+Three kinds have more to say:
 
 - For {{control:problemsTabKindLinkToAHiddenPage}}, choose {{menu:publishPagesThatLinksLeadTo}}. See [Publish the pages a class page links to](page:links-checklist).
+- For {{control:problemsTabKindScienceSimulation}}, the row names the page, the block and the line. A misspelt name is the usual cause, and the row gives the closest names PhET has. Until the block is put right, students see its lines as you typed them. See [Science simulations](page:phet).
 - {{control:problemsTabKindFileTooLarge}} comes from a deploy to Cloudflare Pages, which refuses any single file bigger than 25 MB. The section was not deployed there. Shorten or compress the file, or deploy the section to Netlify, which allows larger files.
 
 ## If it does not work
