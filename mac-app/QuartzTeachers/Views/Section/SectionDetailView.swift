@@ -415,18 +415,47 @@ struct SectionDetailView: View {
     /// Whether another program holds this course in a way that would refuse
     /// a Deploy pressed here (#729). Read from the watcher, which is
     /// observable, so the button greys and un-greys when its answer moves.
+    /// Asked for THIS section since #835: a lease that names only another
+    /// section of the course leaves this Deploy available.
     var courseIsHeldElsewhere: Bool {
-        return leaseWatcher?.holding(forCourse: course.code) != nil
+        return leaseWatcher?.holding(forCourse: course.code, section: sectionNumber) != nil
+    }
+
+    /// This section's number when the lease in Deploy's way NAMES it (#835),
+    /// so the help can say which section; nil when it names none (it holds
+    /// the whole course) or nothing is in the way.
+    var sectionHeldElsewhere: Int? {
+        return SectionDetailView.sectionNamed(
+            by: leaseWatcher?.holding(forCourse: course.code, section: sectionNumber), section: sectionNumber
+        )
+    }
+
+    /// The section a holding names, of the one asked about: the section when
+    /// the lease names it, nil when it names none or there is no holding.
+    static func sectionNamed(by holding: WorkLeaseFiles.Holding?, section: Int) -> Int? {
+        guard let holding, holding.entry(forSection: section) != nil else {
+            return nil
+        }
+        return section
     }
 
     /// The Deploy button's help, and its accessibility hint (#729). The
     /// folder not being ready wins, as it does for every button; then
-    /// another program holding the course; then the ordinary words.
-    static func deployHelp(folderReadinessReason: String?, heldElsewhere: Bool, courseCode: String) -> String {
+    /// another program holding the course (the section, when its lease
+    /// names it, #835); then the ordinary words.
+    static func deployHelp(
+        folderReadinessReason: String?,
+        heldElsewhere: Bool,
+        courseCode: String,
+        heldSection: Int? = nil
+    ) -> String {
         if let folderReadinessReason {
             return folderReadinessReason
         }
         if heldElsewhere {
+            if let heldSection {
+                return SectionDetailView.deployIsHeldElsewhere(course: courseCode, section: heldSection)
+            }
             return SectionDetailView.deployIsHeldElsewhere(course: courseCode)
         }
         return SectionDetailView.deployOrdinaryHelp
@@ -448,6 +477,16 @@ struct SectionDetailView: View {
             + "Deploy will be available again once that preview is stopped or that deploy has finished."
     }
 
+    /// The same, when the lease in the way names THIS section (#835):
+    /// `shared-rules.json` → `returningToASectionMidDeploy.heldElsewhere
+    /// .helpForASection`. Only this section's Deploy is grey then, so the
+    /// sentence says which section rather than the whole course.
+    static func deployIsHeldElsewhere(course: String, section: Int) -> String {
+        return "\(course) Section \(section) is being previewed or deployed somewhere else on this computer, "
+            + "by an assistant working from another app, another copy of Plantoir, or a scheduled deploy that is running now. "
+            + "Deploy will be available again once that preview is stopped or that deploy has finished."
+    }
+
     /// Whether Deploy may be pressed for a section (#706) — the button,
     /// Section ▸ Deploy… and ⇧⌘D all ask this, and `deployAndWait` and
     /// `deployWillBeRefused` ask its first half, `deployIsUnderWay`.
@@ -456,8 +495,8 @@ struct SectionDetailView: View {
     /// waiting on that zip deletes what this would publish. Not while the
     /// folder's tools are still being copied (#476). Not while another
     /// program holds the course in a way that would refuse the press
-    /// (`heldElsewhere`, #729: `LeaseWatcher`), on every section of it,
-    /// because a lease names the course.
+    /// (`heldElsewhere`, #729: `LeaseWatcher`): on the sections its lease
+    /// names, or on every section of the course when it names none (#835).
     static func deployIsAvailable(
         run: SectionDeployRun,
         folderPath: String?,
@@ -781,12 +820,17 @@ struct SectionDetailView: View {
                     .help(SectionDetailView.deployHelp(
                         folderReadinessReason: workspace.folderReadinessReason,
                         heldElsewhere: courseIsHeldElsewhere,
-                        courseCode: course.code
+                        courseCode: course.code,
+                        heldSection: sectionHeldElsewhere
                     ))
                     // The same sentence for VoiceOver while another program
-                    // holds the course (#729); nothing extra otherwise.
+                    // holds the course or this section (#729, #835);
+                    // nothing extra otherwise.
                     .accessibilityHint(courseIsHeldElsewhere && workspace.folderReadinessReason == nil
-                        ? SectionDetailView.deployIsHeldElsewhere(course: course.code)
+                        ? SectionDetailView.deployHelp(
+                            folderReadinessReason: nil, heldElsewhere: true,
+                            courseCode: course.code, heldSection: sectionHeldElsewhere
+                        )
                         : "")
                     // The pointer reaching for a greyed Deploy is the moment a
                     // stale answer would cost the teacher, so read the leases
@@ -1894,8 +1938,10 @@ struct SectionDetailView: View {
             displayCode: course.displayCode,
             sectionNumber: sectionNumber
         ) != nil
+        // This section's front page only: a sibling built elsewhere does not
+        // write it (#835).
         let anotherProgramIsBuilding: Bool = WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false, section: sectionNumber
         ) != nil
         return SectionDetailView.frontPageMayBeAskedAbout(
             isKeptForReference: course.isKeptForReference,
@@ -2305,18 +2351,23 @@ struct SectionDetailView: View {
         // build counts, so two programs pressing at the same instant cannot
         // both go ahead. Nothing has been stopped or started yet, so
         // declining costs the teacher nothing but the sentence.
+        // Since #835 only work on THIS section counts, or work that names no
+        // section; the claim is this section's own entry in the build lease.
         if let holding = WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true, section: sectionNumber
         ) {
             previewBuildWait.end()
             releasePreviewLease()
             WorkLeaseRegistry.noteDeclined(
                 act: "Preview", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
             )
-            showPreviewRefusal(
-                title: "Cannot Preview Yet",
-                sentence: AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
-            )
+            var sentence: String = AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+            if let named = SectionDetailView.sectionNamed(by: holding, section: sectionNumber) {
+                sentence = AssistWording.sectionIsBeingBuiltElsewhere(
+                    course: course.displayCode, section: String(named)
+                )
+            }
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: sentence)
             return
         }
         // Every window's copy of this course, not only this window's: the
@@ -2382,11 +2433,14 @@ struct SectionDetailView: View {
             // The teacher asked for that deploy, so the end is shown as
             // "Closed for a deploy", not as a failure (#433's stack review,
             // item 6). Asked of the leases at the moment the run ends.
+            // This section's: a sibling built elsewhere does not end this
+            // preview, so its end is not "Closed for a deploy" (#835).
             let folderPathForLeases: String = workspaceURL.path
             let courseCodeForLeases: String = course.code
+            let sectionForLeases: Int = sectionNumber
             previewRunner.endedForAnotherProgramsBuild = {
                 return WorkLeaseRegistry.anotherProgramIsBuilding(
-                    folderPath: folderPathForLeases, courseCode: courseCodeForLeases
+                    folderPath: folderPathForLeases, courseCode: courseCodeForLeases, section: sectionForLeases
                 )
             }
             previewRunner.run(

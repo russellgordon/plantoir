@@ -179,7 +179,7 @@ enum UpdateGate {
 
         // Leases first: another program's build or publish. A lease held by
         // a scheduled publish is named from that publish's own arguments,
-        // because the lease names the course and not the section.
+        // because a lease may name no section (and the gate asks for none).
         var elsewhere: [String] = []
         for lease in leases {
             if !UpdateGate.leaseKindsThatHold.contains(lease.kind.lowercased()) {

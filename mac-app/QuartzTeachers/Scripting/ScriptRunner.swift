@@ -100,8 +100,8 @@ class ScriptRunner {
     /// server killed the way `stop_preview_serving` kills it; and another
     /// program holds a build lease on the course.
     ///
-    /// The residual, accepted: a lease names the course and not the section,
-    /// so a section-2 deploy elsewhere coinciding with a section-1 preview
+    /// The residual, accepted: a lease that names no section (Windows, an
+    /// older Plantoir) holds the whole course, so a section-2 deploy there coinciding with a section-1 preview
     /// whose server was SIGKILLed for some other reason reads as closed. It
     /// needs a serving preview's server killed by that exact signal while
     /// another program builds the same course; and even then the output stays

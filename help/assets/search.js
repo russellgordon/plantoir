@@ -11,12 +11,16 @@
  * - The last word of the query also matches as the start of a word, so a
  *   query typed half way ("schedul") still finds its page.
  * - A word holding a key symbol (⌘P) matches any word that contains it (⇧⌘P).
- * - Pages need not hold every word. They rank by how many query words they
- *   hold; then a page whose title or id holds them ranks above one that only
- *   mentions them (a page whose id the query covers most, then a short
- *   title the words cover, first); then by where the words are and how rare.
- * - A floor: when some pages hold at least half the query's words, pages
- *   holding fewer are dropped.
+ * - Pages need not hold every word. Each query word scores by where the page
+ *   holds it (title 5, question 4, keywords 4, description 2, body 1) times
+ *   how rare it is across the pages, so a word nearly every page holds
+ *   ("page", "student") carries almost nothing and a body that merely
+ *   mentions the words cannot outrank a title, question or keyword.
+ * - A keyword phrase the query says outright ("snow day", "new page") adds
+ *   its words' weight again; only the best such phrase counts.
+ * - A page whose id and short title the query covers gains a share of the
+ *   query's whole weight ("deploy" for deploy, "class-pages" for "classes").
+ * - A floor: pages scoring below 0.4 of the best page's score are dropped.
  * - At most ten results are shown, with a line counting the rest.
  *
  * The small box below it runs on the contents page: the search form on every
@@ -100,11 +104,21 @@
     var entries = [];
     for (var i = 0; i < index.length; i += 1) {
       var entry = index[i];
+      var phrases = [];
+      var keywordList = entry.keywords || [];
+      for (var p = 0; p < keywordList.length; p += 1) {
+        var phrase = queryWords(keywordList[p]);
+        if (phrase.length > 0) {
+          phrases.push(phrase);
+        }
+      }
       entries.push({
         entry: entry,
         title: words(entry.title + " " + String(entry.id || "").split("-").join(" ")),
-        id: words(String(entry.id || "").split("-").join(" ")),
-        keywords: words((entry.keywords || []).join(" ")),
+        id: queryWords(String(entry.id || "").split("-").join(" ")),
+        question: words(entry.question),
+        keywords: words(keywordList.join(" ")),
+        phrases: phrases,
         description: words(entry.description),
         text: words(entry.text)
       });
@@ -112,51 +126,109 @@
     return entries;
   }
 
+  // True when every word of the phrase stands in the query, side by side and in order.
+  function queryHoldsPhrase(wanted, phrase) {
+    for (var start = 0; start + phrase.length <= wanted.length; start += 1) {
+      var all = true;
+      for (var i = 0; i < phrase.length; i += 1) {
+        var prefix = start + i === wanted.length - 1;
+        if (!holds([phrase[i]], wanted[start + i], prefix)) {
+          all = false;
+          break;
+        }
+      }
+      if (all) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Where a word counts most: a page's title says what it is about, its question and
+  // keywords are the words a teacher would use for it, its body merely mentions things.
+  var IN_TITLE = 5;
+  var IN_QUESTION = 4;
+  var IN_KEYWORDS = 4;
+  var IN_DESCRIPTION = 2;
+  var IN_TEXT = 1;
+  // A word no rarer than this carries next to nothing ("page" is on nearly every page).
+  var LEAST_WEIGHT = 0.02;
+  // Pages scoring below this share of the best page's score are dropped.
+  var FLOOR = 0.4;
+
   function searchHelp(index, query) {
     var wanted = queryWords(query);
     if (wanted.length === 0) {
       return [];
     }
     var entries = prepared(index);
-    // A rare word says more than a common one: weight each by how few pages hold it.
+    // A rare word says more than a common one: weight each by how few pages hold it,
+    // so a word nearly every page holds carries almost no weight.
     var weights = [];
     for (var w = 0; w < wanted.length; w += 1) {
       var asPrefix = w === wanted.length - 1;
       var holders = 0;
       for (var e = 0; e < entries.length; e += 1) {
-        var all = entries[e].title.concat(entries[e].keywords, entries[e].description, entries[e].text);
+        var all = entries[e].title.concat(entries[e].question, entries[e].keywords, entries[e].description, entries[e].text);
         if (holds(all, wanted[w], asPrefix)) {
           holders += 1;
         }
       }
-      weights.push(Math.log(1 + entries.length / Math.max(1, holders)));
+      weights.push(Math.max(LEAST_WEIGHT, Math.log((entries.length + 1) / (holders + 0.5))));
+    }
+    var queryWeight = 0;
+    for (var qw = 0; qw < weights.length; qw += 1) {
+      queryWeight += weights[qw];
     }
     var results = [];
     for (var i = 0; i < entries.length; i += 1) {
       var page = entries[i];
       var matched = 0;
-      var titleHits = 0;
       var score = 0;
       for (var j = 0; j < wanted.length; j += 1) {
         var prefix = j === wanted.length - 1;
         var where = 0;
         if (holds(page.title, wanted[j], prefix)) {
-          where = 4;
-          titleHits += 1;
+          where = IN_TITLE;
+        } else if (holds(page.question, wanted[j], prefix)) {
+          where = IN_QUESTION;
         } else if (holds(page.keywords, wanted[j], prefix)) {
-          where = 3;
+          where = IN_KEYWORDS;
         } else if (holds(page.description, wanted[j], prefix)) {
-          where = 2;
+          where = IN_DESCRIPTION;
         } else if (holds(page.text, wanted[j], prefix)) {
-          where = 1;
+          where = IN_TEXT;
         }
         if (where > 0) {
           matched += 1;
           score += where * weights[j];
         }
       }
-      // How much of the page's id the query asks for: all of "deploy" for deploy,
-      // half of "class-pages" for "classes".
+      if (matched === 0) {
+        continue;
+      }
+      // A keyword phrase of two or more words that the query says outright ("snow day",
+      // "new page") is the page naming itself in the teacher's words. Only the best such
+      // phrase counts, so a page listing "answer key" and "answer keys" gains nothing twice.
+      var bestPhrase = 0;
+      for (var k = 0; k < page.phrases.length; k += 1) {
+        var phrase = page.phrases[k];
+        if (phrase.length > 1 && queryHoldsPhrase(wanted, phrase)) {
+          var phraseWeight = 0;
+          for (var pw = 0; pw < phrase.length; pw += 1) {
+            for (var x = 0; x < wanted.length; x += 1) {
+              if (holds([phrase[pw]], wanted[x], x === wanted.length - 1)) {
+                phraseWeight += weights[x];
+                break;
+              }
+            }
+          }
+          bestPhrase = Math.max(bestPhrase, phraseWeight);
+        }
+      }
+      score += IN_KEYWORDS * bestPhrase;
+      // How much of the page's id, and of its title, the query covers: all of "deploy" for
+      // deploy, half of "class-pages" for "classes". A short title about the words wins.
       var idHits = 0;
       for (var d = 0; d < page.id.length; d += 1) {
         if (holds(wanted, page.id[d], false)) {
@@ -164,7 +236,12 @@
         }
       }
       var idShare = idHits / Math.max(1, page.id.length);
-      // How much of the title the query covers (numbers aside): a short title about the words wins.
+      var titleHits = 0;
+      for (var h = 0; h < wanted.length; h += 1) {
+        if (holds(page.title, wanted[h], h === wanted.length - 1)) {
+          titleHits += 1;
+        }
+      }
       var titleWords = 0;
       var meaningful = queryWords(page.entry.title);
       for (var m = 0; m < meaningful.length; m += 1) {
@@ -173,48 +250,30 @@
         }
       }
       var titleShare = titleHits / Math.max(1, titleWords);
-      if (matched > 0) {
-        results.push({
-          id: page.entry.id, title: page.entry.title, description: page.entry.description,
-          matched: matched, titleHits: titleHits, idShare: idShare, titleShare: titleShare, score: score
-        });
-      }
+      score += queryWeight * (2 * idShare + titleShare);
+      results.push({
+        id: page.entry.id, title: page.entry.title, description: page.entry.description,
+        matched: matched, score: score
+      });
     }
-    // A floor: when some pages hold at least half the query's words, drop the rest.
-    var half = Math.ceil(wanted.length / 2);
+    // A floor relative to the best match: a page far below it only mentions the words.
     var best = 0;
     for (var r = 0; r < results.length; r += 1) {
-      best = Math.max(best, results[r].matched);
+      best = Math.max(best, results[r].score);
     }
-    if (best >= half) {
-      var kept = [];
-      for (var k = 0; k < results.length; k += 1) {
-        if (results[k].matched >= half) {
-          kept.push(results[k]);
-        }
+    var kept = [];
+    for (var f = 0; f < results.length; f += 1) {
+      if (results[f].score >= FLOOR * best) {
+        kept.push(results[f]);
       }
-      results = kept;
     }
-    // A page whose title or id holds the words ranks above one that only mentions them.
-    results.sort(function (first, second) {
-      if (second.matched !== first.matched) {
-        return second.matched - first.matched;
-      }
-      if (second.titleHits !== first.titleHits) {
-        return second.titleHits - first.titleHits;
-      }
-      if (second.idShare !== first.idShare) {
-        return second.idShare - first.idShare;
-      }
-      if (second.titleShare !== first.titleShare) {
-        return second.titleShare - first.titleShare;
-      }
+    kept.sort(function (first, second) {
       if (second.score !== first.score) {
         return second.score - first.score;
       }
       return first.title < second.title ? -1 : 1;
     });
-    return results;
+    return kept;
   }
 
   function showResults() {

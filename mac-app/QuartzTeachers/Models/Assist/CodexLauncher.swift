@@ -27,8 +27,9 @@ import Foundation
 /// quietly turn `args` from a list into one string — a door that greets the
 /// teacher and then cannot start its server.
 ///
-/// The menu item only appears when `isAvailable` is true. Plantoir never
-/// installs Codex, and never offers to.
+/// The menu item only appears when `isAvailable` is true. Plantoir sets
+/// Codex up only when the teacher asks, from Settings ▸ Other Assistants
+/// (#855, `AssistantSetUp`).
 nonisolated enum CodexLauncher {
 
     // MARK: - Stored properties
