@@ -78,7 +78,9 @@ Plantoir --write-contracts contracts     # or the built binary in DerivedData
 
 It preserves the hand-written halves (`scenarios`, `nearMisses`,
 `promptHistory`, every case list) and rewrites only the readouts. It is
-idempotent, so a run that changes nothing produces no diff. **Commit the diff —
+idempotent, so a run that changes nothing produces no diff: since #866 it
+keeps the committed TEXT of every key it does not change, so an authored key
+keeps its author's order (`contracts/README.md` → "Regenerating"). **Commit the diff —
 that diff is how the change travels.**
 
 **It is not how they find out**, and the difference has cost real time. Nobody

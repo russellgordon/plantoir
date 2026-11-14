@@ -119,7 +119,8 @@ enum AppRulesContract {
     static func write(into directory: URL) -> String {
         let url: URL = directory.appendingPathComponent(fileName)
         var rules: [String: Any] = [:]
-        if let data = try? Data(contentsOf: url),
+        let committed: Data? = try? Data(contentsOf: url)
+        if let data = committed,
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             rules = existing
         }
@@ -136,7 +137,9 @@ enum AppRulesContract {
             rules["note"] = "What both apps must agree on outside the assistant. See contracts/README.md."
         }
         do {
-            try AssistContract.encode(rules).write(to: url)
+            // Over the committed text (#866): the authored keys keep their
+            // authors' order, so a run that changes nothing changes no byte.
+            try AssistContract.encode(rules, keepingTheTextOf: committed).write(to: url)
         } catch {
             return "Could not write the app rules: \(error.localizedDescription)"
         }
