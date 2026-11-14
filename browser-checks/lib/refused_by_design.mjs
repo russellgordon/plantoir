@@ -23,6 +23,17 @@
 // refusedByDesign names are set aside, only on a page where such a script
 // was found, never a refusal of any other kind.
 //
+// And they are COUNTED, page by page (597b fix review, d1): at most
+// `refusedScriptsPerDocument` such scripts in any one document the page was
+// sent, and exactly `linesPerRefusedScript` messages for each of them
+// (WebKit's two records of one message counted once, by the caller). One
+// script and one message a document in each engine is what was measured
+// against a stand-in for Netlify's edge (2026-11-14: Tasks, loaded, reloaded
+// and taken to My Progress, 3; Embeds, reloaded, 2; every other page 1). A
+// second injected script, more messages in the badge's wording than the
+// scripts found account for (a refusal of the site's own whose text the
+// reading here could not find), or fewer, fails the page and names the count.
+//
 // No packages; Node 22. Tested by test_refused_by_design.mjs.
 
 import { createHash } from "node:crypto"
@@ -90,11 +101,12 @@ export function policyAllows(header, text) {
 //              the host serves it to a client that is not a browser
 //   inTheDom   the texts of the inline scripts the last document holds now
 //              (judged by the last document's policy)
-// Answers { injected, own, madeAtRunTime }: refused scripts that only the
-// browser was sent, refused scripts the site's own pages hold, and refused
-// scripts that are in neither (the page's scripts made them). Answers null
-// when a document's served copy is missing: without it nothing can be told
-// apart, and nothing is set aside.
+// Answers { injected, own, madeAtRunTime, injectedPerDocument }: refused
+// scripts that only the browser was sent, refused scripts the site's own
+// pages hold, refused scripts that are in neither (the page's scripts made
+// them), and for each document the number of refused scripts only the
+// browser was sent in it. Answers null when a document's served copy is
+// missing: without it nothing can be told apart, and nothing is set aside.
 export function sortRefusedScripts({ documents, inTheDom }) {
   if (!Array.isArray(documents) || documents.length === 0) return null
   const receivedScripts = new Set()
@@ -121,6 +133,16 @@ export function sortRefusedScripts({ documents, inTheDom }) {
     else if (receivedScripts.has(candidate.text)) sorted.injected.push(one)
     else sorted.madeAtRunTime.push(one)
   }
+  // Counted in each document as it was received, a script repeated in one
+  // document counted each time it is there, since each is refused.
+  sorted.injectedPerDocument = []
+  for (const document of documents) {
+    let count = 0
+    for (const text of inlineScriptsIn(document.received)) {
+      if (!policyAllows(document.policy, text) && !servedScripts.has(text)) count += 1
+    }
+    sorted.injectedPerDocument.push(count)
+  }
   return sorted
 }
 
@@ -146,7 +168,8 @@ export function isRefusalLine(entry, text) {
 //   entries   the refusedByDesign entries for this host
 //   sorted    sortRefusedScripts' answer for the page (or null: not looked at)
 //   lines     the page's console and refusal lines, as the row collected them
-// Answers { setAside: [lines], entry, failures: [sentences] }.
+// Answers { setAside: [lines], entry, failures: [sentences], allowed }:
+// allowed is the most lines the scripts found can account for.
 export function judgeRefusals(entries, sorted, lines) {
   const failures = []
   if (!sorted) return { setAside: [], entry: null, failures }
@@ -158,9 +181,58 @@ export function judgeRefusals(entries, sorted, lines) {
   }
   if (failures.length > 0 || sorted.injected.length === 0 || entries.length === 0) return { setAside: [], entry: null, failures }
   const entry = entries[0]
+  const perDocument = entry.refusedScriptsPerDocument ?? 1
+  const perScript = entry.linesPerRefusedScript ?? 1
+  const counts = sorted.injectedPerDocument ?? [sorted.injected.length]
+  let scripts = 0
+  for (const count of counts) {
+    if (count > perDocument) {
+      failures.push(`${count} refused inline scripts the host sent the browser alone in one document, where ${entry.name} is ${perDocument} (rendered_rows.json -> refusedByDesign.refusedScriptsPerDocument)`)
+    }
+    scripts += count
+  }
+  const allowed = scripts * perScript
   const setAside = []
   for (const text of lines) {
     if (isRefusalLine(entry, text)) setAside.push(text)
   }
-  return { setAside, entry, failures }
+  if (setAside.length > allowed) {
+    failures.push(`${setAside.length} refusal lines in the wording of ${entry.name}, where the ${scripts} such script(s) the page was sent account for ${allowed} (rendered_rows.json -> refusedByDesign.linesPerRefusedScript): a refusal more than the host's`)
+  } else if (setAside.length < allowed) {
+    // Measured equal on every page in both engines (2026-11-14, a stand-in
+    // for Netlify's edge): fewer means a refusal was not seen, and the count
+    // can no longer be trusted, so it errs red.
+    failures.push(`${setAside.length} refusal lines in the wording of ${entry.name}, where the ${scripts} such script(s) the page was sent account for ${allowed} (rendered_rows.json -> refusedByDesign.linesPerRefusedScript): a refusal of the host's script was not seen`)
+  }
+  if (failures.length > 0) return { setAside: [], entry: null, failures, allowed }
+  return { setAside, entry, failures, allowed }
+}
+
+// The page's console and refusal lines as MESSAGES, for counting (597b fix
+// review, d1). WebKit's "Refused to" line is recorded twice by the rendered
+// check, in its console list with the page's address after it and in its
+// refused list without (measured 2026-11-14), so each refused line that has
+// a console twin is one message, matched one for one: two refusals with the
+// same words are still two. Answers { messages, twinOf }: twinOf maps a
+// refused line to the console line it is a copy of.
+export function refusalMessages(consoleLines, refusedLines) {
+  const said = consoleLines ?? []
+  const messages = [...said]
+  const twinOf = new Map()
+  const used = new Set()
+  for (const text of refusedLines ?? []) {
+    let twin = -1
+    for (let index = 0; index < said.length; index += 1) {
+      const line = said[index]
+      if (!used.has(index) && (line === text || line.startsWith(text + " ("))) {
+        twin = index
+        break
+      }
+    }
+    if (twin >= 0) {
+      used.add(twin)
+      twinOf.set(text, said[twin])
+    } else messages.push(text)
+  }
+  return { messages, twinOf }
 }

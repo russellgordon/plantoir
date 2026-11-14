@@ -61,7 +61,8 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { outsidePins, pinnedButNotAsked, sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
 import { whoseRefusal } from "./lib/frame_refusals.mjs"
-import { byDesignFor, judgeRefusals, runsAsScript, sortRefusedScripts } from "./lib/refused_by_design.mjs"
+import { INDEX_WAIT_CEILING_MS, indexWaitNote, untilFetchDataSettles } from "./lib/index_wait.mjs"
+import { byDesignFor, judgeRefusals, refusalMessages, runsAsScript, sortRefusedScripts } from "./lib/refused_by_design.mjs"
 import { startSiteServer } from "./lib/site_server.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -352,7 +353,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [] }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [], indexWaitsGaveUp: 0 }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -613,22 +614,12 @@ async function openPage(context, record, url) {
 }
 
 // Before a row takes the page somewhere else (a reload, the next page): until
-// the page's own request for the site's search index has answered. Quartz
-// asks for static/contentIndex.json as the page loads (its inline script's
-// `fetchData`, which nothing catches), and a navigation that cancels it makes
-// WebKit throw "TypeError: Load failed" into the page, which the clean-page
-// row counts as the row's own fault. Measured 2026-11-13 on the first
-// deployed run's build in headless WebKit: no page error with no delay, two
-// with 0.5 s on every request but the page's own (597b first-run
-// investigation, (d)). A wait on the page's own promise, the real dependency,
-// with a ceiling; never a fixed sleep. A page with no `fetchData` has nothing
-// in flight to cancel.
-async function untilTheIndexHasArrived(page) {
-  await page.evaluate(() => {
-    const pending = typeof fetchData === "undefined" ? null : fetchData
-    if (!pending || typeof pending.then !== "function") return null
-    return Promise.race([pending.then(() => null, () => null), new Promise((resolve) => setTimeout(resolve, 30000))])
-  }).catch(() => null)
+// the page's own request for the site's search index has answered, with a
+// ceiling (lib/index_wait.mjs says why, and what was measured). Reaching the
+// ceiling is counted on the record, and the row's line says so (runPage).
+async function untilTheIndexHasArrived(page, record) {
+  const answer = await page.evaluate(untilFetchDataSettles, INDEX_WAIT_CEILING_MS).catch(() => null)
+  if (answer === "gave up") record.indexWaitsGaveUp += 1
 }
 
 const ROW_CHECKS = {}
@@ -873,15 +864,15 @@ ROW_CHECKS.tasks = async ({ page, context, record, base }) => {
   if (await box.isChecked()) return { fail: "the first box was ticked before anyone pressed it" }
   await box.click({ timeout: 10000 })
   if (!(await box.isChecked())) return { fail: "the box did not tick when pressed" }
-  await untilTheIndexHasArrived(page)
+  await untilTheIndexHasArrived(page, record)
   await page.reload({ waitUntil: "load" })
   const kept = await waitInPage(page, () => document.querySelector("input.plantoir-task")?.checked === true, 5000)
   if (!kept) return { fail: "a tick did not survive a reload" }
   return { ok: "a box ticked by a real press was still ticked after a reload" }
 }
 
-ROW_CHECKS.progress = async ({ page, base }) => {
-  await untilTheIndexHasArrived(page)
+ROW_CHECKS.progress = async ({ page, base, record }) => {
+  await untilTheIndexHasArrived(page, record)
   await page.goto(base + "My-Progress", { waitUntil: "load", timeout: 60000 })
   const row = await waitInPage(page, () => {
     const holder = document.querySelector("[data-plantoir-progress]")
@@ -1129,7 +1120,7 @@ ROW_CHECKS.embeds = async ({ page, record }) => {
     const request = response.request()
     if (request.isNavigationRequest() && request.frame() !== page.mainFrame()) answered.set(request.url(), response.status())
   })
-  await untilTheIndexHasArrived(page)
+  await untilTheIndexHasArrived(page, record)
   await page.reload({ waitUntil: "load", timeout: 60000 })
   // Until every frame's document has answered, with a ceiling, never a fixed wait.
   const answeredFor = (src) => { for (const url of answered.keys()) if (url.split("?")[0] === src.split("?")[0] || url.startsWith(src)) return true; return false }
@@ -1464,15 +1455,16 @@ function judgeClean(record, network, refusals = null) {
   const forTheNetwork = (text) => offline.some((host) => OFFLINE_LINES[host].test(text))
   // What the site's policy refuses on purpose: set aside by line, only on a
   // page that holds such a script and none of its own refused.
-  const judged = refusals ? judgeRefusals(refusals.entries, refusals.sorted, [...record.console, ...record.refused]) : { setAside: [], entry: null, failures: [] }
+  // Counted as messages, not as records (lib/refused_by_design.mjs,
+  // refusalMessages): WebKit records each "Refused to" line twice.
+  const { messages, twinOf } = refusalMessages(record.console, record.refused)
+  const judged = refusals ? judgeRefusals(refusals.entries, refusals.sorted, messages) : { setAside: [], entry: null, failures: [] }
   for (const failure of judged.failures) said.push("refused: " + failure)
   const byDesign = new Set(judged.setAside)
-  let refusedByDesign = 0
+  for (const [text, twin] of twinOf) if (byDesign.has(twin)) byDesign.add(text)
+  const refusedByDesign = judged.setAside.length
   const consider = (label, text) => {
-    if (byDesign.has(text)) {
-      refusedByDesign += 1
-      return
-    }
+    if (byDesign.has(text)) return
     if (expectedLine(text)) return
     if (forTheNetwork(text)) {
       setAside += 1
@@ -1488,7 +1480,7 @@ function judgeClean(record, network, refusals = null) {
     + (record.embedLines > 0 ? `; ${record.embedLines} line(s) from inside a teacher's embeds set aside (the embeds row judges the frames)` : "")
   const designed = refusedByDesign > 0 ? `; ${refusedByDesign} refusal line(s) of ${judged.entry.name} set aside (refused by the site's policy by design, rendered_rows.json -> refusedByDesign)` : ""
   if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}${designed}` }
-  if (refusedByDesign > 0) return { expected: `${refusedByDesign} refusal line(s) of ${judged.entry.name}, and nothing else${aside}`, byDesign: judged.entry.name }
+  if (refusedByDesign > 0) return { expected: `${refusedByDesign} refusal line(s) of ${judged.entry.name}, of the ${judged.allowed} its scripts account for, and nothing else${aside}`, byDesign: judged.entry.name, byDesignLines: refusedByDesign }
   return { ok: `nothing reported to the console, no page error, nothing refused${aside}` }
 }
 
@@ -1678,6 +1670,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
     for (const row of pageRows) {
       if (row.name === "cold visit") continue
       let outcome
+      const waitsBefore = record.indexWaitsGaveUp
       try {
         outcome = await Promise.race([
           ROW_CHECKS[row.name]({ page, context, record, base, engine, network }),
@@ -1686,7 +1679,15 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
       } catch (error) {
         outcome = { fail: String(error.message ?? error).split("\n")[0] }
       }
-      outcomes.push(toOutcome(row.name, outcome))
+      const one = toOutcome(row.name, outcome)
+      // Never silent: a wait for the page's index that reached its ceiling
+      // during this row is said in the row's line, and counted.
+      const gaveUp = record.indexWaitsGaveUp - waitsBefore
+      if (gaveUp > 0) {
+        one.detail += indexWaitNote(gaveUp)
+        one.indexWaitsGaveUp = gaveUp
+      }
+      outcomes.push(one)
     }
     // Before the page is judged: scrolled to its end, so what loads only
     // below the fold is asked for, then held until it has asked for nothing
@@ -1724,7 +1725,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
 
 function toOutcome(row, outcome) {
   if (outcome?.skip) return { row, state: "SKIPPED", detail: outcome.skip }
-  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts ?? [], asked: outcome.asked, byDesign: outcome.byDesign }
+  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts ?? [], asked: outcome.asked, byDesign: outcome.byDesign, byDesignLines: outcome.byDesignLines }
   if (outcome?.fail && outcome.asked) return { row, state: "FAIL", detail: outcome.fail, asked: outcome.asked }
   if (outcome?.ok && outcome.asked) return { row, state: "OK", detail: outcome.ok, asked: outcome.asked }
   if (outcome?.ok && outcome.partSkipped) return { row, state: "OK", detail: outcome.ok, partSkipped: outcome.partSkipped }
@@ -1790,9 +1791,12 @@ async function plainRun(engines, network) {
         // on purpose, by name, with the pages it was seen on
         // (rendered_rows.json -> refusedByDesign).
         const byName = new Map()
-        for (const one of expected) byName.set(one.byDesign, [...(byName.get(one.byDesign) ?? []), one.page])
-        for (const [name, pages] of [...byName].sort()) {
-          say("EXPECTED", row.name, engineName, `${name} refused by the site's policy on ${pages.length} of ${mine.length} pages (${pages.join(", ")}): by design, set aside only where the page holds a refused inline script the host sent the browser alone (rendered_rows.json -> refusedByDesign)`)
+        // Each page with its count of lines set aside, so a page that set
+        // aside more than the others is in sight (597b fix review, d1).
+        for (const one of expected) byName.set(one.byDesign, [...(byName.get(one.byDesign) ?? []), one])
+        for (const [name, ones] of [...byName].sort()) {
+          const counted = ones.map((one) => `${one.page} ${one.byDesignLines ?? "?"}`)
+          say("EXPECTED", row.name, engineName, `${name} refused by the site's policy on ${ones.length} of ${mine.length} pages (${counted.join(", ")}): by design, set aside only where the page holds a refused inline script the host sent the browser alone, and only as many lines as such scripts account for (rendered_rows.json -> refusedByDesign)`)
         }
         const clean = mine.filter((one) => one.state === "OK")
         if (clean.length > 0) say("OK", `${row.name}, the other pages`, engineName, `${clean.length} pages - ${clean.map((one) => one.page).join(", ")}`)
@@ -1815,6 +1819,12 @@ async function plainRun(engines, network) {
         say("OK", row.name, engineName, `${mine.length - skipped.length} pages - ${mine.filter((one) => one.state === "OK").map((one) => one.page).join(", ")}; e.g. ${example.page}: ${example.detail}`)
       }
     }
+  }
+  // The waits for a page's own index that reached their ceiling, one line
+  // each, which verify-deploy.sh carries into its Result block (597b fix
+  // review, d2).
+  for (const one of collected) {
+    if (one.indexWaitsGaveUp > 0) say("NOTE", "index wait", one.engine, `${one.page}, the ${one.row} row: the page's own request for the search index had not answered after ${Math.round(INDEX_WAIT_CEILING_MS / 1000)} s, ${one.indexWaitsGaveUp} time(s), so the row went on without it`)
   }
   // A listed host that no page asked in an engine's whole run has stopped
   // failing: said as a failure, so the list is shortened rather than left

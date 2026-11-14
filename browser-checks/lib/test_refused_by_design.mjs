@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { byDesignFor, hashOf, inlineScriptsIn, isRefusalLine, judgeRefusals, policyAllows, sortRefusedScripts } from "./refused_by_design.mjs"
+import { byDesignFor, hashOf, inlineScriptsIn, isRefusalLine, judgeRefusals, policyAllows, refusalMessages, sortRefusedScripts } from "./refused_by_design.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ENTRIES = JSON.parse(readFileSync(join(HERE, "..", "rendered_rows.json"), "utf-8")).refusedByDesign
@@ -79,6 +79,34 @@ sorted = sortRefusedScripts({ documents: [
   { policy: NEXT_POLICY, received: NEXT.replace("</head>", `<script>${BADGE}</script></head>`), served: NEXT },
 ], inTheDom: [BADGE] })
 expect("a reload and the next page: the badge once, as the host's, nothing of the site's", sorted && sorted.injected.length === 1 && sorted.own.length === 0 && sorted.madeAtRunTime.length === 0, JSON.stringify(sorted))
+
+// Counted page by page (597b fix review, d1): one refused script a document
+// that only the browser was sent, one line for each, as the first run
+// measured; anything more fails and says the count.
+sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: WITH_BADGE, served: SITE }], inTheDom: [] })
+judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM, CHROMIUM])
+expect("counted: three refusal lines in the badge's wording where one badge accounts for one fail, naming the count, and nothing is set aside", judged.setAside.length === 0 && judged.failures.length === 1 && /^3 refusal lines .* account for 1 /.test(judged.failures[0]), JSON.stringify(judged))
+const SECOND = "(function(){window.second=1})()"
+const TWO_INJECTED = WITH_BADGE.replace("</head>", `<script>${SECOND}</script></head>`)
+sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: TWO_INJECTED, served: SITE }], inTheDom: [] })
+judged = judgeRefusals(NETLIFY, sorted, [WEBKIT, WEBKIT])
+expect("counted: a second refused script the host sent the browser alone, in one document, fails, naming the count", sorted.injectedPerDocument.join() === "2" && judged.setAside.length === 0 && judged.failures.length === 1 && /^2 refused inline scripts the host sent the browser alone in one document/.test(judged.failures[0]), JSON.stringify(judged))
+const RELOADED = [{ policy: POLICY, received: WITH_BADGE, served: SITE }, { policy: POLICY, received: WITH_BADGE, served: SITE }]
+sorted = sortRefusedScripts({ documents: RELOADED, inTheDom: [BADGE] })
+judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM])
+expect("counted: a page reloaded once was sent the badge twice, and its two lines are set aside", sorted.injectedPerDocument.join() === "1,1" && judged.failures.length === 0 && judged.setAside.length === 2 && judged.allowed === 2, JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM, CHROMIUM, CHROMIUM])
+expect("counted: a page reloaded once with three lines in the badge's wording fails", judged.failures.length === 1 && judged.setAside.length === 0 && /^3 refusal lines .* account for 2 /.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, sorted, [CHROMIUM])
+expect("counted: a page reloaded once with one line in the badge's wording, where it was sent the badge twice, fails", judged.failures.length === 1 && judged.setAside.length === 0 && /^1 refusal lines .* account for 2 .*was not seen/.test(judged.failures[0]), JSON.stringify(judged))
+const AT = " (https://example.netlify.app/Rendered-Check/Quiz)"
+let counted = refusalMessages([WEBKIT + AT], [WEBKIT])
+expect("counted: WebKit's one refusal, recorded in the console with its address and again in the refused list, is one message", counted.messages.length === 1 && counted.twinOf.get(WEBKIT) === WEBKIT + AT, JSON.stringify(counted.messages))
+counted = refusalMessages([WEBKIT + AT, WEBKIT + AT], [WEBKIT, WEBKIT])
+expect("counted: two refusals in the same words are two messages, never one", counted.messages.length === 2, JSON.stringify(counted.messages))
+counted = refusalMessages([CHROMIUM], [WEBKIT])
+expect("counted: a refused line with no console twin is a message of its own", counted.messages.length === 2, JSON.stringify(counted.messages))
+expect("counted: refusedByDesign carries the two counts, one a document and one a script", NETLIFY[0].refusedScriptsPerDocument === 1 && NETLIFY[0].linesPerRefusedScript === 1 && !("expectedLinesPerEngine" in NETLIFY[0]), JSON.stringify(NETLIFY[0]))
 
 if (failures > 0) {
   console.log(`${failures} case(s) failed`)

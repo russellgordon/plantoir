@@ -785,6 +785,12 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
       ?*) RENDER_EXPECTED+=("$label ${line#EXPECTED: }") ;;
     esac
   done < <(grep '^EXPECTED: ' "$log")
+  # A wait for a page's own index that reached its ceiling is never silent
+  # (597b fix review, d2): each is measured, with its count, in the Result
+  # block, whatever the row then said.
+  while IFS= read -r line; do
+    [ -n "$line" ] && MEASURED+=("$label, the rendered check (#597): ${line#NOTE: }")
+  done < <(grep '^NOTE: index wait ' "$log")
   line=$(grep '^DONE: ' "$log" | tail -1 | sed 's/^DONE: //')
   # The expected failures are compared with the pinned number (597b review
   # finding 2): one line per listed host in each engine. A count that moved
@@ -797,11 +803,14 @@ rendered_one() {  # rendered_one <host> <label> <address ending in /> <failures 
     no "$label, rendered: $expected_here expected failure(s), where rendered_rows.json -> thirdPartyHostsToday pins ${pinned:-?} (one a listed host in each engine)"
     status=1
   fi
-  # At most expectedLinesPerEngine in each engine of the refusals set aside
-  # on this host, and none on a host refusedByDesign does not name: none
-  # when Netlify sent no badge, which hides nothing, since nothing is set
-  # aside on a page holding no such script.
-  by_design_allowed=$(python3 -c 'import json,sys; print(sum(entry["expectedLinesPerEngine"] * 2 for entry in json.load(open(sys.argv[1])).get("refusedByDesign", []) if sys.argv[2] in entry["hosts"]))' "$SCRIPT_REPO/browser-checks/rendered_rows.json" "$host" 2>/dev/null)
+  # At most one EXPECTED clean-page line in each engine for each
+  # refusedByDesign entry naming this host, and none on a host no entry
+  # names: none when Netlify sent no badge, which hides nothing, since
+  # nothing is set aside on a page holding no such script. How many lines
+  # each page set aside is pinned inside the checker, page by page
+  # (refusedScriptsPerDocument, linesPerRefusedScript: 597b fix review, d1),
+  # where a page over the count is a FAIL that names it.
+  by_design_allowed=$(python3 -c 'import json,sys; print(sum(2 for entry in json.load(open(sys.argv[1])).get("refusedByDesign", []) if sys.argv[2] in entry["hosts"]))' "$SCRIPT_REPO/browser-checks/rendered_rows.json" "$host" 2>/dev/null)
   if [ "$status" -eq 0 ] && [ "$by_design_here" -gt "${by_design_allowed:-0}" ]; then
     no "$label, rendered: $by_design_here refusal line(s) set aside as by design, where rendered_rows.json -> refusedByDesign allows ${by_design_allowed:-0} on this host"
     status=1
@@ -1030,7 +1039,13 @@ live_reload_client_in() {
   rule=$(live_reload_rule)
   [ -n "$rule" ] || return 2
   if [ -d "$1" ]; then
-    LC_ALL=C grep -rzqs --include='*.html' -- "$rule" "$1"
+    # Every page, whatever the case of its name: .html and .htm (597b fix
+    # review, (a)). A client in a .js file, an extensionless page or a
+    # different shape of the client is what the product's readers miss too,
+    # a follow-up for both platforms (documentation/07, the five
+    # corrections); the preview row fetches a real serve-mode page, so a
+    # Quartz that moved the client is red there first.
+    LC_ALL=C grep -rzqs --include='*.[hH][tT][mM][lL]' --include='*.[hH][tT][mM]' -- "$rule" "$1"
   else
     LC_ALL=C grep -zqs -- "$rule" "$1"
   fi
@@ -1862,6 +1877,22 @@ STUB
   else
     no "by design on Cloudflare: $(printf '%s\n' "$out" | grep -E '❌|checked' | head -3)"
   fi
+  # A row whose wait for the page's index reached its ceiling: the checker's
+  # NOTE line is carried into the Result block with its count, never dropped
+  # (597b fix review, d2).
+  WAIT_LINES=()
+  for st_line in "${GOOD_LINES[@]}"; do
+    case "$st_line" in "DONE: "*) ;; *) WAIT_LINES+=("$st_line") ;; esac
+  done
+  WAIT_LINES+=("NOTE: index wait [webkit]: Tasks, the tasks row: the page's own request for the search index had not answered after 30 s, 1 time(s), so the row went on without it" "DONE: 41 OK, 0 FAIL, 0 SKIPPED, 6 EXPECTED in 100 s (stub; ran in chromium and webkit)")
+  plan_reset; plan_step 1 0 "${WAIT_LINES[@]}"
+  RS_TARGETS=("netlify|$PS_URL|0")
+  out=$(rs_run)
+  if printf '%s\n' "$out" | grep -q "^MEASURED Netlify, the rendered check (#597): index wait \[webkit\]: Tasks, the tasks row: the page's own request for the search index had not answered after 30 s, 1 time(s)"; then
+    ok "a wait for a page's own index that reached its ceiling is in the Result block, with the page, the row and the count"
+  else
+    no "an index wait that reached its ceiling was dropped: $(printf '%s\n' "$out" | grep -E 'MEASURED|checked' | head -3)"
+  fi
   plan_reset; plan_step 1 0 "${BADGE_LINES[@]}" "EXPECTED: clean page [webkit]: Netlify's own badge script $BADGE_LINE"
   RS_TARGETS=("netlify|$PS_URL|0")
   out=$(rs_run)
@@ -2068,6 +2099,20 @@ STUB
   else
     no "a single fetched page was judged otherwise than its folder"
   fi
+  # A page whose name is in capitals, or that ends .htm, is a page all the
+  # same (597b fix review, (a)).
+  # Named day-2, beside the clean day-1.html: on a Mac's disk, which ignores
+  # case, DAY-1.HTML would take over day-1.html's name and test nothing.
+  for st_name in DAY-2.HTML day-2.htm Day-2.Htm; do
+    lr_site "$ST_DIR/lr-named"
+    cp "$ST_DIR/lr-preview/notes/day-1.html" "$ST_DIR/lr-named/notes/$st_name"
+    said=$(lr_said "$ST_DIR/lr-named")
+    case "$said" in *"❌ case CONTAINS THE LIVE-RELOAD CLIENT"*) ok "a preview's page named $st_name is a page all the same: the client in it is seen" ;; *) no "a preview's page named $st_name was not seen: $said" ;; esac
+  done
+  lr_site "$ST_DIR/lr-named"
+  cp "$ST_DIR/lr-preview/notes/day-1.html" "$ST_DIR/lr-named/notes/day-2.txt"
+  said=$(lr_said "$ST_DIR/lr-named")
+  case "$said" in *"✅ case carries no live-reload client"*) ok "a file that is not a page (day-2.txt) is not read as one, though it holds the client's text" ;; *) no "a .txt file read as a page: $said" ;; esac
   mkdir -p "$ST_DIR/lr-broken/.toolchain/contracts"; printf '{}\n' >"$ST_DIR/lr-broken/.toolchain/contracts/app-rules.json"
   said=$(LR_FOLDER="$ST_DIR/lr-broken" lr_said "$ST_DIR/lr-preview")
   case "$said" in *"❌ case: the rule for a preview's page could not be read"*) ok "a working folder whose contract has no rule is a failure that says so, never a clean folder" ;; *) no "an unreadable rule: $said" ;; esac
@@ -2122,6 +2167,26 @@ STUB
   else
     no "a refusal the site's policy makes on purpose: $(grep -v '^OK: ' "$ST_DIR/by-design.txt" | head -3)"
   fi
+  # Counted page by page (597b fix review, d1): a second injected script, or
+  # a refusal line more than the scripts found account for, fails the page.
+  for st_case in "three refusal lines in the badge's wording where one badge accounts for one fail" \
+                 "a second refused script the host sent the browser alone, in one document, fails" \
+                 "a page reloaded once with three lines in the badge's wording fails" \
+                 "a page reloaded once with one line in the badge's wording, where it was sent the badge twice, fails"; do
+    if grep -qF "OK: counted: $st_case" "$ST_DIR/by-design.txt"; then
+      ok "the badge's refusals are counted page by page: $st_case"
+    else
+      no "the badge's refusals are not counted page by page: no passing case \"$st_case\" in browser-checks/lib/test_refused_by_design.mjs"
+    fi
+  done
+  # The wait for a page's own index says when it reached its ceiling (597b
+  # fix review, d2).
+  if node "$SCRIPT_REPO/browser-checks/lib/test_index_wait.mjs" >"$ST_DIR/index-wait.txt" 2>&1 \
+     && grep -q '^OK: an index that never answers: the wait gives up at its ceiling and says so' "$ST_DIR/index-wait.txt"; then
+    ok "the wait for a page's own index: $(grep -c '^OK: ' "$ST_DIR/index-wait.txt") cases, an index that never answers gives up at the ceiling and says so (browser-checks/lib/test_index_wait.mjs)"
+  else
+    no "the wait for a page's own index: $(grep -v '^OK: ' "$ST_DIR/index-wait.txt" | head -3)"
+  fi
   # A row that takes the page elsewhere waits first for the page's own
   # request for the search index (WebKit's "Load failed" when a reload
   # cancels it: measured with 0.5 s of latency). Every reload and every goto
@@ -2145,7 +2210,7 @@ for number, line in enumerate(source, 1):
             if source[back].strip():
                 before = source[back].strip()
                 break
-        if before != "await untilTheIndexHasArrived(page)":
+        if before != "await untilTheIndexHasArrived(page, record)":
             unwaited.append(f"{row} (line {number})")
 print(f"{found} {' '.join(unwaited) if unwaited else '-'}")
 SCAN

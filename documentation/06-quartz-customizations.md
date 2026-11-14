@@ -5010,12 +5010,18 @@ Waits are on the state asked about, with a ceiling.
   design, one refusal a page in both engines. `rendered_rows.json` →
   `refusedByDesign` names the host and the two engines' wordings, and
   `browser-checks/lib/refused_by_design.mjs` sets a line aside only on a page
-  holding a refused inline script that is in every document the page was
-  sent as the browser received it, and not in the same address fetched
-  without a browser's User-Agent; the site's own refused script, or one its
-  scripts made, fails the row, so a policy that lost a hash is still red.
-  What is set aside is an EXPECTED line of the clean-page row, counted and
-  named, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
+  holding a refused inline script that is in some document the page was
+  sent, as the browser received it, and in no document fetched again at the
+  same address without a browser's User-Agent; the site's own refused
+  script, or one its scripts made, fails the row, so a policy that lost a
+  hash is still red. The refusals are counted page by page: at most one
+  such script a document (`refusedScriptsPerDocument`) and exactly one
+  message for each (`linesPerRefusedScript`, WebKit's two records of one
+  message counted once), so a second injected script, a refusal more than
+  the scripts account for, or one fewer fails the page and names the count
+  (597b fix review, d1; measured on a stand-in edge: Tasks 3, Embeds 2,
+  every other page 1, in both engines). What is set aside is an EXPECTED
+  line of the clean-page row, with each page's count, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
   documentation/07-deployment.md has the measurements.
 - **A row that takes the page elsewhere waits for the page's own index
   request first.** Quartz fetches `static/contentIndex.json` as a page loads
@@ -5023,8 +5029,12 @@ Waits are on the state asked about, with a ceiling.
   "TypeError: Load failed" into the page (measured with 0.5 s of latency;
   the first deployed run's Cloudflare red). The tasks reload, the progress
   row's next page and the embeds reload each wait on the page's `fetchData`
-  promise first (`untilTheIndexHasArrived`, 30 s ceiling), the real
-  dependency rather than a fixed sleep or a network-idle guess.
+  promise first (`untilTheIndexHasArrived`, 30 s ceiling,
+  `browser-checks/lib/index_wait.mjs`), the real dependency rather than a
+  fixed sleep or a network-idle guess. Reaching the ceiling is never silent
+  (597b fix review, d2): the row's line says so with a count, the checker
+  prints a `NOTE: index wait` line for it, and `verify-deploy.sh` carries
+  that line into its Result block.
 - **Until the page is quiet.** Before a page is judged it is scrolled to its
   end a window at a time, so what loads only below the fold is asked for,
   then held until it has asked for nothing for a second and at least 5 s

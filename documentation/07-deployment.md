@@ -2812,7 +2812,7 @@ diagram taken out of a copy, both engines), and `verify-deploy.sh`
 compares each host's EXPECTED count with the pinned number
 (`expectedLinesPerEngine`, 3, so 6 a host), failing a total that moved
 without the pin. The clean-page row's EXPECTED lines (Netlify's badge,
-`refusedByDesign`) are not in that count; they have their own limit. A listed host that no page asked for in an engine's
+`refusedByDesign`) are not in that count; they have their own, page by page. A listed host that no page asked for in an engine's
 whole run is a FAILURE ("an expected failure that stopped … take it off
 `thirdPartyHostsToday`"), so when #566 moves Mermaid and then the fonts onto
 the site, the list has to shrink with it and the gate tightens without
@@ -2851,7 +2851,11 @@ script:
   `buildFreshness.previewBuild.signature.asABasicRegex` (#291), read from the
   contract (`live_reload_rule`), over `.html` pages only, each read as one
   record in the C locale, the way `deploy.sh`'s `site_carries_preview_client`
-  reads it. Proved both ways: the real serve-mode page the run saved
+  reads it. Pages are matched by name without regard to case, `.html` and
+  `.htm` alike (597b fix review, (a)); a client in a `.js` file, an
+  extensionless page or another shape of the client is missed here and by
+  the product's readers alike, which is the follow-up issue drafted as
+  597b-followup-live-reload-shapes. Proved both ways: the real serve-mode page the run saved
   (`preview.html`) is seen, alone and behind a clean front page with the
   GeoGebra file beside it; the build with the engine inside, and the engine
   file itself, are not. A rule that cannot be read is a failure that says
@@ -2899,9 +2903,30 @@ script:
   scripts), fails the row. What is set aside is an `EXPECTED: clean page`
   line in each engine, counted in the DONE line, named in its own Result
   block line ("Refused by the site's own policy by design …"), and allowed
-  on Netlify only, at most `expectedLinesPerEngine` (1) an engine; the
-  six-a-host pin of `thirdPartyHostsToday` counts the other EXPECTED lines
-  only. Measured on a local stand-in for Netlify's edge (the run's build
+  on Netlify only, one such line an engine; the six-a-host pin of
+  `thirdPartyHostsToday` counts the other EXPECTED lines only. **The count
+  is pinned inside the checker, page by page** (597b fix review, d1: the
+  first version collapsed every page into one EXPECTED line an engine, so
+  its "at most one an engine" could never fail, and one injected script
+  set aside every line in the badge's wording on its page). Now each page
+  may hold at most `refusedScriptsPerDocument` (1) refused script the host
+  sent the browser alone in any one document, and must show exactly
+  `linesPerRefusedScript` (1) message for each; anything else fails the
+  page and names the count. WebKit records one refusal twice (in the
+  console list with the page's address, and in the refused list), and
+  `refusalMessages` counts those as one message, one for one, so two
+  refusals in the same words stay two. Measured on the stand-in edge below,
+  both engines, the new checker: one message a document, so Tasks
+  (loaded, reloaded, taken to My Progress) 3, Embeds (reloaded) 2, every
+  other page 1, and `39 OK, 0 FAIL, 0 SKIPPED, 8 EXPECTED`; before the
+  twin was counted once, WebKit failed every page at 2 against 1. **This
+  logic has not yet met a real Netlify page**: the first run predates it.
+  The next credentialed run must show both clean-page EXPECTED lines with
+  those counts (Tasks 3, Embeds 2, the rest 1) and no clean-page FAIL. A
+  page failing on the badge's own wording with nothing set aside is most
+  likely a redirect whose document Playwright could not read (Netlify's
+  pretty URLs): without the document nothing can be told apart, so it errs
+  red, and that is the first thing to look at. Measured on a local stand-in for Netlify's edge (the run's build
   with its real `_headers`, a script added to every page for a browser's
   User-Agent only): the 597b checker gave `39 OK, 2 FAIL, 0 SKIPPED, 6
   EXPECTED`, the first run's line exactly; the new one `39 OK, 0 FAIL, 0
@@ -2921,6 +2946,12 @@ script:
   page's own `fetchData` promise, with a 30 s ceiling
   (`untilTheIndexHasArrived`), never a fixed sleep; the self-test checks
   that every reload and next page inside a row is preceded by that wait.
+  Reaching the ceiling is said, never silent (597b fix review, d2: an index
+  that never answered passed the clean-page row with no word): the row's
+  line carries the count, the checker prints `NOTE: index wait [engine]:
+  <page>, the <row> row: …`, and `verify-deploy.sh` puts that line in the
+  Result block's measurements (`lib/index_wait.mjs`, its node test and a
+  stub case in the self-test).
   Measured with 0.5 s added to every answer but the page itself, headless
   WebKit: the 597b checker failed the clean-page row on Tasks twice of two;
   the new one passed three runs of three, both engines. Rejected:
