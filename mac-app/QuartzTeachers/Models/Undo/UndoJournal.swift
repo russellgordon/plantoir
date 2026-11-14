@@ -331,6 +331,7 @@ nonisolated enum UndoFoldCache {
 
         let numbers: [Int] = try journal.segmentNumbers()
         var entry: Entry
+        let readingOn: Bool
         if let cached, stillValid(cached, numbers: numbers, journal: journal) {
             entry = cached
             for (number, _) in cached.ends where !numbers.contains(number) {
@@ -339,11 +340,18 @@ nonisolated enum UndoFoldCache {
                 entry.lineCounts[number] = nil
                 entry.fileNumbers[number] = nil
             }
-            readOns += 1
+            readingOn = true
         } else {
             entry = Entry(fold: UndoFold(), ends: [:], tails: [:], lineCounts: [:])
+            readingOn = false
+        }
+        guardLock.lock()
+        if readingOn {
+            readOns += 1
+        } else {
             fullReads += 1
         }
+        guardLock.unlock()
         for number in numbers {
             let from: Int = entry.ends[number] ?? 0
             let url: URL = journal.segmentURL(number: number)

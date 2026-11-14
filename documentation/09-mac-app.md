@@ -17105,8 +17105,9 @@ its fold of each list (`UndoFoldCache`) and reads only the bytes after
 where it stopped. Before trusting what it remembers it checks, per segment,
 that the file is still the same file (its number on the volume), at least
 as long, and holds the same 64 bytes just before the remembered end, and
-that no segment has gone or appeared below the newest one read; anything
-else reads the journal whole again. This is safe because nothing is ever
+that no segment has appeared below the newest one read or gone from
+anywhere but the oldest end (where pruning deletes, and only what is off
+the list); anything else reads the journal whole again. This is safe because nothing is ever
 rewritten: the one truncation, of a torn last line, only ever cuts bytes
 after the last line feed, which is where every remembered end sits.
 
@@ -17273,15 +17274,39 @@ Every core file in `Models/Undo/` except `UndoAppSeams.swift` and
 `UndoShadowPublish.swift` compiles without the app, beside copies of
 `ProcessLiveness`, `PageVisibilityReader`, `PageFrontmatter`,
 `CalendarDay` and `AssistPageVisibility`, and
-`Tests/QuartzTeachersTests/UndoContractReplay.swift` holds every contract
-replay without XCTest. The harness the director keeps under
-`measure/899-u1/` runs them for real: the 20 traces (524 calls), the
-check, stack, step and recovery cases, a torn last line, an unwritable
-list, two writers in one process, two PROCESSES appending 200 steps each to
-one list (interleaved, 400 distinct rising numbers, nothing lost), and a
-child process killed with `SIGKILL` at each of ten kill points, after which
-recovery left every file wholly before or after. The two-process test in
-the app (`Plantoir --mcp-stdio` beside the window's runner) is U7's.
+`Tests/QuartzTeachersTests/UndoContractReplay.swift` and `UndoCoreChecks.swift`
+hold every replay and check without XCTest. The harness runs them for real
+(the latest copy is in the director's scratchpad for the U1 fixes, under
+`u1/harness/`). After the fixes, on an M4 Pro: the 20 traces (641 calls),
+27 check, 30 stack, 3 step and 15 recovery cases, a torn last line, an
+unwritable list, the three core checks, two writers in one process, two
+PROCESSES appending 200 steps each to one list (interleaved, 400 distinct
+rising numbers, nothing lost), and a child killed with `SIGKILL` at each of
+ten kill points, after which recovery left every file wholly before or
+after: 0 failures throughout. A working folder on an exFAT disk image
+recorded three live steps and made its `folder-id`.
+
+What it measured, besides the lock and reading-on figures above: a one-page
+publish in shadow costs 5 to 6 ms whatever the journal's size up to 4.1 MB;
+the first read in a process costs 14 ms at 106 KB and 179 ms at 4.1 MB.
+Before the fixes the same publish cost 26 ms at 1 MB and 83 ms at 4.1 MB
+even reading on, because every step's `madeAt` and every line's `at` made a
+new `ISO8601DateFormatter` (about 80 microseconds each). `UndoMoment` now
+reads its own form by hand (checked against the formatter at 797,151
+moments from 1906 to 2103, none different) and falls back to a formatter
+made once for any other ISO 8601 form. 400 shadow publishes of 233 pages in
+one process, with three segments deleted along the way, made one full read
+(median 29 ms, max 52 ms each): deleting segments from the oldest end no
+longer throws the fold away.
+
+Must-fail proofs, each a copy of one fixed file with one fix taken out,
+built into its own harness: the age judged only at the next write (six
+stack cases red), a newer version's line read as this version's (five), the
+guard that deletes nothing while anything is unreadable removed (the
+`foreignBlobLine` case), recovery giving up on a hand edit (eight recovery
+checks across two cases), and a damaged identifier file not set aside (the
+core check throws). The two-process test in the app (`Plantoir --mcp-stdio`
+beside the window's runner) is U7's.
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
