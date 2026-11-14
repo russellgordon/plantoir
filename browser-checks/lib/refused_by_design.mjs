@@ -2,37 +2,46 @@
 // makes by mistake, for the clean-page row of the rendered check
 // (browser-checks/rendered_features.mjs, #597's second half).
 //
-// The one case today is Netlify's badge. Netlify adds an inline script to a
-// page on its way to a browser, and the Content-Security-Policy that
-// scripts/netlify_badge.py writes leaves 'unsafe-inline' out so that this
-// script is refused (documentation/07, "Suppressing Netlify's own ad
-// badge"). The first deployed run (2026-11-13) saw exactly one such refusal
-// on each of the 11 pages, in both engines, and counted each as a failure of
-// the site.
+// The one case today is Netlify's badge. Netlify appends a loader after the
+// page's own `</html>`, `<script async src="/.netlify/scripts/hud?variant=public"
+// data-nf-variant="public" …>`, a file of its own origin that the policy's
+// 'self' lets run. The loader builds `iframe#nl-badge-frame` and writes the
+// badge into its `srcdoc`, with one inline script; a srcdoc frame takes its
+// page's policy, and the Content-Security-Policy scripts/netlify_badge.py
+// writes leaves 'unsafe-inline' out, so that script is refused
+// (documentation/07, "Suppressing Netlify's own ad badge"; #625 settled the
+// frame, measured at about:srcdoc:85). The first two deployed runs
+// (2026-11-13 and 14) saw it on each of the 11 pages, in both engines.
 //
 // What identifies it is not its wording alone. A site whose policy lost the
 // hash of one of its OWN inline scripts (the drift netlify_badge.py exists to
-// prevent) is refused with the same words, and that must stay red. So a
-// refused inline script is set aside only when it is in the page as the
-// browser received it and NOT in the page as the host serves it to a client
-// that is not a browser (the injection is made for browsers; measured with
-// curl on the first run's Netlify pages, which carried only scripts the
-// policy allowed). A refused script that is in the site's own page, or that
-// is in neither (made at run time by the page's scripts), is the site's,
-// and fails. And only the console lines in the wording rendered_rows.json ->
-// refusedByDesign names are set aside, only on a page where such a script
-// was found, never a refusal of any other kind.
+// prevent) is refused with the same words, and that must stay red. What is
+// certain is WHERE it is said: in the badge's srcdoc frame (the console
+// message's own address is about:srcdoc), which no page a site builds makes,
+// and never in the page itself, where the site's own scripts run. So a
+// message is set aside only when it is in the wording rendered_rows.json ->
+// refusedByDesign names, said in its frame, on a page whose every document
+// was read for the loader, and only as many as the documents that carried
+// the loader account for.
 //
-// And they are COUNTED, page by page (597b fix review, d1): at most
-// `refusedScriptsPerDocument` such scripts in any one document the page was
-// sent, and exactly `linesPerRefusedScript` messages for each of them
-// (WebKit's two records of one message counted once, by the caller). One
-// script and one message a document in each engine is what was measured
-// against a stand-in for Netlify's edge (2026-11-14: Tasks, loaded, reloaded
-// and taken to My Progress, 3; Embeds, reloaded, 2; every other page 1). A
-// second injected script, more messages in the badge's wording than the
-// scripts found account for (a refusal of the site's own whose text the
-// reading here could not find), or fewer, fails the page and names the count.
+// The first version of this rule (597b's fix) looked for the refused script
+// in the page's own HTML as the browser received it and not as the host
+// serves it to anything else. It was proven against a stand-in that wrote
+// the script into the page; the real edge writes a loader that is a file,
+// sent to curl as well as to browsers, and the refused script is built in
+// the frame at run time, so it was in neither copy and nothing was set
+// aside (second deployed run, 2026-11-14: 2 FAIL, 6 EXPECTED where 8 were
+// predicted). The reading of the page's own copies stays, to NAME a refused
+// script of the site's own (sortRefusedScripts), never to set one aside.
+//
+// And they are COUNTED, page by page (597b fix review, d1): exactly
+// `refusalsPerDocument` messages for each document that carried the
+// loader (WebKit's two records of one message counted once, by the caller).
+// The loader is an async script, which the load event waits for, and it
+// mounts the frame at once, so every document a row waited on is refused
+// once: Tasks (loaded, reloaded, taken to My Progress) 3, Embeds (reloaded)
+// 2, every other page 1. A second refusal in the frame, or one fewer, fails
+// the page and names the count.
 //
 // No packages; Node 22. Tested by test_refused_by_design.mjs.
 
@@ -165,62 +174,118 @@ export function isRefusalLine(entry, text) {
   return false
 }
 
-// The judgement for one page: which lines the clean-page row sets aside, and
-// what it must fail on whatever the lines say.
-//   entries   the refusedByDesign entries for this host
-//   sorted    sortRefusedScripts' answer for the page (or null: not looked at)
-//   lines     the page's console and refusal lines, as the row collected them
-// Answers { setAside: [lines], entry, failures: [sentences], allowed }:
-// allowed is the most lines the scripts found can account for.
-export function judgeRefusals(entries, sorted, lines) {
+// Whether a document's HTML carries an entry's loader: the tag the host
+// appends AFTER the page's own `</html>` (Netlify's
+// `<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" …>`,
+// measured 2026-11-14 on the second deployed run's served copy and on a
+// live test site; #625 settled the same tag). Read only after the last
+// `</html>`, which no page a site builds writes anything past, so a page
+// that merely mentions the address in its own text is not counted.
+// Answers null when there is no HTML to read.
+export function loaderIn(entry, html) {
+  if (typeof html !== "string") return null
+  const end = html.toLowerCase().lastIndexOf("</html>")
+  if (end < 0) return false
+  return new RegExp(entry.loader).test(html.slice(end + "</html>".length))
+}
+
+// The hash Chromium names for the script it refused ("Either the
+// 'unsafe-inline' keyword, a hash ('sha256-…'), or a nonce … is required"),
+// or null: WebKit's wording names none.
+export function namedHash(text) {
+  const found = /a hash \('(sha(?:256|384|512)-[A-Za-z0-9+/=]+)'\)/.exec(String(text ?? ""))
+  return found ? found[1] : null
+}
+
+// The judgement for one page: which refusal messages the clean-page row
+// sets aside, and what it must fail on whatever the messages say.
+//   entries    the refusedByDesign entries for this host
+//   evidence   what readRefusals saw on the page:
+//                sorted      sortRefusedScripts' answer (or null)
+//                documents   one { url, carriesLoader } for every document
+//                            the page was sent (true, false, or null when
+//                            neither copy could be read)
+//                ownHashes   the hashes of the inline scripts in the page as
+//                            the host serves it
+//   messages   the page's refusal and console lines as messages, each
+//              { text, at }: at is the address of the frame the browser said
+//              it in (null when the record carried none)
+// Answers { setAside: [messages], entry, failures: [sentences], allowed }.
+//
+// Set aside only what is CERTAIN to be Netlify's badge (second deployed
+// run, 2026-11-14): a message in the entry's wording, said in the entry's
+// frame (about:srcdoc: the badge is built in a srcdoc frame by the loader,
+// and no page a site builds makes one), on a page whose every document can
+// be read for the loader, and exactly `refusalsPerDocument` of them for each
+// document that carried it. A refusal said in the page itself is never set
+// aside, whatever the host: that is where the site's own scripts run.
+export function judgeRefusals(entries, evidence, messages) {
   const failures = []
-  if (!sorted) return { setAside: [], entry: null, failures }
-  for (const one of sorted.own) {
-    failures.push(`the page's own inline script (${one.hash}, starting "${one.start}") was refused: the page's policy does not list it`)
-  }
-  for (const one of sorted.madeAtRunTime) {
-    failures.push(`an inline script the page's scripts made (${one.hash}, starting "${one.start}") was refused: it is in no page the host sends`)
-  }
-  if (failures.length > 0 || sorted.injected.length === 0 || entries.length === 0) return { setAside: [], entry: null, failures }
+  if (!entries || entries.length === 0 || !evidence) return { setAside: [], entry: null, failures }
   const entry = entries[0]
-  const perDocument = entry.refusedScriptsPerDocument ?? 1
-  const perScript = entry.linesPerRefusedScript ?? 1
-  const counts = sorted.injectedPerDocument ?? [sorted.injected.length]
-  let scripts = 0
-  for (const count of counts) {
-    if (count > perDocument) {
-      failures.push(`${count} refused inline scripts the host sent the browser alone in one document, where ${entry.name} is ${perDocument} (rendered_rows.json -> refusedByDesign.refusedScriptsPerDocument)`)
+  const sorted = evidence.sorted ?? null
+  if (sorted) {
+    for (const one of sorted.own) {
+      failures.push(`the page's own inline script (${one.hash}, starting "${one.start}") was refused: the page's policy does not list it`)
     }
-    scripts += count
+    for (const one of sorted.madeAtRunTime) {
+      failures.push(`an inline script the page's scripts made (${one.hash}, starting "${one.start}") was refused: it is in no page the host sends`)
+    }
+    for (const one of sorted.injected) {
+      failures.push(`an inline script the host added to the page itself (${one.hash}, starting "${one.start}") was refused: ${entry.name} is built in its ${entry.frame} frame, never in the page`)
+    }
   }
-  const allowed = scripts * perScript
-  const setAside = []
-  for (const text of lines) {
-    if (isRefusalLine(entry, text)) setAside.push(text)
+  const own = new Set(evidence.ownHashes ?? [])
+  const inFrame = []
+  for (const message of messages ?? []) {
+    if (!isRefusalLine(entry, message.text)) continue
+    const hash = namedHash(message.text)
+    const naming = hash ? `, naming ${hash}` : ""
+    if (message.at !== entry.frame) {
+      failures.push(`a refusal in the wording of ${entry.name}, said in ${message.at ? message.at : "a frame the browser did not name"}${naming}, where ${entry.name} is refused in ${entry.frame}: the site's own`)
+    } else if (hash && own.has(hash)) {
+      failures.push(`a refusal in ${entry.frame} naming ${hash}, the hash of one of the page's own inline scripts: the site's own`)
+    } else inFrame.push(message)
   }
-  if (setAside.length > allowed) {
-    failures.push(`${setAside.length} refusal lines in the wording of ${entry.name}, where the ${scripts} such script(s) the page was sent account for ${allowed} (rendered_rows.json -> refusedByDesign.linesPerRefusedScript): a refusal more than the host's`)
-  } else if (setAside.length < allowed) {
-    // Measured equal on every page in both engines (2026-11-14, a stand-in
-    // for Netlify's edge): fewer means a refusal was not seen, and the count
-    // can no longer be trusted, so it errs red.
-    failures.push(`${setAside.length} refusal lines in the wording of ${entry.name}, where the ${scripts} such script(s) the page was sent account for ${allowed} (rendered_rows.json -> refusedByDesign.linesPerRefusedScript): a refusal of the host's script was not seen`)
+  const documents = evidence.documents ?? []
+  let carried = 0
+  let unread = 0
+  for (const document of documents) {
+    if (document.carriesLoader === true) carried += 1
+    else if (document.carriesLoader !== false) unread += 1
+  }
+  const perDocument = entry.refusalsPerDocument ?? 1
+  const allowed = carried * perDocument
+  if (inFrame.length > 0 && unread > 0) {
+    failures.push(`${unread} of the ${documents.length} document(s) the page was sent could not be read for ${entry.name}'s loader, so its ${inFrame.length} refusal(s) in ${entry.frame} cannot be counted`)
+  } else if (inFrame.length > allowed) {
+    failures.push(`${inFrame.length} refusal(s) in the wording of ${entry.name} in ${entry.frame}, where the ${carried} of ${documents.length} document(s) carrying its loader account for ${allowed} (rendered_rows.json -> refusedByDesign.refusalsPerDocument): a refusal more than the host's`)
+  } else if (inFrame.length > 0 && inFrame.length < allowed) {
+    // Measured equal on every page in both engines (2026-11-14): the loader
+    // runs before the load event, so every document a row waited on was
+    // refused once. Fewer means a refusal was not seen, and the count can no
+    // longer be trusted, so it errs red. None at all sets nothing aside, and
+    // the row is judged on the rest.
+    failures.push(`${inFrame.length} refusal(s) in the wording of ${entry.name} in ${entry.frame}, where the ${carried} of ${documents.length} document(s) carrying its loader account for ${allowed} (rendered_rows.json -> refusedByDesign.refusalsPerDocument): a refusal of the host's script was not seen`)
   }
   if (failures.length > 0) return { setAside: [], entry: null, failures, allowed }
-  return { setAside, entry, failures, allowed }
+  return { setAside: inFrame, entry, failures, allowed }
 }
 
 // The page's console and refusal lines as MESSAGES, for counting (597b fix
-// review, d1). WebKit's "Refused to" line is recorded twice by the rendered
-// check, in its console list with the page's address after it and in its
-// refused list without (measured 2026-11-14), so each refused line that has
-// a console twin is one message, matched one for one: two refusals with the
-// same words are still two. Answers { messages, twinOf }: twinOf maps a
-// refused line to the console line it is a copy of.
-export function refusalMessages(consoleLines, refusedLines) {
+// review, d1), each { text, at } with the address of the frame it was said
+// in (consoleWhere, in step with consoleLines; null where none was kept).
+// WebKit's "Refused to" line is recorded twice by the rendered check, in its
+// console list with the page's address after it and in its refused list
+// without (measured 2026-11-14), so each refused line that has a console
+// twin is one message, matched one for one: two refusals with the same
+// words are still two. Answers { messages, twins }: twins[i] is the index of
+// the console line refused line i is a copy of, or -1.
+export function refusalMessages(consoleLines, refusedLines, consoleWhere = []) {
   const said = consoleLines ?? []
-  const messages = [...said]
-  const twinOf = new Map()
+  const messages = []
+  for (let index = 0; index < said.length; index += 1) messages.push({ text: said[index], at: consoleWhere[index] ?? null, console: index })
+  const twins = []
   const used = new Set()
   for (const text of refusedLines ?? []) {
     let twin = -1
@@ -231,10 +296,9 @@ export function refusalMessages(consoleLines, refusedLines) {
         break
       }
     }
-    if (twin >= 0) {
-      used.add(twin)
-      twinOf.set(text, said[twin])
-    } else messages.push(text)
+    twins.push(twin)
+    if (twin >= 0) used.add(twin)
+    else messages.push({ text, at: null, refused: twins.length - 1 })
   }
-  return { messages, twinOf }
+  return { messages, twins }
 }

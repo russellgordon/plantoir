@@ -94,6 +94,23 @@ public class OutsideDoorRefusalTests : IDisposable
         Assert.Contains("…", greeting);
 
         Assert.True(ClaudeCodeLauncher.Open(_folder, "ICS3U", name), "Claude's door did not open for a long name");
-        Assert.True(File.Exists(_output), "the door wrote nothing");
+        Assert.True(StubWrote(_output, TimeSpan.FromSeconds(15)), "the door wrote nothing");
+    }
+
+    /// <summary>
+    /// Open returns once the stub has STARTED (it watches at most 400 ms for a
+    /// quick failure), not once the stub has written, so on a busy PC the file
+    /// appears after Open returns. Wait for it, bounded, instead of reading it
+    /// at once (#882 follow-up).
+    /// </summary>
+    private static bool StubWrote(string path, TimeSpan within)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (!File.Exists(path))
+        {
+            if (clock.Elapsed > within) return false;
+            Thread.Sleep(25);
+        }
+        return true;
     }
 }

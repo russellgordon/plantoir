@@ -184,11 +184,15 @@ did on its own — and `deploy.py` asks the same in `ensure_base_url_and_rebuild
 Without it 1.9.1's stylesheet changes never reached a redeployed site. What was
 measured, the fix and what was rejected:
 [05 → "Which toolchain built a site (#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746).
-`deploy.ps1`'s folder publish asks the same question since 1.9.3 (#749): it
-runs the shared Python's `site_was_built_by_this_toolchain`, and anything but
-a plain yes builds first, in the one rebuild block it shares with the
-live-reload check below; the Windows section of 05 says how, and why the
-toolchain's id is remembered there.
+`deploy.ps1`'s folder publish asked the toolchain question from 1.9.3 (#749);
+since #799 it asks the WHOLE question before every destination, folder,
+Netlify and Cloudflare: one call to the shared Python's
+`why_build_before_deploying` (a preview's site, the toolchain, the clock,
+the pages), and anything but a plain `reuse` builds first, in the one
+rebuild function, `Invoke-BuildFirstWhenAsked`, which also writes the "site
+built again before deploying" trail line. The Windows section of 05 says how,
+why the toolchain's id is remembered there, and why there are two call sites
+(the native run's comes before any token is in the environment).
 
 ### Automatic production rebuilds (live-reload detection)
 
@@ -253,7 +257,10 @@ lines from deploy.sh rather than retyping them. The other three rebuild lines
 appeared. Nothing was deployed.") followed in v1.4.4 (#441) and the same test
 pins them, with deploy.sh's leading "❌ " trimmed; every other deploy.ps1 line
 that said "published" for a deploy moved with them ("Deploy and publish: the
-two words (v1.4.4, #443)", below).
+two words (v1.4.4, #443)", below). Since #799 those lines are printed before
+any destination, not only the folder leg, and the pages and clock pairs
+("Something in this course has changed since its site was last built…",
+"This site's last build is dated later than now…") are pinned by the same test.
 
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
@@ -266,11 +273,14 @@ they did not agree:
 | The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
 | `deploy.sh`, every destination | one `site_carries_preview_client`, called four times: first in `why_this_deploy_builds_first`, which asks a preview's site before the toolchain for every destination (#768), then three times in the folder leg | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
 | `toolchain_paths.site_carries_preview_client` (deploy.py's `main` and `why_build_before_deploying`, Netlify and Cloudflare, both platforms) | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract; one Python copy since #768 |
-| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
+| `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)**. *Since #799 deploy.ps1 DECIDES with the shared Python's `site_carries_preview_client` (the row above), before every destination; `Test-CarriesLiveReload` runs only after a rebuild, in its wait and its "still carries" refusal.* |
 | `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 
-(Windows' scheduled task builds unconditionally, so it has no check to get
-wrong.)
+(Windows' scheduled task built unconditionally until #799, so it had no check
+to get wrong. Since then it asks the shared Python before it builds, the
+`toolchain_paths.site_carries_preview_client` row above, through the same
+lines deploy.ps1 asks with; and deploy.ps1's own question runs before EVERY
+destination, not only the folder leg.)
 
 **Why the apps being narrower mattered.** The built tree is replaced file by
 file, so a clean front page in front of a preview's pages is a real state. The
@@ -3233,57 +3243,111 @@ script:
   its own issue (drafted as the 597b follow-up), for both platforms.
 - **Netlify's own badge script is refused by our policy on purpose**, and
   the clean-page row counted that refusal as a failure of all 11 pages in
-  both engines. What identifies it, measured from the run: one refusal a
-  page, worded `Executing inline script violates the following Content
-  Security Policy directive 'script-src …` in Chromium and `Refused to
-  execute a script because its hash, its nonce, or 'unsafe-inline' does not
-  appear in the script-src directive of the Content Security Policy.` in
-  WebKit, while the live policy listed exactly the site's own five inline
-  scripts. The wording alone is not enough, because a policy that lost one
-  of the site's hashes (the drift `netlify_badge.py` exists to prevent) is
-  refused in the same words. So `rendered_rows.json` → `refusedByDesign`
-  names the two wordings, and `browser-checks/lib/refused_by_design.mjs` sets
-  a line aside only on a page holding a refused inline script that is in the
-  page as the browser received it and NOT in the page as the host serves it
-  to a client that is not a browser (the injection is made for browsers; the
-  run's pages fetched with curl carried none). A refused script that is in
-  the site's own page, or that is in neither (made at run time by the page's
-  scripts), fails the row. What is set aside is an `EXPECTED: clean page`
-  line in each engine, counted in the DONE line, named in its own Result
-  block line ("Refused by the site's own policy by design …"), and allowed
-  on Netlify only, one such line an engine; the six-a-host pin of
-  `thirdPartyHostsToday` counts the other EXPECTED lines only. **The count
-  is pinned inside the checker, page by page** (597b fix review, d1: the
-  first version collapsed every page into one EXPECTED line an engine, so
-  its "at most one an engine" could never fail, and one injected script
-  set aside every line in the badge's wording on its page). Now each page
-  may hold at most `refusedScriptsPerDocument` (1) refused script the host
-  sent the browser alone in any one document, and must show exactly
-  `linesPerRefusedScript` (1) message for each; anything else fails the
-  page and names the count. WebKit records one refusal twice (in the
-  console list with the page's address, and in the refused list), and
+  both engines. Both engines word it the same way on every page:
+  `Executing inline script violates the following Content Security Policy
+  directive 'script-src …` in Chromium and `Refused to execute a script
+  because its hash, its nonce, or 'unsafe-inline' does not appear in the
+  script-src directive of the Content Security Policy.` in WebKit. The live
+  policy listed exactly the site's own five inline scripts. The wording
+  alone is not enough, because a policy that lost one of the site's hashes
+  (the drift `netlify_badge.py` exists to prevent) is refused in the same
+  words.
+
+  **What the badge really is (the second deployed run, 2026-11-14).** The
+  first version of the rule looked for a refused inline script that was in
+  the page as the browser received it and not in the page as the host
+  serves it to anything else. It had been proven only against a stand-in
+  that wrote an inline script into the page. On real Netlify it set
+  nothing aside: the second run read `39 OK, 2 FAIL, 0 SKIPPED, 6
+  EXPECTED`, with the clean page failing on all 11 pages in both engines,
+  where 8 EXPECTED had been predicted. The run's full checker log
+  (`rendered-netlify.log` in the run's work folder) showed one refusal
+  line on every page. The served copy it saved
+  (`rendered-netlify-mark.html`) and a live free-tier test site fetched
+  with curl showed what Netlify sends. It appends
+  `<script async src="/.netlify/scripts/hud?variant=public"
+  data-nf-variant="public" …>` after the page's own `</html>`, to curl as
+  well as to browsers. That file is served from the site's own origin, so
+  `'self'` lets it run. Its source (fetched read-only from the live test
+  site) builds `iframe#nl-badge-frame` and writes the badge into the frame's
+  `srcdoc`, with one inline script. A srcdoc frame takes its page's
+  policy, so that script is refused there. #625 had settled the same thing
+  from the other side (`about:srcdoc:85`). The refused script is in
+  neither copy of the page, so the first rule could never find it.
+
+  **The rule now** (`rendered_rows.json` → `refusedByDesign`, with `frame`,
+  `loader` and `refusalsPerDocument`; `lib/refused_by_design.mjs`). A
+  message is set aside only when all of these hold:
+  - it is in one of the two wordings;
+  - the browser said it in `about:srcdoc`, which is the console message's
+    own address, kept beside each line as `consoleWhere`. No page a site
+    builds makes a srcdoc frame;
+  - every document the page was sent could be read for the loader, which is
+    looked for only after the last `</html>`;
+  - there are exactly `refusalsPerDocument` (1) such messages for each
+    document that carried the loader.
+
+  A redirect is not counted as a document. The same words said in the page
+  itself fail with that address named, whatever the host. A refusal in the
+  frame that names one of the page's own hashes (Chromium names the refused
+  script's hash) fails. An inline script the host writes into the page
+  itself fails, so the old stand-in's model is red now. The page's own
+  copies are still read, but only to name a refused script of the site's
+  own (`sortRefusedScripts`). A line in these wordings is never set aside
+  by `expectedConsole`, whose `netlify` matches the site's own address on
+  every Netlify page. That pattern was what had quietly set aside WebKit's
+  console copy of the badge's refusal on both runs, leaving only its
+  refused-list copy red. Every clean-page line on a host with an entry now
+  ends with what was seen: how many documents carried the loader, where
+  each refusal was said, the hash Chromium named, and the srcdoc frames the
+  page holds with their scripts' hashes. A red run therefore says which
+  script was refused and where, which the second run's log could not.
+
+  What is set aside is an `EXPECTED: clean page` line in each engine,
+  counted in the DONE line, named in its own Result block line ("Refused
+  by the site's own policy by design …"), and allowed on Netlify only, one
+  such line an engine. The six-a-host pin of `thirdPartyHostsToday` counts
+  the other EXPECTED lines only. WebKit records one refusal twice (in the
+  console list with the frame's address, and in the refused list).
   `refusalMessages` counts those as one message, one for one, so two
-  refusals in the same words stay two. Measured on the stand-in edge below,
-  both engines, the new checker: one message a document, so Tasks
-  (loaded, reloaded, taken to My Progress) 3, Embeds (reloaded) 2, every
-  other page 1, and `39 OK, 0 FAIL, 0 SKIPPED, 8 EXPECTED`; before the
-  twin was counted once, WebKit failed every page at 2 against 1. **This
-  logic has not yet met a real Netlify page**: the first run predates it.
+  refusals in the same words stay two, and each record is set aside only
+  as often as its message was.
+
+  **Measured on a stand-in for the real edge** (2026-11-14:
+  `M/measure/597c-hud/edge3.mjs`, the run's build with its real `_headers`,
+  Netlify's loader appended after `</html>` for every client, and Netlify's
+  own `hud.js` served at `/.netlify/scripts/hud`). The 597b checker gave
+  the real run's two lines word for word: Chromium's `console:` and
+  WebKit's `refused:`. The new checker gave `39 OK, 0 FAIL, 0 SKIPPED, 8
+  EXPECTED`, one refusal a document in both engines, so Tasks (loaded,
+  reloaded, taken to My Progress) 3, Embeds (reloaded) 2, and every other
+  page 1. Chromium named `sha256-BkKP2XO6WOEc3kXOiLr2ZoY83hamalKjPY9xBcbXVuw=`,
+  the hash of the frame's one script. These cases were proved still red in
+  both engines on the Tasks page:
+  - the policy with one of the site's hashes dropped (the row names the
+    site's script);
+  - a second inline script in the badge's srcdoc ("4 … account for 2");
+  - an inline script written into the page itself;
+  - the same build checked as `--host cloudflare`, where nothing is set
+    aside.
+
+  The load event waits for the async loader, and the loader mounts the
+  frame at once, so every document a row waited on is refused once. That
+  is why one fewer than the documents also fails. None at all sets nothing
+  aside.
+
+  Rejected:
+  - ignoring CSP refusals on Netlify, which hides the hash drift;
+  - pinning the badge script's hash, which is Netlify's to change and would
+    turn the gate red on a Netlify release;
+  - requiring the frame to still be in the last document, because Quartz's
+    page swap can remove it.
+
   The next credentialed run must show both clean-page EXPECTED lines with
-  those counts (Tasks 3, Embeds 2, the rest 1) and no clean-page FAIL. A
-  page failing on the badge's own wording with nothing set aside is most
-  likely a redirect whose document Playwright could not read (Netlify's
-  pretty URLs): without the document nothing can be told apart, so it errs
-  red, and that is the first thing to look at. Measured on a local stand-in for Netlify's edge (the run's build
-  with its real `_headers`, a script added to every page for a browser's
-  User-Agent only): the 597b checker gave `39 OK, 2 FAIL, 0 SKIPPED, 6
-  EXPECTED`, the first run's line exactly; the new one `39 OK, 0 FAIL, 0
-  SKIPPED, 8 EXPECTED`. Proved still red: the same script sent to every
-  client, and the run's policy with one of the site's hashes dropped (badge
-  still added), each failed the row in both engines, naming the site's own
-  script. Rejected: ignoring CSP refusals on Netlify (that hides the hash
-  drift), and matching the badge by its content (never read; the sites were
-  deleted).
+  those counts and no clean-page FAIL, 8 EXPECTED on Netlify. If a page
+  still fails on the badge's wording, its line now names where the
+  refusal was said and what the frames held, and that is the first thing
+  to read.
 - **The tasks row reloaded while the page was still fetching
   `static/contentIndex.json`**, and WebKit throws "TypeError: Load failed"
   into the page when a navigation cancels that fetch (Quartz's `fetchData`,
@@ -3311,6 +3375,12 @@ So a run on `dev` without #799 should show exactly the four Cloudflare rows
 of #892 and nothing else, with Netlify's rendered line reading `39 OK, 0
 FAIL, 0 SKIPPED, 8 EXPECTED` and the badge's two lines under their own
 Result heading. The self-test went from 62 cases to 77.
+
+#799 reached `dev` on 2026-11-14 (3180c439b) and the Mac's stack with it,
+so a run on that tree should show none of the four: 0 failed, both hosts
+`checked`, and both second deploys "built nothing, uploaded nothing", on a
+test course that records no custom domain. A red Cloudflare row of #892's
+shape on that tree is a regression, not the expected red described above.
 
 **What a teacher's embed says is set aside, and counted.** The first
 deployed-mode run (the fixture site served under `--base … --host netlify`,
@@ -3533,19 +3603,28 @@ The clean-page row used to read only the page's own documents, so that
 second line was one more than the page's documents could account for, and
 the row failed the Simulation page. It now reads every document of the
 site's own host that a frame of the page was sent as well (listed before
-the page's, so the page's last document still judges the scripts it holds),
-and each such document may carry one badge, as a page may. Nothing was
-added to `refusedByDesign`. A frame document whose own script the policy
-does not list still fails, naming it (`test_refused_by_design.mjs`). Whether
-real Netlify adds its badge to a frame's document is not measured; with no
-badge there, the frame's document counts 0 and nothing changes.
+the page's, so the page's last document still judges the scripts it holds).
+Since 597b's second deployed run the badge is judged by where it is refused
+(above, "What the badge really is"): each of those documents is read for
+Netlify's loader after its `</html>`, and each that carried it accounts for
+one refusal in `about:srcdoc`, as a page's own document does. Nothing was
+added to `refusedByDesign` for it. A frame document whose own script the
+policy does not list still fails, naming it (`test_refused_by_design.mjs`).
+Netlify appends its loader to every HTML answer (curl got it), so the
+simulation's frame document is expected to carry it and its loader to build
+a badge frame of its own. That is measured only on the stand-in, which added
+an inline script rather than Netlify's loader. If real Netlify's frame
+document carries the loader and no refusal is seen for it, the page fails
+"a refusal of the host's script was not seen", and its line names the
+documents and where each refusal was said.
 
 What the next credentialed run must show for it, in each engine on both
 hosts: `OK: phet` (opened on a real press from the site's own copy, on an
 isolated page, the credit line under it); the Simulation page among the
 own-host row's EXPECTED pages ("on 12 of 12 pages"); on Netlify the
-Simulation page in the clean-page EXPECTED line with a count of 1, or 2 if
-Netlify badges the frame's document (then say so here); on Cloudflare the
+Simulation page in the clean-page EXPECTED line with a count of 2 (its own
+document and the simulation's frame document, each with the loader; say
+here if it reads otherwise); on Cloudflare the
 clean-page row OK on it. So Netlify's line becomes `41 OK, 0 FAIL, 0
 SKIPPED, 8 EXPECTED` where it read 39 OK: one `phet` result an engine.
 
@@ -4412,7 +4491,19 @@ fails there.
   destinations with different addresses** (Netlify AND Cloudflare Pages, say):
   the site is built for one address, and the next destination finds the other
   one baked in and rebuilds for its own. So that one stays reachable whatever
-  happens to #136, and for such a course it is not a first-publish corner. Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
+  happens to #136, and for such a course it is not a first-publish corner.
+  **Measured, and ruled, on #799 (2026-11-13):** each site carries its OWN
+  address (Russell), so such a course builds once per host on every deploy,
+  even with nothing changed: 1, 3 and 5 builds over three unchanged deploys
+  of a Netlify course with a Cloudflare destination too, against 1, 2 and 3
+  before #799, when the Cloudflare leg rebuilt for an address its rebuild
+  never got and the Cloudflare site carried the Netlify address. Accepted.
+  The cost on the Lenovo 20QES70500 (i5-8365U, 16 GB): the one extra
+  Cloudflare rebuild measured at the director's gate (`verify-deploy.ps1`'s
+  log) took 69 s, and a section's rebuild there takes 12 to 74 s (05 →
+  "Known extra builds"). Since #799 a
+  destination is also built for its own custom domain when the course records
+  one (05 → "On Windows (#799)"). Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
   find carrying the preview's live-reload client — reachable in a scheduled run
   only while the wrapper's is-the-site-stale check is narrower than the
   launchers' (the gap described under "How it is tested" below,
@@ -4585,6 +4676,25 @@ with that refusal turned off.
 | `deploy.bat` → `deploy.ps1` | `deploy.ps1`'s own check |
 | `python3 scripts/deploy.py …` | `deploy.py`, first thing in `main()` |
 | `verify-deploy.sh` / `.ps1` | inherits the two launchers' |
+
+### A deploy already set is turned off, so there is nothing to Cancel
+
+A deploy set before the course became one (or arriving with a hand-edited
+marker, or from another machine) is turned off when the working folder is
+READ — `scheduledDeployCancellation`, "a course kept for reference is met when
+the working folder is read" — and the trail gets `scheduled deploy turned off`
+for each section. The mac does it in `ReferenceCourseUpkeep` through
+`ScheduledDeployCleanup` (`Reason.theCourseIsKeptForReference`); Windows in
+`ReferenceCourseUpkeep.BringUpToDate` since #241. The row "already on disk,
+firing" above is the backstop for a task the read has not reached.
+
+So **neither platform offers Cancel Scheduled Deploy… on a reference
+section**: the menu bar greys it (`subjectMenus`), and since #527 (2026-11-13)
+Windows' sidebar row leaves it out too, as the mac's always did. Until then
+the Windows row kept it, on the stale belief that Windows did not turn such a
+deploy off by itself and the row was the only way to stop one. What was
+checked before it went, state by state, is in `12-windows-app.md` → "Menus,
+the Section menu's functions and #475 on Windows".
 
 ### Why door 12 needs the SHELL and not only `deploy.py`
 

@@ -12431,11 +12431,11 @@ piece 785b moves the automatic backups onto it. The code is
   holds every file (`zipinfo` listing, plan review amendment 2), which must
   ask `pathsNotHeld(by:)` for Media. Windows' `CourseRestorer` and its import
   are the same doors there. A test should walk every caller of `unpack`.
-- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 35
+- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 36
   cases): anything unreadable stops it; needed is every checksum named by a
   small backup that is there (or its pre-macOS 14 `.icloud` placeholder,
   through its list copy), a list whose zip has not arrived and is under a day
-  old, an Undo list under 31 days old, a pending list of a backup being
+  old, an Undo list under 61 days old, a pending list of a backup being
   written (a day, or while its process runs on this computer), and a FINISHED
   backup's pending list for a day after it finished. Nothing is deleted until
   a sweep a day after this computer first found it unneeded still finds it
@@ -12483,7 +12483,12 @@ piece 785b moves the automatic backups onto it. The code is
   Undo calls `keepForUndo(stepID:checksums:writtenAt:)` with the backup's
   `list(ofBackupNamed:zipURL:).checksums`; when the step leaves the Undo list
   it calls `releaseForUndo(stepID:)`. Every computer's sweep honours the list
-  for 31 days by its own `writtenAt`. A reference replace that must not trust
+  for 61 days by its own `writtenAt`: one more than the 60 days the journal
+  keeps a step on the disk (30 offered and a grace of 30 for a clock set
+  wrong, `undo.rule.limits`). It was 31 when 785a merged, which covered what
+  is offered but not the grace, so a step offered again once a wrong clock
+  was put right could have lost its pictures (#899 U1's second core review;
+  changed when U1 merged `dev`, the director's ruling 11 on its third round). A reference replace that must not trust
   a zip's listing alone asks `pathsNotHeld(by:)`, which re-hashes each file.
 - **Measured** after the review's fixes (Apple M4 Pro, macOS 26, 2026-11-13,
   scratch folders and hidden disk images). The AVI1O example course
@@ -12549,7 +12554,7 @@ piece 785b moves the automatic backups onto it. The code is
   review, measured). Issue #908 owns the whole zip's loop; until it lands, a
   door that falls back must bound the whole zip or report the refusal.
 - **Known limits.** The two-computer race above. A clock set days forward
-  deletes for real while it is forward and can end an Undo list's 31 days
+  deletes for real while it is forward and can end an Undo list's 61 days
   early (review M2). Since macOS 14 iCloud Drive keeps an evicted file under
   its own name with no data on this disk, not as `.X.icloud`; reading such a
   zip's list downloads it under the sweep's lock or fails, and a failure keeps
@@ -12561,7 +12566,8 @@ piece 785b moves the automatic backups onto it. The code is
   Three more, measured by the pre-merge sweep (2026-11-13):
   - **An Undo list is counted from its own written moment only**, not from
     when another computer first saw it, so a computer whose clock runs
-    behind shortens it everywhere else. With B's clock two days behind, A
+    behind shortens it everywhere else (measured with the 31 days it then
+    had). With B's clock two days behind, A
     honoured B's Undo list until day 31.1 by A's clock (29.1 days after B
     wrote it) and deleted the pictures at day 45.2; with B's clock 40 days
     behind, A removed the list the first time it saw it and deleted the
@@ -18207,6 +18213,759 @@ does not match, a canonicalised `..`), the excluded port ranges inside and
 below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
 whether an unelevated shell may listen on the block are to be measured
 there. The `windows` issue for #850 carries the list.
+
+## Undo and Redo: one list for the app (#899)
+
+Russell's rulings on #899 make Undo and Redo ONE list for the whole app:
+every change made through Plantoir (a menu, a sheet, the wizard, the
+built-in assistant's window, an outside assistant calling Plantoir's
+tools) is one step on it, strictly linear (ruling 9), kept across quits
+for the last 50 steps and 30 days, counted across the app (rulings 3 and
+5). The plan is the director's `plans/899-plan-final.md`; it is built in
+seven pieces, U1 to U7, each merged on its own behind one constant,
+`UndoSwitch.undoJournalIsLive`, which stays **off** until U7. While it is
+off the list is written in SHADOW: steps are recorded and never offered.
+Section ▸ Undo Last Change, Undo Getting Ready and the built-in assistant's
+own "undo that" work exactly as before, and no Edit ▸ Undo item exists.
+
+This section is U1, the journal core: the format, the lock, the
+write-ahead rule, recovery, the content check and the staged swap. The
+format is `contracts/file-formats.json` → `undoJournal`; the rule and its
+cases are `contracts/shared-rules.json` → `undo`; the traces are
+`contracts/undo-traces.json`. Code: `mac-app/QuartzTeachers/Models/Undo/`.
+
+### Where the list lives, and why not anywhere else
+
+`Library/Application Support/Plantoir/undo/` under the home
+`RealHome.forFiles` answers (`UndoJournalLocation`). So it follows
+`--state-dir`, and under the unit suite it is in the suite's throwaway home;
+`RealHomeTripwireTests` sees no new home lookup, because the location is
+built from `RealHome.forFiles` and nothing else. Tests that need a list of
+their own pass a folder (`UndoJournal(folderURL:)`) or set
+`UndoJournalLocation.folderOverride`.
+
+It is never in a working folder. One list spans every working folder, and
+a working folder may be synced between two computers: a journal there
+would merge two computers' lists. Each computer has its own list; the
+other computer's changes to a synced folder read as hand edits, and the
+content check refuses over them. Each working folder gets
+`courses/.internal/folder-id` (one UUID, made exclusively the first time a
+step is recorded there, `FolderIdentityFile`), because the folder's other
+identifier is a hash of its path and a step has to know its folder again
+after a move. U1 reaches a step's folder only at the path it was made at,
+when the folder there carries the step's id (`UndoReach`); Open Recent is
+the second place to look, added with the menu in U7. When neither finds it,
+Undo and Redo are not available while that step is the newest (greyed,
+plain "Undo", ruling 10), and nothing skips past it: `undo.stackCases`
+"ruling 10".
+
+`folder-id` (and the list's own `computer-id`) is written lower case and
+read leniently: a byte-order mark, white space, carriage returns and either
+case are accepted (`undoJournal.identifierFiles`), because a synced working
+folder's `folder-id` is the one file of this format both platforms read.
+It is made exclusively: a hard link of a whole temporary file onto the name
+where the volume has links, and otherwise an exclusive create of the name.
+**Measured by the core review:** on an exFAT disk image the link-only
+version failed every time (`couldNotStoreContent`), so a working folder on
+a USB stick or a school share could never record a step. A file that holds
+no identifier (damaged, or a sync conflict's leftovers) never blocks the
+folder for good: it is set aside as `folder-id.unreadable-<uuid>` and a new
+identifier made, unless it is empty and less than ten seconds old, which is
+another process part way through making it. Ten, not the first version's
+two, because FAT keeps a modification time only to two seconds, so a file
+being made could already look two seconds old (the second core review). It
+is set aside only while it is still the file that was inspected (the same
+file number), and a file that turns out to hold an identifier once it is
+aside is put back with a rename that fails if the name has been taken: the
+contract review found a second process's good identifier could be moved
+away between the look and the move.
+
+### The format: append-only, folded, never replaced
+
+`undo/` holds `.lock`, `computer-id`, `journal-000001.jsonl` and its
+successors (a new one past 4 MiB), and `content/<aa>/<sha256>` blobs. One
+event per line (`UndoFormat.swift`): `begin`, `applied`, `rolledBack`,
+`interrupted`, `undoing`, `undone`, `redoing`, `redone`, `failed`,
+`dropped`, `pruned`, `cleared` and `note`. The mac writes keys sorted, for a person
+reading a diff; readers never compare a line's bytes. Nothing is ever
+replaced in place: events are appended, blobs are written under a
+temporary name and renamed onto the name with a rename that fails if the
+name exists (`renamex_np` with `RENAME_EXCL` on the mac). The head is never
+stored: `UndoFold` folds the events, and the table of moves is in the
+contract (`undoJournal.folding.moves`). A reader counts only complete
+lines; a torn last line (no line feed) is ignored, and the next writer cuts
+it off inside the lock, reading one byte to find out whether there is one.
+
+**Every object is open, and what a version cannot read it keeps**
+(`undoJournal.unknown`). This was the biggest change after U1's two
+reviews, made before Windows writes a reader so the format does not change
+under it. The review measured the first version's fixed `UndoOp` struct
+against the shapes U2 to U5 will write: a `move` (from and to, no `path`),
+an `editJSON` (numbers as before and after) or any line with `"v":2` made
+the whole step unreadable, and Undo then undid the step BELOW it, passing
+over a change still in effect (ruling 9); an unknown kind that did decode
+made Undo clear the whole list (ruling 13); and pruning deleted the newer
+step's blob and could delete its segment. This is reachable without anyone
+downgrading: an `--mcp-stdio` process from the old bundle keeps running
+after the app updates itself. So now:
+
+- Only `kind` is required of an op and only `seq`, `madeAt` and `ops` of a
+  step; every decoder is lenient and marks what it could not read instead
+  of dropping it (`UndoLenient`).
+- A line's `seq` counts for the next number whatever else in it can be
+  read, so a newer version's number is never reused.
+- A line or step this version cannot read is a BARRIER: while one stands at
+  or above the newest step offered, Undo and Redo are not available (greyed,
+  plain "Undo", as for an unreachable folder), never a reason to clear and
+  never passed over. A later `cleared` line, or the oldest run past the
+  limits, retires it.
+- An op that needs content names every blob in one shared key, `blobs`, so
+  a pruner that cannot read the op still keeps them. A line this version
+  cannot read keeps exactly the blobs whose names its text holds (any run
+  of 64 lower-case hex characters) and its own segment, until the newest
+  `at` written in that segment is more than 60 days old; then the segment
+  goes like any other (`undoJournal.unknown.deleting`). A segment holding
+  no readable `at` at all (junk, or a newer version that renamed the key)
+  is judged by the first later segment that has one, since every line in it
+  was written before that segment's (`UndoPruning.segmentBound`, the
+  director's ruling 7 on the third round: before it, such a segment kept
+  itself and every later one for good, because segments go only from the
+  oldest end). The first fix kept
+  EVERYTHING while any unreadable line existed, and the second reviews
+  found what that costs: the line is never rewritten, so its segment is
+  never deleted, so deletion stopped for the life of the list. The
+  measurement before and after the change is under "The U1 harness".
+  **Rejected:** retiring the barrier for deletion at the next `cleared` line
+  (the contract review's suggestion): with deploys no longer clearing,
+  clearings are rare, and a list that is never refused would keep growing.
+- **One neutral kind, `note`**, which every reader passes over whatever else
+  it carries: no move, no barrier, nothing kept for it. The contract
+  review's probe showed why it has to exist from the first version: any
+  event a v1 reader does not know is a barrier, so a record a later version
+  adds would grey Undo on every older reader. A truly unknown kind stays a
+  barrier; a later version that needs a record older readers can skip writes
+  a `note`. U1 writes notes only in its cases and traces. A note's `v` (1)
+  and `seq` are required, or it is an unreadable line like any other; its
+  `at` and `about` are optional, and whatever else it carries, a `phase` or
+  `reason` of any value included, it stays a note (the contract review of
+  the second round probed each).
+- `undoJournal.opKinds.reserved` fixes the outline of every later op kind
+  now (`replaceText`, `editJSON`, `move`, `createTree`, `removeTree`,
+  `external`, `trash`, `storeHeld`), and a step needs a working folder only
+  when one of its ops has a `path`, so U4's preference steps fit.
+- A path in an op must be relative with forward slashes and no empty, `.`
+  or `..` part, leading slash, backslash, drive letter or NUL; one that is
+  not makes the op unreadable, so nothing outside the folder is ever
+  written by an undo.
+- **Four sentences for a second reader** (the Fable sweep of U1, before
+  Windows writes its reader; no v1 byte changed). A `recompute` whose
+  `maintainer` this version does not know makes its op unreadable
+  (`UndoOp.maintainersThisVersionKnows`), and so does a `holds` other than
+  `section` or `course` for its step (`UndoStep.holdsThisVersionKnows`;
+  absent is readable): either step is a barrier, because an older reader
+  would otherwise undo it with the re-derivation skipped, or under the
+  wrong lease. The sweep measured the code before this: both read as
+  readable. `madeBy`, `class` and `action.key` are open strings no reader
+  rejects. A key a reader does not know on a known op is ignored, so a
+  known kind never gains a key that changes what undoing it does: a new
+  meaning needs a new `kind`. And `madeBy` is split at its ends: who before
+  the first colon, the session or conversation id after the last, so an
+  outside assistant's client name may hold colons. Each has a check case
+  or a stack case (`stepFromAnotherVersion:<variant>`, a begin line written
+  raw as another version would write it). Must-fail: with the old
+  `UndoFormat.swift`, 2 check verdicts and 6 stack checks are red.
+
+**Rejected:** skipping a line it cannot read (the first version; measured
+above); treating an unknown op as "changed since" (it clears the list under
+ruling 13); refusing to read a journal that holds a newer line (it would
+make one old process disable Undo for the whole app until it quits, and a
+cleared list or the age limit would never retire it).
+
+**Rejected:** a `head.json` beside the journal (a replaced file, which
+Windows refuses while any reader holds it: the Windows director measured
+1,136 of 2,000 replaces lost with one try, W2); one JSON file per step plus
+a head pointer (the plan review's shape, a replace on every move of the
+head); SQLite (a third library on Windows for something a log does, with
+its own locking trap on network and synced volumes); AppKit's
+`UndoManager` as the store (per window, in memory, unreadable by an
+`--mcp-stdio` process or by Windows).
+
+### The lock and the read rule
+
+Every change takes one exclusive lock, reads the journal fresh inside it,
+and holds it only for journal events, never while a change is applied.
+The mac's mechanism is `flock(LOCK_EX)` on `undo/.lock` (`UndoLock`): it
+belongs to the open file, so the app, an `--mcp-stdio` process and two
+`UndoJournal` objects in one process all exclude each other, and the
+kernel releases it when the holder dies. (A scheduled run never opens the
+list: a deploy set for later records nothing, rulings 17 and 18.) The
+contract names the rule, not the mechanism; Windows uses a wait the system
+queues on the same file, `LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY`,
+never an exclusive open retried on a timer (W3).
+
+It is tried once without blocking; when it is held, a BLOCKING `flock`
+runs on a thread of its own, which the kernel queues, and the caller waits
+on a condition for that thread's answer or its deadline: two seconds live,
+50 ms in shadow. Nothing polls and nothing sleeps for a guessed time. A
+wait that runs out abandons the request, and the thread lets the lock go
+the moment it is granted. In shadow, once a wait has run out in a process,
+later shadow attempts there only try once until that process next gets the
+lock, so an outside-assistant process that has stopped while holding it
+costs one publish 50 ms, not every publish.
+
+**Measured.** The first version polled with `LOCK_NB` and a pause. The
+core review ran 8 processes making 200 shadow steps each against it: 663
+of 1,600 begins gave up after 250 ms, and a holder stopped with `SIGSTOP`
+added a quarter of a second to every publish. With the blocking request,
+in the U1 harness on an M4 Pro: 2 processes making 200 shadow steps each
+recorded 400 of 400; 8 processes making 200 LIVE steps each (two-second
+wait) recorded 1,600 of 1,600 and left none in flight. 8 processes in
+shadow recorded 579 of 1,600: in shadow the 50 ms bound is the point (a
+list nobody is offered must never slow an action), and a step it misses
+costs one trail line. **Rejected:** the poll (it starves), and a pause that
+grew to a tenth of a second (it starved worse: 398 of 400 with only two
+writers).
+
+A step's closing event waits up to ten seconds. If even that runs out, the
+closing event is kept in the process and written first at its next lock
+(`UndoFoldCache.keepPendingClosing`), so a step this process made is not
+left in flight, holding Undo back, for the life of the process.
+
+**Read on, never whole** (the core review's W4). The first version read
+every segment whole on every lock hold, twice per action, and the review
+measured 21 ms per round at 0.75 MB rising to 74 ms at 3 MB, and 150 to
+164 ms per action at 2 to 4.6 MB, on the main actor. Each process now keeps
+its fold of each list (`UndoFoldCache`) and reads only the bytes after
+where it stopped. Before trusting what it remembers it checks, per segment,
+that the file is still the same file (its number on the volume), at least
+as long, and holds the same 64 bytes just before the remembered end, and
+that no segment has appeared below the newest one read or gone from
+anywhere but the oldest end (where pruning deletes, and only what is off
+the list); anything else reads the journal whole again. This is safe because nothing is ever
+rewritten: the one truncation, of a torn last line, only ever cuts bytes
+after the last line feed, which is where every remembered end sits.
+
+### Write-ahead, and recovery from the content
+
+A step runs in three phases (`JournaledWrite.perform`): under the lock,
+recovery, the next number (one more than the highest `seq` in ANY line),
+the blobs, and a `begin` line naming every op's expected state, made
+durable with `F_FULLFSYNC`; the change, outside the lock; then, under the
+lock, the redo branch dropped and `applied` written, with pruning. The redo
+branch used to be dropped at `begin`, so a step that was then refused (a
+file in use) or never written still cut off Redo (the core review's M3). Undo and redo have the same shape (`undoing` then
+`undone`, `redoing` then `redone`), and an undo or redo first checks every
+op and writes nothing if any is in the way.
+
+Recovery (`UndoRecovery`) runs inside the lock before every new step, undo
+and redo. For an unfinished event whose process is gone (pid, then the
+process table's name and start time, the work leases' own
+`ProcessLiveness` rule), it reads where each FILE the step changed stands,
+by content: every file where the work started, `failed`; every file where
+it was going, completed; some of each, what took effect is put back and
+the step is `rolledBack`, with a trail line. When a file is NEITHER
+(changed by hand after the process died), every file that can be verified
+is put back where the work started, the step is recorded `interrupted`
+naming the files in the way by path, and the whole list is cleared with
+reason `interrupted` (as ruling 13 clears for a refused step). The journal
+never says done or failed for a step that is half applied. The first
+version wrote nothing at all once any file read neither: the core review
+killed a 300-page step at its 150th swap, edited one page not yet reached,
+and recovery left 150 changed pages with the step recorded `failed`, which
+nothing could ever undo. Leftover staged files for that step are deleted.
+Recovery's own repair runs inside the lock (the one exception to "never
+while a change is applied"), so two processes cannot repair the same step
+at once; it is rare and bounded by the step's size (the review measured
+about 300 ms for 300 pages), and it is left that way. The host name is recorded and never compared: a Mac's host name
+changes with its network, and the list is this computer's own. In shadow
+recovery never writes into a working folder. Recovery at every launch of
+the app is U7's (it needs the app's launch path); until then the first new
+step after a launch settles what a crash left.
+
+**Nothing stays in flight for ever** (the second core review's WRONG, the
+director's ruling 4). Pruning stopped at the first step still in flight,
+and recovery left a dead process's step untouched when its folder could not
+be reached or its put-back could not be made. Measured on the fixed code
+before this change: a step killed before its first swap, its working folder
+then renamed as the Finder would, and 120 more steps: 121 on the list and
+none pruned; a whole-file step killed mid-swap with its blobs then removed,
+and 70 more steps: 71 on the list, none pruned. So now:
+
+- A put-back that cannot even be planned (content it needs is missing) can
+  never succeed later: recovery closes the step `interrupted` (reason
+  `couldNotPutBack`, naming the files left part way) and clears the list,
+  as for a hand edit.
+- A swap refused because a file is in use is tried again, on a bounded
+  schedule (`UndoRefusedSwaps`, the director's ruling 5 on the third round):
+  at once at an Undo or a Redo, where the teacher is waiting for it, and on
+  the ordinary path at a process's first lock, then one minute after a
+  refusal, doubling, never more than an hour apart, until the step is past
+  the limits and pruning closes it. On Windows a file another program holds
+  is the everyday case (W5), and a closed step cannot be retried.
+  **Measured** (the core reviewer's reproduction: a 300-page step stopped
+  after 150 swaps, one of those pages made immutable, then one-page
+  actions): retried at every lock, each of the next 50 actions cost 187 to
+  255 ms, against 7 to 11 ms for a free page (the core review of the second
+  round; the one figure the contract and these documents cite). On the
+  schedule, rerun by the implementer on the third round's harness, the
+  first cost 148 to 194 ms and every one after it 6 to 19 ms. **Rejected:** once per process (a file held for a
+  minute would wait for the next launch).
+- A step closed `interrupted` leaves nothing of the journal's in a course
+  (the director's ruling 6 on the third round): its staged files are removed
+  when it is closed, and when its folder cannot be reached then, by the
+  first recovery in each process that reaches it
+  (`UndoRecovery.tidyClosedSteps`). The reproduction above used to leave a
+  hidden `.k-0.md.plantoir-undo-1-apply-recover-orig` for good, and it was
+  worse than it looked: that kept original is a copy when the page cannot
+  be linked, and `copyfile` copies the page's immutable flag onto it, so it
+  could not be removed at all. A staged file the swap made, with one link,
+  now has its flags cleared before it is removed (`UndoSwap.removeStaged`);
+  a kept original that is a hard link shares the page's flags (a reference
+  course's lock) and is never touched.
+- A step whose folder cannot be reached, or that this version cannot read,
+  stays in flight while it is on the list (ruling 10: Undo is greyed while
+  it is the newest, and available again when the folder comes back). Once
+  it is past the limits, pruning closes it `interrupted` (reason
+  `unsettled`, naming every file it names) and goes on. No clearing goes
+  with that one: everything older than it is already past the limits, and a
+  clearing would take every newer step with it.
+- A step this version cannot read is pruned like any other past the
+  limits; it no longer holds the list on the disk for ever.
+
+Measured after: the same two reproductions end with 50 steps on the list,
+70 and 20 pruned, and the stuck step `interrupted`.
+**Rejected:** closing an unreachable step as soon as recovery meets it
+(ruling 10 would then lose a list to a USB stick pulled out for a minute);
+pruning an in-flight step to `pruned` (the reviewer's first suggestion: the
+journal would then say nothing about files that may be half changed).
+
+**Measured** (Apple M4 Pro, APFS, the U1 harness): `F_FULLFSYNC` of a 1 KB
+append 4.0 to 4.2 ms median against 0.03 ms for a plain `fsync`, so only
+the events recovery cannot do without (`begin`, `undoing`, `redoing`) are
+made durable that way, and every other release of the lock is a plain
+`fsync`: a closing line lost to a power cut is put back by recovery from
+the content. A one-page step costs 5 to 6 ms in all; a step publishing 233
+pages 34 ms to begin (26 ms of it working out the line ops and proving
+them both ways) and 36 ms in all, with a 19 KB line. The plan's earlier 1 ms
+for writing that step did not include the flush or the proof.
+
+### Ops and the content check
+
+U1 builds `writeFile` (a whole file, by SHA-256, with both copies as blobs)
+and `editLine` (one top-level front-matter key's entry: its line and the
+lines its value runs on to, carriage returns kept), and records
+`recompute` (a file kept true by a rule, such as the section's front page,
+re-derived after the other ops; run by U2). The rest of plan 3.1 arrives
+with U2 and U5. `JournaledWrite.ops(for:)` chooses `editLine` for a change
+only when applying its ops to the before text gives the after text byte for
+byte AND undoing them gives the before text back; otherwise the change is
+one `writeFile`. So a page the line model cannot describe exactly falls back
+to the whole file, never to a guess.
+
+The check (`UndoCheck.state`) compares the content of exactly what the op
+changed, never a time (ruling 4, W6): an entry byte for byte, not with
+Swift's `==` (which calls a precomposed and a decomposed é equal); a file
+by its hash. A missing page is never "already back" for a line op; the key
+written twice, a fence that never closes, a folder or a file that is not
+UTF-8 is changed since. The case list is `undo.checkCases`.
+
+**Measured, and the reason for one contract detail:** Foundation's
+`JSONSerialization` drops a byte-order mark inside a JSON string (a fixture
+page beginning with one came back without it), and `String(contentsOf:)`
+drops a leading one from a file. So the traces carry each fixture page's
+exact bytes as `utf8Hex`, the check cases give such a page as `bytesHex`,
+and the shadow record of a publish takes each page's `before` from the
+disk's own bytes rather than from the text the action read.
+
+### All or nothing, staged then swapped (ruling 4, W5)
+
+`UndoSwap` writes every new content beside its target as a dot file
+(`.<name>.plantoir-undo-<seq>-<apply|undo|redo>-new`), and only when all
+are written swaps them in with one rename each, re-reading each target
+first. The original is kept under a second name (a hard link, so its bytes,
+mode and owner are its own; a copy on a volume without links) until every
+swap is in. If one cannot go in, the swaps already made are reversed and
+the file is named (`undo.stepCases`). A rename happened or it did not, so
+a process killed part way leaves each file wholly old or wholly new.
+
+### Linear, cleared, pruned
+
+Undo acts on the newest step that is not undone and Redo on the most
+recently undone; a newer step still in flight refuses both. Any new step
+drops the redo branch. The whole list is CLEARED by one `cleared` line with
+its reason, and a reader honours that line WHATEVER its reason says, a
+reason it does not know included (the director's ruling 1 on the third
+round): `UndoFold.takeClearing` never reads the reason, and the contract now
+says so, because a Windows reader that checked the reason against
+`undo.clearReasons` would read a later version's clearing as an unreadable
+line, a barrier. This version clears in four cases (`undo.clearReasons`):
+when Undo refuses a step because what it changed was changed by hand since
+(ruling 13, which replaced the plan's recommendation that the refused step
+stay); when Undo refuses it because content it needs is missing from the
+list (below); when recovery closes a step `interrupted`; and once when the
+switch goes live (below). The `cleared` line's `seq` is the highest step
+number in the journal when it is written, whatever cleared it (the contract
+review found the first version wrote the refused step's number for a
+refusal and the highest for a deploy).
+
+**Steps recorded in shadow are never offered** (the director's ruling 1 on
+the third round). A shadow list has gaps by design: most writers are
+journaled only from U3 to U6, and a shadow begin that misses its 50 ms wait
+is dropped (579 and 986 of 1,600 with 8 processes at once). So the flip of
+the switch in U7 writes one `cleared` line, reason `wentLive`, before
+anything is offered (`UndoJournal.clearTheListAsTheSwitchGoesLive`), and the
+list starts empty. **Rejected:** offering them as they stand (the core
+review of the second round: the first Undo after the update could take back
+a publish from three weeks ago and leave the teacher's newest change, which
+nobody recorded, standing, and the content check passes whenever that page
+was not touched since); pruning them one by one (more lines, the same
+result).
+
+**A process still in shadow after the flip is not settled yet**
+(`undo.knownLimits.shadowProcessAfterTheFlip`, found by the Fable sweep of
+U1). An outside-assistant session that outlives an update runs the older
+build, switch off, and goes on writing shadow steps into the same list,
+which a live reader cannot tell from live ones. Measured standalone: after
+`goLive` and one live step, a shadow-mode step became the head the live app
+offered, and Undo took it back past a newer change the shadow process never
+recorded; and a live two-page step killed after its first swap, when the
+first process to take the lock was in shadow, was closed `interrupted`
+with one page published and the other not, both staged files left and no
+trail line. No v1 line changes for it; U7 picks one of two ways out before
+Windows ships anything (`undo.laterPieces.U7`): the shadow list in a folder
+of its own (`undo-shadow/`, the cheaper), or a key on every shadow begin
+that live readers never offer.
+
+**An Undo refused for missing content clears the list too**, once it has
+said so (held question M9 on the second reviews; built as recommended behind
+one constant, `UndoSwitch.undoRefusedForMissingContentClearsTheList`).
+Content that is missing (a blob a disk cleaner removed, or from U5 a 785
+store file swept early) never comes back, so before this the newest step
+was offered and refused on every try until it aged out, and nothing earlier
+could be undone. A Redo refused for missing content drops only its redo, as
+for a hand edit (ruling 20).
+
+**A deploy is not on the list and cuts nothing** (ruling 17), and neither
+does sharing unit plans or stopping sharing them (ruling 18). That holds for
+a deploy set for later when it runs. Whether SETTING or CANCELLING one is a
+step is held for Russell (M10): the reserved `external` op names the
+LaunchAgent, and the rollover turns a schedule off. Until he answers it is
+counted as not a step, and the writer scan's `ScheduledDeploy.swift` entry
+says "held for Russell (M10)". They replaced
+rulings 14 and 16, under which a deploy and a share cleared the list. So
+everything done before a deploy can still be undone after it; when an Undo
+or a Redo takes back something a website already shows, it happens and
+Plantoir then offers to deploy (ruling 19, built in U6 from "Deployed or
+not" below). No line was ever written for a deploy (nothing in the app
+called the clearing), so no journal on any computer holds one.
+
+**A refused Redo drops only the redo** (ruling 20), whether the page was
+changed by hand or content it needs is missing. It is refused once, with
+the page named, and then the undone steps from it upward are `dropped`
+(reason `redoRefused`): Redo greys out, Undo still works for everything
+earlier, and the Redo is never offered and refused again. Choice (b) of
+the first fix (refuse and leave the list as it was) offered a Redo that
+could never succeed until the next step; clearing, as for a refused Undo,
+would have thrown away an undo side nothing was wrong with.
+
+**A clearing takes a step in flight in another process too**, as one fixed
+rule (the director's ruling 3): a step begun before the `cleared` line was
+written and finished after it leaves the list, because its own `applied`,
+`undone` or `redone` records nothing undoable. This was the constant
+`UndoFold.clearingTakesStepsBegunBeforeIt`, held for Russell while a deploy
+still cleared. With the deploy gone the question became the director's:
+the two clearings left are a refusal and a crash, the window is a few
+milliseconds, and a step that leaves the list refuses rather than undoing
+the wrong thing. Cases for both: `undo.stackCases` "a step another process
+began while a refused undo was clearing the list" and
+`undo.recoveryCases` "a step another process has in flight when recovery
+clears the list".
+
+**The limits are judged when the list is OFFERED** (ruling 3), not only at
+the next write: the first version offered, and undid, a step 43 days old
+because nothing had been written since. `UndoFold.offer(now:)` drops a step
+more than 30 days old and, because the list is linear, everything older
+than it; then it keeps the newest 50. Each step's time is its own `madeAt`
+or the latest one before it in the list, whichever is later, so a clock set
+back for one step never makes it older than the steps before it (the core
+review measured a step made with the clock set back being pruned out of
+order, after which Undo went past it). The moment the list is judged at is
+the clock, or the latest step time no more than a day ahead of the clock;
+a step time further ahead is not trusted, so a clock set forward and then
+put right brings the list back. Done, undone and in-flight steps all count
+toward the 50.
+
+On the disk, pruning removes one oldest run only and stops at the first
+step it keeps: past the newest 50, or more than 60 days old (30 and a grace
+of 30, so a wrong clock never destroys the list), and nothing for age while
+the clock is behind a written time by more than a day. Content no step on
+the list names is deleted, and old segments only from the oldest end and
+never the one holding the highest number, so a step can never come back to
+life because the line that ended it was deleted, and a number is never
+reused.
+
+**Known limits, not fixed** (`undo.knownLimits`, the director's ruling 6):
+a clock set more than 60 days forward and then put right loses the list
+(the core review: steps 1 to 5, step 6 a year ahead, the clock put right,
+one step offered), because the forward step is trusted when it is written
+and everything older is pruned in that hold; a holder of the lock that is
+stopped rather than killed leaves one waiting thread per live wait until it
+goes (bounded by the waits made); and a step that died fully swapped with
+one page changed by hand is put back on every other page (299 of 300
+measured), which is the rule (never call half a step done) and goes on the
+UI review page. **Rejected for the clock:** refusing to prune for age in a
+hold whose own step's time is far ahead of the step before it (the
+reviewer's suggestion): it would protect a list from one forward jump and
+not from a clock that stays forward, and a real return after the summer
+looks the same.
+
+### Deployed or not: read from the published-pages record (ruling 19)
+
+Ruling 19 needs to know, when an Undo or a Redo happens, whether a website
+shows what it takes back. **That is read from the published-pages record
+the launchers already write, never from the journal** (the director's
+ruling 1 on the second reviews; `undo.rule.deployed`, `undo.deployedCases`,
+`UndoWebsite`). This section said "the deploy markers" until the third
+round; the contract review pointed out that in `file-formats.json` those
+are `firstDeployMarkers`, the site files, which cannot answer it, so a
+reader built from the words would have gone to the wrong file. Read in `scripts/deploy.py`, `deploy.sh` and `deploy.ps1` on
+2026-11-13: every deploy path writes the section's published-pages record
+(`contracts/file-formats.json` → `publishedPagesRecord`, #379), one fragment
+`courses/<CODE>/.publish_state/section<N>.published-pages/<yyyyMMddTHHmmssZ>-<destination>.json`
+per destination that succeeded, holding the build's own list of every page
+the uploaded site shows (`places`). `deploy.py` writes it after each Netlify
+and Cloudflare upload (`record_published_pages`), and the folder branch,
+which never enters `deploy.py`, writes it in `deploy.sh` and `deploy.ps1`
+(`Record-PublishedPages`). The app's Deploy button, a deploy set for later
+(a scheduled `deploy.sh`) and a deploy typed in Terminal all go through
+those three, so all leave the same trace; the Netlify and Cloudflare site
+markers (`.netlify_sites/`, `.cloudflare_sites/`) only name the site and are
+written when one is made, so they cannot answer it.
+
+The rule compares CONTENT, not times. It reads only the destinations the
+section deploys to NOW (its primary and any additional, by type), because a
+destination left behind keeps its last fragment as the newest for good:
+a course that went to Netlify and then to Cloudflare would otherwise offer
+to deploy on every Undo, and deploying (to Cloudflare) would never refresh
+the Netlify fragment (the contract review of the third round, I1). For each
+of those destinations, the newest fragment by the moment in its own name is
+what that website shows. An Undo or Redo offers to deploy when, for a page
+whose visibility it changes, some destination's newest fragment shows the
+page as the course has it before the move. A destination with a site marker
+and no fragment is `cannotTell`: a section last deployed before the record
+existed (v1.4.1), or rolled over with the "same website" answer, which moves
+every fragment aside and keeps the marker, has a live site and no record of
+it. A fragment that cannot be read, or a move that changes what a page says
+without changing who can see it, is `cannotTell` too, and an offer from any
+destination wins over it. No fragment and no marker anywhere it deploys
+now: no offer (a folder keeps no marker). Places are compared in Unicode
+normalization form C, then code point for code point: the review measured
+Swift's `Set` matching a decomposed and a composed name and Python's `in`
+not, so without one stated form the two apps would answer differently. No
+journal time is read, so a clock that moved between a step and a deploy
+cannot mislead it. A deploy whose fragment was not written (a preview's
+`.build-id` replaced the publish build's first, or the write failed) leaves
+the newest fragment older than the site (`undo.knownLimits.recordNotWritten`).
+
+**What the record cannot answer, said exactly:** the record holds which
+pages a site shows, not what they say. U1's steps (publishing and hiding)
+change only visibility, so for them the answer is complete, short of the
+known limit above. For a step that
+changes a page's text (U2's body edits, U3's actions that rewrite a page),
+whether the website shows that text cannot be read from any marker: the
+fragment would have to carry a digest of each page's source as the build
+read it. That is a change to the build's visible-pages list and the record,
+not to the journal, and it is the director's to decide before U6.
+
+**Rejected:** a `deployed` event in the journal (one review proposed it): a
+scheduled deploy and a deploy typed in Terminal never touch the journal, so
+it would be missing for every deploy the app did not start, and a v1 reader
+would stop at it as an unknown event unless it were a `note`; comparing a
+fragment's moment with a step's `madeAt` (two clocks, and the journal's is
+the one the limits already distrust); the union of every fragment (the
+record's own readers take the union to know what has EVER been shown,
+which is the wrong question here).
+
+### The one action recorded in U1
+
+Publishing and hiding pages (`AssistToolRunner.carryOut`, from the menu,
+the built-in window and an outside assistant) is recorded in shadow beside
+today's history by `UndoShadowPublish`: before `AssistPublishPlanner.apply`
+runs, it works out what apply will write with the same functions and
+records that; afterwards the step is kept (`applied`) only if what was
+written is exactly what was recorded, and is `failed` otherwise. Apply, its
+result, its sentences and its order of effects are unchanged, and a list
+that cannot be written leaves the action exactly as it was with one trail
+line (`UndoShadowPublishTests.testAListThatCannotBeWrittenChangesNothingAboutTheAction`).
+Ruling 15 as finally given makes the built-in window's "undo that" the same
+as Edit ▸ Undo; that routing is a later piece, behind the switch, and U1
+changes nothing the window does.
+
+The list is read and written OFF the main actor (the director's ruling 8 on
+the third round): `UndoShadowPublish` works out the pages on the main actor,
+then runs the lock, the read of the journal and the writes on a detached
+task the action waits for. Today's history records the change BEFORE that
+wait for the step's close (`history.record(change)` above the `await`, the
+Fable sweep of U1), so Undo Last Change knows of a write the moment it is
+made, as it did before U1; for the 5 to 35 ms of the close it otherwise
+did not. A process's first read of the journal is a whole
+one, 100 to 300 ms and more at a year's steady 2 to 6 MB (the core review of
+the second round), and it was running on the main actor at the first
+publish after a launch. A page's place in the working folder is worked out with every link
+resolved through its deepest folder that exists (`canonicalPath`):
+Foundation's `resolvingSymlinksInPath` resolves nothing in a path that does
+not exist, so a section whose front page was not there yet, reached through
+a linked folder, put the front page outside its own working folder and its
+`recompute` op went unrecorded (the second Mac's run of
+`UndoShadowPublishTests.testAPublishIsRecordedInShadow`, reproduced
+standalone with a linked root).
+
+`UndoWriterScanTests` lists every product file that writes files, with its
+count and why: the door, not a step, or the piece of #899 that will wire
+it. U7 cannot flip the switch while any "waits for" remains. After the
+reviews it reads `Scripting` and `App` as well as `Models` and `Views`
+(`Scripting/NewCourseCreator.swift` writes a course's folder and its
+`course_config.json`, which the first version's comment said nothing there
+did), and it counts every kind of writing call: Foundation's writes,
+moves, removals, copies, `setAttributes` (the reference lock's `uchg`) and
+links, a `FileHandle` opened for writing, truncation, and the C calls that
+write (`rename`, `link`, `unlink`, `mkdir`, `chmod`, `open` with a writing
+flag). After the second core review (the director's ruling 7) it also
+counts a call split across lines (a line ending in `(` is read with the
+next: `PlantoirDefaults` and `ProblemReportBuilder` had `.write(` and `to:`
+on two lines, uncounted), a tool that writes run as a process (by its
+path: `/usr/bin/ditto` in `CourseRestorer` and `ReferenceZipSource`,
+`/usr/bin/zip`, `/bin/chmod`, `/usr/bin/chflags`, and the `/bin/rm` and
+`/bin/mv` lines of the scripts `ScheduledDeploy` writes),
+`setResourceValues(` and `NSWorkspace`'s `recycle(`. Seven files' counts
+rose and no new writer was found; `testTheScanCountsSplitCallsToolsAndTheTrash`
+counts 7 of the review's samples where the scan before counted 1. The count
+is per file, so a file can swap one write for another and stay green; what
+it catches is a new writer.
+
+After the third round (the director's ruling 9) it counts a SHELL run as a
+process (`/bin/bash`, `/bin/sh`, `/bin/zsh`) and a launcher named in quotes
+(`setup.sh`, `preview.sh`, `deploy.sh`), so whoever starts one is listed with
+what it waits for: `ScriptRunner` runs every launcher through `/bin/bash`
+and was on no list, though `setup.sh` makes a new course and `preview.sh`'s
+preflight rewrites a course's `course_config.json` (both U4's); a deploy and
+sharing unit plans through `deploy.sh` are listed as not steps (rulings 17
+and 18). It counts `rmdir`, a bare `remove`, `mkstemp`, `mkdtemp`, `utimes`,
+the extended-attribute calls and `NSWorkspace`'s `duplicate` too. Making it
+showed a fault in the scan itself: `removeItem(` holds `moveItem(`, so every
+removal had been counted as two writes, and the second round's own sample
+test (`testTheScanCountsSplitCallsToolsAndTheTrash`, which expects 1 for a
+`removeItem`) was red on it; `.moveItem(` is now matched with its dot. With
+both changes 32 files' counts fell, four rose (`BuilderWarmUp`,
+`DeployCommand`, `WorkspaceModel`, `NewCourseCreator`, for the shells and
+launchers they name) and 11 files joined the list;
+`testTheScanCountsShellsLaunchersAndTheCCalls` counts 9 of its samples where
+the scan before counted 2. `DeployCommand`, `ScheduledDeploy` and
+`PlanSharing` no longer say they wait for U6: a deploy, set for later or
+not, and sharing unit plans are not counted (rulings 17 and 18; whether
+setting or cancelling a deploy for later is a step is held as M10), and
+`DeployCommand.releaseSite`, the rollover's "cut loose", is U4's with the
+rollover. 87 files wrote on the branch; with `dev` merged (#785a and #897c), 90: `OneSectionRestore` (an `unzip -p` that only reads), and the shared Media store's `SharedMediaStore` and `SharedMediaFiles` (U5's).
+
+### The U1 harness
+
+Every core file in `Models/Undo/` except `UndoAppSeams.swift` and
+`UndoShadowPublish.swift` compiles without the app, beside copies of
+`ProcessLiveness`, `PageVisibilityReader`, `PageFrontmatter`,
+`CalendarDay` and `AssistPageVisibility`, and
+`Tests/QuartzTeachersTests/UndoContractReplay.swift` and `UndoCoreChecks.swift`
+hold every replay and check without XCTest. The harness runs them for real
+(the first fixes' copy is in the director's scratchpad for the U1 fixes,
+under `u1/harness/`). After the first fixes, on an M4 Pro: the 20 traces (641 calls),
+27 check, 30 stack, 3 step and 15 recovery cases, a torn last line, an
+unwritable list, the three core checks, two writers in one process, two
+PROCESSES appending 200 steps each to one list (interleaved, 400 distinct
+rising numbers, nothing lost), and a child killed with `SIGKILL` at each of
+ten kill points, after which recovery left every file wholly before or
+after: 0 failures throughout. A working folder on an exFAT disk image
+recorded three live steps and made its `folder-id`.
+
+What it measured, besides the lock and reading-on figures above: a one-page
+publish in shadow costs 5 to 6 ms whatever the journal's size up to 4.1 MB;
+the first read in a process costs 14 ms at 106 KB and 179 ms at 4.1 MB.
+Before the fixes the same publish cost 26 ms at 1 MB and 83 ms at 4.1 MB
+even reading on, because every step's `madeAt` and every line's `at` made a
+new `ISO8601DateFormatter` (about 80 microseconds each). `UndoMoment` now
+reads its own form by hand (checked against the formatter at 797,151
+moments from 1906 to 2103, none different) and falls back to a formatter
+made once for any other ISO 8601 form. 400 shadow publishes of 233 pages in
+one process, with three segments deleted along the way, made one full read
+(median 29 ms, max 52 ms each): deleting segments from the oldest end no
+longer throws the fold away.
+
+Must-fail proofs, each a copy of one fixed file with one fix taken out,
+built into its own harness: the age judged only at the next write (six
+stack cases red), a newer version's line read as this version's (five), the
+guard that deletes nothing while anything is unreadable removed (the
+`foreignBlobLine` case), recovery giving up on a hand edit (eight recovery
+checks across two cases), and a damaged identifier file not set aside (the
+core check throws). The two-process test in the app (`Plantoir --mcp-stdio`
+beside the window's runner) is U7's.
+
+**After the second round of fixes** (rulings 17 to 20 and the director's
+rulings on the two fix reviews; the harness is under `u1/r2/` in the
+director's scratchpad for that round, built with `-swift-version 6` from
+copies of the core): the 20 regenerated traces (612 calls, with 26 notes
+and 4 refused redos), 27 check, 35 stack, 19 recovery, 13 deployed and 3
+step cases, the torn line, the unwritable list, the three core checks, two
+writers in one process, two PROCESSES and ten real `SIGKILL`s: 0 failures.
+A simulated school year (five publishes of 233 pages and one whole-file
+edit a day for 365 days, 2,190 steps, with one unreadable line and a newer
+version's line naming a blob on day 2), on an M4 Pro with other work
+running:
+
+| | journal at the year's end | blobs | a process's first read | its first publish |
+|---|---|---|---|---|
+| before (the first fix's "keep everything") | 59.8 MB, 15 segments | 367 | 2.9 s | 3.3 s |
+| after (ruling 5) | 4.8 MB, 2 segments | 10 | 187 ms | 335 ms |
+
+The barriers and the newer version's blob were gone by day 90 (the
+segment's own newest time past 60 days). A journal on an exFAT disk image
+recorded a whole-file step and undid it (before: `couldNotRecordTheStep`,
+because `renamex_np` with `RENAME_EXCL` is refused there). The core
+review's two reproductions of a stuck step: 121 on the list and none
+pruned before, 50 on the list after (70 and 20 pruned, the step
+`interrupted`).
+
+Must-fail proofs for this round, each the new code with one fix taken out:
+a refused Redo dropping nothing (4 traces and 6 stack checks red), recovery
+leaving an unplannable step in flight (6 recovery checks red), a `note`
+read as a barrier (333 trace checks red), pruning stopping at a dead
+process's step (2 stack checks red); and the old code (56b2b23a9) on the
+stuck-step reproductions and the year above.
+
+**After the third round** (the director's rulings on the second fix reviews;
+the harness is under `u1/r3/` in the director's scratchpad for that round,
+run one process at a time while the director's gate held the Mac, with
+`origin/dev` 86ae77e53 merged): the 20 traces (612 calls), 27 check, 41
+stack, 20 recovery, 18 deployed and 3 step cases, the five core checks, two
+writers in one process, two PROCESSES and ten real `SIGKILL`s: 0 failures.
+The core reviewer's kill script: 36 kill cases at 18 points, each settled
+with nothing left beside a page and a second settle changing nothing, and
+60 random kills on 300 pages stable. A one-page shadow publish, first in a
+fresh process then read on: 12.8 then 5 to 6 ms at 106 KB, 50.8 then 5 to 6
+ms at 1.0 MB, 170.9 then 6 to 8 ms at 3.9 MB (a list of 20-page steps never
+reaches 5 MB: pruning deletes the old segment first). The year with an
+unreadable line on day 1: a peak of 9.95 MB on day 60, the barrier gone by
+day 90, then 2.1 to 5.6 MB in one or two segments, first reads 81 to 380
+ms, and the read-on fold equal to a whole read on all 365 days. The 8-process
+lock measurement was left for the second Mac (no artificial load on this
+one).
+
+Must-fail proofs for this round, each the new code with one fix out (the
+`u1/mustfail3/` folder): `rule.deployed` reading every destination (2
+deployed cases red), missing content refused for ever (10 stack checks), a
+refused put-back retried at every lock (1 recovery case), no tidying at
+close (the core check), the timeless segment kept (the core check), the
+shadow publish's old `relativePath` (a front page that does not exist yet,
+under a linked root, falls outside it: reproduced standalone, and red on the
+bench as `UndoShadowPublishTests.testAPublishIsRecordedInShadow`), 785a's 31
+days (the 40-day sweep case), and the second round's scan (11 checks).
 
 ## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
 
