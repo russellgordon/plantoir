@@ -911,13 +911,6 @@
    },
    "windows": null
   },
-  "newCourseSheetUseLCSSpecificTerminology": {
-   "label": "Use LCS-specific terminology",
-   "mac": {
-    "file": "mac-app/QuartzTeachers/Views/Wizard/NewCourseWizardView.swift"
-   },
-   "windows": null
-  },
   "newCourseSheetFoldersAndFiles": {
    "label": "Folders and files",
    "mac": {

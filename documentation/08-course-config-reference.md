@@ -1430,9 +1430,11 @@ Keys the Windows settings UI must round-trip (per-section maps use
   `include_curriculum_pages: true`, which is what fetches the
   expectations written for their code
 - `use_lcs_terminology` (entry 94) — retired in 2.0.0 (#891): no longer
-  written, never read; an existing value is left where it is. Only the
-  `DEFAULT_*` factory sets remain in `scripts/setup_course.py`, and the
-  Windows `WizardDefaults` mirrors them
+  written by the Mac or the command line, never read; an existing value is
+  left where it is. Only the `DEFAULT_*` factory sets remain in
+  `scripts/setup_course.py`. Until #891's `windows` issue lands, the Windows
+  wizard still writes the key and its `WizardDefaults` still holds the
+  second sets
 - `custom_short_name` — the ≤12-character label shown beside the header
   emoji instead of the course code, in club mode. Already implemented on
   Windows (`CourseConfiguration.cs`); listed here because this table is the

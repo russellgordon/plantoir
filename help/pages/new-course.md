@@ -92,7 +92,6 @@ The sheet says of {{control:newCourseSheetStructurePart}} that the defaults are 
 
 - **{{control:newCourseSheetFoldersAndFiles}}** folds down to four lists: the folders and files every section shares, and the folders and files each section has for itself. A fifth list, {{control:curriculumFolders}}, shows when the code has a folder of curriculum expectations to offer. See [Shared folders and section folders in Course Settings](page:course-folders).
 - **{{control:foldersWhoseWorkCountsForMarks}}** names the folders that hold marked work. See [The folders Plantoir treats specially](page:special-folders).
-- **{{control:newCourseSheetUseLCSSpecificTerminology}}** is an option for one school. It uses that school's own terms, with pages named Grove Time and SIC Drop-In Sessions in place of Extra Help. It also adds a College Board Curriculum folder.
 
 ## Footer and Advanced
 

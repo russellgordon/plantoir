@@ -441,7 +441,7 @@ reference course this way, and what was rejected, is `09-mac-app.md` →
   schemes come from `support/colour_schemes.json`. Different sections get
   different schemes so a teacher (and their students) can tell sections
   apart at a glance. The picker starts on the section's own scheme, so a
-  re-run with Return keeps it. One entry in the file is never offered: see
+  re-run with Return keeps it. One entry in the file is offered only to a section that already uses it: see
   "Grove Colours: one scheme, two ids" below.
 - **Fonts**: a curated list of six Google-Font header/body pairings plus
   system-font and custom options, and six monospaced code fonts. Choices are
