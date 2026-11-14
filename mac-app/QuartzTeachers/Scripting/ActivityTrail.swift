@@ -1554,7 +1554,7 @@ nonisolated enum ActivityTrail {
         case filesForTheSiteDownloaded = "files for the site downloaded"
         /// A build STOPPED because something its pages use was not on this
         /// computer and could not be downloaded (`keptDownloads.stop`): how
-        /// many of what kind, and why, as offline or damaged.
+        /// many of what kind, and why, as offline, damaged or notReady.
         case filesForTheSiteCouldNotBeDownloaded = "files for the site could not be downloaded"
     }
 

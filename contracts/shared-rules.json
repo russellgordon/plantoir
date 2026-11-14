@@ -1113,12 +1113,13 @@
       },
       {
         "event": "files for the site could not be downloaded",
-        "carries": "what kind and how many, why (offline: no internet connection, or the download stopped; damaged: what arrived was not what was asked for, and was thrown away), and the course and section, whose build therefore STOPPED",
+        "carries": "what kind and how many, why (offline: no internet connection, or the download stopped; damaged: what arrived was not what was asked for, and was thrown away; notReady: something on this computer went wrong while making it ready), and the course and section, whose build therefore STOPPED",
         "marker": "PLANTOIR_DOWNLOADED: with failed and its reason (keptDownloads.marker)",
         "line": "{course}/{section} · could not download {what} for the site, so it was not built: {why}",
         "whyWords": {
           "offline": "no internet connection, or the download stopped",
-          "damaged": "what arrived was not what was asked for, and was thrown away"
+          "damaged": "what arrived was not what was asked for, and was thrown away",
+          "notReady": "something on this computer went wrong while making it ready"
         },
         "why": "#674. The one case that stops a build because of the network (keptDownloads.stop), which otherwise reads as 'Preview is broken' or as a scheduled deploy that did not happen."
       },
@@ -30324,7 +30325,7 @@
     },
     "marker": {
       "prefix": "PLANTOIR_DOWNLOADED:",
-      "rule": "ONE line per kind per build, printed only when the build downloaded something or stopped: {kind, course, section, downloaded (how many), bytes, seconds} or {kind, course, section, failed (how many distinct names), reason (offline or damaged)}. It names no page and no file of the teacher's. Both apps read it from the console of a run they start and from a scheduled publish's record, as PLANTOIR_SWIFT:, and write the trail line (activityTrail.mustRecord: 'files for the site downloaded', 'files for the site could not be downloaded'); the console a teacher reads leaves it out, by the one rule for every PLANTOIR_ line.",
+      "rule": "ONE line per kind per build, printed only when the build downloaded something or stopped: {kind, course, section, downloaded (how many), bytes, seconds} or {kind, course, section, failed (how many distinct names, 0 when none can be named), reason (offline, damaged or notReady)}. It names no page and no file of the teacher's. Both apps read it from the console of a run they start and from a scheduled publish's record, as PLANTOIR_SWIFT:, and write the trail line (activityTrail.mustRecord: 'files for the site downloaded', 'files for the site could not be downloaded'); the console a teacher reads leaves it out, by the one rule for every PLANTOIR_ line.",
       "cases": [
         {
           "kind": "phet",
@@ -30370,6 +30371,11 @@
           "sentence": "could not download 3 science simulations for the site, so it was not built: what arrived was not what was asked for, and was thrown away"
         },
         {
+          "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}",
+          "event": "files for the site could not be downloaded",
+          "sentence": "could not download a science simulation for the site, so it was not built: something on this computer went wrong while making it ready"
+        },
+        {
           "line": "PLANTOIR_DOWNLOADED: {\"kind\":\"newer\",\"course\":\"SCH3U\",\"section\":2,\"downloaded\":4,\"bytes\":8000000,\"seconds\":2.0}",
           "event": "files for the site downloaded",
           "sentence": "downloaded 4 files for the site (8.0 MB in 2.0 s), kept on this computer for later builds"
@@ -30380,7 +30386,8 @@
         "failed": "could not download {what} for the site, so it was not built: {why}",
         "why": {
           "offline": "no internet connection, or the download stopped",
-          "damaged": "what arrived was not what was asked for, and was thrown away"
+          "damaged": "what arrived was not what was asked for, and was thrown away",
+          "notReady": "something on this computer went wrong while making it ready"
         },
         "unknownKind": {
           "one": "a file",
@@ -30391,10 +30398,11 @@
       }
     },
     "stop": {
-      "rule": "A build whose pages students can see use something of a kind that is not kept, and that cannot be downloaded now (asking: offline; or the kind's checks fail: damaged), STOPS before Quartz runs, exit 1, with nothing written to the site: `first` for the reason, after the cross, filled with {course}, {section}, {what} (kinds' one or several, counting each name once however many pages use it) and {source}; then one line per place it is used, `item`, indented three spaces, at most listedAtMost, then andMore. Then the marker. The previous site is left as it was. A preview stops, a deploy stops, and a scheduled deploy stops (scheduledPublishStopped's 'the pages could not be built' line is what the trail already says). A kind's other faults (a misspelt name) are folder problems and never stop.",
+      "rule": "A build whose pages students can see use something of a kind that is not kept, and that cannot be downloaded now (asking: offline; or the kind's checks fail: damaged), STOPS before Quartz runs, exit 1, with nothing written to the site: `first` for the reason, after the cross, filled with {course}, {section}, {what} (kinds' one or several, counting each name once however many pages use it) and {source}; then one line per place it is used, `item`, indented three spaces, at most listedAtMost, then andMore. Then the marker. The previous site is left as it was. A preview stops, a deploy stops, and a scheduled deploy stops (scheduledPublishStopped's 'the pages could not be built' line is what the trail already says). A kind's other faults (a misspelt name) are folder problems and never stop. A fault in the kind's pass itself, not in a download, stops too when a page students can see uses the kind (notReady; phetFences.stop.passFails); {what} is then the kind's several, with no number, when nothing can be named.",
       "first": {
         "offline": "{course} Section {section} was not built: this computer could not reach {source} to download {what} that its pages use for the first time. Connect to the internet, then build again.",
-        "damaged": "{course} Section {section} was not built: {what} that its pages use for the first time did not arrive from {source} as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download causes this."
+        "damaged": "{course} Section {section} was not built: {what} that its pages use for the first time did not arrive from {source} as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this.",
+        "notReady": "{course} Section {section} was not built: {what} that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu."
       },
       "item": "“{item}” on “{page}”",
       "andMore": "and {count} more",
@@ -30402,7 +30410,7 @@
       "explained": "{first} Not downloaded yet: {items}.",
       "explainedRule": "What the apps' failure explanation makes of the lines (app-rules.json -> failureExplanations): the first line lifted (FailureExplainer.liftedSentence: everything before its first ASCII letter or digit taken off; it begins with the course code), then `explained` with {items} the item lines, each trimmed, joined with \"; \". The marker word every first line carries, whatever the reason, is `markerWords`.",
       "markerWords": "was not built: ",
-      "markerWordsAlso": "for the first time",
+      "markerWordsAlso": "that its pages use",
       "cases": [
         {
           "name": "one simulation, offline",
@@ -30528,8 +30536,36 @@
             }
           ],
           "lines": [
-            "❌ SPH3U Section 1 was not built: a science simulation that its pages use for the first time did not arrive from PhET as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download causes this.",
+            "❌ SPH3U Section 1 was not built: a science simulation that its pages use for the first time did not arrive from PhET as expected, so nothing was kept. Build again while connected to the internet; a school network that sends a sign-in page in place of a download can cause this.",
             "   “gas-properties” on “Unit 3/Gas Laws”"
+          ]
+        },
+        {
+          "name": "the pass itself failed, and it can say where",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "notReady",
+          "missing": [
+            {
+              "item": "gas-properties",
+              "page": "Unit 3/Gas Laws"
+            }
+          ],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu.",
+            "   “gas-properties” on “Unit 3/Gas Laws”"
+          ]
+        },
+        {
+          "name": "the pass itself failed, and it cannot say where",
+          "kind": "phet",
+          "course": "SPH3U",
+          "section": 1,
+          "reason": "notReady",
+          "missing": [],
+          "lines": [
+            "❌ SPH3U Section 1 was not built: science simulations that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu."
           ]
         }
       ],
@@ -30539,7 +30575,9 @@
     "knownLimits": [
       "A kept entry is never refreshed: a newer PhET version reaches a site only once the kept one is unused for 90 days, or its folder under .downloaded is removed by hand.",
       "A course left unbuilt for 90 days (a summer) loses its kept copies, so its next build needs the internet, and may get a newer version.",
-      "A scheduled deploy that meets a simulation for the first time with no internet stops at its hour with nobody there: preview once after adding a simulation, before scheduling."
+      "A scheduled deploy that meets a simulation for the first time with no internet stops at its hour with nobody there: preview once after adding a simulation, before scheduling.",
+      "The kept copies belong to one working folder on one computer: the builds folder is named by a hash of the working folder's path. A working folder moved or renamed, copied to a new computer, or opened on the other platform starts with nothing kept, so its next build that shows a simulation needs the internet, or stops (implementation review, 2026-11-13). Help says to preview once with the internet after moving a working folder or changing computers.",
+      "The stop's first line after a fault in the pass itself (notReady) is followed by the same `Not downloaded yet:` in the apps' sentence (stop.explained), though the copy may be kept and only the site's own files could not be written."
     ]
   },
   "phetFences": {
@@ -30591,6 +30629,41 @@
           "name": "a word that only starts with phet",
           "page": "```phetio\nsim: ph-scale\n```\n",
           "found": []
+        }
+      ]
+    },
+    "keys": {
+      "rule": "A simulation's card is looked up in the manifest by geogebraFences.keys' rule, REUSED: SHA-256 of the tidied fence body (figures.key_of in the build, figureRules.keyOf on the site's mdast code value in plantoirPhet.ts), the body read after the quote markers of its depth are taken off. Each case is the same fence in another place, so every key is the same. Run by scripts/test_phet.py and, through the site's own Markdown reader in Node, by scripts/check_phet_rules_against_the_site.py (verify.sh), with every fences case's count and line.",
+      "cases": [
+        {
+          "name": "at the top of the page",
+          "page": "```phet\nsim: gas-properties\nalt: A box of gas.\n```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "in a callout",
+          "page": "> [!note] Try it\n> ```phet\n> sim: gas-properties\n> alt: A box of gas.\n> ```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "in a list item",
+          "page": "1. Open this:\n\n   ```phet\n   sim: gas-properties\n   alt: A box of gas.\n   ```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "with tildes",
+          "page": "~~~phet\nsim: gas-properties\nalt: A box of gas.\n~~~\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "with Windows line endings",
+          "page": "```phet\r\nsim: gas-properties\r\nalt: A box of gas.\r\n```\r\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
+        },
+        {
+          "name": "in a quiz's explanation",
+          "page": "> [!quiz] What happens to the pressure?\n> - [x] It goes up\n> - [ ] It goes down\n>\n> > [!explain]\n> > ```phet\n> > sim: gas-properties\n> > alt: A box of gas.\n> > ```\n",
+          "key": "3da3e02ad799c5fc5a185af887f28392cd13818dba154c4a7ba08e54af58fa2f"
         }
       ]
     },
@@ -31030,8 +31103,68 @@
             "kept": true,
             "keptHasNo": "cloudflareinsights"
           }
+        },
+        {
+          "name": "PhET answers in a shape nobody foresaw",
+          "kept": false,
+          "phet": "oddAnswer",
+          "expect": {
+            "stop": "damaged",
+            "shown": 0,
+            "problems": [],
+            "kept": false
+          }
         }
-      ]
+      ],
+      "passFails": {
+        "rule": "A fault in the pass ITSELF, not in a download (an answer of a shape nobody foresaw that slips past the checks, a full disk, a folder that cannot be written): when any page students can see shows a simulation, the build STOPS with reason notReady (keptDownloads.stop.first.notReady), naming each simulation and page it can still find; with none, the build carries on, as nothing is missing. When the visibility rule itself fails, every Markdown file of the course is read as text for its fences. When even that cannot be told, the build stops naming nothing. Never only a console line: a site that says it built and shows a code block where the page promises a simulation is the fault the ruling's stop exists to prevent (implementation review, 2026-11-13). The console line before the stop gives the plain reason only (a full disk's words), never a path.",
+        "cases": [
+          {
+            "name": "the pass fails on a page that shows a simulation",
+            "fails": "prepare",
+            "pages": {
+              "Unit 3/Gas Laws.md": "Gases.\n\n```phet\nsim: gas-properties\nalt: Pump gas into a box.\n```\n"
+            },
+            "expect": {
+              "stop": "notReady",
+              "lines": [
+                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu.",
+                "   “gas-properties” on “Unit 3/Gas Laws”",
+                "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}"
+              ]
+            }
+          },
+          {
+            "name": "the pass fails and no page shows a simulation",
+            "fails": "prepare",
+            "pages": {
+              "Unit 1/Welcome.md": "Welcome to the course.\n"
+            },
+            "expect": {
+              "stop": null
+            }
+          },
+          {
+            "name": "the visibility rule itself fails, and the fences are read from the files",
+            "fails": "pages",
+            "pages": {
+              "Unit 3/Gas Laws.md": "~~~phet\nsim: gas-properties\n~~~\n"
+            },
+            "expect": {
+              "stop": "notReady",
+              "lines": [
+                "❌ SPH3U Section 1 was not built: a science simulation that its pages use could not be made ready on this computer, so nothing was changed. Build again; if it stops the same way, choose Report a Problem in the Help menu.",
+                "   “gas-properties” on “Unit 3/Gas Laws”",
+                "PLANTOIR_DOWNLOADED: {\"kind\":\"phet\",\"course\":\"SPH3U\",\"section\":1,\"failed\":1,\"reason\":\"notReady\"}"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "quizzes": {
+      "rule": "As geogebraFences.quizzes, for the same reason: a simulation works in a self-check question's QUESTION (before the choices) and in its EXPLANATION, and is REFUSED in a CHOICE (quizCallouts.words.problems.simulationInAChoice, in quizCallouts.recognise.order straight after sketchInAChoice), found by quizzes.py (a ```phet or ~~~phet fence opened inside an item of the quiz's boxed list, a callout in the item included) and by the site (quizRules.QuizModel.simulationInAChoice: a plantoirPhet node, or a phet code block the build could not show, inside an item of the first boxed list), whether or not the simulation itself can be shown, so the two agree. The cases are quizCallouts.recognise's aSimulationInAChoice, aSimulationInACalloutInAChoice and aSimulationInTheQuestion. A quiz page's search text reads a card as its description alone (withoutAnswers).",
+      "whyNotInAChoice": "A choice is a click target: its label wraps the box, so a tap on the simulation's button, or inside the simulation, would toggle the answer; and the shuffle moves the choices, which would reload a simulation a student had open."
     },
     "attribution": {
       "rule": "PhET's licence (https://phet.colorado.edu/en/licensing, read 2026-11-13): the simulations are CC BY-NC 4.0, free for any non-commercial use by students and educators, classroom use included, and a copy shared must carry `sentence` \"as close as possible to the point of use\", human-readable, unmodified (translations allowed). Under every card on screen: `sentence`, its licence name linked to licenceUrl (rel=license) and its address linked; on paper the same sentence as plain text. ABOUT.txt carries it with the copy. The PhET logo stays visible: the frame is never cropped (documentation/06 S).",
@@ -31073,9 +31206,8 @@
     "knownLimits": [
       "The attribution is in English on every page, French courses included (PhET allows a translation; none is written yet).",
       "A simulation's sounds play after a student touches it; nothing turns them off (it is part of the simulation, and not ruled on).",
-      "In a self-check question's choices a simulation is not refused, as a GeoGebra sketch is (geogebraFences.quizzes): a tap on its button may also choose the answer. Put a simulation in the question or the explanation.",
       "Obsidian shows the block as a code block (no Obsidian plugin reads ```phet).",
-      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Whether Netlify takes a long header whole is measured at the release gate (documentation/06 S)."
+      "Every simulation a site carries adds its inline scripts' hashes to the policy a Netlify publish sends with every file (scripts/netlify_badge.py): 22 for gas-properties, 20 for projectile-motion, none shared, about 1 KB a simulation (measured 2026-11-13). Whether Netlify takes a long header whole (twenty simulations' worth, 421 hashes, a 22,766-character line) is measured with a credentialed test site before this piece merges (documentation/07)."
     ]
   },
   "previewStartPage": {
@@ -33774,6 +33906,7 @@
         "twoAnswers",
         "choicesAndAnswer",
         "sketchInAChoice",
+        "simulationInAChoice",
         "oneChoice",
         "noCorrectChoice",
         "noAnswerLine",
@@ -34362,6 +34495,43 @@
           "quizzes": [
             {
               "problem": "sketchInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSimulationInAChoice",
+          "markdown": "> [!quiz] Which simulation shows a gas?\n> - [x] This one\n>   ```phet\n>   sim: gas-properties\n>   alt: A box of gas, in a choice.\n>   ```\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "simulationInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSimulationInACalloutInAChoice",
+          "markdown": "> [!quiz] Which simulation shows a gas?\n> - [x] This one\n>   > [!note] The simulation\n>   > ~~~phet\n>   > sim: gas-properties\n>   > alt: A box of gas, in a note in a choice.\n>   > ~~~\n> - [ ] Not this one\n",
+          "quizzes": [
+            {
+              "problem": "simulationInAChoice",
+              "line": 1
+            }
+          ],
+          "untouched": false
+        },
+        {
+          "name": "aSimulationInTheQuestion",
+          "markdown": "> [!quiz] Pump in more gas. What happens to the pressure?\n> ```phet\n> sim: gas-properties\n> alt: A box of gas, in a question.\n> ```\n> - [x] It goes up\n> - [ ] It goes down\n",
+          "quizzes": [
+            {
+              "kind": "single",
+              "correct": [
+                0
+              ],
+              "shuffle": false,
               "line": 1
             }
           ],
@@ -35107,6 +35277,7 @@
         "badTolerance": "answer line {n} has a ± that is not a number ± a number, like 3.14 ± 0.01",
         "unknownOption": "“{option}” is not a quiz setting - the only one is shuffle",
         "sketchInAChoice": "a GeoGebra sketch sits inside one of its choices, where dragging the sketch would pick that choice - put the sketch in the question, above the choices, or in its explanation",
+        "simulationInAChoice": "a PhET simulation sits inside one of its choices, where a tap on the simulation would pick that choice - put the simulation in the question, above the choices, or in its explanation",
         "choicesInHtml": "a line of HTML sits between the question and its choices, so the choices read as HTML - leave an empty `>` line after the HTML, or take it out",
       "notAtTopLevel": "it is inside a list or another callout - a quiz works only on its own, starting at the left edge of the page",
         "readDifferently": "the site and the folder check read this question differently - preview the site again, and if this line comes back, rewrite it from one of the patterns in the plantoir-quizzes skill"

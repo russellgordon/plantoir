@@ -71,7 +71,7 @@ ANALYTICS = (b'<script defer src="https://static.cloudflareinsights.com/beacon.m
 class FakePhet:
     """A local server answering as phet.colorado.edu does, in one of the
     contract's moods: answers, down, cutOff, wrongFile, notFound,
-    withAnalytics."""
+    withAnalytics, oddAnswer."""
 
     def __init__(self, mood="answers", sims=("gas-properties",)):
         self.mood = mood
@@ -108,6 +108,10 @@ class FakePhet:
                              "simulations": [{"name": sim, "localizedSimulations": {"en": {"title": sim}}}]}
                             for sim in sorted(self.sims | {"gas-properties", "projectile-motion"})]
                 return json.dumps({"projects": projects}).encode(), 200, None
+            if self.mood == "oddAnswer":
+                # The shape the implementation review measured reaching the
+                # pass's catch-all: `projects` holding a string.
+                return json.dumps({"projects": ["html/" + wanted]}).encode(), 200, None
             if self.mood == "notFound" or wanted not in self.sims:
                 return b'{"error": ["No sims found with the criteria provided"]}', 200, None
             return json.dumps({"projects": [{"name": f"html/{wanted}", "version": {"string": "1.1.12"},
@@ -188,6 +192,14 @@ class FenceTests(unittest.TestCase):
             with self.subTest(case["name"]):
                 found = [{"block": one["block"], "line": one["line"]} for one in phet.simulations_on_page(case["page"])]
                 self.assertEqual(found, case["found"])
+
+    def test_every_key_case(self):
+        # The site's half of these cases is scripts/check_phet_rules_against_the_site.py (verify.sh).
+        for case in rules("keys", "cases"):
+            with self.subTest(case["name"]):
+                found = phet.simulations_on_page(case["page"])
+                self.assertEqual(len(found), 1)
+                self.assertEqual(found[0]["key"], case["key"])
 
     def test_every_settings_case(self):
         for case in rules("settings", "cases"):
@@ -314,6 +326,15 @@ class KeptDownloadsTests(unittest.TestCase):
         self.assertEqual(first["folder"], second["folder"])
         leftovers = [entry.name for entry in (self.root / "phet" / "ph-scale").iterdir() if entry.name.startswith(".")]
         self.assertEqual(leftovers, [])
+
+    def test_a_version_folder_left_without_its_record_is_replaced(self):
+        store = kept_downloads.Store(self.root, "phet")
+        left = self.root / "phet" / "gas-properties" / "1.1.12"
+        left.mkdir(parents=True)
+        (left / "simulation.html").write_bytes(b"left half removed")
+        entry = store.put("gas-properties", "1.1.12", {"simulation.html": b"the real one"})
+        self.assertIsNotNone(entry)
+        self.assertEqual((entry["folder"] / "simulation.html").read_bytes(), b"the real one")
 
     def test_a_half_written_entry_is_never_read(self):
         store = kept_downloads.Store(self.root, "phet")
@@ -492,6 +513,15 @@ class PrepareTests(Scratch):
         self.assertEqual([note["reason"] for note in outcome["notes"]], ["notInThisLanguage"])
         self.assertTrue(any(line.startswith("plantoir: note: Unit 3/Gas Laws.md: phet block 1, line ") for line in lines))
 
+    def test_the_list_of_names_is_asked_once_however_many_names_are_wrong(self):
+        text = ("```phet\nsim: gas-propertys\nalt: A.\n```\n\n```phet\nsim: gas-propertiez\nalt: B.\n```\n"
+                "\n```phet\nsim: gaz-properties\nalt: C.\n```\n")
+        server = self.fake()
+        outcome, _ = self.prepare([page(text)], server.site())
+        self.assertEqual(len(outcome["problems"]), 3)
+        whole_list = [path for path in server.asked if "/services/metadata/" in path and "simulation=" not in path]
+        self.assertEqual(len(whole_list), 1)
+
     def test_a_name_phet_does_not_have_offers_the_closest(self):
         text = "```phet\nsim: gas-propertys\nalt: A box of gas.\n```\n"
         outcome, lines = self.prepare([page(text)], self.fake().site())
@@ -538,6 +568,59 @@ class BuildStopTests(Scratch):
         stop_at = source.index("_stop_for_phet(phet_here")
         for later in ("site_health.announce_or_stay_quiet(", "wire_quartz_additions(output_dir)", '"bootstrap-cli.mjs"'):
             self.assertLess(stop_at, source.index(later), later)
+
+
+class PassFailsTests(Scratch):
+    """phetFences.stop.passFails: a fault in the pass itself never gives a
+    build that reports success with its simulations missing."""
+
+    def test_every_pass_fails_case(self):
+        import contextlib
+        import io
+        import build_site
+        for case in rules("stop", "passFails", "cases"):
+            with self.subTest(case["name"]):
+                content = self.root / "content" / case["name"].replace(" ", "-").replace(",", "")
+                for relative, text in case["pages"].items():
+                    (content / relative).parent.mkdir(parents=True, exist_ok=True)
+                    (content / relative).write_text(text, encoding="utf-8")
+                (self.output / "quartz" / "static" / "phet" / "left").mkdir(parents=True, exist_ok=True)
+                real_prepare = phet.prepare
+                real_pages = phet.pages_students_see
+
+                def broken(*args, **kwargs):
+                    raise OSError(28, "No space left on device")
+
+                if case["fails"] == "prepare":
+                    phet.prepare = broken
+                else:
+                    phet.pages_students_see = broken
+                printed = io.StringIO()
+                try:
+                    with contextlib.redirect_stdout(printed):
+                        outcome = build_site._prepare_phet(content, self.output, self.root / "course", {},
+                                                           "SPH3U", 1)
+                finally:
+                    phet.prepare = real_prepare
+                    phet.pages_students_see = real_pages
+                expect = case["expect"]
+                self.assertEqual((outcome.get("stop") or {}).get("reason"), expect["stop"])
+                self.assertFalse((self.output / "quartz" / "static" / "phet").exists())
+                said = printed.getvalue()
+                self.assertIn("(No space left on device)", said)
+                self.assertNotIn(str(self.root), said)
+                if expect["stop"]:
+                    self.assertEqual(phet.stop_lines(outcome, "SPH3U", 1), expect["lines"])
+                    stopped = io.StringIO()
+                    with contextlib.redirect_stdout(stopped), self.assertRaises(SystemExit) as exit_code:
+                        build_site._stop_for_phet(outcome, "SPH3U", 1)
+                    self.assertEqual(exit_code.exception.code, 1)
+
+    def test_when_nothing_can_be_told_the_build_stops_naming_nothing(self):
+        def broken():
+            raise RuntimeError("no pages")
+        self.assertIsNone(phet.places_after_a_failed_pass(broken, self.root / "not-there" / "\0"))
+        self.assertEqual(phet.places_after_a_failed_pass(broken, self.root / "empty"), [])
 
 
 # ---- The folder problem --------------------------------------------------------------

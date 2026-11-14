@@ -3696,7 +3696,15 @@ and `scripts/test_phet.py` runs every case.
    PhET version reaches a site only after the kept one is pruned or its
    folder removed by hand; a course left unbuilt over the summer (close to
    90 days) needs the internet for its first build in September, and may get
-   a newer version.
+   a newer version; and the copies belong to ONE working folder on ONE
+   computer, since the builds folder is named by a hash of the working
+   folder's path, so a working folder moved or renamed, copied to a new
+   computer, or opened on the other platform starts with nothing kept, and
+   its next build that shows a simulation needs the internet, or stops.
+   Help says to preview once with the internet after moving a working folder
+   or changing computers. Rejected: keeping the copies inside the working
+   folder so they travel with it (they would sync to the teacher's cloud
+   drive and show in Obsidian; `keptDownloads.where.rejected`).
 5. **Asking** (`Fetcher`). https only, to the kind's own hosts; a redirect
    anywhere else is refused, so a school's sign-in page is not followed. A
    body larger than 20 MB, or shorter than its `Content-Length`, is refused
@@ -3718,10 +3726,34 @@ and `scripts/test_phet.py` runs every case.
    explanations lift it), then one indented line per place it is used
    (`“gas-properties” on “Unit 3/Gas Laws”`), at most ten and then
    `and N more`, then the marker. The apps turn the lines into one sentence
-   (`app-rules.json` → `failureExplanations`, four cases). A preview stops,
+   (`app-rules.json` → `failureExplanations`, five cases). A preview stops,
    a deploy stops, and a scheduled deploy stops at its hour with nobody
    there (`scheduledPublishStopped`'s line records it), which is why Help
    says to preview once after adding a simulation, before scheduling.
+
+   **A fault in the pass itself stops too** (`notReady`,
+   `phetFences.stop.passFails`). An answer of a shape nobody foresaw that
+   slips past the checks, a full disk, a folder that cannot be written: when
+   any page students can see shows a simulation, the build stops with
+   `keptDownloads.stop.first.notReady` ("could not be made ready on this
+   computer … choose Report a Problem in the Help menu"), naming each
+   simulation and page it can still find. When the visibility rule itself is
+   what failed, every Markdown file of the course is read as text for its
+   fences; when even that cannot be told, it stops naming nothing (`{what}`
+   is then the kind's several with no number). With no simulation on any
+   such page the build carries on, since nothing is missing. The console
+   line before it gives the plain reason only (a full disk's own words),
+   never a path. Found by the implementation review: until then the pass
+   caught every error, printed one console line and let the build make a
+   site with every phet block left as code, exit 0, which is the fault the
+   ruling's stop exists to prevent, reached by another road. GeoGebra's
+   catch-all, which the code had copied, is right for GeoGebra, whose ruling
+   is the opposite one. The answer shape the review measured reaching it
+   (`projects` holding a string) is now `damaged` in `PhetSite.metadata`
+   itself (`phetFences.stop` case "PhET answers in a shape nobody
+   foresaw"). Rejected: a folder problem in place of the stop (the site
+   would still build without the simulation), and reusing `damaged` (its
+   sentence tells a teacher with a full disk to reconnect).
 7. **The marker** `PLANTOIR_DOWNLOADED:` (`keptDownloads.marker`), one line
    per kind per build, only when something was downloaded or the build
    stopped: counts, bytes, seconds and a reason, never a page or a file of
@@ -3857,7 +3889,9 @@ places.** `scripts/phet.py` does everything that can fail; the contract is
     characters, sent with every file of the site. Each simulation adds about
     21 hashes (none shared between gas-properties and projectile-motion,
     measured by the planner). Whether Netlify takes a long header whole is
-    measured at the release gate with a test site (documentation/07); the
+    measured before this piece merges with a credentialed test site
+    (documentation/07): twenty simulations' worth, 421 hashes, a
+    22,766-character line; the
     fallback, if it does not, is to move each simulation's inline scripts
     into files beside it.
 13. **Image.** `scripts/` and `support/` change, so every working folder

@@ -48,7 +48,7 @@ This module is that ONE rule for every such kind, so #679 uses it unchanged:
   A kind's own checks decide `damaged`.
 
 Every rule a case can pin is in contracts/shared-rules.json ->
-keptDownloads, run by scripts/test_kept_downloads.py. The reasons, the
+keptDownloads, run by scripts/test_phet.py. The reasons, the
 measurements and what was rejected are in documentation/05-build-pipeline.md
 -> "Files downloaded when a page first uses them".
 """
@@ -313,6 +313,15 @@ class Store:
                 os.rename(hidden, target)
             except OSError:
                 # Another build kept it first: theirs is used, ours goes.
+                # Unless what is there has no record that checks (a folder
+                # left half removed): then it goes, and ours takes its place
+                # once, so a version is never blocked until the prune.
+                if self.get(name, version) is None:
+                    shutil.rmtree(target, ignore_errors=True)
+                    try:
+                        os.rename(hidden, target)
+                    except OSError:
+                        pass
                 shutil.rmtree(hidden, ignore_errors=True)
         except OSError:
             shutil.rmtree(hidden, ignore_errors=True)
@@ -363,8 +372,12 @@ def _filled(template: str, values: dict) -> str:
 
 
 def what(kind: str, count: int) -> str:
-    """'a science simulation', '3 science simulations' (keptDownloads.kinds)."""
+    """'a science simulation', '3 science simulations' (keptDownloads.kinds);
+    with no count (a stop that cannot name what is missing,
+    keptDownloads.stop, notReady), 'science simulations'."""
     said = rules("kinds", kind)
+    if count == 0:
+        return said["several"]
     if count == 1:
         return said["one"]
     return f"{count} {said['several']}"
@@ -392,7 +405,7 @@ def stop_lines(kind: str, course: str, section, missing: list, reason: str) -> l
     the apps lift into the sentence a teacher reads (app-rules.json ->
     failureExplanations), then one line per item and page, at most
     `listedAtMost`, then "and N more". `missing` is [{"item", "page"}] in the
-    order the pages were read; `reason` is offline or damaged.
+    order the pages were read; `reason` is offline, damaged or notReady.
     """
     stop = rules("stop")
     said = rules("kinds", kind)

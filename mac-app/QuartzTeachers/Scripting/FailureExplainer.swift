@@ -100,7 +100,7 @@ struct FailureExplainer {
     /// use and that could not be downloaded carries, whatever the reason
     /// (#674): `shared-rules.json` → `keptDownloads.stop.markerWords` and
     /// `markerWordsAlso`. Pinned to the contract by `AppRulesContractTests`.
-    static let keptDownloadsStopMarkers: [String] = ["was not built: ", "for the first time"]
+    static let keptDownloadsStopMarkers: [String] = ["was not built: ", "that its pages use"]
 
     /// `keptDownloads.stop.explained`: the lifted first line, then the place
     /// lines that follow it, each trimmed, joined with "; ".

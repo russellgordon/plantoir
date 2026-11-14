@@ -575,7 +575,7 @@ cost, measured 2026-11-13: gas-properties adds 22 hashes, projectile-motion
 20, none shared, so each simulation adds about 1 KB to a header Netlify
 sends with EVERY file of the site; a site with gas-properties alone wrote a
 policy line of 1,247 characters. Netlify's limit on one `_headers` value was
-not found documented. It is measured at the release gate, with a test site
+not found documented. It is measured before this piece merges, with a test site
 carrying twenty simulations' worth of hashes fetched back whole; if Netlify
 refuses or cuts it, the fallback is to move each simulation's inline scripts
 into files beside it at build. No host is added: a simulation loads no

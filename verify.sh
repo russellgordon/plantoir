@@ -1672,6 +1672,17 @@ else
   fail "a geogebraFences key or fence case reads differently through the site's own Markdown reader (scripts/check_geogebra_rules_against_the_site.py, #578)"
   cat /tmp/verify_geogebra_rules_site.log
 fi
+# #674: the key every PhET simulation's card is found by, through the SITE's
+# own Markdown reader in Node, as GeoGebra's above.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_phet_rules_against_the_site.py" /opt/scripts/check_phet_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_phet_rules_against_the_site.py \
+  >/tmp/verify_phet_rules_site.log 2>&1; then
+  pass "every phetFences key and fence case holds through the site's own Markdown reader: the site and the build find each simulation by the same key (scripts/check_phet_rules_against_the_site.py, #674)"
+else
+  fail "a phetFences key or fence case reads differently through the site's own Markdown reader (scripts/check_phet_rules_against_the_site.py, #674)"
+  cat /tmp/verify_phet_rules_site.log
+fi
 
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
 # pictureSizes.js (the file the site's transformer imports) reads every

@@ -2551,24 +2551,40 @@ def _prepare_phet(content_root: Path, output_dir: Path, course_dir: Path, config
     .downloaded/phet) or downloaded from PhET now and kept, and handed to the
     site's transformer. Answers phet.prepare's outcome; when that says
     `stop`, the caller STOPS the build before Quartz runs (phetFences.stop,
-    Russell's ruling of 2026-11-13). A fault in this pass itself never stops
-    a build: every fence stays a plain code block and the build says so.
+    Russell's ruling of 2026-11-13).
+
+    A fault in this pass ITSELF (an answer of a shape nobody foresaw, a full
+    disk) also stops the build when any page students can see shows a
+    simulation (phetFences.stop.passFails, reason notReady): carrying on
+    would make a site that says it built and shows a code block where the
+    page promises a simulation, the fault the ruling's stop exists to
+    prevent. With no simulation on any such page the build carries on, as
+    nothing is missing.
     """
-    try:
-        pages = phet.pages_students_see(
+    def list_pages():
+        return phet.pages_students_see(
             content_root, _is_draft,
             lambda page: _place_in_the_course(page, content_root),
             _vault_source_of, skip=_is_media_name)
+
+    try:
+        pages = list_pages()
         kept_root = kept_downloads.root_for(course_dir)
         return phet.prepare(pages, output_dir, kept_root,
                             course_locale=(config.get("locale") or "en-US"),
                             course=course_code, section=section_number)
     except Exception as error:
-        print(f"⚠️ Could not prepare the science simulations: {error}")
+        # The plain reason only (a full disk says so), never a path.
+        reason = error.strerror if isinstance(error, OSError) and error.strerror else type(error).__name__
+        print(f"⚠️ Could not prepare the science simulations ({reason}).")
         shutil.rmtree(output_dir / "quartz" / phet.WORKSPACE, ignore_errors=True)
         shutil.rmtree(output_dir / "quartz" / "static" / phet.SITE_FOLDER, ignore_errors=True)
+        places = phet.places_after_a_failed_pass(list_pages, content_root)
+        stop = None
+        if places is None or places:
+            stop = {"reason": "notReady", "missing": places or []}
         return {"counts": {phet.KIND: 0}, "problems": [], "notes": [], "simulations": 0, "shown": 0,
-                "downloaded": [], "fromBefore": [], "bytes": 0, "seconds": 0.0, "stop": None}
+                "downloaded": [], "fromBefore": [], "bytes": 0, "seconds": 0.0, "stop": stop}
 
 
 def _stop_for_phet(outcome: dict, course_code: str, section_number) -> None:

@@ -266,15 +266,25 @@ class PhetSite:
             raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected") from None
         if not isinstance(answer, dict) or not answer.get("projects"):
             return None
-        for project in answer["projects"]:
+        projects = answer["projects"]
+        if not isinstance(projects, list):
+            raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected")
+        for project in projects:
+            if not isinstance(project, dict) or not isinstance(project.get("simulations") or [], list):
+                raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected")
             for simulation in (project.get("simulations") or []):
+                if not isinstance(simulation, dict):
+                    raise kept_downloads.DownloadFailed("damaged", "PhET's answer was not what was expected")
                 if simulation.get("name") != sim:
                     continue
-                version = str((project.get("version") or {}).get("string") or "")
+                version_about = project.get("version")
+                version = str(version_about.get("string") or "") if isinstance(version_about, dict) else ""
                 project_name = str(project.get("name") or "")
                 if not kept_downloads.safe_name(version) or not re.match(r"^html/[a-z0-9-]+$", project_name):
                     raise kept_downloads.DownloadFailed("damaged", "PhET's answer named no version")
                 localized = simulation.get("localizedSimulations") or {}
+                if not isinstance(localized, dict):
+                    localized = {}
                 titles = {}
                 for locale, about in localized.items():
                     if isinstance(about, dict) and about.get("title"):
@@ -289,9 +299,11 @@ class PhetSite:
         except (kept_downloads.DownloadFailed, UnicodeDecodeError, ValueError):
             return []
         names = []
-        for project in answer.get("projects") or []:
-            for simulation in project.get("simulations") or []:
-                if simulation.get("name"):
+        projects = answer.get("projects") if isinstance(answer, dict) else None
+        for project in projects if isinstance(projects, list) else []:
+            simulations = project.get("simulations") if isinstance(project, dict) else None
+            for simulation in simulations if isinstance(simulations, list) else []:
+                if isinstance(simulation, dict) and simulation.get("name"):
                     names.append(str(simulation["name"]))
         return sorted(set(names))
 
@@ -582,8 +594,11 @@ def prepare(pages: list, output_dir, kept_root, course_locale="en-US", course=""
                     answers[sim]["fresh"] = True
             answer = answers[sim]
             if not answer["ok"] and answer["reason"] == "notFound":
-                near = difflib.get_close_matches(sim, answers.setdefault("\0names", phet_site.all_names()
-                                                                         if phet_site else []), n=3, cutoff=0.6)
+                # PhET's full list of names, asked once per build and only
+                # for a name it does not have (phetFences.download).
+                if "\0names" not in answers:
+                    answers["\0names"] = phet_site.all_names() if phet_site else []
+                near = difflib.get_close_matches(sim, answers["\0names"], n=3, cutoff=0.6)
                 outcome["problems"].append(_located(found, {
                     "reason": "simulationNotFound", "sim": sim, "blockLine": read["lines"].get("sim"),
                     "near": ", ".join(near)}))
@@ -665,6 +680,44 @@ def _unkept_entry(sim: str, answer: dict, output_dir) -> dict:
         (folder / name).write_bytes(data)
         files[name] = {"sha256": kept_downloads.sha256_of(data), "bytes": len(data)}
     return {"name": sim, "version": answer["version"], "folder": folder, "files": files, "about": answer["about"]}
+
+
+def places_after_a_failed_pass(list_pages, content_root):
+    """
+    Where the pages students can see use a simulation, for the stop a build
+    makes when the pass ITSELF failed (keptDownloads.stop, notReady;
+    phetFences.stop.passFails): [{"item", "page"}] in the order the pages
+    are read, [] when no page shows one (the build carries on), or None when
+    even that cannot be told (the build stops, naming nothing). Never
+    raises. `list_pages` is a callable answering pages_students_see's shape;
+    when it fails, every Markdown file under `content_root` is read as text,
+    so a fault in the visibility rule still never lets a promised
+    simulation go missing in silence.
+    """
+    try:
+        pages = list_pages()
+    except Exception:
+        pages = None
+    if pages is None:
+        try:
+            root = Path(content_root)
+            pages = []
+            for path in sorted(root.rglob("*.md")):
+                text = path.read_text(encoding="utf-8", errors="replace")
+                place = path.relative_to(root).with_suffix("").as_posix()
+                pages.append({"place": place, "text": text})
+        except Exception:
+            return None
+    try:
+        places = []
+        for page in pages:
+            for found in simulations_on_page(page["text"]):
+                sim = read_fence(found["body"])["settings"].get("sim")
+                if sim:
+                    places.append({"item": sim, "page": page["place"]})
+        return places
+    except Exception:
+        return None
 
 
 def stop_lines(outcome: dict, course: str, section) -> list:

@@ -466,6 +466,24 @@ function renderQuiz(
 const SKETCH_NODE = "plantoirGeoGebra"
 const SKETCH_LANGUAGE = "geogebra"
 
+// A PhET simulation anywhere inside a node (#674, phetFences.quizzes): the
+// "plantoirPhet" node the simulations' transformer leaves, or a ```phet
+// code block the build could not show, found the same way as a sketch.
+const SIMULATION_NODE = "plantoirPhet"
+const SIMULATION_LANGUAGE = "phet"
+
+function holdsSimulation(node: AnyNode): boolean {
+  if (node.type === SIMULATION_NODE || (node.type === "code" && node.lang === SIMULATION_LANGUAGE)) {
+    return true
+  }
+  for (const child of node.children ?? []) {
+    if (holdsSimulation(child)) {
+      return true
+    }
+  }
+  return false
+}
+
 function holdsSketch(node: AnyNode): boolean {
   if (node.type === SKETCH_NODE || (node.type === "code" && node.lang === SKETCH_LANGUAGE)) {
     return true
@@ -488,6 +506,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
   let blanks = blanksInTitle(titleHtml)
   let htmlChoices = false
   let sketchInAChoice = false
+  let simulationInAChoice = false
   for (const child of content?.children ?? []) {
     const kind = calloutKind(child)
     if (child.type === "list") {
@@ -499,6 +518,9 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
             choices.push(item.checked === true ? true : item.checked === false ? false : null)
             if (holdsSketch(item)) {
               sketchInAChoice = true
+            }
+            if (holdsSimulation(item)) {
+              simulationInAChoice = true
             }
           }
         }
@@ -523,6 +545,7 @@ function modelOf(quiz: AnyNode, source: string[]): QuizModel {
     blanks,
     htmlChoices,
     sketchInAChoice,
+    simulationInAChoice,
   }
 }
 

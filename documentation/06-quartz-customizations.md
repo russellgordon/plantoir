@@ -5243,7 +5243,29 @@ a box of the simulation's own shape holding its picture, the title in the
 page's language, the description, the button `words.site.open` with the
 gzipped size ("about 1 MB" for gas-properties), the print note and PhET's
 credit line. A fence the manifest does not know stays the code block it
-was.
+was. The manifest is keyed by `figures.key_of` in the build and
+`figureRules.keyOf` on the site's mdast code value, GeoGebra's rule reused;
+`phetFences.keys` holds the same fence at the top of a page, in a callout,
+in a list item, with tildes, with Windows line endings and in a quiz's
+explanation, run by `test_phet.py` and, through the site's own Markdown
+reader in Node, by `scripts/check_phet_rules_against_the_site.py`
+(verify.sh, beside GeoGebra's check). The plan named that check and the
+first implementation left it out; the implementation review found the gap
+(a callout fence the two read differently would build as "ready" and show
+as code, with no folder problem), and it was put back.
+
+**In a self-check question** (`phetFences.quizzes`), as for a sketch: a
+simulation works in the question and in the explanation, and one inside a
+choice makes the quiz `simulationInAChoice` (a folder problem and a
+not-ready quiz), found by `quizzes.py` and by the site's `modelOf`
+(`holdsSimulation`: a `plantoirPhet` node, or a ` ```phet ` code block the
+build could not show) alike. A choice is a click target, so a tap on the
+simulation would pick it, and the shuffle moves the choices, which would
+reload a simulation a student had open. The cases are
+`quizCallouts.recognise`'s `aSimulationInAChoice`,
+`aSimulationInACalloutInAChoice` and `aSimulationInTheQuestion`, which
+verify.sh 6k plants with the others. Must-fail: `quizzes.py` from before the
+check gives the two refusals as working questions.
 
 ### S3. A tap
 
@@ -5305,11 +5327,9 @@ was written).
 - A simulation's sounds play after a student touches it (part of the
   simulation; not ruled on). The rendered check holds every frame's audio
   suspended.
-- In a self-check question's choices a simulation is not refused, as a
-  GeoGebra sketch is (`geogebraFences.quizzes`): a tap on its button may
-  also choose the answer.
 - Each simulation adds about 21 hashes (about 1 KB) to the policy a Netlify
-  publish sends with every file of the site (documentation/07).
+  publish sends with every file of the site (documentation/07). Whether
+  Netlify serves a long one whole is measured before this piece merges.
 
 ## E. Summary: what is *not* customized
 

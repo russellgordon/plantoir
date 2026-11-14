@@ -2185,10 +2185,17 @@
    },
    "windows": null
   },
+  "problemsTabKindScienceSimulation": {
+   "label": "Science simulation",
+   "mac": {
+    "say": "shared-rules#sectionProblems.kinds[15].label"
+   },
+   "windows": null
+  },
   "problemsTabKindFileTooLarge": {
    "label": "File too large",
    "mac": {
-    "say": "shared-rules#sectionProblems.kinds[15].label"
+    "say": "shared-rules#sectionProblems.kinds[16].label"
    },
    "windows": null
   },

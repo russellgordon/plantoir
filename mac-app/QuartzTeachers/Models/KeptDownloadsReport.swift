@@ -35,7 +35,8 @@ struct KeptDownloadsReport: Equatable {
     /// site could not be downloaded` event's `whyWords`.
     nonisolated static let whyWords: [String: String] = [
         "offline": "no internet connection, or the download stopped",
-        "damaged": "what arrived was not what was asked for, and was thrown away"
+        "damaged": "what arrived was not what was asked for, and was thrown away",
+        "notReady": "something on this computer went wrong while making it ready"
     ]
 
     let kind: String
@@ -46,7 +47,8 @@ struct KeptDownloadsReport: Equatable {
     let bytes: Int64
     let seconds: Double
 
-    /// Why it stopped (offline or damaged), or nil when it downloaded.
+    /// Why it stopped (offline, damaged or notReady), or nil when it
+    /// downloaded.
     let reason: String?
 
     let course: String?
@@ -62,10 +64,14 @@ struct KeptDownloadsReport: Equatable {
         return .filesForTheSiteCouldNotBeDownloaded
     }
 
-    /// 'a science simulation' or '3 science simulations'.
+    /// 'a science simulation' or '3 science simulations'; with no count (a
+    /// stop that could not name what was missing), 'science simulations'.
     nonisolated var what: String {
         let words: (one: String, several: String) = KeptDownloadsReport.kindWords[kind]
             ?? KeptDownloadsReport.unknownKindWords
+        if count == 0 {
+            return words.several
+        }
         if count == 1 {
             return words.one
         }
