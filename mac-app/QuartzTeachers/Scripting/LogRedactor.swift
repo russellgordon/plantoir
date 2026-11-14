@@ -56,9 +56,10 @@ nonisolated enum LogRedactor {
     /// credential. Cloudflare API tokens are 40 characters.
     static let secretLength: Int = 40
 
-    /// **Redacting twice changes nothing (#780).** The two rules that take
-    /// whatever follows a label (`labelledSecret`, `bearerHeader`) do not
-    /// take a value that is already a placeholder, `(?!\[removed: )`. Before
+    /// **Redacting twice changes nothing (#780).** The rules that take
+    /// whatever follows a label (`labelledSecret`, `bearerHeader`, and since
+    /// #853 `basicAuthHeader` and `userFlag`) do not take a value that is
+    /// already a placeholder, `(?!\[removed: )`. Before
     /// that, a line redacted at its call site and again by the trail writer
     /// (`ScriptRunner`'s "started …" line is one) read
     /// `token=[removed: token] token]`; the trail writer now redacts twice
@@ -83,9 +84,17 @@ nonisolated enum LogRedactor {
         // A username and password written into an address (#709): before
         // the email rule, which would otherwise take the password and the
         // host for an address and leave the username behind.
+        //
+        // Any scheme, not only http and https (#853: `ftp://` left its
+        // username behind). The password may hold a raw `/` and, unless it
+        // starts with a digit, single spaces. The digit exception is a
+        // port: `http://localhost:8081 ready; write to someone@school…`
+        // would otherwise lose everything up to the address (measured on an
+        // invented trail). A password that starts with a digit is still
+        // taken whole up to the `@` when it holds no space.
         RedactionRule(
             name: "urlUserinfo",
-            pattern: #"(?i)(https?://)[^/\s:@]+:[^/\s@]+@"#,
+            pattern: #"(?i)\b([a-z][a-z0-9+.\-]*://)[^/\s:@]+:(?:(?=\d)[^\s@]+|(?!\d)[^\s@]+(?: [^\s@]+)*)@"#,
             replacement: "$1" + removedToken + "@"
         ),
         RedactionRule(
@@ -106,9 +115,30 @@ nonisolated enum LogRedactor {
         // A Basic Authorization header (#709): the base64 of a unit plan's
         // username and password. Anchored on the header's own name, so
         // "Basic French" in a course title is left alone (review L4).
+        //
+        // The header's name and value may each sit in quotes, and the name
+        // may be followed by `=` (#853): a JSON dump of request headers,
+        // `"Authorization": "Basic …"`, and a Python one,
+        // `'Authorization': 'Basic …'`, both went through whole. A value
+        // that is already a placeholder is left alone, as in the two label
+        // rules above: before that, redacting twice wrote
+        // `Basic [removed: token] token]`.
         RedactionRule(
             name: "basicAuthHeader",
-            pattern: #"(?i)(\bAuthorization:\s*Basic\s+)\S+"#,
+            pattern: #"(?i)(\bAuthorization["']?\s*[:=]\s*["']?\s*Basic\s+)(?!\[removed: )\S+"#,
+            replacement: "$1" + removedToken
+        ),
+        // A username and password handed to a command line's `-u` or
+        // `--user` (#853), the way curl takes them. Only a value holding a
+        // colon goes: a bare `-u name` holds no password (curl asks for
+        // it), and `git push -u origin …` holds no colon. A quoted value is
+        // taken to its closing quote, spaces and all. The flag is kept, so
+        // the line still says a user was given. `-u` may close a run of
+        // short flags (`-su`), and it is not read inside a word or after a
+        // second dash.
+        RedactionRule(
+            name: "userFlag",
+            pattern: #"(?<![\w\-])((?:-[A-Za-z]*u\s*|--user(?:=|\s+)))(?!\[removed: )(?:'[^'\n]*:[^'\n]*'|"[^"\n]*:[^"\n]*"|[^\s:'"]+:\S+)"#,
             replacement: "$1" + removedToken
         ),
         RedactionRule(

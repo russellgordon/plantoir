@@ -516,8 +516,8 @@ final class SharedRulesContractTests: XCTestCase {
             }
         }
         XCTAssertEqual(
-            assembledCount, 3,
-            "the Basic header case, the address with a username and password in it, and the tripwire that only a filled template passes"
+            assembledCount, 10,
+            "#709 and #844's three (the Basic header, the address with a username and password in it, the tripwire that only a filled template passes) and #853's seven (two quoted Basic headers, two user flags, ftp, a slash and a space in a password)"
         )
 
         // The header really is the base64 of the pair, so the Basic case is
