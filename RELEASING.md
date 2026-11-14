@@ -531,8 +531,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    other, added to the shared list under `wrangler` with its reason, and
    told to the mac in a `mac` issue, because the list moved under it.
 
-   **If the release changes anything under `scripts/`, the Dockerfile or a
-   launcher, run the publishing verifier rather than smoking it by hand** —
+   **Every release runs the publishing verifier on the mac, because it is
+   where the really deployed sites are opened in Chrome and in Safari's
+   engine** (#597; the owner, 2026-10-19: "checking … in Chrome and Safari"
+   with each cut, against both hosts). Before #597 the rule was narrower,
+   and it still holds on its own: **if the release changes anything under
+   `scripts/`, the Dockerfile or a launcher, run the publishing verifier
+   rather than smoking it by hand** —
    `verify-deploy.ps1` on Windows, `./verify-deploy.sh` on the mac. It is the
    automation this step used to ask for in prose: it publishes to all three
    destinations (Netlify, Cloudflare Pages, a folder — different code paths
@@ -542,8 +547,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    having copied the wrong thing or nothing.
 
    > **Require a run with nothing skipped.** A destination with no credentials
-   > on the machine is skipped and the run still exits 0 — correct for everyday
-   > use, wrong for a release. Read the summary line: `passed, failed, skipped`.
+   > on the machine is skipped. Until #597 the run then still exited 0; now
+   > the rendered check fails that host as not reached, so a run without
+   > Netlify's or Cloudflare's credentials exits 1. Read the summary line:
+   > `passed, failed, skipped`.
    > A cut is the moment "Cloudflare was skipped on that laptop" stops being
    > acceptable, so get the credentials on the machine and run it again.
    >
@@ -587,17 +594,64 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > reuses a project of the same name, which is why the surname is random
    > on each run.
    >
+   > **Both runs include the rendered check on every host** (#597, "Rendered
+   > in Chrome and in Safari's engine, on every host"): the fixture pages from
+   > `browser-checks/fixtures/rendered/` are planted into the course (removed
+   > on any exit) and `browser-checks/rendered_features.mjs` opens each
+   > host's site in Chrome for Testing and in Safari's engine, both REQUIRED.
+   > Fetch the engines once per Mac with `./browser-checks/fetch-browsers.sh`
+   > (Node 22). The Result block's "Rendered in Chrome and in Safari's engine,
+   > per host" lines must read **checked** for BOTH hosts, Netlify and
+   > Cloudflare Pages; one `checked` and one anything else is a failed run: "FAILED" means the rendered check did not pass or the host's leg
+   > failed before it (said even when the browsers then passed), and "NOT
+   > REACHED" means the host gave no address (no credentials, or a publish
+   > that printed none). Both are failures of the run. A row the check had to
+   > run twice is named there as answered on retry (#762); read those. The
+   > **expected failures** below them are what a deployed site still asks of
+   > other hosts (Google's fonts, cdnjs for Mermaid), counted, never a pass;
+   > #566 removes them, and a listed host that no page asks any more is a
+   > failure that says to shorten the list in
+   > `browser-checks/rendered_rows.json` → `thirdPartyHostsToday`. Each listed
+   > host is pinned to its pages and paths there, and the count is compared
+   > with a pinned number, so a new page or a new path asking one is a
+   > failure too. After the rendered check, each host is deployed once more
+   > to settle and then a SECOND time with nothing changed, which must build
+   > nothing and upload nothing ("A second deploy with nothing changed, per
+   > host", #892; a deploy that exits other than 0 fails it), and each leg's
+   > live front page must name its own host in `og:image` (#799), or the
+   > custom domain `course_config.json` records for that destination when
+   > there is one. A Cloudflare course that also has a Netlify record must
+   > build for its own address (#892's shape, fixed by #799); where it does
+   > not, Cloudflare is red on both and the line says so by name: that red
+   > is real. The cold
+   > visits in Safari's engine (#625: typed cold, from the front page, Python
+   > to Swift) are in the measured lines on every run. Paste the per-host
+   > lines and the expected-failure count into the release's record.
+   > `documentation/07-deployment.md` → "Rendered in two browsers, on the
+   > deployed sites (#597)".
+   >
    > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
    > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline, no
-   > credentials, about 75 s on the mac and about 30 s on Windows: it proves
+   > credentials, about 2 minutes on the mac and about 30 s on Windows: it proves
    > the wait for Cloudflare's production address against a stub, so a real
    > run's Cloudflare lines can be trusted, and (since #740 on the mac, #743
    > on Windows) that a first-publish run retries a brand-new site's files
    > for up to 60 s before failing one. Since #869 on the mac, the same goes
    > for its pages: the page of runnable code, the page and front-page
    > headers, and the page links. The run's Result block counts the
-   > retries. It reads 25 passed, 0 failed on the mac, and 13 passed,
-   > 0 failed on Windows until Windows has #869's cases.
+   > retries. Since #762 a plain run asks a just-uploaded file or page
+   > again too (once after 10 s, then until 60 s), counted as answered on
+   > retry; a file that stays wrong is still the failure. Since #597 it also
+   > judges the rendered check per host against a stub checker: a leg that
+   > failed before the browsers, a host not reached, a skipped engine, a row
+   > answered on retry, an expected failure that stopped, an old Node, a
+   > checker that could not run, a re-run that fails again, expected
+   > failures off their pinned count, and the second deploy's and the
+   > sharing card's judgements (#892, #799, a custom domain included), a
+   > refused frame inside an embed set aside, and a host serving an earlier
+   > deployment. It reads 62 passed, 0 failed on
+   > the mac (about 2 minutes), and 13 passed, 0 failed on Windows until
+   > Windows has #869's, #762's, #597's and #892's cases.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,

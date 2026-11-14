@@ -4944,17 +4944,21 @@ works when a student's press reaches it, in **Chrome for Testing and in
 Playwright's WebKit build** (Safari's engine), and that the page reported
 nothing and asked nothing of a host it should not. This piece (597a) runs it
 locally in `verify.sh`; the second half of #597 runs the same file against
-the deployed test sites on every host in a list.
+the deployed test sites on every host in a list, where the hosts the site
+still asks today are counted expected failures and the cold visit takes
+#625's two routes as well (documentation/07-deployment.md → "Rendered in two
+browsers, on the deployed sites (#597)").
 
 **The pieces.**
 
 | File | What it is |
 |---|---|
 | `browser-checks/rendered_features.mjs` | the checker: `--site <folder>` serves a built site itself, `--base <url/> --host <name>` reads a deployed one; `--expect-red <sabotage>\|all` proves the rows see |
-| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host. Data both platforms run |
+| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host, `refusedByDesign`. Data both platforms run |
 | `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
 | `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
 | `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
+| `browser-checks/lib/refused_by_design.mjs` | tells a refusal the policy makes on purpose (Netlify's badge, sent to browsers only) from the site's own script refused; `test_refused_by_design.mjs` beside it |
 | `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
 | `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
 | `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
@@ -4987,7 +4991,50 @@ Waits are on the state asked about, with a ceiling.
   any page through, implementation review H1; measured: a frame from
   example.com on the Quiz page was green in both engines). The Embeds page is
   judged like every other: until the fixes review (F2) the own-host row
-  skipped it, so that rule decided nothing.
+  skipped it, so that rule decided nothing. On a deployed site (`--base`)
+  the `thirdPartyHostsToday` hosts still go through the router, but each is
+  an EXPECTED line rather than allowed, and a listed host no page asked is
+  a failure (`browser-checks/lib/expected_failures.mjs`, #597's second half).
+- **A teacher's embed's own console is set aside** (#597's second half,
+  measured 2026-11-13 on the Embeds page under `--base`): a console line
+  that names, or comes from, a request an embed made, a page error thrown
+  by an embed's own script (the first address its stack names), and an
+  embed's own failed request are counted in the clean-page row's line and
+  not judged; the embeds row judges the frames themselves. Without it the
+  row failed both engines on YouTube's advert requests, Vimeo's and PhET's
+  fullscreen checks and GeoGebra reaching for the page.
+- **A refusal the site's policy makes on purpose is set aside, by what it
+  is, never by its words alone** (#597's second half, the first deployed
+  run, 2026-11-13). Netlify adds its badge as an inline script on a page's
+  way to a browser, and the policy `netlify_badge.py` writes refuses it by
+  design, one refusal a page in both engines. `rendered_rows.json` →
+  `refusedByDesign` names the host and the two engines' wordings, and
+  `browser-checks/lib/refused_by_design.mjs` sets a line aside only on a page
+  holding a refused inline script that is in some document the page was
+  sent, as the browser received it, and in no document fetched again at the
+  same address without a browser's User-Agent; the site's own refused
+  script, or one its scripts made, fails the row, so a policy that lost a
+  hash is still red. The refusals are counted page by page: at most one
+  such script a document (`refusedScriptsPerDocument`) and exactly one
+  message for each (`linesPerRefusedScript`, WebKit's two records of one
+  message counted once), so a second injected script, a refusal more than
+  the scripts account for, or one fewer fails the page and names the count
+  (597b fix review, d1; measured on a stand-in edge: Tasks 3, Embeds 2,
+  every other page 1, in both engines). What is set aside is an EXPECTED
+  line of the clean-page row, with each page's count, never a pass. Its node test runs in `verify-deploy.sh --self-test`;
+  documentation/07-deployment.md has the measurements.
+- **A row that takes the page elsewhere waits for the page's own index
+  request first.** Quartz fetches `static/contentIndex.json` as a page loads
+  and nothing catches it, so a reload that cancels it makes WebKit throw
+  "TypeError: Load failed" into the page (measured with 0.5 s of latency;
+  the first deployed run's Cloudflare red). The tasks reload, the progress
+  row's next page and the embeds reload each wait on the page's `fetchData`
+  promise first (`untilTheIndexHasArrived`, 30 s ceiling,
+  `browser-checks/lib/index_wait.mjs`), the real dependency rather than a
+  fixed sleep or a network-idle guess. Reaching the ceiling is never silent
+  (597b fix review, d2): the row's line says so with a count, the checker
+  prints a `NOTE: index wait` line for it, and `verify-deploy.sh` carries
+  that line into its Result block.
 - **Until the page is quiet.** Before a page is judged it is scrolled to its
   end a window at a time, so what loads only below the fold is asked for,
   then held until it has asked for nothing for a second and at least 5 s

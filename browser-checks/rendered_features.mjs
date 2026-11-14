@@ -28,8 +28,16 @@
 // input gets), on [::1] (GeoGebra's rule). Write the _headers first, the way
 // a Netlify publish does (verify.sh does, on a copy).
 //
-// Every line is `OK: <row> [<engine>]: …`, `FAIL: …` or `SKIPPED: …`.
-// Exit 0 when every row asked for passed in every engine asked for; 1 when
+// Every line is `OK: <row> [<engine>]: …`, `FAIL: …`, `SKIPPED: …` or, on a
+// deployed site only, `EXPECTED: …`: the own-host row there allows no other
+// host at all (the owner, 2026-11-13), so each host the site still asks
+// today (rendered_rows.json -> thirdPartyHostsToday, which #566 empties) is
+// an expected failure, printed and counted, never a pass; a listed host no
+// page asked any more is a FAILURE that says to shorten the list
+// (lib/expected_failures.mjs, #597's second half). On a deployed site the
+// cold visit also takes the two routes of #625's sightings, by a real press.
+// Exit 0 when every row asked for passed in every engine asked for (an
+// EXPECTED line does not change it); 1 when
 // anything FAILED (a missing engine never hides a failure); 3 when nothing
 // failed but an engine, or the network a row needs, was not there (a SKIP
 // the caller reports by name, never a pass). PLANTOIR_REQUIRE_ENGINES=
@@ -51,6 +59,10 @@ import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { outsidePins, pinnedButNotAsked, sortAsked, stoppedFailing } from "./lib/expected_failures.mjs"
+import { whoseRefusal } from "./lib/frame_refusals.mjs"
+import { INDEX_WAIT_CEILING_MS, indexWaitNote, untilFetchDataSettles } from "./lib/index_wait.mjs"
+import { byDesignFor, judgeRefusals, refusalMessages, runsAsScript, sortRefusedScripts } from "./lib/refused_by_design.mjs"
 import { startSiteServer } from "./lib/site_server.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -341,7 +353,7 @@ async function openContext(browser, engine, origin, pageName) {
   if (engine === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin }).catch(() => {})
   }
-  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine }
+  const record = { offSite: [], aborted: new Set(), console: [], pageErrors: [], refused: [], mixed: [], engine, embedUrls: new Set(), embedLines: 0, frameRefusals: [], ownFrames: [], nestedFrames: [], documents: [], indexWaitsGaveUp: 0 }
   await context.exposeBinding("__plantoirRenderedTell", (source, kind, told) => {
     let url
     try {
@@ -355,6 +367,7 @@ async function openContext(browser, engine, origin, pageName) {
   const siteHost = new URL(origin).host
   const allowed = new Set(ROWS.thirdPartyHostsToday.hosts)
   const embedHosts = new Set(pageName === "Embeds" ? (ROWS.rows.find((row) => row.name === "embeds")?.allowedFrames ?? []) : [])
+  record.embedHosts = embedHosts
   // A WebSocket from the page, in both engines (from a worker: WORKER_WATCH).
   await context.routeWebSocket(/.*/, (socket) => {
     let url
@@ -397,6 +410,18 @@ async function openContext(browser, engine, origin, pageName) {
       return route.continue()
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return route.continue()
+    // Which frames the page asked for: its own (a child of the page) and
+    // those inside an embed, so a "Refused to display" line can be told
+    // apart (lib/frame_refusals.mjs, 597b fix review MINOR 2). Asked before
+    // either engine logs the refusal, which follows the frame's response.
+    try {
+      if (request.isNavigationRequest() && request.frame().parentFrame() !== null) {
+        if (request.frame().parentFrame().parentFrame() === null) record.ownFrames.push(request.url())
+        else record.nestedFrames.push(request.url())
+      }
+    } catch {
+      // A worker's request has no frame, and is no frame's document.
+    }
     // When the page last asked for anything: the quiet period before the
     // judging waits on it (fixes review F3).
     record.lastRequestAt = Date.now()
@@ -414,7 +439,11 @@ async function openContext(browser, engine, origin, pageName) {
       // Nothing plays, but a sound or a film asked of another host is still
       // the site asking another host (fixes review F4), so it is recorded
       // first, a teacher's embed's included as one.
-      if (url.host !== siteHost) record.offSite.push({ host: url.host, path: url.pathname, fromEmbed: embedOf(request, url), kind: "media" })
+      if (url.host !== siteHost) {
+        const fromEmbed = embedOf(request, url)
+        record.offSite.push({ host: url.host, path: url.pathname, fromEmbed, kind: "media" })
+        if (fromEmbed) record.embedUrls.add(request.url())
+      }
       record.aborted.add(request.url())
       return route.abort()
     }
@@ -455,6 +484,9 @@ async function openContext(browser, engine, origin, pageName) {
     }
     const fromEmbed = embedOf(request, url)
     record.offSite.push({ host: url.host, path: url.pathname, fromEmbed, kind: request.isNavigationRequest() ? "frame" : "request" })
+    // What a teacher's embed asks for is the embed's own business: what it
+    // then says to the console is set aside by these addresses (watchPage).
+    if (fromEmbed) record.embedUrls.add(request.url())
     if (fromEmbed || allowed.has(url.host)) return route.continue()
     // Recorded and refused: nothing the site should not ask for leaves this Mac.
     record.aborted.add(request.url())
@@ -464,12 +496,52 @@ async function openContext(browser, engine, origin, pageName) {
 }
 
 function watchPage(page, record) {
+  // Each document the page was sent (its first load, a row's reload or its
+  // next page), as the browser received it with its policy, for the refusals
+  // the site's policy makes on purpose (rendered_rows.json -> refusedByDesign).
+  page.on("response", (response) => {
+    const request = response.request()
+    if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) return
+    record.documents.push(Promise.all([response.text(), response.headerValue("content-security-policy")])
+      .then(([body, policy]) => ({ url: response.url(), body, policy: policy ?? "" }), () => null))
+  })
+  // Said by, or about, something a teacher's embed asked for (a provider's
+  // own script, an advert it could not reach, its own document): the
+  // embed's console, not the site's (measured 2026-11-13 on the Embeds
+  // page: YouTube's advert requests refused by this Mac's resolver, Vimeo's
+  // permissions-policy line, Cloudflare's beacon inside PhET's frame).
+  // Counted and said by the clean-page row; the embeds row judges the
+  // frames themselves.
+  const saidByAnEmbed = (text, at) => record.embedUrls.size > 0
+    && (record.embedUrls.has(at) || Array.from(record.embedUrls).some((url) => text.includes(url)))
   page.on("console", (message) => {
     const text = message.text()
+    const at = message.location()?.url ?? ""
+    // A frame the provider refuses to be shown in (X-Frame-Options): students
+    // see a blank box. A frame of the page itself is never the embed's own
+    // business: the embeds row fails on it and the clean-page row keeps the
+    // line (597b review finding 1, measured: the frame's navigation answers
+    // 200 in both engines, then this line in both). A refused frame INSIDE an
+    // embed is set aside and counted, as the request half below sets it
+    // aside (597b fix review MINOR 2). This line does not carry
+    // frame-ancestors in either engine; the failed document below does.
+    const refused = /Refused to display '([^']+)' in a frame/.exec(text)
+    if (refused && whoseRefusal(refused[1], record.ownFrames, record.nestedFrames) === "embed") {
+      record.embedLines += 1
+      return
+    }
+    if (refused) {
+      record.frameRefusals.push({ url: refused[1], why: text.slice(0, 200) })
+      record.console.push(text)
+      return
+    }
+    if ((message.type() === "error" || /Mixed Content|Refused to /i.test(text)) && saidByAnEmbed(text, at)) {
+      record.embedLines += 1
+      return
+    }
     if (/Mixed Content/i.test(text)) record.mixed.push(text)
     if (/Refused to /.test(text)) record.refused.push(text)
     if (message.type() !== "error") return
-    const at = message.location()?.url ?? ""
     if (record.aborted.has(at)) return
     for (const aborted of record.aborted) {
       if (text.includes(aborted)) return
@@ -477,9 +549,48 @@ function watchPage(page, record) {
     // A resource that failed is named by the message's place, not its words.
     record.console.push(at && !text.includes(at) ? `${text} (${at})` : text)
   })
-  page.on("pageerror", (error) => record.pageErrors.push(String(error?.message ?? error)))
+  page.on("pageerror", (error) => {
+    // Thrown inside a teacher's embed (measured 2026-11-13: GeoGebra's,
+    // Vimeo's and PhET's own scripts reaching for the page that holds them,
+    // and their fullscreen checks): it was thrown by the embed's own
+    // script, the first one its stack names. Set aside and counted, as the
+    // embed's console lines are.
+    const thrower = (String(error?.stack ?? "").match(/https?:\/\/[^\s()]+?(?=:\d+:\d+)/) ?? [])[0]
+    let fromEmbed = false
+    try {
+      fromEmbed = Boolean(thrower) && (record.embedUrls.has(thrower) || record.embedHosts.has(new URL(thrower).host))
+    } catch {
+      fromEmbed = false
+    }
+    if (fromEmbed) {
+      record.embedLines += 1
+      return
+    }
+    record.pageErrors.push(String(error?.message ?? error))
+  })
   page.on("requestfailed", (request) => {
     if (record.aborted.has(request.url())) return
+    // A frame's own document that failed after it answered (Chromium:
+    // net::ERR_BLOCKED_BY_RESPONSE for a refused frame) is the embeds row's
+    // failure, never set aside.
+    let frameDocument = false
+    try {
+      // A frame of the page itself, not one inside an embed (an advert frame
+      // a provider opens is the embed's own business).
+      frameDocument = request.isNavigationRequest() && request.frame().parentFrame() === page.mainFrame()
+    } catch {
+      frameDocument = false
+    }
+    if (frameDocument) {
+      const why = request.failure()?.errorText ?? ""
+      record.frameRefusals.push({ url: request.url(), why })
+      if (/BLOCKED|blocked/.test(why)) record.refused.push(`${request.url()} (${why})`)
+      return
+    }
+    if (record.embedUrls.has(request.url())) {
+      record.embedLines += 1
+      return
+    }
     const why = request.failure()?.errorText ?? ""
     if (/BLOCKED|blocked/.test(why)) record.refused.push(`${request.url()} (${why})`)
   })
@@ -500,6 +611,15 @@ async function openPage(context, record, url) {
   await page.goto(url, { waitUntil: "load", timeout: 60000 })
   record.loadedAt = Date.now()
   return page
+}
+
+// Before a row takes the page somewhere else (a reload, the next page): until
+// the page's own request for the site's search index has answered, with a
+// ceiling (lib/index_wait.mjs says why, and what was measured). Reaching the
+// ceiling is counted on the record, and the row's line says so (runPage).
+async function untilTheIndexHasArrived(page, record) {
+  const answer = await page.evaluate(untilFetchDataSettles, INDEX_WAIT_CEILING_MS).catch(() => null)
+  if (answer === "gave up") record.indexWaitsGaveUp += 1
 }
 
 const ROW_CHECKS = {}
@@ -744,13 +864,15 @@ ROW_CHECKS.tasks = async ({ page, context, record, base }) => {
   if (await box.isChecked()) return { fail: "the first box was ticked before anyone pressed it" }
   await box.click({ timeout: 10000 })
   if (!(await box.isChecked())) return { fail: "the box did not tick when pressed" }
+  await untilTheIndexHasArrived(page, record)
   await page.reload({ waitUntil: "load" })
   const kept = await waitInPage(page, () => document.querySelector("input.plantoir-task")?.checked === true, 5000)
   if (!kept) return { fail: "a tick did not survive a reload" }
   return { ok: "a box ticked by a real press was still ticked after a reload" }
 }
 
-ROW_CHECKS.progress = async ({ page, base }) => {
+ROW_CHECKS.progress = async ({ page, base, record }) => {
+  await untilTheIndexHasArrived(page, record)
   await page.goto(base + "My-Progress", { waitUntil: "load", timeout: 60000 })
   const row = await waitInPage(page, () => {
     const holder = document.querySelector("[data-plantoir-progress]")
@@ -998,6 +1120,7 @@ ROW_CHECKS.embeds = async ({ page, record }) => {
     const request = response.request()
     if (request.isNavigationRequest() && request.frame() !== page.mainFrame()) answered.set(request.url(), response.status())
   })
+  await untilTheIndexHasArrived(page, record)
   await page.reload({ waitUntil: "load", timeout: 60000 })
   // Until every frame's document has answered, with a ceiling, never a fixed wait.
   const answeredFor = (src) => { for (const url of answered.keys()) if (url.split("?")[0] === src.split("?")[0] || url.startsWith(src)) return true; return false }
@@ -1012,7 +1135,14 @@ ROW_CHECKS.embeds = async ({ page, record }) => {
     else if (status < 200 || status > 299) problems.push(`${new URL(src).host} answered ${status}`)
   }
   if (problems.length > 0) return { fail: "a frame's document did not answer 2xx: " + problems.join("; ") }
-  return { ok: `all ${frames.length} frames' documents answered 2xx` }
+  // Answering 200 is not being shown: a provider that refuses to be framed
+  // answers 200 and the engine then blanks the frame (597b review finding 1).
+  if (record.frameRefusals.length > 0) {
+    const named = []
+    for (const one of record.frameRefusals) if (!named.includes(one.url)) named.push(one.url)
+    return { fail: `a frame was refused, so students see a blank box: ${named.slice(0, 3).join(", ")} (${record.frameRefusals[0].why})` }
+  }
+  return { ok: `all ${frames.length} frames' documents answered 2xx, and none was refused` }
 }
 
 ROW_CHECKS.pdf = async ({ page, context }) => {
@@ -1286,12 +1416,55 @@ const OFFLINE_LINES = {
   cdnjs: /cdnjs\.cloudflare\.com|dynamically imported module|Importing a module script failed/i,
 }
 
-function judgeClean(record, network) {
+// The refusals the site's policy makes on purpose, on hosts that have one
+// (rendered_rows.json -> refusedByDesign, lib/refused_by_design.mjs): every
+// document the page was sent, each fetched again as the host serves it to a
+// client that is not a browser, and the inline scripts the page holds now.
+// Answers null on a host with none, so nothing is looked at there.
+async function readRefusals(page, record) {
+  const entries = byDesignFor(ROWS.refusedByDesign, options.host)
+  if (entries.length === 0) return null
+  const documents = []
+  for (const pending of record.documents) {
+    const received = await pending
+    let served = null
+    if (received) {
+      try {
+        const answer = await fetch(received.url, { headers: { "User-Agent": "plantoir-verify-deploy", Accept: "*/*" }, signal: AbortSignal.timeout(20000) })
+        if (answer.ok) served = await answer.text()
+      } catch {
+        served = null
+      }
+    }
+    documents.push(received ? { policy: received.policy, received: received.body, served } : null)
+  }
+  let inTheDom = []
+  try {
+    const scripts = await page.evaluate(() => Array.from(document.querySelectorAll("script:not([src])")).map((script) => ({ type: script.getAttribute("type") ?? "", text: script.text })))
+    for (const script of scripts) if (runsAsScript(script.type)) inTheDom.push(script.text)
+  } catch {
+    inTheDom = []
+  }
+  return { entries, sorted: sortRefusedScripts({ documents, inTheDom }) }
+}
+
+function judgeClean(record, network, refusals = null) {
   const said = []
   let setAside = 0
   const offline = Object.keys(OFFLINE_LINES).filter((host) => network[host])
   const forTheNetwork = (text) => offline.some((host) => OFFLINE_LINES[host].test(text))
+  // What the site's policy refuses on purpose: set aside by line, only on a
+  // page that holds such a script and none of its own refused.
+  // Counted as messages, not as records (lib/refused_by_design.mjs,
+  // refusalMessages): WebKit records each "Refused to" line twice.
+  const { messages, twinOf } = refusalMessages(record.console, record.refused)
+  const judged = refusals ? judgeRefusals(refusals.entries, refusals.sorted, messages) : { setAside: [], entry: null, failures: [] }
+  for (const failure of judged.failures) said.push("refused: " + failure)
+  const byDesign = new Set(judged.setAside)
+  for (const [text, twin] of twinOf) if (byDesign.has(twin)) byDesign.add(text)
+  const refusedByDesign = judged.setAside.length
   const consider = (label, text) => {
+    if (byDesign.has(text)) return
     if (expectedLine(text)) return
     if (forTheNetwork(text)) {
       setAside += 1
@@ -1303,14 +1476,17 @@ function judgeClean(record, network) {
   for (const text of record.pageErrors) consider("page error: ", text)
   for (const text of record.refused) consider("refused: ", text)
   for (const text of record.mixed) said.push("mixed content: " + text.slice(0, 200))
-  const aside = setAside > 0 ? `; ${setAside} line(s) set aside that only say ${offline.join(" and ")} could not be reached (no network)` : ""
-  if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}` }
+  const aside = (setAside > 0 ? `; ${setAside} line(s) set aside that only say ${offline.join(" and ")} could not be reached (no network)` : "")
+    + (record.embedLines > 0 ? `; ${record.embedLines} line(s) from inside a teacher's embeds set aside (the embeds row judges the frames)` : "")
+  const designed = refusedByDesign > 0 ? `; ${refusedByDesign} refusal line(s) of ${judged.entry.name} set aside (refused by the site's policy by design, rendered_rows.json -> refusedByDesign)` : ""
+  if (said.length > 0) return { fail: `${said.length} thing(s) reported: ${said.slice(0, 4).join(" | ")}${aside}${designed}` }
+  if (refusedByDesign > 0) return { expected: `${refusedByDesign} refusal line(s) of ${judged.entry.name}, of the ${judged.allowed} its scripts account for, and nothing else${aside}`, byDesign: judged.entry.name, byDesignLines: refusedByDesign }
   return { ok: `nothing reported to the console, no page error, nothing refused${aside}` }
 }
 
-function judgeOwnHost(record, siteHost) {
-  const allowed = new Set(ROWS.thirdPartyHostsToday.hosts)
+function judgeOwnHost(record, siteHost, pageName) {
   const asked = new Map()
+  const asks = []
   const strangers = []
   for (const one of record.offSite) {
     if (one.fromEmbed) continue
@@ -1323,10 +1499,23 @@ function judgeOwnHost(record, siteHost) {
     if (one.host === siteHost) continue
     const kind = one.kind && one.kind !== "request" ? ` (${one.kind})` : ""
     if (!asked.has(one.host)) asked.set(one.host, one.path + kind)
+    asks.push({ host: one.host, path: one.path })
   }
-  for (const [host, path] of asked) if (!allowed.has(host)) strangers.push(`asked another host for ${host}${path}`)
-  if (strangers.length > 0) return { fail: strangers.slice(0, 4).join("; ") }
-  return { ok: (asked.size === 0 ? "nothing asked of any other host" : `asked only ${Array.from(asked.keys()).sort().join(", ")} (thirdPartyHostsToday, until #566)`) + `; scrolled to its end and watched ${Math.round((record.quiet ?? 0) / 100) / 10} s more until quiet. Not seen: anything asked for after that, and a WebSocket from a blob: or data: worker` }
+  // A listed host off its pinned pages or paths is a stranger (597b review
+  // finding 2), here and on a deployed site alike.
+  for (const line of outsidePins(asks, ROWS.thirdPartyHostsToday.pinned, pageName)) {
+    if (!strangers.includes(line)) strangers.push(line)
+  }
+  // On a deployed site the hosts the site still asks today are expected
+  // failures, not allowed (lib/expected_failures.mjs; #597's second half).
+  const deployed = Boolean(options.base)
+  const sorted = sortAsked(asked, ROWS.thirdPartyHostsToday.hosts, deployed)
+  for (const one of sorted.strangers) strangers.push(`asked another host for ${one.host}${one.what}`)
+  const watched = `; scrolled to its end and watched ${Math.round((record.quiet ?? 0) / 100) / 10} s more until quiet. Not seen: anything asked for after that, and a WebSocket from a blob: or data: worker`
+  const expectedText = sorted.expected.map((one) => one.host).sort().join(", ")
+  if (strangers.length > 0) return { fail: strangers.slice(0, 4).join("; ") + (expectedText ? `; and the expected ${expectedText}` : ""), asked: Array.from(asked.keys()) }
+  if (sorted.expected.length > 0) return { expected: `asked ${expectedText}, each an expected failure until #566 (thirdPartyHostsToday)` + watched, hosts: sorted.expected.map((one) => one.host), asked: Array.from(asked.keys()) }
+  return { ok: (asked.size === 0 ? "nothing asked of any other host" : `asked only ${Array.from(asked.keys()).sort().join(", ")} (thirdPartyHostsToday, until #566)`) + watched, asked: Array.from(asked.keys()) }
 }
 
 // -------------------- the cold visit (#625) --------------------
@@ -1347,20 +1536,68 @@ async function coldSample(browser, base) {
   }
 }
 
-async function coldVisit(browser, base) {
+// The two routes of #625's sightings, on a deployed site: into the isolated
+// Python page from the section's front page (not isolated, so the site's
+// router hands the press to a full document navigation into a new
+// browsing-context group), and from it into the isolated Swift page. The
+// press is real, on a link the check adds at the window's corner, so the
+// site's own router takes it the way it takes any link; paint is read from
+// the new document's paint entry, or, when the router swaps the page in
+// without one, from the moment the target's title is in the article.
+async function routeSample(browser, base, fromUrl, toPage) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  try {
+    await context.route("**/*", (route) => (route.request().resourceType() === "media" ? route.abort() : route.continue()))
+    const page = await context.newPage()
+    await page.goto(fromUrl, { waitUntil: "load", timeout: 30000 })
+    const target = pageUrl(base, toPage)
+    await page.evaluate((href) => {
+      const link = document.createElement("a")
+      link.href = href
+      link.id = "plantoir-rendered-cold-link"
+      link.textContent = "the rendered check's link"
+      link.style.cssText = "position:fixed;top:4px;left:4px;z-index:2147483647;background:#fff;color:#000;padding:6px;font:16px sans-serif"
+      document.body.append(link)
+    }, target)
+    // The document pressed in is marked; a new one is not. (Its
+    // performance.timeOrigin cannot tell them apart: WebKit answered two
+    // values for one document, measured 2026-11-13, and the old document's
+    // paint was then read as the new one's.)
+    await page.evaluate(() => { window.__plantoirRenderedColdPressed = true })
+    const pressed = Date.now()
+    await page.locator("#plantoir-rendered-cold-link").click({ timeout: 10000 })
+    const shown = await waitInPage(page, ({ title }) => {
+      if (window.__plantoirRenderedColdPressed !== true) {
+        const paint = performance.getEntriesByType("paint").find((entry) => entry.name === "first-contentful-paint")
+        return paint ? { at: performance.timeOrigin + paint.startTime, how: "a new document", responseStart: Math.round(performance.getEntriesByType("navigation")[0]?.responseStart ?? 0) } : null
+      }
+      const heading = document.querySelector("article h1, h1.article-title")
+      return heading && heading.textContent.trim() === title && /plantoir-rendered-check-597/.test(document.querySelector("article")?.textContent ?? "") ? { at: Date.now(), how: "the router" } : null
+    }, 15000, { title: toPage })
+    if (!shown) return { fcp: null }
+    return { fcp: Math.round(shown.at - pressed), how: shown.how }
+  } finally {
+    await context.close()
+  }
+}
+
+// Five samples of one route: fails when two or more take over 3 s to paint
+// or the median does; one slow sample earns one counted retry (#597 plan
+// review M4: one slow edge must not fail a cut).
+async function sampleRoute(take) {
   const samples = []
   let retries = 0
   const slow = (sample) => sample.fcp === null || sample.fcp > 3000
   for (let index = 0; index < 5; index += 1) {
-    const sample = await coldSample(browser, base)
+    const sample = await take()
     samples.push(sample)
-    // Two slow ones already fail the row: no need to wait for more.
+    // Two slow ones already fail the route: no need to wait for more.
     if (samples.filter(slow).length >= 2) break
   }
   let slowCount = samples.filter(slow).length
   if (slowCount === 1) {
     retries = 1
-    const again = await coldSample(browser, base)
+    const again = await take()
     if (!slow(again)) {
       const at = samples.findIndex(slow)
       samples[at] = { ...again, retried: true }
@@ -1370,8 +1607,37 @@ async function coldVisit(browser, base) {
   const values = samples.map((sample) => (sample.fcp === null ? Infinity : sample.fcp)).sort((a, b) => a - b)
   const median = values[Math.floor(values.length / 2)]
   const shown = samples.map((sample) => (sample.fcp === null ? "never" : `${sample.fcp} ms`)).join(", ")
-  if (slowCount >= 2 || median > 3000) return { fail: `${slowCount} of ${samples.length} cold visits took over 3 s to first contentful paint (${shown}; median ${median === Infinity ? "never" : median + " ms"})` }
-  return { ok: `first contentful paint ${shown} over ${samples.length} cold visits (median ${median} ms)${retries ? `; answered on retry: ${retries}` : ""}` }
+  return { samples, retries, slowCount, median, shown, failed: slowCount >= 2 || median > 3000 }
+}
+
+async function coldVisit(browser, base) {
+  const routes = [{ name: "typed cold", take: () => coldSample(browser, base) }]
+  // Deployed sites only: on this Mac the one route is what the sabotage
+  // proves, and a gate's minutes are kept for it (597a).
+  if (options.base) {
+    routes.push({ name: "from the front page", take: () => routeSample(browser, base, base, "Python") })
+    routes.push({ name: "Python to Swift", take: () => routeSample(browser, base, pageUrl(base, "Python"), "Swift") })
+  }
+  const said = []
+  const failed = []
+  let retries = 0
+  let first = null
+  for (const route of routes) {
+    const result = await sampleRoute(route.take)
+    first = first ?? result
+    retries += result.retries
+    const hows = new Map()
+    for (const sample of result.samples) if (sample.how) hows.set(sample.how, (hows.get(sample.how) ?? 0) + 1)
+    const how = hows.size > 0 ? `, shown by ${[...hows].map(([name, count]) => `${name} ${count} time${count === 1 ? "" : "s"}`).join(" and ")}` : ""
+    const line = `${route.name}: ${result.shown} (median ${result.median === Infinity ? "never" : result.median + " ms"}${how})`
+    said.push(line)
+    if (result.failed) failed.push(`${route.name}: ${result.slowCount} of ${result.samples.length} cold visits took over 3 s to first contentful paint (${result.shown}; median ${result.median === Infinity ? "never" : result.median + " ms"})`)
+  }
+  if (failed.length > 0) return { fail: failed.join("; ") + (routes.length > 1 ? `. All routes: ${said.join("; ")}` : "") }
+  if (routes.length === 1) {
+    return { ok: `first contentful paint ${first.shown} over ${first.samples.length} cold visits (median ${first.median} ms)${retries ? `; answered on retry: ${retries}` : ""}` }
+  }
+  return { ok: `first contentful paint after a cold visit or a real press, five samples a route: ${said.join("; ")}${retries ? `; answered on retry: ${retries}` : ""}` }
 }
 
 // -------------------- running pages --------------------
@@ -1404,6 +1670,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
     for (const row of pageRows) {
       if (row.name === "cold visit") continue
       let outcome
+      const waitsBefore = record.indexWaitsGaveUp
       try {
         outcome = await Promise.race([
           ROW_CHECKS[row.name]({ page, context, record, base, engine, network }),
@@ -1412,7 +1679,15 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
       } catch (error) {
         outcome = { fail: String(error.message ?? error).split("\n")[0] }
       }
-      outcomes.push(toOutcome(row.name, outcome))
+      const one = toOutcome(row.name, outcome)
+      // Never silent: a wait for the page's index that reached its ceiling
+      // during this row is said in the row's line, and counted.
+      const gaveUp = record.indexWaitsGaveUp - waitsBefore
+      if (gaveUp > 0) {
+        one.detail += indexWaitNote(gaveUp)
+        one.indexWaitsGaveUp = gaveUp
+      }
+      outcomes.push(one)
     }
     // Before the page is judged: scrolled to its end, so what loads only
     // below the fold is asked for, then held until it has asked for nothing
@@ -1420,6 +1695,7 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
     // the rows were done).
     record.quiet = await quietPage(page, record, fullQuiet)
     const common = rows.filter((row) => row.page === "*" && !(row.except ?? []).includes(pageName))
+    const refusals = common.some((row) => row.name === "clean page") ? await readRefusals(page, record) : null
     for (const row of common) {
       let outcome
       if (row.name === "fonts") {
@@ -1428,8 +1704,8 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
         } catch (error) {
           outcome = { fail: String(error.message ?? error).split("\n")[0] }
         }
-      } else if (row.name === "clean page") outcome = judgeClean(record, network)
-      else if (row.name === "own host") outcome = judgeOwnHost(record, new URL(base).host)
+      } else if (row.name === "clean page") outcome = judgeClean(record, network, refusals)
+      else if (row.name === "own host") outcome = judgeOwnHost(record, new URL(base).host, pageName)
       outcomes.push(toOutcome(row.name, outcome))
     }
   } finally {
@@ -1449,6 +1725,9 @@ async function runPage(browser, engine, base, pageName, rows, network, fullQuiet
 
 function toOutcome(row, outcome) {
   if (outcome?.skip) return { row, state: "SKIPPED", detail: outcome.skip }
+  if (outcome?.expected) return { row, state: "EXPECTED", detail: outcome.expected, hosts: outcome.hosts ?? [], asked: outcome.asked, byDesign: outcome.byDesign, byDesignLines: outcome.byDesignLines }
+  if (outcome?.fail && outcome.asked) return { row, state: "FAIL", detail: outcome.fail, asked: outcome.asked }
+  if (outcome?.ok && outcome.asked) return { row, state: "OK", detail: outcome.ok, asked: outcome.asked }
   if (outcome?.ok && outcome.partSkipped) return { row, state: "OK", detail: outcome.ok, partSkipped: outcome.partSkipped }
   if (outcome?.fail) return { row, state: "FAIL", detail: outcome.fail }
   return { row, state: "OK", detail: outcome?.ok ?? "passed" }
@@ -1499,6 +1778,7 @@ async function plainRun(engines, network) {
       if (mine.length === 0) continue
       const failed = mine.filter((one) => one.state === "FAIL")
       const skipped = mine.filter((one) => one.state === "SKIPPED")
+      const expected = mine.filter((one) => one.state === "EXPECTED")
       if (row.page !== "*") {
         say(mine[0].state, row.name, engineName, mine[0].detail, mine[0].page)
         if (mine[0].partSkipped) say("SKIPPED", `${row.name}, ${row.networkPart ?? "part of it"}`, engineName, mine[0].partSkipped)
@@ -1506,8 +1786,68 @@ async function plainRun(engines, network) {
         say("FAIL", row.name, engineName, failed.map((one) => `${one.page}: ${one.detail}`).join(" || "))
       } else if (skipped.length === mine.length) {
         say("SKIPPED", row.name, engineName, skipped[0].detail)
+      } else if (expected.length > 0 && row.name === "clean page") {
+        // Never a pass and never a failure: a refusal the site's policy makes
+        // on purpose, by name, with the pages it was seen on
+        // (rendered_rows.json -> refusedByDesign).
+        const byName = new Map()
+        // Each page with its count of lines set aside, so a page that set
+        // aside more than the others is in sight (597b fix review, d1).
+        for (const one of expected) byName.set(one.byDesign, [...(byName.get(one.byDesign) ?? []), one])
+        for (const [name, ones] of [...byName].sort()) {
+          const counted = ones.map((one) => `${one.page} ${one.byDesignLines ?? "?"}`)
+          say("EXPECTED", row.name, engineName, `${name} refused by the site's policy on ${ones.length} of ${mine.length} pages (${counted.join(", ")}): by design, set aside only where the page holds a refused inline script the host sent the browser alone, and only as many lines as such scripts account for (rendered_rows.json -> refusedByDesign)`)
+        }
+        const clean = mine.filter((one) => one.state === "OK")
+        if (clean.length > 0) say("OK", `${row.name}, the other pages`, engineName, `${clean.length} pages - ${clean.map((one) => one.page).join(", ")}`)
+      } else if (expected.length > 0) {
+        // Never a pass: what the site still asks of other hosts, by host, with
+        // the pages that asked it (#597's second half; #566 removes them).
+        const byHost = new Map()
+        for (const one of expected) {
+          for (const host of one.hosts) byHost.set(host, [...(byHost.get(host) ?? []), one.page])
+        }
+        for (const [host, pages] of [...byHost].sort()) {
+          say("EXPECTED", row.name, engineName, `asked ${host} on ${pages.length} of ${mine.length} pages (${pages.join(", ")}): an expected failure until #566 removes it (rendered_rows.json -> thirdPartyHostsToday)`)
+        }
+        const clean = mine.filter((one) => one.state === "OK")
+        if (clean.length > 0) say("OK", `${row.name}, the other pages`, engineName, `${clean.length} pages asked no other host at all - ${clean.map((one) => one.page).join(", ")}`)
       } else {
-        say("OK", row.name, engineName, `${mine.length - skipped.length} pages - ${mine.filter((one) => one.state === "OK").map((one) => one.page).join(", ")}; e.g. ${mine.find((one) => one.state === "OK").detail}`)
+        // The example shown is one that set something aside, when a page did,
+        // so the count of what was set aside is never out of sight.
+        const example = mine.find((one) => one.state === "OK" && /set aside/.test(one.detail)) ?? mine.find((one) => one.state === "OK")
+        say("OK", row.name, engineName, `${mine.length - skipped.length} pages - ${mine.filter((one) => one.state === "OK").map((one) => one.page).join(", ")}; e.g. ${example.page}: ${example.detail}`)
+      }
+    }
+  }
+  // The waits for a page's own index that reached their ceiling, one line
+  // each, which verify-deploy.sh carries into its Result block (597b fix
+  // review, d2).
+  for (const one of collected) {
+    if (one.indexWaitsGaveUp > 0) say("NOTE", "index wait", one.engine, `${one.page}, the ${one.row} row: the page's own request for the search index had not answered after ${Math.round(INDEX_WAIT_CEILING_MS / 1000)} s, ${one.indexWaitsGaveUp} time(s), so the row went on without it`)
+  }
+  // A listed host that no page asked in an engine's whole run has stopped
+  // failing: said as a failure, so the list is shortened rather than left
+  // to excuse a host the site no longer asks (#597's second half). Judged
+  // only on a deployed site, and only when every page ran.
+  if (options.base && !options.only) {
+    for (const engineName of options.engines) {
+      const ownHost = collected.filter((one) => one.engine === engineName && one.row === "own host" && one.asked)
+      if (ownHost.length === 0) continue
+      const seen = []
+      for (const one of ownHost) seen.push(...one.asked)
+      const stopped = stoppedFailing(ROWS.thirdPartyHostsToday.hosts, seen)
+      for (const host of stopped) {
+        say("FAIL", "own host, an expected failure that stopped", engineName, `no page asked ${host} any more: take it off rendered_rows.json -> thirdPartyHostsToday, so the list shrinks and the gate tightens (#566)`)
+      }
+      // A pinned page that ran and did not ask its host: the expected
+      // failure moved or shrank, and its pin goes with it.
+      const askedBy = new Map()
+      for (const one of ownHost) askedBy.set(one.page, one.asked)
+      const ran = ownHost.map((one) => one.page)
+      for (const one of pinnedButNotAsked(ROWS.thirdPartyHostsToday.pinned, askedBy, ran)) {
+        if (stopped.includes(one.host)) continue
+        say("FAIL", "own host, an expected failure that moved", engineName, `the ${one.page} page no longer asks ${one.host}: take it off that host's pages in rendered_rows.json -> thirdPartyHostsToday.pinned (#566)`)
       }
     }
   }
@@ -1563,6 +1903,12 @@ async function redRun(engines, network) {
     const runOne = async (sabotage, onlyEngine = null) => {
       const began = Date.now()
       const aimed = ROWS.rows.find((row) => row.name === sabotage.aims)
+      // A row that runs on deployed sites only (embeds) is proven red with
+      // --site <folder> --host netlify, never on this Mac's local host.
+      if (sabotage.hosts && !sabotage.hosts.includes(options.host)) {
+        say("NOTE", `sabotage ${sabotage.name}`, null, `not run with --host ${options.host}: its row runs on ${sabotage.hosts.join(", ")} only (run it with --site <folder> --host netlify --expect-red "${sabotage.name}")`)
+        return
+      }
       // The keys row runs only on its own sabotage, which runs alone (below):
       // with other browsers busy, WebKit's points fell while the lines ran
       // even with the loader's hold in place (measured 2026-11-13, on the
@@ -1686,7 +2032,7 @@ const failed = results.some((one) => one.state === "FAIL")
 const skipped = engineMissing || results.some((one) => one.state === "SKIPPED")
 const ran = options.engines.filter((engine) => engines[engine] !== null)
 const notRun = options.engines.filter((engine) => engines[engine] === null)
-console.log(`DONE: ${results.filter((one) => one.state === "OK").length} OK, ${results.filter((one) => one.state === "FAIL").length} FAIL, ${results.filter((one) => one.state === "SKIPPED").length} SKIPPED in ${timing.seconds} s (${options.expectRed ? "sabotage " + options.expectRed : options.host}; ran in ${ran.join(" and ") || "no engine"}${notRun.length ? `; NOT run in ${notRun.join(" and ")}` : ""})`)
+console.log(`DONE: ${results.filter((one) => one.state === "OK").length} OK, ${results.filter((one) => one.state === "FAIL").length} FAIL, ${results.filter((one) => one.state === "SKIPPED").length} SKIPPED${results.some((one) => one.state === "EXPECTED") ? `, ${results.filter((one) => one.state === "EXPECTED").length} EXPECTED` : ""} in ${timing.seconds} s (${options.expectRed ? "sabotage " + options.expectRed : options.host}; ran in ${ran.join(" and ") || "no engine"}${notRun.length ? `; NOT run in ${notRun.join(" and ")}` : ""})`)
 console.log(`ENGINES: ${ran.join(",")}`)
 if (options.json) writeFileSync(options.json, JSON.stringify({ host: options.host, expectRed: options.expectRed, seconds: timing.seconds, results }, null, 2))
 process.exit(failed ? 1 : skipped ? 3 : 0)
