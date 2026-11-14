@@ -2081,7 +2081,7 @@ final class AssistToolRunner {
         // is off, and never able to fail, slow or change this action
         // (`UndoShadowPublish`). Today's history below is unchanged.
         let undoJournal: UndoJournal = UndoJournalLocation.standardJournal()
-        let undoTicket: UndoShadowTicket? = UndoShadowPublish.begin(
+        let undoTicket: UndoShadowTicket? = await UndoShadowPublish.begin(
             plan, forSection: sectionNumber, in: course,
             workingFolderURL: workspace.workspaceURL, madeBy: undoMadeBy, journal: undoJournal
         )
@@ -2095,7 +2095,7 @@ final class AssistToolRunner {
             change = applied.change
             leftAlone = applied.leftAlone
         } catch {
-            UndoShadowPublish.finish(undoTicket, written: nil, forSection: sectionNumber, in: course, journal: undoJournal)
+            await UndoShadowPublish.finish(undoTicket, written: nil, forSection: sectionNumber, in: course, journal: undoJournal)
             // Not "Nothing was changed" (said here until #412): the write is
             // page by page, so pages before the one that failed are written —
             // and when one was, it is a write with no undo entry (#531).
@@ -2108,7 +2108,7 @@ final class AssistToolRunner {
                 sectionNumber: sectionNumber
             ))
         }
-        UndoShadowPublish.finish(undoTicket, written: change, forSection: sectionNumber, in: course, journal: undoJournal)
+        await UndoShadowPublish.finish(undoTicket, written: change, forSection: sectionNumber, in: course, journal: undoJournal)
         history.record(change)
 
         // The plan's declined pages are already on the card (`describe`);

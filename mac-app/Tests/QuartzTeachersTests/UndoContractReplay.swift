@@ -646,6 +646,33 @@ nonisolated enum UndoContractReplay {
                     let begin: String = "{\"v\":1,\"seq\":\(next),\"event\":\"begin\",\"at\":\"\(UndoMoment.text(Date()))\",\"step\":{\"seq\":\(next),\"madeAt\":\"\(UndoMoment.text(Date()))\",\"workingFolder\":{\"id\":\"\(folderID)\",\"pathAtTheTime\":\"\(root.path)\"},\"ops\":[{\"kind\":\"move\",\"from\":\"a.md\",\"to\":\"b.md\",\"blobs\":[\"\(sha)\"]}]}}"
                     try appendRaw(begin, to: journal())
                     try appendRaw("{\"v\":1,\"seq\":\(next),\"event\":\"applied\"}", to: journal())
+                } else if value.hasPrefix("cleared:") {
+                    // A clearing written by some version for a reason of its
+                    // own: every reader honours it whatever the reason.
+                    let reason: String = String(value.dropFirst("cleared:".count))
+                    try journal().withLock { writer in
+                        try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason))
+                    }
+                } else if value == "goLive" {
+                    try journal().clearTheListAsTheSwitchGoesLive()
+                } else if value == "wholeFileStep" {
+                    // p1's publish line flipped AND a line added to its body:
+                    // one writeFile op, whose content is a blob.
+                    var wholeFile: [UndoFileChange] = []
+                    for change in flip(in: root, at: pagePath) {
+                        let after: Data = (change.after ?? Data()) + Data("A line the step added.\n".utf8)
+                        wholeFile.append(UndoFileChange(relativePath: change.relativePath, before: change.before, after: after))
+                    }
+                    let outcome: JournaledWriteOutcome = JournaledWrite.perform(
+                        draft(changes: wholeFile, root: root, action: "publishPages"), in: journal(), mode: .live
+                    )
+                    if case .applied = outcome {
+                        last = "applied"
+                    } else {
+                        last = "\(outcome)"
+                    }
+                } else if value == "removeContent" {
+                    try FileManager.default.removeItem(at: journal().contentFolderURL)
                 } else if value == "begin:held" {
                     try beginHeld()
                 } else if value == "finish:held" {
@@ -830,6 +857,7 @@ nonisolated enum UndoContractReplay {
         "name", "work", "stopAt", "mode", "processAlive", "files", "phase", "head", "undo",
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
+        "afterAnOrdinaryStep",
     ]
 
     static func runRecoveryCases(under parent: URL) throws -> (cases: Int, failures: [String]) {
@@ -1001,6 +1029,18 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': the interrupted line names \(foundPaths)")
                 }
             }
+            if let wanted = string(testCase["afterAnOrdinaryStep"]) {
+                // Another step, at once, through the door: the ordinary path,
+                // where a refused put-back waits for its time.
+                let third: String = "courses/TST1O/Section 1/Classes/C.md"
+                try write(beforeText.replacingOccurrences(of: "title: A", with: "title: C"), to: third, in: root)
+                let thirdChanges: [UndoFileChange] = changes(setting: [(path: third, key: "publish", line: "publish: true")], in: root)
+                _ = JournaledWrite.perform(draft(changes: thirdChanges, root: root, action: "publishPages"), in: survivor, mode: .live)
+                let stands: String = (try survivor.read()).records[workSeq]?.phase.rawValue ?? "missing"
+                if stands != wanted {
+                    failures.append("recoveryCases '\(name)': after an ordinary step the step is \(stands), not \(wanted)")
+                }
+            }
             if let undo = string(testCase["undo"]) {
                 let outcome: String = outcomeWord(survivor.undoNewest(resolveRoot: resolveRoot))
                 if outcome != undo {
@@ -1036,7 +1076,9 @@ nonisolated enum UndoContractReplay {
 
     // MARK: - undo.deployedCases
 
-    static let deployedKeys: Set<String> = ["name", "moves", "changesMoreThanVisibility", "record", "answer", "why"]
+    static let deployedKeys: Set<String> = [
+        "name", "moves", "changesMoreThanVisibility", "record", "destinations", "siteMarkers", "answer", "why",
+    ]
 
     /// Ruling 19's question, as data: does a website show what the move
     /// takes back (`UndoWebsite.answer`)?
@@ -1059,10 +1101,20 @@ nonisolated enum UndoContractReplay {
             for fragment in testCase["record"] as? [[String: Any]] ?? [] {
                 record.append(UndoWebsite.Fragment(name: string(fragment["name"]) ?? "", places: fragment["places"] as? [String]))
             }
+            guard let destinations = testCase["destinations"] as? [String] else {
+                failures.append("deployedCases '\(name)': no destinations")
+                continue
+            }
+            var siteMarkers: Set<String> = []
+            for destination in testCase["siteMarkers"] as? [String] ?? [] {
+                siteMarkers.insert(destination)
+            }
             let answer: UndoWebsite.Answer = UndoWebsite.answer(
                 moves: moves,
                 changesMoreThanVisibility: testCase["changesMoreThanVisibility"] as? Bool == true,
-                record: record
+                record: record,
+                destinations: destinations,
+                siteMarkers: siteMarkers
             )
             if answer.rawValue != string(testCase["answer"]) {
                 failures.append("deployedCases '\(name)': \(answer.rawValue), not \(string(testCase["answer"]) ?? "?")")

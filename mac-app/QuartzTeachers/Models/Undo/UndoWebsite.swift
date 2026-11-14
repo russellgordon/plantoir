@@ -4,8 +4,8 @@ import Foundation
 /// the question ruling 19 asks before Plantoir offers to deploy (#899). U1
 /// states the rule and answers it; U6 makes the offer.
 ///
-/// **Read from the deploy markers, never from the journal.** Every deploy
-/// path already writes the section's published-pages record
+/// **Read from the published-pages record, never from the journal.** Every
+/// deploy path already writes the section's published-pages record
 /// (`contracts/file-formats.json` → `publishedPagesRecord`): `deploy.py`
 /// after each Netlify or Cloudflare upload, and `deploy.sh` / `deploy.ps1`
 /// after a folder publish, so the app's button, a deploy set for later and a
@@ -14,6 +14,11 @@ import Foundation
 /// launcher and is not told about deploys: a `deployed` event in it was
 /// rejected because it would be missing for every deploy the app did not
 /// start (the director's ruling 1 on U1's second reviews).
+///
+/// **Only where the section deploys NOW.** A destination the section no
+/// longer deploys to is never read: its last fragment would stay the newest
+/// for good, because deploying elsewhere never refreshes it (the contract
+/// review of U1's second round, I1).
 ///
 /// **What it compares: content, not times.** For each destination the newest
 /// fragment (by the moment in its own name) says which pages that website
@@ -26,8 +31,17 @@ import Foundation
 /// **What it cannot tell.** The record holds which pages a site shows, not
 /// what they say. A move that changes a page's content without changing
 /// whether students can see it (a body edit, from U2) is `cannotTell`: the
-/// markers do not hold it, and U6 must not guess. So is a destination whose
-/// newest fragment cannot be read.
+/// record does not hold it, and U6 must not guess. So is a destination whose
+/// newest fragment cannot be read, and one with a site marker and no
+/// fragment at all: a section last deployed before the record existed
+/// (v1.4.1), or rolled over with the "same website" answer, which moves every
+/// fragment aside and keeps the marker.
+///
+/// **Places in one form.** A place is compared after both sides are put in
+/// Unicode normalization form C, then code point for code point, so a name
+/// spelled decomposed on one side and composed on the other is one page on
+/// both platforms (measured by the contract review: Swift's `Set` matched
+/// them, Python's `in` did not).
 nonisolated enum UndoWebsite {
 
     // MARK: - Stored properties
@@ -60,16 +74,24 @@ nonisolated enum UndoWebsite {
         let places: [String]?
     }
 
-    /// What the markers say about one move.
+    /// What the record says about one move.
     enum Answer: String, Equatable, Sendable {
         /// A website shows what the move takes back: offer to deploy.
         case offerToDeploy
-        /// Every website already shows what the move leaves, or the
-        /// section has never been deployed (no fragment at all).
+        /// Every website already shows what the move leaves, or the section
+        /// has never been deployed where it deploys now (no fragment and no
+        /// site marker there).
         case noOffer
-        /// The markers cannot say.
+        /// The record cannot say.
         case cannotTell
     }
+
+    /// The site-marker folder of each destination that keeps one
+    /// (`file-formats.json` → `firstDeployMarkers`); a folder keeps none.
+    static let markerFolders: [String: String] = [
+        "netlify": ".netlify_sites",
+        "cloudflare": ".cloudflare_sites",
+    ]
 
     // MARK: - Functions
 
@@ -77,13 +99,25 @@ nonisolated enum UndoWebsite {
     ///
     /// - `moves`: every page the step changes, visibility before and after.
     /// - `changesMoreThanVisibility`: the step also changes what some page
-    ///   says (or a file that is not a page), which no marker records.
+    ///   says (or a file that is not a page), which the record does not hold.
     /// - `record`: every file in the section's published-pages folder.
-    static func answer(moves: [PageMove], changesMoreThanVisibility: Bool, record: [Fragment]) -> Answer {
+    /// - `destinations`: the destination types the section deploys to NOW
+    ///   (`netlify`, `cloudflare`, `folder`): its primary and any additional.
+    /// - `siteMarkers`: those of them that have a site marker.
+    static func answer(
+        moves: [PageMove],
+        changesMoreThanVisibility: Bool,
+        record: [Fragment],
+        destinations: [String],
+        siteMarkers: Set<String>
+    ) -> Answer {
         var newestByDestination: [String: Fragment] = [:]
         var newestStamp: [String: String] = [:]
         for fragment in record {
             guard let parts = UndoWebsite.parts(ofFragmentNamed: fragment.name) else {
+                continue
+            }
+            if !destinations.contains(parts.destination) {
                 continue
             }
             if let known = newestStamp[parts.destination], known >= parts.stamp {
@@ -92,29 +126,51 @@ nonisolated enum UndoWebsite {
             newestStamp[parts.destination] = parts.stamp
             newestByDestination[parts.destination] = fragment
         }
-        if newestByDestination.isEmpty {
-            return .noOffer
-        }
+        var everDeployed: Bool = false
         var sawSomethingItCannotTell: Bool = false
-        for (_, fragment) in newestByDestination {
+        var asked: Set<String> = []
+        for destination in destinations {
+            if asked.contains(destination) {
+                continue
+            }
+            asked.insert(destination)
+            guard let fragment = newestByDestination[destination] else {
+                if siteMarkers.contains(destination) {
+                    // Deployed, before the record existed or since a
+                    // rollover moved its fragments aside.
+                    everDeployed = true
+                    sawSomethingItCannotTell = true
+                }
+                continue
+            }
+            everDeployed = true
             guard let places = fragment.places else {
                 sawSomethingItCannotTell = true
                 continue
             }
             var shown: Set<String> = []
             for place in places {
-                shown.insert(place)
+                shown.insert(UndoWebsite.comparable(place))
             }
             for move in moves where move.visibleBeforeTheMove != move.visibleAfterTheMove {
-                if shown.contains(move.place) == move.visibleBeforeTheMove {
+                if shown.contains(UndoWebsite.comparable(move.place)) == move.visibleBeforeTheMove {
                     return .offerToDeploy
                 }
             }
+        }
+        if !everDeployed {
+            return .noOffer
         }
         if sawSomethingItCannotTell || changesMoreThanVisibility {
             return .cannotTell
         }
         return .noOffer
+    }
+
+    /// A place in the one form both platforms compare: Unicode
+    /// normalization form C.
+    static func comparable(_ place: String) -> String {
+        return place.precomposedStringWithCanonicalMapping
     }
 
     /// The moment and the destination in a fragment's name, or nil for any
@@ -169,6 +225,23 @@ nonisolated enum UndoWebsite {
             return nil
         }
         return String(joined.dropLast(3))
+    }
+
+    /// The destinations among these that have a site marker for the section.
+    static func siteMarkers(courseFolder: URL, section: Int, among destinations: [String]) -> Set<String> {
+        var found: Set<String> = []
+        for destination in destinations {
+            guard let folder = markerFolders[destination] else {
+                continue
+            }
+            let marker: URL = courseFolder
+                .appendingPathComponent(folder, isDirectory: true)
+                .appendingPathComponent("section\(section).json")
+            if FileManager.default.fileExists(atPath: marker.path) {
+                found.insert(destination)
+            }
+        }
+        return found
     }
 
     /// Every file of a section's published-pages folder, read. A file that

@@ -160,4 +160,77 @@ enum UndoCoreChecks {
         }
         return failures
     }
+
+    /// A step closed `interrupted` leaves nothing of the journal's in a
+    /// course (the director's ruling 6 on U1's third round): a dead
+    /// process's step left a staged file beside its page, its folder went
+    /// away, and pruning closed the step past the limits; when the folder
+    /// comes back, the next recovery removes the file.
+    static func aClosedStepLeavesNoStagedFile(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let a: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "tidy-a")
+        let b: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "tidy-b")
+        let pageB: String = "courses/TST2O/Section 1/Classes/Day 1.md"
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: pageB, in: b.root)
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: "p.md", in: a.root)
+
+        let changesB: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: pageB, key: "publish", line: "publish: true")], in: b.root)
+        let draftB: UndoStepDraft = UndoContractReplay.draft(changes: changesB, root: b.root, action: "publishPages")
+        let dying: UndoJournal = UndoJournal(folderURL: a.journalFolder, process: UndoContractReplay.goneProcess)
+        let seq: Int = try JournaledWrite.begin(draftB, ops: JournaledWrite.ops(for: draftB), in: dying, mode: .live)
+        let staged: URL = UndoSwap.besideURL(for: b.root.appendingPathComponent(pageB), label: "\(seq)-apply", role: "new")
+        try Data("half of a swap".utf8).write(to: staged)
+
+        let away: URL = b.root.deletingLastPathComponent().appendingPathComponent("wf-away", isDirectory: true)
+        try FileManager.default.moveItem(at: b.root, to: away)
+        _ = UndoContractReplay.writeSteps(count: 51, onPage: "p.md", root: a.root, journalFolder: a.journalFolder)
+        let closed: UndoStepPhase? = try UndoJournal(folderURL: a.journalFolder).read().records[seq]?.phase
+        if closed != .interrupted {
+            failures.append("the dead step past the limits is \(String(describing: closed)), not interrupted")
+        }
+        try FileManager.default.moveItem(at: away, to: b.root)
+        // A step in A (writeSteps starts at "publish: true", which page p
+        // already reads after 51, so it is the second call that writes).
+        _ = UndoContractReplay.writeSteps(count: 2, onPage: "p.md", root: a.root, journalFolder: a.journalFolder)
+        if FileManager.default.fileExists(atPath: staged.path) {
+            failures.append("the closed step's staged file was left in the course")
+        }
+        return failures
+    }
+
+    /// A segment holding only lines with no readable time is bounded like
+    /// any other (the director's ruling 7 on U1's third round): judged by the
+    /// first later segment that has a time, it goes once that one is past
+    /// the limits, and so does the segment after it. Before the rule it kept
+    /// itself and every later segment for good.
+    static func aSegmentWithNoTimeIsBounded(under parent: URL) throws -> [String] {
+        var failures: [String] = []
+        let place: (root: URL, journalFolder: URL) = try UndoContractReplay.scratch(under: parent, named: "timeless")
+        let folder: URL = place.journalFolder
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try UndoContractReplay.write("---\npublish: false\n---\nBody.\n", to: "p.md", in: place.root)
+        let journal: UndoJournal = UndoJournal(folderURL: folder)
+        // Segment 1: junk, and a newer version's line with no `at`.
+        try Data("not a JSON object\n{\"v\":2,\"seq\":1,\"event\":\"later\"}\n".utf8).write(to: journal.segmentURL(number: 1))
+        // Segment 2: one step, made seventy days ago.
+        try Data().write(to: journal.segmentURL(number: 2))
+        let seventyDaysAgo: Date = Date().addingTimeInterval(-70 * 86_400)
+        let then: UndoJournal = UndoJournal(folderURL: folder, now: { seventyDaysAgo })
+        let oldStep: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: "p.md", key: "publish", line: "publish: true")], in: place.root)
+        _ = JournaledWrite.perform(UndoContractReplay.draft(changes: oldStep, root: place.root, action: "publishPages"), in: then, mode: .live)
+        // Segment 3: a step today, whose finish prunes.
+        try Data().write(to: journal.segmentURL(number: 3))
+        let newStep: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: "p.md", key: "publish", line: "publish: false")], in: place.root)
+        _ = JournaledWrite.perform(UndoContractReplay.draft(changes: newStep, root: place.root, action: "publishPages"), in: journal, mode: .live)
+        let left: [Int] = try journal.segmentNumbers()
+        if left != [3] {
+            failures.append("the segments left are \(left), not [3]")
+        }
+        UndoFoldCache.forget(folder)
+        let fold: UndoFold = try journal.read()
+        if fold.highestSeq != 3 || fold.records[3]?.phase != .done {
+            failures.append("the list read whole afterwards is not the newest step alone (highest \(fold.highestSeq))")
+        }
+        return failures
+    }
 }

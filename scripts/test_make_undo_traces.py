@@ -24,6 +24,7 @@ Run with:
 """
 import json
 import re
+import unicodedata
 import unittest
 from pathlib import Path
 
@@ -45,31 +46,49 @@ def committed():
 FRAGMENT = re.compile(r"^(\d{8}T\d{6}Z)-(.+)\.json$")
 
 
+def nfc(text):
+    return unicodedata.normalize("NFC", text)
+
+
 def deployed_answer(case):
-    """undo.rule.deployed: the newest fragment of each destination says what
-    that website shows; a move offers to deploy when a website shows a page
-    as the course has it before the move, for a page whose visibility the
-    move changes."""
+    """undo.rule.deployed: only the destinations the section deploys to now
+    are read; the newest fragment of each says what that website shows; a
+    move offers to deploy when a website shows a page as the course has it
+    before the move, for a page whose visibility the move changes. A site
+    marker with no fragment cannot tell; places compare in NFC."""
+    destinations = case["destinations"]
+    markers = set(case.get("siteMarkers", []))
     newest = {}
     for fragment in case["record"]:
         found = FRAGMENT.match(fragment["name"])
         if not found:
             continue
         stamp, destination = found.group(1), found.group(2)
+        if destination not in destinations:
+            continue
         if destination not in newest or stamp > newest[destination][0]:
             newest[destination] = (stamp, fragment.get("places"))
-    if not newest:
-        return "noOffer"
+    deployed = False
     cannot_tell = False
-    for _, places in newest.values():
+    for destination in destinations:
+        if destination not in newest:
+            if destination in markers:
+                deployed = True
+                cannot_tell = True
+            continue
+        deployed = True
+        places = newest[destination][1]
         if places is None:
             cannot_tell = True
             continue
+        shown = {nfc(place) for place in places}
         for move in case["moves"]:
             path = move["path"]
-            place = "/".join(path.split("/")[2:])[:-3]
-            if move["visibleBefore"] != move["visibleAfter"] and (place in places) == move["visibleBefore"]:
+            place = nfc("/".join(path.split("/")[2:])[:-3])
+            if move["visibleBefore"] != move["visibleAfter"] and (place in shown) == move["visibleBefore"]:
                 return "offerToDeploy"
+    if not deployed:
+        return "noOffer"
     if cannot_tell or case.get("changesMoreThanVisibility"):
         return "cannotTell"
     return "noOffer"
@@ -299,8 +318,8 @@ class ContractCaseTests(unittest.TestCase):
                     elif call == "undo":
                         had = model.highest
                         last = model.undo()
-                        if last[0] == "changedSince":
-                            cleared.append(("changedSince", had))
+                        if last[0] in ("changedSince", "contentMissing") and model.last_clearing == had:
+                            cleared.append((last[0], had))
                     elif call == "redo":
                         last = model.redo()
                     elif call == "editTheLineByHand":
@@ -320,6 +339,25 @@ class ContractCaseTests(unittest.TestCase):
                         lines_written_by_the_deploy = 0
                     elif call == "note":
                         model.note()
+                    elif call.startswith("cleared:"):
+                        # Honoured whatever its reason: a reader never checks it.
+                        model.clear()
+                        cleared.append((call[len("cleared:"):], model.highest))
+                    elif call == "goLive":
+                        if model.clear():
+                            cleared.append(("wentLive", model.highest))
+                        model.prune()
+                    elif call == "wholeFileStep":
+                        before = model.pages[p1]
+                        after = flipped(p1) + "A line the step added.\n"
+                        ops = traces.ops_for_change(p1, before, after)
+                        self.assertEqual([op["kind"] for op in ops], ["writeFile"])
+                        seq = model.begin(ops)
+                        model.pages[p1] = after
+                        model.finish(seq)
+                        last = ("applied", seq)
+                    elif call == "removeContent":
+                        model.content_removed = True
                     elif call == "begin:dead@B":
                         path = folder_b + p1
                         after = flipped(path)
@@ -370,16 +408,20 @@ class ContractCaseTests(unittest.TestCase):
                 if "interrupted" in case:
                     self.assertEqual([step["seq"] for step in model.steps if step["phase"] == "interrupted"], case["interrupted"])
 
-    def test_the_clear_reasons_are_the_two_ruled(self):
-        # Rulings 17 and 18 took the deploy and the share of unit plans off.
-        self.assertEqual(shared_undo()["clearReasons"], ["changedSince", "interrupted"])
+    def test_the_clear_reasons_are_the_four_written(self):
+        # Rulings 17 and 18 took the deploy and the share of unit plans off;
+        # the director's rulings 1 and 3 on U1's third round added the flip
+        # of the switch and an Undo refused for missing content. A reader
+        # never checks the reason (stackCases: a reason no reader knows).
+        self.assertEqual(shared_undo()["clearReasons"], ["changedSince", "interrupted", "contentMissing", "wentLive"])
 
     def test_deployed_cases(self):
         # A reference of undo.rule.deployed, written from the words alone,
         # against the contract's cases (UndoWebsite.answer on the mac).
         for case in shared_undo()["deployedCases"]:
             with self.subTest(case=case["name"]):
-                self.assertEqual(set(case) - {"name", "moves", "changesMoreThanVisibility", "record", "answer", "why"}, set())
+                self.assertEqual(set(case) - {"name", "moves", "changesMoreThanVisibility", "record", "destinations",
+                                              "siteMarkers", "answer", "why"}, set())
                 self.assertEqual(deployed_answer(case), case["answer"])
 
     def test_the_format_names_every_event_and_the_clearing(self):

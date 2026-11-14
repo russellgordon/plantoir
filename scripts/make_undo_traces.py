@@ -376,8 +376,10 @@ def op_state(op, current):
     return "neither"
 
 
-def plan(ops, backward, pages_by_path):
-    """UndoCheck.plan: ('ready', {path: new text or None}) or ('changedSince', first, others)."""
+def plan(ops, backward, pages_by_path, content_missing=False):
+    """UndoCheck.plan: ('ready', {path: new text or None}), ('changedSince',
+    first, others), or ('contentMissing', path) when a whole-file op needs a
+    blob and the list's content is gone (`content_missing`)."""
     ordered = list(reversed(ops)) if backward else list(ops)
     original = {}
     working = {}
@@ -396,7 +398,10 @@ def plan(ops, backward, pages_by_path):
         if state != wanted_from:
             continue
         if op["kind"] == "writeFile":
-            working[path] = op["beforeText"] if backward else op["afterText"]
+            target = op["beforeText"] if backward else op["afterText"]
+            if content_missing and target is not None:
+                return ("contentMissing", path)
+            working[path] = target
         else:
             source = op["after"] if backward else op["before"]
             target = op["before"] if backward else op["after"]
@@ -416,6 +421,8 @@ def plan(ops, backward, pages_by_path):
 
 GRACE_DAYS = 30
 CLOCK_TOLERANCE_DAYS = 1.0
+# UndoSwitch.undoRefusedForMissingContentClearsTheList (held question M9).
+UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS = True
 
 
 class Model:
@@ -433,6 +440,7 @@ class Model:
         self.clock = 0.0
         self.newest_written = None
         self.unreachable = set()   # working folders that cannot be reached
+        self.content_removed = False   # the list's content/ was taken away
 
     # -- the fold -----------------------------------------------------
 
@@ -649,8 +657,10 @@ class Model:
             return ("notAvailable",)
         if self.folder_of(undo) in self.unreachable:
             return ("notAvailable",)
-        result = plan(undo["ops"], True, self.pages)
-        if result[0] == "changedSince":
+        result = plan(undo["ops"], True, self.pages, self.content_removed)
+        if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
+            return result
+        if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 self.clear()
                 self.prune()
@@ -672,8 +682,8 @@ class Model:
             return ("notAvailable",)
         if self.folder_of(candidate) in self.unreachable:
             return ("notAvailable",)
-        result = plan(candidate["ops"], False, self.pages)
-        if result[0] == "changedSince":
+        result = plan(candidate["ops"], False, self.pages, self.content_removed)
+        if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 # Ruling 20: refused once, then only the redo branch goes.
                 for step in self.steps:

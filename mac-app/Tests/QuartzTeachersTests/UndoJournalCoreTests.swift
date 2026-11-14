@@ -1,8 +1,9 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// The journal core's own pieces (#899, U1, after its two reviews): the fold
-/// read on from where it stopped, the identifier file, and the lock. The
+/// The journal core's own pieces (#899, U1, after its reviews): the fold read
+/// on from where it stopped, the identifier file, the lock, a closed step's
+/// staged files, and a segment with no time. The
 /// work is in `UndoCoreChecks`, which the standalone harness runs too.
 ///
 /// Everything happens in folders under the temporary directory.
@@ -34,6 +35,18 @@ final class UndoJournalCoreTests: XCTestCase {
     /// MUST FAIL on 96bcadbcc: a damaged `folder-id` threw for ever.
     func testTheIdentifierFileNeverBlocksForGood() throws {
         XCTAssertEqual(try UndoCoreChecks.identifierFileNeverBlocksForGood(under: scratchURL), [])
+    }
+
+    /// MUST FAIL on a6796be95, whose pruning closed the step and left its
+    /// staged file in the course for good.
+    func testAClosedStepLeavesNoStagedFile() throws {
+        XCTAssertEqual(try UndoCoreChecks.aClosedStepLeavesNoStagedFile(under: scratchURL), [])
+    }
+
+    /// MUST FAIL on a6796be95, which kept a segment holding no time, and
+    /// every segment after it, for good.
+    func testASegmentWithNoTimeIsBounded() throws {
+        XCTAssertEqual(try UndoCoreChecks.aSegmentWithNoTimeIsBounded(under: scratchURL), [])
     }
 
     func testTheLockWaitsForTheGrant() throws {

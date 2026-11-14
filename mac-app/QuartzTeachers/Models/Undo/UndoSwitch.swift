@@ -45,6 +45,27 @@ nonisolated enum UndoSwitch {
     /// anybody can see (plan 4.9).
     static let shadowLockWaitSeconds: Double = 0.05
 
+    /// Whether an Undo refused because content it needs is missing from the
+    /// list clears the list after saying so once, as ruling 13 does for a
+    /// page changed by hand. Content that is missing never comes back, so
+    /// otherwise the newest step is offered and refused on every try until
+    /// it ages out, and nothing earlier can be undone. Russell has not ruled
+    /// on it (held question M9 on U1's second reviews); this is the
+    /// recommended answer, built behind this one constant so it is cheap to
+    /// turn. A Redo refused this way drops only its redo either way
+    /// (ruling 20).
+    static let undoRefusedForMissingContentClearsTheList: Bool = true
+
+    /// How long recovery waits before it tries again to put back a step
+    /// whose swap was refused (a file another program holds), on the
+    /// ordinary path: one minute after the first refusal, doubling, never
+    /// more than an hour. An Undo or a Redo always tries at once. Measured
+    /// before it (the core review of U1's second round): every action paid
+    /// 187 to 255 ms restaging a refused 300-page put-back.
+    static let refusedSwapFirstRetrySeconds: Double = 60
+
+    static let refusedSwapLongestWaitSeconds: Double = 3_600
+
     // MARK: - Computed properties
 
     /// The mode every caller records in, read from the switch.

@@ -497,9 +497,10 @@ nonisolated enum UndoOutcome: Equatable, Sendable {
     /// "Undo", nothing said (ruling 10; the director's ruling 1).
     case notAvailable
     /// Refused, nothing written to the pages. For an Undo whose page was
-    /// changed by hand, `clearedTheList` is true (ruling 13); for a Redo
-    /// refused the same way, only the redo branch is dropped (ruling 20) and
-    /// it is false.
+    /// changed by hand, or whose content is missing, `clearedTheList` is true
+    /// (ruling 13; `UndoSwitch.undoRefusedForMissingContentClearsTheList`);
+    /// for a Redo refused either way, only the redo branch is dropped
+    /// (ruling 20) and it is false.
     case refused(UndoRefusal, clearedTheList: Bool)
     /// The list itself could not be read or written.
     case listUnavailable
@@ -509,10 +510,14 @@ nonisolated enum UndoOutcome: Equatable, Sendable {
 
 /// Why the whole list was cleared: the `reason` of a `cleared` line.
 ///
-/// Two reasons, and only two. A deploy and sharing unit plans are not on the
-/// list and clear nothing (rulings 17 and 18, which replaced 14 and 16):
-/// whether a step was deployed since is read from the deploy markers when
-/// Undo is offered (`UndoWebsite`), never written into the journal.
+/// The reasons this version WRITES. A reader never checks one: a `cleared`
+/// line clears whatever its reason says, a reason no reader knows included
+/// (the director's ruling 1 on U1's third round), so a later version can
+/// clear for a reason of its own. A deploy and sharing unit plans are not
+/// on the list and clear nothing (rulings 17 and 18, which replaced 14 and
+/// 16): whether a step was deployed since is read from the published-pages
+/// record when Undo is offered (`UndoWebsite`), never written into the
+/// journal.
 nonisolated enum UndoClearing: String, Sendable, CaseIterable {
     /// Undo refused the newest step because what it changed was changed by
     /// hand since (ruling 13).
@@ -521,6 +526,16 @@ nonisolated enum UndoClearing: String, Sendable, CaseIterable {
     /// wholly back (the director's ruling 7 on U1's first reviews, and 4 on
     /// its second).
     case interrupted
+    /// Undo refused the newest step because content it needs is missing
+    /// from the list, which can never come back: refused once with its
+    /// reason, then the list is cleared, as ruling 13 does for a hand edit
+    /// (held question M9, built behind
+    /// `UndoSwitch.undoRefusedForMissingContentClearsTheList`).
+    case contentMissing
+    /// The switch went live (U7): one clearing at the flip, so a step
+    /// recorded in shadow, while most writers were not yet journaled, is
+    /// never offered (the director's ruling 1 on U1's third round).
+    case wentLive
 }
 
 /// Undo, Redo and clearing, as the list does them.
@@ -653,16 +668,27 @@ nonisolated extension UndoJournal {
         return direction == .backward ? .undone(seq: seq) : .redone(seq: seq)
     }
 
-    /// What a refusal because the page was changed by hand does to the list:
-    /// an Undo clears it (ruling 13), a Redo drops only the redo branch
-    /// (ruling 20). Any other refusal (a file in use, missing content)
-    /// leaves the list as it was, to be tried again. True when it cleared.
+    /// What a refusal that can never succeed does to the list. The page was
+    /// changed by hand, or content the step needs is missing from the list:
+    /// an Undo clears it (ruling 13, and for missing content
+    /// `UndoSwitch.undoRefusedForMissingContentClearsTheList`), a Redo drops
+    /// only the redo branch (ruling 20). A file in use leaves the list as it
+    /// was, to be tried again. True when it cleared.
     private func answerARefusal(_ refusal: UndoRefusal, of seq: Int, direction: UndoDirection) -> Bool {
-        guard case .changedSince = refusal else {
+        let reason: UndoClearing
+        switch refusal {
+        case .changedSince:
+            reason = .changedSince
+        case .contentMissing:
+            if direction == .backward && !UndoSwitch.undoRefusedForMissingContentClearsTheList {
+                return false
+            }
+            reason = .contentMissing
+        case .fileIsInUse, .notReadable:
             return false
         }
         if direction == .backward {
-            return (try? clearAfterARefusal(of: seq)) == true
+            return (try? clearAfterARefusal(of: seq, reason: reason)) == true
         }
         try? dropTheRedoBranchAfterARefusal(of: seq)
         return false
@@ -683,12 +709,30 @@ nonisolated extension UndoJournal {
     }
 
     /// Ruling 13: the refused step is still the head, so the list is cleared.
-    private func clearAfterARefusal(of seq: Int) throws -> Bool {
+    private func clearAfterARefusal(of seq: Int, reason: UndoClearing) throws -> Bool {
         return try withLock { writer -> Bool in
             if writer.fold.offer(now: now()).head?.step.seq != seq {
                 return false
             }
-            try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: UndoClearing.changedSince.rawValue))
+            try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: reason.rawValue))
+            UndoPruning.prune(writer)
+            return true
+        }
+    }
+
+    /// The one clearing at the flip (U7 calls it once, at the first launch
+    /// with `undoJournalIsLive` on): every step recorded in shadow leaves the
+    /// list, because while it was off most writers were not journaled yet,
+    /// and an Undo could otherwise pass over the teacher's newest change to
+    /// take back an older one (the director's ruling 1 on U1's third round).
+    /// Writes nothing when nothing is on the list. True when it cleared.
+    @discardableResult
+    func clearTheListAsTheSwitchGoesLive() throws -> Bool {
+        return try withLock { writer -> Bool in
+            if writer.fold.stepsOnTheList.isEmpty {
+                return false
+            }
+            try writer.append(UndoEventLine(seq: writer.fold.highestSeq, event: .cleared, reason: UndoClearing.wentLive.rawValue))
             UndoPruning.prune(writer)
             return true
         }

@@ -26,7 +26,12 @@ import XCTest
 /// writing; the C calls that write (`rename`, `link`, `unlink`, `mkdir`,
 /// `chmod`, `truncate` and the like, and `open` with a flag that writes); and
 /// a tool that writes run as a process (`/usr/bin/ditto`, `/bin/mv`,
-/// `/bin/cp`, `/bin/rm` and the others in `writingTools`). A call split
+/// `/bin/cp`, `/bin/rm` and the others in `writingTools`, a shell among
+/// them); and a launcher named in quotes (`setup.sh`, `preview.sh`,
+/// `deploy.sh`), so whoever starts one is listed with what it waits for
+/// (the director's ruling 9 on U1's third round, which also added `rmdir`,
+/// `remove`, `mkstemp`, `utimes`, the extended-attribute calls and
+/// NSWorkspace's `duplicate`). A call split
 /// across lines counts too: a line that ends in `(` is read together with
 /// the next. The count is per file, so a file can swap one write for
 /// another and stay green: the list says WHO writes, and a new writer is
@@ -39,7 +44,10 @@ final class UndoWriterScanTests: XCTestCase {
     static let writingCalls: [String] = [
         "write(to:",
         "write(toFile:",
-        "moveItem(",
+        // With its dot, so `removeItem(` is not counted twice (it holds
+        // `moveItem(`; found in U1's third round: every removal had been
+        // counted as two writes).
+        ".moveItem(",
         "removeItem(",
         "copyItem(",
         "replaceItemAt(",
@@ -62,13 +70,28 @@ final class UndoWriterScanTests: XCTestCase {
         "Darwin.unlink(",
         "setResourceValues(",
         "recycle(",
+        // NSWorkspace's copy beside the original.
+        ".duplicate(",
     ]
 
     /// Tools that write, counted once on a line that names one by its path
     /// (`"/usr/bin/ditto"`, or `/bin/rm ` inside a script the app writes).
+    ///
+    /// A SHELL counts as a tool that writes (`/bin/bash`, `/bin/sh`,
+    /// `/bin/zsh`): whatever it runs can write a course (the director's
+    /// ruling 9 on U1's third round, after `ScriptRunner` ran `setup.sh`
+    /// through `/bin/bash` uncounted).
     static let writingTools: [String] = [
         "ditto", "mv", "cp", "rm", "rsync", "unzip", "zip", "chmod", "chflags", "ln", "mkdir", "touch", "tar",
+        "bash", "sh", "zsh",
     ]
+
+    /// The launchers, which write course files themselves (`setup.sh` makes
+    /// a course, `preview.sh` rewrites a course's `course_config.json`,
+    /// `deploy.sh` writes the published-pages record and the site markers),
+    /// counted once on a line that names one in quotes: whoever starts one
+    /// is on the list with what it waits for (ruling 9).
+    static let launchers: [String] = ["setup.sh", "preview.sh", "deploy.sh"]
 
     /// Where those tools live.
     static let toolFolders: [String] = ["/bin/", "/usr/bin/", "/sbin/", "/usr/sbin/"]
@@ -89,6 +112,17 @@ final class UndoWriterScanTests: XCTestCase {
         "truncate",
         "ftruncate",
         "fopen",
+        "rmdir",
+        "remove",
+        "mkstemp",
+        "mkdtemp",
+        "utimes",
+        "futimes",
+        "lutimes",
+        "setxattr",
+        "fsetxattr",
+        "removexattr",
+        "fremovexattr",
     ]
 
     /// `open(` counts once on a line that also names one of these flags.
@@ -100,81 +134,92 @@ final class UndoWriterScanTests: XCTestCase {
     /// Every file allowed to write, with how many writing calls it holds and
     /// why. Paths are under `QuartzTeachers/`.
     static let allowed: [String: (calls: Int, reason: String)] = [
-        "App/ProblemReportCommands.swift": (8, "notAStep: a problem report, built and saved outside every course"),
+        "App/ProblemReportCommands.swift": (5, "notAStep: a problem report, built and saved outside every course"),
         "App/QuartzTeachersApp.swift": (1, "notAStep: the app's own state folder for `--state-dir`"),
         "Models/AgentGuidance.swift": (2, "waitsFor: U4"),
         "Models/Assist/AppRulesContract.swift": (1, "notAStep: writes the contract files for `--write-contracts`, a developer's command"),
-        "Models/Assist/AssistChangeHistory.swift": (3, "waitsFor: U7 (today's undo itself; kept as an adapter when the switch flips)"),
+        "Models/Assist/AssistChangeHistory.swift": (2, "waitsFor: U7 (today's undo itself; kept as an adapter when the switch flips)"),
         "Models/Assist/AssistContract.swift": (2, "notAStep: writes the contract files for `--write-contracts`, a developer's command"),
         "Models/Assist/AssistCurriculumMentions.swift": (1, "waitsFor: U3"),
-        "Models/Assist/AssistModelStore.swift": (11, "notAStep: the assistant's model download and removal (class D, plan 7)"),
+        "Models/Assist/AssistModelStore.swift": (7, "notAStep: the assistant's model download and removal (class D, plan 7)"),
         "Models/Assist/AssistPublishPlan.swift": (1, "waitsFor: U3"),
-        "Models/Assist/AssistServerHost.swift": (7, "notAStep: the assistant's own launch files"),
+        "Models/Assist/AssistServerHost.swift": (5, "notAStep: the assistant's own launch files"),
+        "Models/Assist/AssistSiteWork.swift": (1, "waitsFor: U4 (starts preview.sh, whose preflight rewrites a course's course_config.json outside the door)"),
         "Models/Assist/AssistToolRunner.swift": (2, "waitsFor: U3"),
         "Models/Assist/ClaudeCodeLauncher.swift": (4, "notAStep: an outside assistant's launch files, outside any course"),
         "Models/Assist/CodexLauncher.swift": (2, "notAStep: an outside assistant's launch files, outside any course"),
         "Models/Assist/CopilotLauncher.swift": (3, "notAStep: an outside assistant's launch files, outside any course"),
-        "Models/BuildOutputLocation.swift": (37, "notAStep: the built websites' folder and its move out of the working folder"),
-        "Models/BuilderWarmUp.swift": (5, "notAStep: the builder cache of #836 (class D)"),
-        "Models/ClassInsertionPlanner.swift": (7, "waitsFor: U3"),
+        "Models/BuildOutputLocation.swift": (25, "notAStep: the built websites' folder and its move out of the working folder"),
+        "Models/BuilderWarmUp.swift": (10, "notAStep: the builder cache of #836 (class D), and the shell and launchers it warms the builder with"),
+        "Models/ClassInsertionPlanner.swift": (6, "waitsFor: U3"),
         "Models/ClassesDatedLater.swift": (2, "waitsFor: U3"),
-        "Models/CourseArchiver.swift": (9, "waitsFor: U5"),
+        "Models/CourseArchiver.swift": (6, "waitsFor: U5"),
         "Models/CourseConfiguration.swift": (2, "waitsFor: U4"),
         "Models/CoursePageCopier.swift": (3, "waitsFor: U4"),
         "Models/CourseRenamer.swift": (3, "waitsFor: U4"),
-        "Models/CourseRestorer.swift": (23, "waitsFor: U5"),
-        "Models/DeployCommand.swift": (2, "waitsFor: U6"),
+        "Models/CourseRestorer.swift": (17, "waitsFor: U5"),
+        "Models/DeployCommand.swift": (3, "waitsFor: U4 (releaseSite: the rollover's cut loose, undone with it; the deploy.sh it names is not counted, rulings 17 and 18)"),
+        "Models/FolderContainers.swift": (2, "notAStep: the website builder's containers, through a shell, outside every course"),
         "Models/FolderScaffold.swift": (1, "waitsFor: U4 (a new working folder's scaffold, made with New Course)"),
         "Models/HowITeachPage.swift": (1, "waitsFor: U3"),
         "Models/LinksChecklist/LinksChecklistOffer.swift": (2, "waitsFor: U3"),
-        "Models/LinksChecklist/PublishedPagesRecord.swift": (6, "notAStep: the published-pages record is a world record (undo.worldRecords, U6)"),
-        "Models/ObsidianFigureAddOns.swift": (14, "waitsFor: U4"),
+        "Models/LinksChecklist/PublishedPagesRecord.swift": (4, "notAStep: the published-pages record, written by a deploy (rulings 17 and 18) and read by undo.rule.deployed"),
+        "Models/ObsidianFigureAddOns.swift": (11, "waitsFor: U4"),
         "Models/PlaceholderClassPlanner.swift": (2, "waitsFor: U3"),
-        "Models/PlanSharing.swift": (9, "waitsFor: U6"),
+        "Models/PlanSharing.swift": (7, "notAStep: sharing unit plans and stopping (ruling 18); its releasePlanMarkers runs inside a reference copy, which is U4's"),
         "Models/PlantoirDefaults.swift": (2, "notAStep: the preferences store's own note file under a state folder"),
-        "Models/ReferenceCopier.swift": (4, "waitsFor: U4"),
+        "Models/PreviewReachability.swift": (1, "notAStep: a shell that asks whether a preview answers; it writes no file"),
+        "Models/RealHome.swift": (1, "notAStep: names the login shell; runs nothing"),
+        "Models/ReferenceCopier.swift": (3, "waitsFor: U4"),
         "Models/ReferenceCreation.swift": (2, "waitsFor: U4"),
-        "Models/ReferenceImporter.swift": (5, "waitsFor: U4"),
+        "Models/ReferenceImporter.swift": (4, "waitsFor: U4"),
         "Models/ReferenceLock.swift": (1, "waitsFor: U4 (a reference course's locks, lifted and put back inside the step that changes it, plan 2.6)"),
         "Models/ReferenceReadingView.swift": (2, "waitsFor: U4"),
         "Models/ReferenceReplacer.swift": (3, "waitsFor: U5"),
         "Models/ReferenceShelfStore.swift": (3, "waitsFor: U4"),
-        "Models/ReferenceStaging.swift": (9, "waitsFor: U4"),
+        "Models/ReferenceStaging.swift": (6, "waitsFor: U4"),
         "Models/ReferenceTreeCopier.swift": (5, "waitsFor: U4"),
-        "Models/ReferenceZipSource.swift": (7, "waitsFor: U4"),
-        "Models/ScheduledDeploy.swift": (43, "waitsFor: U6"),
-        "Models/ScheduledPublishOutcome.swift": (7, "notAStep: a scheduled run's outcome record, a world record"),
+        "Models/ReferenceZipSource.swift": (6, "waitsFor: U4"),
+        "Models/ScheduledDeploy.swift": (37, "notAStep: a deploy set for later (rulings 17 and 18): launchd jobs and the scripts they run, outside every course"),
+        "Models/ScheduledPublishOutcome.swift": (5, "notAStep: a scheduled run's outcome record, a world record"),
         "Models/ScheduledPublishWatcher.swift": (1, "notAStep: a scheduled run's outcome record, a world record"),
+        "Models/ScheduledRunFolderRefresh.swift": (4, "notAStep: a deploy set for later refreshing its folder's launchers (rulings 17 and 18), outside every course"),
         "Models/SectionAdder.swift": (13, "waitsFor: U4"),
         "Models/SectionIndexPointer.swift": (1, "waitsFor: U3"),
         "Models/SectionProblems.swift": (2, "notAStep: folder-problem acknowledgements (plan 7: not steps)"),
-        "Models/SectionPublishState.swift": (2, "notAStep: deploy markers are world records (undo.worldRecords, U6)"),
+        "Models/SectionPublishState.swift": (2, "notAStep: the site markers, written by a deploy (rulings 17 and 18) and read by undo.rule.deployed"),
         "Models/SectionReDatePlanner.swift": (1, "waitsFor: U3"),
         "Models/SectionTimetable.swift": (2, "waitsFor: U3"),
-        "Models/SetUp/AssistantSetUpCentre.swift": (7, "notAStep: setting up an outside assistant, outside every course (it changes no course: not on the list; ruling 16's reason, asked again under ruling 17)"),
-        "Models/SetUp/SetUpRecord.swift": (11, "notAStep: the record of the assistants Plantoir set up, outside every course (as AssistantSetUpCentre)"),
-        "Models/SetUp/SetUpRunner.swift": (4, "notAStep: a set-up's own work folder, outside every course (as AssistantSetUpCentre)"),
+        "Models/SetUp/AssistantSetUp.swift": (3, "notAStep: setting up an outside assistant, outside every course (held question M8, as AssistantSetUpCentre)"),
+        "Models/SetUp/AssistantSetUpCentre.swift": (5, "notAStep: setting up an outside assistant, outside every course (it changes no course: not on the list; ruling 16's reason, asked again under ruling 17)"),
+        "Models/SetUp/SetUpRecord.swift": (8, "notAStep: the record of the assistants Plantoir set up, outside every course (as AssistantSetUpCentre)"),
+        "Models/SetUp/SetUpRunner.swift": (3, "notAStep: a set-up's own work folder, outside every course (as AssistantSetUpCentre)"),
         "Models/SiteHealthRepair.swift": (3, "waitsFor: U4"),
-        "Models/SpecialFolderRenamer.swift": (6, "waitsFor: U4"),
+        "Models/SpecialFolderRenamer.swift": (5, "waitsFor: U4"),
         "Models/StartOfYear/StartOfYearPlanner.swift": (1, "waitsFor: U3"),
         "Models/TodaysClassOnTheFrontPage.swift": (3, "waitsFor: U3"),
-        "Models/ToolchainCopyMarker.swift": (4, "notAStep: the toolchain mirror"),
-        "Models/ToolchainFingerprints.swift": (9, "notAStep: the toolchain mirror's index"),
-        "Models/Undo/UndoCheck.swift": (20, "door: the staged swaps of an undo, a redo and recovery"),
-        "Models/Undo/UndoJournal.swift": (23, "door: the list itself, outside every working folder"),
+        "Models/ToolchainCopyMarker.swift": (3, "notAStep: the toolchain mirror"),
+        "Models/ToolchainFingerprints.swift": (7, "notAStep: the toolchain mirror's index"),
+        "Models/Undo/UndoCheck.swift": (12, "door: the staged swaps of an undo, a redo and recovery"),
+        "Models/Undo/UndoJournal.swift": (19, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
-        "Models/Undo/UndoRecovery.swift": (4, "door: pruning the list's own content and segments"),
-        "Models/UnitWordRenamer.swift": (7, "waitsFor: U4"),
-        "Models/WorkLeaseFiles.swift": (4, "notAStep: work leases"),
-        "Models/WorkLeaseRegistry.swift": (4, "notAStep: work leases"),
-        "Models/WorkspaceModel.swift": (18, "waitsFor: U4 and U5 (Add Section, New Course, restore, remove, archive, delete)"),
-        "Scripting/NewCourseCreator.swift": (2, "waitsFor: U4 (New Course from the command line: the course folder and its course_config.json)"),
+        "Models/Undo/UndoRecovery.swift": (2, "door: pruning the list's own content and segments"),
+        "Models/UnitWordRenamer.swift": (6, "waitsFor: U4"),
+        "Models/WorkLeaseFiles.swift": (3, "notAStep: work leases"),
+        "Models/WorkLeaseRegistry.swift": (3, "notAStep: work leases"),
+        "Models/WorkspaceModel.swift": (25, "waitsFor: U4 and U5 (Add Section, New Course, restore, remove, archive, delete, and the launchers it copies into a working folder)"),
+        "Scripting/MultiDestinationDeployRunner.swift": (1, "waitsFor: U4 (the build before a deploy is preview.sh, whose preflight rewrites course_config.json; the deploy itself is not counted, rulings 17 and 18)"),
+        "Scripting/NewCourseCreator.swift": (5, "waitsFor: U4 (New Course from the command line: the course folder, its course_config.json, and setup.sh)"),
+        "Scripting/PlanShareRunner.swift": (1, "notAStep: sharing unit plans through deploy.sh (ruling 18)"),
+        "Scripting/PreviewStopper.swift": (4, "notAStep: stops a preview through preview.sh, which writes no course file when it stops"),
         "Scripting/ProblemReport.swift": (7, "notAStep: problem reports and their records, outside every course"),
-        "Scripting/ProblemReportBuilder.swift": (7, "notAStep: a problem report's working folder, outside every course"),
+        "Scripting/ProblemReportBuilder.swift": (6, "notAStep: a problem report's working folder, outside every course"),
+        "Scripting/ScriptRunner.swift": (2, "waitsFor: U4 (runs the launchers through /bin/bash: setup.sh makes a course for New Course, preview.sh rewrites course_config.json in its preflight; deploy.sh is not counted, rulings 17 and 18)"),
         "Views/CourseSettings/CourseSettingsView.swift": (2, "waitsFor: U4"),
-        "Views/CourseSettings/StringListEditorView.swift": (6, "waitsFor: U4"),
+        "Views/CourseSettings/StringListEditorView.swift": (3, "waitsFor: U4"),
         "Views/Helpers/FolderActions.swift": (5, "waitsFor: U5"),
-        "Views/SidebarView.swift": (8, "waitsFor: U5"),
+        "Views/Section/SectionDetailView.swift": (1, "waitsFor: U4 (starts preview.sh, as AssistSiteWork)"),
+        "Views/SidebarView.swift": (4, "waitsFor: U5"),
         "Views/Wizard/SetSchoolYearSheet.swift": (1, "waitsFor: U4"),
     ]
 
@@ -240,6 +285,38 @@ final class UndoWriterScanTests: XCTestCase {
             }
             XCTAssertEqual(count, sample.calls, sample.source)
         }
+    }
+
+    /// What the third core review found passed the scan, and a removal
+    /// counted twice. MUST FAIL on the scan at a6796be95, which knew no
+    /// shell or launcher run as a process and none of these C calls, and
+    /// counted `removeItem(` twice because it holds `moveItem(`: it counts
+    /// 2 where these samples hold 9 (the director's ruling 9 on U1's third
+    /// round).
+    func testTheScanCountsShellsLaunchersAndTheCCalls() {
+        let samples: [(source: String, calls: Int)] = [
+            (source: "newProcess.executableURL = URL(fileURLWithPath: \"/bin/bash\")", calls: 1),
+            (source: "runner.run(scriptNamed: \"setup.sh\", arguments: [], workingDirectory: url)", calls: 1),
+            (source: "_ = utimes(url.path, nil)", calls: 1),
+            (source: "rmdir(path)", calls: 1),
+            (source: "let descriptor = mkstemp(&template)", calls: 1),
+            (source: "try remove(url)", calls: 1),
+            (source: "setxattr(path, name, value, size, 0, 0)", calls: 1),
+            (source: "NSWorkspace.shared.duplicate([url]) { _, _ in }", calls: 1),
+            (source: "try FileManager.default.removeItem(at: url)", calls: 1),
+            (source: "items.remove(at: 0)", calls: 0),
+            (source: "let tool = \"/usr/bin/shasum\"", calls: 0),
+        ]
+        var total: Int = 0
+        for sample in samples {
+            var count: Int = 0
+            for code in UndoWriterScanTests.codeLines(of: sample.source) {
+                count += UndoWriterScanTests.writingCallCount(inCode: code)
+            }
+            XCTAssertEqual(count, sample.calls, sample.source)
+            total += count
+        }
+        XCTAssertEqual(total, 9)
     }
 
     func testEveryReasonIsOneOfTheThreeKinds() {
@@ -343,6 +420,9 @@ final class UndoWriterScanTests: XCTestCase {
             }
         }
         if UndoWriterScanTests.runsAWritingTool(code) {
+            count += 1
+        }
+        for launcher in launchers where code.contains("\"" + launcher + "\"") {
             count += 1
         }
         return count

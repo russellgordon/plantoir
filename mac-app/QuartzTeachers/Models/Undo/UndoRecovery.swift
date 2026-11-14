@@ -29,24 +29,47 @@ import Foundation
 /// file it must move is in the way) can never succeed later either: the
 /// step is closed `interrupted` (reason `couldNotPutBack`, naming the files
 /// left part way) and the list cleared, exactly as for a hand edit. A swap
-/// that is refused (a file another program holds) is left to be tried again
-/// at the next lock. A step whose working folder cannot be reached, or that
+/// that is refused (a file another program holds, the everyday case on
+/// Windows) is tried again on a bounded schedule (`UndoRefusedSwaps`): at
+/// once at an Undo or a Redo, and on the ordinary path one minute after the
+/// first refusal, doubling to an hour, so an ordinary action pays nothing
+/// for it in between (the director's ruling 5 on U1's third round; measured
+/// before, 187 to 255 ms on every action for a 300-page put-back). A step
+/// whose working folder cannot be reached, or that
 /// this version cannot read, is left as it is while it is on the list, and
 /// Undo is not available while it is the newest (ruling 10); pruning closes
 /// it once it is past the limits (`UndoPruning`), so nothing stays in flight
 /// for ever (the director's ruling 4 on U1's second reviews: measured
 /// before, 121 steps and none pruned behind one such step).
+///
+/// A step closed `interrupted` leaves nothing of the journal's in a course:
+/// its staged files are removed when it is closed, and when its folder could
+/// not be reached then, by the first recovery in each process that can reach
+/// it (`tidyClosedSteps`; the director's ruling 6 on U1's third round).
 nonisolated enum UndoRecovery {
+
+    // MARK: - Stored properties
+
+    /// Closed steps whose staged files this process has already looked for,
+    /// by list and step number.
+    nonisolated(unsafe) private static var tidied: Set<String> = []
+
+    private static let tidiedLock: NSLock = NSLock()
 
     // MARK: - Functions
 
+    /// `trySwapsNow`: an Undo or a Redo, where a put-back refused earlier is
+    /// tried again at once; false on the ordinary path, where it waits for
+    /// its turn on `UndoRefusedSwaps`' schedule.
     @discardableResult
     static func run(
         _ writer: UndoJournalWriter,
         mode: UndoMode,
+        trySwapsNow: Bool = true,
         resolveRoot: (UndoWorkingFolder) -> URL?
     ) -> [UndoRecoveryResult] {
         var results: [UndoRecoveryResult] = []
+        let now: Date = writer.journal.now()
         for record in writer.fold.inFlight {
             guard let process = record.process else {
                 continue
@@ -60,11 +83,62 @@ nonisolated enum UndoRecovery {
             guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
                 continue
             }
-            if let result = settle(record, root: root, writer: writer, mode: mode) {
+            let key: String = UndoRefusedSwaps.key(for: record, in: writer.journal)
+            if !trySwapsNow && !UndoRefusedSwaps.isDue(key, now: now) {
+                continue
+            }
+            var swapRefused: Bool = false
+            if let result = settle(record, root: root, writer: writer, mode: mode, swapRefused: &swapRefused) {
+                UndoRefusedSwaps.forget(key)
                 results.append(result)
+            } else if swapRefused {
+                UndoRefusedSwaps.noteARefusal(key, now: now)
             }
         }
+        if mode == .live {
+            tidyClosedSteps(writer, resolveRoot: resolveRoot)
+        }
         return results
+    }
+
+    /// Removes the staged files of every step closed `interrupted` that this
+    /// process has not yet looked for and whose folder it can reach. Each is
+    /// looked for once per process: a few folder listings, and only for the
+    /// rare step that was closed.
+    static func tidyClosedSteps(_ writer: UndoJournalWriter, resolveRoot: (UndoWorkingFolder) -> URL?) {
+        for seq in writer.fold.orderedSeqs {
+            guard let record = writer.fold.records[seq], record.phase == .interrupted else {
+                continue
+            }
+            let key: String = writer.journal.folderURL.standardizedFileURL.path + "#" + String(seq)
+            tidiedLock.lock()
+            let done: Bool = tidied.contains(key)
+            tidiedLock.unlock()
+            if done {
+                continue
+            }
+            guard let folder = record.step.workingFolder, let root = resolveRoot(folder) else {
+                continue
+            }
+            tidyStagedFiles(of: record.step, root: root)
+            tidiedLock.lock()
+            tidied.insert(key)
+            tidiedLock.unlock()
+        }
+    }
+
+    /// Every staged file a step's apply, undo, redo or recovery left beside
+    /// the files it names.
+    static func tidyStagedFiles(of step: UndoStep, root: URL) {
+        var urls: [URL] = []
+        for op in step.ops {
+            if let path = op.path {
+                urls.append(root.appendingPathComponent(path))
+            }
+        }
+        for work in ["apply", "undo", "redo"] {
+            UndoSwap.tidyLeftovers(label: "\(step.seq)-\(work)", beside: urls)
+        }
     }
 
     /// Where each file of a step stands: before, after or neither.
@@ -114,11 +188,14 @@ nonisolated enum UndoRecovery {
         return (before: before, after: after, neither: neither)
     }
 
+    /// Nil when nothing was written: `swapRefused` says whether that was a
+    /// put-back refused because a file is in use.
     static func settle(
         _ record: UndoStepRecord,
         root: URL,
         writer: UndoJournalWriter,
-        mode: UndoMode
+        mode: UndoMode,
+        swapRefused: inout Bool
     ) -> UndoRecoveryResult? {
         let step: UndoStep = record.step
         let phase: UndoPhase
@@ -214,7 +291,8 @@ nonisolated enum UndoRecovery {
                     return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
                 }
                 if UndoSwap.swap(targets, label: label + "-recover") != UndoSwapResult.swapped {
-                    // A file in use: tried again at the next lock.
+                    // A file in use: tried again on the schedule.
+                    swapRefused = true
                     return nil
                 }
                 putBack = targets.count
@@ -317,8 +395,13 @@ nonisolated enum UndoPruning {
     /// newer step. A step a running process holds stops the run. A step this
     /// version cannot read is pruned like any other once past the limits.
     /// Then it deletes the content and old segments nothing kept can need.
-    /// Inside the lock only, and never failing a caller.
-    static func prune(_ writer: UndoJournalWriter) {
+    /// Inside the lock only, and never failing a caller. In shadow it writes
+    /// nothing into a working folder.
+    static func prune(
+        _ writer: UndoJournalWriter,
+        mode: UndoMode = .live,
+        resolveRoot: (UndoWorkingFolder) -> URL? = UndoReach.root
+    ) {
         let fold: UndoFold = writer.fold
         let now: Date = writer.journal.now()
         let ageLimit: Double = Double(UndoSwitch.daysKept + UndoFold.deletionGraceDays) * 86_400
@@ -354,6 +437,13 @@ nonisolated enum UndoPruning {
                 } catch {
                     return
                 }
+                // Nothing of the journal's is left in a course: its staged
+                // files go now when its folder can be reached, or at the
+                // first recovery that can reach it (`tidyClosedSteps`).
+                if mode == .live, let folder = record.step.workingFolder, let root = resolveRoot(folder) {
+                    UndoRecovery.tidyStagedFiles(of: record.step, root: root)
+                }
+                UndoRefusedSwaps.forget(UndoRefusedSwaps.key(for: record, in: writer.journal))
                 remaining -= 1
                 continue
             }
@@ -420,9 +510,13 @@ nonisolated enum UndoPruning {
     /// Old segments, from the oldest end only, while they hold no event of a
     /// step still on the list and are older than the segment holding the
     /// highest step number (so a number is never used twice). A segment
-    /// holding a line this version cannot read goes too, once its own record
-    /// (the newest time written in it) is past the limits on the disk and
-    /// the clock is trusted, like any other: never while it holds no time.
+    /// holding a line this version cannot read goes too, once its bound is
+    /// past the limits on the disk and the clock is trusted, like any other:
+    /// its own record (the newest time written in it), or, for a segment
+    /// with no readable time at all, the record of the first later segment
+    /// that has one (`segmentBound`). Never for ever (the director's ruling 7
+    /// on U1's third round: before it, such a segment kept itself and every
+    /// newer segment for good).
     static func deleteUnneededSegments(_ writer: UndoJournalWriter, now: Date, trustTheClock: Bool) {
         guard let numbers = try? writer.journal.segmentNumbers(), numbers.count > 1 else {
             return
@@ -446,7 +540,7 @@ nonisolated enum UndoPruning {
                 return
             }
             if barrierSegments.contains(number) {
-                guard trustTheClock, let newest = writer.fold.segmentNewestAt[number], newest < ageCutoff else {
+                guard trustTheClock, let bound = segmentBound(number, among: numbers, writer.fold), bound < ageCutoff else {
                     return
                 }
             }
@@ -456,5 +550,95 @@ nonisolated enum UndoPruning {
             writer.forgetSegment(number)
             index += 1
         }
+    }
+
+    /// The time a segment is judged by: the newest time written in it, or,
+    /// when it holds none it can read, the newest time of the first later
+    /// segment that has one. Lines are appended in order, so every line of a
+    /// segment was written before every line of the segments after it, and
+    /// under a clock that has not gone back the later segment's newest time
+    /// is no earlier than this one's own would be: the bound keeps such a
+    /// segment at least as long as its own time would have. Deleting a
+    /// segment never takes a kept step's blob, which its step keeps. Nil
+    /// when no later segment has a time either.
+    static func segmentBound(_ number: Int, among numbers: [Int], _ fold: UndoFold) -> Date? {
+        if let own = fold.segmentNewestAt[number] {
+            return own
+        }
+        for later in numbers where later > number {
+            if let found = fold.segmentNewestAt[later] {
+                return found
+            }
+        }
+        return nil
+    }
+}
+
+/// When recovery next tries a put-back whose swap was refused because a file
+/// is in use (the director's ruling 5 on U1's third round). Per process: a
+/// process that has never seen the refusal tries at its first lock, and
+/// after each refusal it waits one minute, then two, four and so on, never
+/// more than an hour (`UndoSwitch.refusedSwapFirstRetrySeconds` and
+/// `refusedSwapLongestWaitSeconds`). An Undo or a Redo tries at once
+/// whatever the schedule, because that is when the teacher is waiting for
+/// it. Bounded at the other end too: once the step is past the limits,
+/// pruning closes it `unsettled` and it is forgotten here.
+///
+/// Rejected: trying at every lock (measured, the core review of U1's second
+/// round: 187 to 255 ms on each of about 50 actions for a 300-page step,
+/// against 7 to 11 ms for a free page); trying only once per process (a
+/// file a program holds for a minute would then wait for the next launch).
+nonisolated enum UndoRefusedSwaps {
+
+    // MARK: - Stored properties
+
+    /// By step: how many refusals in a row, and when to try next.
+    nonisolated(unsafe) private static var schedule: [String: (refusals: Int, nextTry: Date)] = [:]
+
+    private static let guardLock: NSLock = NSLock()
+
+    // MARK: - Functions
+
+    /// One step's work in one list: its number, where its work stands, and
+    /// when it began, so a new list in a reused folder is never confused
+    /// with an old one.
+    static func key(for record: UndoStepRecord, in journal: UndoJournal) -> String {
+        return journal.folderURL.standardizedFileURL.path + "#" + String(record.step.seq)
+            + "#" + record.phase.rawValue + "#" + record.step.madeAt
+    }
+
+    static func isDue(_ key: String, now: Date) -> Bool {
+        guardLock.lock()
+        defer {
+            guardLock.unlock()
+        }
+        guard let entry = schedule[key] else {
+            return true
+        }
+        return now >= entry.nextTry
+    }
+
+    static func noteARefusal(_ key: String, now: Date) {
+        guardLock.lock()
+        defer {
+            guardLock.unlock()
+        }
+        let refusals: Int = (schedule[key]?.refusals ?? 0) + 1
+        var wait: Double = UndoSwitch.refusedSwapFirstRetrySeconds
+        var doubled: Int = 1
+        while doubled < refusals && wait < UndoSwitch.refusedSwapLongestWaitSeconds {
+            wait = wait * 2
+            doubled += 1
+        }
+        if wait > UndoSwitch.refusedSwapLongestWaitSeconds {
+            wait = UndoSwitch.refusedSwapLongestWaitSeconds
+        }
+        schedule[key] = (refusals: refusals, nextTry: now.addingTimeInterval(wait))
+    }
+
+    static func forget(_ key: String) {
+        guardLock.lock()
+        schedule[key] = nil
+        guardLock.unlock()
     }
 }

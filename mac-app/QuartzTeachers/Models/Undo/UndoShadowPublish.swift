@@ -14,6 +14,13 @@ import Foundation
 ///
 /// Every failure here is swallowed: the list is not in use yet, so it can
 /// never block, slow noticeably or change the teacher's action (plan 4.9).
+///
+/// The list itself is read and written OFF the main actor: the pages are
+/// read here, then the lock, the read of the journal and the writes run on a
+/// task of their own, which the action waits for. A process's first read of
+/// the journal is a whole one (100 to 300 ms and more at a year's steady 2
+/// to 6 MB, the core review of U1's second round), and it must never hold
+/// the window (the director's ruling 8 on U1's third round).
 /// When U3 wires this action through `JournaledWrite.perform` itself, this
 /// file goes.
 @MainActor
@@ -30,7 +37,7 @@ enum UndoShadowPublish {
         workingFolderURL: URL?,
         madeBy: String,
         journal: UndoJournal
-    ) -> UndoShadowTicket? {
+    ) async -> UndoShadowTicket? {
         let root: URL = workingFolderURL
             ?? course.directoryURL.deletingLastPathComponent().deletingLastPathComponent()
         let predicted: [UndoFileChange] = predictedChanges(plan, forSection: sectionNumber, in: course, root: root)
@@ -56,7 +63,10 @@ enum UndoShadowPublish {
             changes: predicted,
             recomputes: recomputes
         )
-        return JournaledWrite.beginInShadow(draft, in: journal)
+        let recording: Task<UndoShadowTicket?, Never> = Task.detached(priority: .userInitiated) {
+            return JournaledWrite.beginInShadow(draft, in: journal)
+        }
+        return await recording.value
     }
 
     /// Closes the step with what `apply` actually wrote (nil: it threw).
@@ -66,12 +76,12 @@ enum UndoShadowPublish {
         forSection sectionNumber: Int,
         in course: Course,
         journal: UndoJournal
-    ) {
+    ) async {
         guard let ticket else {
             return
         }
         guard let change else {
-            JournaledWrite.finishInShadow(ticket, actuallyWritten: nil, in: journal)
+            await closeOffTheMainActor(ticket, actuallyWritten: nil, in: journal)
             return
         }
         let frontPage: URL = SectionIndexPointer.indexURL(forSection: sectionNumber, in: course).standardizedFileURL
@@ -89,7 +99,19 @@ enum UndoShadowPublish {
             }
             written[path] = after
         }
-        JournaledWrite.finishInShadow(ticket, actuallyWritten: written, in: journal)
+        await closeOffTheMainActor(ticket, actuallyWritten: written, in: journal)
+    }
+
+    /// `JournaledWrite.finishInShadow` on a task of its own, waited for.
+    static func closeOffTheMainActor(
+        _ ticket: UndoShadowTicket,
+        actuallyWritten: [String: Data?]?,
+        in journal: UndoJournal
+    ) async {
+        let closing: Task<Void, Never> = Task.detached(priority: .userInitiated) {
+            JournaledWrite.finishInShadow(ticket, actuallyWritten: actuallyWritten, in: journal)
+        }
+        await closing.value
     }
 
     /// What `AssistPublishPlanner.apply` will write, page by page: the same

@@ -219,7 +219,7 @@ nonisolated enum JournaledWrite {
         let folderID: String = try FolderIdentityFile.identifier(forWorkingFolder: draft.workingFolderURL)
         let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
         return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
-            UndoRecovery.run(writer, mode: mode, resolveRoot: UndoReach.root)
+            UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root)
             var wholeFilePaths: Set<String> = []
             for op in ops where op.knownKind == .writeFile {
                 if let path = op.path {
@@ -276,7 +276,7 @@ nonisolated enum JournaledWrite {
                     JournaledWrite.dropTheRedoBranch(below: seq, writer)
                 }
                 try writer.append(closing)
-                UndoPruning.prune(writer)
+                UndoPruning.prune(writer, mode: mode)
             }
         } catch {
             UndoFoldCache.keepPendingClosing(closing, for: journal.folderURL)
