@@ -5212,6 +5212,43 @@ for a host as an entry in a list). Firefox (not asked for; `firefox-1543` is
 cached and the checker could add it by name). Screenshots to judge paint
 (blank in headless WebKit until `load`, #625).
 
+### A check ended from outside ends what it started (#906)
+
+The sixteen checks that drive Chrome over its debugging port start it
+through `browser-checks/lib/own_processes.mjs` (`spawnBrowser`), not a plain
+`spawn`. Before #906 a check ended its Chrome only in its own `finish()`, so
+a check stopped from outside left the browser running with no parent.
+**Measured** (M4 Pro, Chrome for Testing 155, 2026-11-13): `maths_offline.mjs`
+from `dev`, given SIGTERM while it ran, left 11 Chrome processes running
+3 s later; the same check through the helper left 0 after SIGTERM, SIGINT
+and SIGHUP alike (exits 143, 130, 129). `rendered_features.mjs` is left as it
+is: Playwright's `launch` ends its browsers on those three signals by its own
+defaults (`handleSIGINT`, `handleSIGTERM`, `handleSIGHUP`), which this piece
+read in its documentation and did not measure.
+
+The helper answers a normal exit, `process.exit()`, an uncaught error and
+the three signals by ending the children Node has not yet seen end, and only
+those: a process the check did not start is never sent anything
+(`test_own_processes.mjs` keeps a bystander running beside a killed check).
+SIGKILL cannot be answered; measured, a check killed that way leaves its
+Chrome. So every browser a check starts carries
+`--plantoir-check-of=<checkout>` (Chrome keeps a switch it does not know on
+its command line and ignores it), and `node browser-checks/lib/own_processes.mjs
+leftovers` names a process carrying this checkout's mark whose parent is gone.
+`verify.sh` prints that line before its browser checks, with the `kill` that
+ends them, and ends them only with `PLANTOIR_END_LEFTOVER_BROWSERS=1`, since
+the run did not start them. `verify.sh`'s own page server
+(`python3 -m http.server`) is ended by its EXIT trap as well, so a run
+stopped part way leaves none behind.
+
+**Rejected.** Starting each browser in a process group of its own and ending
+the group, as the issue first proposed: a browser in the check's own group
+already receives a signal sent to the whole group, SIGKILL included, so
+detaching it would make the one case nothing can answer worse, and ending
+Chrome's main process already ends its helpers (all of them gone within 3 s,
+measured). Ending leftovers by name (`pkill -f Chrome`): it would end a
+browser some other checkout or person started.
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — the explorer's STYLES included,

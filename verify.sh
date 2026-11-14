@@ -2858,7 +2858,18 @@ restore_hit_fixture() {
   fi
   rm -f "$HIT_CONFIG_BACKUP" "$HIT_CONFIG_BACKUP_BACKUP"
 }
-trap 'restore_hit_fixture; release_verify_lock' EXIT
+# The page server the browser checks below share (#906): ended by the EXIT
+# trap as well as after the last check that uses it, so a run stopped part way
+# leaves no python3 -m http.server behind. The pid is cleared once it has been
+# ended, so the trap never signals a number another process may have taken.
+PRINT_SERVER_PID=""
+end_print_server() {
+  if [[ -n "$PRINT_SERVER_PID" ]]; then
+    kill "$PRINT_SERVER_PID" 2>/dev/null || true
+    PRINT_SERVER_PID=""
+  fi
+}
+trap 'end_print_server; restore_hit_fixture; release_verify_lock' EXIT
 printf 'I teach by plantoir-hit-sentinel-course-7f3a.\n' > "$HIT_COURSE/How I Teach.md"
 printf 'I teach by plantoir-hit-sentinel-section-7f3a.\n' > "$HIT_COURSE/section1/HOW I TEACH.md"
 printf 'A look-alike page: plantoir-hit-sentinel-lookalike-7f3a.\n' > "$HIT_COURSE/How I Teach 1.md"
@@ -6016,6 +6027,29 @@ fi
 # It needs a browser on this Mac, so it runs when one is found (PLANTOIR_CHROME,
 # or the copy documentation/06 F7 installs) and says SKIPPED otherwise.
 PRINT_CHROME="${PLANTOIR_CHROME:-}"
+# #906: every browser check below starts its Chrome through
+# browser-checks/lib/own_processes.mjs, which ends it on any exit a check can
+# answer (SIGINT, SIGTERM and SIGHUP included). SIGKILL cannot be answered, so
+# a browser left by an earlier check of this checkout killed that way is NAMED
+# here, with the command that ends it; this run did not start it, so it is
+# ended only when PLANTOIR_END_LEFTOVER_BROWSERS=1 asks for that.
+if command -v node >/dev/null 2>&1; then
+  if [[ "${PLANTOIR_END_LEFTOVER_BROWSERS:-0}" == "1" ]]; then
+    LEFTOVER_BROWSERS="$(node browser-checks/lib/own_processes.mjs leftovers --end 2>&1 || true)"
+  else
+    LEFTOVER_BROWSERS="$(node browser-checks/lib/own_processes.mjs leftovers 2>&1 || true)"
+  fi
+  case "$LEFTOVER_BROWSERS" in
+    NONE:*) ;;
+    *) echo "⚠️  $LEFTOVER_BROWSERS" ;;
+  esac
+  if node browser-checks/lib/test_own_processes.mjs >/tmp/verify_own_processes.log 2>&1; then
+    pass "a browser check ended from outside ends what it started and nothing else: its child gone after SIGTERM, SIGINT, SIGHUP, process.exit and an uncaught error, a bystander left running, a plain spawn's child outliving it (the must-fail), a SIGKILLed check's child named as this checkout's leftover - $(grep -c '^ok' /tmp/verify_own_processes.log) cases$(grep -q '^SKIP' /tmp/verify_own_processes.log && echo ', the real Chrome case skipped: no Chrome for Testing') (browser-checks/lib/test_own_processes.mjs, #906)"
+  else
+    fail "a browser check ended from outside leaves what it started running, or ends what it did not start (browser-checks/lib/test_own_processes.mjs, #906)"
+    cat /tmp/verify_own_processes.log
+  fi
+fi
 if [[ -z "$PRINT_CHROME" ]]; then
   for candidate in "$HOME"/Library/Caches/Plantoir-dev/browsers/chrome/*/chrome-mac-*/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"; do
     [[ -x "$candidate" ]] && PRINT_CHROME="$candidate"
@@ -6118,7 +6152,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "maths did not render from the site's own KaTeX offline, or print after a page change lost its stylesheets (browser-checks/maths_offline.mjs, #494)"
     cat /tmp/verify_maths_offline.log
   fi
-  kill "$PRINT_SERVER_PID" 2>/dev/null || true
+  end_print_server
   # #455: runnable code as a student runs it, against a server the check
   # starts itself so it can also play the hosts that break it.
   if node browser-checks/code_runner.mjs "$PRINT_CHROME" "$SITE_PUBLIC" /Runner-Playground.html /Discussions/Runner-Printable.html /Runner-Autorun.html \

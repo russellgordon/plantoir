@@ -34,11 +34,11 @@
 //
 //   node browser-checks/picture_heights.mjs <chrome> <site folder>
 
-import { spawn } from "node:child_process"
 import { createServer } from "node:http"
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, siteFolder] = process.argv.slice(2)
 if (!chromePath || !siteFolder) {
@@ -83,7 +83,7 @@ function serve() {
 }
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-picture-heights-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1280,900", "--use-mock-keychain",
   "--password-store=basic", "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
