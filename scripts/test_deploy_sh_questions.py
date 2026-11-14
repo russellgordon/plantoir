@@ -57,6 +57,7 @@ Pure stdlib. Run with:
     python3 scripts/test_deploy_sh_questions.py
 """
 
+import atexit
 import os
 import re
 import shutil
@@ -143,8 +144,30 @@ REFUSAL_HEADLINE = "nobody is here to answer"
 # file and test_deploy_sh_plans. Measured against the fix review's probe
 # (bare curl, /usr/bin/curl, `command -p curl`, urllib): before this, only
 # the first was caught.
+#
+# The stand-ins live in a temp folder of their own, one per working folder,
+# never inside the working folder: a test that checks a refused run left
+# nothing behind (test_preview_sh_questions) would otherwise find them there.
 NO_NETWORK_FOLDER = "no-network"
 NO_NETWORK_LOG = "requests-refused.log"
+_STAND_INS_BY_FOLDER: dict = {}
+
+
+def _the_stand_ins_for(folder: Path) -> Path:
+    """The temp folder holding `folder`'s stand-ins, made on first use and
+    removed when the test run ends."""
+    key = str(Path(folder).resolve())
+    if key not in _STAND_INS_BY_FOLDER:
+        _STAND_INS_BY_FOLDER[key] = Path(tempfile.mkdtemp(prefix="plantoir-no-network-")) / NO_NETWORK_FOLDER
+    return _STAND_INS_BY_FOLDER[key]
+
+
+def _remove_every_stand_in() -> None:
+    for shim in _STAND_INS_BY_FOLDER.values():
+        shutil.rmtree(shim.parent, ignore_errors=True)
+
+
+atexit.register(_remove_every_stand_in)
 
 _SITECUSTOMIZE = """\
 # Written by test_deploy_sh_questions.the_network_refused: refuses any socket
@@ -212,7 +235,7 @@ def _a_listener_that_writes_down_every_connection(log: Path) -> int:
 
 def the_network_refused(folder: Path, environment: dict) -> dict:
     """`environment` with all three doors to the network shut (above)."""
-    shim = folder / NO_NETWORK_FOLDER
+    shim = _the_stand_ins_for(folder)
     shim.mkdir(exist_ok=True)
     log = shim / NO_NETWORK_LOG
     curl = shim / "curl"
@@ -239,7 +262,7 @@ def the_network_refused(folder: Path, environment: dict) -> dict:
 
 def no_request_was_made(folder: Path) -> None:
     """Raises when the launcher tried the network during the run."""
-    log = folder / NO_NETWORK_FOLDER / NO_NETWORK_LOG
+    log = _the_stand_ins_for(folder) / NO_NETWORK_LOG
     if log.exists():
         count = len(log.read_text(encoding="utf-8").splitlines())
         raise AssertionError(
