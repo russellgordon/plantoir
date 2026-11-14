@@ -8320,6 +8320,46 @@ points the session at is `plantoir-unit-planning`, written into the working
 folder like the others (`documentation/09-mac-app.md` → "Unit planning
 (#707)").
 
+### What the Revise greeting must say, checked (#791)
+
+`app-rules.json` → `outsideAgents.greetingMustSay` lists what the Revise
+doors' greeting must say. Until 2026-11-14 it was eight sentences of prose
+that no suite on either platform read (707a review L9), so a greeting that
+dropped one stayed green. Since
+[#791](https://github.com/russellgordon/plantoir/issues/791) each entry is
+`{key, says, where}`: `key` names the contract text it is about, `says` keeps
+the prose, and `where` is one of five checks that `greetingMustSayHow`
+defines (`first`, `contains`, `afterPlanFirst`, `whenReferenceCourses`,
+`last`). The four sentences that had no key gained one: `greetingOpening`
+(the course by code, and by name in brackets when the name differs),
+`greetingToolsSentence`, `greetingSectionsSentence` and
+`greetingPlanFirstSentence`. The mac builds the greeting from named
+constants for each (`ClaudeCodeLauncher.openingWithNameTemplate`,
+`toolsGreetingSentence`, `sectionsGreetingSentence`,
+`planFirstGreetingSentence`), and the bytes are unchanged:
+`greetingHandoutsCases` compares whole greetings and did not move.
+
+`AppRulesContractTests.testEveryDoorsGreetingSaysWhatTheContractSays` runs
+`prepareSession` for each of the three doors in `outsideAgents.agents`, in
+three variants (a name that differs from the code; a reference course and no
+unit plan yet; a name that is the code), and reads the greeting off the line
+the script starts the assistant with, at the position the door's `arguments`
+give `{greeting}`. It checks every entry, and every word of
+`greetingMustNotSay`: Russell's ruling on #750 (2026-11-13) that the greeting
+never mentions marking, class results or report card comments, which are
+offered only in context by the skill in use. A `where` the suite does not
+know fails, so a new kind of entry proposed from either side turns the other
+red until it is implemented.
+
+Rejected: matching the prose itself (a sentence cannot be checked against a
+description of it); a whole-text case per door (`greetingHandoutsCases`
+already does that for one door's builder, and an extra copy of the same
+paragraph would be one more thing to keep in step when a sentence changes);
+and checking the Fix with and Plan a Unit messages here, which replace the
+greeting and have their own whole-text cases. The built-in assistant's
+surface did not move (`scripts/test_tool_surface_digest.py`): the greeting
+reaches outside assistants only.
+
 ### A sentence on every door: printed handouts (#859)
 
 Russell ruled on 2026-11-13 that an outside assistant opened from Plantoir
