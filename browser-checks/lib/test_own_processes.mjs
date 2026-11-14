@@ -15,7 +15,7 @@
 // Every process this test starts is ended by it: by pid, never by name.
 
 import { spawn } from "node:child_process"
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -136,15 +136,22 @@ async function main() {
     const child = await run.child
     run.check.kill("SIGTERM")
     await run.exited
-    await gone(child)
+    const ended = await gone(child)
     expect("a check that is ended leaves a process it did not start running", running(bystander.pid), "the bystander was ended")
     endOurs(bystander.pid)
+    if (!ended) endOurs(child)
   }
 
   {
     // SIGKILL cannot be answered: leftovers() finds what it leaves, by this
     // checkout's mark and a parent that is gone, and nothing else.
-    const checkout = mkdtempSync(join(tmpdir(), "plantoir-own-processes-checkout-"))
+    // The checkout's path has a space in it, and another checkout's path is
+    // the part before the space: neither may name the other's leftovers.
+    const parent = mkdtempSync(join(tmpdir(), "plantoir-own-processes-checkout-"))
+    const shorter = join(parent, "plantoir")
+    const checkout = join(parent, "plantoir two")
+    mkdirSync(shorter)
+    mkdirSync(checkout)
     const run = standIn("marked", "wait", checkout)
     const child = await run.child
     await pause(200)
@@ -159,9 +166,10 @@ async function main() {
     }
     expect("after SIGKILL, the check's child is named as a leftover of its checkout", found.length === 1 && found[0].pid === child, JSON.stringify(found))
     expect("and is no leftover of a checkout whose path only starts the same", leftovers(checkout.slice(0, -1)).length === 0 && leftovers(checkout + "x").length === 0)
+    expect("nor of a checkout whose path is the part of this one's before a space", leftovers(shorter).length === 0, JSON.stringify(leftovers(shorter)))
     endOurs(child)
     await gone(child)
-    rmSync(checkout, { recursive: true, force: true })
+    rmSync(parent, { recursive: true, force: true })
   }
 
   {

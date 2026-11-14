@@ -43,8 +43,11 @@ let answering = false
 
 // The switch every browser a check starts carries: Chrome keeps a switch it
 // does not know on its main process's command line and does nothing with it.
+// The checkout is written with encodeURI, so the mark holds no space and ends
+// where the argument ends: unencoded, the mark of a checkout /x/plantoir was
+// the start of the mark of a checkout "/x/plantoir two", followed by a space.
 export function checkoutMark(checkout = CHECKOUT) {
-  return `--plantoir-check-of=${checkout}`
+  return `--plantoir-check-of=${encodeURI(checkout)}`
 }
 
 function stillRunning(child) {
@@ -104,7 +107,8 @@ export function leftovers(checkout = CHECKOUT) {
     if (row === null) continue
     const [, pid, parent, command] = row
     // The mark ends at the end of the argument: a checkout whose path is
-    // this one's with more after it is another checkout.
+    // this one's with more after it is another checkout. The mark holds no
+    // space (checkoutMark), so a space after it is the end of the argument.
     const at = command.indexOf(mark)
     if (at === -1) continue
     const after = command.slice(at + mark.length, at + mark.length + 1)

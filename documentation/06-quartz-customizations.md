@@ -5235,11 +5235,34 @@ Chrome. So every browser a check starts carries
 `--plantoir-check-of=<checkout>` (Chrome keeps a switch it does not know on
 its command line and ignores it), and `node browser-checks/lib/own_processes.mjs
 leftovers` names a process carrying this checkout's mark whose parent is gone.
+The checkout is written with `encodeURI`, so the mark holds no space: written
+plainly, the mark of a checkout `/x/plantoir` was the start of the mark of a
+checkout `/x/plantoir two`, and one would have named the other's leftovers.
 `verify.sh` prints that line before its browser checks, with the `kill` that
 ends them, and ends them only with `PLANTOIR_END_LEFTOVER_BROWSERS=1`, since
-the run did not start them. `verify.sh`'s own page server
-(`python3 -m http.server`) is ended by its EXIT trap as well, so a run
-stopped part way leaves none behind.
+the run did not start them. Ended that way, a real Chrome's twelve processes
+took about 9 s to go under load (3 s unloaded). Without `node` the self-test
+is a SKIP line by name.
+
+A signal to `verify.sh` alone reaches the check it is running. Bash runs a
+trap only after its foreground child ends, so before this a TERM to
+`verify.sh` waited for the check to finish by itself (measured with a 6 s
+child: the trap ran 6 s later), and with no trap at all bash exited at once
+and left the check running with no parent. Every browser check now runs
+through `run_check`, which starts it in the background and waits on it, so
+the signal interrupts the wait at once; `stop_for_signal` passes the signal
+on to that one pid and to nothing else, waits for the check to end (it then
+ends its own Chrome, above), and exits 129, 130 or 143. An INT is passed on
+as TERM, because a command bash starts in the background with no job
+control ignores INT. `scripts/test_verify_lock.py` holds it: the check gone,
+a process the run started some other way still running, for each of the
+three signals; a foreground `run_check`, a trap that passes nothing on, and
+one that signals every child of the run each turn it red. `verify.sh`'s own
+page server (`python3 -m http.server`) is ended by its EXIT trap as well, so
+a run stopped part way leaves neither behind. A SIGKILL to `verify.sh`
+cannot be answered: the check and the page server run on, and a check that
+is then killed the same way leaves its browser for the next run's leftover
+line to name.
 
 **Rejected.** Starting each browser in a process group of its own and ending
 the group, as the issue first proposed: a browser in the check's own group
