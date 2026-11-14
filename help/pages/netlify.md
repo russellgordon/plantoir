@@ -50,9 +50,8 @@ Deploying is what uses the allowance. Publishing or hiding a page uses none, bec
 ## Deploy for the first time
 
 1. Select the section and press {{control:deployButton}}.
-2. A sheet titled {{control:connectToNetlifySheetTitle}} opens. It lists the steps for making an access token on Netlify's website, and has a link named {{control:connectToNetlifySheetLink}}. Follow its steps in your browser. One of them matters months later:
-   {{say:app-rules#credentialRequests.requests[0].steps[3]}}
-3. Netlify shows the token once. Copy it, paste it into the {{control:connectToNetlifySheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this computer, and Plantoir does not ask for it again. [See, change or remove a deploy token](page:deploy-tokens) says where to look at it later.
+2. A sheet titled {{control:connectToNetlifySheetTitle}} opens. It lists the steps for making an access token on Netlify's website, and has a link named {{control:connectToNetlifySheetLink}}. Follow its steps in your browser. One of them is about the token's expiry, and it matters months later. Netlify's tokens start with an expiry of 7 days. Set a date after the end of your school year, or choose no expiry if Netlify offers it. Once a token has expired, deploys stop until you change it.
+3. Netlify shows the token once. Copy it, paste it into the {{control:connectToNetlifySheetTokenField}} field, and press {{control:credentialSheetContinueButton}}. The token is saved securely on this {{machine}}. Plantoir does not ask for it again while that token is saved and Netlify accepts it. [See, change or remove a deploy token](page:deploy-tokens) says where to look at it later.
 4. If a sheet titled {{control:teacherSurnameSheetTitle}} opens, type your surname in the {{control:teacherSurnameSheetSurnameField}} field, using letters only. Plantoir asks once, and uses the surname in the names of your class websites.
 
 {{picture:netlify-1}}

@@ -43,7 +43,7 @@ The pane has a {{control:deployTokensNetlifySection}} part and a {{control:deplo
 The status line says one of these things:
 
 - **Connected.** The token is saved and the service accepts it.
-- **Connected, with an end date.** Cloudflare tells Plantoir when a token ends, so the line gives the date. In the last 30 days before that date the line turns orange and asks you to make a new token. Netlify gives no end date, so nothing can warn ahead for a Netlify token.
+- **Connected, with an end date.** Cloudflare tells Plantoir when a token ends, so the line gives the date. When that date is less than 30 days away the line turns orange and asks you to make a new token. Netlify gives no end date, so nothing can warn ahead for a Netlify token.
 - **Not connected.** No token is saved. The next deploy to that service asks for one.
 - **The token is no longer accepted.** It was refused, has expired, or was turned off at the service. Change the token before you next deploy.
 - **The token cannot deploy to the Cloudflare account above.** The token belongs to another account, or lacks the permission it needs.
@@ -55,7 +55,7 @@ A check never changes or removes a token.
 
 1. Make a new token on the service's website. [Set up Netlify](page:netlify) and [Put your site online with Cloudflare Pages](page:cloudflare) say how.
 2. In the {{control:plantoirSettingsDeployingPane}} pane, press {{control:deployTokensChangeToken}} in that service's part. A sheet opens with the same steps the first deploy showed.
-3. Paste the new token into the field. Press {{control:deployTokensCheckAndSave}}. Plantoir checks the token with the service, and then against every class website this working folder has deployed. The sheet's Cancel button waits while it checks.
+3. Paste the new token into the field. Press {{control:deployTokensCheckAndSave}}. Plantoir checks the token with the service, and then against every class website this working folder has deployed. The sheet's Cancel button is greyed while it checks.
 4. When the token is accepted, it is saved and the sheet closes. The status line says the service is connected.
 
 When the token is not saved, the reason shows under the field, and your old token stays as it was. Correct what the reason names, and press {{control:deployTokensCheckAndSave}} again.
@@ -83,7 +83,7 @@ Removing a token here does not delete it at the service. To stop a token working
 
 ## The warning before a Cloudflare token ends
 
-A warning shows for the last 30 days before a Cloudflare token's end date, and after that date. It is above the website of every section that deploys to Cloudflare Pages. The same sentence shows in the Cloudflare part of the course's settings. The warning has an {{control:deployTokenEndOpenSettings}} button, which opens the {{control:plantoirSettingsDeployingPane}} pane.
+A warning shows when a Cloudflare token's end date is less than 30 days away, and after that date. It is above the website of every section that deploys to Cloudflare Pages. The same sentence shows in the Cloudflare part of the course's settings. The warning has an {{control:deployTokenEndOpenSettings}} button, which opens the {{control:plantoirSettingsDeployingPane}} pane.
 
 Make a new token at Cloudflare, with an end date after the end of your school year or with none, and change it here. The warning goes once the new token is saved.
 

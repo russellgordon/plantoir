@@ -25,9 +25,9 @@ keywords:
 - youtube-nocookie
 - video blocked at school
 - video will not play
-description: A page shows a YouTube or Vimeo video when its address is on a line of its own, in the form used for a picture.
+description: A page shows a YouTube or Vimeo video when its address is written in the form used for a picture.
 ---
-A page can show a video from YouTube or Vimeo. You write the video's address on a line of its own, in the form used for a picture. Students see a player there on the class website.
+A page can show a video from YouTube or Vimeo. You write the video's address in the form used for a picture. Students see a player there on the class website.
 
 ## Steps
 
@@ -74,6 +74,7 @@ The code a video site gives for embedding its player still works when pasted int
 
 - **A YouTube video plays at home and not at school.** The school's network may allow youtube.com and block youtube-nocookie.com. Ask the people who run the network to allow both.
 - **The page shows a broken picture where the video should be.** The address is not the address of one video. A Vimeo showcase or profile is not, and neither is the address of a YouTube live stream. Use the address the video's Share button gives.
+- **You pasted the address from your own browser after uploading a video to Vimeo.** That address is for managing the video, and the page shows a broken picture. Open the video's Share button at Vimeo and use the address it gives.
 - **A Vimeo video does not play on the class website.** Its owner may have limited it to certain websites. It then plays only on the websites the owner has listed at Vimeo, and your class website must be one of them.
 - **In Obsidian a Vimeo line looks like a picture that did not load.** Obsidian does not show a Vimeo address in this form as a player. The class website does.
 - **The video is a file of your own.** That is a different thing. It goes in the course's Media folder: see [Pictures, PDFs and the Media folder](page:media).

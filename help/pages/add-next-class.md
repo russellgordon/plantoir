@@ -34,7 +34,7 @@ keywords:
 - undo
 description: Add Class makes the page for a section's next class. It can be the next class in the unit under way, the first class of a new unit, or a copy of an earlier class.
 ---
-Add Class makes the page for a section's next class. There are three ways to add it. It can be the next class in the unit under way, the first class of a new unit, or a copy of an earlier class. Each way gives a page dated with the section's next class day and left unpublished until you have written it.
+{{menu:addClass}} makes the page for a section's next class. There are three ways to add it. It can be the next class in the unit under way, the first class of a new unit, or a copy of an earlier class. Each way gives a page dated with the section's next class day and left unpublished until you have written it.
 
 ## Steps
 
@@ -84,7 +84,7 @@ The copy holds everything the first page held. Change what differs in Obsidian, 
 - **The first word follows your course.** Where units are called Module or Thread, the sheet and the new page use that word. See [Change what units are called](page:unit-word).
 - **A club's pages carry one number.** After Week 9 comes Week 10. A missing number earlier in the list is not filled in. A club has no units, so the way that starts a new unit is greyed, and the sheet speaks of meetings.
 
-Each use of Add Class adds one page. The Section menu has no command that adds several days at once.
+Each use of {{menu:addClass}} adds one page. The Section menu has no command that adds several days at once.
 
 ## If the section has no class dates yet
 

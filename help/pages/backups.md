@@ -100,12 +100,15 @@ For such a backup the question has two buttons in place of one:
 - **{{control:sidebarRestoreQuestionRestoreSectionButton}}**, where {N} is the number of the section. It puts back that section's pages, its settings on the pages every section shares, its class dates and its record of what was published. It leaves your other sections alone.
 - **{{control:sidebarRestoreQuestionRestoreWholeCourseButton}}** puts every section back, as the steps above do.
 
+The button for one section is the default. Pressing Return restores that one section, not the whole course.
+
 Either way, the course as it is now moves to {{control:sidebarArchived}} first, and the backup is kept.
 
 After one section is restored, an alert says the section is back and gives the backup's date and time. It may add one of these:
 
 - A shared page made since the backup is now hidden from that section. The backup has no such page, so that section's students could not see it then.
 - A shared page kept the setting it has now, because Plantoir could not change the settings at the top of it.
+- A shared page could not be saved, so it was left as it is. Its setting for that section may not be what the backup had.
 - The section still goes to the website address it has now. A restore never changes where students read a section.
 
 The website students read does not change until the section is next deployed.
@@ -113,9 +116,11 @@ The website students read does not change until the section is next deployed.
 The question offers one section only when all of these are true:
 
 - Plantoir made the backup before a change to one section. A backup you made with {{menu:courseBackUpNow}} is of the whole course, and is restored whole.
+- The backup holds that section's folder.
 - The course still has that section.
 - The course is not kept for reference.
-- The course names its class pages and its folders as it did when the backup was made. A change to what units are called, or a renamed folder, means the section can only come back with the whole course.
+- No rename is left unfinished in the course. This is a rename of what the course calls a unit, or of a folder, that stopped part way. Some pages then carry the new names and some the old, and the section can only come back with the whole course.
+- The course names its class pages and its folders as it did when the backup was made. The naming differs after a finished change to what units are called, or after a folder was renamed or removed. The section can then only come back with the whole course.
 
 {{assistant}}
 A backup made before an assistant changed one section offers that section in the same way.

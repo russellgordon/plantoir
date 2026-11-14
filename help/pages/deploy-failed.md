@@ -44,7 +44,7 @@ Plantoir turns a failure it recognises into one sentence. Find yours here.
   {{say:app-rules#failureExplanations.cases[16].expect}}
 - Plantoir could not reach Cloudflare to check the token. There is a sentence like it for Netlify:
   {{say:app-rules#failureExplanations.cases[18].expect}}
-- A token you pasted during this deploy was not saved. There are five such sentences, and each ends by saying it was not saved as your token. This is one:
+- A token you pasted during this deploy was not saved. There are five such sentences, and each says the token was not saved. This is one:
   {{say:app-rules#failureExplanations.cases[21].expect}}
 - A science simulation that a page uses has not been downloaded yet. The sentence names the section, the page and the simulation. See [Science simulations](page:phet). This is one:
   {{say:app-rules#failureExplanations.cases[1].expect}}

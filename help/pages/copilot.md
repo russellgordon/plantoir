@@ -29,7 +29,7 @@ description: What is particular to GitHub Copilot when you open it from Plantoir
 ---
 GitHub Copilot is one of the three outside assistants Plantoir works with. Plantoir opens GitHub Copilot's command-line tool, which runs in a terminal window. This page says what is particular to it.
 
-You install the tool and sign in to it yourself, with your own GitHub account. Plantoir needs no assistant: see [About the assistants (optional)](page:assistants).
+You sign in to the tool yourself, with your own GitHub account. You can install it yourself, or ask Plantoir to set it up: choose {{menu:helpSetUpAnAssistant}}, and see [Set up an assistant's command-line tool](page:set-up-assistant). Plantoir needs no assistant: see [About the assistants (optional)](page:assistants).
 
 ## Where it appears
 

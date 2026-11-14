@@ -29,7 +29,7 @@ keywords:
 - moved folder
 factsChecked: 2026-11-13
 authority: https://phet.colorado.edu/en/licensing
-description: Put a PhET science simulation on a page by naming it in a short block. The class website carries its own copy, which Plantoir downloads once.
+description: Put a PhET science simulation on a page by naming it in a short block. The class website carries its own copy, which Plantoir downloads and keeps.
 ---
 A page can hold a PhET simulation that students open and use. PhET Interactive Simulations, at the University of Colorado Boulder, makes simulations for science and mathematics. You name one in a short block of text, and the class website carries its own copy of it.
 
@@ -54,7 +54,7 @@ alt: A phet block as typed in Obsidian, with its sim line and its alt line marke
 
 5. Preview the section while this {{machine}} is connected to the internet. The part below says why.
 
-Obsidian shows the block as plain text. The simulation appears only on the class website.
+Obsidian shows the block as a code block. The simulation appears only on the class website.
 
 ## The settings
 
@@ -71,7 +71,7 @@ The first time a preview or a deploy meets a simulation, Plantoir downloads it f
 
 - **Preview once, connected, after you add a simulation.** Do it before you schedule a deploy. A scheduled deploy that meets a new simulation with no connection stops at its hour, with nobody there to see it.
 - **One copy serves the whole working folder.** Two sections, or two courses, that use the same simulation share it.
-- **The kept copies stay with this working folder on this {{machine}}.** After you move or rename the working folder, or copy it to a new computer, nothing is kept yet. Preview each section once with the internet.
+- **The kept copies stay with this working folder on this {{machine}}.** After you move or rename the working folder, or copy it to another computer, nothing is kept there yet. Preview each section once with the internet.
 - **A copy unused for about 90 days is cleared away.** A course left alone over the summer needs the internet for its first preview in September.
 
 ## When there is no internet
@@ -107,6 +107,6 @@ A page with the frame that phet.colorado.edu offers for other websites keeps wor
 - **The page shows the block's lines as you typed them.** The block could not be shown. The section's {{control:problemsTab}} tab has a row of the kind {{control:problemsTabKindScienceSimulation}}. The row names the page, the block and the line, and says what is wrong. Most often the name is misspelt, and the row gives the closest names PhET has. See [The Problems tab](page:problems).
 - **The preview stopped and Plantoir says the section was not built.** A simulation has not been downloaded yet. Connect to the internet and preview again.
 - **It stopped the same way while connected.** A school network can send its sign-in page in place of the download. Sign in to the network, or try from another network.
-- **Plantoir says a simulation could not be made ready on this computer.** Preview again. If it stops the same way, choose {{menu:helpReportAProblem}}. See [Send a problem report](page:report).
+- **Plantoir says a simulation could not be made ready on this {{machine}}.** Preview again. If it stops the same way, choose {{menu:helpReportAProblem}}. See [Send a problem report](page:report).
 - **The simulation shows in English in a French course.** That simulation has no French version yet.
 - **A line of the block seems to be ignored.** Only the four settings above are read. Any other line is left out.
