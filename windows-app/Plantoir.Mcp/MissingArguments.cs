@@ -80,7 +80,9 @@ public static class MissingArguments
         bool noSection = needs.Contains("section") && Missing(arguments, "section");
         bool asks = AddClassesTools.Contains(tool);
         bool noUnit = asks && needs.Contains("unit") && Missing(arguments, "unit");
-        bool noCount = asks && needs.Contains("howMany") && Missing(arguments, "howMany");
+        // A count of 0 or less is asked about too, as the mac's
+        // addClassesQuestion asks (no contract case covers it).
+        bool noCount = asks && needs.Contains("howMany") && (Missing(arguments, "howMany") || NotACount(arguments!["howMany"]));
         if (!noSection && !noUnit && !noCount) return pass;
         if (!needs.Contains("course")) return pass;
 
@@ -107,6 +109,29 @@ public static class MissingArguments
         return new Outcome(null, supplied);
     }
 
+    /// <summary>
+    /// Everything the server's call-tool filter asks before a tool runs, in
+    /// the mac's order (its two gates in <c>AssistToolRunner.run</c>, then
+    /// <c>locate</c> inside the tool): the one section SUPPLIED first, so the
+    /// gates and <c>AfterCall</c> read the section the tool will run with;
+    /// then <see cref="ReferenceWriteGate"/> (nothing writes to a course kept
+    /// for reference, and a settings file that cannot be read keeps its
+    /// fail-safe sentence); then <see cref="OutsideChangeGate"/> (an outside
+    /// change while the course is being built is held back, #436); and only
+    /// then <see cref="For"/>'s own refusal. Until the batch review's M1 the
+    /// refusal came first, and a reference course was asked to choose a
+    /// section that would then be refused anyway.
+    /// </summary>
+    public static Outcome InFrontOfTheTool(string tool, Dictionary<string, JsonElement>? arguments, AssistWorkspace workspace)
+    {
+        var missing = For(tool, arguments, workspace);
+        var runWith = missing.Arguments;
+        string? refusal = ReferenceWriteGate.Refusal(tool, runWith, workspace)
+                          ?? OutsideChangeGate.Refusal(tool, runWith, workspace)
+                          ?? missing.Refusal;
+        return new Outcome(refusal, runWith);
+    }
+
     /// <summary>"Sections 1 and 2", "Sections 1, 2 and 3" (the mac's form; a lone section is never said, it is supplied).</summary>
     public static string SectionsPhrase(IReadOnlyList<int> numbers)
     {
@@ -118,6 +143,11 @@ public static class MissingArguments
         }
         return text.ToString();
     }
+
+    /// <summary>A number of 0 or less, as a JSON number or a string of digits; anything else is left to the SDK.</summary>
+    private static bool NotACount(JsonElement value) =>
+        value.ValueKind == JsonValueKind.Number ? value.TryGetDouble(out double n) && n <= 0
+        : value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out int m) && m <= 0;
 
     private static bool Missing(Dictionary<string, JsonElement>? arguments, string key) =>
         arguments is null || !arguments.TryGetValue(key, out var value)

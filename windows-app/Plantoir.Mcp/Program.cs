@@ -127,27 +127,24 @@ builder.Services.AddMcpServer(options =>
     {
         var arguments = context.Params?.Arguments is { } given
             ? new Dictionary<string, System.Text.Json.JsonElement>(given) : null;
-        // A call that names no section (or, for add_classes, no unit or count)
-        // is answered in the contract's words, and a one-section course has
-        // its section supplied, FIRST, so every gate below and AfterCall read
-        // the section the tool will run with (#885): MissingArguments.
+        // In order (MissingArguments.InFrontOfTheTool): a one-section course's
+        // section is SUPPLIED first (#885), so the gates and AfterCall read the
+        // section the tool will run with; then ReferenceWriteGate (nothing
+        // writes to a course kept for reference) and OutsideChangeGate (an
+        // outside change while the course is being BUILT is held back, #436);
+        // and only then the filter's own refusal for a section, unit or count
+        // nobody named, as the mac answers its two gates before locate.
         if (context.Params is { Name: { } called } calling)
         {
-            var missing = MissingArguments.For(called, arguments, workspace);
-            if (missing.Refusal is { } unnamed)
-                return new CallToolResult { Content = [new TextContentBlock { Text = unnamed }] };
-            if (!ReferenceEquals(missing.Arguments, arguments))
+            var front = MissingArguments.InFrontOfTheTool(called, arguments, workspace);
+            if (!ReferenceEquals(front.Arguments, arguments))
             {
-                arguments = missing.Arguments;
+                arguments = front.Arguments;
                 calling.Arguments = arguments;
             }
+            if (front.Refusal is { } refusal)
+                return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
         }
-        if (context.Params?.Name is { } tool && ReferenceWriteGate.Refusal(tool, arguments, workspace) is { } refusal)
-            return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
-        // An outside assistant's change while the course is being BUILT is held
-        // back here, before any backup (#436): OutsideChangeGate.
-        if (context.Params?.Name is { } asked && OutsideChangeGate.Refusal(asked, arguments, workspace) is { } heldBack)
-            return new CallToolResult { Content = [new TextContentBlock { Text = heldBack }] };
         var topBefore = workspace.TopOfTheUndoList;
         var result = await next(context, cancellation);
         return PlantoirTools.AfterCall(workspace, topBefore, Text(arguments, "course"), Number(arguments, "section"), result);

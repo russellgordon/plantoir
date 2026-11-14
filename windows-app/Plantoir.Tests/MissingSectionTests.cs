@@ -17,6 +17,7 @@ namespace Plantoir.Tests;
 /// behind holds <c>Plantoir.Core.dll</c> open): that was measured once and is
 /// recorded in the issue's closing comment.
 /// </summary>
+[Collection(SharedActivityState.Name)]
 public sealed class MissingSectionTests : IDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory("plantoir-missing-section").FullName;
@@ -30,6 +31,17 @@ public sealed class MissingSectionTests : IDisposable
         Course("ICS3U", 1);
         Course("SNC2D");
         Course("ENG4U", 1, 2, 3);
+        // Kept for reference, showing MPM2D, with two sections; and a course
+        // whose settings file cannot be read (batch review M1).
+        Course("MPM2D-2024", 1, 2);
+        string kept = Path.Combine(_folder, "courses", "MPM2D-2024", "course_config.json");
+        var values = JsonNode.Parse(File.ReadAllText(kept))!.AsObject();
+        values["course_code"] = "MPM2D";
+        values["kept_for_reference"] = true;
+        values["reference_school_year"] = 2024;
+        File.WriteAllText(kept, values.ToJsonString());
+        string bad = Directory.CreateDirectory(Path.Combine(_folder, "courses", "BAD1X")).FullName;
+        File.WriteAllText(Path.Combine(bad, "course_config.json"), "{ this is not json");
     }
 
     public void Dispose()
@@ -242,14 +254,92 @@ public sealed class MissingSectionTests : IDisposable
         Assert.Contains("arguments[\"section\"] = _section;", agent);
     }
 
-    /// <summary>The server runs the filter, before the reference gate and with what it supplied (review L1): a source rule, as ReferenceRefusalTests pins the gate.</summary>
+    /// <summary>
+    /// The order, by source (batch review M1): Program.cs asks
+    /// <see cref="MissingArguments.InFrontOfTheTool"/> and puts what it
+    /// supplied into the request BEFORE returning its refusal; that function
+    /// supplies first, then asks the reference gate, then the outside-change
+    /// gate, and only then says the filter's own sentence.
+    /// </summary>
     [Fact]
-    public void TheServerAsksTheFilterFirst()
+    public void TheServerSuppliesFirstThenAsksTheGatesThenTheFilter()
     {
         string program = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "Program.cs"));
-        int filter = program.IndexOf("MissingArguments.For(", StringComparison.Ordinal);
-        int gate = program.IndexOf("ReferenceWriteGate.Refusal(", StringComparison.Ordinal);
-        Assert.True(filter > 0 && gate > filter, "MissingArguments.For must be called before ReferenceWriteGate.Refusal");
-        Assert.Contains("calling.Arguments = arguments;", program);
+        int front = program.IndexOf("MissingArguments.InFrontOfTheTool(", StringComparison.Ordinal);
+        int supplied = program.IndexOf("calling.Arguments = arguments;", StringComparison.Ordinal);
+        int refused = program.IndexOf("front.Refusal is { } refusal", StringComparison.Ordinal);
+        Assert.True(front > 0 && supplied > front && refused > supplied, "Program.cs: InFrontOfTheTool, then the supplied arguments, then the refusal");
+        Assert.DoesNotContain("MissingArguments.For(", program);
+
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "MissingArguments.cs"));
+        string body = source[source.IndexOf("public static Outcome InFrontOfTheTool(", StringComparison.Ordinal)..];
+        int missing = body.IndexOf("For(tool, arguments, workspace)", StringComparison.Ordinal);
+        int reference = body.IndexOf("ReferenceWriteGate.Refusal(tool, runWith, workspace)", StringComparison.Ordinal);
+        int outside = body.IndexOf("OutsideChangeGate.Refusal(tool, runWith, workspace)", StringComparison.Ordinal);
+        int own = body.IndexOf("?? missing.Refusal", StringComparison.Ordinal);
+        Assert.True(missing > 0 && reference > missing && outside > reference && own > outside,
+                    "InFrontOfTheTool: supply, the reference gate, the outside-change gate, then its own refusal");
+    }
+
+    /// <summary>A course kept for reference, two sections, none named: a writing tool gets the reference refusal, not a question about which section (batch review M1).</summary>
+    [Fact]
+    public void AReferenceCourseIsRefusedAsOneBeforeASectionIsAskedFor()
+    {
+        var workspace = Workspace();
+        foreach (string tool in new[] { "publish_pages", "deploy_section", "schedule_deploy", "unpublish_pages" })
+        {
+            var named = WithoutASection(tool, "MPM2D-2024");
+            named["section"] = JsonSerializer.SerializeToElement(1);
+            string? gate = ReferenceWriteGate.Refusal(tool, named, workspace);
+            Assert.True(gate is not null, $"{tool}: the reference gate let it through");
+            var outcome = MissingArguments.InFrontOfTheTool(tool, WithoutASection(tool, "MPM2D-2024"), workspace);
+            Assert.Equal(gate, outcome.Refusal);
+        }
+        // A tool that only reads is not gated, so it is asked which section.
+        Assert.Equal(AssistWording.NoSectionNamed("MPM2D-2024", MissingArguments.SectionsPhrase(new[] { 1, 2 })),
+                     MissingArguments.InFrontOfTheTool("list_pages", Args(new { course = "MPM2D-2024" }), workspace).Refusal);
+    }
+
+    /// <summary>A course whose settings file cannot be read keeps the gate's fail-safe sentence, never "there's no course called" (batch review M1).</summary>
+    [Fact]
+    public void AnUnreadableSettingsFileKeepsItsFailSafeSentence()
+    {
+        var workspace = Workspace();
+        var named = Args(new { course = "BAD1X", section = 1, pages = "Day 1" });
+        string? failSafe = ReferenceWriteGate.Refusal("publish_pages", named, workspace);
+        Assert.True(failSafe is not null, "the reference gate did not refuse an unreadable settings file");
+        Assert.Equal(failSafe, MissingArguments.InFrontOfTheTool("publish_pages", Args(new { course = "BAD1X", pages = "Day 1" }), workspace).Refusal);
+    }
+
+    /// <summary>For an ordinary course the four sentences still answer through the whole front of the tool, and the one section is supplied.</summary>
+    [Fact]
+    public void TheFourSentencesStillAnswerThroughTheFrontOfTheTool()
+    {
+        var workspace = Workspace();
+        Assert.Equal(AssistWording.NoSectionNamed("MPM2D", MissingArguments.SectionsPhrase(new[] { 1, 2 })),
+                     MissingArguments.InFrontOfTheTool("deploy_section", Args(new { course = "MPM2D" }), workspace).Refusal);
+        Assert.Equal(AssistWording.NoSectionNamedAndNoSections("SNC2D"),
+                     MissingArguments.InFrontOfTheTool("publish_pages", Args(new { course = "SNC2D", pages = "x" }), workspace).Refusal);
+        Assert.Equal(AssistWording.AddClassesNeedsAUnit,
+                     MissingArguments.InFrontOfTheTool("add_classes", Args(new { course = "MPM2D", section = 1, howMany = 2 }), workspace).Refusal);
+        Assert.Equal(AssistWording.AddClassesNeedsACount,
+                     MissingArguments.InFrontOfTheTool("add_classes", Args(new { course = "MPM2D", section = 1, unit = 1 }), workspace).Refusal);
+        var one = MissingArguments.InFrontOfTheTool("list_pages", Args(new { course = "ICS3U" }), workspace);
+        Assert.Null(one.Refusal);
+        Assert.Equal(1, one.Arguments!["section"].GetInt32());
+    }
+
+    /// <summary>A count of 0 or less is asked for, as the mac's addClassesQuestion asks (no contract case covers it); a positive count runs.</summary>
+    [Fact]
+    public void ACountOfZeroOrLessIsAskedFor()
+    {
+        var workspace = Workspace();
+        foreach (string tool in MissingArguments.AddClassesTools)
+        {
+            foreach (object count in new object[] { 0, -1, "0" })
+                Assert.Equal(AssistWording.AddClassesNeedsACount,
+                             MissingArguments.For(tool, Args(new Dictionary<string, object> { ["course"] = "MPM2D", ["section"] = 1, ["unit"] = 1, ["howMany"] = count }), workspace).Refusal);
+            Assert.Null(MissingArguments.For(tool, Args(new { course = "MPM2D", section = 1, unit = 1, howMany = 1 }), workspace).Refusal);
+        }
     }
 }

@@ -13083,13 +13083,14 @@ nothing was planned or deployed, but nothing true was said. AFTER, the
 contract's sentences, and `list_pages` for ICS3U lists Section 1.
 
 - **A call filter, nothing a model is shown.** `MissingArguments.For`
-  runs first in `Program.cs`'s call-tool filter: the course (its own
+  runs in `Program.cs`'s call-tool filter, in the order the next bullets
+  give: the course (its own
   refusal, `noCourseNamed` included), then `noSectionNamed` with the
   course's "Sections 1 and 2", `noSectionNamedAndNoSections`, or the one
   section SUPPLIED into the request and the filter's copy (so the
   reference gate, the outside-change gate and `AfterCall` read it); then,
   for `add_classes` and `plan_add_classes` only, `addClassesNeedsAUnit`
-  and `addClassesNeedsACount`. Another tool that requires `unit` keeps the
+  and `addClassesNeedsACount` (a count of 0 or less included). Another tool that requires `unit` keeps the
   SDK's answer. A named section is untouched, one that is not there
   included. What a tool requires is read off its own parameters by
   reflection: 36 of the 43 tools require a section (`back_up_course`
@@ -13103,9 +13104,24 @@ contract's sentences, and `list_pages` for ICS3U lists Section 1.
   `AssistAgent.BoundToThisWindow` writes the window's course and section
   into every call whose tool declares them, and its 13 local tools do not
   include the `add_classes` pair (`MissingSectionTests.TheBuiltInAssistantNeverMeetsThem`).
-- **A `howMany` of 0 is not asked about here** (the mac asks for 0 as for
-  a missing count): the filter answers only an argument that is absent or
-  null, as #885 asks; 0 reaches the tool as it did before. Not measured.
+- **The order, as the mac's** (batch review M1): `Program.cs` asks
+  `MissingArguments.InFrontOfTheTool`, which SUPPLIES the one section
+  first, then asks `ReferenceWriteGate`, then `OutsideChangeGate`, and only
+  then says its own sentence. So a course kept for reference with no
+  section named gets the reference refusal for a writing tool, not a
+  question about a section it would refuse anyway, and a course whose
+  `course_config.json` cannot be read keeps the gate's fail-safe "cannot
+  tell" sentence (measured over stdio, the same answers as before the
+  filter). The first version of this piece said its refusal FIRST and got
+  both wrong. A reading tool on a reference course (`list_pages`) is not
+  gated, so it is asked which section.
+  `MissingSectionTests.TheServerSuppliesFirstThenAsksTheGatesThenTheFilter`
+  pins the order by source, and two behaviour tests pin both cases.
+- **A `howMany` of 0 or less** is asked for with `addClassesNeedsACount`,
+  as the mac's `addClassesQuestion` asks (before, Windows' tool answered
+  "Ask for at least one class.", measured over stdio). No contract case
+  covers 0, or any of these four keys; a case list for them would be the
+  mac's generated half to add.
 - **No trail line**: the contract's `activityTrail.mustRecord` names no
   event for it and the mac writes none.
 - **Tests**: `MissingSectionTests` (pure, no stdio drive: a server left

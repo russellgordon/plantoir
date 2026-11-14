@@ -265,7 +265,12 @@ public class ReferenceRefusalTests : IDisposable
     {
         string program = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "Program.cs"));
         Assert.Contains("AddCallToolFilter", program);
-        Assert.Contains("ReferenceWriteGate.Refusal(", program);
+        // Since #885 the filter asks MissingArguments.InFrontOfTheTool, which
+        // runs this gate (and OutsideChangeGate) before its own refusal;
+        // MissingSectionTests pins that order by behaviour and by source.
+        Assert.Contains("MissingArguments.InFrontOfTheTool(", program);
+        string front = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "MissingArguments.cs"));
+        Assert.Contains("ReferenceWriteGate.Refusal(", front);
     }
 
     /// <summary>A stand-in tool type with one write tool nobody listed.</summary>
