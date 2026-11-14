@@ -13873,7 +13873,8 @@ It owes, in this order (the contract review's recommendation):
 8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
    section's destinations as Windows knows them (primary and additional, by
    type) and whether each has a site marker, read from the same
-   `firstDeployMarkers` paths the scheduled deploy reads.
+   `firstDeployMarkers` paths the scheduled deploy reads. Built
+   2026-11-14 (W5): "Step 8 built: was it deployed?" below.
 
 Until each is built it is a named gap. What goes red on that side the day
 U1 merges, measured by reading the tests rather than running them: the
@@ -13892,3 +13893,71 @@ and only `begin`, `undoing` and `redoing` need the expensive flush
 byte-order mark (`String(contentsOf:)` does, as `File.ReadAllText` does),
 and the traces' writer does the same, so the BOM page in the fixture is
 rewritten without it on both platforms.
+
+### Step 8 built: was it deployed? (#899 piece W5, 2026-11-14)
+
+`Plantoir.Core/Undo/UndoWebsite.cs` answers `undo.rule.deployed` and
+nothing else: given the pages an Undo or a Redo changes (each with whether
+students can see it before and after), whether it also changes what a page
+says, the section's published-pages record, the destinations it deploys to
+now and which of them have a site marker, it says `OfferToDeploy`,
+`NoOffer` or `CannotTell`. It reads no journal, writes nothing, shows
+nothing and offers nothing; nothing calls it until W10 (U6) makes the
+offer. No statics and no clock: `Answer` is pure, and `Inputs(course,
+section)` is the one reader of the disk, taking the course it reads.
+
+**The record it reads, and why that one.** The contract means
+`courses\<CODE>\.publish_state\section<N>.published-pages\`, one fragment
+`yyyyMMddTHHmmssZ-<destination>.json` per destination a deploy reached,
+read by its `places` only. On Windows it is written by `deploy.py`'s
+`record_published_pages` after each Netlify (`-netlify.json`) or
+Cloudflare (`-cloudflare.json`) upload, and by `deploy.ps1`'s
+`Record-PublishedPages` after a folder publish (`-folder.json`, the
+folder branch never entering `deploy.py`), each copying the build's
+`.visible-pages.json` only when its `buildId` matches `.build-id`. So the
+app's button, a scheduled deploy and a deploy typed at the command line
+leave the same trace, and #799's per-host builds (each host built for its
+own address) each leave their own fragment after their own upload. #799's
+freshness records (`BuildFreshness`, the build-started marker, the
+preview stamp) say whether the LAST BUILD reflects the course, not what any
+website shows, so they are not this record. `LinksChecklist.PublishedPlaces`
+reads the same folder as a UNION of every fragment of every destination,
+which is the right question for "has this page ever been on a site" and
+the wrong one here: it is not reused, and a must-fail below shows why.
+
+**Inputs, as Windows spells them.** The destinations are
+`CourseConfiguration.AllDeployDestinations` (primary first, then
+additional), mapped `netlify` (or absent) → `netlify`, `cloudflare_pages`
+→ `cloudflare`, `local_folder` → `folder` (the plan review's L7: the
+fragment says `folder`). A type no deploy accepts maps to nothing and is
+not read, since `deploy.ps1` refuses it. The markers are
+`DeployCommand.FirstDeployMarkerPath`'s, the ones the scheduled deploy
+reads. Only the newest fragment of each destination read is OPENED: a
+year of deploys is hundreds of fragments, and an older one cannot change
+the answer.
+
+**What the cases do not say, and what Windows does** (tests named
+`Proposed_`, proposed to the Mac as authored cases, not written into the
+contract): a record folder that cannot be listed is `CannotTell` for every
+destination (none: `NoOffer`); a fragment is read by its `places`
+whatever its `version` says, absent included; a fragment whose `places`
+is missing, not a list, or holds a non-string is unreadable (only matters
+when it is the newest); an op path not of the shape
+`courses/<CODE>/<place>.md` is `CannotTell`; a change to what a page says
+in a section never deployed is `NoOffer` (the rule's own NO OFFER sentence
+comes first); a destination type no deploy accepts is not read. Also
+pinned, from the rule's words: a missing record folder is no fragments; a
+fragment held open by another program, or with a byte-order mark; two web
+hosts in different states, each read on its own.
+
+**Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200):
+the 18 `deployedCases` pass twice, through `Answer` and through a real
+course folder read by `Inputs` (`UndoWebsiteContractTests`). Each of
+nineteen plausible wrong implementations, put in place one at a time,
+turns named cases red; the list is in #899's closing comment for W5.
+Among them: reading every destination (the contract review's I1 case),
+the union of fragments, ordinal without NFC (the composed and decomposed
+name), the primary destination only, a folder counted as always deployed
+(which is what `firstDeployMarkers` says of a folder for the scheduled
+deploy's question, and wrong here), and an answer read from the journal
+(which no deploy writes: every offer case red).
