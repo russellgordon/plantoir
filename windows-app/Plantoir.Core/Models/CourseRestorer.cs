@@ -80,7 +80,7 @@ public static class CourseRestorer
         if (!Directory.Exists(destination))
         {
             StagedRestore.Place(item.FilePath, item.CourseCode, coursesDirectory, coursesDirectory, steps);
-            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            CourseArchiver.DiscardBuiltSites(coursesDirectory, item.CourseCode);
             LockAgainIfKeptForReference(destination);
             return;
         }
@@ -122,8 +122,10 @@ public static class CourseRestorer
             // build left standing would read as newer and publish what the
             // course used to say. (Also after a failure that was put back: it
             // costs one rebuild, and a putting back that could not finish is
-            // exactly when the build may not match.)
-            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            // exactly when the build may not match.) The kept copies of
+            // geogebra.org sketches stay (#805): each is named by its fence's
+            // key, so it is right for whatever the backup's pages say.
+            CourseArchiver.DiscardBuiltSites(coursesDirectory, item.CourseCode);
             LockAgainIfKeptForReference(destination);
         }
         // The old contents go last, and a part that will not go now is

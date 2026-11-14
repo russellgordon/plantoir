@@ -428,7 +428,7 @@ public static class StagedRestore
         if (parts.Length == 2 && CourseRestorer.NamesASectionFolder(parts[1]) && int.TryParse(parts[1]["section".Length..], out int section))
             CourseArchiver.DiscardBuilds(coursesDirectory, course, section);
         else
-            CourseArchiver.DiscardBuilds(coursesDirectory, course);
+            CourseArchiver.DiscardBuiltSites(coursesDirectory, course);
     }
 
     private static string FirstSegment(string relative) =>

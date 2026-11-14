@@ -162,6 +162,108 @@ public static class BuildOutputLocation
     }
 
     /// <summary>
+    /// The folder of kept copies of geogebra.org sketches beside a course's
+    /// built sites (<c>shared-rules.json</c> →
+    /// <c>buildOutputLocation.keptCopiesSurviveTheClear.folder</c>, pinned by
+    /// a test; the mac's <c>keptCopiesFolderName</c>). <c>scripts/geogebra.py</c>
+    /// reads and writes it under <c>PLANTOIR_BUILD_ROOT\&lt;CODE&gt;</c>.
+    /// </summary>
+    public const string KeptCopiesFolderName = ".geogebra-cache";
+
+    /// <summary>
+    /// Throw away a course's BUILT SITES and its build workspace, and keep its
+    /// kept copies of geogebra.org sketches (#805, the mac's #789
+    /// <c>discardBuiltSites</c>). Used by a restore from a backup, whose pages
+    /// may be older than the built site (so the site goes, as
+    /// <see cref="DiscardBuildsFor(string, string)"/> explains) but whose
+    /// fences still name the same sketches: a kept copy is named by the key of
+    /// the fence that asked for it, so it is right for any page that still
+    /// carries that fence. Cleared with the rest, a copy comes back only while
+    /// the computer is online, and offline the sketch is a folder problem.
+    ///
+    /// <para>Only a REAL folder is kept: a <c>.geogebra-cache</c> that is a
+    /// file, a junction, a symbolic link or a link to itself goes with the
+    /// rest, and removing a link never touches what it points at
+    /// (<c>keptCopiesSurviveTheClear</c>'s cases). A course builds folder that
+    /// is ITSELF a link is never enumerated: only the link goes, exactly as
+    /// <see cref="DiscardBuildsFor(string, string)"/> removes it (the plan
+    /// review's P5 M1: enumerating it would delete what it points at).
+    /// Best-effort, like every discard here.</para>
+    ///
+    /// <para>Archiving a course or a section still discards everything,
+    /// deliberately, on both platforms.</para>
+    /// </summary>
+    public static void DiscardBuiltSitesFor(string buildsRoot, string courseCode)
+    {
+        if (WouldCollideWithEveryCourse(courseCode)) return;
+        string course = ForCourse(buildsRoot, courseCode);
+        Discard(WorkspaceForCourse(buildsRoot, courseCode));
+        FileAttributes attributes;
+        try { attributes = File.GetAttributes(course); }
+        catch { return; }                                              // nothing there
+        if ((attributes & FileAttributes.Directory) == 0 || (attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            DiscardEntry(course);                                      // a file, or a link: only it goes
+            return;
+        }
+        List<FileSystemInfo> entries;
+        try { entries = new DirectoryInfo(course).EnumerateFileSystemInfos("*", ReferenceLock.Unfiltered).ToList(); }
+        catch { return; }
+        foreach (var entry in entries)
+        {
+            if (IsARealKeptCopiesFolder(entry)) continue;
+            try { CourseRestorer.DeleteTree(entry.FullName); }
+            catch { /* best-effort, as Discard */ }
+        }
+    }
+
+    private static bool IsARealKeptCopiesFolder(FileSystemInfo entry) =>
+        string.Equals(entry.Name, KeptCopiesFolderName, StringComparison.Ordinal)
+        && (entry.Attributes & FileAttributes.Directory) != 0
+        && (entry.Attributes & FileAttributes.ReparsePoint) == 0;
+
+    /// <summary>
+    /// Carries a course's builds folder to its new code when the course is
+    /// renamed (#805; the mac's <c>moveBuild</c>, minus the link Windows does
+    /// not have): <c>builds\&lt;id&gt;\&lt;OLD&gt;</c> becomes
+    /// <c>builds\&lt;id&gt;\&lt;NEW&gt;</c>, built sites and kept copies of
+    /// geogebra.org sketches together, because a rename should not cost a
+    /// teacher their website (<c>buildOutputLocation.aBuildWithNoLinkIsNotAdopted.renameIsTheException</c>)
+    /// and the copies are right for the same fences under either name. A
+    /// folder already under the new code (a course of that name removed
+    /// earlier) is stale and is replaced. The OLD code's build workspace is
+    /// discarded: it is made again, and its Quartz project may name the old
+    /// code. Best-effort: a builds folder something still holds open stays
+    /// where it is, as it did before this existed.
+    ///
+    /// <para>Only a REAL folder is moved; one that is a link is removed as a
+    /// link (never what it points at), since a link left under the old code
+    /// names nothing.</para>
+    /// </summary>
+    public static void MoveBuild(string buildsRoot, string oldCode, string newCode)
+    {
+        if (WouldCollideWithEveryCourse(oldCode) || WouldCollideWithEveryCourse(newCode)) return;
+        if (string.Equals(oldCode, newCode, StringComparison.OrdinalIgnoreCase)) return;   // one folder on NTFS
+        Discard(WorkspaceForCourse(buildsRoot, oldCode));
+        string source = ForCourse(buildsRoot, oldCode);
+        FileAttributes attributes;
+        try { attributes = File.GetAttributes(source); }
+        catch { return; }
+        if ((attributes & FileAttributes.Directory) == 0 || (attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            DiscardEntry(source);
+            return;
+        }
+        string target = ForCourse(buildsRoot, newCode);
+        try
+        {
+            if (Directory.Exists(target) || File.Exists(target)) CourseRestorer.DeleteTree(target);
+            Directory.Move(source, target);
+        }
+        catch { /* best-effort: see the summary */ }
+    }
+
+    /// <summary>
     /// Throw away ONE section's built site and workspace, leaving the course's
     /// other sections alone.
     /// </summary>
@@ -346,6 +448,13 @@ public static class BuildOutputLocation
 
     private static bool WouldCollideWithEveryCourse(string courseCode) =>
         courseCode.Equals(WorkspaceDirectoryName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Removes one entry whatever it is (a file, a link, a dangling link: only the link), best-effort.</summary>
+    private static void DiscardEntry(string path)
+    {
+        try { CourseRestorer.DeleteTree(path); }
+        catch { /* best-effort, as Discard */ }
+    }
 
     private static void Discard(string directory)
     {
