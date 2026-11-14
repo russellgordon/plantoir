@@ -42298,5 +42298,43 @@
       "A separate, differently named menu item for the folder: Russell ruled one Open in Browser for both (2026-11-13).",
       "URLProtocol (serves only the app's own web views), SwiftNIO (a dependency for about 400 lines), and NetworkListener behind #available (macOS 26 only, two code paths)."
     ]
+  },
+  "colourSchemePicker": {
+    "why": "#891 (v2.0.0, Russell 2026-11-13): the colour scheme that was stored under an id naming one school is KEPT and offered to everyone as “Grove Colours”. A course that already uses it must look exactly the same, and neither opening its settings nor re-running the command-line set-up may rewrite its colours. So support/colour_schemes.json holds TWO entries with the same name and colours: `grove-colours`, listed, which every new pick writes, and the old entry under its old id, marked `\"listed\": false` with `\"sameAs\": \"grove-colours\"`. Every reader that looks a scheme up by id (the build's website colours, the sharing card, the Coverage tab, the command-line picker's starting place) finds either id exactly as it did before, with no change to any of them. Only the PICKERS filter the list.",
+    "rule": "A picker for one section lists the schemes in the file's order: every listed scheme, and an unlisted scheme only when it is that section's own stored scheme. When it is, it takes the place of the listed scheme its `sameAs` names, so the name appears once and the section's own id is the one selected. Showing the list writes nothing. Picking the unlisted scheme again keeps its id; picking any other scheme writes that scheme's id.",
+    "data": "support/colour_schemes.json: an entry with no `listed` key is listed. An unlisted entry's `name` and `colors` equal those of the entry its `sameAs` names, pinned by scripts/test_grove_colours.py, so the two cannot drift apart.",
+    "cases": [
+      {
+        "name": "a section on the standard colours is offered every listed scheme",
+        "sectionScheme": "quartz-standard",
+        "selected": "quartz-standard"
+      },
+      {
+        "name": "a section that chose Grove Colours under its new id is offered every listed scheme",
+        "sectionScheme": "grove-colours",
+        "selected": "grove-colours"
+      },
+      {
+        "name": "a section stored under Grove Colours' old id sees Grove Colours once, in its place, selected",
+        "sectionSchemeIsTheUnlistedTwinOf": "grove-colours",
+        "twinTakesThePlaceOf": "grove-colours"
+      },
+      {
+        "name": "a section with no scheme chosen is offered every listed scheme",
+        "sectionScheme": "",
+        "selected": ""
+      },
+      {
+        "name": "a section whose stored id is in no entry is offered every listed scheme",
+        "sectionScheme": "a-scheme-that-is-not-in-the-file",
+        "selected": "a-scheme-that-is-not-in-the-file"
+      }
+    ],
+    "caseShape": "`sectionScheme` is the stored id; `sectionSchemeIsTheUnlistedTwinOf` instead names a listed id, and the stored id is the unlisted entry whose `sameAs` is that id (so the old id is written in one shipped file, the scheme list, and not here). The expected list is every listed scheme in file order, with the twin in the place of `twinTakesThePlaceOf` when that is given. `selected` is the id the picker shows chosen; for a twin case it is the twin's own id. In every case each scheme name appears at most once.",
+    "rejected": [
+      "Deleting the old entry: measured on a copy, the build, the sharing card and the Coverage tab then drew the default colours (False, False, False), and the command-line picker started at the first scheme, so Enter wrote quartz-standard.",
+      "Keeping only the old id and renaming it: every new course that picked Grove Colours would write the school's name into its settings.",
+      "One entry with the new id and a list of former ids read by every lookup: six readers on two platforms must agree, and a Windows build carrying the new scheme list before its code matched a former id would show the first scheme as chosen and write quartz-standard at the next touch. With two entries a lagging app can only show the name twice."
+    ]
   }
 }

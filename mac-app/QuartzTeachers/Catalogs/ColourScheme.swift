@@ -9,6 +9,16 @@ struct ColourScheme: Identifiable, Equatable {
     let id: String
     let name: String
 
+    /// False for an entry kept only so courses that stored its id keep
+    /// their colours (`"listed": false` in the file, #891). A picker shows
+    /// it only to a section whose own scheme it is.
+    let isListed: Bool
+
+    /// For an unlisted entry, the id of the listed entry with the same name
+    /// and colours (`sameAs`). A picker shows the unlisted entry in that
+    /// one's place, so the name appears once.
+    let sameAs: String?
+
     /// Quartz theme colour names → hex strings for light mode.
     let lightModeColors: [String: String]
 

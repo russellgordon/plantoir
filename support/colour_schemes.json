@@ -28,8 +28,38 @@
       }
    },
    {
+      "id":"grove-colours",
+      "name":"Grove Colours",
+      "colors":{
+         "lightMode":{
+            "light":"#faf8f8",
+            "lightgray":"#e5e5e5",
+            "gray":"#b9c2be",
+            "darkgray":"#3c4a43",
+            "dark":"#22342c",
+            "secondary":"#28634e",
+            "tertiary":"#84a59d",
+            "highlight":"rgba(143, 159, 169, 0.15)",
+            "textHighlight":"#fff23688"
+         },
+         "darkMode":{
+            "light":"#151718",
+            "lightgray":"#303635",
+            "gray":"#5f6d65",
+            "darkgray":"#d0d6d2",
+            "dark":"#dfe6e2",
+            "secondary":"#6d845f",
+            "tertiary":"#99af8c",
+            "highlight":"rgba(143, 159, 169, 0.15)",
+            "textHighlight":"#b3aa0288"
+         }
+      }
+   },
+   {
       "id":"lakefield-college-school",
-      "name":"Lakefield College School Colours",
+      "name":"Grove Colours",
+      "listed":false,
+      "sameAs":"grove-colours",
       "colors":{
          "lightMode":{
             "light":"#faf8f8",

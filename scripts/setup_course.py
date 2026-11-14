@@ -439,7 +439,32 @@ def render_scheme_preview_for_section(scheme, idx, total, section_number):
 
     print("Use ← / → (or 'p' / 'n') to browse, Enter to select. Press 'q' to keep previous choice.")
 
+def schemes_to_list(schemes, section_scheme_id):
+    """The schemes the picker offers a section whose stored scheme id is
+    `section_scheme_id`, in the file's order (shared-rules.json ->
+    colourSchemePicker, #891). Every listed scheme is offered. An entry
+    marked "listed": false is offered only when it is the section's own
+    scheme, and then it takes the place of the scheme its "sameAs" names, so
+    the name is shown once and Enter keeps the id the course already has."""
+    own_unlisted = None
+    for scheme in schemes:
+        if scheme.get("id") == section_scheme_id and scheme.get("listed", True) is False:
+            own_unlisted = scheme
+    result = []
+    for scheme in schemes:
+        if scheme.get("listed", True) is False:
+            if scheme.get("id") == section_scheme_id:
+                result.append(scheme)
+            continue
+        if own_unlisted is not None and own_unlisted.get("sameAs") == scheme.get("id"):
+            continue
+        result.append(scheme)
+    return result
+
 def interactive_pick_scheme_for_section(schemes, section_number, default_id=None):
+    if not schemes:
+        return default_id
+    schemes = schemes_to_list(schemes, default_id)
     if not schemes:
         return default_id
     start = 0
