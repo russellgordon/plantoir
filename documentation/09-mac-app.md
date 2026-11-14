@@ -753,8 +753,9 @@ run exists.
   assistant, a command line) did not grey the button, because nothing in the
   app watched the leases. Since #729 a program that holds leases greys it
   ("Deploy waits for another program (#729)", next). A program that holds
-  none, such as a deploy typed in Terminal, still does not: a press then is
-  refused in words by the launcher.
+  none, such as a build typed in Terminal or a `deploy.sh` from before #829,
+  still does not: a press then is refused in words by the launcher. Since
+  #829 a deploy typed in Terminal holds leases and greys it.
 
 Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
 
@@ -955,9 +956,8 @@ in reserve was not built.
 - A trail line per grey and un-grey (#729 question 3). It is a state, not an
   act: a refused press is already on the trail.
 - `deploy.sh` taking a lease itself, so a deploy typed in Terminal greys the
-  button. It has real value and is a follow-up (#729 question 2). It touches
-  `ProcessLiveness` (a bash holder's name and start), `workLeases` on both
-  platforms and three launchers.
+  button, was left out of #729 as a follow-up (#729 question 2). It was built
+  by #829 (above).
 - The watcher creating the activity folder (above).
 
 **Tests.**
@@ -1052,7 +1052,12 @@ every lease.
 is `returningToASectionMidDeploy.heldElsewhere.helpForASection` when the
 lease names the section, and `help` when it names none. The window's Cannot
 Preview Yet says `wording.sectionIsBeingBuiltElsewhere` when the lease names
-the section. The in-app assistant is still told `courseIsBeingBuiltElsewhere`
+the section, and since #829's Fable sweep `wording.sectionIsBeingDeployed`
+when another program's publish lease names it (a deploy of that section, a
+`deploy.sh` typed in Terminal among them): the sentence this app's own deploy
+of the section is told with, chosen by `SectionDetailView
+.previewDeclinedSentence` over `WorkLeaseFiles.aDeployHolds`
+(`previewWhileItsSectionDeploys.leaseCases`). The in-app assistant is still told `courseIsBeingBuiltElsewhere`
 (nothing it is shown changes, the owner's instruction for this release), and
 an outside assistant `courseIsBeingBuilt`. The trail's "build declined,
 course busy elsewhere" line says "Section N of the course" when the lease

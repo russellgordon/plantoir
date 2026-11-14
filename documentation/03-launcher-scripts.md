@@ -2584,7 +2584,7 @@ changes: `take_the_work_leases` writes `<COURSE>.build.<pid>.lease` and
 `courses/.internal` and its `activity` folder only if they are missing, and
 `give_back_the_work_leases` removes the leases by their own paths and those
 folders if they are left empty, so a launcher test's working folder ends as it
-began. The rule and its eight cases are `shared-rules.json` → `workLeases
+began. The rule and its nine cases are `shared-rules.json` → `workLeases
 .launcherLeases`.
 
 **The start is read in UTC.** `ps -o lstart` prints local time with no zone,
@@ -2606,6 +2606,32 @@ same id would grey Deploy for its whole life; the review measured exactly that
 (a recycled `bash`, line 4 empty: alive). Taking none errs the way `deploy.sh`
 did before #829: Deploy stays pressable and the guard refuses in words. The
 case "its own start cannot be read" holds it.
+
+**A course it cannot find takes nothing.** The Fable sweep of #829 (F1)
+measured the block alone with course `NOSUCH`: it wrote
+`NOSUCH.build.<pid>.lease` and both trail lines before "Course folder not
+found" refused the run further down. Since then the call refuses a code with no
+folder in `courses/` first, with the same refusal
+(`refuse_a_course_folder_not_found`, one function for both places), so it
+leaves no lease and no line; and `take_the_work_leases` takes none for a code
+holding a slash, since a lease is named after it. Only when `courses/` exists:
+a run in a folder with no `courses/` takes no lease anyway and is still
+refused where it always was, after the recipe check, which
+`test_deploy_non_interactive.py` relies on. The case "a course code with no
+folder in courses/" holds it; the test is red on f36e40783 (the trail held
+the two lines).
+
+**What a window's Preview is told while it runs.** The deploy's build lease
+names its section, so a Preview of that section in a window is declined at the
+LEASE layer before `preview.sh` is reached
+(`previewWhileItsSectionDeploys.layers.lease`). Read from the code and the
+pure decision compiled alone (`WorkLeaseFiles` with `ProcessLiveness`, fed
+the block's exact lease body): until the sweep's fixes it was told
+`wording.sectionIsBeingBuiltElsewhere`, which names an assistant, another
+copy of Plantoir and a scheduled deploy, and not a deploy typed in Terminal.
+It is now told `wording.sectionIsBeingDeployed`, the sentence this app's own
+deploy of the section is told with, whenever another program's publish lease
+names the section (`previewWhileItsSectionDeploys.leaseCases`, five cases).
 
 **On the trail.** When it takes the leases, `deploy.sh` writes one line
 through `note_on_the_trail`, and one more when it gives them back
@@ -3281,6 +3307,18 @@ line would fall back to `HOME`. Rejected: running the 26 launcher tests
 under a scratch `HOME` as the proof, which took 333 s in that measurement
 (`test_port_blocks.py` alone 208 s). That run stays the one proof this
 leaves out.
+
+**`verify-deploy.sh` and the trail (#829's Fable sweep, F2).** It drives
+`./deploy.sh` and `./preview.sh` with the real `HOME`, and until 2026-11-14
+set no `PLANTOIR_TRAIL_DIR`. Since #829 every `deploy.sh` the app did not
+start writes two trail lines, so each publish a run made left two lines in
+the teacher's own trail. The script now sets the variable to `trail/` inside
+its own work folder (`keep_the_launchers_trail_in`, called once, straight
+after the work folder is made and before any launcher starts). Its
+`--self-test` runs deploy.sh's own `note_on_the_trail` with a scratch `HOME`
+after that call, checks the line lands in the run's folder and nothing is
+written under `HOME`, and reads the script for the one top-level call. With
+that call taken out the self-test reads 87 passed, 1 failed.
 
 **Windows (#682).** `Write-TrailLine` in `preview.ps1` and `deploy.ps1` (one
 function, byte-identical in both) takes `PLANTOIR_TRAIL_DIR` when it is

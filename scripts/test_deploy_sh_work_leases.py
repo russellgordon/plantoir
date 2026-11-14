@@ -22,6 +22,8 @@ cases; contracts/file-formats.json -> workLease the shape. This file:
     leases, once each, and never by one the app started;
   * checks the start is read in UTC, with a fixed clock in the hour the
     clocks go back, and that a start that cannot be read means no lease;
+  * checks a course code it cannot find is refused before any lease or trail
+    line is taken (the Fable sweep of #829, F1);
   * and, for the cases that must never run here (--reset-token and --logout
     clear a saved sign-in; --plans needs the website builder), that the
     lease is taken only under the condition that leaves those out.
@@ -221,7 +223,7 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
         }
         held_line, let_go_line = _the_trail_lines()
         for case in _the_rule()["cases"]:
-            if case["arguments"][0] != "--to-folder" or "start" in case:
+            if case["arguments"][0] != "--to-folder" or "start" in case or "course" in case:
                 continue
             with self.subTest(case=case["name"]):
                 self._forget_the_trail()
@@ -353,6 +355,32 @@ class ADeployTypedInTerminalHoldsItsLeases(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.activity.exists())
 
+    def test_a_course_code_it_cannot_find_is_refused_before_anything_is_taken(self):
+        """The Fable sweep of #829, F1: a mistyped code took both leases and
+        wrote both trail lines before "Course folder not found" refused it.
+        Now it is refused first, and leaves no lease, no folder and no line.
+        Red on f36e40783: the trail held the two lines."""
+        case = None
+        for each in _the_rule()["cases"]:
+            if each.get("course") == "notFound":
+                case = each
+        self.assertIsNotNone(case, "the contract holds the case")
+        self.assertEqual(case["expect"], [])
+        environment = self._environment(None)
+        for typed in ("NOSUCH", "X/../C"):
+            self._forget_the_trail()
+            result = subprocess.run(
+                ["/bin/bash", "./deploy.sh", typed, "1", "--to-folder", str(self.tmp / "published"),
+                 "--non-interactive", "--image", THIS_TOOLCHAIN],
+                cwd=str(self.folder), capture_output=True, timeout=180, env=environment)
+            said = result.stdout.decode("utf-8", "replace") + result.stderr.decode("utf-8", "replace")
+            self.assertEqual(result.returncode, 1, said)
+            self.assertIn("Course folder not found", said, typed)
+            self.assertEqual(self._trail(), [], typed)
+            self.assertFalse((self.folder / "courses" / ".internal").exists(), typed)
+            self.assertEqual(self._seen(), {}, typed)
+            self.assertFalse((self.tmp / "published").exists(), typed)
+
     def _start_and_wait_for_the_build(self, new_group: bool):
         for leftover in (self.folder / "go", self.folder / "stand-in-pid"):
             if leftover.exists():
@@ -430,11 +458,18 @@ class TheRunsThatMustNotHoldOne(unittest.TestCase):
 
     def test_the_call_is_guarded_and_after_the_guard(self):
         text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
-        call = ('if [[ "$RESET_TOKEN" != "true" && "$PLANS_MODE" != "true" ]]; then\n'
-                '  if this_run_takes_work_leases "${PLANTOIR_LEASES_HELD_BY:-}"; then\n'
+        outer = 'if [[ "$RESET_TOKEN" != "true" && "$PLANS_MODE" != "true" ]]; then\n'
+        call = ('  if this_run_takes_work_leases "${PLANTOIR_LEASES_HELD_BY:-}"; then\n'
                 '    take_the_work_leases "$COURSE_CODE" "$SECTION_NUM"\n')
         self.assertEqual(text.count(call), 1)
         self.assertEqual(text.count('take_the_work_leases "'), 1)
+        # The call sits inside the outer condition, with only the refusal of
+        # a course it cannot find (the sweep's F1) between the two.
+        opened = text.rindex(outer, 0, text.index(call))
+        between = text[opened + len(outer):text.index(call)]
+        self.assertNotIn("\nfi\n", between)
+        self.assertIn("refuse_a_course_folder_not_found\n", between)
+        self.assertNotIn("take_", between)
         guard = 'refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy\n'
         self.assertLess(text.index(guard), text.index(call))
         self.assertIn('    --reset-token|--logout)\n      RESET_TOKEN="true" ;;\n', text)
@@ -447,7 +482,10 @@ class TheRunsThatMustNotHoldOne(unittest.TestCase):
                 empty.append(case["arguments"][0] if case["heldBy"] == "absent" else case["heldBy"])
             if case.get("start") == "unreadable":
                 empty[-1] = "unreadable start"
-        self.assertEqual(sorted(empty), ["--logout", "--plans", "--reset-token", "running", "unreadable start"])
+            if case.get("course") == "notFound":
+                empty[-1] = "course not found"
+        self.assertEqual(sorted(empty), ["--logout", "--plans", "--reset-token", "course not found",
+                                         "running", "unreadable start"])
 
     def test_every_later_exit_trap_gives_them_back(self):
         """A later `trap … EXIT` replaces an earlier one, so every EXIT trap

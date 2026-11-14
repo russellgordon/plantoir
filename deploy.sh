@@ -2415,6 +2415,10 @@ take_the_work_leases() {
   courses="$(pwd)/courses"
   # Only when courses/ is there, as the mac's own writer does.
   [[ -d "$courses" ]] || return 0
+  # A course code, not a path: a lease is named after it.
+  case "$course" in
+    ''|*/*) return 0 ;;
+  esac
   case "$section" in
     ''|*[!0-9]*) return 0 ;;
   esac
@@ -2481,7 +2485,31 @@ give_back_the_work_leases() {
 }
 # <<< WORK LEASE BLOCK <<<
 
+# refuse_a_course_folder_not_found: the refusal for a course code with no
+# folder in courses/, said in one place for its two callers.
+refuse_a_course_folder_not_found() {
+  echo "❌ Course folder not found on host:"
+  echo " $(pwd)/courses/${COURSE_CODE}"
+  echo
+  echo " Make sure you've run the course setup and/or preview steps."
+  echo " Try: ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM}"
+  if [[ -d "$(pwd)/courses" ]]; then
+    echo
+    echo " Available course folders:"
+    ls -1 "$(pwd)/courses" | sed 's/^/ - /'
+  fi
+  exit 1
+}
+
 if [[ "$RESET_TOKEN" != "true" && "$PLANS_MODE" != "true" ]]; then
+  # A mistyped course code is refused HERE, before any lease is taken, so it
+  # leaves no lease and no trail line (the Fable sweep of #829, F1: course
+  # NOSUCH wrote NOSUCH.build.<pid>.lease and both trail lines). Only when
+  # courses/ is there, because a run in a folder with no courses/ takes no
+  # lease either and is refused later, where it always was.
+  if [[ -d "$(pwd)/courses" && ! -d "$(pwd)/courses/${COURSE_CODE}" ]]; then
+    refuse_a_course_folder_not_found
+  fi
   if this_run_takes_work_leases "${PLANTOIR_LEASES_HELD_BY:-}"; then
     take_the_work_leases "$COURSE_CODE" "$SECTION_NUM"
   fi
@@ -2694,17 +2722,7 @@ echo "🕒 Host timezone offset: $HOST_TZ_OFFSET"
 
 # Preflight checks
 if [[ ! -d "${COURSE_DIR_HOST}" ]]; then
-  echo "❌ Course folder not found on host:"
-  echo " ${COURSE_DIR_HOST}"
-  echo
-  echo " Make sure you've run the course setup and/or preview steps."
-  echo " Try: ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM}"
-  if [[ -d "$(pwd)/courses" ]]; then
-    echo
-    echo " Available course folders:"
-    ls -1 "$(pwd)/courses" | sed 's/^/ - /'
-  fi
-  exit 1
+  refuse_a_course_folder_not_found
 fi
 
 if [[ "$PLANS_MODE" != "true" && ! -d "${SECTION_DIR_HOST}" ]]; then
