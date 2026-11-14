@@ -11945,6 +11945,246 @@ their cap of five (`CourseArchiver.mostBackupsKept`, untouched); a teacher's are
 never pruned. The rules are `contracts/course-management.json` → `backups`,
 with `pruneCases`, `sizeCases` and `deleteCases`.
 
+**Small backups: each Media file kept once (#785).** Russell's ruling,
+2026-11-13: every backup Plantoir makes on its own (the assistant's, the
+Section menu's, and those saved before adding a class, starting a new year,
+renaming the unit word, replacing a reference course and Copy a Page) keeps
+the course's pages in an ordinary zip and each Media file ONCE, in a store
+shared by the working folder's backups. Only a Back Up the teacher presses
+stays a whole zip that can be carried anywhere. Piece 785a (2026-11-13) built
+the store and nothing calls it yet, so every backup on disk is still whole;
+piece 785b moves the automatic backups onto it. The code is
+`Models/SharedMedia/` (`SharedMediaStore`, `SharedMediaList`,
+`SharedMediaSweepRule`); the format is `contracts/file-formats.json` →
+`sharedMediaStore`, the rules and cases `course-management.json` →
+`backups.sharedMedia`.
+
+- **Where and what.** `courses/_backups/.shared-media/`: `files/<aa>/<sha256>`
+  for the bytes, `lists/backup-<zip>.json` for a copy of each small backup's
+  list, `lists/undo-<step>.json` for Undo, `pending/<id>.json` for a backup
+  being written, `sweep-<computer>.json` for this computer's record of what
+  it found unneeded and when, and `.lock`. A small backup is
+  `<name>_shared-media.zip`: the course as the whole zip holds it, minus its
+  top-level `Media`, with the list at the zip's root as `.plantoir-backup.json`
+  (path, SHA-256, size, date and permissions of every file; every folder, so
+  empty ones come back). The `_shared-media` piece is also the guard for older
+  versions: every released parser refuses a fourth `_` piece, so an older
+  Plantoir never lists a small backup it could not restore.
+- **What both zips leave out comes from one place.** `CourseArchiver.
+  archiveRules(forFolderAt:)` builds the `zip -x` patterns AND the names the
+  Media walk leaves out from `excludedFromArchives`; the whole zip's `archive`
+  reads the same function. Only a folder LISTED as exactly `Media` is left
+  out: a course whose folder is spelled `media` keeps it in the zip, as the
+  whole zip's case-sensitive `zip -x` does (review I2).
+- **The walk is `zip -r`'s walk** (`SharedMediaStore.walkMedia`, through
+  `SharedMediaFiles`, measured case by case against the whole zip's restore).
+  A link to a file is that file's bytes under the link's name. A link to a
+  folder, inside the course or outside it, is that folder's contents under
+  the link's name, and the folder itself is walked again under its own name.
+  A link that leads nowhere is left out. A loop is followed until the system
+  refuses a path with more than 32 links, which is where `zip -r` stops too:
+  a link back to its own parent gave 100 entries in both. Paths are resolved
+  from the course's parent folder (`openat`, `fstatat`), as zip resolves them
+  from its working folder, so a link above the working folder does not stop
+  the walk one level early. More than 200,000 entries refuses the small
+  backup. Until the implementation review (W1) the walk skipped any folder it
+  had already been through, so a link that sorted before its sibling folder
+  made the real folder vanish from the restore while the restore reported
+  nothing missing.
+- **Names are bytes** (review W2). Every name is carried as the listing's own
+  UTF-8 bytes and every file call takes a Swift `String` straight to POSIX
+  (`SharedMediaFiles`), because `URL.appendingPathComponent(...).path` and
+  `withUnsafeFileSystemRepresentation` decompose a name: a precomposed
+  `café.png` (`caf\xc3\xa9`) came back as `cafe\xcc\x81`. Finder and Obsidian
+  on APFS do not tell them apart; the website builder, reading the course
+  from Linux, does. The tests compare trees by name BYTES, since Swift's
+  `String` equality treats the two forms as one and hid the fault.
+- **Writing, in this order.** Shared lock; every Media file read and hashed,
+  every time; a pending list; each file not kept copied into the store under
+  `.incoming-<uuid>`, checked against its checksum after writing, flushed,
+  renamed (a kept file is re-checked and replaced if damaged; a mismatch fails
+  the backup and says whether the copy or the picture changed); the pages
+  zipped under `.writing-<uuid>.zip`, the list added, the zip tested with
+  `unzip -t` and its list read back; the list copied to `lists/` BEFORE the
+  zip takes its name, so an older copy of the same name can never stand for
+  it (review M5; the copy is removed again if the name turns out taken); the
+  zip renamed with `RENAME_EXCL`; the pending list rewritten with `finishedAt`
+  and kept for a day. A crash at any step leaves store files nothing names,
+  never a zip whose files are missing.
+- **Restoring.** A small zip unpacks into its pages plus
+  `.plantoir-backup.json` at the staging root. That file is the MARKER:
+  `SharedMediaStore.refuseUnlessItsMediaWasPutBack(unpackedAt:backupFileName:)`
+  throws `mediaNotPutBack` while it is there, and `fill` removes it once the
+  Media is back (review I3). `beginRestore` takes the shared lock and finds
+  every listed file before anything changes: in the store, checked by
+  checksum, and when the store's copy is missing or damaged, in the course's
+  CURRENT Media by checksum (plan review, amendment 4). The result carries
+  `missing` (paths, for the teacher's screen) and `canBeRestored` (false when
+  the list names files and none can be found). `fill` makes every folder,
+  copies each file in under a temporary name with the list's exact name
+  bytes, checks it again, gives it its listed date and permissions, and names
+  any that fail; nothing is skipped silently.
+- **For 785b: every door that unpacks a backup must call the marker guard**
+  before it swaps anything in, or route through `beginRestore` and `fill`
+  first. On the mac today those doors are `CourseRestorer.unpack`, reached
+  from `restoreBackup` (Restore from Backup…, `WorkspaceModel`),
+  `restoreSection` (the assistant window's Restore Section N…,
+  `AssistSectionRestore`), #897 C's `restoreSectionFromTheMenu`, and
+  `extract` (a course or section restored into an empty place, and Restore
+  from Archive); `ReferenceZipSource`'s `ditto` unpack (importing a backup
+  zip as a reference course); and `ReferenceReplacer`'s check that a backup
+  holds every file (`zipinfo` listing, plan review amendment 2), which must
+  ask `pathsNotHeld(by:)` for Media. Windows' `CourseRestorer` and its import
+  are the same doors there. A test should walk every caller of `unpack`.
+- **The sweep** (`SharedMediaSweepRule.decide`, pure, with the contract's 35
+  cases): anything unreadable stops it; needed is every checksum named by a
+  small backup that is there (or its pre-macOS 14 `.icloud` placeholder,
+  through its list copy), a list whose zip has not arrived and is under a day
+  old, an Undo list under 31 days old, a pending list of a backup being
+  written (a day, or while its process runs on this computer), and a FINISHED
+  backup's pending list for a day after it finished. Nothing is deleted until
+  a sweep a day after this computer first found it unneeded still finds it
+  so, or FOURTEEN days once any sign of another computer has been seen in the
+  store (a list, pending list or small backup naming another host, or another
+  computer's sweep record; remembered in this computer's record). Every age is
+  a moment a list or this computer wrote down; a moment more than a day ahead
+  of this computer's clock is counted from when this computer first saw that
+  list (review M1). A pending list, or a list whose zip is not here, that
+  ANOTHER computer wrote counts its day from the LATER of its own moment and
+  when this computer first saw it (`honouredFrom`, fix review M-a): a computer
+  whose clock runs more than a day behind wrote moments that looked old here,
+  and its finished pending list was removed the first time it was seen.
+  Measured with B's clock two days behind and only B's zip and list copy
+  lagging: before, A deleted the picture and B's restore refused; after, A
+  kept it and B's restore put it back. A list this computer wrote keeps its
+  own moment, since it was dated by this clock and did not travel; counting
+  it from first sight too would hold a deleted backup's pictures one more
+  day for nothing (measured in the harness, which caught it). What a crash
+  leaves that names nothing (a `.writing-*.zip`,
+  the store's `.incoming-*` folders, `.writing-*` temporaries) is removed once
+  its own date is more than a day old (review I1). It takes the lock
+  exclusively without waiting, and deletes nothing while a backup or a
+  restore holds it on this computer. The lock is `flock` on the lock file, so
+  a working folder reached through a symbolic link or in another case is one
+  lock (tested).
+- **Two computers on one synced folder** (review W3). A picture computer B
+  lists again in a new backup copies nothing into the store, so the only sign
+  of B's reliance is B's pending list. It is the first file B writes and is
+  now kept a day after B's backup finishes, so a sync service usually carries
+  it to A first; and once A has seen any sign of B, A waits fourteen days, not
+  one, before deleting. The fourteen days run from when A first found the
+  file unneeded, not from B's backup, so they cover up to fourteen days
+  between that finding and B's lists arriving at A: a file A found unneeded on
+  day 1 goes on day 15 even if B wrote on day 2 and its lists arrive on day
+  16 (fix review M-b). The cost is that space comes back two weeks after a
+  delete on a shared folder. Measured before the fix: with
+  an hour of sync lag, A deleted the picture and B's restore could not find
+  it; after it, A keeps it and B's restore finds it. **No wait closes this race
+  against a sync delay of any length:** if nothing of B's reaches A before A's
+  wait ends, the picture is deleted, and B's restore then names it as missing,
+  in words, before anything changes, and refuses when it was the only one
+  (measured in the harness).
+- **Undo's seam (#899).** Before a step deletes or moves a small backup,
+  Undo calls `keepForUndo(stepID:checksums:writtenAt:)` with the backup's
+  `list(ofBackupNamed:zipURL:).checksums`; when the step leaves the Undo list
+  it calls `releaseForUndo(stepID:)`. Every computer's sweep honours the list
+  for 31 days by its own `writtenAt`. A reference replace that must not trust
+  a zip's listing alone asks `pathsNotHeld(by:)`, which re-hashes each file.
+- **Measured** after the review's fixes (Apple M4 Pro, macOS 26, 2026-11-13,
+  scratch folders and hidden disk images). The AVI1O example course
+  with its three pictures moved into Media (0.27 MB of pages, 0.62 MB of
+  Media): whole zip 0.07 s and 0.79 MB; each small backup about 0.27 s and a
+  0.17 MB zip, the pictures 0.62 MB in the store once; seven backups 2.05 MB
+  against about 5.5 MB as whole zips. The same course with 120 incompressible
+  4.4 MB stand-in pictures (528.6 MB of Media): whole zip 8.01 s and 528.9 MB;
+  the first small backup 0.84 s, a 0.18 MB zip and 528.6 MB into the store;
+  each later one about 0.70 s and 0.18 MB, adding nothing after a text edit,
+  one 0.2 MB file after one picture changed, nothing after one was renamed;
+  seven backups 530.3 MB against about 3.7 GB. Byte for byte, with trees
+  compared by name BYTES: the store's harness course (892 entries: links to
+  files, to a sibling folder that sorts first, to a folder outside the
+  course, a loop, a link to nothing, names in both Unicode forms, hidden
+  files, permissions, empty files and folders) restored identically to the
+  whole zip on APFS, on a case-sensitive APFS image and on an exFAT image;
+  the review's own course (33 entries) restored identically on APFS and
+  case-sensitive APFS, and on exFAT differed only by an extended attribute
+  the whole zip carries as an AppleDouble `._` file. Each picture keeps its
+  own date, which the whole zip does not: it brought a September date back
+  an hour out (DOS time, across daylight saving). Harness totals: 288 checks
+  on APFS, 299 with a second volume, none failed; fourteen sabotages of the
+  fixed code each turned 1 to 11 checks red. After the fix review's round
+  (N1, M-a, M-c): 312 checks on APFS, 323 with an exFAT image and 323 with a
+  case-sensitive APFS image, none failed; the same harness on the code before
+  that round failed 21. The review's own byte driver, with names that begin
+  with a combining mark at the top of Media, gave 35 entries both ways and 0
+  differences.
+- **Names are split on the `/` BYTE** (fix review N1). Swift splits and
+  searches a `String` by Character, and a `/` or `\` followed by a combining
+  mark is one Character. Measured: `Media/\u{0308}Bild.png` split by
+  `components(separatedBy:)` into ONE part, so the list's path rule refused
+  the backup's own list; the writer compared the read-back list only as
+  bytes, published the backup as made, and the restore then failed with
+  `listUnreadable` while every sweep kept everything. `"\\\u{0301}x".contains("\\")`
+  is false, so the same rule also let a backslash through. `isSafeMediaPath`,
+  `folderPart` and `makeFolders` now split on the byte
+  (`SharedMediaList.pathParts`), and the writer DECODES the read-back list as
+  a restore will before the zip is given its name: a list this version would
+  refuse is never published. A Media name holding a backslash, legal on the
+  mac, is still refused by the path rule (it is a separator on Windows), so
+  such a course's small backup now fails in words and publishes nothing;
+  785b's fallback must handle that (below). A name that is not UTF-8 makes
+  its folder unreadable rather than decoded with replacement characters and
+  skipped (fix review M-c; APFS and exFAT cannot hold one).
+- **Rejected.** A guard on a store file's modification date (a copy keeps the
+  source's, plan review amendment 1). An `added/` record of when a file
+  ENTERED the store, reconsidered after the review's W3 and still rejected: a
+  file another computer lists again entered the store long ago, so its added
+  moment says nothing about that computer's reliance, while the kept pending
+  list names every file a backup relies on, old and new; the earlier stated
+  reason implied the day's wait protected that old file, and it did not.
+  Trusting an unchanged size and date instead of hashing (0.02 s against 0.25
+  s for 526 MB, and a picture edited by a tool that keeps its date would
+  restore as the old one). Git, hard links, compressing the store, a store
+  per course; a `.plantoirbackup` extension; reporting missing pictures after
+  the swap instead of before it.
+- **For 785b: never fall back to an unbounded whole zip when a small backup
+  is refused.** A course with two loop links in Media stops a small backup in
+  11.2 s with `mediaHasTooManyEntries`; the whole zip of the same course did
+  not finish in 100 s and left its `zip` orphaned and still looping (fix
+  review, measured). Issue #908 owns the whole zip's loop; until it lands, a
+  door that falls back must bound the whole zip or report the refusal.
+- **Known limits.** The two-computer race above. A clock set days forward
+  deletes for real while it is forward and can end an Undo list's 31 days
+  early (review M2). Since macOS 14 iCloud Drive keeps an evicted file under
+  its own name with no data on this disk, not as `.X.icloud`; reading such a
+  zip's list downloads it under the sweep's lock or fails, and a failure keeps
+  everything (review M3, not measured). On exFAT the whole zip also brings back
+  a file's extended attributes as an AppleDouble `._` file, which a small
+  backup does not (measured); attributes are not a teacher's content. A server that tells
+  the two Unicode forms apart was not available to measure. Not measured on a
+  real iCloud Drive folder, nor with tens of thousands of Media files.
+  Three more, measured by the pre-merge sweep (2026-11-13):
+  - **An Undo list is counted from its own written moment only**, not from
+    when another computer first saw it, so a computer whose clock runs
+    behind shortens it everywhere else. With B's clock two days behind, A
+    honoured B's Undo list until day 31.1 by A's clock (29.1 days after B
+    wrote it) and deleted the pictures at day 45.2; with B's clock 40 days
+    behind, A removed the list the first time it saw it and deleted the
+    pictures 15 days later, while B's step still had 30 days. The fourteen
+    days' wait hides a clock up to about 15 days behind. #899's Undo piece
+    decides whether to change it.
+  - **A first sight recorded while this computer's clock is far ahead is
+    kept.** `listsFirstSeen` has no guard against this computer's own
+    future, where `unneededSince` has one. With A's clock 400 days ahead
+    for the one sweep that first saw B's pending list, and B's zip never
+    arriving, the list was honoured until day 416.5 and the picture deleted
+    at day 431. It keeps and never loses.
+  - **A Media name holding a backslash refuses every small backup of that
+    course** (the N1 bullet above): the backup fails as `zipFailed`, which
+    says the zip's list could not be read back, after the
+    Media files have been hashed and copied into the store and the pages
+    zipped. Nothing is published. 785b's fallback must handle it.
+
 **Where the space is shown.** The sidebar's Backups header carries the total
 once every backup has been measured; each backup's tooltip, its own pane and
 its delete confirmation carry its size; and a new first row, **All Backups**
@@ -12065,6 +12305,157 @@ pruner" above for why.
 
 
 **On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it" until #783 and since then with the slot naming the session's own assistant ("a GitHub Copilot session still open on {CODE} made it", or all three when its lease names none: `shared-rules.json` → `doorCourseHold.naming`), never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
+
+### Restoring one section from a backup (#897 C)
+
+**Russell's ruling, 2026-11-13: Restore from Backup…, for a backup made for
+one section, offers "Restore Section N" as the default button, with "Restore
+Whole Course" beside it.** Every route to a restore (Course ▸ Restore from
+Backup…, a backup's row, All Backups' Restore…) sets
+`workspace.backupRestoreRequest`, and the one alert in `SidebarView` asks
+`WorkspaceModel.oneSectionRestoreOffer(for:)` which section to offer, or none.
+The rule is `OneSectionRestore.offeredSection`; the cases, the file list and
+every sentence are `contracts/course-management.json` →
+`backups.restoreOneSection`, run by `OneSectionRestoreContractTests`.
+
+**When it is offered.** The backup's maker (`BackupMaker.menu` or
+`.assistant`, read from the name) names a section; that section is in the
+course now; the course is not kept for reference; no unit-word or folder
+rename has a record still on disk; the zip holds `section<N>/`; and the
+course's naming fits the backup's (`OneSectionRestore.Naming.difference`):
+the unit word, the class page scheme and the class folder are the same, and
+every folder the BACKUP lists among the shared and per-section folders is
+still listed, because `SpecialFolderRenamer` rewrites the links into a
+renamed folder in every page. A folder ADDED since never counts, and that
+was measured, not assumed: `build_site.preflight_update_course_config` adds
+every new top-level folder to those lists on every preview build (a new
+`Quizzes` folder and one build gave `['Concepts', 'Media', 'Quizzes']`; a new
+`Labs` at the top of a section gave `['All Classes', 'Labs']`), so comparing
+the lists exactly, as the first fix did, withdrew the offer after any new
+folder (the fix review, WRONG 1). A folder renamed or removed is refused
+with `wording.foldersChanged`, a changed word, scheme or class folder with
+`wording.namingChanged`; both are asked of the settings as SAVED on disk. The zip's part is read by
+`OneSectionRestore.readFacts`, `zipinfo -1` for the listing and `unzip -p`
+for `course_config.json` alone, once per backup (an unreadable zip is kept
+as holding nothing), when `backupRestoreRequest` is set, never while the
+alert draws. Otherwise the alert is the whole-course one, unchanged. Every
+condition is asked again at the click (`oneSectionRestoreRefusal`) BEFORE the
+whole course is archived, so a refused click leaves nothing in Archived.
+
+**What comes back.** `CourseRestorer.restoreSectionFromTheMenu`:
+
+- the section folder's contents, as before;
+- this section's per-section keys on every shared page, as before;
+- five files outside the folder: the class dates
+  (`.internal/timetable/section<N>.json`), the published record
+  (`.publish_state/section<N>.published-pages/`), the links checklist's
+  answers, the classes dated later that were kept, and the front-page answer.
+  Each comes back as the backup has it and is removed when the backup has
+  none. A rollover sets three of them aside, so before this a restore from
+  before a rollover gave last year's pages this year's dates and an empty
+  record, and said "put back";
+- the links checklist offer (written by the build) is discarded with the
+  built site;
+- the deploy stamp and the website markers are LEFT, because they describe the
+  live site; the legacy Netlify marker inside `.merged_output/section<N>/`
+  is kept across the discarded build for the same reason. The finished line
+  says the address is unchanged when the backup's record differs;
+- a shared page the backup does not have (made since) is hidden from this
+  section with `AssistPageVisibility.setting`, unless it already is. A page
+  Quartz never publishes (a dot folder, or `private/` or `templates/` at the
+  top) is left alone. Identity is the PATH, so a page renamed or moved since
+  the backup is hidden too: the safe direction, and the finished line says
+  only that the backup has no page at that place.
+
+**Measured and rejected.**
+
+- The plan named two files outside the folder; a grep of every
+  `section\(…)` file name under `mac-app/QuartzTeachers` found seven plus the
+  markers (plan review, amendment 17). The section's entries inside
+  `course_config.json` (fonts, emoji, grade and section marker) are left:
+  they are Course Settings choices in a file every section shares, no
+  Section menu change makes them, and putting them back means merging JSON.
+- For a page made since the backup the plan proposed taking this section's
+  keys off. Rejected (amendment 18): a page whose plain line is
+  `publish: true` and which the teacher hid for this section with
+  `publishForSection2: false` is then PUBLISHED to it.
+  `OneSectionRestoreTests.testASharedPageMadeSinceTheBackupIsHiddenFromTheSection`
+  holds both shapes.
+- Offering one section after the course's word for a unit changed was
+  rejected (amendment 19): the pages come back named for a scheme the course
+  no longer reads. The same holds for a shared or per-section folder renamed
+  since (the implementation review): the section's pages would link to the
+  old name. The restore asks again of the unpacked backup and refuses with
+  `wording.namingChanged` for the word, scheme or class folder and with
+  `wording.foldersChanged` for a folder renamed or removed; a folder ADDED
+  since never refuses.
+
+**Staged, then swapped, with a way back (both one-section routes).** The backup is
+unpacked into `courses/.internal/restoring/<id>/`, on the courses' own volume
+so every move is a rename (the system temporary folder can be another
+volume, where a move is a copy and a rollback a second copy). Nothing in the
+course moves until the backup is unpacked and checked. Then
+`swapSectionInPlace` moves the live children and the live outside files
+aside, moves the backup's in, and on any failure moves every moved file back,
+last first: the teacher is told the section was left as it was. If a move
+back fails too, nothing is deleted: the set-aside files move to
+`courses/_backups/<CODE>/Section N before a restore <stamp>` (no comma, since
+the sentence that names it is punctuated after it), a
+folder Finder shows (`courses/.internal` is a dot folder Finder hides), on
+the same volume, where nothing reads a folder (the backup and archive lists
+read zip names only). The trail gets `section restore stopped part way`
+with that path, and the teacher reads `wording.stoppedPartWay`: the section
+may hold a mix, and where the files are; on the menu's route also that the
+course as it was is in Archived. When the kept folder holds no file Finder
+shows (every page went back and only hidden records are left; the fix review
+measured that in 5 plus 46 of 91 double failures on its fixture), the
+sentence is `wording.stoppedPartWayNothingToOpen` instead, so nobody is sent
+to what looks like an empty folder; the trail names the folder either way.
+If that last move fails as well, the files stay in `courses/.internal/
+restoring/` and that path is what is said.
+
+Measured on 2026-11-13. A standalone copy of the swap, the function's text
+sliced out and compiled with `swiftc -default-isolation MainActor`: a failure
+injected at each of the five moves of a small fixture left the section and
+its class dates exactly as they were. The implementation review ran the same
+slice on a larger fixture (four section files, one hidden and one nested; six
+outside files): a failure at each of the 14 forward moves left course and
+payload byte-identical; and a failure at forward move k and way-back move j,
+for every k in 2…14 and j < k, 91 cases, kept every original file in the
+course or the aside folder. **12 of those 91 left `section<N>/` holding a
+mix of live and backup files. That is a known limit**: a way back that
+itself fails cannot be made whole, so it is said rather than hidden.
+
+By Russell's ruling on #897 the assistant window's own "Restore Section N…"
+uses the same swap, over the section folder only; nothing it says on success
+changed, and on a stopped restore it says the restorer's sentence without
+its usual "Nothing was put back:" in front. **Restore Whole Course is NOT
+staged**: `CourseRestorer.restoreBackup` still removes the course's contents
+before moving the backup's in, protected by the archive made first. Whether
+it gets the same swap is a question with Russell. Windows' section restore
+still deletes first (#873).
+
+Two edges, both true of the whole-course restore as well. A section removed
+and later added again under the same number is offered an old backup of
+the section that had that number. And anything in `section<N>/` that backups
+leave out (`CourseArchiver.excludedFromArchives`: `build`, `out`, `dist`,
+`.cache`, `node_modules`, `.git` and the rest) is removed by the swap and is
+in neither the backup nor the archive made first.
+
+**Order around it** (`WorkspaceModel.restoreOneSection`): the
+`structuralRefusal` before and after, a refusal while the Section menu or the
+assistant is changing that section, the WHOLE course archived first (so
+"nothing is lost" holds before Undo), the restore, a `section restored` line
+(`ActivityTrail.restoredOneSectionFromTheMenuLine`: the backup's and the
+archive's file names, the count of pages hidden and the count of pages that
+could not be saved), `page settings left as
+they were` when pages could not take a key, and the finished line in the
+backup alert's slot.
+
+**For Undo (#899).** `restoreSectionFromTheMenu(…keepingWhatWasReplaced:)`
+is handed the aside folder, holding the section and its outside files as they
+were, after the swap and before it is deleted. A journal takes its snapshot
+there; the shared pages' key edits that follow are `editField`s.
 
 ## Notifications: the one permission, and where it is asked (#212)
 
