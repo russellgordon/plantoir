@@ -112,8 +112,12 @@ nonisolated enum ActivityTrail {
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"
         /// A teacher put a section back to how it was when an assistant
-        /// conversation started ("Restore Section N…"). Carries the course,
-        /// the section and the backup's FILE NAME — never a page.
+        /// conversation started ("Restore Section N…"), or, since #897 C,
+        /// from Restore from Backup…'s "Restore Section N" for a backup made
+        /// for one section (`restoredOneSectionFromTheMenuLine`: the archive
+        /// made first, how many shared pages made since the backup were
+        /// hidden, and how many shared pages could not be saved, too). Carries the course, the section and the backup's
+        /// FILE NAME — never a page.
         ///
         /// It is the one line that explains a section whose pages are older
         /// than the conversation that changed them. Without it the trail shows
@@ -125,6 +129,14 @@ nonisolated enum ActivityTrail {
         /// Windows recorded this first (`AssistWindow.xaml.cs`); the mac had
         /// the same button and wrote nothing.
         case sectionRestored = "section restored"
+        /// A one-section restore (from Restore from Backup… or the assistant
+        /// window's "Restore Section N…") failed part way AND could not move
+        /// every file back (#897 C). The section may hold some files from the
+        /// backup and some as they were. Carries the course, the section and
+        /// where the set-aside files were kept, as a path inside the working
+        /// folder, never a page. Without it the trail shows nothing at all
+        /// for the one restore outcome that leaves a section changed.
+        case sectionRestoreStoppedPartWay = "section restore stopped part way"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
@@ -1020,6 +1032,29 @@ nonisolated enum ActivityTrail {
         /// before, for one delete or many.
         case backupsDeleted = "backups deleted"
 
+        /// A backup Plantoir made on its own was saved small, its Media
+        /// files kept once in the working folder's shared store (#785).
+        /// Carries the course, the backup's FILE NAME, how many Media files
+        /// were already kept, how many were added and their size. Never a
+        /// Media file's name. It dates when the store grew, which is what
+        /// "my disk filled up" is answered by.
+        case backupKeptItsMediaOnce = "backup kept its Media files once"
+
+        /// The shared Media store was swept (#785): how many files no
+        /// backup needs were removed and their size, how many lists that
+        /// kept nothing were removed; or that EVERYTHING was kept, and why
+        /// (a backup or a list could not be read, a backup or restore was
+        /// using the store). Never a Media file's name. It is the only line
+        /// that answers "the pictures of an old backup are gone".
+        case sharedMediaSwept = "shared backup Media swept"
+
+        /// A restore of a small backup could not find some of its Media
+        /// files in the store or in the course (#785): the backup's FILE
+        /// NAME and how many of how many. The paths are shown to the teacher
+        /// and never written here, since a picture's name can carry a
+        /// student's.
+        case backupMediaNotFound = "backup Media not found"
+
         /// A build of a course was declined because ANOTHER program on this
         /// Mac holds a build, publish or preview lease on it (#156) — Preview
         /// or Deploy in the window, the in-app assistant's rebuild or deploy,
@@ -1621,6 +1656,40 @@ nonisolated enum ActivityTrail {
             }
         }
         return nil
+    }
+
+    /// The words for `sectionRestored` when Restore from Backup… put ONE
+    /// section back (#897 C): the backup's file name, the archive made of the
+    /// whole course first, and how many shared pages made since the backup
+    /// were hidden from the section. File names and a count, never a page.
+    static func restoredOneSectionFromTheMenuLine(
+        backupFileName: String,
+        archiveFileName: String?,
+        pagesMadeSinceHidden: Int,
+        pagesNotSaved: Int = 0
+    ) -> String {
+        var line: String = "put the section back from \(backupFileName), from Restore from Backup…"
+        if let archiveFileName {
+            line += "; the course as it was is in Archived as \(archiveFileName)"
+        }
+        if pagesMadeSinceHidden == 1 {
+            line += "; 1 shared page made since the backup is now hidden from this section"
+        } else if pagesMadeSinceHidden > 1 {
+            line += "; \(pagesMadeSinceHidden) shared pages made since the backup are now hidden from this section"
+        }
+        if pagesNotSaved == 1 {
+            line += "; 1 shared page could not be saved and is as it was"
+        } else if pagesNotSaved > 1 {
+            line += "; \(pagesNotSaved) shared pages could not be saved and are as they were"
+        }
+        return line
+    }
+
+    /// The words for `sectionRestoreStoppedPartWay`: what may be mixed, and
+    /// where the set-aside files are. A path, never a page.
+    static func sectionRestoreStoppedPartWayLine(keptAt: String) -> String {
+        return "a section restore stopped part way and could not move every file back; the section may hold "
+             + "some files from the backup and some as they were; the files set aside are kept in " + keptAt
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and

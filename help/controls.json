@@ -1961,6 +1961,20 @@
    },
    "windows": null
   },
+  "sidebarRestoreQuestionRestoreSectionButton": {
+   "label": "Restore Section {N}",
+   "mac": {
+    "say": "course-management#backups.restoreOneSection.wording.restoreSectionButton"
+   },
+   "windows": null
+  },
+  "sidebarRestoreQuestionRestoreWholeCourseButton": {
+   "label": "Restore Whole Course",
+   "mac": {
+    "wording": "OneSectionRestoreWording.restoreWholeCourseButton"
+   },
+   "windows": null
+  },
   "sidebarDeleteQuestionDeleteButton": {
    "label": "Delete",
    "mac": {

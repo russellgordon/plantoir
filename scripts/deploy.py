@@ -174,12 +174,18 @@ def safe_clean_public_dir(public_dir: Path):
     except Exception:
         pass
 
-def rebuild_for_production(course_code: str, section: str, host_os: str):
+def rebuild_for_production(course_code: str, section: str, host_os: str, base_url: str = ""):
     """
     Rebuild the section site for production using build_site.py --build-only.
     Stages the build workspace on container-internal ext4 storage (/tmp/quartz-builds),
     syncs public/ to host courses/<COURSE>/.merged_output/section<N>/public,
     and ensures all live site domains and OpenGraph metadata are up to date.
+
+    `base_url`, when given, is the address of the destination this deploy is
+    for, and the build bakes it in (build_site.DEPLOY_BASE_URL_VARIABLE, set
+    on that one build only). Without it the build resolved the address from
+    the course's records again, so a rebuild "for the address" could come out
+    with the same wrong one, and every deploy then rebuilt for it (#799).
     """
     print(" Rebuilding site for production…")
     build_script = toolchain_paths.SCRIPTS_DIR / "build_site.py"
@@ -194,8 +200,12 @@ def rebuild_for_production(course_code: str, section: str, host_os: str):
         "--build-only",
         f"--host-os={host_os}",
     ]
+    environment = None
+    if base_url:
+        environment = dict(os.environ)
+        environment[DEPLOY_BASE_URL_VARIABLE] = base_url
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=environment)
         print("✅ Production build complete.")
     except (subprocess.CalledProcessError, OSError) as e:
         if build_was_stopped_by_the_teacher(e):
@@ -249,6 +259,48 @@ SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW = (
 # is the one that asks.
 PAGES_ALREADY_ASKED_VARIABLE = "PLANTOIR_PAGES_ALREADY_ASKED"
 
+# The address this deploy's own rebuild is for, set on that build only: build_site.py's
+# DEPLOY_BASE_URL_VARIABLE, the same name (test_build_site_domain_resolution pins the two).
+# Without it a rebuild for the address could resolve the same wrong one again (#799).
+DEPLOY_BASE_URL_VARIABLE = "PLANTOIR_DEPLOY_BASE_URL"
+
+
+def leg_custom_domain(course_dir: Path, section, leg_type: str) -> str:
+    """The teacher's own domain for THIS destination of the section, or "".
+
+    contracts/file-formats.json -> custom_domains: keyed by destination type
+    (`netlify`, `cloudflare_pages`), a domain meant for one destination never
+    applied to another; the OLDER bare-string shape is the primary
+    destination's (`deploy_target`, Netlify when absent) and no other's.
+    Neither service's own record carries it reliably: Cloudflare's project
+    `subdomain` is always `<project>.pages.dev`, and Netlify's `ssl_url` is the
+    custom domain only once it is attached on Netlify's side, so the address a
+    leg is built for is this one when it is set (#799's third review, H1:
+    otherwise every rebuild baked the service's own host and the sharing
+    cards, sitemap and feed dropped the teacher's domain)."""
+    try:
+        config = json.loads((Path(course_dir) / "course_config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    if not isinstance(config, dict):
+        return ""
+    custom_domains = config.get("custom_domains")
+    if not isinstance(custom_domains, dict):
+        return ""
+    sections = custom_domains.get("sections")
+    if not isinstance(sections, dict):
+        return ""
+    entry = sections.get(f"section{section}")
+    if isinstance(entry, dict):
+        value = entry.get(leg_type)
+    elif isinstance(entry, str) and (config.get("deploy_target") or "netlify") == leg_type:
+        value = entry
+    else:
+        value = None
+    if not isinstance(value, str):
+        return ""
+    return clean_base_url(value)
+
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
@@ -288,7 +340,7 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
 
     if needs_rebuild:
         print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
         return
     reason = why_this_deploy_builds_first(course_code, section_dir)
     if reason == toolchain_paths.REASON_TOOLCHAIN:
@@ -298,19 +350,19 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
         # one place both destinations decide whether to rebuild, so a deploy
         # builds at most once.
         print(SAY_BUILT_BY_AN_EARLIER_VERSION)
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
     elif reason == toolchain_paths.REASON_PREVIEW:
         # main() has rebuilt a preview's site already; this is the backstop.
         print(" Preview build detected (live-reload client) — rebuilding for production…")
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
     elif reason == toolchain_paths.REASON_CLOCK:
         print(SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW)
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
     elif reason == toolchain_paths.REASON_PAGES:
         # #768: a page, a picture, a setting, a deleted or renamed page.
         # Without this a deploy typed at a command line sent the last build.
         print(SAY_SOMETHING_CHANGED_SINCE_THE_BUILD)
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
 
 
 def why_this_deploy_builds_first(course_code: str, section_dir: Path):
@@ -946,7 +998,11 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
 
     marker = load_cloudflare_marker(course_dir, section) or {}
     host = marker.get("subdomain") or f"{project_name}.pages.dev"
-    ensure_base_url_and_rebuild(public_dir.parent, host, course_code, str(section), _HOST_OS)
+    # Built for the teacher's own domain for the section's CLOUDFLARE
+    # destination when one is recorded, else the project's pages.dev host,
+    # which is all Cloudflare's record ever names (#799's third review, H1).
+    ensure_base_url_and_rebuild(public_dir.parent, leg_custom_domain(course_dir, section, "cloudflare_pages") or host,
+                                course_code, str(section), _HOST_OS)
 
     # Live input (#583): the pages whose code may ask for input as it runs
     # get the headers that isolate them - after any rebuild above, which
@@ -1600,7 +1656,12 @@ def main():
         print("❌ Could not determine Netlify site ID.")
         sys.exit(1)
 
-    target_domain = clean_base_url(site_url)
+    # The address this site is built for: the teacher's own domain for the
+    # section's NETLIFY destination when one is recorded, else Netlify's own
+    # (whose ssl_url is the custom domain only once it is attached there) -
+    # #799's third review, H1. The same address names the site's own links
+    # on the way up (own_host, below).
+    target_domain = leg_custom_domain(course_dir, args.section, "netlify") or clean_base_url(site_url)
     # Called with no address too (#746): it is also where a site an earlier
     # version of Plantoir built is built again, and that must not depend on
     # Netlify having said where the site lives.

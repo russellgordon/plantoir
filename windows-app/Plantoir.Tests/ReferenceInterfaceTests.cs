@@ -20,8 +20,9 @@ public class ReferenceInterfaceTests
         int from = text.IndexOf(start, StringComparison.Ordinal);
         Assert.True(from >= 0, start);
         int to = text.IndexOf(end, from + start.Length, StringComparison.Ordinal);
+        Assert.True(to >= 0, end);   // a missing end would scan to the end of the file and pass for the wrong reason
         // Comments say what is withheld; only code is asserted on.
-        return string.Join(Environment.NewLine, text[from..(to < 0 ? text.Length : to)].Split(Environment.NewLine[^1])
+        return string.Join(Environment.NewLine, text[from..to].Split(Environment.NewLine[^1])
             .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
     }
 
@@ -30,14 +31,46 @@ public class ReferenceInterfaceTests
     {
         string sidebar = Source("Plantoir", "Views", "SidebarPane.Reference.cs");
         string courseMenu = Between(sidebar, "private MenuFlyout ReferenceCourseMenu(", "private MenuFlyout ReferenceSectionMenu(");
-        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "private MenuFlyoutItem ReferenceObsidianItem(");
+        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "// ---- The calm note");
         foreach (string withheld in new[] { "Rename", "Add Section", "KeepACopyMenuItem", "Revise", "Schedule Deploy", "Restore Section" })
         {
             Assert.DoesNotContain(withheld, courseMenu);
             Assert.DoesNotContain(withheld, sectionMenu);
         }
-        Assert.Contains("Cancel Scheduled Deploy", sectionMenu);   // gate by direction
         Assert.Contains("SetSchoolYearMenuItem", courseMenu);
+    }
+
+    /// <summary>
+    /// #527: a reference section's ROW offers no Cancel Scheduled Deploy…, so
+    /// it agrees with the menu bar (<c>subjectMenus</c> leaves
+    /// cancelScheduledDeploy out for a course kept for reference). Nothing is
+    /// left for one to stop: every read of the folder turns such a deploy off
+    /// (<see cref="ReferenceCourseUpkeep.BringUpToDate"/>, proved by
+    /// <c>ReferenceRefusalTests.ReadingTheFolderTurnsOffAReferenceCoursesDeploy</c>).
+    /// The row is WinUI, so its code is what is asserted on.
+    /// </summary>
+    [Fact]
+    public void AReferenceSectionsRowOffersNoCancelScheduledDeploy()
+    {
+        string sidebar = Source("Plantoir", "Views", "SidebarPane.Reference.cs");
+        string courseMenu = Between(sidebar, "private MenuFlyout ReferenceCourseMenu(", "private MenuFlyout ReferenceSectionMenu(");
+        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "// ---- The calm note");
+        foreach (string door in new[] { "Cancel Scheduled Deploy", "ConfirmCancelScheduledDeploy", "TaskScheduling" })
+        {
+            Assert.DoesNotContain(door, sectionMenu);
+            Assert.DoesNotContain(door, courseMenu);
+        }
+
+        // The menu bar's half, from the contract's own case.
+        var live = new SubjectMenuRules.Situation
+        {
+            HasFolder = true,
+            Row = SubjectMenuRules.Row.Section,
+            HasSchedule = true,
+        };
+        Assert.Contains(SubjectMenuRules.Item.CancelScheduledDeploy, SubjectMenuRules.Enabled(live));
+        Assert.DoesNotContain(SubjectMenuRules.Item.CancelScheduledDeploy,
+            SubjectMenuRules.Enabled(live with { KeptForReference = true }));
     }
 
     [Fact]

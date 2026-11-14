@@ -869,6 +869,27 @@ public static partial class AssistWording
     public const string NoCourseNamed = "No course was named, so nothing was done.";
 
     /// <summary>
+    /// A call over MCP named no section, for a course with more than one
+    /// (#885, the mac's #865). <paramref name="sections"/> is the phrase
+    /// "Sections 1 and 2" or "Sections 1, 2 and 3". Said by
+    /// <c>plantoir-mcp</c>'s call filter (<c>MissingArguments</c>) in place of
+    /// the SDK's "An error occurred invoking …", which named nothing.
+    /// </summary>
+    public static string NoSectionNamed(string course, string sections) =>
+        $"No section was named. {course} has {sections}; say which one.";
+
+    /// <summary>A call over MCP named no section, for a course that has none (#885, the mac's #865).</summary>
+    public static string NoSectionNamedAndNoSections(string course) =>
+        $"No section was named, and {course} has no sections.";
+
+    /// <summary><c>add_classes</c> or its plan with no unit (#885, the mac's #865).</summary>
+    public const string AddClassesNeedsAUnit =
+        "No unit was named. Which unit should the class pages be added to? Give its number, for example 4.";
+
+    /// <summary><c>add_classes</c> or its plan with no count (#885, the mac's #865).</summary>
+    public const string AddClassesNeedsACount = "No number of class pages was given. How many should be added?";
+
+    /// <summary>
     /// The model answered with the teacher's own request (#217). Deliberately
     /// GENERAL: the guard fires on any request answered in plain words, so
     /// advice about pages or verbs would be false for a whole class of them.
