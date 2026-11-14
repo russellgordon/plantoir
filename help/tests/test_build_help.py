@@ -15,6 +15,7 @@ import json  # noqa: E402
 import shutil  # noqa: E402
 import tempfile  # noqa: E402
 import unittest  # noqa: E402
+from typing import Dict, List  # noqa: E402
 
 from helpers import HELP_DIR, REPO, run_build, run_page_search  # noqa: E402
 
@@ -117,19 +118,21 @@ class RealRepositoryTests(unittest.TestCase):
             if page_id not in assistant_ids:
                 self.assertTrue((web / (page_id + ".html")).exists(), page_id)
 
-    def test_ten_teacher_queries_put_the_right_page_first(self) -> None:
-        # Over the real pages (stubs today), with the assistant switch on in a copy so the
-        # Coverage and GitHub Copilot pages are in the index. Measured 2026-11-13.
+    def search_the_real_pages(self, queries: List[str]) -> Dict[str, List[str]]:
+        # Over the real pages, with the assistant switch on in a copy so the Coverage and
+        # GitHub Copilot pages are in the index.
         node = shutil.which("node")
         if node is None:
             self.skipTest("node is not installed; the search was not run")
         copy = Path(self.temporary) / "search-help"
-        shutil.copytree(str(HELP_DIR), str(copy), ignore=shutil.ignore_patterns("tests", "__pycache__"))
-        facts = copy / "facts.json"
-        facts.write_text(facts.read_text(encoding="utf-8").replace('"assistantOnTheWeb": false', '"assistantOnTheWeb": true'), encoding="utf-8")
+        if not copy.exists():
+            shutil.copytree(str(HELP_DIR), str(copy), ignore=shutil.ignore_patterns("tests", "__pycache__"))
+            facts = copy / "facts.json"
+            facts.write_text(facts.read_text(encoding="utf-8").replace('"assistantOnTheWeb": false', '"assistantOnTheWeb": true'), encoding="utf-8")
         web = Path(self.temporary) / "search-web"
-        code, output = run_build(["--web", str(web), "--help-dir", str(copy), "--repo", str(REPO)])
-        self.assertEqual(code, 0, output)
+        if not web.exists():
+            code, output = run_build(["--web", str(web), "--help-dir", str(copy), "--repo", str(REPO)])
+            self.assertEqual(code, 0, output)
         script = Path(self.temporary) / "search.js"
         script.write_text(
             'const fs=require("fs"),vm=require("vm");const sb={window:{}};vm.createContext(sb);'
@@ -138,6 +141,25 @@ class RealRepositoryTests(unittest.TestCase):
             "console.log(JSON.stringify(out));",
             encoding="utf-8",
         )
+        import subprocess
+
+        completed = subprocess.run(
+            [node, str(script), str(web / "assets" / "search-index.js"), str(web / "assets" / "search.js")] + queries,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout)
+        return json.loads(completed.stdout)
+
+    def assert_first(self, firsts: Dict[str, str]) -> Dict[str, List[str]]:
+        found = self.search_the_real_pages(list(firsts))
+        for query in firsts:
+            with self.subTest(query=query):
+                self.assertGreater(len(found[query]), 0)
+                self.assertEqual(found[query][0], firsts[query], found[query][:5])
+        return found
+
+    def test_ten_teacher_queries_put_the_right_page_first(self) -> None:
+        # Measured over stubs on 2026-11-13, and again over the 73 written pages.
         firsts = {
             "how do I deploy my site": "deploy",
             "print a worksheet": "printing",
@@ -152,21 +174,44 @@ class RealRepositoryTests(unittest.TestCase):
             "quizzes": "quizzes",
             "quiz": "quizzes",
         }
-        import subprocess
-
-        completed = subprocess.run(
-            [node, str(script), str(web / "assets" / "search-index.js"), str(web / "assets" / "search.js")] + list(firsts),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-        )
-        self.assertEqual(completed.returncode, 0, completed.stdout)
-        found = json.loads(completed.stdout)
-        for query in firsts:
-            with self.subTest(query=query):
-                self.assertGreater(len(found[query]), 0)
-                self.assertEqual(found[query][0], firsts[query], found[query][:5])
+        found = self.assert_first(firsts)
         # "classes" and "class" fold both ways; the floor keeps a long query short.
         self.assertEqual(found["classes"][:3], ["class-pages", "class-dates", "later-classes"])
         self.assertLessEqual(len(found["change the dates of my classes after a snow day"]), 5)
+
+    def test_twenty_seven_more_teacher_queries_put_the_right_page_first(self) -> None:
+        # Written against the 73 written pages (#839): a teacher's words, misspellings,
+        # plurals, questions, symptoms and the exact names of menu items.
+        firsts = {
+            "snow day": "redate",
+            "students still see the old version of the site": "deploy",
+            "cloudfare": "cloudflare",
+            "quizes": "quizzes",
+            "it is stuck on the first preview": "slow-first-build",
+            "backup my course": "backups",
+            "I deleted a course by mistake": "archive",
+            "add a youtube video": "videos",
+            "chemical formulas": "notation",
+            "checklist students can tick": "task-boxes",
+            "move my working folder to dropbox": "synced-folder",
+            "deploy greyed out": "deploy-failed",
+            "Set School Year": "school-year",
+            "Make Room for Classes": "make-room",
+            "Copy a Page": "copy-a-page",
+            "Get Ready for the Start of the Year": "start-of-year",
+            "start of the school year": "start-of-year",
+            "add another section": "add-section",
+            "my diagrams show as text in obsidian": "obsidian-addons",
+            "how do I show a pie chart": "diagrams-from-text",
+            "what's the difference between publish and deploy": "publish-and-deploy",
+            "problems tab warning": "problems",
+            "change the color of my site": "section-look",
+            "students run python code": "code",
+            "where do pictures go": "media",
+            "share a unit plan with a colleague": "share-plan",
+            "my site address is taken": "site-address",
+        }
+        self.assert_first(firsts)
 
     def test_the_real_contents_page_caps_its_results_at_ten(self) -> None:
         # The whole page path over the real web copy: a query that finds more than ten pages
@@ -209,7 +254,7 @@ class RealRepositoryTests(unittest.TestCase):
         )
         code, output = run_build(["--check", "--help-dir", str(copy), "--repo", str(REPO)])
         self.assertEqual(code, 0, output)
-        self.assertIn("Help: 1 pages written, ", output)
+        self.assertIn("Help: 86 pages written, ", output)
 
     def test_the_real_web_copy_is_not_ready_to_go_live(self) -> None:
         # RETIRED AT THE CUT: true until every page is written and every picture taken (CF);

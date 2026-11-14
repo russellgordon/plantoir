@@ -75,6 +75,9 @@ def check_inline_syntax(file: str, line: int, text: str, problems: Problems) -> 
         name: str = inside.split(":", 1)[0]
         if name in ("picture", "mac", "/mac", "windows", "/windows", "assistant", "/assistant"):
             problems.fail(file, line, "`{{" + inside + "}}` goes on a line of its own")
+        elif inside == "machine":
+            # The one token with no argument: the reader's computer (#898).
+            continue
         elif name not in INLINE_TOKENS or ":" not in inside:
             problems.fail(file, line, "unknown token `{{" + inside + "}}`")
     unmatched: str = re.sub(r"\{\{[^{}\n]*\}\}", "", outside_code)
@@ -522,6 +525,9 @@ def readable_inline(text: str) -> str:
     for kind, value in split_inline(text):
         if kind == "text":
             result.append(str(value))
+        elif kind == "token" and str(value).strip() == "machine":
+            # Read as a word, so a sentence that ends on it still ends (#898).
+            result.append("computer")
         elif kind in ("code", "token"):
             result.append(" ")
         elif kind == "link":

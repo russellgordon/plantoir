@@ -14,7 +14,8 @@ fails the build instead of leaving Help wrong:
 - `{{fact:<id>}}`    help/facts.json;
 - `{{key:<id>}}`     a shortcut: a menu id's key from the golden, or
                      help/controls.json -> keys;
-- `{{count:<name>}}` a number counted from support/ (counts.py).
+- `{{count:<name>}}` a number counted from support/ (counts.py);
+- `{{machine}}`      the reader's computer: "Mac" or "PC" (#898).
 """
 
 from __future__ import annotations
@@ -33,6 +34,24 @@ from .problems import HelpError, Problems
 MENU_SEPARATOR = " ▸ "
 GOLDEN_PATH = Path("mac-app") / "Tests" / "Goldens" / "menu-bar.txt"
 SWIFT_SOURCES = Path("mac-app") / "QuartzTeachers"
+
+
+# The word for the reader's computer, by the platform a passage is rendered
+# for (#898). The build has no Windows form yet: the Mac book and the web copy
+# both say "Mac", and "PC" is filled only inside a {{windows}} run. A Windows
+# form of the build passes "windows" as its platform and gets "PC" from here.
+MACHINE_TOKEN = "{{machine}}"
+MACHINE_WORDS: Dict[str, str] = {"mac": "Mac", "web": "Mac", "windows": "PC"}
+
+
+def machine_word(platform: str) -> str:
+    return MACHINE_WORDS.get(platform, MACHINE_WORDS["mac"])
+
+
+def fill_machine(text: str, platform: str) -> str:
+    """Fills {{machine}} in text that takes no other token: a page's
+    description and a picture's alt line."""
+    return text.replace(MACHINE_TOKEN, machine_word(platform))
 
 
 def read_json(path: Path) -> Any:
@@ -280,6 +299,8 @@ class Registries:
 
     def render_inline(self, token: str, platform: str, file: str, line: int, problems: Problems) -> str:
         """The HTML for one inline token; a failure renders as nothing."""
+        if token.strip() == "machine":
+            return html.escape(machine_word(platform))
         if ":" not in token:
             problems.fail(file, line, "unknown token `{{" + token + "}}`")
             return ""
