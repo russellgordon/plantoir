@@ -408,7 +408,6 @@ public sealed class DeployedFolderReadersTests : IDisposable
         var readers = new List<Socket>();
         try
         {
-            var clock = Stopwatch.StartNew();
             for (int i = 0; i < DeployedFolderServer.MaximumConnections; i++)
             {
                 var reader = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { ReceiveBufferSize = 4096 };
@@ -417,16 +416,26 @@ public sealed class DeployedFolderReadersTests : IDisposable
                 readers.Add(reader);
             }
             DeployedFolderServerTests.WaitFor(() => server.OpenConnections == DeployedFolderServer.MaximumConnections, TimeSpan.FromSeconds(5));
+            // Measured from the moment every place is taken by a reader, so the
+            // time it takes this PC to open 64 connections is not counted.
+            var clock = Stopwatch.StartNew();
             Thread.Sleep(2000);
 
             var normal = Exchange(server.Port, Encoding.ASCII.GetBytes($"GET / HTTP/1.1\r\nHost: 127.0.0.1:{server.Port}\r\nConnection: close\r\n\r\n"), false, TimeSpan.Zero);
             Assert.Equal((bool)expect["aNormalRequestAnswered"]!, normal.Status == 200 && normal.BodyText == "home");
 
-            // Every stalled reader goes once its piece has sat untaken past the deadline.
-            DeployedFolderServerTests.WaitFor(() => server.OpenConnections == 0, TimeSpan.FromSeconds(within + 5));
-            double seconds = clock.Elapsed.TotalSeconds;
-            Assert.True(server.OpenConnections == 0, $"{server.OpenConnections} stalled readers still open after {seconds:F1} s");
-            Assert.InRange(seconds, DeployedFolderServer.SecondsToTakeAPiece - 1, within);
+            // The contract's case: A stalled reader is closed within its seconds,
+            // and not before the piece deadline (63 are left once the newcomer
+            // made room).
+            int left = DeployedFolderServer.MaximumConnections - 1;
+            DeployedFolderServerTests.WaitFor(() => server.OpenConnections < left, TimeSpan.FromSeconds(within + 5));
+            double first = clock.Elapsed.TotalSeconds;
+            Assert.True(server.OpenConnections < left, $"no stalled reader closed after {first:F1} s");
+            Assert.InRange(first, DeployedFolderServer.SecondsToTakeAPiece - 1, within);
+
+            // And then every one of them, so none holds a place for good.
+            DeployedFolderServerTests.WaitFor(() => server.OpenConnections == 0, TimeSpan.FromSeconds(30));
+            Assert.True(server.OpenConnections == 0, $"{server.OpenConnections} stalled readers still open after {clock.Elapsed.TotalSeconds:F1} s");
         }
         finally
         {

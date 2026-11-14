@@ -158,12 +158,32 @@ public sealed class DeployedFolderShows
         public DeployedFolderServer Server { get; } = server;
     }
 
-    private static readonly Lazy<DeployedFolderShows> SharedInstance = new(() => new DeployedFolderShows(SettingsDeployedFolderPorts.Instance));
+    private static readonly Lazy<DeployedFolderShows> SharedInstance = new(() => new DeployedFolderShows(new InMemoryDeployedFolderPorts()));
 
-    /// <summary>The app's one registry, remembering ports in the app's settings.</summary>
+    /// <summary>
+    /// The app's one registry. It remembers ports in this process only until
+    /// the window calls <see cref="RememberPortsIn"/> once at start-up with the
+    /// app's own settings and its dispatcher.
+    /// </summary>
     public static DeployedFolderShows Shared => SharedInstance.Value;
 
-    private readonly IDeployedFolderPorts _ports;
+    /// <summary>
+    /// From now on, remember ports in <paramref name="settings"/> (the app's
+    /// own <c>App.Settings</c>, never a second copy loaded from disk, which
+    /// would save over it), written and saved only through
+    /// <paramref name="onUiThread"/>, the way the rest of the app saves its
+    /// settings (the review's L3). Ports remembered before this call are kept.
+    /// </summary>
+    public void RememberPortsIn(AppSettings settings, Action<Action> onUiThread)
+    {
+        var known = _ports;
+        var ports = new SettingsDeployedFolderPorts(settings, onUiThread);
+        if (known is InMemoryDeployedFolderPorts memory)
+            foreach (var (path, port) in memory.All()) ports.Remember(path, port);
+        _ports = ports;
+    }
+
+    private volatile IDeployedFolderPorts _ports;
     private readonly ILocalFiles _files;
     private readonly object _gate = new();
     private readonly List<Running> _running = [];
@@ -221,7 +241,7 @@ public sealed class DeployedFolderShows
     {
         bool changed;
         lock (_gate) changed = _folderWentAway.Remove(Key(courseCode, sectionNumber, workingFolder));
-        if (changed) Changed?.Invoke();
+        if (changed) RaiseChanged();
     }
 
     // ---- Opening -----------------------------------------------------------------------
@@ -262,10 +282,7 @@ public sealed class DeployedFolderShows
         }
 
         if (already is not null)
-        {
-            Raise(new DeployedFolderHappening.Opened(courseCode, sectionNumber, from, AlreadyOpen: true, AddressMoved: false));
-            return HandOver(already, courseCode, sectionNumber, openInBrowser);
-        }
+            return HandOver(already, courseCode, sectionNumber, from, alreadyOpen: true, addressMoved: false, openInBrowser, startedHere: false);
         if (nothingDeployed) return CouldNot(DeployedFolderCouldNotOpen.NothingDeployed, courseCode, sectionNumber);
         if (joining is not null)
         {
@@ -273,8 +290,7 @@ public sealed class DeployedFolderShows
             // quick presses start ONE show (the mac's implementation review M1).
             var joined = await joining;
             if (joined.Show is null) return new OpenOutcome(null, joined.Why);
-            Raise(new DeployedFolderHappening.Opened(courseCode, sectionNumber, from, AlreadyOpen: true, AddressMoved: false));
-            return HandOver(joined.Show, courseCode, sectionNumber, openInBrowser);
+            return HandOver(joined.Show, courseCode, sectionNumber, from, alreadyOpen: true, addressMoved: false, openInBrowser, startedHere: false);
         }
 
         Attempt attempt;
@@ -290,11 +306,11 @@ public sealed class DeployedFolderShows
         }
         // Null with no reason: a Stop pressed while it started ended it.
         if (attempt.Show is null) return new OpenOutcome(null, attempt.Why);
-        return HandOver(attempt.Show, courseCode, sectionNumber, openInBrowser);
+        return HandOver(attempt.Show, courseCode, sectionNumber, from, alreadyOpen: false, attempt.AddressMoved, openInBrowser, startedHere: true);
     }
 
     /// <summary>What one start came to: a show, or none and why (null: Stop was pressed while it started).</summary>
-    private sealed record Attempt(Show? Show, DeployedFolderCouldNotOpen? Why);
+    private sealed record Attempt(Show? Show, DeployedFolderCouldNotOpen? Why, bool AddressMoved = false);
 
     private Attempt StartShowing(string canonical, string courseCode, int sectionNumber, string workingFolder, DeployedFolderFrom from)
     {
@@ -309,7 +325,6 @@ public sealed class DeployedFolderShows
             Raise(new DeployedFolderHappening.CouldNotOpen(courseCode, sectionNumber, DeployedFolderCouldNotOpen.NoFreeAddress));
             return new Attempt(null, DeployedFolderCouldNotOpen.NoFreeAddress);
         }
-        _ports.Remember(canonical, server.Port);
         var show = new Show(canonical, courseCode, sectionNumber, workingFolder, server.Port);
         bool stopAsked;
         lock (_gate)
@@ -317,24 +332,42 @@ public sealed class DeployedFolderShows
             _running.Add(new Running(show, server));
             stopAsked = _stopsAskedWhileStarting.Remove(canonical);
         }
-        Raise(new DeployedFolderHappening.Opened(courseCode, sectionNumber, from, AlreadyOpen: false, AddressMoved: result.FirstWasTaken));
-        Changed?.Invoke();
         if (stopAsked)
         {
             // Stop was pressed while it started: stopped as soon as it has, and
-            // nothing is left listening.
-            StopShow(canonical, DeployedFolderStopReason.StopPressed);
+            // nothing is left listening. It never reached the browser, so the
+            // trail says nothing of it (the review's L4): no "opened", no "stopped".
+            StopShow(canonical, DeployedFolderStopReason.StopPressed, onTheTrail: false);
             return new Attempt(null, null);
         }
-        return new Attempt(show, null);
+        // Remembered once it is listening: the remembered port is tried first
+        // next time, then the block from the folder's hash (address.rule). So
+        // a port that had to move stays moved until it is taken in its turn.
+        _ports.Remember(canonical, server.Port);
+        RaiseChanged();
+        return new Attempt(show, null, result.FirstWasTaken);
     }
 
-    private OpenOutcome HandOver(Show show, string courseCode, int sectionNumber, Func<Uri, bool> openInBrowser)
+    /// <summary>
+    /// Hands the address to the browser, and only THEN says "opened" on the
+    /// trail (the review's L4: the trail must not say opened for an address the
+    /// browser never took). A show this press started that the browser refused
+    /// is stopped again without a line of its own: the one line is "could not
+    /// open … the browser did not open it". One that was already running keeps
+    /// running: it is still open where it was opened before.
+    /// </summary>
+    private OpenOutcome HandOver(Show show, string courseCode, int sectionNumber, DeployedFolderFrom from, bool alreadyOpen,
+                                 bool addressMoved, Func<Uri, bool> openInBrowser, bool startedHere)
     {
         bool took;
         try { took = openInBrowser(show.Address); }
         catch { took = false; }
-        if (took) return new OpenOutcome(show.Address, null);
+        if (took)
+        {
+            Raise(new DeployedFolderHappening.Opened(courseCode, sectionNumber, from, alreadyOpen, addressMoved));
+            return new OpenOutcome(show.Address, null);
+        }
+        if (startedHere) StopShow(show.Id, DeployedFolderStopReason.StopPressed, onTheTrail: false);
         return CouldNot(DeployedFolderCouldNotOpen.BrowserDidNotOpen, courseCode, sectionNumber);
     }
 
@@ -382,7 +415,7 @@ public sealed class DeployedFolderShows
         foreach (string id in ending) StopShow(id, DeployedFolderStopReason.PlantoirQuit);
     }
 
-    private void StopShow(string canonical, DeployedFolderStopReason reason)
+    private void StopShow(string canonical, DeployedFolderStopReason reason, bool onTheTrail = true)
     {
         Running? found;
         lock (_gate)
@@ -394,17 +427,41 @@ public sealed class DeployedFolderShows
                 _folderWentAway.Add(Key(found.Show.CourseCode, found.Show.SectionNumber, found.Show.WorkingFolder));
         }
         found.Server.Stop();
-        Raise(new DeployedFolderHappening.Stopped(found.Show.CourseCode, found.Show.SectionNumber, reason,
-                                                   found.Server.Requests, found.Server.NotFound));
-        Changed?.Invoke();
+        if (onTheTrail)
+            Raise(new DeployedFolderHappening.Stopped(found.Show.CourseCode, found.Show.SectionNumber, reason,
+                                                       found.Server.Requests, found.Server.NotFound));
+        RaiseChanged();
     }
 
     // ---- Helpers ------------------------------------------------------------------------
 
+    /// <summary>
+    /// Both events are raised on whatever thread caused them, a listener's own
+    /// background thread among them (a folder gone, a listener ended), where an
+    /// exception would end the app. So neither lets one out: a subscriber that
+    /// throws, as a WinUI handler touching a control off its dispatcher does,
+    /// loses its own redraw and nothing else (the review's M1: an unguarded
+    /// Changed ended the process, exit 0xE0434352). Each subscriber is called
+    /// on its own, so one that throws does not stop the next.
+    /// </summary>
     private void Raise(DeployedFolderHappening happening)
     {
-        try { Happened?.Invoke(happening); }
-        catch { }
+        if (Happened is not { } handlers) return;
+        foreach (var handler in handlers.GetInvocationList().Cast<Action<DeployedFolderHappening>>())
+        {
+            try { handler(happening); }
+            catch { }
+        }
+    }
+
+    private void RaiseChanged()
+    {
+        if (Changed is not { } handlers) return;
+        foreach (var handler in handlers.GetInvocationList().Cast<Action>())
+        {
+            try { handler(); }
+            catch { }
+        }
     }
 
     private static bool IsSection(Show show, string courseCode, int sectionNumber, string workingFolder) =>

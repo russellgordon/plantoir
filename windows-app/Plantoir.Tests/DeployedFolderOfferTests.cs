@@ -212,56 +212,6 @@ public sealed class DeployedFolderOfferTests : IDisposable
         Assert.Equal(@"D:\Sites\x\section2", DeployedFolderOffer.SectionFolder(@" D:\Sites\x\ ", workingFolder, 2));
     }
 
-    /// <summary>
-    /// The launcher's OWN function, cut out of <c>deploy.ps1</c> and run in
-    /// Windows PowerShell 5.1 (what deploy.ps1 runs in), beside
-    /// <see cref="DeployedFolderOffer.SectionFolder"/> on the same settings,
-    /// with deploy.ps1's own section join: a change to either that the other
-    /// has not made fails here.
-    /// </summary>
-    [Fact]
-    public void TheAppResolvesTheFolderExactlyAsDeployPs1Does()
-    {
-        string workingFolder = Path.Combine(_base, "Working Folder");
-        Directory.CreateDirectory(workingFolder);
-        string deploy = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "deploy.ps1"));
-        int start = deploy.IndexOf("function Resolve-PublishFolder", StringComparison.Ordinal);
-        Assert.True(start >= 0, "deploy.ps1 has no Resolve-PublishFolder");
-        int end = deploy.IndexOf("\n}", start, StringComparison.Ordinal);
-        string function = deploy[start..(end + 2)];
-        // deploy.ps1 1009: [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
-        Assert.Contains("[IO.Path]::Combine($folderAsked.TrimEnd('\\','/'), (\"section{0}\" -f $SECTION_NUM))", deploy);
-
-        string inputs = Path.Combine(_base, "inputs.txt");
-        File.WriteAllLines(inputs, Settings.Select(s => Convert.ToBase64String(Encoding.UTF8.GetBytes(s))));
-        string script = Path.Combine(_base, "resolve.ps1");
-        File.WriteAllText(script, function + "\n" +
-            "$wf = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($args[1]))\n" +
-            "foreach ($line in [IO.File]::ReadAllLines($args[0])) {\n" +
-            "  $asked = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line))\n" +
-            "  $r = $null; try { $r = Resolve-PublishFolder $asked $wf } catch { $r = $null }\n" +
-            "  if ($null -eq $r) { 'NULL' } else { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([IO.Path]::Combine($r.TrimEnd('\\','/'), 'section1'))) }\n" +
-            "}\n", new UTF8Encoding(true));
-        var info = new ProcessStartInfo("powershell.exe")
-        {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-        };
-        foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, inputs,
-                                            Convert.ToBase64String(Encoding.UTF8.GetBytes(workingFolder)) })
-            info.ArgumentList.Add(argument);
-        using var process = Process.Start(info)!;
-        string output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(60_000);
-        var answers = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        Assert.Equal(Settings.Length, answers.Length);
-        for (int i = 0; i < Settings.Length; i++)
-        {
-            string? launcher = answers[i] == "NULL" ? null : Encoding.UTF8.GetString(Convert.FromBase64String(answers[i]));
-            Assert.True(launcher == DeployedFolderOffer.SectionFolder(Settings[i], workingFolder, 1),
-                        $"'{Settings[i]}': deploy.ps1 {launcher ?? "null"}, the app {DeployedFolderOffer.SectionFolder(Settings[i], workingFolder, 1) ?? "null"}");
-        }
-    }
-
     // ---- The facts, read from the saved settings and the disk ------------------------------
 
     private (Course Course, string WorkingFolder) MakeCourse(JObject settings)
@@ -348,5 +298,88 @@ public sealed class DeployedFolderOfferTests : IDisposable
             ["deploy_target"] = "local_folder", ["deploy_folder_path"] = sites, ["kept_for_reference"] = true,
         });
         Assert.Equal("absent", Spoken(DeployedFolderOffer.LookUp(course, 1, workingFolder).Decision));
+    }
+
+    [Fact]
+    public void UnreadableSavedSettingsAreNeverOfferedOnTheWindowsCopy()
+    {
+        string sites = Path.Combine(_base, "Sites");
+        Directory.CreateDirectory(Path.Combine(sites, "section1"));
+        File.WriteAllText(Path.Combine(sites, "section1", "index.html"), "x");
+        string workingFolder = Path.Combine(_base, "wf");
+        string courseFolder = Path.Combine(workingFolder, "courses", "ICS3U");
+        Directory.CreateDirectory(courseFolder);
+        File.WriteAllText(Path.Combine(courseFolder, "course_config.json"), "{ not json");
+        // The window's unsaved copy names the folder; the saved file cannot be read.
+        var unsaved = CourseConfiguration.FromDictionary(new JObject { ["deploy_target"] = "local_folder", ["deploy_folder_path"] = sites });
+        var lookup = DeployedFolderOffer.LookUp(new Course("ICS3U", courseFolder, unsaved), 1, workingFolder);
+        Assert.Equal("absent", Spoken(lookup.Decision));
+        Assert.Null(lookup.SectionFolder);
+    }
+}
+
+/// <summary>
+/// <c>deploy.ps1</c>'s own <c>Resolve-PublishFolder</c> beside the app's, in
+/// the wall-clock collection because it starts Windows PowerShell 5.1 (the
+/// review's L5).
+/// </summary>
+[Collection(DeployedFolderTimings.Name)]
+public sealed class DeployedFolderLauncherFolderTests : IDisposable
+{
+    private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-launcher-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose() => ReferenceFixtures.Remove(_base);
+
+    public static readonly string[] Settings = DeployedFolderOfferTests.Settings;
+
+    /// <summary>
+    /// The launcher's OWN function, cut out of <c>deploy.ps1</c> and run in
+    /// Windows PowerShell 5.1 (what deploy.ps1 runs in), beside
+    /// <see cref="DeployedFolderOffer.SectionFolder"/> on the same settings,
+    /// with deploy.ps1's own section join: a change to either that the other
+    /// has not made fails here.
+    /// </summary>
+    [Fact]
+    public void TheAppResolvesTheFolderExactlyAsDeployPs1Does()
+    {
+        string workingFolder = Path.Combine(_base, "Working Folder");
+        Directory.CreateDirectory(workingFolder);
+        string deploy = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "deploy.ps1"));
+        int start = deploy.IndexOf("function Resolve-PublishFolder", StringComparison.Ordinal);
+        Assert.True(start >= 0, "deploy.ps1 has no Resolve-PublishFolder");
+        int end = deploy.IndexOf("\n}", start, StringComparison.Ordinal);
+        string function = deploy[start..(end + 2)];
+        // deploy.ps1, where it builds the target from Resolve-PublishFolder's answer:
+        // [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
+        Assert.Contains("[IO.Path]::Combine($folderAsked.TrimEnd('\\','/'), (\"section{0}\" -f $SECTION_NUM))", deploy);
+
+        string inputs = Path.Combine(_base, "inputs.txt");
+        File.WriteAllLines(inputs, Settings.Select(s => Convert.ToBase64String(Encoding.UTF8.GetBytes(s))));
+        string script = Path.Combine(_base, "resolve.ps1");
+        File.WriteAllText(script, function + "\n" +
+            "$wf = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($args[1]))\n" +
+            "foreach ($line in [IO.File]::ReadAllLines($args[0])) {\n" +
+            "  $asked = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line))\n" +
+            "  $r = $null; try { $r = Resolve-PublishFolder $asked $wf } catch { $r = $null }\n" +
+            "  if ($null -eq $r) { 'NULL' } else { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([IO.Path]::Combine($r.TrimEnd('\\','/'), 'section1'))) }\n" +
+            "}\n", new UTF8Encoding(true));
+        var info = new ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, inputs,
+                                            Convert.ToBase64String(Encoding.UTF8.GetBytes(workingFolder)) })
+            info.ArgumentList.Add(argument);
+        using var process = Process.Start(info)!;
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit(60_000);
+        var answers = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal(Settings.Length, answers.Length);
+        for (int i = 0; i < Settings.Length; i++)
+        {
+            string? launcher = answers[i] == "NULL" ? null : Encoding.UTF8.GetString(Convert.FromBase64String(answers[i]));
+            Assert.True(launcher == DeployedFolderOffer.SectionFolder(Settings[i], workingFolder, 1),
+                        $"'{Settings[i]}': deploy.ps1 {launcher ?? "null"}, the app {DeployedFolderOffer.SectionFolder(Settings[i], workingFolder, 1) ?? "null"}");
+        }
     }
 }

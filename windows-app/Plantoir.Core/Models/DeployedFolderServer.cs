@@ -272,7 +272,9 @@ public sealed class DeployedFolderServer : IDisposable
                 // The listener ended without being asked (the mac's
                 // implementation review L4): the show is dropped.
                 Stop();
-                _onEnded?.Invoke();
+                // The caller's code, on this listener's own thread: whatever it
+                // throws must not end the app (the review's M1).
+                try { _onEnded?.Invoke(); } catch { }
                 return;
             }
             Connection connection;
@@ -380,7 +382,8 @@ public sealed class DeployedFolderServer : IDisposable
                 // Told AFTER the answer has gone: the show it ends stops this
                 // server, which would otherwise reset the very connection the
                 // browser is waiting on (found by ARequestThatFindsTheFolderGoneStopsItUntilDismissed).
-                if (folderGone && _onFolderGone is { } gone) StartThread(gone, "Plantoir deployed folder gone");
+                if (folderGone && _onFolderGone is { } gone)
+                    StartThread(() => { try { gone(); } catch { } }, "Plantoir deployed folder gone");
                 if (!sent) { connection.Reset(); return; }
                 if (answer.ClosesTheConnection) { connection.CloseAfterAnswer(); return; }
 

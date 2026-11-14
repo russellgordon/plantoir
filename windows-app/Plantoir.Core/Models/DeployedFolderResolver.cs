@@ -183,7 +183,7 @@ public sealed class DeployedFolderResolver
         var relative = new List<string>();
         for (int index = 0; index < path.Segments.Count - 1; index++)
         {
-            if (EntryName(path.Segments[index], directory) is not { } actual || !IsFolderAt(Path.Join(directory, actual)))
+            if (EntryName(path.Segments[index], directory) is not { } actual || !IsFolderAt(Path.Join(directory, actual), realRoot))
                 return NotFound(isHead);
             directory = Path.Join(directory, actual);
             relative.Add(actual);
@@ -197,19 +197,19 @@ public sealed class DeployedFolderResolver
             var folderRelative = new List<string>(relative);
             if (last.Length > 0)
             {
-                if (EntryName(last, directory) is { } actual && IsFolderAt(Path.Join(directory, actual)))
+                if (EntryName(last, directory) is { } actual && IsFolderAt(Path.Join(directory, actual), realRoot))
                 {
                     folder = Path.Join(directory, actual);
                     folderRelative.Add(actual);
                 }
-                else if (EntryName(last + ".html", directory) is { } page && IsFileAt(Path.Join(directory, page)))
+                else if (EntryName(last + ".html", directory) is { } page && IsFileAt(Path.Join(directory, page), realRoot))
                 {
                     // /a/ where only a.html exists: the page's own address.
                     return Redirect(path.Segments, endsWithSlash: false, query);
                 }
                 else return NotFound(isHead);
             }
-            if (EntryName("index.html", folder) is { } indexName && IsFileAt(Path.Join(folder, indexName)))
+            if (EntryName("index.html", folder) is { } indexName && IsFileAt(Path.Join(folder, indexName), realRoot))
             {
                 folderRelative.Add(indexName);
                 return Serve(Path.Join(folder, indexName), indexName, folderRelative, realRoot, request, isHead);
@@ -220,14 +220,14 @@ public sealed class DeployedFolderResolver
 
         // No slash after the last name: the file itself, then that name + .html,
         // then a folder (redirected to its slash so its relative links work).
-        if (EntryName(last, directory) is { } file && IsFileAt(Path.Join(directory, file)))
+        if (EntryName(last, directory) is { } file && IsFileAt(Path.Join(directory, file), realRoot))
             return Serve(Path.Join(directory, file), file, [.. relative, file], realRoot, request, isHead);
-        if (EntryName(last + ".html", directory) is { } withHtml && IsFileAt(Path.Join(directory, withHtml)))
+        if (EntryName(last + ".html", directory) is { } withHtml && IsFileAt(Path.Join(directory, withHtml), realRoot))
             return Serve(Path.Join(directory, withHtml), withHtml, [.. relative, withHtml], realRoot, request, isHead);
-        if (EntryName(last, directory) is { } sub && IsFolderAt(Path.Join(directory, sub)))
+        if (EntryName(last, directory) is { } sub && IsFolderAt(Path.Join(directory, sub), realRoot))
         {
             string folder = Path.Join(directory, sub);
-            if (EntryName("index.html", folder) is { } indexName && IsFileAt(Path.Join(folder, indexName)))
+            if (EntryName("index.html", folder) is { } indexName && IsFileAt(Path.Join(folder, indexName), realRoot))
                 return Redirect(path.Segments, endsWithSlash: true, query);
         }
         return NotFound(isHead);
@@ -344,9 +344,15 @@ public sealed class DeployedFolderResolver
         return null;
     }
 
-    private bool IsFolderAt(string path) => _files.FinalPath(path) is { } real && _files.IsFolder(real);
+    // Every folder and file looked at on the way is judged INSIDE the real
+    // root or not there at all (the review's L1: a junction leading out
+    // answered 308 when the outside folder held an index.html, which told a
+    // caller that file exists). The serve path still checks the opened handle.
+    private bool IsFolderAt(string path, string realRoot) =>
+        _files.FinalPath(path) is { } real && LocalSiteGuard.IsWithin(real, realRoot) && _files.IsFolder(real);
 
-    private bool IsFileAt(string path) => _files.FinalPath(path) is { } real && !_files.IsFolder(real);
+    private bool IsFileAt(string path, string realRoot) =>
+        _files.FinalPath(path) is { } real && LocalSiteGuard.IsWithin(real, realRoot) && !_files.IsFolder(real);
 
     // ---- The answers -----------------------------------------------------------------
 

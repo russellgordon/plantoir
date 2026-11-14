@@ -13814,8 +13814,31 @@ All in `Plantoir.Core/Models`:
   listener's own thread when a folder goes or a listener ends): marshal to
   the dispatcher.
 - **The remembered port:** `AppSettings.DeployedFolderPorts` (canonical path
-  → port), read and written by `SettingsDeployedFolderPorts`, which
-  `Shared` uses.
+  → port). 889b calls `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))` once at start-up; until
+  then ports are remembered in the process only. `SettingsDeployedFolderPorts`
+  reads its own copy and writes and saves `App.Settings` only through that
+  action, on the UI thread, as the rest of the app saves it (the
+  implementation review's L3: the first version wrote `AppSettings.Current`,
+  a SECOND copy of the settings loaded from disk, from a pool thread, and its
+  save would have written over `App.Settings`' and been written over in
+  turn). A port that had to move is remembered where it moved to and tried
+  first next time, the usual one (the hash's) after it, as `address.rule`
+  says: the remembered port first, then the block from the hash.
+- **Never throws at its caller's expense:** a subscriber of `Changed` or
+  `Happened` that throws is called on its own and its exception dropped
+  (the implementation review's M1: an unguarded `Changed` on the listener's
+  own thread, when a folder went or a listener ended, ENDED THE PROCESS,
+  0xE0434352; shown again here against the unguarded copy: "Test host process
+  crashed: Unhandled exception").
+  `ASubscriberThatThrowsLeavesTheAppAliveAndTheShowStopped`.
+- **"Opened" goes on the trail only after the browser took the address**
+  (the review's L4): a Stop pressed while it started leaves no line at all,
+  and a browser that refuses a NEW show leaves one line, "could not open …
+  the browser did not open it", with nothing left running
+  (`OpenedIsSaidOnlyAfterTheBrowserTookTheAddress`).
+- **Saved settings that cannot be read** make the item absent, never offered
+  on the window's unsaved copy (the review's L7).
 
 ### Who serves it: a TcpListener of the app's own
 
@@ -13884,6 +13907,13 @@ rules case for case; the Windows parts:
   `WindowsLocalFiles` at the place each leads, so the containment check on
   the opened handle is what refuses them. Over a socket, the folder link is
   a real junction; only `TheFileLinkCaseOverASocket` skips, by name.
+- **Every folder and file looked at on the way must be inside the folder's
+  real path**, not only the one served (the implementation review's L1): a
+  junction inside the folder that leads out answered 308 to `/junc` when the
+  outside folder held an `index.html`, which told a caller that file exists.
+  It now answers exactly as a missing path does, status and body
+  (`AJunctionLeadingOutAnswersAsAMissingPathDoes`, over a real junction; red
+  with the check taken out, `/junc: 308`).
 
 **Limits.** 64 connections; when every place is taken the connection quiet
 longest is RESET to make room (a reset, not a graceful close, which would
@@ -14015,7 +14045,15 @@ force-killed leaves nothing to clean up: Windows closes its sockets with it.
   socket (no answer in 20 s). That was the server's own work waiting for
   pool threads, so the server moved to threads of its own (above), and the
   server, registry and readers classes also run in their own collection
-  with parallelism off (`DeployedFolderTimings`). And one fault the tests
+  with parallelism off (`DeployedFolderTimings`), with the over-socket
+  resolution cases and the PowerShell 5.1 resolver test
+  (`DeployedFolderLauncherFolderTests`) since the review's L5. The readers
+  test's clock starts once all 64 places are taken, and it asserts the
+  contract's case as written (A stalled reader closed within 40 s, and not
+  before the 30 s piece deadline), then every reader gone within 30 s more.
+  **Not measured** (the review's L2): a program listening dual-mode on
+  `[::]:<port>` is not passed over the way one on 0.0.0.0 is; measuring it
+  needs a non-loopback bind, which raises the firewall's prompt. And one fault the tests
   found in the first version:
   a request that found the folder gone stopped the show from inside its own
   answer, so the browser got a reset instead of the 404; the folder going is

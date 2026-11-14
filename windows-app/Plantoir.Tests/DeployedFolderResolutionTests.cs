@@ -16,6 +16,7 @@ namespace Plantoir.Tests;
 /// <see cref="TheFileLinkCaseOverASocket"/> needs and skips by name when this
 /// account cannot make one).
 /// </summary>
+[Collection(DeployedFolderTimings.Name)]
 public sealed class DeployedFolderResolutionTests : IDisposable
 {
     private readonly string _base = Path.Combine(Path.GetTempPath(), "plantoir-deployed-" + Guid.NewGuid().ToString("N"));
@@ -117,6 +118,44 @@ public sealed class DeployedFolderResolutionTests : IDisposable
         Check(testCase, response.Status, response.Headers, response.Body, response.Closed, isHead);
         // A HEAD's answer carries no body: nothing arrives after its headers.
         if (isHead) Assert.Equal(0, reader.Extra);
+    }
+
+    /// <summary>
+    /// The review's L1: a junction inside the folder that leads out answers
+    /// EXACTLY as a missing path does, even when the outside folder holds an
+    /// index.html (the first version answered 308 to <c>/junc</c>, which told a
+    /// caller that file exists). Over a real junction, through the resolver and
+    /// over a socket.
+    /// </summary>
+    [Fact]
+    public void AJunctionLeadingOutAnswersAsAMissingPathDoes()
+    {
+        int port = FreePort();
+        var places = NewPlaces(port);
+        Directory.CreateDirectory(places.Root);
+        File.WriteAllText(Path.Combine(places.Root, "index.html"), "home");
+        Directory.CreateDirectory(Path.Combine(places.Outside, "folder"));
+        File.WriteAllText(Path.Combine(places.Outside, "index.html"), SecretMarker);
+        File.WriteAllText(Path.Combine(places.Outside, "folder", "index.html"), SecretMarker);
+        ReferenceFixtures.Junction(Path.Combine(places.Root, "junc"), places.Outside);
+
+        var resolver = new DeployedFolderResolver(places.Root);
+        using var missing = resolver.Answer(DeployedFolderRequest.Get("/missing", port), port);
+        using var server = DeployedFolderServer.Start(places.Root, [port]).Server!;
+        var missingWire = Exchange(port, Wire(DeployedFolderRequest.Get("/missing", port)), false, TimeSpan.Zero);
+        foreach (string target in new[] { "/junc", "/junc/", "/junc/index.html", "/junc/folder", "/junc/folder/", "/junc/secret" })
+        {
+            using var answer = resolver.Answer(DeployedFolderRequest.Get(target, port), port);
+            Assert.True(answer.Status == missing.Status, $"{target}: {answer.Status}");
+            Assert.Null(answer.Value("Location"));
+            Assert.Equal(BodyOf(missing), BodyOf(answer));
+
+            var wire = Exchange(port, Wire(DeployedFolderRequest.Get(target, port)), false, TimeSpan.Zero);
+            Assert.Equal(missingWire.Status, wire.Status);
+            Assert.Null(wire.Value("Location"));
+            Assert.Equal(missingWire.Body, wire.Body);
+            Assert.DoesNotContain(SecretMarker, wire.BodyText);
+        }
     }
 
     // ---- What each expectation means ------------------------------------------------------

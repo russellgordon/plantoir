@@ -155,7 +155,14 @@ public static class DeployedFolderOffer
         files ??= WindowsLocalFiles.Instance;
         CourseConfiguration configuration;
         try { configuration = CourseConfiguration.Load(course.ConfigFilePath); }
-        catch { configuration = course.Configuration; }
+        catch
+        {
+            // The saved settings are what a deploy uses; when they cannot be
+            // read, no deploy can say where the folder is, so neither does
+            // this: absent, never offered on the window's unsaved copy (the
+            // review's L7).
+            return new Lookup(new Facts(), Decision.Absent, null);
+        }
 
         var facts = new Facts { KeptForReference = configuration.KeptForReference };
         if (FolderSetting(configuration) is not { } setting)
@@ -272,32 +279,51 @@ public interface IDeployedFolderPorts
     void Remember(string canonicalPath, int port);
 }
 
-/// <summary>The remembered ports in <see cref="AppSettings.DeployedFolderPorts"/>, saved at once.</summary>
+/// <summary>
+/// The remembered ports in the app's own settings (<see cref="AppSettings.DeployedFolderPorts"/>),
+/// read from a copy of this class's own and written only on the UI thread,
+/// through the dispatcher the window hands over, because that is where the
+/// rest of the app writes and saves <c>App.Settings</c> (the review's L3: a
+/// write from the pool thread that starts a show could race a save of the same
+/// object, and a second copy loaded from disk would save over the first).
+/// </summary>
 public sealed class SettingsDeployedFolderPorts : IDeployedFolderPorts
 {
-    public static readonly SettingsDeployedFolderPorts Instance = new();
+    private readonly AppSettings _settings;
+    private readonly Action<Action> _onUiThread;
+    private readonly Dictionary<string, int> _known = new(StringComparer.Ordinal);
 
-    private static readonly object Gate = new();
+    /// <param name="settings">The app's own settings object (<c>App.Settings</c>).</param>
+    /// <param name="onUiThread">Runs an action on the UI thread (the window's <c>DispatcherQueue.TryEnqueue</c>).</param>
+    public SettingsDeployedFolderPorts(AppSettings settings, Action<Action> onUiThread)
+    {
+        _settings = settings;
+        _onUiThread = onUiThread;
+        // Read once, here, on the thread that hands the settings over.
+        foreach (var (path, port) in settings.DeployedFolderPorts) _known[path] = port;
+    }
 
     public int? Remembered(string canonicalPath)
     {
-        lock (Gate)
-            return AppSettings.Current.DeployedFolderPorts.TryGetValue(canonicalPath, out int port) ? port : null;
+        lock (_known) return _known.TryGetValue(canonicalPath, out int port) ? port : null;
     }
 
     public void Remember(string canonicalPath, int port)
     {
-        lock (Gate)
+        lock (_known)
         {
-            var settings = AppSettings.Current;
-            if (settings.DeployedFolderPorts.TryGetValue(canonicalPath, out int known) && known == port) return;
-            settings.DeployedFolderPorts[canonicalPath] = port;
-            settings.Save();
+            if (_known.TryGetValue(canonicalPath, out int known) && known == port) return;
+            _known[canonicalPath] = port;
         }
+        _onUiThread(() =>
+        {
+            _settings.DeployedFolderPorts[canonicalPath] = port;
+            try { _settings.Save(); } catch { }
+        });
     }
 }
 
-/// <summary>A test's or a headless run's memory of ports, kept in the process only.</summary>
+/// <summary>A memory of ports kept in this process only: tests, and the app before the window hands its settings over.</summary>
 public sealed class InMemoryDeployedFolderPorts : IDeployedFolderPorts
 {
     private readonly Dictionary<string, int> _ports = new(StringComparer.Ordinal);
@@ -311,4 +337,11 @@ public sealed class InMemoryDeployedFolderPorts : IDeployedFolderPorts
     {
         lock (_ports) _ports[canonicalPath] = port;
     }
+
+    /// <summary>Every port remembered so far.</summary>
+    public IReadOnlyList<KeyValuePair<string, int>> All()
+    {
+        lock (_ports) return _ports.ToList();
+    }
 }
+

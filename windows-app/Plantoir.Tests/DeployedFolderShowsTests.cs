@@ -162,10 +162,120 @@ public sealed class DeployedFolderShowsTests : IDisposable
         Assert.Null(outcome.Why);
         Assert.Empty(_browser);
         Assert.Equal(0, _shows.Count);
-        var stopped = Assert.IsType<DeployedFolderHappening.Stopped>(Happened().Last());
-        Assert.Equal(DeployedFolderStopReason.StopPressed, stopped.Reason);
-        Assert.IsType<DeployedFolderHappening.Opened>(Happened().First());
+        // It never reached the browser, so the trail says nothing of it: no
+        // "opened" followed by "stopped" (the review's L4).
+        Assert.Empty(Happened());
         Assert.True(Refused(port));
+    }
+
+    /// <summary>The review's L4: "opened" is said only once the browser has taken the address.</summary>
+    [Fact]
+    public async Task OpenedIsSaidOnlyAfterTheBrowserTookTheAddress()
+    {
+        string folder = Deployed();
+        var order = new List<string>();
+        _shows.Happened += h => { lock (order) order.Add(h.GetType().Name); };
+        var outcome = await _shows.OpenAsync(folder, "ICS3U", 1, _workingFolder, DeployedFolderFrom.Toolbar, address =>
+        {
+            lock (order) order.Add("browser");
+            return true;
+        });
+        Assert.NotNull(outcome.Address);
+        Assert.Equal(["browser", "Opened"], order);
+
+        // A browser that refuses a NEW show: one line, could not open, and nothing left running.
+        _shows.StopEverything();
+        lock (_happened) _happened.Clear();
+        var refused = await _shows.OpenAsync(folder, "ICS3U", 1, _workingFolder, DeployedFolderFrom.Toolbar, _ => false);
+        Assert.Equal(DeployedFolderCouldNotOpen.BrowserDidNotOpen, refused.Why);
+        Assert.Equal(0, _shows.Count);
+        var only = Assert.Single(Happened());
+        Assert.Equal(DeployedFolderCouldNotOpen.BrowserDidNotOpen, Assert.IsType<DeployedFolderHappening.CouldNotOpen>(only).Why);
+    }
+
+    /// <summary>
+    /// The review's M1: a subscriber of either event that throws, on the
+    /// listener's own thread (a folder gone, a listener ended), must not end
+    /// the app. Run against the first version, the test host died
+    /// (0xE0434352) and the run had no totals line.
+    /// </summary>
+    [Fact]
+    public async Task ASubscriberThatThrowsLeavesTheAppAliveAndTheShowStopped()
+    {
+        // The folder goes: the show stops on the server's own thread. The
+        // throwing subscribers come after the show is open, so it is that
+        // thread, and nothing on the test's own, that meets them.
+        string folder = Deployed();
+        var outcome = await Open(folder);
+        _shows.Changed += () => throw new InvalidOperationException("a redraw off its dispatcher");
+        _shows.Happened += _ => throw new InvalidOperationException("a trail write that failed");
+        int after = 0;
+        _shows.Changed += () => Interlocked.Increment(ref after);
+        Directory.Delete(folder, recursive: true);
+        Fetch(outcome.Address!);
+        DeployedFolderServerTests.WaitFor(() => _shows.Count == 0 && Happened().LastOrDefault() is DeployedFolderHappening.Stopped, TimeSpan.FromSeconds(5));
+        Assert.Equal(0, _shows.Count);
+        Assert.True(_shows.FolderWentAway("ICS3U", 1, _workingFolder));
+        Assert.Equal(DeployedFolderStopReason.FolderGone, Assert.IsType<DeployedFolderHappening.Stopped>(Happened().Last()).Reason);
+
+        // Long enough for the server's thread to have finished telling every
+        // subscriber: an exception that escaped it would end the process here.
+        Thread.Sleep(1000);
+
+        // The listener ends on its own: the accept thread stops the show.
+        var second = await Open(Deployed("Again"));
+        var running = (System.Collections.IList)typeof(DeployedFolderShows).GetField("_running", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(_shows)!;
+        var server = (DeployedFolderServer)running[0]!.GetType().GetProperty("Server")!.GetValue(running[0])!;
+        ((TcpListener)typeof(DeployedFolderServer).GetField("_listener", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(server)!).Stop();
+        DeployedFolderServerTests.WaitFor(() => _shows.Count == 0 && Happened().LastOrDefault() is DeployedFolderHappening.Stopped, TimeSpan.FromSeconds(5));
+        Assert.Equal(0, _shows.Count);
+        Assert.True(Refused(second.Address!.Port));
+        // A subscriber after the one that threw was still told.
+        Assert.True(Volatile.Read(ref after) >= 2);
+        // Still here: a process that had died would not reach this line.
+        Thread.Sleep(500);
+        Assert.False(Environment.HasShutdownStarted);
+    }
+
+    /// <summary>The review's L3: the app's settings are written only on the UI thread, and a port remembered before the hand-over is kept.</summary>
+    [Fact]
+    public void PortsAreWrittenToTheSettingsOnlyThroughTheUiThread()
+    {
+        var settings = new AppSettings();
+        settings.DeployedFolderPorts[@"C:\Sites\old\section1"] = 41011;
+        var posted = new List<Action>();
+        var ports = new SettingsDeployedFolderPorts(settings, posted.Add);
+        Assert.Equal(41011, ports.Remembered(@"C:\Sites\old\section1"));
+
+        ports.Remember(@"C:\Sites\new\section1", 41222);
+        Assert.Equal(41222, ports.Remembered(@"C:\Sites\new\section1"));
+        // Nothing written from this thread: the write waits for the UI thread.
+        Assert.False(settings.DeployedFolderPorts.ContainsKey(@"C:\Sites\new\section1"));
+        Assert.Single(posted);
+        string? file = AppSettings.PathOverride;
+        AppSettings.PathOverride = Path.Combine(_base, "settings.json");
+        try { posted[0](); }
+        finally { AppSettings.PathOverride = file; }
+        Assert.Equal(41222, settings.DeployedFolderPorts[@"C:\Sites\new\section1"]);
+        Assert.Contains("41222", File.ReadAllText(Path.Combine(_base, "settings.json")));
+
+        // The same port again posts nothing.
+        ports.Remember(@"C:\Sites\new\section1", 41222);
+        Assert.Single(posted);
+
+        // A registry that remembered in memory before the window handed its
+        // settings over keeps those ports, written through the UI thread too.
+        var memory = new InMemoryDeployedFolderPorts();
+        memory.Remember(@"C:\Sites\early\section1", 41333);
+        var shows = new DeployedFolderShows(memory);
+        var later = new AppSettings();
+        var queued = new List<Action>();
+        shows.RememberPortsIn(later, queued.Add);
+        Assert.Empty(later.DeployedFolderPorts);
+        AppSettings.PathOverride = Path.Combine(_base, "settings2.json");
+        try { foreach (var action in queued) action(); }
+        finally { AppSettings.PathOverride = file; }
+        Assert.Equal(41333, later.DeployedFolderPorts[@"C:\Sites\early\section1"]);
     }
 
     /// <summary><c>stopCases</c>: "Stop is pressed, in the notice or the Section menu".</summary>
@@ -223,7 +333,7 @@ public sealed class DeployedFolderShowsTests : IDisposable
         var server = (DeployedFolderServer)running[0]!.GetType().GetProperty("Server")!.GetValue(running[0])!;
         var listener = (TcpListener)typeof(DeployedFolderServer).GetField("_listener", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(server)!;
         listener.Stop();
-        DeployedFolderServerTests.WaitFor(() => _shows.Count == 0, TimeSpan.FromSeconds(5));
+        DeployedFolderServerTests.WaitFor(() => _shows.Count == 0 && Happened().LastOrDefault() is DeployedFolderHappening.Stopped, TimeSpan.FromSeconds(5));
         Assert.Equal(0, _shows.Count);
         var stopped = Assert.IsType<DeployedFolderHappening.Stopped>(Happened().Last());
         Assert.Equal(DeployedFolderStopReason.EndedOnItsOwn, stopped.Reason);
@@ -240,7 +350,7 @@ public sealed class DeployedFolderShowsTests : IDisposable
         _shows.Changed += () => Interlocked.Increment(ref changed);
         Directory.Delete(folder, recursive: true);
         Fetch(outcome.Address!);
-        DeployedFolderServerTests.WaitFor(() => _shows.Count == 0, TimeSpan.FromSeconds(5));
+        DeployedFolderServerTests.WaitFor(() => _shows.Count == 0 && Happened().LastOrDefault() is DeployedFolderHappening.Stopped, TimeSpan.FromSeconds(5));
         Assert.Equal(0, _shows.Count);
         Assert.True(_shows.FolderWentAway("ICS3U", 1, _workingFolder));
         Assert.Equal(DeployedFolderStopReason.FolderGone, Assert.IsType<DeployedFolderHappening.Stopped>(Happened().Last()).Reason);
