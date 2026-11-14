@@ -787,7 +787,7 @@ KEY_FILE="courses/.internal/.key"
 #
 # Measured 2026-11-13 on macOS 26.6 against a throwaway keychain made for the
 # purpose: with `ps` sampled while the store tool ran, 0 processes carried
-# the token under `security -i` and 1 did under `-w <token>`; and 13 invented
+# the token under `security -i` and 1 did under `-w <token>`; and 12 invented
 # tokens, among them a space, a double quote, a backslash, a trailing
 # backslash, a single quote, a dollar sign, a semicolon, a hash and a TAB,
 # came back byte for byte with each backslash and double quote escaped and
@@ -795,23 +795,46 @@ KEY_FILE="courses/.internal/.key"
 # as the tool's exit status (45 for an item it would not write), so `set -e`
 # stops on it as it did before. One line is one command, so a secret holding
 # a line break is refused here; no token the paste rule lets through holds one.
+# A vertical tab or a form feed is refused with them. `security -i` was
+# measured to keep both inside a quoted argument, as it keeps a carriage
+# return, so this is a second guard: the paste rule refuses every kind of
+# whitespace already, and a password typed for the plans share has no paste
+# rule in front of it.
 # The escaping is done by sed on a pipe rather than by bash's ${…//…/…},
 # whose handling of a backslash in the replacement changed in bash 5.2, and
 # the text reaches sed on its standard input, never in its arguments.
+#
+# KEYCHAIN_COMMAND_LINE_LIMIT is the longest command line, in bytes before
+# its line break, that keychain_save_secret hands on. `security -i` reads at
+# most 4096 bytes as one line: measured 2026-11-13 on macOS 26.6 with lines
+# of exactly 4080 to 4099 bytes, against a throwaway keychain, a line of
+# 4096 bytes ran as one command and every line of 4097 or more was split,
+# its tail run as a command of its own, so the first part would save the
+# token cut short and report success. Half of that leaves room for the
+# escaping and for a keychain named at the end of the line. A token is about
+# 40 characters; a command line over the limit is refused before the store
+# tool starts, and the caller sees the failure (Settings: couldNotSave).
+KEYCHAIN_COMMAND_LINE_LIMIT=2048
 keychain_command_escaped() {
   printf '%s' "${1:-}" | LC_ALL=C /usr/bin/sed 's/[\\"]/\\&/g'
 }
 # $1 the service, $2 the account, $3 the secret.
 keychain_save_secret() {
-  local service="${1:-}" account="${2:-}" secret="${3:-}"
-  if [[ "$service$account$secret" == *$'\n'* || "$service$account$secret" == *$'\r'* ]]; then
-    return 1
-  fi
+  local LC_ALL=C
+  local service="${1:-}" account="${2:-}" secret="${3:-}" store_line=""
+  case "$service$account$secret" in
+    *$'\n'* | *$'\r'* | *$'\v'* | *$'\f'*) return 1 ;;
+  esac
   service="$(keychain_command_escaped "$service")"
   account="$(keychain_command_escaped "$account")"
   secret="$(keychain_command_escaped "$secret")"
-  printf 'add-generic-password -U -s "%s" -a "%s" -w "%s"\n' "$service" "$account" "$secret" \
-    | /usr/bin/security -i >/dev/null
+  printf -v store_line 'add-generic-password -U -s "%s" -a "%s" -w "%s"' "$service" "$account" "$secret"
+  secret=""
+  if (( ${#store_line} > KEYCHAIN_COMMAND_LINE_LIMIT )); then
+    store_line=""
+    return 1
+  fi
+  printf '%s\n' "$store_line" | /usr/bin/security -i >/dev/null
 }
 # END keychain_save
 
@@ -1051,9 +1074,9 @@ PY
 # `save` reads the token from standard input (all of it), never from an
 # argument or the environment, because both can be read by other programs
 # while this runs, and every request below hands it to curl the same way
-# (http_answer). The store's own writer, set_token_keychain, still passes it
-# to the store tool as an argument for an instant, as it always has: that and
-# the older paste checks are a follow-up of their own.
+# (http_answer). The store's own writer, set_token_keychain, saves it through
+# keychain_save_secret, which writes the store tool's command on `security
+# -i`'s standard input, so the token is on no command line there either.
 
 # The paste rule (deployTokens.paste): what is kept of what was pasted. Sets
 # TIDIED_TOKEN, and TOKEN_PASTE_PROBLEM to tokenEmpty, tokenHasSpaces or

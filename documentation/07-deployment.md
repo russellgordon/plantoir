@@ -1536,11 +1536,29 @@ arguments for as long as it runs. Both now go through `keychain_save_secret`
 service, the account and the token each have their backslashes and double
 quotes escaped by `sed` on a pipe (bash's `${…//…/…}` treats a backslash in
 its replacement differently from 5.2 on) and are wrapped in double quotes; a
-line break in any of them is refused, because one line is one command.
+line break in any of them is refused, because one line is one command. A
+vertical tab and a form feed are refused with it: `security -i` was measured
+to keep both inside a quoted argument (the second fix review read them as
+separators, which was its probe's line splitting, not the tool's), so this is
+a second guard behind the paste rule, which refuses all whitespace, and the
+only guard for a plans password, which has no paste rule.
+
+**One line is at most 4096 bytes.** `security -i` reads a line of up to 4096
+bytes before its line break as one command and splits a longer one, running
+its tail as a command of its own (measured 2026-11-13 on macOS 26.6 with
+`help` lines of exactly 4080 to 4099 bytes, each naming a throwaway keychain:
+4096 is one command, 4097 is two). The first part would save the token cut
+short and report success. `keychain_save_secret` therefore refuses, before
+the store tool starts, a command line longer than
+`KEYCHAIN_COMMAND_LINE_LIMIT`, 2048 bytes, half the measured line, so the
+escaping and a keychain named at the end both fit. A host-issued token is
+about 40 characters, so no real token meets the limit; one that did would
+reach Settings as `couldNotSave` (`DeployTokenWording.problemCouldNotSave`),
+and a deploy-time paste stops under `set -e` as for any refused save.
 Measured 2026-11-13 on macOS 26.6, only against a keychain made for the
 purpose with `security create-keychain` in a temporary folder and deleted by
 its path: with `ps` sampled while the tool ran, 0 processes carried an
-invented token under `-i` and 1 under `-w <token>`; 13 invented tokens with a
+invented token under `-i` and 1 under `-w <token>`; 12 invented tokens with a
 space, a double quote, a backslash, a trailing backslash, a single quote, a
 dollar sign, a semicolon, a hash and a TAB came back byte for byte (`security
 -w` shows a value holding a TAB in hex); and a refused write comes back as the
@@ -1550,6 +1568,13 @@ checks for the keychain file before every write: `security` given a keychain
 path that does not exist does NOT fail; it writes to the login keychain
 instead. `TheKeychainSave` in `scripts/test_deploy_tokens.py` runs the real
 function through the real `security -i` against such a throwaway keychain.
+Its limit and control-character cases hand the line to a stand-in that never
+starts the real tool, so a line the real tool would split never reaches it;
+a 1,904-character invented token under the limit goes to the throwaway
+keychain and comes back whole. No gate saves to the login keychain: the
+end-to-end proof is one change of token in Settings
+(`DeployTokenWording.changeButton`) with an expendable token,
+followed by a deploy that reads it back.
 The plans share's password (`PLAN_KEYCHAIN_SERVICE`) and the account entry
 still use `-w`; they are not this piece's saves, and the follow-up issue
 names them.

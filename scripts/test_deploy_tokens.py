@@ -36,6 +36,7 @@ Pure stdlib. Run with:
 import atexit
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -565,6 +566,13 @@ while IFS= read -r line; do
 done | /usr/bin/security "$@"
 """
 
+# A stand-in that writes down that it was started, reads what it is handed,
+# and never runs the real store tool.
+RECORDING_STORE_TOOL = r"""#!/bin/bash
+printf '%s\n' "$*" >> "$STORE_ARGUMENTS"
+cat > /dev/null
+"""
+
 
 @unittest.skipUnless(ON_A_MAC and os.path.exists("/usr/bin/security"), "the Keychain is the mac's")
 class TheKeychainSave(unittest.TestCase):
@@ -650,6 +658,73 @@ class TheKeychainSave(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.arguments.exists(), "the store tool was never started")
         self.assertIsNone(self._saved("other", "other"))
+
+    # The fix review's m1 and m2 on #696. These hand the function's line to a
+    # stand-in that only writes down that it started and never runs the real
+    # store tool: on the old code a line over 4096 bytes reached the real
+    # `security -i`, which splits it, and its first part names no keychain.
+    def _run_with_a_recording_tool(self, service: str, secret: str):
+        recording = self.scratch / "security-recording"
+        recording.write_text(RECORDING_STORE_TOOL, encoding="utf-8")
+        recording.chmod(0o755)
+        function = _cut_from_deploy_sh("keychain_save")
+        script = function.replace("/usr/bin/security -i", '"$STORE_TOOL" -i') + \
+            '\nkeychain_save_secret "$1" "$2" "$(cat "$3")"\n'
+        held = self.scratch / "held-secret"
+        held.write_text(secret, encoding="utf-8")
+        environment = dict(os.environ, STORE_TOOL=str(recording), STORE_ARGUMENTS=str(self.arguments))
+        return subprocess.run(self.shell + ["-c", script, "_", service, "invented-account", str(held)],
+                              env=environment, capture_output=True, timeout=60)
+
+    def _limit(self) -> int:
+        function = _cut_from_deploy_sh("keychain_save")
+        found = re.findall(r"^KEYCHAIN_COMMAND_LINE_LIMIT=(\d+)$", function, re.MULTILINE)
+        self.assertEqual(len(found), 1, "one named limit, between the keychain_save markers")
+        return int(found[0])
+
+    def test_the_limit_is_safely_under_the_line_security_splits(self):
+        # Measured 2026-11-13, macOS 26.6: a line of 4096 bytes is one command,
+        # one of 4097 is two.
+        self.assertLessEqual(self._limit(), 4096 // 2)
+
+    def test_a_command_line_over_the_limit_is_refused_before_the_store_tool_starts(self):
+        """MUST-FAIL on bd57680c1, which had no limit."""
+        service = "plantoir-test-long"
+        empty_line = 'add-generic-password -U -s "%s" -a "%s" -w ""' % (service, "invented-account")
+        at_the_limit = "A" * (self._limit() - len(empty_line))
+        # The last one is short, and over the limit only once each quote is escaped.
+        for secret in (at_the_limit + "B", "A" * 5000, '"' * (self._limit() // 2)):
+            with self.subTest(length=len(secret)):
+                if self.arguments.exists():
+                    self.arguments.unlink()
+                result = self._run_with_a_recording_tool(service, secret)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.arguments.exists(), "the store tool was never started")
+        result = self._run_with_a_recording_tool(service, at_the_limit)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.arguments.read_text(encoding="utf-8").splitlines(), ["-i"])
+
+    def test_a_long_token_under_the_limit_is_saved_whole(self):
+        token = "L" * 1900 + "-end"
+        function = _cut_from_deploy_sh("keychain_save")
+        script = function.replace("/usr/bin/security -i", '"$STORE_TOOL" -i') + \
+            '\nkeychain_save_secret "$1" "$2" "$(cat "$3")"\n'
+        environment = dict(os.environ, STORE_TOOL=str(self.tool), STORE_ARGUMENTS=str(self.arguments),
+                           THROWAWAY_KEYCHAIN=str(self.keychain))
+        held = self.scratch / "token-long"
+        held.write_text(token, encoding="utf-8")
+        result = subprocess.run(self.shell + ["-c", script, "_", "plantoir-test-long-saved", "invented-account",
+                                              str(held)], env=environment, capture_output=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._saved("plantoir-test-long-saved", "invented-account"), token)
+
+    def test_a_vertical_tab_or_a_form_feed_is_refused_before_the_store_tool_starts(self):
+        """MUST-FAIL on bd57680c1, which refused only a line feed and a carriage return."""
+        for secret in ("vertical\vtab", "form\ffeed"):
+            with self.subTest(secret=repr(secret)):
+                result = self._run_with_a_recording_tool("plantoir-test-control", secret)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.arguments.exists(), "the store tool was never started")
 
     def test_both_token_stores_save_through_it(self):
         text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
