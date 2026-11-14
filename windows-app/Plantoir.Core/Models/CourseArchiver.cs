@@ -327,8 +327,16 @@ public static class CourseArchiver
         var leftOut = PlantoirAddOnsIn(folderPath);
         try
         {
-            using var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
-            AddFolder(archive, folderPath, rootName, leftOut);
+            using var file = new FileStream(archivePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
+                AddFolder(archive, folderPath, rootName, leftOut);
+            // ON THE DISK before anyone relies on it (#873, the shelf plan
+            // review's B-H2): NTFS journals the renames and deletions that
+            // follow, not a file's data, so without FlushFileBuffers a power
+            // cut seconds after a restore or a removal could keep those and
+            // lose the zip's contents — leaving neither the old course nor a
+            // readable copy of it.
+            file.Flush(flushToDisk: true);
         }
         catch
         {

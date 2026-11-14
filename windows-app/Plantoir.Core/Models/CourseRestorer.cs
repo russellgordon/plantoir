@@ -24,7 +24,7 @@ public static class CourseRestorer
             if (Directory.Exists(sectionDir))
                 throw new RestoreException(
                     $"Section {section} of {item.CourseCode} already exists. Remove it first if you want the archived copy back.");
-            Extract(item.FilePath, "section" + section, course.DirectoryPath);
+            Extract(item.FilePath, "section" + section, course.DirectoryPath, coursesDirectory);
             PutSectionBack(course, section);
             // The restored section's notes can be OLDER than a built site left
             // standing outside the working folder, which would read as "already
@@ -37,7 +37,7 @@ public static class CourseRestorer
             if (Directory.Exists(courseDir))
                 throw new RestoreException(
                     $"{item.CourseCode} is already in Courses & Clubs. Remove it first if you want the archived copy back.");
-            Extract(item.FilePath, item.CourseCode, coursesDirectory);
+            Extract(item.FilePath, item.CourseCode, coursesDirectory, coursesDirectory);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
             LockAgainIfKeptForReference(courseDir);
         }
@@ -57,53 +57,78 @@ public static class CourseRestorer
     /// refreshes on its own. Unpacked and verified BEFORE anything is
     /// touched, so an unreadable zip can never leave an emptied folder.
     /// </summary>
-    public static void RestoreBackup(BackupItem item, string coursesDirectory)
+    public static void RestoreBackup(BackupItem item, string coursesDirectory) =>
+        RestoreBackup(item, coursesDirectory, StagedRestore.Steps.Real);
+
+    /// <remarks>
+    /// <para><b>Staged (#873).</b> Unpacked and checked in a hidden folder
+    /// BESIDE the course, on the course's own volume; the course's contents are
+    /// then set aside, the backup's renamed in, and the old ones removed only
+    /// once the swap has succeeded (<see cref="StagedRestore"/>). Any failure
+    /// puts the old contents back and rethrows, so the teacher reads the
+    /// restore's existing failure (the dialog <see cref="BackupProblemTitle.Restoring"/>
+    /// with the error) over a course that is exactly as it was, and the caller
+    /// writes no "course restored" line. Until #873 this unpacked into %TEMP%,
+    /// deleted the contents FIRST and moved the backup's folders in with
+    /// <c>Directory.Move</c>, which cannot cross volumes: a working folder off
+    /// the system disk lost every subfolder, and a move that failed part way
+    /// left the course partly emptied.</para>
+    /// </remarks>
+    internal static void RestoreBackup(BackupItem item, string coursesDirectory, StagedRestore.Steps steps)
     {
         string destination = Path.Combine(coursesDirectory, item.CourseCode);
         if (!Directory.Exists(destination))
         {
-            Extract(item.FilePath, item.CourseCode, coursesDirectory);
+            StagedRestore.Place(item.FilePath, item.CourseCode, coursesDirectory, coursesDirectory, steps);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
             LockAgainIfKeptForReference(destination);
             return;
         }
 
-        string staging = Path.Combine(Path.GetTempPath(), "restore-" + Guid.NewGuid());
-        Directory.CreateDirectory(staging);
+        var staging = StagedRestore.Staging.Make(coursesDirectory, item.CourseCode);
+        bool swapped = false;
         try
         {
-            string payload = Unpack(item.FilePath, item.CourseCode, staging);
+            string payload = StagedRestore.Unpack(staging, item.FilePath, item.CourseCode, steps);
 
             // A reference course is locked (#241): unlock what is about to be
-            // written over, and lock again below — asked of the settings AFTER
+            // set aside, and lock again below — asked of the settings AFTER
             // the restore, so a backup made before the course was kept for
-            // reference restores a course that is not one.
+            // reference restores a course that is not one (and a restore that
+            // was put back locks the course it put back).
             ReferenceLock.Unlock(destination);
 
             // Out with the current contents (hidden files included — the
             // backup carries its own .obsidian), in with the backup's.
-            foreach (string child in Directory.EnumerateFileSystemEntries(destination))
-                DeleteTree(child);
-            foreach (string child in Directory.EnumerateFileSystemEntries(payload))
-            {
-                string target = Path.Combine(destination, Path.GetFileName(child));
-                if (Directory.Exists(child)) Directory.Move(child, target);
-                else File.Move(child, target);
-            }
+            StagedRestore.Swap(staging, destination, payload, steps);
+            swapped = true;
+
+            // A restored course no longer holds what a stopped rename of its
+            // word for a unit was part way through (#158, as the mac does).
+            // Only once it IS restored: a restore that was put back still
+            // holds the pages that record describes.
+            UnitWordRenamer.ClearRenameRecord(destination);
+        }
+        catch (StagedRestore.StopHereForATest) { throw; }
+        catch
+        {
+            if (!swapped && Directory.Exists(staging.Path) && !Directory.Exists(staging.Aside)) staging.TryRemove();
+            throw;
         }
         finally
         {
-            // Whatever happened to the contents, the built site no longer
-            // matches them: a backup's pages are by definition older than the
-            // ones just replaced, so a build left standing would read as newer
-            // and publish what the course used to say.
+            // The built site no longer matches what came back: a backup's
+            // pages are by definition older than the ones just replaced, so a
+            // build left standing would read as newer and publish what the
+            // course used to say. (Also after a failure that was put back: it
+            // costs one rebuild, and a putting back that could not finish is
+            // exactly when the build may not match.)
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
-            // A restored course no longer holds what a stopped rename of its
-            // word for a unit was part way through (#158, as the mac does).
-            UnitWordRenamer.ClearRenameRecord(destination);
             LockAgainIfKeptForReference(destination);
-            try { Directory.Delete(staging, recursive: true); } catch { }
         }
+        // The old contents go last, and a part that will not go now is
+        // finished by the next launch (StagedRestore.RecoverLeftovers).
+        staging.TryRemove();
     }
 
 
@@ -136,35 +161,46 @@ public static class CourseRestorer
         if (ReadsAsKeptForReference(courseDir) is { } shown)
             throw new RestoreException(ReferenceCourse.StaysAsItIs(shown));
 
-        string staging = Path.Combine(Path.GetTempPath(), "restore-" + Guid.NewGuid());
-        Directory.CreateDirectory(staging);
+        return RestoreSection(sectionNumber, item, coursesDirectory, StagedRestore.Steps.Real);
+    }
+
+    /// <remarks>
+    /// The section's folder goes through the same staged swap as a whole
+    /// course (#873, and Russell's ruling on #897 that the safer restore covers
+    /// the assistant's own restore as well as the menu's): unpacked beside the
+    /// course, the section's contents set aside, the backup's renamed in, the
+    /// old ones removed last. Until #873 this emptied the section folder first
+    /// and moved the backup's in from %TEMP%, copying when that crossed a
+    /// volume; a move that failed part way left the section partly emptied.
+    /// The per-section keys are rewritten only once the folder is swapped.
+    /// </remarks>
+    internal static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory, StagedRestore.Steps steps)
+    {
+        string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
+        var staging = StagedRestore.Staging.Make(coursesDirectory, item.CourseCode + "-section" + sectionNumber);
+        int notPutBack;
         try
         {
-            string payload = Unpack(item.FilePath, item.CourseCode, staging);
+            string payload = StagedRestore.Unpack(staging, item.FilePath, item.CourseCode, steps);
             string folderName = "section" + sectionNumber;
             string backedUpSection = Path.Combine(payload, folderName);
             if (!Directory.Exists(backedUpSection))
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
 
-            ReplaceContents(Path.Combine(courseDir, folderName), backedUpSection);
-            int notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
+            StagedRestore.Swap(staging, Path.Combine(courseDir, folderName), backedUpSection, steps);
+            notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode, sectionNumber);
-            return notPutBack;
         }
-        finally
+        catch (StagedRestore.StopHereForATest) { throw; }
+        catch
         {
-            try { Directory.Delete(staging, recursive: true); } catch { }
+            if (Directory.Exists(staging.Path) && !Directory.Exists(staging.Aside)) staging.TryRemove();
+            throw;
         }
+        staging.TryRemove();
+        return notPutBack;
     }
 
-    /// <summary>
-    /// Out with the live folder's children, hidden ones included; in with the
-    /// backup's. Moved when the staging folder is on the same volume, COPIED
-    /// when it is not: <c>Directory.Move</c> fails across volumes on Windows,
-    /// and a working folder on D: with %TEMP% on C: would otherwise be left
-    /// with an emptied section — the one outcome this method exists to
-    /// prevent. (The mac's <c>moveItem</c> copies across volumes itself.)
-    /// </summary>
     /// <summary>The code a teacher reads, when the course at <paramref name="courseDir"/> is kept for reference; otherwise null.</summary>
     private static string? ReadsAsKeptForReference(string courseDir)
     {
@@ -184,36 +220,6 @@ public static class CourseRestorer
     private static void LockAgainIfKeptForReference(string courseDir)
     {
         if (ReadsAsKeptForReference(courseDir) is not null) ReferenceLock.Lock(courseDir);
-    }
-
-    private static void ReplaceContents(string live, string backedUp)
-    {
-        Directory.CreateDirectory(live);
-        foreach (string child in Directory.EnumerateFileSystemEntries(live))
-            DeleteTree(child);
-        foreach (string child in Directory.EnumerateFileSystemEntries(backedUp))
-        {
-            string target = Path.Combine(live, Path.GetFileName(child));
-            try
-            {
-                if (Directory.Exists(child)) Directory.Move(child, target);
-                else File.Move(child, target);
-            }
-            catch (IOException)
-            {
-                if (Directory.Exists(child)) CopyTree(child, target);
-                else File.Copy(child, target, overwrite: true);
-            }
-        }
-    }
-
-    private static void CopyTree(string source, string target)
-    {
-        Directory.CreateDirectory(target);
-        foreach (string file in Directory.EnumerateFiles(source))
-            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
-        foreach (string folder in Directory.EnumerateDirectories(source))
-            CopyTree(folder, Path.Combine(target, Path.GetFileName(folder)));
     }
 
     /// <summary>
@@ -472,46 +478,11 @@ public static class CourseRestorer
     /// <summary>
     /// Extract expecting the named folder at the archive root; when it is
     /// absent but the archive holds exactly one folder, use that one (so
-    /// archives made by another version still restore).
+    /// archives made by another version still restore). Unpacked and checked
+    /// beside the courses, on their own volume, and renamed into place in one
+    /// step (#873: unpacking into %TEMP% made the final <c>Directory.Move</c>
+    /// fail for a working folder off the system disk).
     /// </summary>
-    private static void Extract(string archivePath, string expectedName, string destinationParent)
-    {
-        string staging = Path.Combine(Path.GetTempPath(), "restore-" + Guid.NewGuid());
-        Directory.CreateDirectory(staging);
-        try
-        {
-            string payload = Unpack(archivePath, expectedName, staging);
-            Directory.CreateDirectory(destinationParent);
-            Directory.Move(payload, Path.Combine(destinationParent, expectedName));
-        }
-        finally
-        {
-            try { Directory.Delete(staging, recursive: true); } catch { }
-        }
-    }
-
-    /// <summary>
-    /// Unzips into the staging folder and returns the payload — the folder
-    /// the archive's name promised, or the single folder it holds (so an
-    /// archive made by another version still restores).
-    /// </summary>
-    private static string Unpack(string archivePath, string expectedName, string staging)
-    {
-        try { ZipFile.ExtractToDirectory(archivePath, staging); }
-        catch (Exception error)
-        {
-            throw new RestoreException($"The archive could not be opened: {error.Message}");
-        }
-
-        string payload = Path.Combine(staging, expectedName);
-        if (!Directory.Exists(payload))
-        {
-            var entries = Directory.EnumerateFileSystemEntries(staging)
-                .Where(e => !Path.GetFileName(e).StartsWith('.'))
-                .ToList();
-            if (entries.Count == 1) payload = entries[0];
-            else throw new RestoreException($"The archive could not be opened: it does not contain {expectedName}");
-        }
-        return payload;
-    }
+    private static void Extract(string archivePath, string expectedName, string destinationParent, string coursesDirectory) =>
+        StagedRestore.Place(archivePath, expectedName, destinationParent, coursesDirectory, StagedRestore.Steps.Real);
 }

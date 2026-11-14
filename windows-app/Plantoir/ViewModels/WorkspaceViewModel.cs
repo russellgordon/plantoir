@@ -369,6 +369,13 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
                 WorkspaceProblem = "There are no courses in this folder yet. Click New Course to create your first one.";
             else
             {
+                // A restore that stopped part way (#873): put back, or finished,
+                // BEFORE the courses are listed, so a course whose contents were
+                // set aside is never listed as missing. Only a leftover whose
+                // owner is no longer running; one listing of courses\ when there
+                // is none.
+                foreach (var (leftover, what) in StagedRestore.RecoverLeftovers(Workspace.CoursesDirectory(_state.FolderPath)))
+                    App.LogDiagnostic($"restore leftover {Path.GetFileName(leftover)}: {what}");
                 App.LogDiagnostic("WorkspaceViewModel.Reload: DiscoverCourses starting");
                 Courses = Workspace.DiscoverCourses(_state.FolderPath);
                 App.LogDiagnostic($"WorkspaceViewModel.Reload: DiscoverCourses found {Courses.Count} courses");
