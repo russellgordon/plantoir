@@ -1,4 +1,232 @@
 {
  "about": "Menu paths a page names with {{menu:<id>}}. Each entry: \"mac\" is the path as the menu bar shows it, items joined by \" \u25b8 \", and must be a path in mac-app/Tests/Goldens/menu-bar.txt; an entry for a menu the golden does not list (Plantoir, Edit, Window) carries \"system\": true and is checked against help/system-menus.json instead. \"windows\" is null until the Windows side fills it (P2b); \"windowsKey\" is that platform's shortcut. The Mac shortcut is read from the golden, never typed here. An id no page uses is a warning; F's --release refuses it.",
- "entries": {}
+ "entries": {
+  "newCourse": {
+   "mac": "File \u25b8 New Course\u2026",
+   "windows": null
+  },
+  "openWorkingFolder": {
+   "mac": "File \u25b8 Open Working Folder\u2026",
+   "windows": null
+  },
+  "removeCourse": {
+   "mac": "Course \u25b8 Remove Course\u2026",
+   "windows": null
+  },
+  "courseOpenInObsidian": {
+   "mac": "Course \u25b8 Open in Obsidian",
+   "windows": null
+  },
+  "sectionOpenInObsidian": {
+   "mac": "Section \u25b8 Open in Obsidian",
+   "windows": null
+  },
+  "preview": {
+   "mac": "Section \u25b8 Preview",
+   "windows": null
+  },
+  "deploy": {
+   "mac": "Section \u25b8 Deploy\u2026",
+   "windows": null
+  },
+  "publishPages": {
+   "mac": "Section \u25b8 Publish Pages\u2026",
+   "windows": null
+  },
+  "hidePages": {
+   "mac": "Section \u25b8 Hide Pages\u2026",
+   "windows": null
+  },
+  "publishClassForDate": {
+   "mac": "Section \u25b8 Publish Class for a Date\u2026",
+   "windows": null
+  },
+  "undoLastChange": {
+   "mac": "Section \u25b8 Undo Last Change",
+   "windows": null
+  },
+  "addNextClass": {
+   "mac": "Section \u25b8 Add Next Class",
+   "windows": null
+  },
+  "publishingAndDeploying": {
+   "mac": "Help \u25b8 Publishing and Deploying\u2026",
+   "windows": null
+  },
+  "rebuildPreview": {
+   "mac": "Section \u25b8 Rebuild Preview",
+   "windows": null
+  },
+  "sectionOpenInBrowser": {
+   "mac": "Section \u25b8 Open in Browser",
+   "windows": null
+  },
+  "previewAtLastViewedMenu": {
+   "mac": "Section \u25b8 Preview at Last Viewed",
+   "windows": null
+  },
+  "scheduleDeploy": {
+   "mac": "Section \u25b8 Schedule Deploy\u2026",
+   "windows": null
+  },
+  "cancelDeployAt": {
+   "mac": "Section \u25b8 Cancel Deploy at\u2026",
+   "windows": null
+  },
+  "reDateClasses": {
+   "mac": "Section \u25b8 Re-date Classes\u2026",
+   "windows": null
+  },
+  "makeRoomForClasses": {
+   "mac": "Section \u25b8 Make Room for Classes\u2026",
+   "windows": null
+  },
+  "classDates": {
+   "mac": "Section \u25b8 Class Dates\u2026",
+   "windows": null
+  },
+  "getReadyForStartOfYear": {
+   "mac": "Section \u25b8 Get Ready for the Start of the Year\u2026",
+   "windows": null
+  },
+  "undoGettingReady": {
+   "mac": "Section \u25b8 Undo Getting Ready for the Start of the Year\u2026",
+   "windows": null
+  },
+  "publishPagesThatLinksLeadTo": {
+   "mac": "Section \u25b8 Publish Pages That Links Lead To\u2026",
+   "windows": null
+  },
+  "viewBack": {
+   "mac": "View \u25b8 Back",
+   "windows": null
+  },
+  "viewForward": {
+   "mac": "View \u25b8 Forward",
+   "windows": null
+  },
+  "viewReloadPage": {
+   "mac": "View \u25b8 Reload Page",
+   "windows": null
+  },
+  "settings": {
+   "mac": "Plantoir \u25b8 Settings\u2026",
+   "windows": null,
+   "system": true
+  },
+  "addSection": {
+   "mac": "Course \u25b8 Add Section\u2026",
+   "windows": null
+  },
+  "saveCourseSettings": {
+   "mac": "Course \u25b8 Save Course Settings",
+   "windows": null
+  },
+  "revertCourseSettings": {
+   "mac": "Course \u25b8 Revert Course Settings",
+   "windows": null
+  },
+  "courseRename": {
+   "mac": "Course \u25b8 Rename",
+   "windows": null
+  },
+  "removeSection": {
+   "mac": "Section \u25b8 Remove Section\u2026",
+   "windows": null
+  },
+  "restoreFromArchive": {
+   "mac": "File \u25b8 Restore from Archive\u2026",
+   "windows": null
+  },
+  "openRecent": {
+   "mac": "File \u25b8 Open Recent",
+   "windows": null
+  },
+  "openRecentClearMenu": {
+   "mac": "File \u25b8 Open Recent \u25b8 Clear Menu",
+   "windows": null
+  },
+  "courseKeepACopyForReference": {
+   "mac": "Course \u25b8 Keep a Copy for Reference\u2026",
+   "windows": null
+  },
+  "courseSetSchoolYear": {
+   "mac": "Course \u25b8 Set School Year\u2026",
+   "windows": null
+  },
+  "courseMoveToGroup": {
+   "mac": "Course \u25b8 Move to Group",
+   "windows": null
+  },
+  "fileImportCoursesForReference": {
+   "mac": "File \u25b8 Import Courses for Reference\u2026",
+   "windows": null
+  },
+  "courseCopyAPageFromThisCourse": {
+   "mac": "Course \u25b8 Copy a Page from This Course\u2026",
+   "windows": null
+  },
+  "courseBackUpNow": {
+   "mac": "Course \u25b8 Back Up Now",
+   "windows": null
+  },
+  "courseRestoreFromBackup": {
+   "mac": "Course \u25b8 Restore from Backup\u2026",
+   "windows": null
+  },
+  "courseDeleteBackup": {
+   "mac": "Course \u25b8 Delete Backup\u2026",
+   "windows": null
+  },
+  "courseDeleteArchive": {
+   "mac": "Course \u25b8 Delete Archive\u2026",
+   "windows": null
+  },
+  "fileReloadCourses": {
+   "mac": "File \u25b8 Reload Courses",
+   "windows": null
+  },
+  "helpReportAProblem": {
+   "mac": "Help \u25b8 Report a Problem\u2026",
+   "windows": null
+  },
+  "plantoirCheckForUpdates": {
+   "mac": "Plantoir \u25b8 Check for Updates\u2026",
+   "windows": null,
+   "system": true
+  },
+  "plantoirQuitPlantoir": {
+   "mac": "Plantoir \u25b8 Quit Plantoir",
+   "windows": null,
+   "system": true
+  },
+  "sectionReviseWithLocalAssistant": {
+   "mac": "Section \u25b8 Revise With \u25b8 Local AI Assistant\u2026",
+   "windows": null
+  },
+  "courseReviseWithClaude": {
+   "mac": "Course \u25b8 Revise With \u25b8 Claude\u2026",
+   "windows": null
+  },
+  "courseReviseWithCodex": {
+   "mac": "Course \u25b8 Revise With \u25b8 Codex\u2026",
+   "windows": null
+  },
+  "courseReviseWithCopilot": {
+   "mac": "Course \u25b8 Revise With \u25b8 GitHub Copilot\u2026",
+   "windows": null
+  },
+  "sectionReviseWithClaude": {
+   "mac": "Section \u25b8 Revise With \u25b8 Claude\u2026",
+   "windows": null
+  },
+  "sectionReviseWithCodex": {
+   "mac": "Section \u25b8 Revise With \u25b8 Codex\u2026",
+   "windows": null
+  },
+  "sectionReviseWithCopilot": {
+   "mac": "Section \u25b8 Revise With \u25b8 GitHub Copilot\u2026",
+   "windows": null
+  }
+ }
 }

@@ -46,11 +46,13 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Back Up Now
   Restore from Backup…
   ----
-  Revise With  [if any reviser]
+  Revise With
     Claude…  [if claude]
     Codex…  [if codex]
     GitHub Copilot…  [if copilot]
     Local AI Assistant…  [if local]
+    ----  [if any reviser]
+    Set Up an Assistant…
   ----
   Open in Obsidian
   Show in Finder
@@ -84,11 +86,13 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Undo Getting Ready for the Start of the Year…
   Publish Pages That Links Lead To…
   ----
-  Revise With  [if any reviser]
+  Revise With
     Claude…  [if claude]
     Codex…  [if codex]
     GitHub Copilot…  [if copilot]
     Local AI Assistant…  [if local]
+    ----  [if any reviser]
+    Set Up an Assistant…
   ----
   Open in Obsidian
   Show in Finder
@@ -97,5 +101,6 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Remove Section…
 == Help
   Plantoir Help
+  Set Up an Assistant…
   Publishing and Deploying…
   Report a Problem…

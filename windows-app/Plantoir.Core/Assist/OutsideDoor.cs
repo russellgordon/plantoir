@@ -55,6 +55,13 @@ namespace Plantoir.Core.Assist;
 /// </remarks>
 public static class OutsideDoor
 {
+    /// <summary>
+    /// What a door hands its program and writes on the trail once it opened:
+    /// the argv after the program, and the "assistant opened" line
+    /// (<see cref="ClaudeCodeLauncher.Prepare"/>, <see cref="CodexLauncher.Prepare"/>).
+    /// </summary>
+    public sealed record Session(IReadOnlyList<string> Arguments, string TrailText);
+
     /// <summary>cmd itself, by its full path, never whatever is called cmd.exe on PATH.</summary>
     public static string Cmd => Path.Combine(Environment.SystemDirectory, "cmd.exe");
 
@@ -155,6 +162,29 @@ public static class OutsideDoor
     /// </summary>
     public static bool WithinCommandLineLimit(string program, IReadOnlyList<string> arguments) =>
         LineLength(program, arguments) <= LimitFor(program);
+
+    /// <summary>
+    /// A Revise door's argv with as many unit plans named as its command line
+    /// has room for (790a review M2): the contract's six, then one fewer at a
+    /// time from the END, the rest counted into <c>greetingUnitPlans.more</c>,
+    /// until <see cref="WithinCommandLineLimit"/> holds for
+    /// <paramref name="program"/> — the bound Fix with…'s rows are dropped to.
+    /// A name is cut to 60 TEXT ELEMENTS, and an element has no bound in UTF-16
+    /// units (a letter under 40 stacked accents is 41), so six names can be
+    /// over 8,191 on their own. Never fewer than one name: the contract has no
+    /// words for "a unit plan for , and 1 more", so a single name still too
+    /// long leaves the line over and the door refuses, as it does for an
+    /// over-long course name. Null <paramref name="program"/> names them all.
+    /// </summary>
+    internal static IReadOnlyList<string> GreetingThatFits(string? program, Plantoir.Core.Models.UnitPlans.Reading? unitPlans,
+                                                           Func<int, IReadOnlyList<string>> argumentsNaming)
+    {
+        int named = Math.Min(Plantoir.Core.Models.UnitPlans.MostUnitsNamed, unitPlans?.Plans.Count ?? 0);
+        var arguments = argumentsNaming(Math.Max(named, 1));
+        while (program is not null && named > 1 && !WithinCommandLineLimit(program, arguments))
+            arguments = argumentsNaming(--named);
+        return arguments;
+    }
 
     /// <summary>
     /// Starts it. False when nothing started, so the caller says

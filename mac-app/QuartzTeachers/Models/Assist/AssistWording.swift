@@ -434,8 +434,8 @@ nonisolated enum AssistWording {
     /// Added to an outside assistant's successful deploy when a preview of
     /// the course was open in Plantoir (#433, Russell 2026-10-03: the deploy
     /// goes ahead). Deploying a section ends that section's preview, as the
-    /// window's own Deploy does; "if" because Plantoir's record names the
-    /// course and not the section, and a preview of another section stays.
+    /// window's own Deploy does; "if" because a lease that names no section
+    /// holds the whole course (#835), and a preview of another section stays.
     static func deployClosedAnOpenPreview(course: String, section: String) -> String {
         return "If a preview of \(course) Section \(section) was open in Plantoir, deploying closed it — "
              + "press Preview there to open it again."
@@ -451,11 +451,13 @@ nonisolated enum AssistWording {
 
     /// Said when ANOTHER program on this computer is previewing, building or
     /// publishing the course — an assistant working from another app, another
-    /// copy of Plantoir, or a deploy set for later (#156) — to a teacher who
+    /// copy of Plantoir, or a scheduled deploy that is running (#156) — to a teacher who
     /// pressed Preview or Deploy, or asked the in-app assistant for either.
     ///
-    /// Names the COURSE, not the section, because the lease it comes from
-    /// names only the course (Windows' format). Names no program: the same
+    /// Names the COURSE, not the section, for a lease that names no section
+    /// (Windows', an older Plantoir's, course-wide work); the window names
+    /// the section when the lease does (`sectionIsBeingBuiltElsewhere`,
+    /// #835). Names no program: the same
     /// sentence has to be true whichever of the three is in the way, and an
     /// assistant reached from Claude Code and one reached from Codex are the
     /// same thing to a teacher. The third is "a scheduled deploy that is
@@ -470,6 +472,19 @@ nonisolated enum AssistWording {
              + "by an assistant working from another app, another copy of Plantoir, or a scheduled "
              + "deploy that is running. Both would build the same pages in the same place, so doing "
              + "it here as well would spoil both. Try again once that has finished."
+    }
+
+    /// The same, in the window, when the lease in the way names the SECTION
+    /// asked about (#835): since then another program's work on a sibling
+    /// section does not stand in the way, so the sentence says which section
+    /// is busy. Said in the window's Cannot Preview Yet alert only; the
+    /// in-app assistant is still told `courseIsBeingBuiltElsewhere`, which
+    /// stays true. `shared-rules.json` → `workLeases.declining.sections`.
+    static func sectionIsBeingBuiltElsewhere(course: String, section: String) -> String {
+        return "\(course) Section \(section) is being previewed or deployed somewhere else on this computer "
+             + "right now — by an assistant working from another app, another copy of Plantoir, or a "
+             + "scheduled deploy that is running. Both would build the same pages in the same place, so "
+             + "doing it here as well would spoil both. Try again once that has finished."
     }
 
     /// Said when a preview of a section was asked for while THIS copy of
