@@ -279,7 +279,6 @@ internal static class NamedGapLedger
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
     private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
     private const string Reason884Naming = "naming the assistant at work through {assistant} needs plantoir-mcp to write the door's key as the assist lease's fifth line (#884 item 7, with WorkLease); until then every Windows hold names none, and the contract's anyAssistant for that names GitHub Copilot, which a Windows teacher cannot open yet, so the older 'Claude or Codex' words stay the true ones";
-    private const string Reason885 = "what plantoir-mcp answers a call that names no section (or no howMany) is #885's piece of v2.0.0 (the mac's #865): measured first, then these sentences where it mis-answers; not built here yet";
     private const string Reason889 ="Open in Browser for a section deployed to a folder is #889's piece of v2.0.0 (the mac's #850), not built here yet";
 
     // #868's held-by-name piece (2026-11-13): the mac's #835 part 3 and #855 merged into dev.
@@ -406,8 +405,6 @@ internal static class NamedGapLedger
              "deployed folder opened in the web browser", "deployed folder no longer shown", "deployed folder could not be opened"),
         Owed(SubjectMenuItems, 889, V200, Reason889, "stopShowingDeployedFolder"),
         Owed(SubjectMenuSituationKeys, 889, V200, Reason889, "deployedFolderReady", "deployedFolderShown"),
-        Owed(AssistWordingKeys, 885, V200, Reason885,
-             "noSectionNamed", "noSectionNamedAndNoSections", "addClassesNeedsAUnit", "addClassesNeedsACount"),
 
         // ---- #868's held-by-name piece (2026-11-13): what the mac's #835
         // part 3 (holds narrow to the section) and #855 (Set Up an

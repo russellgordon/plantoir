@@ -127,6 +127,21 @@ builder.Services.AddMcpServer(options =>
     {
         var arguments = context.Params?.Arguments is { } given
             ? new Dictionary<string, System.Text.Json.JsonElement>(given) : null;
+        // A call that names no section (or, for add_classes, no unit or count)
+        // is answered in the contract's words, and a one-section course has
+        // its section supplied, FIRST, so every gate below and AfterCall read
+        // the section the tool will run with (#885): MissingArguments.
+        if (context.Params is { Name: { } called } calling)
+        {
+            var missing = MissingArguments.For(called, arguments, workspace);
+            if (missing.Refusal is { } unnamed)
+                return new CallToolResult { Content = [new TextContentBlock { Text = unnamed }] };
+            if (!ReferenceEquals(missing.Arguments, arguments))
+            {
+                arguments = missing.Arguments;
+                calling.Arguments = arguments;
+            }
+        }
         if (context.Params?.Name is { } tool && ReferenceWriteGate.Refusal(tool, arguments, workspace) is { } refusal)
             return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
         // An outside assistant's change while the course is being BUILT is held
