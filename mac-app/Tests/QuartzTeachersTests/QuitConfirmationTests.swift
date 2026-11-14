@@ -44,6 +44,8 @@ final class QuitConfirmationTests: XCTestCase {
             )
             // #850: 0 when a case leaves it out (the contract says so).
             let shownCount: Int = (given["deployedFoldersShown"] as? Int) ?? 0
+            // #855: 0 when a case leaves it out (the contract says so).
+            let setUpCount: Int = (given["assistantsBeingSetUp"] as? Int) ?? 0
             let reasonName: String = try XCTUnwrap(given["quitReason"] as? String)
             let reason: QuitConfirmation.Reason = reasonName == "theMacIsLoggingOutOrShuttingDown"
                 ? .theMacIsLoggingOutOrShuttingDown
@@ -52,10 +54,15 @@ final class QuitConfirmationTests: XCTestCase {
             CourseActivity.reset()
             PreviewLeases.reset()
             DeployedFolderShows.shared.resetForTests()
+            SetUpsUnderWay.reset()
             defer {
                 CourseActivity.reset()
                 PreviewLeases.reset()
                 DeployedFolderShows.shared.resetForTests()
+                SetUpsUnderWay.reset()
+            }
+            for index in 0..<setUpCount {
+                SetUpsUnderWay.begin("Assistant \(index + 1)")
             }
             // REAL shows, so a quit rule that counted them would fail here
             // (the Fable sweep: a pretended count was read by nothing).
@@ -110,6 +117,14 @@ final class QuitConfirmationTests: XCTestCase {
                 expectAsk,
                 "\(name): the rule and the contract disagree"
             )
+            // #855: the question's first button, where the case names it.
+            if let firstButton = testCase["expectFirstButton"] as? String {
+                let buttons: [QuitConfirmation.Button] = QuitConfirmation.buttons(
+                    onlySettingUp: QuitConfirmation.onlySettingUpNow()
+                )
+                XCTAssertEqual(buttons[0].title, firstButton, name)
+                XCTAssertEqual(buttons[0].choice, .keepWorking, name)
+            }
         }
     }
 

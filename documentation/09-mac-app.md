@@ -795,9 +795,12 @@ un-greys honestly, and measure what a folder watch can be trusted with before
 relying on it.
 
 **What a teacher sees.**
-- Deploy, Section ▸ Deploy… and ⇧⌘D are greyed on EVERY section of a course
-  another program holds, in this working folder. A lease names the course,
-  never the section, and a press on a sibling section is refused the same way.
+- Deploy, Section ▸ Deploy… and ⇧⌘D are greyed on the sections another
+  program holds, in this working folder. Since #835 a lease names the sections
+  it holds, and only those are greyed; a lease that names none (Windows, an
+  older Plantoir, course-wide work such as plan sharing) greys EVERY section
+  of the course, and a press on a sibling section is refused the same way
+  ("Holds narrow to the section (#835)", below).
 - The button's help and its VoiceOver hint are
   `returningToASectionMidDeploy.heldElsewhere.help`. The folder not being
   ready still wins (`folderReadinessReason`). Its third program is "a
@@ -960,6 +963,113 @@ in reserve was not built.
   button, with the window key and with it behind another (a breakpoint on
   `LeaseWatcher.reread` in a Debug build shows it), and that VoiceOver reads the sentence ONCE: it is both the `.help` and the
   `.accessibilityHint`, and if it is read twice the hint goes.
+
+## Holds narrow to the section (#835)
+
+**What it closes.** Russell (#835): one section has a scheduled deploy
+running, and he could not deploy another section of the course until it
+finished. Every work lease named the whole course, so any build, preview or
+deploy by another program (a scheduled deploy, an outside assistant, another
+copy of Plantoir) held every section of it.
+
+**What is measured, and what made it safe.** One copy of Plantoir already
+builds two sections at once (its in-process rules are per section). In 63
+real paired runs of EXC2O's two sections built, previewed, stopped and
+folder-deployed at the same moment in one website builder, every site came
+out byte for byte as when built alone (the measurement behind #835's plan).
+`03-launcher-scripts.md` → "Two at once in one website builder (#835)" and
+`05-build-pipeline.md` → "Two builds of one course writing its shared files"
+have the three shared things #835's second piece fixed first: the deploy
+token, two previews on one address, and two shared writes.
+
+**The format.** A build, preview or publish lease may carry a SIXTH line,
+`sections 1=<moment> 2=<moment>`, each section with the moment it was taken,
+and on a preview lease `@<port>`, the address it is served on
+(`file-formats.json` → `workLease.lines`). Line 5 is the door key on an
+`assist` lease (#783), so the writer writes line 4 and an empty line 5 first.
+Every doubt reads as the whole course: no sixth line, a line without the word
+`sections`, no entry, any entry that does not read. Windows and an older mac
+read lines 1 to 4, so they read every new lease as course-wide (they hold
+more, never less), and their leases name no sections, so the mac reads those
+as course-wide too. `workLease.bodyCases` holds every shape.
+
+**The rule** (`shared-rules.json` → `workLeases.declining.sections`). An ask is
+about one section, or about the whole course. A lease blocks when its kind is
+one the asker blocks on AND it names no sections, or the ask is course-wide,
+or it names the asked section. After taking, the claim is compared with that
+section's entry. One program holding several sections keeps one file per
+kind with an entry each; adding a section keeps every moment already there
+and line 3. `WorkLeaseRegistry.Written` keeps each section's moment in memory
+even while the file is course-wide, and `buildClaim(…, section:)` answers
+with it; a course-wide question claims the moment course-wide work began. A
+section the program holds no claim for has no claim, and its look counts
+every lease.
+
+**Who narrows, and who stays course-wide.**
+- Narrowed to its section: the window's Preview, Deploy (the button's grey,
+  its help and `claimAPublish`), the front-page question, a preview's end
+  read as "Closed for a deploy", the Section menu's Deploy… check,
+  `LeaseWatcher.holding(forCourse:section:)`, the scheduled deploy's wait
+  and its own leases (the director's ruling on the plan, Q1), the
+  assistant's rebuild and deploy (`AssistSiteWork`, `rebuild_preview`,
+  `deploy_section`), and the Coverage tab's "being built elsewhere".
+- Course-wide, unchanged: plan sharing (`PlanSharing.leaseSection`, 0, makes
+  the build and publish leases name no sections while it runs), the start of
+  the year, backups, restores, replaces, imports, archive, rename and Add
+  Section (they relink `.merged_output`, which clears every section's builds),
+  an outside assistant's page WRITES (ruled: every section's build reads the
+  pages), `assist`, `import` and `copy` leases, `UpdateGate` and the quit
+  question. A reader asked about no section asks for the whole course, so a
+  caller not changed holds more, never less.
+
+**What a teacher sees.** On a section another program holds, Deploy's help
+is `returningToASectionMidDeploy.heldElsewhere.helpForASection` when the
+lease names the section, and `help` when it names none. The window's Cannot
+Preview Yet says `wording.sectionIsBeingBuiltElsewhere` when the lease names
+the section. The in-app assistant is still told `courseIsBeingBuiltElsewhere`
+(nothing it is shown changes, the owner's instruction for this release), and
+an outside assistant `courseIsBeingBuilt`. The trail's "build declined,
+course busy elsewhere" line says "Section N of the course" when the lease
+named it. A Deploy refused in the race after the button was available still
+says the course sentence (it is shared with the in-app assistant).
+
+**Addresses.** `PreviewLeases.lease` skips every address another live
+program's preview lease in the folder names (`app-rules.json` →
+`previewPorts.anotherProgramsPreviews`, 7 cases, mac only: Windows binds
+natively). The builder's claim
+(`twoPreviewsOneAddress`) still refuses the two shapes this cannot see: two
+programs choosing at once, and a lease with no sixth line.
+
+**Rejected.** One moment per FILE (rewriting it when a section is added lets
+a third program's build of the first section through; keeping it lets a
+racing build of the second through); a lease kind per section (Windows and an
+older mac would hold nothing for it); line 5 with a meaning by kind (#783's
+trap); a companion file (not one atomic write); a section in the name
+(rejected on record since #156).
+
+**A known limit.** Adding a section rewrites the lease file. A rewrite that
+fails (a full disk) leaves the file naming only the sections it named, so
+another program may build the new section; the same is true of a first lease
+that cannot be written, which has never stopped the work.
+
+**Tests.** `WorkLeaseDecliningTests.testTheSectionRuleIsTheContracts`,
+`testTwoSectionsInOneProgramShareAFileAndKeepTheirMoments`,
+`testCourseWideWorkMakesTheLeaseHoldTheWholeCourse`,
+`testASiblingBuiltElsewhereLeavesThisSectionFree`,
+`testAScheduledPublishWaitsOnlyForItsOwnSection`,
+`testAPreviewSkipsAnAddressAnotherProgramServes`,
+`testThePreviewPortCasesAreTheContracts`;
+`WorkLeaseLivenessTests.testALeaseIsReadTheContractsWay` (the body cases);
+`LeaseWatcherTests.testEveryHeldElsewhereCase` (18 cases). Must-fail, each
+rebuilt and run: the rule made course-wide again (`holds(section:)` always
+true) fails the section rule, the two-sections, sibling and scheduled tests
+and the held-elsewhere cases; each section restamped on every rewrite fails
+the two-sections test; the address avoidance removed fails the address test;
+a reader that ignores line 6 fails 5 body cases.
+
+**What was not measured.** Two copies of Plantoir side by side (no app is
+launched on this run); Windows (it reads and writes no sixth line yet: GitHub
+#868).
 
 ## A section's Problems tab, its marker and its alert (#717)
 
@@ -1158,7 +1268,8 @@ in place of the plain greeting. Every word, number and case is
 is installed, read from `OutsideAssistantPresence` (asked at launch and when
 the app becomes active, never while the table draws — the view's source scan
 holds that it never calls `isAvailable`), and never on a course kept for
-reference: HIDDEN, never greyed, as Revise With ▸ (`hiddenWhenNotInstalled`).
+reference: HIDDEN, never greyed, as Revise With ▸'s door items (`hiddenWhenNotInstalled`;
+the submenu itself has been drawn always since #855, with its set-up item).
 They are enabled while at least one row is handed over: ticked (absent means
 ticked) AND not `fixedInTheSource`. A ticked row another section's later build
 shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
@@ -5310,7 +5421,14 @@ is blank" found nothing, which is the failure rule 5 exists for. Choosing a
 unit, Back, Forward and Reload still write nothing. No line carries a plan's
 title: it is the teacher's own words, and the count is what a report needs.
 So `LogRedactor` needed no new rule: the lines carry a course code, counts
-and an assistant's name.
+and an assistant's name. No trail line names the computer (`couldNotShowLine`
+lost "on this Mac" in #902, as Coverage's did in 5107c8d8b), so both apps
+write the same line. The three sentences on the tab that do name it
+(`cannotShowDescription`, `openInBrowserCouldNotOpen`,
+`openInBrowserNoBrowser`) carry `{machine}`, are recorded in
+`specialNames.platformWording.machine.usedIn`, and are filled with
+`MachineWord.filling` where `PlanningTabView` shows them (Russell's ruling
+on #801, 2026-11-13).
 
 **A greeting can name plans the tab does not offer yet** (review L3,
 accepted): the greeting names every plan with a readable `plan.json`, the
@@ -8295,9 +8413,10 @@ blocking kind is `build`. The reason is in `build_site.py`: every
 (`stop_preview_serving`) on purpose, so without this an outside assistant's
 rebuild would take down the page the teacher is reading — which the in-app
 assistant already refused to do (`busyDescription` counts previews). An
-outside assistant can retry; a teacher reading a page cannot. Because leases
-name the course, a preview of Section 1 in another copy of Plantoir declines a
-build of Section 2 from here too. What the window shows if its preview dies
+outside assistant can retry; a teacher reading a page cannot. A preview of
+Section 1 in another copy of Plantoir declined a build of Section 2 from here
+too until #835; since then it does only when its lease names no section
+(Windows, an older Plantoir). What the window shows if its preview dies
 anyway (a build started by something that does not read leases) stays what
 #235 made it.
 
@@ -8389,7 +8508,8 @@ mac writes.
 - **A section in the lease name** — Windows reads the kind as the third-last
   dot-separated part, so any extra part is a format change on both sides.
   Course-level costs Section 2 a decline for the length of a build of Section
-  1, and the sentence names the course.
+  1, and the sentence names the course. Still rejected by #835, which narrowed
+  holds by a sixth line instead ("Holds narrow to the section (#835)").
 - **A sweep of dead leases** on folder open, and the plan's own-pid sweep.
   `WorkLease`'s design is no cleanup pass; the reader already ignores a dead
   owner, and line 4's start time settles the recycled-pid case the sweep was
@@ -13002,17 +13122,17 @@ and a stopped virtual machine adds 22 to 27 s (#312). So the first scheduled
 deploy after an update can take between a few seconds and about two minutes
 longer than the one before it, which is why the trail line says so.
 
-**Two sections of one course set for the same time take turns** (the
-review's LOW 2). They wait for each other on the course's leases
-(`waitForTheCourse`, ten minutes, looking every fifteen seconds), and the
-first now holds them through its copy (0.84 to 4.7 s measured above, up to
-14.3 s at background priority), any wait for another program's copy (up to
-five minutes) and, after an update, the builder built again (6 to 70 s) and
-the site rebuilt (about 32 s). The second section's own copy then finds
-nothing to change (0.85 s) and its builder is already built, so it adds
-only its own deploy. It stands down `courseWasBusy` only if the first takes
-more than ten minutes in all, which needs the five-minute wait used up as
-well; it was not measured end to end, for want of a real launchd job.
+**Two sections of one course set for the same time no longer take turns**
+(since #835's third piece; until then they waited for each other on the
+course's leases). A scheduled deploy waits only for work on its own section
+(`waitForTheCourse(section:)`, ten minutes, looking every fifteen seconds),
+and its leases name its section, so the two run at once. What they still
+share is the copy of the app's tools (0.84 to 4.7 s measured above, up to
+14.3 s at background priority; the second finds nothing to change, 0.85 s)
+and, after an update, the builder being built again (6 to 70 s), which one
+of them does while the other waits. Two sections of one course deploying at
+once is what #835's paired runs measured; the pair was not measured end to
+end under launchd.
 
 **Rejected:**
 - **Standing down when the copy fails** (Windows' choice): it turns a copy
@@ -17162,3 +17282,31 @@ one list (interleaved, 400 distinct rising numbers, nothing lost), and a
 child process killed with `SIGKILL` at each of ten kill points, after which
 recovery left every file wholly before or after. The two-process test in
 the app (`Plantoir --mcp-stdio` beside the window's runner) is U7's.
+
+## Settings ▸ Other Assistants: setting up Claude Code, Codex or GitHub Copilot (#855)
+
+A fifth Settings pane (`OtherAssistantsSettingsView`, `SettingsPane.otherAssistants`),
+reached also from Help ▸ Set Up an Assistant… and Revise With ▸ Set Up an
+Assistant… (the same words in both since Russell's evening ruling; one view, `SetUpAnotherAssistantButton`, in the menu bar, every
+live row's context menu and the Help menu, so the item cannot differ between
+them). Each row's sentence and buttons come from `AssistantSetUpState.decide`,
+run against `outsideAgents.setUp.stateCases`. Set Up… opens
+`AssistantSetUpSheet` (on `SheetTitleScanTests.sheets`): what is downloaded,
+from whom, where it goes, that it is checked once in place, and where the
+course content goes; a link to the maker's plans page; for GitHub Copilot,
+Help's `github-education` page. Cancel is the default answer.
+
+`ReviseWithMenu` is always drawn now; the golden (`Tests/Goldens/menu-bar.txt`)
+pins the set-up item and the divider above it (`[if any reviser]`). Quitting
+while a set-up runs asks (`QuitConfirmation.settingUpOne`, `SetUpsUnderWay`);
+Quit Anyway stops it (`AssistantSetUpCentre.stopEverySetUp` in
+`letEverythingGo`) and the next launch settles the record
+(`settleInterruptedSetUps`, behind the not-under-tests guard).
+
+Help links go through `PlantoirHelpPage.open(anchor:)`: the Help book's page
+once #839 wires the book into the app (`CFBundleHelpBookName`), the support
+page until then, with the anchor on the trail either way.
+
+How a set-up runs, what it records, what was measured and what was rejected
+are in `documentation/10-local-ai-assistant.md` → "Setting up an outside
+assistant (#855)".

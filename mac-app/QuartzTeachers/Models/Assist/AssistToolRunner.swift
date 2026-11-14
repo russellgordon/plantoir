@@ -2334,25 +2334,32 @@ final class AssistToolRunner {
     /// What another program on this Mac holds that stands in the way of
     /// building this course — the EARLY look, before anything is stopped
     /// (#156). Nil when the way is clear or there is no working folder.
+    ///
+    /// `section` is the section the build would be of (#835); nil asks for
+    /// the whole course, which start-of-year work does.
     private func whatBlocksABuild(
-        of course: Course, asker: WorkLeaseFiles.Asker = .aBuild
+        of course: Course, asker: WorkLeaseFiles.Asker = .aBuild, section: Int? = nil
     ) -> WorkLeaseFiles.Holding? {
         guard let folder = workspace.workspaceURL else {
             return nil
         }
         return WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: folder.path, courseCode: course.code, afterTaking: false, asker: asker
+            folderPath: folder.path, courseCode: course.code, afterTaking: false, asker: asker, section: section
         )
     }
 
     /// What an outside assistant's change to this course meets (#433):
     /// clear, a site being built elsewhere, or a preview elsewhere that is
-    /// only being served. `.clear` with no working folder.
-    private func outsideChangeMeets(_ course: Course) -> WorkLeaseFiles.OutsideChangeMeets {
+    /// only being served. `.clear` with no working folder. `section` is the
+    /// section a rebuild or deploy is of (#835); nil asks for the whole
+    /// course.
+    private func outsideChangeMeets(_ course: Course, section: Int? = nil) -> WorkLeaseFiles.OutsideChangeMeets {
         guard let folder = workspace.workspaceURL else {
             return .clear
         }
-        return WorkLeaseRegistry.whatAnOutsideChangeMeets(folderPath: folder.path, courseCode: course.code)
+        return WorkLeaseRegistry.whatAnOutsideChangeMeets(
+            folderPath: folder.path, courseCode: course.code, section: section
+        )
     }
 
     /// The tools that are not page changes, or that decide about building
@@ -2647,7 +2654,8 @@ final class AssistToolRunner {
         // with a build (Markdown is not what a build clears), so it goes
         // ahead and the teacher's preview is left up; the note after the
         // write says why it was not refreshed.
-        if whatBlocksABuild(of: course) != nil {
+        // The restart is of this section, so only work on it counts (#835).
+        if whatBlocksABuild(of: course, section: sectionNumber) != nil {
             return false
         }
         if !window.isPreviewRunning() {
@@ -2723,7 +2731,7 @@ final class AssistToolRunner {
         // refuses `rebuild_preview` as before; after a change that has been
         // written it is said as saved, never as busy.
         if surface == .mcp {
-            switch outsideChangeMeets(course) {
+            switch outsideChangeMeets(course, section: sectionNumber) {
             case .previewServed:
                 return leftTheOpenPreviewAlone(course: course, sectionNumber: sectionNumber, afterAChange: afterAChange)
             case .building(let holding):
@@ -2745,7 +2753,7 @@ final class AssistToolRunner {
         // FIRST, before a window is opened or a preview stopped (#156): a
         // build another program is running, or a preview it is showing, is
         // not this conversation's to end.
-        if let holding = whatBlocksABuild(of: course) {
+        if let holding = whatBlocksABuild(of: course, section: sectionNumber) {
             WorkLeaseRegistry.noteDeclined(
                 act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
                 sectionNumber: sectionNumber, holding: holding
@@ -2784,7 +2792,7 @@ final class AssistToolRunner {
                 // above and the rebuild's own lease. After a change an outside
                 // assistant has made, still said as saved (#433).
                 if surface == .mcp && afterAChange {
-                    if case .previewServed = outsideChangeMeets(course) {
+                    if case .previewServed = outsideChangeMeets(course, section: sectionNumber) {
                         return leftTheOpenPreviewAlone(course: course, sectionNumber: sectionNumber, afterAChange: true)
                     }
                     return AssistWording.changesAreSavedWhileTheCourseIsBuilt(
@@ -3336,11 +3344,11 @@ final class AssistToolRunner {
         var aPreviewWasOpenElsewhere: Bool = false
         if surface == .mcp {
             asker = .anOutsideDeploy
-            if case .previewServed = outsideChangeMeets(located.course) {
+            if case .previewServed = outsideChangeMeets(located.course, section: located.sectionNumber) {
                 aPreviewWasOpenElsewhere = true
             }
         }
-        if let holding = whatBlocksABuild(of: located.course, asker: asker) {
+        if let holding = whatBlocksABuild(of: located.course, asker: asker, section: located.sectionNumber) {
             WorkLeaseRegistry.noteDeclined(
                 act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: located.course.code,
                 sectionNumber: located.sectionNumber, holding: holding
@@ -3395,9 +3403,9 @@ final class AssistToolRunner {
         // An outside assistant is the exception (#433): the teacher may not
         // be looking at Plantoir at all, and Claude, Codex or GitHub Copilot has no window to
         // see, so a preview its deploy closed is said in the same success
-        // sentence, plainly. "If" because leases name the course and not the
-        // section: the open preview may be of another section, which the
-        // deploy leaves alone.
+        // sentence, plainly. "If" because a lease that names no section holds
+        // the whole course: the open preview may be of another section, which
+        // the deploy leaves alone (#835 asks about this section only).
         if aPreviewWasOpenElsewhere {
             ActivityTrail.note(
                 .outsideChangeLeftThePreviewAlone,

@@ -326,7 +326,11 @@ final class SectionCoverage {
         var updated: Entry = entry(sectionKey)
         updated.reading = reading
         updated.hasCurriculum = !CurriculumFolderRule.resolvedFolders(for: course).isEmpty
-        updated.elsewhere = WorkLeaseRegistry.anotherProgramIsBuilding(folderPath: folder.path, courseCode: course.code)
+        // This section's map only: a sibling built elsewhere writes its own
+        // (#835).
+        updated.elsewhere = WorkLeaseRegistry.anotherProgramIsBuilding(
+            folderPath: folder.path, courseCode: course.code, section: sectionNumber
+        )
         updated.clickLine = nil
         let mapId: String? = reading.record?.buildId
         if mapId != updated.walkedFor {
