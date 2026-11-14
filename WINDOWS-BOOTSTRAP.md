@@ -347,6 +347,12 @@ Split it in two:
   files the run takes about five minutes, not eight seconds. The image's 3.11
   is held only by `RuntimePythonTests.TheSharedScriptsParseAsPython311` (a
   grammar check with known limits — `documentation/02-docker-image.md`).
+  **Since #886 it also runs Plantoir Help's `help/tests/test_*.py`**
+  (`SharedHelpTestFilePasses`), discovered the same way, from the
+  repository root as `verify.sh` runs them, with the runtime's `node` on
+  PATH so the search tests run; only the Mac Help book's `hiutil` tests
+  skip. Seven files, about two and a half minutes
+  (`documentation/12-windows-app.md` → "Plantoir Help on Windows").
 - **The IMAGE is not, because Windows has no image at all.** It carries its
   own runtime and builds natively, so a publish driven through the app here
   exercises the bundled runtime, not the image. A change to the Dockerfile or

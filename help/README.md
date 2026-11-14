@@ -491,5 +491,10 @@ P6, not this folder's.
 repository: no names, nothing real) to a temporary folder, change one thing,
 and run `build_help.py` against it with `-I -B`. The `hiutil` tests skip off a
 Mac; the search test runs `search.js` with `node` and skips without it.
-`verify.sh` runs each file. Windows' `PythonToolchainTests` discovers only
-`scripts/test_*.py` today, so wiring these in is a Windows obligation.
+`verify.sh` runs each file. Windows' `PythonToolchainTests` discovers and
+runs them too since #886, from the repository root with the runtime's `node`
+on PATH, so only the `hiutil` tests skip there. That is why `build_help.py`
+writes UTF-8 whatever the console's code page, and why every test that reads
+a child's output decodes it with `encoding="utf-8"` rather than
+`universal_newlines=True` (the locale's encoding, cp1252 on Windows): keep
+both when adding a test.

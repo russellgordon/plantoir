@@ -2329,9 +2329,11 @@ contract declines must be declined here, and every case it allows is
 declined here too (the course-wide hold). The day #868 narrows a hold to its
 section that second half fails, saying to walk the cases exactly instead.
 
-**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` are not
-discovered by `PythonToolchainTests` (it finds `scripts/test_*.py` only), so
-they neither run nor fail here; wiring them in is #886's first piece.
+**Not red, so nothing held.** #839's Help: `help/tests/test_*.py` were not
+discovered by `PythonToolchainTests` when this was written (it found
+`scripts/test_*.py` only), so they neither ran nor failed here. #886's first
+piece (886a) wires them in: "Plantoir Help on Windows" at the end of this
+page.
 #902's Planning tab sentences carry `{machine}` as Windows' Planning tab
 already says them. #835's `returningToASectionMidDeploy.heldElsewhere`
 cases and `helpForASection` have no Windows reader yet (#868 owes them).
@@ -13271,4 +13273,110 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 `-SendAnswerKeysOpenly` with the launcher's rule that a newly asked password
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
+
+## Plantoir Help on Windows (#886, the mac's #839)
+
+`help/` is the one source of Plantoir Help on both platforms: the page
+format, `outline.json`, the checks and the builder (`help/build_help.py`,
+standard library only, Python 3.9 syntax), owned by the Mac's #839 and
+explained in `help/README.md`. Windows' Help is built in pieces, in the order
+the v2.0.0 run's plan review set (its "amended split", which #886 records);
+886a is the only one landed.
+
+### 886a: the Help build and its tests work on Windows, and the suite runs them
+
+**The fault, reproduced.** On Windows, Python's stdout to a pipe uses the ANSI
+code page (cp1252). The checks' messages carry "▸" and "…", so the first
+failure `build_help.py` printed raised `UnicodeEncodeError` and the build
+ended in a traceback instead of naming the fault. `help/tests/test_tokens.py`
+ran 14 tests with 2 failures under the runtime's Python 3.14.10 (both menu-path
+refusals, `encodings\cp1252.py` → `'▸'`). `PYTHONIOENCODING` and
+`PYTHONUTF8` cannot fix it, though `PythonToolchainTests` sets both: every
+caller, the tests' `helpers.run_build` included, runs the script with `-I`,
+which ignores `PYTHON*` variables.
+
+**The fix.** `build_help.py` reconfigures stdout and stderr to UTF-8
+(`errors="strict"`, so an unwritable character is a failure, never a silent
+"?") when run as a script, and only where they are not UTF-8 already; on the
+Mac they are (a UTF-8 locale, and Python 3.7+ turns on UTF-8 mode in the C
+locale), so nothing is reconfigured there. Every reader of a child's output
+in `help/` (`tests/helpers.py`, `tests/test_build_help.py`,
+`tests/test_web_search.py`, `helpbook/macbook.py`'s `hiutil`) decodes UTF-8
+explicitly (`encoding="utf-8"` in place of `universal_newlines=True`, which
+decodes with the locale's encoding: UTF-8 on the Mac, cp1252 here). Both
+halves are needed, and each was proved red alone: the old `build_help.py`
+with the new tests fails `test_tokens` 2 of 14 on the traceback, and the new
+`build_help.py` with the old `helpers.py` fails the same 2 on mojibake
+("Γû╕" for "▸"). The other three readers' changes have no red case on today's
+content (their children print ASCII: search ids, a build summary); they are
+the same fault waiting for a non-ASCII line, and a cp1252 decode can also
+RAISE on five undefined bytes (0x81, 0x8D, 0x8F, 0x90, 0x9D), which is worse
+than mojibake. Rejected: setting `PYTHONIOENCODING` in the runner (ignored
+under `-I`); dropping `-I` from the callers (it is the Mac's Xcode build
+phase's protection against a stray `PYTHONPATH`); `errors="replace"` (output
+is compared by the tests, and a "?" would pass a wrong message).
+
+**The suite.** `PythonToolchainTests.SharedHelpTestFilePasses` DISCOVERS
+`help/tests/test_*.py` and runs each as `verify.sh` does (`python3
+help/tests/test_x.py` from the repository root; the files put their own
+folder on `sys.path`, so the runtime's `._pth` needs nothing), on the
+runtime's Python, with the runtime's `node` first on PATH so the search
+tests run. `TheHelpTestsAreActuallyFound` fails a discovery that finds none;
+its floor is "above zero" rather than today's seven, because `help/` is the
+Mac's and in active work, and a floor at today's count would red this gate
+the day the Mac merges two files. `TheHelpTestsGetTheRuntimesNodeWhenOneIsFetched`
+fails a runtime without `node`, whose skips would read as passes. The same
+180-second per-file limit applies as for `scripts/`.
+
+**Measured** on the Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200),
+runtime Python 3.14.10 and node 22.23.4, 2026-11-14, each file run alone
+from the repository root:
+
+| File | Tests | Result | Seconds |
+|---|---|---|---|
+| `test_build_help.py` | 14 | OK, 1 skipped (`hiutil`) | 92 to 94 |
+| `test_checks.py` | 23 | OK | 12 |
+| `test_macbook.py` | 10 | OK, 10 skipped (`hiutil`) | under 1 |
+| `test_markdown.py` | 27 | OK, 2 skipped (`hiutil`) | 15 |
+| `test_tokens.py` | 14 | OK (2 failures before the fix) | 7 |
+| `test_web_search.py` | 20 | OK, 2 skipped (`hiutil`) | 15 |
+| `test_words.py` | 29 | OK | 15 |
+
+About two and a half minutes in all. Without `node` the search tests skip
+too (4 in `test_build_help.py`, 6 in `test_web_search.py`). `test_build_help.py`
+is the slow one: nine of its tests each build the real `help/` (86 pages
+written, 16 stubs on 2026-11-14), 7 to 12 seconds a build. It is the file
+nearest the 180-second limit, and one filtered run made while another
+agent's build and full suite started on this PC took it past the limit
+(exit 124); alone it takes half the limit.
+
+**`build_help.py --check` on Windows** runs clean: exit 0, two warnings
+(`sidebarRestoreQuestionRestoreSectionButton` and
+`sidebarRestoreQuestionRestoreWholeCourseButton` in `help/controls.json`
+are used by no page) and `Help: 86 pages written, 16 stubs, 151 scenes
+awaiting capture, 2 warnings, 0 publish/deploy notes, 0 failures` on
+`origin/dev` 86ae77e53. Everything it reads is in the repository (the
+menu golden `mac-app/Tests/Goldens/menu-bar.txt`, the Swift sources, the
+contract); it needs no tool. It is not wired into the Windows gate by
+itself: `test_build_help.py`'s `test_the_real_repository_checks_green`
+already runs it on the real `help/` in the gate.
+
+### What follows 886a, and what each waits for
+
+- **886b**, after the Mac's pages branch merged (it has, by 86ae77e53):
+  `--windows` and `--release-windows` in the shared builder, on the pages'
+  `{{machine}}` token; a token with no Windows column renders a visible
+  placeholder and is counted, never failed, so a Mac merge cannot red
+  Windows' build; `{{say:}}` fills `{machine}` and the word check reads the
+  rendered Windows HTML.
+- **886c**, after #790's 790b (`GuardedSite`, its proxied environment and
+  the headless probe): the Help window, `Help.Open(pageId, from)`, Help ▸
+  Plantoir Help and F1, the bundle target and its prerequisite, the trail
+  lines.
+- **886d**, after all the Mac's pages are in and Windows' #897/#900 menu
+  items have merged: the menu table, the Windows golden and the Windows
+  columns, then the Windows runs written by Fable.
+- **886e**: Help buttons on dialogs from the outline's `opensFrom`.
+- **886f**, last before the cut: Windows' own pictures at 200%, and Help's
+  lines in the one Narrator sitting.
 
