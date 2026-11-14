@@ -130,8 +130,12 @@ class ImageOnlyTestsSaySoTests(unittest.TestCase):
                 self.assertEqual(answer.returncode, MISSING_MODULE_EXIT, name + answer.stdout + answer.stderr)
                 self.assertEqual(answer.stdout.strip(), the_line(name))
             elif answer.returncode != 0:
-                unsaid.append(f"{name} (exit {answer.returncode})")
-        self.assertEqual(unsaid, [], "these fail on a Mac's own Python without the modules and do not carry the block")
+                last_lines = answer.stderr.strip().splitlines()
+                last_line = last_lines[-1] if last_lines else "(nothing on stderr)"
+                unsaid.append(f"{name} (exit {answer.returncode}: {last_line})")
+        self.assertEqual(unsaid, [], "these fail on a Mac's own Python with frontmatter and yaml hidden, "
+                                     "and do not carry the block; the reason may be something else, so read "
+                                     "the last line of each")
 
     def test_every_file_opens_with_the_same_block_before_its_imports(self):
         blocks = set()

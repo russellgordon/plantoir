@@ -23,8 +23,16 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
 
     /// How many times its cost per read on 500 pages the scan of 4,000
     /// pages may cost per read (#905). A scan whose work grows with the
-    /// pages measured 3.4 to 4.9; today's measured 0.4 to 1.6.
+    /// pages measured 2.71 to 6.45; today's measured 0.58 to 1.98 under
+    /// load (with `smallCourseTimingsPerRound` timings of 500 pages).
     static let perPageCostGrowsAtMost: Double = 2.5
+
+    /// How many times the 500-page pair is timed in each of the five
+    /// rounds (#905). Reading 500 pages takes about 10 ms, so one timing
+    /// per round let a burst of load catch all five and shrink the
+    /// denominator of the growth figure: 5 of 75 loaded runs failed that
+    /// way. Four timings per round add about 0.2 s.
+    static let smallCourseTimingsPerRound: Int = 4
 
     // MARK: - Setting up
 
@@ -246,16 +254,19 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     /// no worse per page in a big course than in a small one (#905). The
     /// scan and plain reading (`readEveryPage`, the least any scan that
     /// reads the pages must cost) are timed on 500 pages and on 4,000 in
-    /// the same run, five times interleaved, and the fastest of each kept,
-    /// so a burst of load slows both or neither. Two bounds, neither in
-    /// seconds: on 4,000 pages the scan costs under
+    /// the same run, in five interleaved rounds, and the fastest of each
+    /// kept, so a burst of load slows both or neither. The 500-page pair is
+    /// timed `smallCourseTimingsPerRound` times a round, since one quick
+    /// sample a round could be caught by load all five times. Two bounds,
+    /// neither in seconds: on 4,000 pages the scan costs under
     /// `scanCostsAtMostThisManyReads` reads; and its cost per read on 4,000
     /// pages is under `perPageCostGrowsAtMost` times its cost per read on
     /// 500, which a scan whose work per page grows with the course cannot
-    /// meet. Measured standalone at -Onone on the M4 Pro (M/905/harness):
-    /// growth 1.1 to 1.2 unloaded and 0.4 to 1.6 with 24 busy loops on its
-    /// 12 cores; a scan that searched a list of the pages it had read
-    /// measured 4.2 to 4.9 unloaded and 3.4 to 4.6 under the same load.
+    /// meet. Measured standalone at -Onone on the M4 Pro (12 cores), four
+    /// timings a round: 0 of 55 runs failed with 24 busy loops, 0 of 148
+    /// with 6 and 0 of 100 with none (growth at most 1.98); a scan that
+    /// searched a list of the pages it had read failed 8 of 8, 21 of 21
+    /// and 20 of 20. With one timing a round, 5 of 75 loaded runs failed.
     func testTheScanIsQuickAndGrowsNoFasterThanThePages() throws {
         let smallCourseURL: URL = try makePages(count: 500, named: "SMALL")
         let largeCourseURL: URL = try makePages(count: 4000, named: "LARGE")
@@ -264,8 +275,10 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         var fastestLargeRead: Double = Double.infinity
         var fastestLargeScan: Double = Double.infinity
         for _ in 0..<5 {
-            fastestSmallRead = min(fastestSmallRead, ObsidianFigureAddOnsTests.secondsToReadEveryPage(inCourseAt: smallCourseURL))
-            fastestSmallScan = min(fastestSmallScan, ObsidianFigureAddOnsTests.secondsToScan(courseAt: smallCourseURL))
+            for _ in 0..<ObsidianFigureAddOnsTests.smallCourseTimingsPerRound {
+                fastestSmallRead = min(fastestSmallRead, ObsidianFigureAddOnsTests.secondsToReadEveryPage(inCourseAt: smallCourseURL))
+                fastestSmallScan = min(fastestSmallScan, ObsidianFigureAddOnsTests.secondsToScan(courseAt: smallCourseURL))
+            }
             fastestLargeRead = min(fastestLargeRead, ObsidianFigureAddOnsTests.secondsToReadEveryPage(inCourseAt: largeCourseURL))
             fastestLargeScan = min(fastestLargeScan, ObsidianFigureAddOnsTests.secondsToScan(courseAt: largeCourseURL))
         }

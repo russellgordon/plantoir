@@ -5244,7 +5244,10 @@ the run did not start them. Ended that way, a real Chrome's twelve processes
 took about 9 s to go under load (3 s unloaded). Without `node` the self-test
 is a SKIP line by name.
 
-A signal to `verify.sh` alone reaches the check it is running. Bash runs a
+A signal to `verify.sh` alone reaches the browser check it is running. Only
+the browser checks go through `run_check`: during any other step (the image
+build, the Docker runs of the Python tests) a signal still waits for that step
+to end, as it did before. Bash runs a
 trap only after its foreground child ends, so before this a TERM to
 `verify.sh` waited for the check to finish by itself (measured with a 6 s
 child: the trap ran 6 s later), and with no trap at all bash exited at once

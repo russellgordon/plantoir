@@ -7755,26 +7755,37 @@ and none names a number of seconds.
   second read that went around `readPage` would not be counted.
 - `testTheScanIsQuickAndGrowsNoFasterThanThePages` times the scan and plain
   reading of the same pages (`readEveryPage`, the least any scan that reads
-  them must cost) on 500 pages and on 4,000 in the same run, five times
-  interleaved, keeping the fastest of each. On 4,000 pages the scan must
+  them must cost) on 500 pages and on 4,000 in the same run, in five
+  interleaved rounds, keeping the fastest of each. The 500-page pair is
+  timed `smallCourseTimingsPerRound` (4) times in each round, because
+  reading 500 pages takes about 10 ms. On 4,000 pages the scan must
   cost under `scanCostsAtMostThisManyReads` (10) reads, and its cost per
   read there must be under `perPageCostGrowsAtMost` (2.5) times its cost
   per read on 500 pages.
 
-Measured standalone at -Onone on the M4 Pro (12 cores), the growth figure
-was 1.1 to 1.2 unloaded and 0.4 to 1.6 with 24 busy loops; a scan that kept
-a list of the pages it had read and searched it for each page measured 4.2
-to 4.9 unloaded and 3.4 to 4.6 loaded, and fails. Sabotaged copies that read
+Measured standalone at -Onone on the M4 Pro (12 cores). With one timing of
+the 500-page pair per round, 5 of 75 runs under 12 or 24 busy loops failed
+the growth bound (growth up to 6.51), and a quadratic scan passed it in 1 of
+8. Every failing run had a low 500-page ratio: a burst of load had caught all
+five small reads, so the denominator of the growth figure was too small and
+the scan itself was not slow. With four timings per round: 55 runs under 24
+busy loops and 148 under 6 (half the cores, while a `verify.sh` run went
+on beside them, load average 20 to 44) all passed, the highest
+growth 1.98; 0 of 100 failed with no busy loops (load average 9 to 18 from other work, growth 0.71 to 1.12). A scan that kept a list of the pages it had read
+and searched it for each page failed every run: 8 of 8 under 24 loops
+(growth 3.40 to 6.45), 21 of 21 under 6 (2.96 to 4.68), and 20 of 20 with none (2.71 to 3.94). Sabotaged copies that read
 each page two, three or five times through `readPage` fail the read count,
 and one that read each page a second time with `Data(contentsOf:)` fails the
 source check. What the tests do not pin: a slower scan whose cost is still
-linear in the pages, up to ten reads' worth (today's measured 1.1 to 1.5);
+linear in the pages, up to ten reads' worth (today's measured 1.0 to 1.5
+with no busy loops and up to 2.2 with them);
 and growth too small to show between 500 and 4,000 pages. Rejected: a wider
 fixed limit, which would pass a slow Mac and a slow scan alike; timing one
 size against plain reading, which cannot see growth (the first version of
 this change did that, and the quadratic scan above passed it at 2,000
-pages); and a growth bound tighter than 2.5, which the loaded baseline came
-within 0.9 of.
+pages); a growth bound tighter than 2.5, which the loaded baseline came
+within 0.6 of (1.98); and a 1,000-page small course in place of repeated
+timing, which the review offered as an alternative and nobody measured.
 
 **Backups and reference copies.** `CourseArchiver` adds `zip -x
 <course>/.obsidian/plugins/<id>/*` for each folder carrying the marker,
