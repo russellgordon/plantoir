@@ -14,7 +14,7 @@ namespace Plantoir.Core.Models;
 /// <c>followsThePage</c>, <c>saveOnPlanning</c>), walked by
 /// <c>PlanningTabTests</c>; every word is in its <c>words</c>
 /// (<see cref="PlanningTabWording"/>). Ported from the mac's
-/// <c>PlanningTab.swift</c>. The tab itself is 790b; this is its Core.</para>
+/// <c>PlanningTab.swift</c>. The tab itself is <c>PlanningTabView</c>; this is its Core.</para>
 ///
 /// <para>Paths here are Windows paths. The tab's web view reports a served
 /// address (<c>LocalSiteGuard</c>), which the view turns into the path

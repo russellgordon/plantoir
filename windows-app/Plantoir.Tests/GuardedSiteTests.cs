@@ -51,8 +51,11 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
         // An inline script, an onload attribute, a srcdoc frame's script and an
         // SVG script each try to change the title; a javascript: link is there
         // to be found. The title is the page's own.
-        var page = _runs.Proxied.Step("title");
-        Assert.Contains("TITLE plan", page);
+        // Measured twice: with the page policy (which forbids script too) and
+        // with no policy at all, where only IsScriptEnabled stands between the
+        // page and its scripts.
+        Assert.Contains("TITLE plan", _runs.Proxied.Step("title"));
+        Assert.Contains("TITLE plan", _runs.HandlerAlone.Step("title"));
     }
 
     [Fact]
@@ -208,7 +211,7 @@ public sealed class GuardedSiteTests : IClassFixture<GuardedSiteTests.Runs>
             // First, before the run below changes plan.css on disk.
             HandlerAlone = GuardProbe.Run(Plan.PlanningFolder, "proxy", Plan.UserData("handler"), new[]
             {
-                "show=" + Plan.UnitPage,
+                "show=" + Plan.UnitPage, "title",
             }, csp: "none");
             HandlerAloneConnections = Interlocked.Exchange(ref _accepted, 0);
 

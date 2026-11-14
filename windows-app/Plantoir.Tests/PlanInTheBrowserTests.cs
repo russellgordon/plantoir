@@ -16,7 +16,7 @@ namespace Plantoir.Tests;
 /// which is SKIPPED by name where the account cannot make one, and any other
 /// case whose link cannot be made fails. The page on screen is the served
 /// address a web view would report (<see cref="LocalSiteFixtures.Address"/>).
-/// Starting the browser and the trail line are 790b.
+/// Starting the browser and the trail line: <c>PlanInTheBrowserPressTests</c>.
 /// </summary>
 public sealed class PlanInTheBrowserTests : IDisposable
 {

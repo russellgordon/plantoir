@@ -12880,10 +12880,9 @@ and the three trail events, and turns the greeting's sentence on.
   started; `Open` calls them. `UnitPlansGreetingTests` walks the 18
   `greetingUnitPlansCases` through BOTH, each on its own `today`. An
   opening message (Fix with…, Plan a Unit…) replaces the greeting, so
-  neither the sentence nor the clause rides along. **The call site is not
-  wired**: `SidebarPane.ReviseWithClaude`/`ReviseWithCodex` pass no plans,
-  so today's greeting is exactly what it was; 790b passes
-  `UnitPlans.ToMention(course directory, kept for reference, today)`.
+  neither the sentence nor the clause rides along. The call site was not
+  wired in 790a; since 790b `SidebarPane.ReviseWithClaude`/`ReviseWithCodex`
+  pass `UnitPlans.ToMention(course directory, kept for reference, today)`.
 - **Where #880's sentence goes.** `ClaudeCodeLauncher.Greeting` keeps its
   sentences in a list: the plain greeting, then (marked in the code) the
   reference-courses sentence of `outsideAgents.greetingReferenceCourses`
@@ -12943,8 +12942,14 @@ segment percent-encoded, with NO folder mapped to the host.
   `COM0` and `LPT0` (790a review L2): that page's list starts at COM1, but
   the same page names COM0 as a device link in the Win32 namespace, so both
   are refused rather than trusted. Measured on this PC (Windows 11 Pro
-  26200), through a FULL path only `NUL` still opens a device: `CON`,
+  26200), through a plain full path only `NUL` still opens a device: `CON`,
   `COM1`, `COM0`, `LPT0`, `COM¹.txt` and `CONIN$` all create ordinary files.
+  **The guard never opens a plain full path, though**: since 790a's review
+  L1 every file is opened with the long-path prefix (below). Re-measured by
+  790b (2026-11-13, `CreateFileW` with `OPEN_EXISTING` in a fresh folder):
+  `C:\…\NUL` opens a character device (file type 2), and `\\?\C:\…\NUL`
+  opens NOTHING (error 2, no such file); `CON`, `COM1` and `NUL.txt` open
+  nothing either way. So no device name reaches a device through the guard.
   The list is the second check behind the handle's `GetFileType`, kept for
   the Windows versions that still reserve them.
 - **A page longer than MAX_PATH is served** (790a review L1). The disk is
@@ -12983,9 +12988,10 @@ segment percent-encoded, with NO folder mapped to the host.
   connection from the teacher's PC. Measured with a counting seam: zero
   calls. A served page's click on a `file:` link raises no navigation in
   WebView2 at all (review L5), so a contract case with a `file:` address
-  inside the folder would not load on Windows; none has one. 790b's
-  adapter must load the SERVED address of a `file:` path the decision lets
-  through, so no page is ever read through Chromium's own file access.
+  inside the folder would not load on Windows; none has one. The adapter
+  (`GuardedSite`, 790b) loads the SERVED address of a `file:` path the
+  decision lets through, so no page is ever read through Chromium's own
+  file access.
 - **What it does not see**: a hard link to a file outside the course is
   the same file; no path check can tell, on either platform. The guard
   keeps mistakes and links out, not a writer who could copy the file in.
@@ -13044,9 +13050,11 @@ text element has NO bound in UTF-16 units. Six names of 60 ZWJ family
 emoji (11 units each), "and 3 more", an 80-element course name of the
 same emoji and the How I Teach sentence make a greeting of 5,362 units:
 for a shim in a 240-character folder (`OutsideDoor.LimitFor`: 7,823) the
-Claude door's line is 5,756 and the Codex door's 6,193 with a
+Claude door's line is 5,756 and the Codex door's 6,257 with a
 240-character working folder
-(`UnitPlansGreetingTests.TheWorstSentenceStillFitsBothDoorsCommandLines`).
+(`UnitPlansGreetingTests.TheWorstSentenceStillFitsBothDoorsCommandLines`;
+re-measured by 790b, 2026-11-13: the Codex door has carried one more
+argument since #884's hold, and 790a's 6,193 was measured before it).
 But a letter under 40 stacked combining accents is ONE element of 41
 units, and six names of those (790a review M2) made a greeting of 14,879
 units here (the reviewer's fixture, 15,110): the door refused to open,
@@ -13065,8 +13073,9 @@ folder's length and 128 (`ShimExpansionAllowance`, measured 2026-11-12,
 "What the outside doors hand to Windows, and how"). Measured with that
 fixture (`NamesTooLongForTheCommandLineAreDroppedFromTheEnd`): a
 `claude.exe` door names 3 (line 7,878 of 8,191); a shim in a 240-character
-folder names 2 (5,754 of 7,823); Codex names 2 either way (5,933 of 8,191,
-6,191 of 7,823). It never names fewer than one: the contract has no words
+folder names 2 (5,754 of 7,823); Codex names 2 either way (5,997 of 8,191,
+6,255 of 7,823; re-measured by 790b after #884's added argument, where 790a
+measured 5,933 and 6,191). It never names fewer than one: the contract has no words
 for a sentence naming none, so one name still too long leaves the line
 over and the door refuses, as it does for an over-long course name (a
 pre-existing gap, not this piece's). The trail clause still counts every
@@ -13130,15 +13139,196 @@ with `MachineWord.filling` where `PlanningTabView` shows them, and
 filled there). `PlanningTabTests.testTheWordsAreTheContracts` and
 `testTheTabsTrailLinesAreTheContractsAndNameNoPlan` pin both.
 
-### What 790b still owes
+### What 790b built: the tab a teacher sees
 
-The course page's two tabs and the Planning tab's view (#801 items 1, 2, 6),
-the web view on this guard with its own proxied environment (790 plan review
-H1: preconnect and a meta refresh opened sockets no event saw, measured), the
-headless guard harness, Plan a Unit's buttons, Open in Browser's launch
-through the `https` ProgId (#820 items 3 to 6), the three trail events (the
-`NamedGapLedger` holds them until their first `Note`), and the one-line
-`SidebarPane` change that turns the greeting's sentence on.
+- **The course page's two tabs** (`CourseSettingsView`, #801 item 1). The
+  page keeps its class and its header (code, name, Open in Obsidian, on both
+  tabs as on the mac); under the header a `SelectorBar` `courseTabs`
+  (`courseTabSettings`, `courseTabPlanning`, words `tabSettings` and
+  `tabPlanning`) is shown only while `PlanningTab.IsShown` holds for
+  `OutsideAssistantPresence` (Claude Code or Codex; GitHub Copilot passes
+  false until #884), re-read when the presence changes. With none installed
+  the bar is collapsed and the page is the form it always was; a course
+  kept for reference never reaches this page (`ReferenceSummaryView`).
+  **Only the chosen tab is drawn**: the settings area and the Planning view
+  are siblings in one `*` row and the other is `Collapsed`, which in WinUI
+  takes no focus and leaves the Tab order. The keyboard is moved on purpose
+  at the switch (to the Planning item, then the Unit popup or the first Plan
+  a Unit button: 790 plan review M3), never left in a box that is no longer
+  drawn. Unsaved text lives in `Course.Configuration`, which the form writes
+  on every change, so it is there on return. Undo: WinUI's undo lives in
+  each text box, and none can have the keyboard on Planning, so there is
+  nothing for Ctrl+Z to reach (the mac clears the window's Undo on a switch;
+  Windows has no window-wide Undo to clear).
+  **Rejected:** a `TabView` (the contract's `rejected` list, and it would
+  move the web view between containers); detaching the settings form from
+  the tree (collapsing measured enough: `PlanningTabUiTests`); moving the
+  header into a new page class (it would change every `as CourseSettingsView`
+  the menus and nine tests use, for nothing a teacher sees).
+- **Course ▸ Save on Planning** (`saveOnPlanning`): live whenever the course
+  has unsaved changes, held back or not; a held-back Save, a failure or a
+  Save with a notice shows Settings, where the form says its sentence; a
+  plain one stays and shows the form's own "Saved ✓" beside the tabs
+  (`planningSaveStatus`) for the same three seconds. `Save()` returns the
+  two facts `PlanningTab.AfterASave` decides by. **Revert** is dimmed on
+  Planning with a greyed `courseRevertOnPlanning` line under it reading
+  `words.revertOnPlanning` (the Rename reason's pattern). With focus inside
+  the plan page no XAML key fires (measured for the preview in #488's
+  sitting), so Ctrl+S there does nothing; the web view's own keys are off
+  (below), so it is not the browser's Save As either.
+- **The Planning tab** (`PlanningTabView`, code-only): a bar (Unit popup
+  `planningUnitPopup`, `planningBack`, `planningForward`, `planningReload`,
+  `planningOpenInBrowser`, each named and tool-tipped with its `words`
+  entry), the plan, and `planningShareBarSlot`, an empty `Auto` row for
+  #824's bar. With nothing to show, the bar goes and `planningEmpty` shows
+  `emptyTitle`, `emptyDescription` and one Plan a Unit button per assistant
+  installed, Claude's first (`planAUnitWithClaude`, `planAUnitWithCodex`;
+  GitHub Copilot's stays held by name for #884); when the guarded view
+  cannot be made, `cannotShowTitle` with `CannotShowDescription` filled
+  ("PC") and nothing loaded. **The popup is a `DropDownButton` with a menu
+  of radio items**, not a `ComboBox`: a ComboBox raises nothing when the
+  entry it already names is chosen again, and `followsThePage.rule` says
+  choosing an entry always loads its page. Its Name is `words.unitPopup`
+  and its ItemStatus the chosen entry's title (Narrator reading it is on
+  Russell's hand list). It starts on `PlanningTab.StartingChoice` for
+  today, follows the page on `SourceChanged` (`ChoiceForPage`) without
+  loading, and looks again when the tab appears, when the window is
+  activated (`MainWindow.Activated` → `CourseSettingsView.WindowBecameActive`),
+  when a unit is chosen and on Reload: `PlanningAssets.Refresh` then
+  `PlanningTab.LookIn`, off the interface thread, and the page on screen
+  reloaded. No watcher, no timer.
+- **The guarded view** (`GuardedSite`, `LocalPagesEnvironment`), below.
+- **Plan a Unit** (#801 item 5): `OutsideDoorWording.RefusedWhileRevised` at
+  the click in an alert; otherwise the door with `PlanAUnit.OpeningMessage`
+  as its opening message (which already ends with `greetingHandoutsSentence`,
+  790a); a door that did not open shows its own could-not-start alert and
+  writes nothing; one that did writes "asked an assistant to plan a unit"
+  after its own "assistant opened" line. The built-in assistant is not
+  touched: nothing it is shown changed (#897's ruling).
+- **Open in Browser** (#820): `PlanInTheBrowser.Press` asks the rule again
+  with the web view's address at the click, hands an allowed page's
+  `file:` address to `WindowsDefaultBrowser`, and writes the trail once the
+  browser answered; a refusal or failure is an alert titled
+  `openInBrowserCouldNotOpenTitle`. Dimmed while refused, with the
+  refusal's sentence as its help: a disabled WinUI button takes no pointer,
+  so the tooltip is ALSO on the cell around it, and `HelpText` carries it
+  for Narrator. **The browser is asked by name**: `AssocQueryString(ASSOCF_IS_PROTOCOL,
+  ASSOCSTR_PROGID, "https")`, required to have an `open` command or a
+  `DelegateExecute`, then `ShellExecuteEx` with `SEE_MASK_CLASSNAME` and
+  that ProgId (790 plan review M5), so the https class's own verb runs and
+  the file's type is never asked; no ProgId, nothing started,
+  `openInBrowserNoBrowser`. Measured on this PC: `https` → `MSEdgeHTM`,
+  command `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+  --single-argument %1`, no `DelegateExecute`; `.pdf` here belongs to
+  `MSEdgePDF`, a different class. A redirected run (`--state-dir`) appends
+  `<ProgId> | <file URI>` to `browser-opened.txt` instead of starting
+  anything. **Not measured:** Chrome, Firefox and a Store browser set as the
+  default (#820 item 6, Russell's hand list); the browser inherits the
+  app's environment, `WEBVIEW2_USER_DATA_FOLDER` included, which only a
+  WebView2 runtime reads. **Rejected:** reading the command and starting
+  the program it names (a Store browser's ProgId has none; `%1`/`%L`/`%*`
+  and DDE are each a parser); the IApplicationAssociationRegistration COM
+  interface (the same answer through built-in COM).
+- **The greeting's sentence is on**: `SidebarPane.ReviseWithClaude` /
+  `ReviseWithCodex` pass `UnitPlans.ToMention(course, kept, today)`, read at
+  the click, so the "assistant opened" line carries its clause too.
+- **The trail** (rule 5): `ActivityTrail.Event.UnitPlansLookedAt` (once per
+  appearance, `PlanningTab.NoteAppearance`: the count, or in its place
+  `couldNotShowLine` when a plan was there and no view could be made; once
+  per appearance `couldNotRefreshTheLookLine` with the count of files that
+  failed), `AskedAnAssistantToPlanAUnit`, `UnitPlanOpenedInBrowser`. Their
+  three `NamedGapLedger` entries are gone. A mirror REFUSED for a link (no
+  file failed) writes no trail line, as on the mac, only the diagnostic
+  log: the contract has no line for it (a question in 790b's report).
+
+### The guarded view on the real WebView2, and what the gate measures
+
+`GuardedSite` puts the three guards on one `CoreWebView2`: scripts, web
+messages, host objects, DevTools, the status bar, autofill, password saving,
+the context menu, swipe navigation, SmartScreen and the browser's own keys
+OFF; the PDF toolbar's Save and Save As hidden (Print kept for plans,
+off for a view that says so: #811); every request of every kind from every
+frame (`AddWebResourceRequestedFilter("*", All, All)`) answered by the app
+through `LocalSiteGuard` (served with `Cache-Control: no-store` and
+`X-Content-Type-Options: nosniff`, a 403 otherwise, any other host
+included); `NavigationStarting` decided by `PlanNavigation.Decide` with the
+web view's own string (a `file:` address the rule lets through is loaded at
+its SERVED address); a frame loads only a served page of the folder and is
+never handed out; a new-window request is handled here (`loadHere`);
+downloads, external schemes, permissions, basic authentication and the Save
+As dialog are refused. Read from `Microsoft.Web.WebView2.Core` only, so
+`Plantoir.GuardProbe` compiles the same file against the WinForms flavour
+of the same SDK (1.0.3179.45), differing in one call (a response body is a
+`Stream` there, an `IRandomAccessStream` in WinRT).
+
+**The environment is the local pages' own** (790 plan review H1):
+`AppDataRoot\WebView2-local-pages`, `--proxy-server=127.0.0.1:9
+--proxy-bypass-list=<-loopback>`, made once per process and shared by every
+plan view (and #811's), each view InPrivate with a profile name (`plans`,
+`coverage`). **Measured** (`Plantoir.GuardProbe --env-check`):
+`WEBVIEW2_USER_DATA_FOLDER`, which `Program.Main` sets for the preview,
+OVERRIDES the folder an environment is created with, and a second
+environment with other arguments on that folder failed to start
+(`0x8007139F`); with the variable taken away for the one creating call and
+put back, both environments live in one process, each with its own browser
+process. The local pages' browser process: 117.6 MB working set with one
+plan view (this PC).
+
+**`GuardedSiteTests` (in `Plantoir.Tests`, so the GATE runs it)** builds a
+plan folder with junctions, a 127.0.0.1 listener standing for the internet,
+and runs the probe three times (about 25 s on this PC; the probe exits
+leaving no `msedgewebview2.exe`, checked): the page's stylesheet, font,
+pictures, frame and a junction that stays inside are served; three ways out
+(`..` three folders up, a picture beside the planning folder, a junction to
+the course) are refused; scripts do not run (inline, `onload`, `srcdoc`,
+SVG; the title stays the page's); a meta refresh to the web or out of the
+folder is refused; a clicked web and `mailto:` link go to `openOutside`
+once each, never through the system prompt; a click out of the plan is
+refused and the page stays; a `target=_blank` link loads here and Back
+returns; a PDF of the plan is served as one; a `.zip` is not served and
+nothing downloads; Reload reads the disk again (a stylesheet changed
+between loads changes the computed colour, through the DevTools protocol);
+no file of the InPrivate profile's data folder names the plan's host; with
+the page's policy taken off, every kind of outside request (img, srcset,
+picture source, poster, `@import`, CSS `url()`, a frame's picture, icon,
+prefetch, object, embed) still arrives at the handler and is refused; and
+**zero** connections reach the listener through the local pages'
+environment, against **some** through a plain one (a preconnect, a meta
+refresh), so the zero is the proxy's doing. The probe fails the test,
+never skips it, when it cannot run.
+
+**The page policy names each kind and has no `default-src`.** Measured
+with the probe: a page sent `Content-Security-Policy: default-src 'self'`
+raised no navigation at all for a link to the web clicked through the
+DevTools protocol (3 runs of 3); the same page with
+`GuardedSite.PlansContentSecurityPolicy` (script, object, base, form,
+worker, manifest and connect none; images, fonts, styles, frames and media
+from the host) raised it as a click. Whether a real mouse is stopped the
+same way was not measured. Sent on HTML only (790 plan review L3).
+
+**Not measured here:** a PDF DRAWN inline with scripts off (the probe sees
+the response, not the drawing; hand list), dark mode following the app
+(`FollowTheme`, from the page's `ActualTheme`), a DNS-only leak
+(`dns-prefetch` names no socket a loopback listener can see; with a fixed
+proxy Chromium does not resolve names itself).
+
+### What the window's tests drive
+
+`PlanningTabUiTests` (`[UiFact]`, stubs `claude.exe` and an npm-shaped
+`codex.cmd` first on PATH, `--state-dir`, no real assistant, no browser
+started): the tabs' words; a name typed in the settings form, Planning
+chosen by UI Automation's `Select` (no click, so the keyboard is not moved
+first), 30 Tabs with no settings control ever focused and the form not
+drawn, a key typed, Course ▸ Save writing exactly what was typed and
+`planningSaveStatus` saying so; the bar's words; the page on screen (a
+redirected run sets Reload's ItemStatus to the view's address, as the
+preview's neighbour button does); the web view under the tabs and inside
+the window; Open in Browser recording the page's `file:` address; a click
+to a unit's page with the popup following; a click out of the folder
+refused; Back; another unit chosen from the popup; Revise With ▸ Claude…
+ending with `UnitPlans.GreetingSentence`; the empty offer's words and
+buttons, Claude's first, and Plan a Unit handing exactly
+`PlanAUnit.OpeningMessage`; and the trail lines, with no plan title on any.
 
 ## Sharing unit plans (#709): what Windows owes
 

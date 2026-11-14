@@ -10,7 +10,7 @@ namespace Plantoir.Core.Assist;
 /// REPLACES the greeting, so no unit-planning reminder and no reference-courses
 /// sentence ride along (<c>planAUnit.atTheClick</c>); it goes to the door as
 /// its <c>openingMessage</c> (<see cref="ClaudeCodeLauncher.Prepare"/>).
-/// Pinned by <c>PlanAUnitTests</c>; the buttons themselves are 790b.
+/// Pinned by <c>PlanAUnitTests</c>; the buttons are <c>PlanningTabView</c>'s (790b).
 /// </summary>
 public static class PlanAUnit
 {

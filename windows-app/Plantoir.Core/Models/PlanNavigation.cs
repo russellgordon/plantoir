@@ -23,7 +23,7 @@ namespace Plantoir.Core.Models;
 /// (inside, after links, is load), though a served page's click on one raises
 /// no navigation in WebView2 at all (measured by the plan review's probe; plan
 /// review L5), so no contract case that writes one inside the folder should be
-/// expected to load on Windows. The adapter (790b) must answer a <c>Load</c> of
+/// expected to load on Windows. The adapter (<c>GuardedSite</c>) answers a <c>Load</c> of
 /// a <c>file:</c> address by loading the SERVED address of the same path, so
 /// that no page is ever read through Chromium's own file access.</para>
 ///
