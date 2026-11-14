@@ -1604,7 +1604,7 @@
      "question": "Where do I change a course's name, footer, printing, folders or sidebar?",
      "about": "Course Settings' course-wide parts (Overall, Deploying, Footer, Printing, Content Structure, Marks, Sidebar Visibility), Save and Revert.",
      "steps": [
-      "Select the course row: its settings show (a Settings and Planning tab bar appears only when Claude Code or Codex is installed)",
+      "Select the course row: its settings show (a Settings and Planning tab bar appears only when Claude Code, Codex or GitHub Copilot is installed)",
       "The parts in order: Overall (Course name, Language and region, read times, the coverage map, the unit word), Deploying, Footer, Printing, Content Structure, Marks, Sidebar Visibility, then one part per section (link section-look)",
       "Press Save (⌘S, also Course > Save Course Settings) or Revert",
       "A preview or deploy started with unsaved changes uses the settings as last saved; after a save while previewing, Preview Again appears",
@@ -4819,8 +4819,8 @@
      "question": "How do I plan a unit with an assistant and see the plan in Plantoir?",
      "about": "Planning a unit with an assistant and reading it on the Planning tab.",
      "steps": [
-      "Ask Claude Code or Codex to plan the unit (Revise With, or Plan a Unit with Claude… on an empty Planning tab)",
-      "Select the course and open its Planning tab (shown only when Claude Code or Codex is installed)",
+      "Ask Claude Code, Codex or GitHub Copilot to plan the unit (Revise With, or Plan a Unit with Claude… on an empty Planning tab)",
+      "Select the course and open its Planning tab (shown only when Claude Code, Codex or GitHub Copilot is installed)",
       "Choose the unit in the Unit pop-up, or All Plans",
       "Open in Browser to read or print it",
       "Use the section's Coverage tab to see what the course's pages reach"

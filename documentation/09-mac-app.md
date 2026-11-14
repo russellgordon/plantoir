@@ -4168,7 +4168,11 @@ of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
   preferences, the section's fingerprint) until the section's words change
   or the file goes. Both answers are a trail line, `asked before adding
   guidance to a file`. A file is never appended to without a yes; the skills
-  are written either way.
+  are written either way. The sheet's explanation (`words.askFound`) names
+  Claude Code, Codex and GitHub Copilot as assistants that read the file,
+  since [#887](https://github.com/russellgordon/plantoir/issues/887) (it named
+  the first two until then, though #783's trial had measured that Copilot
+  reads both root files and both skill homes); `words.askFoundWhy` says why.
 
 **It never holds the folder back** (implementation review S1). The first
 version counted a guidance failure in the toolchain copy's outcome, so a

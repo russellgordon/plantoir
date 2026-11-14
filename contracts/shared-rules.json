@@ -29175,7 +29175,8 @@
       },
       "words": {
         "askTitle": "Add a section to {file}?",
-        "askFound": "This working folder already has {file}, a file that assistants such as Claude Code and Codex read before they start.",
+        "askFound": "This working folder already has {file}, a file that assistants such as Claude Code, Codex and GitHub Copilot read before they start.",
+        "askFoundWhy": "GitHub #887: named the two assistants of #454 until GitHub Copilot's door (#783), which reads both root files and both skill homes (measured in #783's trial), so the guidance already served it and only the words were behind. The three in the order the menus list them, with their own names, since these are the programs that read the file; 'such as' because any assistant that reads AGENTS.md is served. No assistant is needed for anything Plantoir does.",
         "askWhat": "Plantoir would like to add a short section at the end of it that points them to its guidance for writing pages — for example, how to make a page printable.",
         "askYoursStays": "Your own text stays exactly as it is, above the new section.",
         "showWhatIsAdded": "Show what would be added",
