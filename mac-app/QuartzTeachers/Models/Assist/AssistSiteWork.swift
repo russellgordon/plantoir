@@ -163,13 +163,13 @@ final class AssistToolchainWork: AssistSiteWork {
         // Recorded HERE and not inside `ScriptRunner`, because a publish's own
         // `--build-only` wears the same launcher's name and is already counted
         // as the publish it belongs to. The `defer` covers every return below.
-        CourseActivity.beginPreviewBuild(
+        // Its own claim (#812): a section window's start of the same section
+        // holds another, and whichever ends first leaves the other recorded.
+        let buildClaim: CourseActivity.PreviewBuildClaim = CourseActivity.beginPreviewBuildClaim(
             folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
         )
         defer {
-            CourseActivity.endPreviewBuild(
-                folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
-            )
+            CourseActivity.endPreviewBuild(buildClaim)
         }
 
         // Taken, THEN checked (#156): the `build` lease is on disk from the

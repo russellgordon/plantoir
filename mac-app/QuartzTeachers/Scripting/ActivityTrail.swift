@@ -83,6 +83,12 @@ nonisolated enum ActivityTrail {
         /// Preview Again, pressed beside the sentence Course Settings shows
         /// after a Save that an open preview could not see (#265).
         case previewAgainAfterSettingsSaved = "preview again after settings saved"
+        /// A preview was asked for while this window's own start was still
+        /// waiting for a stop or building, and nothing more was done (#812).
+        /// That ask used to end the first start's record and raise a refusal
+        /// about another window; now nothing shows, and this line is the
+        /// only sign it was made.
+        case previewAlreadyStarting = "preview already starting"
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"

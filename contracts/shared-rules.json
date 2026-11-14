@@ -86,6 +86,11 @@
         "why": "The button beside specialNames.settingsSavedWhilePreviewing. It stops and restarts a preview that may be in another window, so the trail says it was the Settings button that did it rather than a press in that window (issue #265)."
       },
       {
+        "carries": "the course code and the section",
+        "event": "preview already starting",
+        "why": "Issue #812: a preview asked for while the same window's own start is still waiting for a stop or building does nothing (quittingWhileWorkIsUnderWay.previewBuildRecord). It used to end the first start's record, so quitting did not ask about a build that was running, and it raised a refusal saying the section was previewed in another window. Nothing shows now, so this line is the only record that the press was made and why nothing new began."
+      },
+      {
         "carries": "the launcher and its arguments, redacted",
         "event": "task started",
         "why": "What was actually asked for, as against what the teacher believes they asked for."
@@ -14789,6 +14794,151 @@
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
+    },
+    "previewBuildRecord": {
+      "rule": "A preview build is recorded by CLAIM: each start that records one (a section window's start, the assistant's rebuild with no window) holds its own claim on the section's record and ends only that claim, so the record lasts while any start of the section is still building, and whatCountsAsUnderWay counts each section once however many claims it has. A start asked for while the same window's own start is still under way (its wait for the page has begun and it holds its own preview lease, which is the case while it waits for an old stop to finish and while it builds) does nothing at all: nothing is recorded, no lease is asked for, no refusal is shown, and a trail line says so (activityTrail.mustRecord: preview already starting). A start refused by a lease ends its own claim and nobody else's (issue #812).",
+      "why": "The mac kept one record per section, and every ending removed it. A second start, by a second press during the old stop, from Section > Preview, or from the assistant (which saw no running preview yet), ended the first start's record and was refused by the first start's own lease, and the first start then built with nothing recorded: quitting went ahead without asking, which whatCountsAsUnderWay says it must not. The same happened through another window on the section, and between a window and the assistant's rebuild. Measured 2026-11-13 on dev fcd0a51c5 by compiling the real PreviewBuildWait with copies of the real record functions: after a second press the record count was 0 while the first start went on to build. Windows records per start already (CourseActivity.BeginPreviewBuild returns one token per start) and writes the record after the lease, so a refused press there ends nothing.",
+      "pressCasesHow": "Section 1 of ICS3U in one working folder. Steps, in order: A.start and B.start (window A or B asks for a preview: if its own start is under way nothing happens and alreadyStarting counts it; otherwise its build is recorded and a preview lease taken, and a refused lease ends that window's own claim and counts in refusals); A.runEnds and B.runEnds (that window's start ends, however it ends: its wait ends and its lease is handed back); assistant.begins and assistant.ends (the assistant's rebuild with no window records the build and ends it; it takes no preview lease). expect.records is how many sections a quit would ask about at the end, and aIsWaiting whether window A is still waiting for its page.",
+      "pressCases": [
+        {
+          "name": "one start",
+          "steps": [
+            "A.start"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 0,
+            "alreadyStarting": 0,
+            "aIsWaiting": true
+          },
+          "why": "The ordinary press: its build is recorded from the press, so quitting asks."
+        },
+        {
+          "name": "a second press while the first waits for its stop",
+          "steps": [
+            "A.start",
+            "A.start"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 0,
+            "alreadyStarting": 1,
+            "aIsWaiting": true
+          },
+          "why": "Issue #812. The Preview button reads Preview, not Stop, until the run begins, so a second press comes in while the first start waits for an old stop to finish. It used to end the first start's record and be refused by that start's own lease with a sentence about another window; the first start then built with nothing recorded and quitting did not ask."
+        },
+        {
+          "name": "three presses",
+          "steps": [
+            "A.start",
+            "A.start",
+            "A.start"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 0,
+            "alreadyStarting": 2,
+            "aIsWaiting": true
+          },
+          "why": "Each later press does nothing, however many come."
+        },
+        {
+          "name": "another window's press while the first waits",
+          "steps": [
+            "A.start",
+            "B.start"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 1,
+            "alreadyStarting": 0,
+            "aIsWaiting": true
+          },
+          "why": "Issue #812 through another window on the same section: its press is refused by the first window's lease, as it always was, and ends only its own claim. It used to end the first window's record, because one section had one record that any ending removed."
+        },
+        {
+          "name": "another window's press, then the first start ends",
+          "steps": [
+            "A.start",
+            "B.start",
+            "A.runEnds"
+          ],
+          "expect": {
+            "records": 0,
+            "refusals": 1,
+            "alreadyStarting": 0,
+            "aIsWaiting": false
+          },
+          "why": "Nothing is left behind: a claim outliving its build would make every later quit ask about a preview nobody is building (#232)."
+        },
+        {
+          "name": "the assistant's rebuild ends while a window's start is building",
+          "steps": [
+            "assistant.begins",
+            "A.start",
+            "assistant.ends"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 0,
+            "alreadyStarting": 0,
+            "aIsWaiting": true
+          },
+          "why": "The assistant's rebuild with no window takes no preview lease, so a window's start of the same section goes ahead beside it. Each holds its own claim: the rebuild ending first used to end the window's record too, and the window then built unrecorded."
+        },
+        {
+          "name": "a window's start ends while the assistant still rebuilds",
+          "steps": [
+            "assistant.begins",
+            "A.start",
+            "A.runEnds"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 0,
+            "alreadyStarting": 0,
+            "aIsWaiting": false
+          },
+          "why": "The other way round: the window's start ending leaves the rebuild recorded."
+        },
+        {
+          "name": "a start after the first one ended",
+          "steps": [
+            "A.start",
+            "A.runEnds",
+            "A.start"
+          ],
+          "expect": {
+            "records": 1,
+            "refusals": 0,
+            "alreadyStarting": 0,
+            "aIsWaiting": true
+          },
+          "why": "Once the first start has ended a press starts again as normal: only a start still under way makes a press do nothing."
+        },
+        {
+          "name": "everything ends",
+          "steps": [
+            "A.start",
+            "B.start",
+            "assistant.begins",
+            "assistant.ends",
+            "A.runEnds"
+          ],
+          "expect": {
+            "records": 0,
+            "refusals": 1,
+            "alreadyStarting": 0,
+            "aIsWaiting": false
+          },
+          "why": "Every claim ended, so quitting asks about nothing."
+        }
+      ],
+      "rejected": [
+        "Greying the Preview button while a start waits for its stop: it covers one way in of four (Section > Preview, the assistant and Course Settings still come through startPreview), and a second window on the section would still end the first one's record.",
+        "A ticket that lets a refused start end only its own wait inside one window: by the time the lease refuses, the second start's begin has already ended the first start's claim, and the refusal would still name another window.",
+        "Waiting a moment before a second start, or retrying it: the first start is the one the teacher asked for, and a fixed delay only moves the race."
+      ]
     },
     "whileUnitPlansAreShared": {
       "rule": "A run of the unit plans' launcher (#709) holds the course under a lease of kind publish, so quitting while it runs asks first. It can be doing one of three things a teacher tells apart: SHARING (Share, Share Again, Add a Password, Remove Password), CHANGING THE PASSWORD (Change Password, which saves a new password and sends nothing) and STOPPING SHARING. Since #863 (Russell, 2026-11-13: sharing gets its own wording on quit) the question names each for what it is and never counts it as a section being deployed, and the message says what each could leave part way, and names the class website only when a section is being deployed. The lease cannot tell the three apart, so the app keeps a record beside it of what the run was started to do (on the mac `CourseActivity.PlanWorkRecord`, written by `PlanShareRunner.start` and removed with the lease).",

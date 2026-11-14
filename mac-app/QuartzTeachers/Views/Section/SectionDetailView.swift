@@ -2269,6 +2269,23 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // A start of this window's own is still under way: waiting for a
+        // stop to finish, or building. The button reads Preview, not Stop,
+        // until the run has begun, and the assistant and Course Settings see
+        // no running preview then either, so this is reached. Asked FIRST,
+        // before anything is written: a second start used to end the first
+        // one's record of a build and be refused by its lease, and ⌘Q then
+        // quit through that build without asking (#812). The start the
+        // teacher is waiting for goes on; this one does nothing.
+        if PreviewStartRecords.aStartIsUnderWay(wait: previewBuildWait, heldLease: previewLease) {
+            ActivityTrail.note(
+                .previewAlreadyStarting,
+                "asked to preview while this window's preview was still starting — the start already under way goes on, and nothing else was started",
+                course: course.code,
+                section: sectionNumber
+            )
+            return
+        }
         // Every way in, not only the button (#351): see its `.disabled`.
         if workspace.isBeingCopied(course.code) {
             return
@@ -2318,23 +2335,22 @@ struct SectionDetailView: View {
         // window would see it as earlier than its build and decline, and the
         // other program would see this window's preview as earlier than its
         // build and decline too. Build first, and exactly one goes ahead.
-        previewBuildWait.begin(
+        //
+        // Each preview runs on its own port, so several windows can show
+        // sections side by side without taking each other down. A refused
+        // lease ends this start's own claim on the record and nobody else's
+        // (#812): another window's start of this section stays recorded.
+        let lease: PreviewLeases.Lease
+        switch PreviewStartRecords.begin(
+            wait: previewBuildWait,
             folderPath: workspaceURL.path,
             courseCode: course.code,
             sectionNumber: sectionNumber
-        )
-        // Each preview runs on its own port, so several windows can show
-        // sections side by side without taking each other down.
-        let lease: PreviewLeases.Lease
-        do {
-            lease = try PreviewLeases.lease(
-                folderPath: workspaceURL.path,
-                courseCode: course.code,
-                sectionNumber: sectionNumber
-            )
-        } catch {
-            previewBuildWait.end()
-            showPreviewRefusal(title: "Cannot Preview Yet", sentence: error.localizedDescription)
+        ) {
+        case .began(let taken):
+            lease = taken
+        case .refused(let sentence):
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: sentence)
             return
         }
         previewLease = lease

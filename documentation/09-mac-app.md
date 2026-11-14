@@ -2710,13 +2710,63 @@ build, which would make EVERY later ⌘Q ask about a preview nobody is building:
   so that one is ended by the silence check itself, guarded by
   `PreviewReachability.theSameRunEndedByItself` — never unconditionally, since
   after a new run has started the wait belongs to it. `end()` is
-  idempotent, and the object ends only the record it began (the window's
+  idempotent, and the object ends only the CLAIM it began (the window's
   `folderThisSectionWorksIn` is also written by a deploy, so rebuilding the
-  record from it at the end could name the wrong folder).
-- **The assistant's no-window rebuild** (`AssistToolchainWork.rebuildPreview`,
-  `--build-only`) records around its run, ended by a `defer` on every return.
-  NOT in `ScriptRunner`: a publish's own `--build-only` wears the same
-  launcher's name and is already counted as the publish.
+  record from it at the end could name the wrong folder; and since #812 the
+  record is held by claim, below).
+- **The assistant's no-window rebuild** (`AssistSiteWork.rebuildPreview`,
+  `--build-only`) holds its own claim around its run, ended by a `defer` on
+  every return. NOT in `ScriptRunner`: a publish's own `--build-only` wears
+  the same launcher's name and is already counted as the publish.
+
+**One claim per start, and a second start that does nothing (#812).** Until
+#812 `CourseActivity` kept ONE record per section, and every ending removed
+it. A second start could come into `startPreview` while the first was still
+waiting for an old stop to finish: the toolbar button reads Preview, not Stop,
+until the run has begun, so a second press reached it, and so did Section ▸
+Preview, the assistant (whose `isPreviewRunning()` is false then) and Course
+Settings. Its `begin` ended the first start's record (a new wait ends the old
+one), the first start's own lease refused it with
+`PreviewLeases.Problem.sectionAlreadyPreviewed`'s sentence about ANOTHER
+window, and the refusal ended the record it had just written. The first start
+then built with nothing recorded and ⌘Q quit through it without asking.
+Measured on `dev` fcd0a51c5 by compiling the real `PreviewBuildWait` with
+copies of the real record functions and driving `startPreview`'s order: after
+the second press the record count was 0 while the first start went on. The
+same measurement found two more ways to the same state: a press in another
+window on the section (it joined the one record, was refused by the first
+window's lease, and its `end()` removed the first window's record), and the
+assistant's no-window rebuild beside a window's start (whichever ended first
+removed the other's record; the window was left waiting with no record).
+
+Two changes, each the real dependency rather than a timing:
+
+- **Claims.** `CourseActivity.beginPreviewBuildClaim` returns one claim per
+  start and `endPreviewBuild(_:)` ends that claim only;
+  `activePreviewBuilds` is the distinct records, so the quit question and
+  every reader are unchanged. `PreviewBuildWait` and the assistant's rebuild
+  hold claims. The by-section `beginPreviewBuild` and `endPreviewBuild` stay,
+  with their old meaning, for tests. This is the shape Windows has had from
+  the start (its `BeginPreviewBuild` returns a token per start).
+- **A start already under way.** `PreviewStartRecords.aStartIsUnderWay` is
+  asked FIRST in `startPreview`: the window's wait has begun and it holds its
+  own lease, which is true while it waits for a stop and while it builds.
+  Then nothing is written, no lease is asked for, no alert is shown, and the
+  trail says `preview already starting`. A preview that is SHOWING is not
+  "already starting" (its wait is over), so a start asked for then goes on as
+  before. `PreviewStartRecords.begin` records and takes the lease in the
+  load-bearing order (#156, M2) and on a refusal ends its own claim.
+
+The rule and nine cases are `quittingWhileWorkIsUnderWay.previewBuildRecord`
+(`pressCases`), run by `PreviewBuildRecordTests` through the real objects;
+with the claim ending every claim on its record and `aStartIsUnderWay`
+answering false (the old meaning, the must-fail copies) five of the nine
+fail. REJECTED: greying the Preview button during the stop (one way in of
+four, and the other window and the assistant still end the record); a ticket
+inside one `PreviewBuildWait` so a refusal ends only its own wait (the second
+`begin` has already ended the first's claim by then, and the refusal still
+names another window); any delay or retry (the first start is the one the
+teacher asked for).
 
 **REJECTED, after it was built: ending the record from `.onChange(of:
 isWaitingForServer)`.** The first cut kept the flag as plain `@State` and ended
@@ -2751,9 +2801,10 @@ of 2026-09-20 named "a publish or preview".
 **Known, and in the safe direction:** the outer ten-minute bound in
 `waitForPreviewServer` ends the wait while a very slow first-ever
 build may still be running, which ends the record early — a quit then goes
-unasked, which is what happened for every preview before #232. A window's
-build and an assistant rebuild of the SAME section at once share one record,
-and whichever ends first clears it; same direction.
+unasked, which is what happened for every preview before #232. (A window's
+build and an assistant rebuild of the SAME section at once used to share one
+record, whichever ended first clearing it; since #812 each holds its own
+claim.)
 
 **Still REJECTED: asking about a preview that is merely open**, for the lease
 reason above.
