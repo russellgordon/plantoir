@@ -95,7 +95,7 @@ def run_build(arguments: List[str], repo: Optional[Path] = None, help_dir: Optio
     environment = dict(os.environ)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     completed = subprocess.run(
-        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", env=environment
     )
     return completed.returncode, completed.stdout
 
@@ -166,7 +166,7 @@ def run_page_search(node: str, web: Path, query: str, ready_state: str = "comple
     search_path: Path = search_js if search_js is not None else web / "assets" / "search.js"
     completed = subprocess.run(
         [node, str(script), str(web / "assets" / "search-index.js"), str(search_path), query, ready_state],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
     )
     if completed.returncode != 0:
         raise AssertionError("the page harness failed: " + completed.stdout)

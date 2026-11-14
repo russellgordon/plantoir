@@ -145,7 +145,7 @@ class RealRepositoryTests(unittest.TestCase):
 
         completed = subprocess.run(
             [node, str(script), str(web / "assets" / "search-index.js"), str(web / "assets" / "search.js")] + queries,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
         )
         self.assertEqual(completed.returncode, 0, completed.stdout)
         return json.loads(completed.stdout)
@@ -298,7 +298,7 @@ class ScriptRuleTests(unittest.TestCase):
 
             completed = subprocess.run(
                 [sys.executable, "-I", "-B", str(HELP_DIR / "build_help.py"), "--check"],
-                cwd=elsewhere, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+                cwd=elsewhere, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
             )
             self.assertEqual(completed.returncode, 0, completed.stdout)
@@ -314,7 +314,7 @@ class ScriptRuleTests(unittest.TestCase):
         environment.pop("PYTHONDONTWRITEBYTECODE", None)
         completed = subprocess.run(
             [sys.executable, str(HELP_DIR / "build_help.py"), "--check"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", env=environment,
         )
         self.assertEqual(completed.returncode, 0, completed.stdout)
         found = []
