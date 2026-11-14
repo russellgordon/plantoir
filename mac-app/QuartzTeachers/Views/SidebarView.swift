@@ -465,7 +465,7 @@ struct SidebarView: View {
 
                 Anything added since then isn’t in the backup.
 
-                Nothing is lost, though: the version you have right now moves to Archived, at the bottom of the sidebar, where you can get it back.
+                \(workspace.wholeCourseRestoreConfirmation(for: item))
 
                 This backup is kept.
                 """)

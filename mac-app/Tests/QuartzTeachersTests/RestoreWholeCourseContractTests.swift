@@ -44,7 +44,25 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         if let lockedInside = fault["lockedInside"] as? String {
             XCTAssertEqual(lchflags(fixture.courseURL.appendingPathComponent(lockedInside).path, UInt32(UF_IMMUTABLE)), 0, name)
         }
-        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        var deeper: [String: Data] = [:]
+        for path in (fault["deeperLeftOut"] as? [String]) ?? [] {
+            try WholeCourseFixture.write("deeper: \(path)\n", to: fixture.courseURL.appendingPathComponent(path))
+            deeper[path] = Data("deeper: \(path)\n".utf8)
+        }
+        var hold: RestoreSwap.CourseHold = RestoreSwap.CourseHold.notHeld
+        if fault["heldByAnotherRestore"] as? Bool == true {
+            hold = RestoreSwap.holdTheCourse("ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL)
+            XCTAssertNotEqual(hold, RestoreSwap.CourseHold.notHeld, name)
+        }
+        defer { RestoreSwap.letGo(hold) }
+        var live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        if !deeper.isEmpty {
+            // What the course should be is the backup's; the deeper items are
+            // judged by keptIn below.
+            for path in deeper.keys {
+                live[path] = nil
+            }
+        }
 
         var moves: [String] = []
         let hooks: RestoreSwap.Hooks = fixture.hooks(
@@ -105,6 +123,9 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             XCTFail("\(name): unknown course \(expectedCourse)")
         }
         XCTAssertEqual(fixture.somethingWasKept(), try XCTUnwrap(testCase["kept"] as? Bool, name), "\(name): kept")
+        if testCase["keptIn"] as? String == "notInTheArchive" {
+            XCTAssertEqual(try fixture.keptIn(folderStartingWith: RestoreSwap.notInTheArchiveName("ICS3U") + " "), deeper, "\(name): keptIn")
+        }
         let staging: String = try XCTUnwrap(testCase["staging"] as? String, name)
         XCTAssertEqual(fixture.leftInRestoring() == 0, staging == "removed", "\(name): staging")
 
@@ -152,6 +173,8 @@ final class RestoreWholeCourseContractTests: XCTestCase {
             XCTAssertEqual(said, CourseRestorer.Problem.archiveUnreadable("its course settings could not be read").localizedDescription, name)
         case "the refusal":
             XCTAssertEqual(said, "REFUSED BEFORE THE SWAP", name)
+        case "anotherRestoreUnderWay":
+            XCTAssertEqual(said, RestoreWholeCourseWording.anotherRestoreUnderWay(course: "ICS3U"), name)
         default:
             XCTFail("\(name): unknown says \(says)")
         }
@@ -297,6 +320,48 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         XCTAssertFalse(listed.contains(BuildOutputLocation.linkName), "the built site's link goes with the old copy")
     }
 
+    /// `keptFolders`: the four names are the engine's, the deeper names
+    /// kept are names backups leave out, and a kept folder follows the
+    /// one-section restore's rule: never read as a backup or an archive,
+    /// never pruned (the fix review's I-b).
+    @MainActor
+    func testTheKeptFoldersAreTheContractsAndAreNeverPruned() throws {
+        let kept: [String: Any] = try XCTUnwrap(try RestoreWholeCourseContractTests.block()["keptFolders"] as? [String: Any])
+        let names: [String: String] = try XCTUnwrap(kept["names"] as? [String: String])
+        func named(_ key: String) throws -> String {
+            return try XCTUnwrap(names[key], key).replacingOccurrences(of: "<CODE>", with: "ICS3U")
+        }
+        XCTAssertEqual(RestoreSwap.stoppedRestoreName("ICS3U"), try named("stoppedPartWay"))
+        XCTAssertEqual(RestoreSwap.newcomersKeptName("ICS3U"), try named("newcomers"))
+        XCTAssertEqual(RestoreSwap.keptBeforeRestoringAgainName("ICS3U"), try named("keptWhatWasReplaced"))
+        XCTAssertEqual(RestoreSwap.notInTheArchiveName("ICS3U"), try named("notInTheArchive"))
+        XCTAssertFalse(
+            RestoreSwap.keptBeforeRestoringAgainName("ICS3U").hasPrefix(RestoreSwap.stoppedRestoreName("ICS3U")),
+            "a teacher can tell the two apart by their names"
+        )
+        let deeper: [String] = try XCTUnwrap(kept["leftOutNamesKeptAtAnyDepth"] as? [String])
+        XCTAssertEqual(RestoreSwap.leftOutNamesKeptAtAnyDepth, deeper)
+        for name in deeper {
+            XCTAssertTrue(CourseArchiver.excludedFromArchives.contains(name), name)
+        }
+
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        var folders: [URL] = []
+        for key in ["stoppedPartWay", "newcomers", "keptWhatWasReplaced", "notInTheArchive"] {
+            let folder: URL = shelf.appendingPathComponent(try named(key) + " 2020-01-01_000000")
+            try WholeCourseFixture.write("kept\n", to: folder.appendingPathComponent("index.md"))
+            folders.append(folder)
+            XCTAssertNil(BackupItem.from(fileURL: folder, courseCode: "ICS3U"), key)
+            XCTAssertNil(ArchivedItem.from(fileURL: folder, courseCode: "ICS3U"), key)
+        }
+        CourseArchiver.pruneBackups(forCourseCode: "ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL)
+        for folder in folders {
+            XCTAssertTrue(RestoreSwap.itemExists(at: folder.appendingPathComponent("index.md")), folder.lastPathComponent)
+        }
+    }
+
     /// Every sentence equals the contract's template, filled with the same
     /// values.
     func testEverySentenceIsTheContractsTemplate() throws {
@@ -341,6 +406,14 @@ final class RestoreWholeCourseContractTests: XCTestCase {
         XCTAssertEqual(RestoreWholeCourseWording.newcomersKept(course: "ICS3U", keptAt: keptAt), try filled("newcomersKept"))
         XCTAssertEqual(RestoreWholeCourseWording.setAsideFilesKept(keptAt: keptAt), try filled("setAsideFilesKept"))
         XCTAssertEqual(RestoreWholeCourseWording.anotherRestoreUnderWay(course: "ICS3U"), try filled("anotherRestoreUnderWay"))
+        XCTAssertEqual(RestoreWholeCourseWording.restoredTitle(course: "ICS3U"), try filled("restoredTitle"))
+        XCTAssertEqual(RestoreWholeCourseWording.keptWhatWasInTheFolder(course: "ICS3U", keptAt: keptAt), try filled("keptWhatWasInTheFolder"))
+        XCTAssertEqual(
+            RestoreWholeCourseWording.keptWhatTheArchiveMayNotHold(course: "ICS3U", keptAt: keptAt), try filled("keptWhatTheArchiveMayNotHold")
+        )
+        XCTAssertEqual(RestoreWholeCourseWording.confirmArchived, try filled("confirmArchived"))
+        XCTAssertEqual(RestoreWholeCourseWording.confirmKeptWithItsBackups(course: "ICS3U"), try filled("confirmKeptWithItsBackups"))
+        XCTAssertEqual(RestoreWholeCourseWording.confirmNoCourseFolder(course: "ICS3U"), try filled("confirmNoCourseFolder"))
 
         // The joins, as wording.joins says.
         XCTAssertEqual(
@@ -517,6 +590,19 @@ struct WholeCourseFixture {
         let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
         var all: [String: Data] = [:]
         for name in (try? FileManager.default.contentsOfDirectory(atPath: shelf.path)) ?? [] {
+            for (path, bytes) in try WholeCourseFixture.snapshot(of: shelf.appendingPathComponent(name)) {
+                all[path] = bytes
+            }
+        }
+        return all
+    }
+
+    /// Every file kept under `courses/_backups/ICS3U/` in folders whose name
+    /// starts with `prefix`, by its path inside the course.
+    func keptIn(folderStartingWith prefix: String) throws -> [String: Data] {
+        let shelf: URL = coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        var all: [String: Data] = [:]
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: shelf.path)) ?? [] where name.hasPrefix(prefix) {
             for (path, bytes) in try WholeCourseFixture.snapshot(of: shelf.appendingPathComponent(name)) {
                 all[path] = bytes
             }

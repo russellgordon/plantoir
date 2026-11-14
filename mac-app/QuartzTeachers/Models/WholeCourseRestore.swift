@@ -84,6 +84,9 @@ enum WholeCourseRestore {
         case beforeTheArchive = "before the archive"
         case afterTheArchive = "after the archive"
         case beforeTheSwap = "once the backup was opened, before anything moved"
+        /// Another restore of the course on this computer held it when this
+        /// one began (`RestoreSwap.holdTheCourse`).
+        case whenItBegan = "when the restore began, before the backup was opened"
     }
 
     // MARK: - Stored properties
@@ -290,16 +293,25 @@ enum WholeCourseRestore {
     /// URL rather than a `BackupItem`. `keepingWhatWasReplaced` is handed
     /// the set-aside copy before it is deleted; no door passes one today,
     /// and U5's plan reads the archive instead (the plan review, M8).
+    ///
+    /// `keepsWhatWasReplaced` keeps the set-aside copy in the backups
+    /// folder instead, recorded first (the fix review's I-a): the door
+    /// passes it when no archive was made of a course folder that is there.
+    /// `archiveBegan` is when the archive made first began, so the files of
+    /// the set-aside copy written after it are kept.
+    @discardableResult
     static func restore(
         fromZipAt zipURL: URL,
         courseCode: String,
         from source: RestoreSwap.Source = RestoreSwap.Source.backups,
         coursesDirectoryURL: URL,
         archiveURL: URL? = nil,
+        archiveBegan: Date? = nil,
+        keepsWhatWasReplaced: Bool = false,
         beforeTheSwap: @escaping (URL) throws -> Void = { (_: URL) throws in },
         hooks: RestoreSwap.Hooks = RestoreSwap.Hooks.real,
         keepingWhatWasReplaced: ((URL) -> Void)? = nil
-    ) throws {
+    ) throws -> RestoreSwap.Restored {
         let courseURL: URL = coursesDirectoryURL.appendingPathComponent(courseCode)
         let backupFileName: String = zipURL.lastPathComponent
         let workingFolderURL: URL = coursesDirectoryURL.deletingLastPathComponent()
@@ -342,10 +354,12 @@ enum WholeCourseRestore {
             afterCommit: { () in
                 afterTheCommit(courseURL: courseURL)
             },
-            keepingWhatWasReplaced: keepingWhatWasReplaced
+            keepingWhatWasReplaced: keepingWhatWasReplaced,
+            keepsWhatWasReplaced: keepsWhatWasReplaced,
+            archiveBegan: archiveBegan
         )
         do {
-            _ = try RestoreSwap.restore(
+            let restored: RestoreSwap.Restored = try RestoreSwap.restore(
                 fromZipAt: zipURL,
                 courseCode: courseCode,
                 backupFileName: backupFileName,
@@ -354,6 +368,8 @@ enum WholeCourseRestore {
                 context: context,
                 hooks: hooks
             )
+            noteWhatWasKept(restored, courseCode: courseCode)
+            return restored
         } catch let failure as RestoreSwap.Failure {
             // Locked again whatever happened: a reference course left as it
             // was is still a reference course.
@@ -414,7 +430,50 @@ enum WholeCourseRestore {
         case .stoppedPartWay:
             // Its own event, `course restore stopped part way`.
             return
+        case .anotherRestoreHoldsTheCourse:
+            noteDidNotGoAhead(
+                .anotherRestore, courseCode: courseCode, backupFileName: backupFileName, asked: .whenItBegan
+            )
         }
+    }
+
+    /// The line for what a restore that worked kept in the backups folder
+    /// (`course restore kept files`), when it kept anything: the paths,
+    /// never a page.
+    static func noteWhatWasKept(_ restored: RestoreSwap.Restored, courseCode: String) {
+        if let keptAt = restored.keptWhatWasReplacedAt {
+            ActivityTrail.note(
+                .courseRestoreKeptFiles,
+                ActivityTrail.courseRestoreKeptFilesLine(keptAt: keptAt, why: ActivityTrail.KeptBecause.noArchive),
+                course: courseCode,
+                section: 0
+            )
+        }
+        if let keptAt = restored.keptWhatTheArchiveMayNotHoldAt {
+            ActivityTrail.note(
+                .courseRestoreKeptFiles,
+                ActivityTrail.courseRestoreKeptFilesLine(keptAt: keptAt, why: ActivityTrail.KeptBecause.notInTheArchive),
+                course: courseCode,
+                section: 0
+            )
+        }
+    }
+
+    /// What a restore that worked tells the teacher about what it kept, or
+    /// nil when it kept nothing (the fix review's I-b: nothing said where
+    /// the folder went).
+    static func sentenceForWhatWasKept(_ restored: RestoreSwap.Restored, courseCode: String) -> String? {
+        var sentences: [String] = []
+        if let keptAt = restored.keptWhatWasReplacedAt {
+            sentences.append(RestoreWholeCourseWording.keptWhatWasInTheFolder(course: courseCode, keptAt: keptAt))
+        }
+        if let keptAt = restored.keptWhatTheArchiveMayNotHoldAt {
+            sentences.append(RestoreWholeCourseWording.keptWhatTheArchiveMayNotHold(course: courseCode, keptAt: keptAt))
+        }
+        if sentences.isEmpty {
+            return nil
+        }
+        return sentences.joined(separator: "\n\n")
     }
 
     /// The line for an error that is not the engine's own: a backup whose
@@ -481,6 +540,8 @@ enum WholeCourseRestore {
                 return .courseLeftAsItWasLocked(courseCode, lockedItem)
             }
             return .courseLeftAsItWas(courseCode, reason, newcomersKeptAt: newcomersKeptAt)
+        case .anotherRestoreHoldsTheCourse:
+            return .refused(RestoreWholeCourseWording.anotherRestoreUnderWay(course: courseCode))
         case .stoppedPartWay(let keptAt, let holdsSomethingToOpen):
             let settingsAreBack: Bool = RestoreSwap.itemExists(at: courseURL.appendingPathComponent("course_config.json"))
             ActivityTrail.note(

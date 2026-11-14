@@ -266,29 +266,30 @@ enum CourseRestorer {
     /// from the sidebar (measured: 35 to 3 of 45 files left at the kill
     /// points, the #909 plan's 1.2). The rename records are cleared AFTER
     /// the restore has happened, so one that fails no longer clears them.
+    ///
+    /// **When no archive was made of a course folder that is there** (one
+    /// with no settings, left by a restore that stopped part way, is not a
+    /// course the sidebar lists, so the door archives nothing), what is in
+    /// it is KEPT in `courses/_backups/<CODE>/<CODE> as it was before
+    /// restoring again <stamp>` rather than removed, so restoring again to
+    /// put it right deletes nothing (the implementation review's I1). Since
+    /// the fix review's I-a the keep is written in the restore's record
+    /// before anything moves and is never skipped: a keep that fails leaves
+    /// the copy where it is for the next reading, and a crash after the
+    /// restore is finished from the record. Until then it was a closure the
+    /// engine ran and ignored the result of, and a settle ran none: 45 of
+    /// 45 files were removed in each case. Returns where it kept files.
+    @discardableResult
     static func restoreBackup(
         _ item: BackupItem,
         coursesDirectoryURL: URL,
         archiveURL: URL? = nil,
+        archiveBegan: Date? = nil,
         beforeTheSwap: @escaping (URL) throws -> Void = { (_: URL) throws in },
         hooks: RestoreSwap.Hooks = RestoreSwap.Hooks.real
-    ) throws {
+    ) throws -> RestoreSwap.Restored {
         let destination: URL = coursesDirectoryURL.appendingPathComponent(item.courseCode)
-        // A course folder no archive was made of (one with no settings, left
-        // by a restore that stopped part way, is not a course the sidebar
-        // lists, so the door archives nothing): what is in it is kept in the
-        // backups folder rather than removed, so restoring again to put it
-        // right deletes nothing (the implementation review's I1).
-        var keepingWhatWasReplaced: ((URL) -> Void)? = nil
-        if archiveURL == nil && RestoreSwap.itemExists(at: destination) {
-            let code: String = item.courseCode
-            keepingWhatWasReplaced = { (aside: URL) in
-                _ = RestoreSwap.moveToTheBackupsFolder(
-                    aside, courseCode: code, name: "\(code) before a restore",
-                    coursesDirectoryURL: coursesDirectoryURL, stamp: ArchiveStamp.text(for: Date())
-                )
-            }
-        }
+        let keepsWhatWasReplaced: Bool = archiveURL == nil && RestoreSwap.itemExists(at: destination)
         if !FileManager.default.fileExists(atPath: destination.path) {
             // The course is not there, so this is an arrival: by its school
             // year (#572 plan review H2). A restore IN PLACE keeps the
@@ -297,14 +298,15 @@ enum CourseRestorer {
                 of: item.courseCode, inMadeGroup: nil, coursesDirectoryURL: coursesDirectoryURL
             )
         }
-        try WholeCourseRestore.restore(
+        return try WholeCourseRestore.restore(
             fromZipAt: item.fileURL,
             courseCode: item.courseCode,
             coursesDirectoryURL: coursesDirectoryURL,
             archiveURL: archiveURL,
+            archiveBegan: archiveBegan,
+            keepsWhatWasReplaced: keepsWhatWasReplaced,
             beforeTheSwap: beforeTheSwap,
-            hooks: hooks,
-            keepingWhatWasReplaced: keepingWhatWasReplaced
+            hooks: hooks
         )
     }
 

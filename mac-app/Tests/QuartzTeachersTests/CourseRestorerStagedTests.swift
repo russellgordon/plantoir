@@ -123,6 +123,105 @@ final class CourseRestorerStagedTests: XCTestCase {
         XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupFiles)
     }
 
+    /// The third case: a name backups leave out, found deeper than the top
+    /// of the course (`section1/Sample App/.git`), is in neither the backup
+    /// nor the archive, so it is kept when the copy set aside is removed.
+    /// `.DS_Store` is not: Finder makes it again. MUST FAIL on db38ed112,
+    /// which removed the `.git`, the `build` and the `out` with the copy.
+    @MainActor
+    func testNamesBackupsLeaveOutDeeperThanTheTopAreKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let deeper: [String: String] = [
+            "section1/Sample App/.git/HEAD": "ref: refs/heads/sample\n",
+            "section1/Sample App/build/app.o": "object\n",
+            "Concepts/Unit 1/out/result.txt": "output\n",
+        ]
+        for (path, text) in deeper {
+            try WholeCourseFixture.write(text, to: fixture.courseURL.appendingPathComponent(path))
+        }
+        try WholeCourseFixture.write("finder\n", to: fixture.courseURL.appendingPathComponent("section1/.DS_Store"))
+        let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
+
+        // As the door runs it, with the course archived first (the zip stands
+        // in for the archive) and the archive begun after every file above.
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL,
+            archiveBegan: Date()
+        )
+
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
+        var expected: [String: Data] = [:]
+        for (path, text) in deeper {
+            expected[path] = Data(text.utf8)
+        }
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "), expected)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// The third case's other half: a page saved while the archive was
+    /// being made may be in it as it was before, so it is kept. MUST FAIL
+    /// on db38ed112.
+    @MainActor
+    func testAPageSavedAfterTheArchiveBeganIsKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let archiveBegan: Date = Date().addingTimeInterval(-1)
+        let page: URL = fixture.courseURL.appendingPathComponent("Concepts/Unit 1/Concept 1.md")
+        try WholeCourseFixture.write("LIVE concept, saved while the archive was made\n", to: page)
+        for path in ["course_config.json", ".obsidian/app.json", "index.md", "section1/All Classes/Unit 1, Day 1.md"] {
+            let older: Date = archiveBegan.addingTimeInterval(-60)
+            try FileManager.default.setAttributes(
+                [.modificationDate: older, .creationDate: older], ofItemAtPath: fixture.courseURL.appendingPathComponent(path).path
+            )
+        }
+
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL,
+            archiveBegan: archiveBegan
+        )
+
+        XCTAssertEqual(
+            try fixture.keptIn(folderStartingWith: "ICS3U not in the archive "),
+            ["Concepts/Unit 1/Concept 1.md": Data("LIVE concept, saved while the archive was made\n".utf8)]
+        )
+    }
+
+    /// The fix review's m-1: a restore of a course that another restore of
+    /// it holds (another copy of Plantoir, at the same moment) is refused
+    /// with nothing written and nothing moved, and the sentence is the one
+    /// for another restore under way; once it lets go, a restore goes
+    /// ahead. MUST FAIL on db38ed112, where both went to their records and
+    /// either could refuse the other.
+    @MainActor
+    func testARestoreAnotherRestoreHoldsIsRefusedWithNothingWritten() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let hold: RestoreSwap.CourseHold = RestoreSwap.holdTheCourse("ICS3U", coursesDirectoryURL: fixture.coursesDirectoryURL)
+        guard case .held = hold else {
+            XCTFail("the hold was not taken: \(hold)")
+            return
+        }
+
+        XCTAssertThrowsError(try CourseRestorer.restoreBackup(try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL)) { error in
+            XCTAssertEqual(error.localizedDescription, RestoreWholeCourseWording.anotherRestoreUnderWay(course: "ICS3U"))
+        }
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live)
+        XCTAssertEqual(fixture.leftInRestoring(), 0, "nothing was written")
+        XCTAssertTrue(fixture.trailText().contains(
+            WholeCourseRestore.DidNotGoAhead.anotherRestore.rawValue + ", asked " + WholeCourseRestore.AskedWhen.whenItBegan.rawValue
+        ), fixture.trailText())
+
+        RestoreSwap.letGo(hold)
+        try CourseRestorer.restoreBackup(
+            try item(fixture), coursesDirectoryURL: fixture.coursesDirectoryURL, archiveURL: fixture.zipURL
+        )
+        XCTAssertEqual(
+            try String(contentsOf: fixture.courseURL.appendingPathComponent("index.md"), encoding: .utf8), "BACKUP front page\n"
+        )
+    }
+
     /// The walk that unlocks the old copy before removing it never follows
     /// a link (the plan review, M7): a locked file in a folder OUTSIDE the
     /// course, reached through a link in the old copy, stays locked and in

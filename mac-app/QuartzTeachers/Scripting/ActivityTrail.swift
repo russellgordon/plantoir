@@ -200,6 +200,14 @@ nonisolated enum ActivityTrail {
         /// backup's file name, what was found and what was done, and any
         /// kept path, never a page.
         case unfinishedRestoreSettled = "unfinished restore settled"
+        /// A WHOLE-course restore that worked kept files in the course's
+        /// backups folder rather than removing them with the copy it set
+        /// aside (#909, the fix review's I-a and I-b, and the third case):
+        /// everything that was in a course folder no archive was made of,
+        /// or the files the archive made first may not hold. Carries the
+        /// course, why, and the path inside the working folder, never a
+        /// page. The teacher is told where; this is the record of it.
+        case courseRestoreKeptFiles = "course restore kept files"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
@@ -1800,6 +1808,19 @@ nonisolated enum ActivityTrail {
              + "some files from the backup and some as they were; the files set aside are kept in " + keptAt
     }
 
+    /// Why a restore that worked kept files (`courseRestoreKeptFiles`).
+    enum KeptBecause: String, Equatable, Sendable {
+        case noArchive = "no archive was made of what was in the course folder, so all of it is kept"
+        case notInTheArchive = "the archive made first may not hold them (changed while it was made, or a kind backups leave out)"
+    }
+
+    /// The words for `courseRestoreKeptFiles`: why, and where. A path,
+    /// never a page.
+    static func courseRestoreKeptFilesLine(keptAt: String, why: KeptBecause) -> String {
+        return "a whole-course restore kept files instead of removing them, because " + why.rawValue
+             + "; they are in " + keptAt
+    }
+
     /// The words for `courseRestoreStoppedPartWay` (#909): what may be
     /// mixed, and where the set-aside files are. A path, never a page.
     static func courseRestoreStoppedPartWayLine(keptAt: String, atTheNextReading: Bool) -> String {
@@ -1853,6 +1874,9 @@ nonisolated enum ActivityTrail {
             line += ": put back as it was"
         case .finish:
             line += ": it had happened, and what was left of it was tidied away"
+            if let keptAt = outcome.keptAt {
+                line += "; what it had set aside is kept in " + keptAt
+            }
         case .remove:
             line += ": it had moved nothing, and was removed"
         case .keep:

@@ -27,17 +27,21 @@ final class WholeCourseRestoreDoorTests: XCTestCase {
     func testRestoreFromBackupsThroughTheMenusEntryPutsTheBackupBack() async throws {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
+        // A page the backup does not have, so "the backup's, byte for byte"
+        // is checked both ways (the fix review's m-2): nothing of the course
+        // as it was is left beside the backup's files.
+        try WholeCourseFixture.write("LIVE only\n", to: fixture.courseURL.appendingPathComponent("Concepts/Made since.md"))
         let workspace: WorkspaceModel = try WholeCourseRestoreDoorTests.openWorkspace(on: fixture)
         let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
 
         await workspace.restoreBackup(try WholeCourseRestoreDoorTests.backup(fixture))
 
         XCTAssertNil(workspace.backupProblem, workspace.backupProblem ?? "")
-        let expected: [String: Data] = fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit)
-        let now: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        for (path, bytes) in expected {
-            XCTAssertEqual(now[path], bytes, "\(path) is not the backup's")
-        }
+        XCTAssertEqual(
+            try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit),
+            "the course is the backup's, every file and nothing else"
+        )
+        XCTAssertFalse(fixture.somethingWasKept(), "the archive holds the course as it was; nothing else is kept")
         XCTAssertEqual(fixture.leftInRestoring(), 0, "nothing is left staged")
         XCTAssertTrue(fixture.trailText().contains("restored ICS3U (ICS3U) from \(fixture.zipURL.lastPathComponent)"), fixture.trailText())
         XCTAssertFalse(fixture.trailText().contains("did not go ahead"), fixture.trailText())
@@ -59,10 +63,12 @@ final class WholeCourseRestoreDoorTests: XCTestCase {
         workspace.restore(archived)
 
         XCTAssertNil(workspace.restoreProblem, workspace.restoreProblem ?? "")
-        let now: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
-        for (path, bytes) in live where path != ".git/HEAD" {
-            XCTAssertEqual(now[path], bytes, "\(path) is not as it was archived")
-        }
+        var archivedFiles: [String: Data] = live
+        archivedFiles[".git/HEAD"] = nil
+        XCTAssertEqual(
+            try WholeCourseFixture.snapshot(of: fixture.courseURL), archivedFiles,
+            "the course is as it was archived, every file and nothing else (an archive leaves out .git)"
+        )
         XCTAssertFalse(RestoreSwap.itemExists(at: archiveURL), "the archive is used up")
         XCTAssertEqual(fixture.leftInRestoring(), 0)
     }
@@ -75,12 +81,22 @@ final class WholeCourseRestoreDoorTests: XCTestCase {
         _ = ReferenceLock.lock(courseDirectory: fixture.courseURL)
         let workspace: WorkspaceModel = try WholeCourseRestoreDoorTests.openWorkspace(on: fixture)
 
+        let liveGit: Data = try Data(contentsOf: fixture.courseURL.appendingPathComponent(".git/HEAD"))
+
         await workspace.restoreBackup(try WholeCourseRestoreDoorTests.backup(fixture))
 
         XCTAssertNil(workspace.backupProblem, workspace.backupProblem ?? "")
-        let page: URL = fixture.courseURL.appendingPathComponent("index.md")
-        XCTAssertEqual(try String(contentsOf: page, encoding: .utf8), "BACKUP front page\n")
-        XCTAssertTrue(ReferenceLock.isLocked(page), "the restored reference course is locked again")
+        // The whole course, both ways (the fix review's m-2: this read one
+        // page), and every page of it locked again.
+        XCTAssertEqual(
+            try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit)
+        )
+        for path in fixture.backupFiles.keys where path.hasSuffix(".md") {
+            XCTAssertTrue(
+                ReferenceLock.isLocked(fixture.courseURL.appendingPathComponent(path)),
+                "\(path): the restored reference course is locked again"
+            )
+        }
     }
 
     // MARK: - Functions: what is said and recorded
@@ -140,21 +156,58 @@ final class WholeCourseRestoreDoorTests: XCTestCase {
         XCTAssertEqual(workspace.backupProblem, "SHOWING ALREADY\n\n" + RestoreWholeCourseWording.didNotFinish(course: "ICS3U"))
     }
 
-    /// I1, the way out: restoring again over a course folder with no
-    /// settings (what a stop leaves) keeps what is in it first, since no
-    /// archive covers a folder the sidebar does not list.
+    /// I1 and the fix review's I-b, the way out: restoring again over a
+    /// course folder with no settings (what a stop leaves) keeps what is in
+    /// it first, since no archive covers a folder the sidebar does not
+    /// list; in a folder named for what it is, not a stop's; and the
+    /// teacher is told where. The confirmation said it "moves to Archived";
+    /// it says what happens. MUST FAIL on db38ed112: no sentence, the
+    /// stop's name, and the Archived paragraph.
     func testRestoringAgainOverAFolderWithNoSettingsKeepsWhatIsInIt() async throws {
         let fixture: WholeCourseFixture = try WholeCourseFixture()
         defer { fixture.tearDown() }
         try FileManager.default.removeItem(at: fixture.courseURL.appendingPathComponent("course_config.json"))
+        try WholeCourseFixture.write("written after the stop\n", to: fixture.courseURL.appendingPathComponent("Concepts/After the stop.md"))
+        var asItWas: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let liveGit: Data? = asItWas[".git/HEAD"]
+        asItWas[".git/HEAD"] = nil
         let workspace: WorkspaceModel = try WholeCourseRestoreDoorTests.openWorkspace(on: fixture)
         XCTAssertNil(WholeCourseRestoreDoorTests.course("ICS3U", in: workspace), "a folder with no settings is not a course")
+        let item: BackupItem = try WholeCourseRestoreDoorTests.backup(fixture)
+        XCTAssertEqual(
+            workspace.wholeCourseRestoreConfirmation(for: item), RestoreWholeCourseWording.confirmKeptWithItsBackups(course: "ICS3U")
+        )
 
-        await workspace.restoreBackup(try WholeCourseRestoreDoorTests.backup(fixture))
+        await workspace.restoreBackup(item)
 
-        XCTAssertNil(workspace.backupProblem, workspace.backupProblem ?? "")
-        XCTAssertEqual(try String(contentsOf: fixture.courseURL.appendingPathComponent("index.md"), encoding: .utf8), "BACKUP front page\n")
-        XCTAssertEqual(try fixture.everythingKept()["index.md"], Data("LIVE front page\n".utf8), "what was in the folder is kept, not deleted")
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), fixture.backupWithWhatIsKeptInPlace(liveGit: liveGit))
+        XCTAssertEqual(try fixture.everythingKept(), asItWas, "everything that was in the folder is kept, and nothing else")
+        let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        let names: [String] = try FileManager.default.contentsOfDirectory(atPath: shelf.path)
+        XCTAssertEqual(names.count, 1)
+        let keptName: String = names.first ?? ""
+        XCTAssertTrue(keptName.hasPrefix("ICS3U as it was before restoring again "), keptName)
+        XCTAssertFalse(keptName.hasPrefix("ICS3U before a restore"), "never the stop's own name")
+        XCTAssertEqual(workspace.backupProblemTitle, RestoreWholeCourseWording.restoredTitle(course: "ICS3U"))
+        XCTAssertEqual(
+            workspace.backupProblem,
+            RestoreWholeCourseWording.keptWhatWasInTheFolder(course: "ICS3U", keptAt: "courses/_backups/ICS3U/" + keptName)
+        )
+        XCTAssertNil(BackupItem.from(fileURL: shelf.appendingPathComponent(keptName), courseCode: "ICS3U"), "it is not a backup")
+        XCTAssertTrue(fixture.trailText().contains("a whole-course restore kept files instead of removing them"), fixture.trailText())
+    }
+
+    /// I-b: the confirmation says what truly happens, by the same test the
+    /// door makes before it archives.
+    func testTheConfirmationSaysWhatHappensToTheCourseAsItIs() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let workspace: WorkspaceModel = try WholeCourseRestoreDoorTests.openWorkspace(on: fixture)
+        let item: BackupItem = try WholeCourseRestoreDoorTests.backup(fixture)
+        XCTAssertEqual(workspace.wholeCourseRestoreConfirmation(for: item), RestoreWholeCourseWording.confirmArchived)
+        try FileManager.default.removeItem(at: fixture.courseURL)
+        workspace.reloadCourses()
+        XCTAssertEqual(workspace.wholeCourseRestoreConfirmation(for: item), RestoreWholeCourseWording.confirmNoCourseFolder(course: "ICS3U"))
     }
 
     // MARK: - Helpers

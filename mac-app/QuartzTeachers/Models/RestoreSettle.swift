@@ -522,15 +522,20 @@ nonisolated enum RestoreSettle {
             guard let record else {
                 return nil
             }
-            let tidied: Bool = RestoreSwap.finishAfterTheCommit(
-                staging: claimed, context: swapContext, hooks: context.hooks
+            // The record says whether the set-aside copy is kept: a crash
+            // between `done` and the keep finishes the keep here (the fix
+            // review's I-a: this passed no keep, and the copy was removed).
+            let finished: RestoreSwap.Finished = RestoreSwap.finishAfterTheCommit(
+                staging: claimed, record: record, coursesDirectoryURL: coursesDirectoryURL,
+                context: swapContext, hooks: context.hooks
             )
-            if !tidied {
+            if !finished.tidied {
                 releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
             }
+            let keptAt: String? = finished.keptWhatWasReplacedAt ?? finished.keptWhatTheArchiveMayNotHoldAt
             return Settled(
                 course: record.course, backup: record.backup, from: source(of: record), found: foundName, action: .finish,
-                says: nil, keptAt: nil, holdsSomethingToOpen: false, newcomersKeptAt: nil
+                says: nil, keptAt: keptAt, holdsSomethingToOpen: keptAt != nil, newcomersKeptAt: nil
             )
         case .putBack:
             guard var record else {
@@ -545,7 +550,25 @@ nonisolated enum RestoreSettle {
                 hooks: context.hooks
             )
             context.afterPuttingBack(record.course)
+            // What the teacher wrote into the backup's folders in the hours
+            // they were in the course went back to staging with them: it is
+            // kept with the newcomers, never removed with staging (the
+            // third case).
+            let everyWrittenFileIsOut: Bool = RestoreSwap.keepWhatWasWrittenIntoTheBackupsItems(
+                record.moves, after: RestoreSwap.writtenAfterMoment(of: record), courseURL: courseURL,
+                coursesDirectoryURL: coursesDirectoryURL,
+                newcomersURL: claimed.appendingPathComponent(RestoreSwap.newcomersName)
+            )
             if back.everyFileIsBack {
+                if !everyWrittenFileIsOut {
+                    // Left with its record for the next reading, which puts
+                    // the rest out; nothing in it is removed.
+                    releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
+                    return Settled(
+                        course: record.course, backup: record.backup, from: source(of: record), found: foundName,
+                        action: .putBack, says: .didNotFinish, keptAt: nil, holdsSomethingToOpen: false, newcomersKeptAt: nil
+                    )
+                }
                 let newcomersAt: String? = RestoreSwap.keepNewcomers(
                     in: claimed, courseCode: record.course,
                     coursesDirectoryURL: coursesDirectoryURL, context: swapContext
@@ -566,7 +589,8 @@ nonisolated enum RestoreSettle {
             }
             let kept: (path: String, holdsSomethingToOpen: Bool) = RestoreSwap.keepTheSetAside(
                 staging: claimed, courseCode: record.course,
-                coursesDirectoryURL: coursesDirectoryURL, context: swapContext
+                coursesDirectoryURL: coursesDirectoryURL, context: swapContext,
+                mayRemoveWhatIsLeft: everyWrittenFileIsOut
             )
             if RestoreSwap.itemExists(at: claimed) {
                 releaseClaim(claimed, claimedRecord: claimedRecord, original: staging, context: context)
@@ -579,10 +603,19 @@ nonisolated enum RestoreSettle {
         case .keep:
             if let record, record.computer == context.computer {
                 // This computer's own: the set-aside copy and any newcomers
-                // go to the backups folder, as a live stop does.
+                // go to the backups folder, as a live stop does, and what was
+                // written into the backup's items first (a stop whose first
+                // try could not move all of it).
+                let everyWrittenFileIsOut: Bool = RestoreSwap.keepWhatWasWrittenIntoTheBackupsItems(
+                    record.moves, after: RestoreSwap.writtenAfterMoment(of: record),
+                    courseURL: coursesDirectoryURL.appendingPathComponent(record.course),
+                    coursesDirectoryURL: coursesDirectoryURL,
+                    newcomersURL: claimed.appendingPathComponent(RestoreSwap.newcomersName)
+                )
                 let kept: (path: String, holdsSomethingToOpen: Bool) = RestoreSwap.keepTheSetAside(
                     staging: claimed, courseCode: record.course,
-                    coursesDirectoryURL: coursesDirectoryURL, context: swapContext
+                    coursesDirectoryURL: coursesDirectoryURL, context: swapContext,
+                    mayRemoveWhatIsLeft: everyWrittenFileIsOut
                 )
                 context.afterPuttingBack(record.course)
                 if RestoreSwap.itemExists(at: claimed) {

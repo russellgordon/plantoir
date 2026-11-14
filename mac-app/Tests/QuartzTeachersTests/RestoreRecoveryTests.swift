@@ -288,6 +288,135 @@ final class RestoreRecoveryTests: XCTestCase {
         _ = try StagedRestore.make(fixture, phase: .unpacking, movesMade: 0, computer: "ANOTHER-COMPUTER")
         XCTAssertEqual(ask(otherThan: own.stagingURL), RestoreSettle.Unsettled.underWay, "another computer's record")
     }
+
+    // MARK: - Functions: nothing removed that is nowhere else (round three)
+
+    /// The fix review's I-a, second case: a crash between `done` and the
+    /// keep. The record says to keep what was replaced, so the next
+    /// reading keeps it, every file byte for byte, and removes nothing.
+    /// MUST FAIL on db38ed112, whose settle passed no keep: 45 of 45 files
+    /// were removed in the harness.
+    @MainActor
+    func testACrashBeforeTheKeepIsKeptAtTheNextReading() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        _ = try StagedRestore.make(
+            fixture, phase: .done, movesMade: Int.max, extraRecordKeys: ["keepsWhatWasReplaced": true]
+        )
+
+        let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+
+        XCTAssertEqual(said, [])
+        XCTAssertEqual(
+            try WholeCourseFixture.snapshot(of: fixture.courseURL),
+            fixture.backupWithWhatIsKeptInPlace(liveGit: live[".git/HEAD"]),
+            "the restore had happened"
+        )
+        let kept: [String: Data] = try fixture.keptIn(folderStartingWith: "ICS3U as it was before restoring again ")
+        var expectedKept: [String: Data] = live
+        expectedKept[".git/HEAD"] = nil
+        XCTAssertEqual(kept, expectedKept, "every file that was in the folder is kept, none removed")
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// The fix review's I-a, first case: the keep fails (the backups folder
+    /// refuses). The copy is NOT removed: the restore has happened, the
+    /// copy waits in staging with its `done` record, and the next reading
+    /// that can keep it does. MUST FAIL on db38ed112, which removed it.
+    @MainActor
+    func testAKeepThatFailsLeavesTheCopyForTheNextReading() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        try FileManager.default.removeItem(at: fixture.courseURL.appendingPathComponent("course_config.json"))
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let shelf: URL = fixture.coursesDirectoryURL.appendingPathComponent("_backups/ICS3U")
+        try FileManager.default.createDirectory(at: shelf, withIntermediateDirectories: true)
+        XCTAssertEqual(chmod(shelf.path, 0o555), 0)
+        defer { _ = chmod(shelf.path, 0o755) }
+
+        let item: BackupItem = try XCTUnwrap(BackupItem.from(fileURL: fixture.zipURL, courseCode: "ICS3U"))
+        try CourseRestorer.restoreBackup(item, coursesDirectoryURL: fixture.coursesDirectoryURL)
+
+        XCTAssertEqual(chmod(shelf.path, 0o755), 0)
+        XCTAssertEqual(fixture.leftInRestoring(), 1, "the copy waits in staging")
+        var waiting: [String: Data] = [:]
+        let restoring: URL = RestoreSwap.restoringFolder(fixture.coursesDirectoryURL)
+        for name in try FileManager.default.contentsOfDirectory(atPath: restoring.path) {
+            waiting = try WholeCourseFixture.snapshot(of: restoring.appendingPathComponent(name).appendingPathComponent("as-it-was"))
+        }
+        var expected: [String: Data] = live
+        expected[".git/HEAD"] = nil
+        XCTAssertEqual(waiting, expected, "nothing of the folder was removed")
+
+        // The next reading, once this process is gone and the folder takes it.
+        try StagedRestore.giveTheRecordAGoneOwner(in: fixture)
+        _ = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+        XCTAssertEqual(try fixture.keptIn(folderStartingWith: "ICS3U as it was before restoring again "), expected)
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// The third case: a crash mid-swap leaves the backup's folders in the
+    /// course; a page is added to one and a backup page edited before the
+    /// next reading. The way back carries them to staging, and they are
+    /// kept with the newcomers, never removed with it. MUST FAIL on
+    /// db38ed112, which removed both (the harness: 3 of 5 and 3 of 5).
+    @MainActor
+    func testAPageWrittenIntoTheBackupsFolderAfterACrashIsKept() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let writtenAfter: Date = Date()
+        _ = try StagedRestore.make(
+            fixture, phase: .swapping, movesMade: Int.max,
+            extraRecordKeys: ["writtenAfter": RestoreSettle.momentText(writtenAfter)]
+        )
+        let folder: URL = fixture.courseURL.appendingPathComponent("section1/All Classes")
+        let edited: URL = folder.appendingPathComponent("Unit 1, Day 1.md")
+        XCTAssertEqual(try String(contentsOf: edited, encoding: .utf8), "BACKUP class\n")
+        let added: URL = folder.appendingPathComponent("Written after the crash.md")
+        try WholeCourseFixture.write("written in Obsidian\n", to: added)
+        try WholeCourseFixture.write("BACKUP class, edited in Obsidian\n", to: edited)
+        // Written an hour later, as a teacher would: well past the zip's own
+        // times, which a zip a test has just made cannot be.
+        let later: Date = writtenAfter.addingTimeInterval(3_600)
+        try FileManager.default.setAttributes([.modificationDate: later], ofItemAtPath: added.path)
+        try FileManager.default.setAttributes([.modificationDate: later], ofItemAtPath: edited.path)
+
+        let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live, "put back as it was")
+        let kept: [String: Data] = try fixture.keptIn(folderStartingWith: "ICS3U made while a restore was unfinished ")
+        XCTAssertEqual(kept["section1/All Classes/Written after the crash.md"], Data("written in Obsidian\n".utf8))
+        XCTAssertEqual(kept["section1/All Classes/Unit 1, Day 1.md"], Data("BACKUP class, edited in Obsidian\n".utf8))
+        XCTAssertEqual(kept.count, 2, "only what was written is kept, never the backup's untouched files")
+        XCTAssertEqual(said.count, 1)
+        XCTAssertTrue(said.first?.contains(RestoreWholeCourseWording.didNotFinish(course: "ICS3U")) == true, said.first ?? "")
+        XCTAssertTrue(said.first?.contains("Files made in ICS3U while the restore was unfinished") == true, said.first ?? "")
+        XCTAssertEqual(fixture.leftInRestoring(), 0)
+    }
+
+    /// The same way back with nothing written: the backup's own files,
+    /// unpacked from a zip made a moment ago (whose times can be two
+    /// seconds ahead), are never taken for a teacher's.
+    @MainActor
+    func testTheBackupsUntouchedFilesAreNeverTakenForWrittenOnes() throws {
+        let fixture: WholeCourseFixture = try WholeCourseFixture()
+        defer { fixture.tearDown() }
+        let live: [String: Data] = try WholeCourseFixture.snapshot(of: fixture.courseURL)
+        let writtenAfter: String = RestoreSwap.writtenAfterMoment(
+            swapping: RestoreSettle.momentText(Date()), zipURL: fixture.zipURL
+        )
+        _ = try StagedRestore.make(
+            fixture, phase: .swapping, movesMade: Int.max, extraRecordKeys: ["writtenAfter": writtenAfter]
+        )
+
+        let said: [String] = WholeCourseRestore.settleUnfinishedRestores(in: fixture.coursesDirectoryURL)
+
+        XCTAssertEqual(try WholeCourseFixture.snapshot(of: fixture.courseURL), live)
+        XCTAssertEqual(said, [RestoreWholeCourseWording.didNotFinish(course: "ICS3U")])
+        XCTAssertFalse(fixture.somethingWasKept())
+    }
 }
 
 /// The on-disk state a kill leaves part way through a whole-course restore.
@@ -310,7 +439,8 @@ struct StagedRestore {
         computer: String = SharedMediaStore.thisComputer,
         writtenAt: Date = Date(),
         from source: RestoreSwap.Source = RestoreSwap.Source.backups,
-        owner: String? = nil
+        owner: String? = nil,
+        extraRecordKeys: [String: Any] = [:]
     ) throws -> StagedRestore {
         let fileManager: FileManager = FileManager.default
         let staging: URL = RestoreSwap.restoringFolder(fixture.coursesDirectoryURL).appendingPathComponent(UUID().uuidString)
@@ -338,6 +468,18 @@ struct StagedRestore {
             writtenAt: RestoreSettle.momentText(writtenAt)
         )
         try RestoreSwap.writeRecord(record, to: staging.appendingPathComponent(RestoreSwap.recordName), flushes: false)
+        if !extraRecordKeys.isEmpty {
+            // Written as keys of the file, as file-formats.json -> restoreRecord
+            // names them, so a reader that does not know one ignores it.
+            let recordURL: URL = staging.appendingPathComponent(RestoreSwap.recordName)
+            var written: [String: Any] = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: try Data(contentsOf: recordURL)) as? [String: Any]
+            )
+            for (key, value) in extraRecordKeys {
+                written[key] = value
+            }
+            try JSONSerialization.data(withJSONObject: written, options: [.sortedKeys]).write(to: recordURL)
+        }
         var made: Int = 0
         for move in moves where made < movesMade {
             let to: URL = RestoreSwap.absolute(move.to, in: fixture.coursesDirectoryURL)
@@ -346,6 +488,18 @@ struct StagedRestore {
             made += 1
         }
         return StagedRestore(stagingURL: staging, moves: moves)
+    }
+
+    /// Rewrites every record in the fixture's staging folders so its owner
+    /// is a process that has finished, as it is after a quit.
+    static func giveTheRecordAGoneOwner(in fixture: WholeCourseFixture) throws {
+        let restoring: URL = RestoreSwap.restoringFolder(fixture.coursesDirectoryURL)
+        for name in try FileManager.default.contentsOfDirectory(atPath: restoring.path) {
+            let recordURL: URL = restoring.appendingPathComponent(name).appendingPathComponent(RestoreSwap.recordName)
+            var record: RestoreSwap.Record = try XCTUnwrap(RestoreSwap.readRecord(at: recordURL))
+            record.owner = try goneOwner()
+            try RestoreSwap.writeRecord(record, to: recordURL, flushes: false)
+        }
     }
 
     /// The lease body of a process that has finished: `/usr/bin/true`, run

@@ -1710,9 +1710,12 @@
       "computer": "the computer that wrote it: the mac's hardware UUID, Windows' MachineGuid (sharedMediaStore's computer)",
       "owner": "the writer's lease body (workLease.lines 1 to 4), so a reader judges it with workLeases.liveness",
       "writtenAt": "ISO 8601 with fractional seconds, UTC",
-      "journalStep": "null; Undo (#899, U5) fills it with its journal step"
+      "journalStep": "null; Undo (#899, U5) fills it with its journal step",
+      "keepsWhatWasReplaced": "true when the set-aside copy is to be KEPT in courses/_backups/<CODE>/<CODE> as it was before restoring again <stamp> after the commit rather than removed: no archive was made of a course folder that is there. Written in the first record, so a settle that finds done keeps it too (the #909 fix review's I-a). Absent or false: removed, after keeping what the archive may not hold (course-management.json -> backups.restoreWholeCourse.keptFolders).",
+      "archiveBegan": "ISO 8601 with fractional seconds, UTC: when the archive made first began, or absent when none was. A file of the set-aside copy Finder shows that was made or changed at or after it is kept rather than removed (keptFolders.notInTheArchive).",
+      "writtenAfter": "ISO 8601 with fractional seconds, UTC, written with phase swapping and kept after it: the moment the record went to swapping, or the backup zip's modification time plus two seconds when that is later. A file of the backup's items with a time later than it was written while they were in the course, and a way back keeps it (keptFolders.writtenIntoTheBackupsItems). Absent (a record an older build wrote): nothing is judged written."
     },
-    "absentKeys": "from, archive and journalStep may be absent rather than null (the mac leaves out a key with no value); a reader treats an absent key as null, and ignores a key it does not know.",
+    "absentKeys": "from, archive, journalStep, keepsWhatWasReplaced, archiveBegan and writtenAfter may be absent rather than null (the mac leaves out a key with no value); a reader treats an absent key as null (false for keepsWhatWasReplaced), and ignores a key it does not know.",
     "flush": "Written to .restore.json.tmp, flushed past the disk's cache (F_FULLFSYNC on the mac, FileStream.Flush(true) on Windows), renamed over restore.json, and the folder flushed, before the step it names: unpacking before the unpack, swapping before the first move, done before anything is removed. A power cut leaves the old record or the new one, never half of one.",
     "example": {
       "version": 1,
@@ -1737,7 +1740,9 @@
       "computer": "0B8E5A1C-1111-2222-3333-444455556666",
       "owner": "4321\nPlantoir\n2026-11-14T08:12:03.1000000Z\nThu Nov 14 08:01:00 2026\n",
       "writtenAt": "2026-11-14T13:12:03.120Z",
-      "journalStep": null
+      "journalStep": null,
+      "archiveBegan": "2026-11-14T13:11:51.004Z",
+      "writtenAfter": "2026-11-14T13:12:03.120Z"
     }
   },
   "sharedMediaStore": {

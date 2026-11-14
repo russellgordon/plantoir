@@ -95,6 +95,49 @@ nonisolated enum RestoreWholeCourseWording {
         return "To put it right, restore a backup of \(course) again: what is in its folder now is kept first, not deleted."
     }
 
+    /// The title of the alert a restore that worked shows when it kept
+    /// files (`keptWhatWasInTheFolder`, `keptWhatTheArchiveMayNotHold`).
+    static func restoredTitle(course: String) -> String {
+        return "\(course) is restored"
+    }
+
+    /// After a restore over a course folder no archive was made of (the fix
+    /// review's I-b): where what was in it went. Kept as the one-section
+    /// restore's set-aside folders are, in the course's backups folder until
+    /// the teacher deletes it.
+    static func keptWhatWasInTheFolder(course: String, keptAt: String) -> String {
+        return "What was in the \(course) folder before the restore is kept in the folder \"\(keptAt)\" inside your "
+             + "working folder. Plantoir never deletes it: delete it yourself once you no longer need it."
+    }
+
+    /// After a restore that worked, when files of the course as it was may
+    /// not be in the archive made first (the third case).
+    static func keptWhatTheArchiveMayNotHold(course: String, keptAt: String) -> String {
+        return "Some files that were in \(course) may not be in the copy that moved to Archived, because they changed "
+             + "while that copy was being made or are of a kind backups leave out. They are kept in the folder "
+             + "\"\(keptAt)\" inside your working folder."
+    }
+
+    /// The confirmation's last word on what happens to the course as it is,
+    /// when it is a course the sidebar lists, so it is archived first: the
+    /// paragraph the confirmation has always had, byte for byte.
+    static let confirmArchived: String =
+        "Nothing is lost, though: the version you have right now moves to Archived, at the bottom of the sidebar, where you can get it back."
+
+    /// The confirmation's last word on what happens to the course as it is,
+    /// when no archive will be made because the folder is not a course the
+    /// sidebar lists (the fix review's I-b: it said the version moves to
+    /// Archived, and nothing was archived).
+    static func confirmKeptWithItsBackups(course: String) -> String {
+        return "Nothing is lost, though: what is in the \(course) folder now is kept in a folder of its own with its "
+             + "backups, and you are told where once the restore is done."
+    }
+
+    /// The same, when there is no course folder at all.
+    static func confirmNoCourseFolder(course: String) -> String {
+        return "There is no \(course) folder now, so nothing is replaced."
+    }
+
     static func didNotFinish(course: String) -> String {
         return "The restore of \(course) from a backup did not finish, so \(course) was left as it was. "
              + "The backup is still in Backups, and you can restore it again."

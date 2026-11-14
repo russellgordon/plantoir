@@ -2841,6 +2841,10 @@ class WorkspaceModel {
             // the course folder, which is the vault — keeps up instead of
             // showing stale files until the vault is reopened.
             var archiveURL: URL?
+            // The moment the archive begins: a file of the course written
+            // after it may not be in the archive, so the restore keeps it
+            // rather than removing it with the copy it sets aside.
+            let archiveBegan: Date = Date()
             for course in courses {
                 if course.code == item.courseCode {
                     archiveURL = try await CourseArchiver.archiveCourse(
@@ -2867,10 +2871,11 @@ class WorkspaceModel {
             // immediately before anything moves (#909 plan review, M3): the
             // unpack takes seconds on a slow disk, minutes from a backup the
             // cloud has to download first.
-            try CourseRestorer.restoreBackup(
+            let restored: RestoreSwap.Restored = try CourseRestorer.restoreBackup(
                 item,
                 coursesDirectoryURL: coursesDirectoryURL,
                 archiveURL: archiveURL,
+                archiveBegan: archiveURL == nil ? nil : archiveBegan,
                 beforeTheSwap: { (ownStaging: URL) throws in
                     // This restore's own record is written by now: it is
                     // passed so the refusal counts every record but it (the
@@ -2904,6 +2909,13 @@ class WorkspaceModel {
                     coursesDirectoryURL: coursesDirectoryURL
                 )
             )
+            // What it kept is said once, where it is (the fix review's
+            // I-b: a course folder no archive was made of went to a folder
+            // nothing listed or named).
+            if let kept = WholeCourseRestore.sentenceForWhatWasKept(restored, courseCode: item.courseCode) {
+                backupProblemTitle = RestoreWholeCourseWording.restoredTitle(course: item.courseCode)
+                backupProblem = kept
+            }
         } catch {
             backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = error.localizedDescription
@@ -2913,6 +2925,25 @@ class WorkspaceModel {
         selection = nil
         reloadCourses()
         selection = SidebarSelection.course(item.courseCode)
+    }
+
+    /// The confirmation's last paragraph for a whole-course restore of
+    /// `item`, saying what truly happens to the course as it is: archived
+    /// when it is a course the sidebar lists (the same test the restore
+    /// makes before it archives); kept with its backups when the folder is
+    /// there but is not one (the fix review's I-b); nothing replaced when
+    /// there is no folder.
+    func wholeCourseRestoreConfirmation(for item: BackupItem) -> String {
+        for course in courses {
+            if course.code == item.courseCode {
+                return RestoreWholeCourseWording.confirmArchived
+            }
+        }
+        if let coursesDirectoryURL,
+           RestoreSwap.itemExists(at: coursesDirectoryURL.appendingPathComponent(item.courseCode)) {
+            return RestoreWholeCourseWording.confirmKeptWithItsBackups(course: item.courseCode)
+        }
+        return RestoreWholeCourseWording.confirmNoCourseFolder(course: item.courseCode)
     }
 
     /// Why a whole-course restore of this course may not go on now, as the
