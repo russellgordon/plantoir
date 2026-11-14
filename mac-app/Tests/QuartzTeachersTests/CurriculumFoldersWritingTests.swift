@@ -8,6 +8,17 @@ import XCTest
 @MainActor
 final class CurriculumFoldersWritingTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    /// A course with two curriculum folders, Ontario's and College Board's,
+    /// as courses made before 2.0.0 have them (the wizard offered this list
+    /// until #891 removed the switch that chose it).
+    static let twoCurriculaFolders: [String] = [
+        "Concepts", "Discussions", "Examples", "Exercises",
+        "Ontario Curriculum", "College Board Curriculum", "Portfolios",
+        "Recaps", "Setup", "Style", "Tasks", "Tutorials",
+    ]
+
     // MARK: - Functions
 
     private func configuration(_ values: [String: Any]) -> CourseConfiguration {
@@ -53,7 +64,7 @@ final class CurriculumFoldersWritingTests: XCTestCase {
     /// folder — so every earlier path writes the file it always wrote.
     func testAWizardWhoseListWasNotTouchedWritesNothing() {
         let wizard: NewCourseWizardView = NewCourseWizardView(
-            courseCode: "ICS3U", sharedFolders: WizardDefaults.lcsSharedFolders
+            courseCode: "ICS3U", sharedFolders: CurriculumFoldersWritingTests.twoCurriculaFolders
         )
         let written: [String: Any] = wizard.buildConfigurationDictionary(code: "ICS3U", name: "Computer Science")
         XCTAssertNil(written["curriculum_folders"])
@@ -66,7 +77,7 @@ final class CurriculumFoldersWritingTests: XCTestCase {
         let wizard: NewCourseWizardView = NewCourseWizardView(
             prepopulatesExampleContent: false,
             startsFromSkeleton: false,
-            sharedFolders: WizardDefaults.lcsSharedFolders,
+            sharedFolders: CurriculumFoldersWritingTests.twoCurriculaFolders,
             curriculumFolderTicks: ["Ontario Curriculum", "College Board Curriculum", "A Folder Since Removed"]
         )
         let written: [String: Any] = wizard.buildConfigurationDictionary(code: "ZZZ9Z", name: "Test")

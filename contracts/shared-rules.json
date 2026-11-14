@@ -11325,39 +11325,32 @@
     "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
     "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test.",
     "skeletonToggle": {
-      "rule": "A skeleton is OFFERED for a course code when a family exists for its prefix AND the teacher is not taking the example content written for that code. One question, in one function — SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:) on the mac, SkeletonCatalog.HasSkeleton on Windows — because three surfaces ask it: the toggle's own visibility, what the structure editor adopts, and the use_skeleton key in course_config.json. A code with ready-made pages therefore has a skeleton too, and gets it the moment those pages are turned down.\n\nAnd then: the structure editor must show what will actually be created, in BOTH directions. Turning \"Start from a <subject> skeleton\" ON adopts that subject's five lists. Turning it OFF puts the defaults back — the LCS variants for the two SHARED lists when the terminology switch is on, the plain defaults for the two per-section lists, which have no LCS variant — for each list still EQUAL to what the adoption put there, and leaves every other list exactly as the teacher left it. The marks pool is the one exception to that last clause, and why is in (4) below: a pool the teacher ticked is kept, but narrowed to the folders the course will actually have, since a pool naming a folder that has just left the editor is a silent loss of marks rather than a choice. With no adoption to compare against, nothing changes at all.\n\nThe example-content toggle moves the editor exactly as the skeleton toggle does, in both directions: turning example content OFF adopts (the skeleton it has just revealed), turning it back ON restores. A teacher who changes their mind must get the file they would have got without changing it.",
-      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate. (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) The LCS switch REWRITES the two shared lists, so flipping it after an adoption leaves them unequal to the snapshot and they stay as the switch left them, while the per-section lists still go back. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (The wizard's pool is the only net: since GitHub issue #192 setup_course.py writes a saved pool back as it was rather than reconciling it again — gradedFolders.rerunningSetup — so a wizard that wrote something untrue would leave it in the file.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.\n\nA fifth consequence, added 2026-09-21 with the first half of the rule above (GitHub issue #248). Both apps asked \"is there example content for this code?\" rather than \"is the teacher taking it?\", so for all 38 codes with a payload the toggle was never shown, nothing was ever adopted, and use_skeleton was written false whatever the teacher chose. MEASURED by driving the real scripts/setup_course.py through a pty: ICS4U created that way holds 18 .md files; the same code with use_skeleton true holds 47, and the tree and the config are byte-identical to what ICS2O — same family, no payload — has always got. The Python needed no change at all, find_skeleton_dir having never looked at payloads; the whole fault was the two apps, which is exactly the shape of drift this file exists to catch, and it stood for five weeks (091a23dc, 2026-08-13) because nothing here asked the question in the teacher's terms. REJECTED while fixing it: a third \"empty folders\" sentence covering all three situations at once, which would have reworded what ~1,900 codes read; and anything retroactive for courses already created this way — Russell's call, 2026-09-21, having deleted and remade the one course it affected.\n\nA sixth consequence, 2026-09-22 (GitHub issue #251), and it REVERSES a rejection recorded here the day before. #248 also rejected a curriculum-pages toggle for a skeleton that ships a Curriculum folder, on the ground that the fixed and control runs produce identical trees, so adding one would make a payload code behave unlike its own family. Half of that is still right: for the ~1,900 codes with no payload there is nothing to include, and the toggle decides nothing. It was wrong for the 38 that HAVE one — the expectations written for their code exist, the teacher declined the lessons rather than the curriculum, and behaving like its own family is precisely what makes their course wrong. So a payload code that declines its ready-made pages now gets the subject's skeleton WITH the payload's curriculum expectations installed into it, and the three curriculum answers written as they are for a payload course. MEASURED: ICS4U went from 2 curriculum pages — a generic index and a placeholder expectation called A1.1 reading \"DELETE THIS PAGE\" — to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O, which has no payload, stayed at 2. The key that says so is expectSavedIncludeCurriculumPages on the payload cases below.",
+      "rule": "A skeleton is OFFERED for a course code when a family exists for its prefix AND the teacher is not taking the example content written for that code. One question, in one function — SkeletonCatalog.hasSkeleton(forCode:takingExampleContent:) on the mac, SkeletonCatalog.HasSkeleton on Windows — because three surfaces ask it: the toggle's own visibility, what the structure editor adopts, and the use_skeleton key in course_config.json. A code with ready-made pages therefore has a skeleton too, and gets it the moment those pages are turned down.\n\nAnd then: the structure editor must show what will actually be created, in BOTH directions. Turning \"Start from a <subject> skeleton\" ON adopts that subject's five lists. Turning it OFF puts the defaults back for each list still EQUAL to what the adoption put there, and leaves every other list exactly as the teacher left it. The marks pool is the one exception to that last clause, and why is in (4) below: a pool the teacher ticked is kept, but narrowed to the folders the course will actually have, since a pool naming a folder that has just left the editor is a silent loss of marks rather than a choice. With no adoption to compare against, nothing changes at all.\n\nThe example-content toggle moves the editor exactly as the skeleton toggle does, in both directions: turning example content OFF adopts (the skeleton it has just revealed), turning it back ON restores. A teacher who changes their mind must get the file they would have got without changing it.",
+      "why": "Russell's decision for Windows, 2026-09-06, copied to the mac 2026-09-18 (issue #77). A one-way adoption was this feature's bug in miniature: a teacher who typed SNC4M, watched Investigations and Concepts appear and then turned the toggle off was shown — and got — the science skeleton's folders with none of its pages, while the file said use_skeleton: false. A wizard that lies about what it is about to make is a worse product than one that never asked.\n\nFour consequences, each deliberate (three since #891). (1) A list is recognised as untouched by VALUE, not by a dirty flag: a list edited and then edited BACK to exactly what the adoption set is restored along with the untouched ones, and that is intended — a teacher cannot see the difference between a list they never touched and one they have put back, so neither can the rule. (2) Until 2.0.0 a terminology switch rewrote the two shared lists, so flipping it after an adoption left them unequal to the snapshot; the switch was removed in #891, with its two cases. (3) With no snapshot — the toggle turned off before any code was typed, or on a code whose skeleton was never adopted — NOTHING changes, rather than the defaults being forced over lists the teacher may have edited first. (4) The marks pool can never name a folder that has just left the editor, and that takes TWO rules rather than one: a pool still equal to the adoption's is RE-INFERRED over the restored folders, and a pool the teacher has ticked themselves is kept but NARROWED to the folders the course will actually have. Miss the second and a teacher who adopted the mathematics skeleton, unticked Tasks and then declined the skeleton is shown a checklist with nothing ticked while the wizard writes graded_folders naming Thinking Tasks, a folder the course does not have — and the two apps then write DIFFERENT files for the same clicks, which is what this contract exists to stop. (The wizard's pool is the only net: since GitHub issue #192 setup_course.py writes a saved pool back as it was rather than reconciling it again — gradedFolders.rerunningSetup — so a wizard that wrote something untrue would leave it in the file.) The two apps reach the same answer from opposite ends: the mac narrows the pool inside the restore, Windows leaves it and narrows on every read (CurrentGradedFolders) and again when the file is written.\n\nRejected: tracking a dirty flag per list (a flag has to be got right in every editing path, and gets one wrong the first time a list is changed from somewhere new, where value equality cannot); and a further rule for the narrow hole value equality leaves, which would have made the two apps differ for a case no teacher can tell apart.\n\nA fifth consequence, added 2026-09-21 with the first half of the rule above (GitHub issue #248). Both apps asked \"is there example content for this code?\" rather than \"is the teacher taking it?\", so for all 38 codes with a payload the toggle was never shown, nothing was ever adopted, and use_skeleton was written false whatever the teacher chose. MEASURED by driving the real scripts/setup_course.py through a pty: ICS4U created that way holds 18 .md files; the same code with use_skeleton true holds 47, and the tree and the config are byte-identical to what ICS2O — same family, no payload — has always got. The Python needed no change at all, find_skeleton_dir having never looked at payloads; the whole fault was the two apps, which is exactly the shape of drift this file exists to catch, and it stood for five weeks (091a23dc, 2026-08-13) because nothing here asked the question in the teacher's terms. REJECTED while fixing it: a third \"empty folders\" sentence covering all three situations at once, which would have reworded what ~1,900 codes read; and anything retroactive for courses already created this way — Russell's call, 2026-09-21, having deleted and remade the one course it affected.\n\nA sixth consequence, 2026-09-22 (GitHub issue #251), and it REVERSES a rejection recorded here the day before. #248 also rejected a curriculum-pages toggle for a skeleton that ships a Curriculum folder, on the ground that the fixed and control runs produce identical trees, so adding one would make a payload code behave unlike its own family. Half of that is still right: for the ~1,900 codes with no payload there is nothing to include, and the toggle decides nothing. It was wrong for the 38 that HAVE one — the expectations written for their code exist, the teacher declined the lessons rather than the curriculum, and behaving like its own family is precisely what makes their course wrong. So a payload code that declines its ready-made pages now gets the subject's skeleton WITH the payload's curriculum expectations installed into it, and the three curriculum answers written as they are for a payload course. MEASURED: ICS4U went from 2 curriculum pages — a generic index and a placeholder expectation called A1.1 reading \"DELETE THIS PAGE\" — to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O, which has no payload, stayed at 2. The key that says so is expectSavedIncludeCurriculumPages on the payload cases below.",
       "whoRunsIt": "The mac runs every case below in SharedRulesContractTests as of 2026-09-18; WizardStructureTests covers what the cases cannot reach — the pieces the rule is assembled from, and a scan proving the toggle is WIRED, since a control with no handler was the original bug and no test that calls the handler itself can see one. Nothing on Windows reads this key yet — their suite stays GREEN until it is wired in, and as of 2026-09-21 their behaviour is NO LONGER the one described here: SkeletonCatalog.HasSkeleton returns false for any code with example content, and their own SkeletonCatalogTests.HasSkeletonReturnsFalseWhenExampleContentExists asserts that against itself and passes. So what Windows owes is the behaviour AND the test, and the seam to run the cases against (their restore lives inside the private NewCourseDialog.RestoreGenericStructure). The line that WILL go red on their side is ContractTests.SharedRules_ActivityTrailEvents_Exist, over the \"course created\" event added to activityTrail.mustRecord in the same piece — deliberately, because an unrun case is a request nobody reads and a red suite naming the issue is one somebody answers.",
       "courseCode": "SNC4M",
       "otherCourseCode": "AMU3M",
       "lists": {
-        "note": "Two of the five slots cannot tell one answer from another for most codes, which is worth knowing before reading a green run as coverage: every bundled family ships per_section_folders of exactly [\"All Classes\"], which is also the factory default, so only perSectionFILES proves the per-section half of a restore; and every family declares graded_folders of [\"Tasks\"] except MATHEMATICS ([\"Thinking Tasks\", \"Tasks\"]), so a marks-pool expectation means nothing unless its case uses a mathematics code. The cases below that carry courseCode MPM1D are there for exactly that reason. A third thing not to read as coverage: in a runner that resolves the skeleton symbol through the same catalog an adoption copies from, a turnOn case's four list expectations prove that the adoption FIRED rather than what it copied — which is why the MPM1D adoption case spells its marks pool out. The factory values of the five lists follow, so a case can say \"the defaults\" without either app retyping them. BOTH suites must assert these arrays EQUAL their own WizardDefaults constants — that is what stops the vocabulary drifting away from the thing it names, and without it a case could pass against a contract that no longer describes the product. The per-section lists have NO LCS variant, the terminology switch rewriting only the two shared ones, so \"lcs\" carries two arrays rather than four. scripts/setup_course.py keeps its own copies for the command-line wizard and they are deliberately NOT pinned here: the Python's shared-folder lists also carry \"Media\", which both apps leave out because the toolchain manages that folder itself, so an equality test would be asserting a difference that is correct.",
+        "note": "Two of the five slots cannot tell one answer from another for most codes, which is worth knowing before reading a green run as coverage: every bundled family ships per_section_folders of exactly [\"All Classes\"], which is also the factory default, so only perSectionFILES proves the per-section half of a restore; and every family declares graded_folders of [\"Tasks\"] except MATHEMATICS ([\"Thinking Tasks\", \"Tasks\"]), so a marks-pool expectation means nothing unless its case uses a mathematics code. The cases below that carry courseCode MPM1D are there for exactly that reason. A third thing not to read as coverage: in a runner that resolves the skeleton symbol through the same catalog an adoption copies from, a turnOn case's four list expectations prove that the adoption FIRED rather than what it copied — which is why the MPM1D adoption case spells its marks pool out. The factory values of the five lists follow, so a case can say \"the defaults\" without either app retyping them. BOTH suites must assert these arrays EQUAL their own WizardDefaults constants — that is what stops the vocabulary drifting away from the thing it names, and without it a case could pass against a contract that no longer describes the product. Until #891 (2.0.0) a second set of shared lists stood beside these for a terminology switch; it went with the switch. scripts/setup_course.py keeps its own copies for the command-line wizard and they are deliberately NOT pinned here: the Python's shared-folder lists also carry \"Media\", which both apps leave out because the toolchain manages that folder itself, so an equality test would be asserting a difference that is correct.",
         "factory": {
           "sharedFolders": ["Concepts", "Discussions", "Examples", "Exercises", "Ontario Curriculum", "Portfolios", "Recaps", "Setup", "Style", "Tasks", "Tutorials"],
           "sharedFiles": ["Extra Help.md", "Learning Goals.md"],
           "perSectionFolders": ["All Classes"],
           "perSectionFiles": ["Private Notes.md", "Scratch Page.md", "Key Links.md"]
-        },
-        "lcs": {
-          "sharedFolders": ["Concepts", "Discussions", "Examples", "Exercises", "Ontario Curriculum", "College Board Curriculum", "Portfolios", "Recaps", "Setup", "Style", "Tasks", "Tutorials"],
-          "sharedFiles": ["SIC Drop-In Sessions.md", "Grove Time.md", "Learning Goals.md"]
         }
       },
       "symbols": {
         "note": "What a list value in a case's given or expect means. A literal array means itself — used for a teacher's own edit, which belongs to nobody's constants.",
         "factory": "The lists.factory array for that slot.",
-        "lcs": "The lists.lcs array for that slot. Valid for the two SHARED lists only.",
         "skeleton": "The family's own array for that slot, resolved through each app's SkeletonCatalog from support/skeletons/<family>/manifest.json for courseCode — NEVER a literal copy here, because the skeletons are GENERATED (.claude/skills/example-content/generate_skeletons.py writes ~1,950 pages across 50 families) and a copy would be a fixture nobody regenerates. In the gradedFolders slot it means what an adoption sets: the manifest's own graded_folders where it names any, and otherwise the historical rule over the family's own folders — SkeletonCatalog.adoptedGradedFolders on the mac, SkeletonCatalog.AdoptedGradedFolders on Windows.",
-        "skeletonReversed": "The same family array, reversed. Stands for a list a teacher emptied and typed back in a different order: the same names, so a dirty flag would call it untouched, and a different value, so this rule leaves it alone.",
-        "lcsFlippedFromSkeleton": "What the terminology switch leaves behind when it is flipped ON over the family's own list — switchingFactoryItems(in: skeleton, toFactory: lcs, fromFactory: factory) on the mac, SwitchingFactoryItems on Windows. Valid for the two SHARED lists only. Computed rather than written out, so a change to a generated skeleton cannot rot the case."
+        "skeletonReversed": "The same family array, reversed. Stands for a list a teacher emptied and typed back in a different order: the same names, so a dirty flag would call it untouched, and a different value, so this rule leaves it alone."
       },
-      "howToRunACase": "Start with given.lists, a snapshot of what an adoption of given.courseCode (or the courseCode above) would set when given.hasSnapshot is true and no snapshot otherwise, the terminology switch at given.usesLCSTerminology, and the toggle itself ON, which is where a new wizard opens. Apply each step in order, each step regardless of what the one before it left the toggle at — a case may open with turnOn on a fixture that has no snapshot, which is a state a real wizard reaches only by other means and is written this way to say what an adoption does from the factory defaults. turnOn adopts unless the teacher's shared folders say the list has been edited (SkeletonCatalog.structureToAdopt / StructureToAdopt, which is the rule that predates this one), recording a fresh snapshot when it does. turnOff restores as the rule above says and then forgets the snapshot. typeAnotherCode is the teacher editing the course-code field to otherCourseCode — a code in a different family — which adopts only while the toggle is ON: the guard in adoptSkeletonStructure / AdoptSkeletonStructure, without which a teacher who declined the skeleton and then corrected a typo in the code is given it back. Be honest about what that case proves: a runner implements the guard itself, so the case pins the RULE and not your app's wiring — deleting the guard from the product leaves it green. Each platform owes its own check that its real adopt entry point reads the toggle (the mac's is a source scan in WizardStructureTests). Compare all five lists with expect. Build each case's fixture on its own: a cache shared between cases would let one case's adoption answer another's.\n\ngiven.takesExampleContent is where the example-content toggle starts, and ABSENT MEANS TRUE — which is where a new wizard opens and which leaves every case written before 2026-09-21 meaning exactly what it meant. A runner must tolerate its absence rather than require it. It is the second half of every adoption question: a case whose courseCode has ready-made pages still resolves a family by prefix, since the prefix map knows nothing about payloads, but nothing is adopted for it WHILE takesExampleContent is true — and everything is adopted for it once that is false, which is the whole of issue #248.\n\nTwo more steps, the two halves of the example-content toggle. declineExampleContent sets takesExampleContent to FALSE and then adopts for given.courseCode (not otherCourseCode — this is the same course, being offered its subject's shape instead of its ready-made pages) reading the same skeletonIsWanted guard turnOn and typeAnotherCode read: a teacher who declined the skeleton and then declined the example content must not have the skeleton handed back. takeExampleContent sets it to TRUE and then restores exactly as turnOff restores, forgetting the snapshot. Three states they reach together are worth saying out loud, because both apps must write the same file in each: a list the teacher EDITED after declining is left alone by the restore, so it travels into a course that is taking ready-made pages (harmless — setup_course.py's example branch overrides the structure and reconciles the marks pool, MEASURED — but the two apps must agree on it); flipping the terminology switch between the two leaves the two shared lists as the switch left them, by consequence (2) above; and a second decline after the skeleton was declined adopts NOTHING, the teacher's choice being remembered, with noStartingContentNote on screen.\n\nexpectSavedUseSkeleton, where a case carries it, is what course_config.json must say after the steps — the rule itself, hasSkeleton(courseCode, takingExampleContent) AND skeletonIsWanted. It is the assertion that fails against an app asking only whether example content EXISTS.\n\nexpectSavedIncludeCurriculumPages, where a case carries it, is what course_config.json must say about the curriculum pages — and ABSENT MEANS NOT ASSERTED, so a runner must tolerate its absence rather than require it, exactly as it does given.takesExampleContent. The rule behind it is curriculumPagesOffered: the code has a payload, that payload declares a curriculum folder, AND either the teacher is taking the payload or a skeleton is offered and wanted. It is written for issue #251, where a teacher who declined the ready-made pages and kept the subject's skeleton was given a Curriculum folder holding the skeleton's generic index and one placeholder expectation called A1.1 — so the curriculum coverage map, built from those pages, had one fake cell to colour. MEASURED by driving the real setup_course.py: ICS4U went from 2 curriculum pages to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O — which has no payload — stayed at 2. An app that writes false here never runs the launcher's new branch, whatever its interface shows, and the course comes out exactly as broken with every gate green.",
+      "howToRunACase": "Start with given.lists, a snapshot of what an adoption of given.courseCode (or the courseCode above) would set when given.hasSnapshot is true and no snapshot otherwise, and the toggle itself ON, which is where a new wizard opens. Apply each step in order, each step regardless of what the one before it left the toggle at — a case may open with turnOn on a fixture that has no snapshot, which is a state a real wizard reaches only by other means and is written this way to say what an adoption does from the factory defaults. turnOn adopts unless the teacher's shared folders say the list has been edited (SkeletonCatalog.structureToAdopt / StructureToAdopt, which is the rule that predates this one), recording a fresh snapshot when it does. turnOff restores as the rule above says and then forgets the snapshot. typeAnotherCode is the teacher editing the course-code field to otherCourseCode — a code in a different family — which adopts only while the toggle is ON: the guard in adoptSkeletonStructure / AdoptSkeletonStructure, without which a teacher who declined the skeleton and then corrected a typo in the code is given it back. Be honest about what that case proves: a runner implements the guard itself, so the case pins the RULE and not your app's wiring — deleting the guard from the product leaves it green. Each platform owes its own check that its real adopt entry point reads the toggle (the mac's is a source scan in WizardStructureTests). Compare all five lists with expect. Build each case's fixture on its own: a cache shared between cases would let one case's adoption answer another's.\n\ngiven.takesExampleContent is where the example-content toggle starts, and ABSENT MEANS TRUE — which is where a new wizard opens and which leaves every case written before 2026-09-21 meaning exactly what it meant. A runner must tolerate its absence rather than require it. It is the second half of every adoption question: a case whose courseCode has ready-made pages still resolves a family by prefix, since the prefix map knows nothing about payloads, but nothing is adopted for it WHILE takesExampleContent is true — and everything is adopted for it once that is false, which is the whole of issue #248.\n\nTwo more steps, the two halves of the example-content toggle. declineExampleContent sets takesExampleContent to FALSE and then adopts for given.courseCode (not otherCourseCode — this is the same course, being offered its subject's shape instead of its ready-made pages) reading the same skeletonIsWanted guard turnOn and typeAnotherCode read: a teacher who declined the skeleton and then declined the example content must not have the skeleton handed back. takeExampleContent sets it to TRUE and then restores exactly as turnOff restores, forgetting the snapshot. Three states they reach together are worth saying out loud, because both apps must write the same file in each: a list the teacher EDITED after declining is left alone by the restore, so it travels into a course that is taking ready-made pages (harmless — setup_course.py's example branch overrides the structure and reconciles the marks pool, MEASURED — but the two apps must agree on it); and a second decline after the skeleton was declined adopts NOTHING, the teacher's choice being remembered, with noStartingContentNote on screen.\n\nexpectSavedUseSkeleton, where a case carries it, is what course_config.json must say after the steps — the rule itself, hasSkeleton(courseCode, takingExampleContent) AND skeletonIsWanted. It is the assertion that fails against an app asking only whether example content EXISTS.\n\nexpectSavedIncludeCurriculumPages, where a case carries it, is what course_config.json must say about the curriculum pages — and ABSENT MEANS NOT ASSERTED, so a runner must tolerate its absence rather than require it, exactly as it does given.takesExampleContent. The rule behind it is curriculumPagesOffered: the code has a payload, that payload declares a curriculum folder, AND either the teacher is taking the payload or a skeleton is offered and wanted. It is written for issue #251, where a teacher who declined the ready-made pages and kept the subject's skeleton was given a Curriculum folder holding the skeleton's generic index and one placeholder expectation called A1.1 — so the curriculum coverage map, built from those pages, had one fake cell to colour. MEASURED by driving the real setup_course.py: ICS4U went from 2 curriculum pages to 61, MCMPR11 to 59 British Columbia standards with no A1.1 among them, and ICS2O — which has no payload — stayed at 2. An app that writes false here never runs the launcher's new branch, whatever its interface shows, and the course comes out exactly as broken with every gate green.",
       "cases": [
         {
           "name": "off, with nothing touched since the adoption",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff"],
@@ -11365,21 +11358,9 @@
           "why": "The plain case, and the one the bug got wrong. The marks pool is the historical rule read off the restored folders, which is what a brand-new course has always opened with. This is also the case a list edited and edited BACK exactly lands in — the data cannot carry that history, and that is the point: the rule asks what is on screen, not what happened to it."
         },
         {
-          "name": "off, with the terminology switch on",
-          "given": {
-            "hasSnapshot": true,
-            "usesLCSTerminology": true,
-            "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
-          },
-          "steps": ["turnOff"],
-          "expect": {"sharedFolders": "lcs", "sharedFiles": "lcs", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
-          "why": "Restoring means restoring what a new course would have opened with NOW, which for a teacher who turned the terminology switch on before typing a code is the LCS set. The two per-section lists have no LCS variant and go back to the plain defaults, which is the half most easily missed."
-        },
-        {
           "name": "off, after the shared folders were edited",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff"],
@@ -11387,21 +11368,9 @@
           "why": "List by list, not all-or-nothing. An earlier version of this on Windows asked one question of the shared folders and replaced all five lists on the answer, which discarded an edited file list. The marks pool is re-inferred over what the editor actually ends up with — the teacher's own folders plus the restored per-section ones — so it cannot name a folder that is no longer there."
         },
         {
-          "name": "off, after the terminology switch was flipped",
-          "given": {
-            "hasSnapshot": true,
-            "usesLCSTerminology": true,
-            "lists": {"sharedFolders": "lcsFlippedFromSkeleton", "sharedFiles": "lcsFlippedFromSkeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
-          },
-          "steps": ["turnOff"],
-          "expect": {"sharedFolders": "lcsFlippedFromSkeleton", "sharedFiles": "lcsFlippedFromSkeleton", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]},
-          "why": "The trap worth knowing: the switch rewrote the two shared lists, so they no longer equal the snapshot and the restore must leave them exactly as they are — including the skeleton's own folders that the switch carried across. The per-section lists it never touched still go back. An implementation that re-snapshotted on the terminology flip would silently restore these two as well, and the teacher would watch their College Board folder disappear."
-        },
-        {
           "name": "off, with a list put back in a different order",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeletonReversed", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff"],
@@ -11412,7 +11381,6 @@
           "name": "off, with nothing ever adopted",
           "given": {
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOff"],
@@ -11423,7 +11391,6 @@
           "name": "on, from the factory defaults",
           "given": {
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn"],
@@ -11434,7 +11401,6 @@
           "name": "on, over lists the teacher has edited",
           "given": {
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": ["Investigations", "Tasks", "Field Trips"], "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn"],
@@ -11445,7 +11411,6 @@
           "name": "off, then on, then off again",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff", "turnOn", "turnOff"],
@@ -11457,7 +11422,6 @@
           "given": {
             "courseCode": "MPM1D",
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn"],
@@ -11469,7 +11433,6 @@
           "given": {
             "courseCode": "MPM1D",
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": ["Thinking Tasks"]}
           },
           "steps": ["turnOff"],
@@ -11480,7 +11443,6 @@
           "name": "off, then a different course code typed",
           "given": {
             "hasSnapshot": true,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "skeleton", "sharedFiles": "skeleton", "perSectionFolders": "skeleton", "perSectionFiles": "skeleton", "gradedFolders": "skeleton"}
           },
           "steps": ["turnOff", "typeAnotherCode"],
@@ -11493,7 +11455,6 @@
             "courseCode": "ADA1O",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["turnOn", "turnOff"],
@@ -11508,7 +11469,6 @@
             "courseCode": "ADA1O",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent"],
@@ -11523,7 +11483,6 @@
             "courseCode": "ADA1O",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent", "turnOff"],
@@ -11538,7 +11497,6 @@
             "courseCode": "MCV4U",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent", "takeExampleContent"],
@@ -11553,7 +11511,6 @@
             "courseCode": "MCV4U",
             "takesExampleContent": true,
             "hasSnapshot": false,
-            "usesLCSTerminology": false,
             "lists": {"sharedFolders": "factory", "sharedFiles": "factory", "perSectionFolders": "factory", "perSectionFiles": "factory", "gradedFolders": ["Tasks"]}
           },
           "steps": ["declineExampleContent"],
@@ -11698,12 +11655,11 @@
         "College Board Curriculum",
         "Curriculum"
       ],
-      "fillRule": "A field moves only while it still holds the value the OTHER choice would have put there — the words of `course` when ticking, of `club` when unticking — so a teacher's own typing survives the box going off and on. The class folder keeps its PLACE in the per-section list and `classFolder` follows it. Ticking removes every `curriculumFolders` name from the shared folders; unticking puts the terminology's factory curriculum folder back at its factory position. A skeleton's folders already adopted for the code are given up BEFORE the fill (the skeleton toggle's own restore rule), and adoption does nothing while the box is ticked.",
+      "fillRule": "A field moves only while it still holds the value the OTHER choice would have put there — the words of `course` when ticking, of `club` when unticking — so a teacher's own typing survives the box going off and on. The class folder keeps its PLACE in the per-section list and `classFolder` follows it. Ticking removes every `curriculumFolders` name from the shared folders; unticking puts the factory curriculum folder back at its factory position. A skeleton's folders already adopted for the code are given up BEFORE the fill (the skeleton toggle's own restore rule), and adoption does nothing while the box is ticked.",
       "cases": [
         {
           "name": "ticking the box fills a club's words and takes the curriculum folder out",
           "isClub": true,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11751,7 +11707,6 @@
         {
           "name": "unticking it puts a course's words and the curriculum folder back",
           "isClub": false,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11799,7 +11754,6 @@
         {
           "name": "a teacher's own words survive the box going off",
           "isClub": false,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11848,7 +11802,6 @@
         {
           "name": "a heading the teacher typed stays when the box goes off, while the club's own words leave",
           "isClub": false,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",
@@ -11897,7 +11850,6 @@
         {
           "name": "the class folder keeps its place in the list",
           "isClub": true,
-          "usesLCSTerminology": false,
           "given": {
             "sharedFolders": [
               "Concepts",

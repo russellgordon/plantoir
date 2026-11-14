@@ -96,6 +96,5 @@
     }
   },
   "unit_word" : "Unit",
-  "use_lcs_terminology" : false,
   "use_skeleton" : true
 }

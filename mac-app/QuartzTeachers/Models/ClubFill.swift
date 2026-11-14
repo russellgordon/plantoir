@@ -86,7 +86,7 @@ enum ClubFill {
     // MARK: - Functions
 
     static func applying(
-        isClub: Bool, to fields: ClubFillFields, usesLCSTerminology: Bool
+        isClub: Bool, to fields: ClubFillFields
     ) -> ClubFillFields {
         let leaving: ClubVocabulary = isClub ? ClubVocabulary.course : ClubVocabulary.club
         let arriving: ClubVocabulary = isClub ? ClubVocabulary.club : ClubVocabulary.course
@@ -132,7 +132,7 @@ enum ClubFill {
             result.sharedFolders = kept
         } else {
             result.sharedFolders = puttingTheCurriculumFoldersBack(
-                into: fields.sharedFolders, usesLCSTerminology: usesLCSTerminology
+                into: fields.sharedFolders
             )
         }
         return result
@@ -141,9 +141,9 @@ enum ClubFill {
     /// The factory curriculum folders, back in their factory places, for a
     /// list that had them taken out.
     private static func puttingTheCurriculumFoldersBack(
-        into folders: [String], usesLCSTerminology: Bool
+        into folders: [String]
     ) -> [String] {
-        let factory: [String] = usesLCSTerminology ? WizardDefaults.lcsSharedFolders : WizardDefaults.sharedFolders
+        let factory: [String] = WizardDefaults.sharedFolders
         var result: [String] = folders
         for (index, name) in factory.enumerated() {
             if !curriculumFolders.contains(name) || result.contains(name) {

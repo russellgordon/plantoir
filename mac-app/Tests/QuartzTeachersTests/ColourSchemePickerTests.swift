@@ -7,6 +7,7 @@ import XCTest
 /// before 2.0.0, kept unlisted so those courses look the same and are never
 /// rewritten. The old id is read from the bundled scheme list, never typed
 /// here.
+@MainActor
 final class ColourSchemePickerTests: XCTestCase {
 
     // MARK: - Stored properties
