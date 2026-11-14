@@ -29,6 +29,9 @@ struct SiteFilesReport: Equatable {
     let putBack: Int
     let putBackFailed: Int
     let takenOut: Int
+    /// Course files found on the site that no built page names, those taken
+    /// out included (`siteFiles.marker`, unreferenced).
+    let unreferenced: Int
     let firstTime: Bool
     let changed: Bool
     let assetsEmitter: String
@@ -37,23 +40,36 @@ struct SiteFilesReport: Equatable {
 
     /// `siteFiles.marker.writtenWhen`: the first build that leaves files off,
     /// a build whose count changed, a build that put a file back, could not,
-    /// or took one out, and a build that used Quartz's own emitter. Nothing
-    /// on a build that changed nothing.
+    /// took one out or found one no page names, and a build that used
+    /// Quartz's own emitter. Nothing on a build that changed nothing.
     nonisolated var isWorthWriting: Bool {
         if firstTime || changed {
             return true
         }
-        if putBack > 0 || putBackFailed > 0 || takenOut > 0 {
+        if putBack > 0 || putBackFailed > 0 || takenOut > 0 || unreferenced > 0 {
             return true
         }
         return assetsEmitter == SiteFilesReport.quartzsOwnEmitter
+    }
+
+    /// The parts of the line that are said only when their count is above
+    /// zero (`activityTrail.mustRecord` → `notZero`), in the contract's order.
+    nonisolated var countsSaidWhenNotZero: String {
+        var parts: String = ""
+        if putBackFailed > 0 {
+            parts += ", \(putBackFailed) could not be put back"
+        }
+        if unreferenced > 0 {
+            parts += ", \(unreferenced) found on the website that no page names"
+        }
+        return parts
     }
 
     /// The trail line without the course and section, which `noteOnTheTrail`
     /// puts in front (`activityTrail.mustRecord` → `line`, and
     /// `lineWhenSortedAfterTheBuild` when Quartz's own emitter ran).
     nonisolated var trailSentence: String {
-        let counts: String = "(\(putBack) put back, \(takenOut) taken out)"
+        let counts: String = "(\(putBack) put back, \(takenOut) taken out\(countsSaidWhenNotZero))"
         if assetsEmitter == SiteFilesReport.quartzsOwnEmitter {
             return "the website leaves off \(leftOff) files no published page uses, sorted after the build "
                 + "because the website builder's settings had changed shape " + counts
@@ -87,12 +103,14 @@ struct SiteFilesReport: Equatable {
             let putBack: Int = (object["putBack"] as? NSNumber)?.intValue ?? 0
             let putBackFailed: Int = (object["putBackFailed"] as? NSNumber)?.intValue ?? 0
             let takenOut: Int = (object["takenOut"] as? NSNumber)?.intValue ?? 0
+            let unreferenced: Int = (object["unreferenced"] as? NSNumber)?.intValue ?? 0
             let firstTime: Bool = (object["firstTime"] as? Bool) ?? false
             let changed: Bool = (object["changed"] as? Bool) ?? false
             let emitter: String = (object["assetsEmitter"] as? String) ?? "plantoir"
             found.append(SiteFilesReport(
                 course: course, section: section, leftOff: leftOff, putBack: putBack,
-                putBackFailed: putBackFailed, takenOut: takenOut, firstTime: firstTime,
+                putBackFailed: putBackFailed, takenOut: takenOut, unreferenced: unreferenced,
+                firstTime: firstTime,
                 changed: changed, assetsEmitter: emitter
             ))
         }

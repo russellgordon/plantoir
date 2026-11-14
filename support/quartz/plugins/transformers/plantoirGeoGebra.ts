@@ -23,10 +23,12 @@
 // block it always was - the byte-identical guarantee for sites without
 // sketches rests on this.
 //
-// The sketch's FILE is published once, by Quartz's own Assets emitter, which
-// copies every file under content/ that is not a page to slugifyFilePath of
-// its path. The address is made here with that same function, so the two
-// cannot disagree (geogebraFences.files).
+// The sketch's FILE is published once, by the site's own emitter
+// (emitters/plantoirAssets.ts, #901), which copies a file under content/ to
+// slugifyFilePath of its path when a published page uses it; this transformer
+// declares the file (file.data.plantoirFiles) so it is carried. The address
+// is made here with that same function, so the two cannot disagree
+// (geogebraFences.files).
 
 import { Root as MdRoot, Code } from "mdast"
 import { Element, Root as HtmlRoot, ElementContent } from "hast"

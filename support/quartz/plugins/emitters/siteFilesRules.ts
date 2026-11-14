@@ -5,17 +5,22 @@
 //
 // A file goes on the site when a page students can see names it:
 //
-// * anywhere in the page's tree as Quartz built it (after CrawlLinks, so a
-//   wikilink resolves the way Quartz resolved it): EVERY string a property
-//   holds is tried as an address from the page, not only the four Quartz
-//   rewrites, so raw HTML's <source src>, srcset, poster, <object data>,
-//   <embed src>, SVG's href, a style's url(...) and a <style>'s url(...)
-//   all count; a GeoGebra sketch's data-geogebra names its file from its own
-//   `root`, and its transformer also declares it (file.data.plantoirFiles);
+// * in the page's tree as Quartz built it (after CrawlLinks, so a wikilink
+//   resolves the way Quartz resolved it), in a place that HOLDS AN ADDRESS:
+//   one of the attributes in siteFiles.addresses on one of its elements
+//   (src, href, srcset, poster, an object's data, SVG's href, a style's
+//   url(...), a GeoGebra sketch's data-geogebra, read from its own `root`),
+//   a <meta> whose content is defined to be an address, or a <style>'s
+//   url(...). Alt text, a link's title, aria-label, a description, any other
+//   attribute, text and code are never addresses: a page that only MENTIONS
+//   a file's name does not use it. The list is the contract's, handed in
+//   through the build's side file (sideFile.keys.addresses), so this file
+//   and scripts/site_files.py follow one list;
 // * through what Plantoir draws outside the tree: the Print button's PDF
 //   (printPdfPath, shared with PlantoirMetaLine.tsx so the two cannot
-//   disagree) and the footer (its addresses, from the build's side file,
-//   resolved from every page as the page's own are);
+//   disagree), a file a transformer declares (file.data.plantoirFiles) and
+//   the footer (its addresses, from the side file, resolved from every page
+//   as the page's own are);
 // * or it is always carried (the site's root favicon.ico, written into
 //   content/ by the build).
 //
@@ -85,64 +90,133 @@ export function geogebraSketchAddress(value: string): string | null {
   return String(root).replace(/\/+$/, "") + "/" + sketch
 }
 
-function addressesInValue(name: string, value: string, into: string[]): void {
+// siteFiles.addresses.attributes: an attribute that holds an address, the
+// elements it holds one on, and how its value is read.
+export type AddressAttribute = {
+  attribute: string
+  property: string
+  elements: string[]
+  read: string
+}
+
+// siteFiles.addresses, as the side file carries it.
+export type AddressRules = {
+  attributes?: AddressAttribute[]
+  metaContent?: string[]
+}
+
+function ruleFor(rules: AddressRules, tagName: string, name: string): AddressAttribute | null {
+  const tag = tagName.toLowerCase()
   const lower = name.toLowerCase()
-  if (lower === "style") {
-    into.push(...addressesInCss(value))
-    return
+  for (const rule of rules.attributes ?? []) {
+    if (rule.property !== name && rule.attribute !== lower) {
+      continue
+    }
+    if (rule.elements.includes("*") || rule.elements.includes(tag)) {
+      return rule
+    }
   }
-  if (lower === "datageogebra" || lower === "data-geogebra") {
+  return null
+}
+
+function jsonUrl(value: string): string | null {
+  try {
+    const data = JSON.parse(value) as Record<string, unknown> | null
+    if (data !== null && typeof data === "object" && typeof data.url === "string") {
+      return data.url
+    }
+  } catch {
+    // Not JSON: no address.
+  }
+  return null
+}
+
+// The addresses one attribute's value holds, read as its rule says
+// (siteFiles.addresses.reads).
+function addressesInValue(read: string, value: string, into: string[]): void {
+  if (read === "css") {
+    into.push(...addressesInCss(value))
+  } else if (read === "geogebraSketch") {
     const sketch = geogebraSketchAddress(value)
     if (sketch !== null) {
       into.push(sketch)
     }
-    return
-  }
-  if (lower === "srcset" || lower === "imagesrcset") {
+  } else if (read === "jsonUrl") {
+    const url = jsonUrl(value)
+    if (url !== null) {
+      into.push(url)
+    }
+  } else if (read === "fromSiteRoot") {
+    if (value.trim() !== "") {
+      into.push("/" + value.trim().replace(/^\/+/, ""))
+    }
+  } else if (read === "srcset") {
     for (const item of value.split(",")) {
       const first = item.trim().split(/\s+/)[0]
       if (first) {
         into.push(first)
       }
     }
-    return
-  }
-  into.push(value)
-  const pieces = value.trim().split(/\s+/)
-  if (pieces.length > 1) {
-    into.push(pieces[0])
+  } else if (read === "address") {
+    into.push(value)
   }
 }
 
-// Every string in the tree that may be an address, in the order met.
-export function addressesInTree(tree: TreeNode): string[] {
+function stringOf(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value
+  }
+  if (Array.isArray(value)) {
+    const parts: string[] = []
+    for (const item of value) {
+      if (typeof item === "string" || typeof item === "number") {
+        parts.push(String(item))
+      }
+    }
+    return parts.join(",")
+  }
+  return null
+}
+
+// Every address the tree holds, in the order met: only the places
+// siteFiles.addresses names.
+export function addressesInTree(tree: TreeNode, rules: AddressRules): string[] {
   const found: string[] = []
+  const metaNames = new Set(rules.metaContent ?? [])
   const walk = (node: TreeNode, inStyle: boolean) => {
     if (node.type === "text" && inStyle && typeof node.value === "string") {
       found.push(...addressesInCss(node.value))
     }
-    if (node.type === "raw" && typeof node.value === "string") {
-      // Left by an html node no rehype-raw read: never the case with
-      // ObsidianFlavoredMarkdown, which reads raw HTML first.
-      found.push(...addressesInCss(node.value))
-    }
+    const tagName = typeof node.tagName === "string" ? node.tagName : ""
     const properties = node.properties ?? {}
-    for (const [name, value] of Object.entries(properties)) {
-      if (typeof value === "string") {
-        addressesInValue(name, value, found)
-      } else if (Array.isArray(value)) {
-        if (name.toLowerCase() === "srcset" || name.toLowerCase() === "imagesrcset") {
-          addressesInValue(name, value.join(","), found)
+    if (tagName.toLowerCase() === "meta") {
+      const named = stringOf(properties.property) ?? stringOf(properties.name)
+      const content = stringOf(properties.content)
+      if (named !== null && content !== null && metaNames.has(named)) {
+        found.push(content)
+      }
+    }
+    if (node.type === "element") {
+      for (const [name, value] of Object.entries(properties)) {
+        const rule = ruleFor(rules, tagName, name)
+        if (rule === null) {
           continue
         }
-        for (const item of value) {
-          if (typeof item === "string") {
-            addressesInValue(name, item, found)
+        if (Array.isArray(value) && rule.read !== "srcset") {
+          for (const item of value) {
+            if (typeof item === "string") {
+              addressesInValue(rule.read, item, found)
+            }
           }
+          continue
+        }
+        const text = stringOf(value)
+        if (text !== null) {
+          addressesInValue(rule.read, text, found)
         }
       }
     }
-    const style = inStyle || node.tagName === "style"
+    const style = inStyle || tagName === "style"
     for (const child of node.children ?? []) {
       walk(child, style)
     }
@@ -185,7 +259,10 @@ export type SitePage = {
   declared?: string[]
 }
 
-export type SideFile = { alwaysCarried?: string[]; footerAddresses?: string[] }
+// quartz/plantoir_site_files.json (siteFiles.sideFile). Without `addresses`
+// no attribute is read, so every file a page shows is left to the check
+// after the build, which puts it back and fails the gates.
+export type SideFile = { alwaysCarried?: string[]; footerAddresses?: string[]; addresses?: AddressRules }
 
 // The addresses (Quartz's slugs of content paths) of every file the
 // published pages use, among `fileAddresses`.
@@ -201,7 +278,7 @@ export function addressesThePagesUse(
     if (isHiddenPage(page.frontmatter)) {
       continue
     }
-    const candidates = addressesInTree(page.tree)
+    const candidates = addressesInTree(page.tree, side.addresses ?? {})
     for (const address of footer) {
       candidates.push(address)
     }

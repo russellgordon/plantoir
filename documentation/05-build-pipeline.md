@@ -4706,16 +4706,18 @@ out: plan review 901-4) and writes each file at Assets' own address
 
 A published page uses a file when:
 
-- **its tree names it.** The tree is the one Quartz built, after
-  `CrawlLinks`, so a wikilink resolves the way Quartz resolved it (shortest
-  path, two files with one name included) and nothing is reimplemented.
-  EVERY string a property holds is tried as an address from the page, not
-  only the four attributes Quartz rewrites, because raw HTML is in the tree
-  (`ofm.ts` runs `rehype-raw` first) and keeps the teacher's own address:
-  `<source src>`, `<track src>`, `poster`, `srcset`, `<object data>`,
-  `<embed src>`, SVG's `href`, `style="…url(…)"` and a `<style>` element's
-  `url(…)` (plan review 901-5). On the 27 sites none of the last group names
-  a course file today; the cases protect the future.
+- **its tree names it in a place that holds an address.** The tree is the
+  one Quartz built, after `CrawlLinks`, so a wikilink resolves the way Quartz
+  resolved it (shortest path, two files with one name included) and nothing
+  is reimplemented. Raw HTML is in the tree too (`ofm.ts` runs `rehype-raw`
+  first) and keeps the teacher's own address, so more than the four
+  attributes Quartz rewrites are read: `<source src>`, `<track src>`,
+  `poster`, `srcset`, `<object data>`, `<embed src>`, SVG's `href`,
+  `style="…url(…)"` and a `<style>` element's `url(…)` (plan review 901-5).
+  Which attributes, on which elements, and how each is read is ONE list,
+  `siteFiles.addresses`, followed by both readers (below, "Only where an
+  address is held"). On the 27 sites none of the raw-HTML group names a
+  course file today; the cases protect the future.
 - **Plantoir draws it outside the tree.** The Print button's PDF
   (`printPdfPath`, the one function `PlantoirMetaLine.tsx` and the emitter
   both use), a GeoGebra sketch (the transformer declares the file on
@@ -4737,15 +4739,18 @@ unmatched references matched that way).
 ### The second reading, after the build
 
 `scripts/site_files.py` never trusts the emitter. It reads the BUILT site:
-every attribute of every built page, the same ways again in Python, resolved
-from the page's address, compared with the course's files (Assets' walk:
+every built page, Head included, at the places `siteFiles.addresses` names,
+again in Python, resolved from the page's address, compared with the course's files (Assets' walk:
 not a page, no dotted names, not under `private`, `templates` or
 `.obsidian`, symlinks followed). It ports `slugifyFilePath`;
 `siteFiles.slugCases` are run through the port here and through Quartz's own
 function in the image, so the two cannot drift.
 
 - **A hole** (a page names a course file the site lacks) is PUT BACK and the
-  teacher is told, one line per file. Russell's ruling on #901: the build
+  teacher is told, one line per file (`words.putBack`, or
+  `words.putBackPreview` on a preview, where nothing reaches the website
+  until the next deploy). The sentence says a page USES the file, which is
+  true because only a place that holds an address counts. Russell's ruling on #901: the build
   goes on, the teacher is told, and a trail line is written. Rejected:
   stopping the build; having no second check.
 - **An exposure** (a course file in the site no built page names) is counted
@@ -4789,12 +4794,79 @@ recommended, every sentence named in `siteFiles.words`.
 
 The build prints one `PLANTOIR_SITE_FILES:` line (counts only) and both apps
 write `site leaves off files no published page uses` from it when it is the
-first, the count changed, a safety count is above zero, or Quartz's own
-emitter ran (`SiteFilesReport` on the mac, from a run's console and a
+first, the count changed, a safety count is above zero (`unreferenced`
+included: a file no page names that the check kept because the site's text
+mentions it is exactly what a problem report needs), or Quartz's own emitter
+ran. The line says how many could not be put back and how many were found on
+the site that no page names only when those counts are not zero (`notZero`
+in the event's `mustRecord` entry) (`SiteFilesReport` on the mac, from a run's console and a
 scheduled deploy's record, as `KeptDownloadsReport`). A deploy typed in
 Terminal writes no such line, as `PLANTOIR_DOWNLOADED:` writes none: the plan
 had `deploy.sh` write it, which would double every line for a deploy the app
 starts, and is listed under `siteFiles.knownLimits` instead.
+
+### Only where an address is held (901a's implementation review)
+
+The first build of 901a tried EVERY attribute value as an address in both
+readers, and its first word as well (for `srcset`). The review measured two
+faults on real launchers, both from that rule:
+
+- **A false put-back that published an answer key.** A published page whose
+  text began "r901-answerkey-beside.pdf will be posted after the test." had
+  the answer key beside it put back and deployed, and the teacher was told
+  a page used it. Quartz's Head writes a page's opening text into
+  `<meta name="description" content>`, `og:description`,
+  `twitter:description` and `og:image:alt`; the check read `content` as an
+  address. The emitter never saw it (Head is not in the tree), so the two
+  readers disagreed and the check "repaired" the emitter's correct answer.
+- **A file carried for its alt text or a link's title.** `![key.pdf is the
+  key](pic.png)` and `[a link](https://example.org "key.pdf")` carried
+  `key.pdf`; the Python check made the same over-read, so the two agreed
+  and no gate saw it.
+
+The fix is one list in the contract, `siteFiles.addresses`: each attribute
+that holds an address, the elements it holds one on (a `<div src>` loads
+nothing), and how it is read (`address`, `srcset`, `css`, `geogebraSketch`,
+`jsonUrl`, `fromSiteRoot`); the `<meta>` names whose content is defined to be
+an address (`og:image`, `twitter:image` and the like); and `neverAddresses`.
+The data-* attributes in it are the ones the site's own scripts read as
+addresses (a grep of `components/scripts` for `dataset` reads):
+`data-geogebra`, `data-phet` and `data-runner-wasm`. The emitter is handed
+the list in `quartz/plantoir_site_files.json`, so it is written once; without
+the side file the emitter reads no attribute and the check puts back every
+used file, which the gates fail on.
+
+Two readers written one from the other share their mistakes, so the tests
+read a third way. `siteFiles.addressFixture` is a small built site with 21
+files its pages use and 11 they only mention (alt, title, aria-label, a
+description, `og:image:alt`, a `<div src>`, a data attribute nobody reads,
+text, a comment, code, a script). `scripts/test_site_files.py` derives its
+needed set with `site_files`' reader, and again with its own element table
+written from the HTML standard over a small DOM it builds, and both must
+equal the hand-written `needed`; the image's check parses the same pages
+with Quartz's own HTML parser and runs `addressesThePagesUse` on them, and
+pins every attribute's `property` against Quartz's `property-information`.
+The image's check also writes the description meta tags into each case's
+built page from the page's text, as Head does, so a case like the review's
+can fail there.
+
+Measured on the tip's files (copies under the run's scratch folder,
+`901a/round2/old/`): with the tip's `siteFilesRules.ts` the Node check
+failed 13 rows (the alt-text, title and raw-HTML cases at both emits, the
+check counting each as unreferenced, and the fixture); with the tip's
+`site_files.py` the Python test failed 18 (every description and
+alt/title/aria/div/data case put back, the fixture, the PhET and
+program cases, the gate test). Rejected: keeping the every-attribute reader
+and adding a list of attributes to skip (a deny list misses the next
+text-bearing attribute; the review's two faults were both of that kind);
+stripping `<head>` before the check reads a page (the sharing picture and
+the favicon link are in it, and Head could gain an address-bearing tag);
+writing the list twice, once in each language, with a test pinning them (a
+second copy is a second answer).
+
+`<iframe srcdoc>` (a page inside an attribute), a script's own `fetch`, and a
+sharing picture written as an absolute address on the section's domain are
+read by neither reader (`siteFiles.knownLimits`).
 
 ### Preview and deploy agree
 

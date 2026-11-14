@@ -75,7 +75,7 @@ final class SiteFilesReportTests: XCTestCase {
     /// Every trail case: whether it is written, and the sentence, word for word.
     func testEveryTrailCaseIsReadAsTheContractSays() throws {
         let cases: [[String: Any]] = try trailCases()
-        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        XCTAssertGreaterThanOrEqual(cases.count, 9)
         for testCase in cases {
             let line: String = try XCTUnwrap(testCase["line"] as? String)
             let reports: [SiteFilesReport] = SiteFilesReport.reports(in: "🏗️ Building\n" + line + "\n")
@@ -89,28 +89,57 @@ final class SiteFilesReportTests: XCTestCase {
     }
 
     /// The sentence is the contract's line with the counts filled in, in both
-    /// of its shapes.
+    /// of its shapes, with the parts said only when their count is above zero
+    /// (`notZero`) present exactly when it is.
     func testTheSentencesAreTheContractsLines() throws {
         let found: [String: Any] = try entry()
         let line: String = try XCTUnwrap(found["line"] as? String)
         let sorted: String = try XCTUnwrap(found["lineWhenSortedAfterTheBuild"] as? String)
-        let plain: SiteFilesReport = SiteFilesReport(
-            course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 0, takenOut: 2,
-            firstTime: false, changed: true, assetsEmitter: "plantoir"
-        )
-        let filled: (String) -> String = { (template: String) -> String in
+        let notZero: [String: Any] = try XCTUnwrap(found["notZero"] as? [String: Any])
+        let failedPart: String = try XCTUnwrap(notZero["putBackFailed"] as? String)
+        let unreferencedPart: String = try XCTUnwrap(notZero["unreferenced"] as? String)
+        let filled: (String, String) -> String = { (template: String, parts: String) -> String in
             return template
                 .replacingOccurrences(of: "{course}/{section} · ", with: "")
                 .replacingOccurrences(of: "{leftOff}", with: "7")
                 .replacingOccurrences(of: "{putBack}", with: "1")
                 .replacingOccurrences(of: "{takenOut}", with: "2")
+                .replacingOccurrences(of: "{notZero}", with: parts)
         }
-        XCTAssertEqual(plain.trailSentence, filled(line))
+        let plain: SiteFilesReport = SiteFilesReport(
+            course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 0, takenOut: 2,
+            unreferenced: 0, firstTime: false, changed: true, assetsEmitter: "plantoir"
+        )
+        XCTAssertEqual(plain.trailSentence, filled(line, ""))
+        let both: SiteFilesReport = SiteFilesReport(
+            course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 3, takenOut: 2,
+            unreferenced: 4, firstTime: false, changed: true, assetsEmitter: "plantoir"
+        )
+        let bothParts: String = failedPart.replacingOccurrences(of: "{putBackFailed}", with: "3")
+            + unreferencedPart.replacingOccurrences(of: "{unreferenced}", with: "4")
+        XCTAssertEqual(both.trailSentence, filled(line, bothParts))
         let quartz: SiteFilesReport = SiteFilesReport(
             course: "SCH3U", section: 2, leftOff: 7, putBack: 1, putBackFailed: 0, takenOut: 2,
-            firstTime: false, changed: true, assetsEmitter: SiteFilesReport.quartzsOwnEmitter
+            unreferenced: 4, firstTime: false, changed: true, assetsEmitter: SiteFilesReport.quartzsOwnEmitter
         )
-        XCTAssertEqual(quartz.trailSentence, filled(sorted))
+        let quartzParts: String = unreferencedPart.replacingOccurrences(of: "{unreferenced}", with: "4")
+        XCTAssertEqual(quartz.trailSentence, filled(sorted, quartzParts))
+    }
+
+    /// A file no page names that is still on the site (the site's text
+    /// mentions it, so the check kept it) is written even when nothing else
+    /// changed: it is what a problem report needs.
+    func testAFileNoPageNamesIsWorthWriting() throws {
+        let kept: SiteFilesReport = SiteFilesReport(
+            course: "SCH3U", section: 2, leftOff: 12, putBack: 0, putBackFailed: 0, takenOut: 0,
+            unreferenced: 1, firstTime: false, changed: false, assetsEmitter: "plantoir"
+        )
+        XCTAssertTrue(kept.isWorthWriting)
+        let quiet: SiteFilesReport = SiteFilesReport(
+            course: "SCH3U", section: 2, leftOff: 12, putBack: 0, putBackFailed: 0, takenOut: 0,
+            unreferenced: 0, firstTime: false, changed: false, assetsEmitter: "plantoir"
+        )
+        XCTAssertFalse(quiet.isWorthWriting)
     }
 
     /// Read from a run's output, a line worth writing lands on the trail under

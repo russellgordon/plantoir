@@ -27,6 +27,13 @@ Both safety counts are zero on a correct build, and verify.sh and the tests
 fail when either is not. In the field they keep a page whole and an unused
 file off the site whatever the emitter got wrong.
 
+Both readers follow ONE list of the places that hold an address
+(siteFiles.addresses: src, href, srcset, poster, an object's data, SVG's
+href, a style's url(), data-geogebra and the like, on the elements that use
+them, and the meta tags whose content is an address). A page that only
+mentions a file's name, in alt text, a link's title, a description or its
+text, does not use the file.
+
 It reads `content/` only to know which files are the course's (the same
 walk Quartz's Assets emitter makes: every non-page file, no dotted names,
 not under an ignored folder, symlinks followed) and to copy a hole back. It
@@ -161,48 +168,92 @@ def course_files(content_dir: Path, ignore_patterns=DEFAULT_IGNORE_PATTERNS) -> 
 
 # ---- Reading a built page --------------------------------------------------
 
-class _AddressReader(HTMLParser):
-    """Every attribute value of every element, as an address to try, plus
-    url(...) inside a style attribute or a <style> element, every item of a
-    srcset, and a GeoGebra sketch's address (data-geogebra's `sketch`, from
-    its own `root`: geogebra.inline.ts loads it from there)."""
+_ADDRESS_RULES: dict = {}
 
-    def __init__(self):
+
+def address_rules_cached() -> dict:
+    if not _ADDRESS_RULES:
+        _ADDRESS_RULES.update(address_rules())
+    return _ADDRESS_RULES
+
+
+def address_rules() -> dict:
+    """siteFiles.addresses: which attributes, on which elements, hold an
+    address, and which meta tags' content is one. The ONE list this reader
+    and the site's emitter follow (the emitter gets it in the side file)."""
+    return rules("addresses")
+
+
+class _AddressReader(HTMLParser):
+    """Every address a built page holds, and only those: an attribute
+    siteFiles.addresses names, on an element it names, read as it says; a
+    <meta> whose content is an address (metaContent); url(...) inside a
+    <style> element. A page that only MENTIONS a file's name (alt text, a
+    link's title, a description Quartz fills from the page's opening text,
+    text, code) does not use it."""
+
+    def __init__(self, address_rules: dict):
         super().__init__(convert_charrefs=True)
         self.addresses: list = []
         self._in_style = 0
+        self._by_attribute: dict = {}
+        for rule in address_rules.get("attributes", []):
+            self._by_attribute.setdefault(rule["attribute"], []).append(rule)
+        self._meta_names = set(address_rules.get("metaContent", []))
 
-    def _attribute(self, name: str, value: str) -> None:
-        if name == "style":
+    def _rule_for(self, tag: str, name: str):
+        for rule in self._by_attribute.get(name, []):
+            if "*" in rule["elements"] or tag in rule["elements"]:
+                return rule
+        return None
+
+    def _read(self, read: str, value: str) -> None:
+        if read == "css":
             self.addresses.extend(addresses_in_css(value))
-            return
-        if name == "data-geogebra":
+        elif read == "geogebraSketch":
             sketch = geogebra_sketch_address(value)
             if sketch is not None:
                 self.addresses.append(sketch)
-            return
-        if name in _SRCSET_NAMES:
+        elif read == "jsonUrl":
+            url = json_url(value)
+            if url is not None:
+                self.addresses.append(url)
+        elif read == "fromSiteRoot":
+            if value.strip() != "":
+                self.addresses.append("/" + value.strip().lstrip("/"))
+        elif read == "srcset":
             for item in value.split(","):
                 first = item.strip().split()
                 if first:
                     self.addresses.append(first[0])
-            return
-        self.addresses.append(value)
-        pieces = value.split()
-        if len(pieces) > 1:
-            self.addresses.append(pieces[0])
+        elif read == "address":
+            self.addresses.append(value)
+
+    def _element(self, tag, attrs):
+        tag = tag.lower()
+        if tag == "meta":
+            named, content = None, None
+            for name, value in attrs:
+                if name in ("property", "name") and value is not None and named is None:
+                    named = value
+                elif name == "content":
+                    content = value
+            if named in self._meta_names and content is not None:
+                self.addresses.append(content)
+        for name, value in attrs:
+            if value is None:
+                continue
+            rule = self._rule_for(tag, name.lower())
+            if rule is not None:
+                self._read(rule["read"], value)
 
     def handle_starttag(self, tag, attrs):
-        for name, value in attrs:
-            if value is not None:
-                self._attribute(name.lower(), value)
+        self._element(tag, attrs)
         if tag == "style":
             self._in_style += 1
 
     def handle_startendtag(self, tag, attrs):
-        for name, value in attrs:
-            if value is not None:
-                self._attribute(name.lower(), value)
+        self._element(tag, attrs)
 
     def handle_endtag(self, tag):
         if tag == "style" and self._in_style:
@@ -211,6 +262,18 @@ class _AddressReader(HTMLParser):
     def handle_data(self, data):
         if self._in_style:
             self.addresses.extend(addresses_in_css(data))
+
+
+def json_url(value: str):
+    """A data-phet JSON's `url`, or None (phet.inline.ts sets a frame's src
+    to it)."""
+    try:
+        data = json.loads(value)
+    except ValueError:
+        return None
+    if isinstance(data, dict) and isinstance(data.get("url"), str):
+        return data["url"]
+    return None
 
 
 def addresses_in_css(text: str) -> list:
@@ -238,8 +301,8 @@ def geogebra_sketch_address(value: str):
     return root.rstrip("/") + "/" + sketch
 
 
-def addresses_in_html(text: str) -> list:
-    reader = _AddressReader()
+def addresses_in_html(text: str, address_rules: dict | None = None) -> list:
+    reader = _AddressReader(address_rules if address_rules is not None else address_rules_cached())
     try:
         reader.feed(text)
         reader.close()
@@ -287,44 +350,67 @@ def _built_pages(public_dir: Path):
 def addresses_the_site_uses(public_dir: Path) -> set:
     """Every address below the root that a built page asks for."""
     used = set()
+    address_rules_now = address_rules()
     for full, relative in _built_pages(public_dir):
         try:
             text = full.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
         slug = page_slug_of(relative)
-        for address in addresses_in_html(text):
+        for address in addresses_in_html(text, address_rules_now):
             target = resolved_from_page(slug, address)
             if target:
                 used.add(target)
     return used
 
 
-def _text_of_the_site(public_dir: Path) -> str:
-    pieces = []
-    for folder, _folders, files in os.walk(public_dir):
-        for name in files:
-            if name.endswith(_TEXT_SUFFIXES):
-                try:
-                    pieces.append((Path(folder) / name).read_text(encoding="utf-8", errors="replace"))
-                except OSError:
-                    continue
-    return "\n".join(pieces)
-
-
-def _mentioned(address: str, text: str) -> bool:
-    """Whether the last part of the file's address appears anywhere in the
-    site's text, as written or as a browser would encode it."""
+def _mentioned_names(address: str) -> list:
+    """The last part of the file's address, as written and as a browser
+    would encode it."""
+    from urllib.parse import quote
     name = address.rsplit("/", 1)[-1]
     if name == "":
-        return True
-    if name in text:
-        return True
-    from urllib.parse import quote
+        return []
+    names = [name]
     encoded = quote(name, safe="")
-    if encoded != name and encoded in text:
-        return True
-    return False
+    if encoded != name:
+        names.append(encoded)
+    return names
+
+
+def _addresses_mentioned(public_dir: Path, addresses) -> set:
+    """Which of `addresses` the site's text mentions anywhere (any .html,
+    .json, .xml, .js, .css, .txt, .webmanifest file). Read one file at a
+    time, and stopped as soon as every address has been found, rather than
+    holding the whole site (Pyodide, GeoGebra and KaTeX included) as one
+    string."""
+    waiting = {}
+    found = set()
+    for address in addresses:
+        names = _mentioned_names(address)
+        if not names:
+            found.add(address)
+        else:
+            waiting[address] = names
+    if not waiting:
+        return found
+    for folder, _folders, files in os.walk(public_dir):
+        for name in files:
+            if not name.endswith(_TEXT_SUFFIXES):
+                continue
+            try:
+                text = (Path(folder) / name).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for address in list(waiting):
+                for candidate in waiting[address]:
+                    if candidate in text:
+                        found.add(address)
+                        del waiting[address]
+                        break
+            if not waiting:
+                return found
+    return found
 
 
 # ---- The check -------------------------------------------------------------
@@ -379,9 +465,9 @@ def check(public_dir, content_dir, *, repair: bool = True, emitter: str = "plant
 
     taken_out = 0
     if unreferenced:
-        site_text = None if emitter == "quartz" else _text_of_the_site(public)
+        mentioned = set() if emitter == "quartz" else _addresses_mentioned(public, unreferenced)
         for address in unreferenced:
-            if site_text is not None and _mentioned(address, site_text):
+            if address in mentioned:
                 continue
             if repair:
                 try:
@@ -473,10 +559,12 @@ def lines_to_say(outcome: dict, previous: dict | None, *, mode: str, section) ->
     the last one's; a file put back is said, one line each."""
     words = rules("words")
     said = []
+    put_back_key = "putBackPreview" if mode == "preview" else "putBack"
+    failed_key = "putBackFailedPreview" if mode == "preview" else "putBackFailed"
     for relative in outcome.get("putBackFiles", []):
-        said.append(_filled(words["putBack"], {"file": relative}))
+        said.append(_filled(words[put_back_key], {"file": relative}))
     for relative in outcome.get("putBackFailedFiles", []):
-        said.append(_filled(words["putBackFailed"], {"file": relative}))
+        said.append(_filled(words[failed_key], {"file": relative}))
     count = int(outcome.get("leftOff", 0))
     values = {
         "count": count,
@@ -526,10 +614,12 @@ def side_file(footer_html: str) -> dict:
     """quartz/plantoir_site_files.json, which the site's emitter reads
     (siteFiles.sideFile): the files always carried and every address the
     footer names, which the emitter resolves from each page as it resolves
-    the page's own."""
+    the page's own, and siteFiles.addresses, so the emitter reads a page's
+    tree by the same list as this module reads the built page."""
     return {
         "alwaysCarried": list(ALWAYS_CARRIED),
         "footerAddresses": addresses_in_html(footer_html or ""),
+        "addresses": address_rules(),
     }
 
 

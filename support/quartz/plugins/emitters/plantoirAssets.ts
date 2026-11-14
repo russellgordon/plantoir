@@ -18,9 +18,11 @@
 // and said, and the gates fail on it.
 //
 // quartz/plantoir_site_files.json (written by the build) is READ, not
-// imported: the files always carried and the footer's addresses. Without it
-// only the root favicon is always carried and the footer's files are left to
-// the check after the build, which puts them back.
+// imported: the files always carried, the footer's addresses, and which
+// attributes hold an address (siteFiles.addresses, the one list this and
+// scripts/site_files.py both follow). Without it only the root favicon is
+// always carried and no attribute is read, so every file a page uses is left
+// to the check after the build, which puts it back and fails the gates.
 
 import { readFileSync } from "fs"
 import fs from "fs"
@@ -42,7 +44,8 @@ function sideFile(): SideFile {
       return parsed as SideFile
     }
   } catch {
-    // Missing or broken: the defaults below, and the check after the build.
+    // Missing or broken: the defaults below, and the check after the build
+    // puts back every file a page uses.
   }
   return { alwaysCarried: ["favicon.ico"], footerAddresses: [] }
 }

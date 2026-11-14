@@ -22,6 +22,13 @@ run through them in Node:
 * `slugCases` through Quartz's own slugifyFilePath, which
   scripts/site_files.py ports (test_site_files.py runs the port);
 * `resolveCases` through resolvedFromPage;
+* every attribute in `addresses` against Quartz's own HTML parser
+  (property-information), so the emitter looks for each under the name the
+  tree really holds it by;
+* `addressFixture`'s pages parsed by Quartz's own HTML parser and read by
+  addressesThePagesUse: exactly the fixture's `needed` (the Python test reads
+  the same fixture twice more, by site_files and by an element table of its
+  own);
 * `cases`: each a small course written to content/, its pages built, and the
   emitter run over the PUBLISHED pages, as Quartz's first emit hands them,
   and again over every page, as a rebuild does: exactly the case's files
@@ -30,8 +37,9 @@ run through them in Node:
   proved against the real old emitter);
 * then scripts/site_files.py's check over each case's built pages (each
   tree as HTML, with the Print button's link and the footer a page draws
-  outside its tree): no hole and no unreferenced file, so the second reading
-  agrees with the first on every case.
+  outside its tree, and the description meta tags Quartz's Head fills from
+  the page's opening text): no hole and no unreferenced file, so the second
+  reading agrees with the first on every case.
 """
 import json
 import os
@@ -74,6 +82,9 @@ import { unified } from "unified"
 import remarkParse from "remark-parse"
 import remarkRehype from "remark-rehype"
 import { toHtml } from "hast-util-to-html"
+import { toString } from "hast-util-to-string"
+import { fromHtml } from "hast-util-from-html"
+import { find, html as htmlSchema } from "property-information"
 import { VFile } from "vfile"
 import { FrontMatter } from "QUARTZ_TRANSFORMERS/frontmatter"
 import { ObsidianFlavoredMarkdown } from "QUARTZ_TRANSFORMERS/ofm"
@@ -82,7 +93,7 @@ import { CrawlLinks } from "QUARTZ_TRANSFORMERS/links"
 import { Assets } from "QUARTZ_EMITTERS/assets"
 import { slugifyFilePath, pathToRoot, joinSegments } from "QUARTZ_UTIL/path"
 import { glob } from "QUARTZ_UTIL/glob"
-import { resolvedFromPage, isHiddenPage, printPdfPath } from "RULES_TS"
+import { resolvedFromPage, isHiddenPage, printPdfPath, addressesThePagesUse } from "RULES_TS"
 import { PlantoirAssets } from "EMITTER_TS"
 
 const rules = JSON.parse(readFileSync(process.argv[2], "utf-8"))
@@ -97,6 +108,28 @@ for (const [path, slug] of rules.slugCases) {
   count += 1
   const got = slugifyFilePath(path)
   if (got !== slug) failures.push(`slug ${JSON.stringify(path)}: Quartz says ${JSON.stringify(got)}, the case ${JSON.stringify(slug)}`)
+}
+// Every attribute the one list names is Quartz's own name for it: the tree
+// the emitter reads holds each under the parser's property name.
+for (const rule of rules.addresses.attributes) {
+  count += 1
+  const got = find(htmlSchema, rule.attribute).property
+  if (got !== rule.property) failures.push(`address attribute ${rule.attribute}: Quartz's parser calls it ${got}, the list ${rule.property}`)
+}
+// The third reading's fixture (addressFixture), parsed by Quartz's own HTML
+// parser and read by the emitter's own function: exactly the files the
+// fixture says a page needs.
+{
+  count += 1
+  const fixture = rules.addressFixture
+  const fileAddresses = new Set(fixture.files.map((fp) => slugifyFilePath(fp)))
+  const pages = []
+  for (const [name, text] of Object.entries(fixture.pages)) {
+    pages.push({ slug: name.replace(/\.html$/, ""), tree: fromHtml(text), frontmatter: {}, declared: [] })
+  }
+  const used = [...addressesThePagesUse(pages, fileAddresses, { addresses: rules.addresses }, (fp) => slugifyFilePath(fp))].sort()
+  const needed = [...fixture.needed].sort()
+  if (!same(used, needed)) failures.push(`addressFixture: the emitter's reader needs ${JSON.stringify(used)}, the fixture ${JSON.stringify(needed)}`)
 }
 for (const [page, address, resolved] of rules.resolveCases) {
   count += 1
@@ -193,6 +226,16 @@ for (const c of rules.cases) {
       const pdf = printPdfPath(file.data.frontmatter)
       if (pdf !== null) body += `<a class="plantoir-print plantoir-print-pdf" href="${joinSegments(rootPath, slugifyFilePath(pdf))}">Print</a>`
       if (c.footer) body += `<footer>${c.footer}</footer>`
+      // What Quartz's Head writes from the page's opening text (#901 review
+      // W1): a description is text, and a page that only mentions a file's
+      // name must not make the check put it back.
+      const description = toString(tree).trim().slice(0, 160)
+      const metas = [["name", "description"], ["property", "og:description"], ["name", "twitter:description"], ["property", "og:image:alt"]]
+      let head = `<title>${toHtml({ type: "text", value: String(file.data.frontmatter?.title ?? "") })}</title>`
+      for (const [kind, name] of metas) {
+        head += toHtml({ type: "element", tagName: "meta", properties: { [kind]: name, content: description }, children: [] })
+      }
+      head += `<meta property="og:image" content="https://example.org/static/og-image.png">`
       if (file.data.plantoirFiles) {
         for (const declared of file.data.plantoirFiles) {
           body += `<figure data-geogebra='${JSON.stringify({ sketch: slugifyFilePath(declared), root: rootPath })}'></figure>`
@@ -200,7 +243,7 @@ for (const c of rules.cases) {
       }
       const target = join(root, "public", slug + ".html")
       mkdirSync(dirname(target), { recursive: true })
-      writeFileSync(target, `<!DOCTYPE html><html><body>${body}</body></html>`)
+      writeFileSync(target, `<!DOCTYPE html><html><head>${head}</head><body>${body}</body></html>`)
     }
   } finally {
     process.chdir(cwd)

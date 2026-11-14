@@ -12,6 +12,13 @@ contracts/shared-rules.json -> siteFiles it can read without Quartz.
 * `checkCases`: each a built site and its content/ written to a temporary
   folder, the check run with repair on, and the counts and the files left
   as the case says;
+* `addressFixture` read three ways that share no code: site_files' reader
+  (the contract's one list of places that hold an address), this test's own
+  element table written from the HTML standard over a small DOM it builds,
+  and the fixture's `needed`, written by hand. Two readers written one from
+  the other agreed on the same mistake (901a review: alt text, a link's
+  title and a description were read as addresses), so a third is written
+  differently;
 * what a teacher reads and when (siteFiles.whenSaid), the marker
   (siteFiles.marker: counts only, never a file's name), the record
   (file-formats.json -> siteFilesRecord) and the side file;
@@ -135,6 +142,20 @@ class TheCheck(unittest.TestCase):
         outcome = site_files.check(public, content, repair=True)
         self.assertEqual((outcome["carried"], outcome["leftOff"], outcome["putBack"]), (1, 1, 1))
 
+    def test_a_put_back_fails_the_gate_and_a_correct_tree_has_none(self):
+        """main() (verify.sh's --check) exits 1 on any put-back, and a tree
+        that carries exactly what its pages use has none."""
+        public, content = self.temporary / "public", self.temporary / "content"
+        write_tree(public, {"index.html": '<img src="Media/a.png" alt="Media/b.png">'})
+        write_tree(content, ["Media/a.png", "Media/b.png"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(site_files.main(["--check", str(public), str(content)]), 1)
+        write_tree(public, {"Media/a.png": "a"})
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(site_files.main(["--check", str(public), str(content)]), 0)
+        shown = json.loads(said.getvalue())
+        self.assertEqual((shown["putBack"], shown["unreferenced"], shown["leftOff"]), (0, 0, 1))
+
     def test_the_reader_reads_every_way_a_case_names(self):
         html = ('<img src="a.png" srcset="b.png 1x, c.png 2x"><video poster="d.png"><source src="e.mp4">'
                 '<track src="f.vtt"></video><object data="g.pdf"></object><embed src="h.pdf">'
@@ -145,6 +166,220 @@ class TheCheck(unittest.TestCase):
         for name in ("a.png", "b.png", "c.png", "d.png", "e.mp4", "f.vtt", "g.pdf", "h.pdf", "i.png",
                      "j.png", "k.png", "../Media/l.ggb"):
             self.assertIn(name, found)
+
+
+# ---- The third reading -----------------------------------------------------
+#
+# Written from the HTML standard's attribute index ("valid URL potentially
+# surrounded by spaces" and friends), per ELEMENT, over a small DOM this test
+# builds itself, and never from site_files or the contract's list. It is not
+# the product's reader: it exists so the product's two readers cannot agree
+# on a mistake without a third, differently made, saying so.
+
+URL_ATTRIBUTES_BY_ELEMENT = {
+    "a": ("href", "xlink:href"),
+    "area": ("href",),
+    "link": ("href",),
+    "img": ("src",),
+    "source": ("src",),
+    "video": ("src", "poster"),
+    "audio": ("src",),
+    "track": ("src",),
+    "iframe": ("src",),
+    "embed": ("src",),
+    "script": ("src",),
+    "input": ("src", "formaction"),
+    "object": ("data",),
+    "form": ("action",),
+    "button": ("formaction",),
+    "body": ("background",),
+    "table": ("background",),
+    "td": ("background",),
+    "th": ("background",),
+    "image": ("href", "xlink:href"),
+    "use": ("href", "xlink:href"),
+}
+SRCSET_BY_ELEMENT = {"img": "srcset", "source": "srcset", "link": "imagesrcset"}
+SHARING_META = ("og:image", "og:image:url", "og:image:secure_url", "og:video", "og:video:url",
+                "og:video:secure_url", "og:audio", "og:audio:url", "og:audio:secure_url", "og:url",
+                "twitter:image", "twitter:player", "twitter:url")
+CSS_URL = __import__("re").compile(r"url\(\s*['\"]?([^'\")]+?)['\"]?\s*\)")
+
+
+class Node:
+    def __init__(self, tag, attributes, parent):
+        self.tag = tag
+        self.attributes = attributes
+        self.parent = parent
+        self.children = []
+        self.text = []
+
+
+class TinyDom(__import__("html.parser").parser.HTMLParser):
+    VOID = {"img", "source", "track", "embed", "input", "link", "meta", "br", "hr", "area", "col", "wbr", "base", "param"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.root = Node("#root", {}, None)
+        self.at = self.root
+
+    def handle_starttag(self, tag, attrs):
+        attributes = {}
+        for name, value in attrs:
+            attributes[name] = value if value is not None else ""
+        node = Node(tag, attributes, self.at)
+        self.at.children.append(node)
+        if tag not in self.VOID:
+            self.at = node
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in self.VOID and self.at.tag == tag:
+            self.at = self.at.parent
+
+    def handle_endtag(self, tag):
+        walker = self.at
+        while walker is not None and walker.tag != tag:
+            walker = walker.parent
+        if walker is not None and walker.parent is not None:
+            self.at = walker.parent
+
+    def handle_data(self, data):
+        self.at.text.append(data)
+
+
+def nodes_of(node):
+    found = [node]
+    for child in node.children:
+        found.extend(nodes_of(child))
+    return found
+
+
+def addresses_the_third_way(html_text):
+    """(address, base) pairs: base is "page" or "root"."""
+    dom = TinyDom()
+    dom.feed(html_text)
+    dom.close()
+    found = []
+    for node in nodes_of(dom.root):
+        for name in URL_ATTRIBUTES_BY_ELEMENT.get(node.tag, ()):
+            if name in node.attributes:
+                found.append((node.attributes[name].strip(), "page"))
+        srcset_name = SRCSET_BY_ELEMENT.get(node.tag)
+        if srcset_name and srcset_name in node.attributes:
+            for item in node.attributes[srcset_name].split(","):
+                words = item.split()
+                if words:
+                    found.append((words[0], "page"))
+        if "style" in node.attributes:
+            for match in CSS_URL.finditer(node.attributes["style"]):
+                found.append((match.group(1).strip(), "page"))
+        if node.tag == "style":
+            for match in CSS_URL.finditer("".join(node.text)):
+                found.append((match.group(1).strip(), "page"))
+        if node.tag == "meta":
+            kind = node.attributes.get("property", node.attributes.get("name"))
+            if kind in SHARING_META and "content" in node.attributes:
+                found.append((node.attributes["content"].strip(), "page"))
+        if "data-geogebra" in node.attributes:
+            spec = json.loads(node.attributes["data-geogebra"])
+            found.append(((spec.get("root") or ".").rstrip("/") + "/" + spec["sketch"], "page"))
+        if "data-phet" in node.attributes:
+            found.append((json.loads(node.attributes["data-phet"])["url"], "page"))
+        if "data-runner-wasm" in node.attributes:
+            found.append((node.attributes["data-runner-wasm"].lstrip("/"), "root"))
+    return found
+
+
+def needed_the_third_way(pages, file_addresses):
+    from urllib.parse import unquote, urljoin, urlsplit
+    needed = set()
+    for name, html_text in pages.items():
+        page_url = "https://fixture.invalid/" + name[: -len(".html")]
+        for address, base in addresses_the_third_way(html_text):
+            joined = urljoin("https://fixture.invalid/" if base == "root" else page_url, address)
+            parts = urlsplit(joined)
+            if parts.netloc != "fixture.invalid":
+                continue
+            target = unquote(parts.path).lstrip("/")
+            if target in file_addresses:
+                needed.add(target)
+    return needed
+
+
+class TheThirdReading(unittest.TestCase):
+
+    def setUp(self):
+        self.temporary = Path(tempfile.mkdtemp(prefix="plantoir-site-files-third-"))
+        self.fixture = RULES["addressFixture"]
+        self.file_addresses = set()
+        for name in self.fixture["files"]:
+            self.file_addresses.add(site_files.slugify_file_path(name))
+
+    def tearDown(self):
+        shutil.rmtree(self.temporary, ignore_errors=True)
+
+    def test_the_fixture_is_a_real_test(self):
+        """Every way a file can be named, and every way it can only be
+        mentioned, is in the fixture: a fixture without the second kind
+        would pass a reader that reads everything."""
+        needed = set(self.fixture["needed"])
+        self.assertGreaterEqual(len(needed), 15)
+        self.assertGreaterEqual(len(self.file_addresses - needed), 10, "too few files only mentioned")
+        self.assertTrue(needed <= self.file_addresses)
+
+    def test_three_readings_agree_on_the_fixture(self):
+        needed = set(self.fixture["needed"])
+        third = needed_the_third_way(self.fixture["pages"], self.file_addresses)
+        public = self.temporary / "public"
+        write_tree(public, self.fixture["pages"])
+        product = site_files.addresses_the_site_uses(public) & self.file_addresses
+        self.assertEqual(sorted(third), sorted(needed), "the test's own reading against the hand-written list")
+        self.assertEqual(sorted(product), sorted(needed), "site_files' reading against the hand-written list")
+
+    def test_the_check_puts_back_exactly_the_needed_files_and_nothing_on_a_correct_tree(self):
+        public, content = self.temporary / "public", self.temporary / "content"
+        write_tree(public, self.fixture["pages"])
+        write_tree(content, self.fixture["files"])
+        outcome = site_files.check(public, content, repair=True)
+        self.assertEqual(outcome["putBack"], len(self.fixture["needed"]))
+        self.assertEqual(outcome["unreferenced"], 0)
+        again = site_files.check(public, content, repair=False)
+        self.assertEqual((again["putBack"], again["putBackFailed"], again["unreferenced"]), (0, 0, 0))
+        self.assertEqual(again["carried"], len(self.fixture["needed"]))
+
+
+class TheOneList(unittest.TestCase):
+    """siteFiles.addresses is the one list both readers follow."""
+
+    def test_the_side_file_hands_the_emitter_the_contracts_list(self):
+        self.assertEqual(site_files.side_file("")["addresses"], RULES["addresses"])
+
+    def test_every_attribute_names_a_known_reading_and_elements(self):
+        reads = set(RULES["addresses"]["reads"])
+        for rule in RULES["addresses"]["attributes"]:
+            with self.subTest(attribute=rule["attribute"]):
+                self.assertIn(rule["read"], reads)
+                self.assertTrue(rule["elements"])
+                self.assertEqual(rule["attribute"], rule["attribute"].lower())
+
+    def test_nothing_the_list_calls_text_is_read(self):
+        page = ('<meta name="description" content="Media/a.png is here"><meta property="og:description" '
+                'content="Media/a.png"><img src="Media/b.png" alt="Media/a.png" title="Media/a.png" '
+                'aria-label="Media/a.png" data-note="Media/a.png"><div src="Media/a.png">Media/a.png</div>'
+                '<!-- Media/a.png --><code>Media/a.png</code>')
+        found = site_files.addresses_in_html(page)
+        self.assertEqual(found, ["Media/b.png"])
+
+    def test_the_tree_reader_is_given_the_list_and_has_no_other(self):
+        """The emitter's rules read the list from the side file: no attribute
+        name of its own, and no 'every property' fallback."""
+        source = (scripts_dir.parent / "support" / "quartz" / "plugins" / "emitters" / "siteFilesRules.ts").read_text(
+            encoding="utf-8")
+        self.assertIn("addresses?: AddressRules", source)
+        self.assertNotIn("Object.entries(properties)) {\n      if (typeof value === \"string\")", source)
+        for name in ('"imagesrcset"', '"srcSet"', '"datageogebra"', '"data-geogebra"', '"poster"', '"xLinkHref"'):
+            self.assertFalse(name in source, name + " is the contract's to say, not the rules file's")
 
 
 class WhatIsSaid(unittest.TestCase):
@@ -177,6 +412,17 @@ class WhatIsSaid(unittest.TestCase):
         self.assertEqual(lines[0], RULES["words"]["putBack"].replace("{file}", "Media/a.png"))
         self.assertIn("1 file in this course (1 KB)", lines[1])
 
+    def test_a_preview_says_a_put_back_in_its_own_words(self):
+        """Nothing is on the website until a deploy (901a review)."""
+        outcome = dict(self.OUTCOME, putBack=1, putBackFiles=["Media/a.png"], putBackFailed=1,
+                       putBackFailedFiles=["Media/b.png"])
+        lines = site_files.lines_to_say(outcome, {"leftOff": 2}, mode="preview", section=1)
+        self.assertEqual(lines, [RULES["words"]["putBackPreview"].replace("{file}", "Media/a.png"),
+                                 RULES["words"]["putBackFailedPreview"].replace("{file}", "Media/b.png")])
+        lines = site_files.lines_to_say(outcome, {"leftOff": 2}, mode="deploy", section=1)
+        self.assertEqual(lines, [RULES["words"]["putBack"].replace("{file}", "Media/a.png"),
+                                 RULES["words"]["putBackFailed"].replace("{file}", "Media/b.png")])
+
     def test_sizes(self):
         self.assertEqual(site_files.size_words(0), "1 KB")
         self.assertEqual(site_files.size_words(1_001), "2 KB")
@@ -201,7 +447,7 @@ class WhatIsSaid(unittest.TestCase):
         """The apps read these lines (SiteFilesReportTests on the Mac), so the
         build must print exactly them."""
         cases = RULES["marker"]["trailCases"]
-        self.assertGreaterEqual(len(cases), 6)
+        self.assertGreaterEqual(len(cases), 9)
         for case in cases:
             with self.subTest(case=case["name"]):
                 line = site_files.marker_line(case["outcome"], case["previous"], course="SCH3U", section=2,
