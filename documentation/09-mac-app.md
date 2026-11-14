@@ -12056,6 +12056,157 @@ pruner" above for why.
 
 **On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it" until #783 and since then with the slot naming the session's own assistant ("a GitHub Copilot session still open on {CODE} made it", or all three when its lease names none: `shared-rules.json` → `doorCourseHold.naming`), never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
 
+### Restoring one section from a backup (#897 C)
+
+**Russell's ruling, 2026-11-13: Restore from Backup…, for a backup made for
+one section, offers "Restore Section N" as the default button, with "Restore
+Whole Course" beside it.** Every route to a restore (Course ▸ Restore from
+Backup…, a backup's row, All Backups' Restore…) sets
+`workspace.backupRestoreRequest`, and the one alert in `SidebarView` asks
+`WorkspaceModel.oneSectionRestoreOffer(for:)` which section to offer, or none.
+The rule is `OneSectionRestore.offeredSection`; the cases, the file list and
+every sentence are `contracts/course-management.json` →
+`backups.restoreOneSection`, run by `OneSectionRestoreContractTests`.
+
+**When it is offered.** The backup's maker (`BackupMaker.menu` or
+`.assistant`, read from the name) names a section; that section is in the
+course now; the course is not kept for reference; no unit-word or folder
+rename has a record still on disk; the zip holds `section<N>/`; and the
+course's naming fits the backup's (`OneSectionRestore.Naming.difference`):
+the unit word, the class page scheme and the class folder are the same, and
+every folder the BACKUP lists among the shared and per-section folders is
+still listed, because `SpecialFolderRenamer` rewrites the links into a
+renamed folder in every page. A folder ADDED since never counts, and that
+was measured, not assumed: `build_site.preflight_update_course_config` adds
+every new top-level folder to those lists on every preview build (a new
+`Quizzes` folder and one build gave `['Concepts', 'Media', 'Quizzes']`; a new
+`Labs` at the top of a section gave `['All Classes', 'Labs']`), so comparing
+the lists exactly, as the first fix did, withdrew the offer after any new
+folder (the fix review, WRONG 1). A folder renamed or removed is refused
+with `wording.foldersChanged`, a changed word, scheme or class folder with
+`wording.namingChanged`; both are asked of the settings as SAVED on disk. The zip's part is read by
+`OneSectionRestore.readFacts`, `zipinfo -1` for the listing and `unzip -p`
+for `course_config.json` alone, once per backup (an unreadable zip is kept
+as holding nothing), when `backupRestoreRequest` is set, never while the
+alert draws. Otherwise the alert is the whole-course one, unchanged. Every
+condition is asked again at the click (`oneSectionRestoreRefusal`) BEFORE the
+whole course is archived, so a refused click leaves nothing in Archived.
+
+**What comes back.** `CourseRestorer.restoreSectionFromTheMenu`:
+
+- the section folder's contents, as before;
+- this section's per-section keys on every shared page, as before;
+- five files outside the folder: the class dates
+  (`.internal/timetable/section<N>.json`), the published record
+  (`.publish_state/section<N>.published-pages/`), the links checklist's
+  answers, the classes dated later that were kept, and the front-page answer.
+  Each comes back as the backup has it and is removed when the backup has
+  none. A rollover sets three of them aside, so before this a restore from
+  before a rollover gave last year's pages this year's dates and an empty
+  record, and said "put back";
+- the links checklist offer (written by the build) is discarded with the
+  built site;
+- the deploy stamp and the website markers are LEFT, because they describe the
+  live site; the legacy Netlify marker inside `.merged_output/section<N>/`
+  is kept across the discarded build for the same reason. The finished line
+  says the address is unchanged when the backup's record differs;
+- a shared page the backup does not have (made since) is hidden from this
+  section with `AssistPageVisibility.setting`, unless it already is. A page
+  Quartz never publishes (a dot folder, or `private/` or `templates/` at the
+  top) is left alone. Identity is the PATH, so a page renamed or moved since
+  the backup is hidden too: the safe direction, and the finished line says
+  only that the backup has no page at that place.
+
+**Measured and rejected.**
+
+- The plan named two files outside the folder; a grep of every
+  `section\(…)` file name under `mac-app/QuartzTeachers` found seven plus the
+  markers (plan review, amendment 17). The section's entries inside
+  `course_config.json` (fonts, emoji, grade and section marker) are left:
+  they are Course Settings choices in a file every section shares, no
+  Section menu change makes them, and putting them back means merging JSON.
+- For a page made since the backup the plan proposed taking this section's
+  keys off. Rejected (amendment 18): a page whose plain line is
+  `publish: true` and which the teacher hid for this section with
+  `publishForSection2: false` is then PUBLISHED to it.
+  `OneSectionRestoreTests.testASharedPageMadeSinceTheBackupIsHiddenFromTheSection`
+  holds both shapes.
+- Offering one section after the course's word for a unit changed was
+  rejected (amendment 19): the pages come back named for a scheme the course
+  no longer reads. The same holds for a shared or per-section folder renamed
+  since (the implementation review): the section's pages would link to the
+  old name. The restore asks again of the unpacked backup and refuses with
+  `wording.namingChanged` for the word, scheme or class folder and with
+  `wording.foldersChanged` for a folder renamed or removed; a folder ADDED
+  since never refuses.
+
+**Staged, then swapped, with a way back (both one-section routes).** The backup is
+unpacked into `courses/.internal/restoring/<id>/`, on the courses' own volume
+so every move is a rename (the system temporary folder can be another
+volume, where a move is a copy and a rollback a second copy). Nothing in the
+course moves until the backup is unpacked and checked. Then
+`swapSectionInPlace` moves the live children and the live outside files
+aside, moves the backup's in, and on any failure moves every moved file back,
+last first: the teacher is told the section was left as it was. If a move
+back fails too, nothing is deleted: the set-aside files move to
+`courses/_backups/<CODE>/Section N before a restore <stamp>` (no comma, since
+the sentence that names it is punctuated after it), a
+folder Finder shows (`courses/.internal` is a dot folder Finder hides), on
+the same volume, where nothing reads a folder (the backup and archive lists
+read zip names only). The trail gets `section restore stopped part way`
+with that path, and the teacher reads `wording.stoppedPartWay`: the section
+may hold a mix, and where the files are; on the menu's route also that the
+course as it was is in Archived. When the kept folder holds no file Finder
+shows (every page went back and only hidden records are left; the fix review
+measured that in 5 plus 46 of 91 double failures on its fixture), the
+sentence is `wording.stoppedPartWayNothingToOpen` instead, so nobody is sent
+to what looks like an empty folder; the trail names the folder either way.
+If that last move fails as well, the files stay in `courses/.internal/
+restoring/` and that path is what is said.
+
+Measured on 2026-11-13. A standalone copy of the swap, the function's text
+sliced out and compiled with `swiftc -default-isolation MainActor`: a failure
+injected at each of the five moves of a small fixture left the section and
+its class dates exactly as they were. The implementation review ran the same
+slice on a larger fixture (four section files, one hidden and one nested; six
+outside files): a failure at each of the 14 forward moves left course and
+payload byte-identical; and a failure at forward move k and way-back move j,
+for every k in 2…14 and j < k, 91 cases, kept every original file in the
+course or the aside folder. **12 of those 91 left `section<N>/` holding a
+mix of live and backup files. That is a known limit**: a way back that
+itself fails cannot be made whole, so it is said rather than hidden.
+
+By Russell's ruling on #897 the assistant window's own "Restore Section N…"
+uses the same swap, over the section folder only; nothing it says on success
+changed, and on a stopped restore it says the restorer's sentence without
+its usual "Nothing was put back:" in front. **Restore Whole Course is NOT
+staged**: `CourseRestorer.restoreBackup` still removes the course's contents
+before moving the backup's in, protected by the archive made first. Whether
+it gets the same swap is a question with Russell. Windows' section restore
+still deletes first (#873).
+
+Two edges, both true of the whole-course restore as well. A section removed
+and later added again under the same number is offered an old backup of
+the section that had that number. And anything in `section<N>/` that backups
+leave out (`CourseArchiver.excludedFromArchives`: `build`, `out`, `dist`,
+`.cache`, `node_modules`, `.git` and the rest) is removed by the swap and is
+in neither the backup nor the archive made first.
+
+**Order around it** (`WorkspaceModel.restoreOneSection`): the
+`structuralRefusal` before and after, a refusal while the Section menu or the
+assistant is changing that section, the WHOLE course archived first (so
+"nothing is lost" holds before Undo), the restore, a `section restored` line
+(`ActivityTrail.restoredOneSectionFromTheMenuLine`: the backup's and the
+archive's file names, the count of pages hidden and the count of pages that
+could not be saved), `page settings left as
+they were` when pages could not take a key, and the finished line in the
+backup alert's slot.
+
+**For Undo (#899).** `restoreSectionFromTheMenu(…keepingWhatWasReplaced:)`
+is handed the aside folder, holding the section and its outside files as they
+were, after the swap and before it is deleted. A journal takes its snapshot
+there; the shared pages' key edits that follow are `editField`s.
+
 ## Notifications: the one permission, and where it is asked (#212)
 
 A scheduled publish tells the teacher how it went with a macOS notification,

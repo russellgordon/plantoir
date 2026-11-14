@@ -5942,8 +5942,24 @@ that way. Migrating during a restore would mean handing the teacher something
 their backup never contained, in the one operation whose whole promise is that
 it does not.
 
-The section folder is emptied and refilled rather than swapped, for the same
-reason `restoreBackup` documents: Obsidian holds the folder open.
+The section folder itself is never swapped, for the same reason
+`restoreBackup` documents: Obsidian holds the folder open. Its CONTENTS were
+emptied and then refilled until #897 C, and a move that failed part way left
+the section half empty while the window said "Nothing was put back". Since
+then (Russell's ruling on #897, 2026-11-13) the window's restore uses the same
+staged swap as Restore from Backup…: the backup is unpacked beside the
+courses, the live contents move aside, the backup's move in, and a failure
+sends every moved file back. If moving back fails too, the window says the
+restorer's own sentence (`backups.restoreOneSection.wording.stoppedPartWay`, or
+`stoppedPartWayNothingToOpen` when no page is left set aside:
+the section may be a mix, and where the set-aside files are kept) without its
+usual "Nothing was put back:" in front, which would then be untrue, and the
+trail gets `section restore stopped part way`. Nothing the window says on success changed; the
+swap covers the section folder only, so the window still leaves the class
+dates and the published record as they are, and leaves a shared page made
+since the conversation began alone. Those are the menu route's alone
+(`documentation/09-mac-app.md` → "Restoring one section from a backup
+(#897 C)").
 
 **Say the surprising part in the confirmation, not in a doc.** Anything the
 teacher changed in that section during the conversation goes back too,

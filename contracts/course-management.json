@@ -323,6 +323,360 @@
           "why": "The shared finder reaches a page with blank lines before its fence (#177), and the build reads it the same either way. The mac's restore rebuilds the page from the fence and so drops them; Windows kept them from parity bundle 2 until Russell chose one behaviour on 2026-10-01 (Windows matched the mac). Proposed from Windows; the mac already behaves this way, so it should pass there unchanged."
         }
       ]
+    },
+    "restoreOneSection": {
+      "note": "Restore from Backup... for a backup made for ONE section (#897, piece C; Russell's ruling 2026-11-13: the default button is \"Restore Section N\", with \"Restore Whole Course\" as the other). AUTHORED; edit as text. offerCases run the rule that decides whether the alert offers one section (OneSectionRestore.offeredSection on the mac); namingCases run what counts as the course naming its class pages the same way; filesOutsideTheSection is every file of one section that lives outside section<N>/, with what the one-section restore does with it; wording is every sentence the alert and its finished line say, as templates ({CODE} the course folder's code, {N} the section, {MADE_BY} the backup's own who-made-it ending, {WHEN} its moment, {COUNT} a count over 1, {REASON} the file system's own words, {KEPT} where set-aside files were kept, as a path inside the working folder). The built-in assistant window's \"Restore Section N...\" is NOT this route: its surface and its sentences on success are unchanged (#897, frozen), so it keeps restoringOneSectionsKeys alone and brings back none of filesOutsideTheSection. By Russell's ruling on #897 (2026-11-13) it shares the staged swap with this route, over the section folder only, and the stopped-part-way sentence (wording.stoppedPartWay, without stoppedPartWayArchived). Restore Whole Course, the alert's other button, is NOT staged: CourseRestorer.restoreBackup still removes the course's contents before moving the backup's in, protected only by the archive made first. Whether it gets the same treatment is a question with Russell.",
+      "routeWhy": "A backup the Section menu or the assistant made before changing Section 2 is a copy of the WHOLE course, and a whole-course restore from it throws away an evening's marking in Section 1. Offering the one section the backup was made for, as the default, is the same scope the assistant's own button has always had; the whole course stays one button away. The whole course is archived first either way, so nothing is lost before Undo (#899) exists.",
+      "offeredWhy": "Offered only when each of these holds, and each is a fault that would report success otherwise: the backup's NAME says it was made for one section (read through the maker in zipNames, never by matching text); that section is in the course now (a section removed since has nowhere to go); the course is one the teacher teaches (a reference course is restored whole or not at all); no rename of the course's word for a unit or of its folders is half done (its record is still on disk); the zip holds section<N>/; and the course's naming fits the backup's (namingCases: the word for a unit, the class page scheme and the class folder are the same, and every folder in the backup's shared and per-section folder lists is still listed, in any order, since a folder rename rewrites links in every page; a folder ADDED since never withdraws the offer, because every preview build adds a folder it finds to those lists). Each namingCases case carries difference: null, classPages (wording.namingChanged) or folders (wording.foldersChanged). A section of 'Unit 3, Day 2' pages put back into a course that now says 'Module' no longer counts as classes, so Add Next Class starts again at Module 1, Day 1 and Re-date passes them over, all after 'Section 2 is back to how it was'. When it is not offered, the alert is the whole-course one, unchanged. Every one is asked AGAIN at the click, BEFORE the whole course is archived (a refused click leaves nothing in Archived), with wording.notMadeForThisSection, sectionNotInCourse, renameUnfinished, namingChanged or foldersChanged; and the naming once more of the unpacked backup, from the settings as SAVED on disk.",
+      "offerCases": [
+        {
+          "name": "a Section menu backup for a section that is there: offered",
+          "maker": "menu",
+          "makerSection": 2,
+          "sectionExistsNow": true,
+          "keptForReference": false,
+          "renameUnfinished": false,
+          "backupHasTheSection": true,
+          "namingSameAsNow": true,
+          "offered": 2,
+          "why": "The ordinary case: the menu backed up the course before changing Section 2."
+        },
+        {
+          "name": "an assistant backup: offered too",
+          "maker": "assistant",
+          "makerSection": 1,
+          "sectionExistsNow": true,
+          "keptForReference": false,
+          "renameUnfinished": false,
+          "backupHasTheSection": true,
+          "namingSameAsNow": true,
+          "offered": 1,
+          "why": "The assistant's backup was made for one conversation about one section, which is the shape this route is for."
+        },
+        {
+          "name": "a teacher's own backup: not offered",
+          "maker": "teacher",
+          "makerSection": null,
+          "sectionExistsNow": true,
+          "keptForReference": false,
+          "renameUnfinished": false,
+          "backupHasTheSection": true,
+          "namingSameAsNow": true,
+          "offered": null,
+          "why": "Made by Back Up Now for the whole course; nothing says which section it was for."
+        },
+        {
+          "name": "the section has been removed since: not offered",
+          "maker": "menu",
+          "makerSection": 3,
+          "sectionExistsNow": false,
+          "keptForReference": false,
+          "renameUnfinished": false,
+          "backupHasTheSection": true,
+          "namingSameAsNow": true,
+          "offered": null,
+          "why": "There is no Section 3 to put back into. Restore Whole Course brings it back with everything else."
+        },
+        {
+          "name": "a reference course: not offered",
+          "maker": "menu",
+          "makerSection": 1,
+          "sectionExistsNow": true,
+          "keptForReference": true,
+          "renameUnfinished": false,
+          "backupHasTheSection": true,
+          "namingSameAsNow": true,
+          "offered": null,
+          "why": "Putting one section back is an edit, and a reference course is not edited; restoring it whole is putting a copy of the shelf back."
+        },
+        {
+          "name": "a rename did not finish: not offered",
+          "maker": "menu",
+          "makerSection": 2,
+          "sectionExistsNow": true,
+          "keptForReference": false,
+          "renameUnfinished": true,
+          "backupHasTheSection": true,
+          "namingSameAsNow": true,
+          "offered": null,
+          "why": "Half the course carries the new names and half the old, so a section from the backup could land in either. A whole-course restore clears the rename's record with the pages it described."
+        },
+        {
+          "name": "the zip has no folder for that section: not offered",
+          "maker": "assistant",
+          "makerSection": 2,
+          "sectionExistsNow": true,
+          "keptForReference": false,
+          "renameUnfinished": false,
+          "backupHasTheSection": false,
+          "namingSameAsNow": true,
+          "offered": null,
+          "why": "Read from the zip's listing; the restore refuses the same way (CourseRestorer.Problem.sectionMissingFromBackup) if it is asked anyway."
+        },
+        {
+          "name": "the course's word for a unit changed since: not offered",
+          "maker": "menu",
+          "makerSection": 2,
+          "sectionExistsNow": true,
+          "keptForReference": false,
+          "renameUnfinished": false,
+          "backupHasTheSection": true,
+          "namingSameAsNow": false,
+          "offered": null,
+          "why": "Amendment 19 of the #897 plan review: the section's pages would come back named for a scheme the course no longer reads."
+        }
+      ],
+      "namingCases": [
+        {
+          "name": "the same settings: the same naming",
+          "live": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes",
+              "Notes"
+            ]
+          },
+          "backup": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes",
+              "Notes"
+            ]
+          },
+          "same": true,
+          "difference": null,
+          "why": "Nothing about how class pages are named has moved."
+        },
+        {
+          "name": "no word recorded reads as Unit",
+          "live": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes"
+            ]
+          },
+          "backup": {
+            "per_section_folders": [
+              "All Classes"
+            ]
+          },
+          "same": true,
+          "difference": null,
+          "why": "An absent unit_word means Unit (ClassPageTerm), so a backup made before the key existed names its pages the same way."
+        },
+        {
+          "name": "Unit renamed to Module: different",
+          "live": {
+            "unit_word": "Module",
+            "per_section_folders": [
+              "All Classes"
+            ]
+          },
+          "backup": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes"
+            ]
+          },
+          "same": false,
+          "difference": "classPages",
+          "why": "The backup's 'Unit 3, Day 2' pages no longer parse as classes in a course that says Module."
+        },
+        {
+          "name": "under the numbered scheme, the word changed: different",
+          "live": {
+            "class_page_scheme": "numbered",
+            "unit_word": "Week",
+            "per_section_folders": [
+              "All Classes"
+            ]
+          },
+          "backup": {
+            "class_page_scheme": "numbered",
+            "unit_word": "Meeting",
+            "per_section_folders": [
+              "All Classes"
+            ]
+          },
+          "same": false,
+          "difference": "classPages",
+          "why": "Under the numbered scheme the word IS the name, 'Week 3' against 'Meeting 3'."
+        },
+        {
+          "name": "the class folder was renamed: different",
+          "live": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "Lessons",
+              "Notes"
+            ],
+            "class_folder": "Lessons"
+          },
+          "backup": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes",
+              "Notes"
+            ],
+            "class_folder": "All Classes"
+          },
+          "same": false,
+          "difference": "classPages",
+          "why": "The section's class pages would come back in a folder the course no longer reads classes from (ClassFolder.name)."
+        },
+        {
+          "name": "another per-section folder renamed: different",
+          "live": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes",
+              "Handouts"
+            ]
+          },
+          "backup": {
+            "unit_word": "Unit",
+            "per_section_folders": [
+              "All Classes",
+              "Notes"
+            ]
+          },
+          "same": false,
+          "difference": "folders",
+          "why": "A per-section folder rename (SpecialFolderRenamer) moves the folder in every section AND rewrites the links into it in every page, so Section N's pages from before it would come back in a folder the course no longer lists, linking to the old name, under 'Section N is back to how it was'. The #897 C implementation review, INCOMPLETE 1; this case said the same until then."
+        },
+        {
+          "name": "a shared folder was renamed: different",
+          "live": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Ideas", "Media"]},
+          "backup": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Concepts", "Media"]},
+          "same": false,
+          "difference": "folders",
+          "why": "The rename rewrote the links to Concepts in every page; Section N's pages from the backup still link to Concepts, which the built site no longer has."
+        },
+        {
+          "name": "the class page scheme alone changed: different",
+          "live": {"class_page_scheme": "numbered", "unit_word": "Unit", "per_section_folders": ["All Classes"]},
+          "backup": {"unit_word": "Unit", "per_section_folders": ["All Classes"]},
+          "same": false,
+          "difference": "classPages",
+          "why": "'Unit 3, Day 2' is a class under unit_day and is not one under numbered, where a class is 'Unit 3'."
+        },
+        {
+          "name": "a shared folder added since the backup: the same",
+          "live": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Concepts", "Media", "Quizzes"]},
+          "backup": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Concepts", "Media"]},
+          "same": true,
+          "difference": null,
+          "why": "Every preview build adds a folder it finds to shared_folders (build_site.preflight_update_course_config, measured 2026-11-13: a new Quizzes folder and one build gave ['Concepts', 'Media', 'Quizzes']). Nothing in Section N's pages from the backup links into a folder that did not exist then, so an added folder must never withdraw the offer (#897 C fix review, WRONG 1)."
+        },
+        {
+          "name": "a per-section folder added since the backup: the same",
+          "live": {"unit_word": "Unit", "per_section_folders": ["All Classes", "Labs"]},
+          "backup": {"unit_word": "Unit", "per_section_folders": ["All Classes"]},
+          "same": true,
+          "difference": null,
+          "why": "The same build adds a new folder at the top of a section to per_section_folders (measured: ['All Classes', 'Labs']). The section comes back without Labs, which is the section as it was."
+        },
+        {
+          "name": "a shared and a per-section folder added at once, the lists in another order: the same",
+          "live": {"unit_word": "Unit", "per_section_folders": ["Labs", "All Classes"], "shared_folders": ["Quizzes", "Media", "Concepts"]},
+          "backup": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Concepts", "Media"]},
+          "same": true,
+          "difference": null,
+          "why": "Only a folder the BACKUP lists that is gone now counts: the backup's lists must each be inside the live ones, in any order."
+        },
+        {
+          "name": "a shared folder removed since the backup: different",
+          "live": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Media"]},
+          "backup": {"unit_word": "Unit", "per_section_folders": ["All Classes"], "shared_folders": ["Concepts", "Media"]},
+          "same": false,
+          "difference": "folders",
+          "why": "Section N's pages from the backup may link into Concepts, which the course no longer has."
+        }
+      ],
+      "filesOutsideTheSection": [
+        {
+          "path": ".internal/timetable/section{N}.json",
+          "folder": false,
+          "treatment": "fromTheBackup",
+          "why": "The section's class dates. A section restored from before a rollover with this year's dates kept is last year's pages on this year's days: half old, half new."
+        },
+        {
+          "path": ".publish_state/section{N}.published-pages",
+          "folder": true,
+          "treatment": "fromTheBackup",
+          "why": "Which pages were published before, which decides whether a page keeps its date when it is published again. A rollover sets it aside; a restore from before the rollover must bring it back."
+        },
+        {
+          "path": ".publish_state/section{N}.links-checklist-answered.json",
+          "folder": false,
+          "treatment": "fromTheBackup",
+          "why": "What the links checklist was already answered for. Set aside by a rollover with the record above."
+        },
+        {
+          "path": ".publish_state/section{N}.later-classes-kept.json",
+          "folder": false,
+          "treatment": "fromTheBackup",
+          "why": "Classes dated later that the teacher chose to keep (#475). Set aside by a rollover with the two above."
+        },
+        {
+          "path": ".publish_state/section{N}.front-page-not-today.json",
+          "folder": false,
+          "treatment": "fromTheBackup",
+          "why": "The teacher's answer to today's class on the front page (#397), which belongs to the pages it was asked about."
+        },
+        {
+          "path": ".publish_state/section{N}.links-checklist.json",
+          "folder": false,
+          "treatment": "discarded",
+          "why": "The offer the build writes from the pages. It is discarded with the built site and the next build writes it from the pages that came back."
+        },
+        {
+          "path": ".publish_state/section{N}.json",
+          "folder": false,
+          "treatment": "leftAsItIs",
+          "why": "The deploy stamp: when the website was last deployed. It describes the live site, which a restore does not change."
+        },
+        {
+          "path": ".netlify_sites/section{N}.json",
+          "folder": false,
+          "treatment": "leftAsItIs",
+          "why": "Which Netlify site students read. A backup older than the first deploy has no marker, so putting the backup's back would make the next deploy create a second site. The finished line says so when the backup's record differs (wording.websiteUnchanged)."
+        },
+        {
+          "path": ".cloudflare_sites/section{N}.json",
+          "folder": false,
+          "treatment": "leftAsItIs",
+          "why": "The same, for Cloudflare Pages."
+        }
+      ],
+      "filesOutsideTheSectionWhy": "Measured 2026-11-13 by a grep of every section\\(...) file name under mac-app/QuartzTeachers (the #897 plan review, amendment 17): seven files outside section<N>/ plus the website markers. The legacy Netlify marker kept INSIDE the section's built output (.merged_output/section<N>/.netlify_site.json, which deploy.py still reads) is kept across the discarded build for the same reason the markers are left. The section's entries inside course_config.json (fonts, emoji, shown grade and section marker) are left as they are: they are Course Settings choices in a file every section shares, no Section menu change makes them, and rewriting them would mean merging JSON the teacher may have changed for other sections since. Moved, not copied: everything moves aside into courses/.internal/restoring/<id>/ (the same volume, so each move is a rename) before the backup's files move in, and a failed move sends every moved file back (sectionLeftAsItWas). If sending them back fails too, the set-aside files are moved to courses/_backups/<CODE>/Section N before a restore <stamp> (a folder Finder shows, on the same volume, where nothing reads a folder: the backup and archive lists read zip names only), the trail gets section restore stopped part way, and the teacher is told the section may be a mix, where the files are and, on this route, that the course as it was is in Archived (stoppedPartWay). Measured by the implementation review: 91 double-failure cases kept every file; 12 of them left section<N>/ a mix of old and new.",
+      "pagesMadeSinceTheBackupWhy": "A page outside every section folder that the backup does not have was made after it, so when the backup was made Section N's students could not see it. It is hidden from Section N with the ordinary per-section setter (publishForSection<N>: false), unless it already is; a page with no room for a key is left as it is and counted with the pages whose setting could not be put back. Rejected (amendment 18 of the #897 plan review): taking Section N's keys OFF such a page, which PUBLISHES a page whose plain publish: is true and which the teacher had hidden for Section N, while the finished line says the section is back to how it was. Pages Quartz never publishes are left alone: any part of the path starting with a dot, or private/ or templates/ at the top (geogebraFences.files.notPublished.folders); a template made since and hidden here would hide every page later made from it. Identity is the PATH, so a page renamed or moved since the backup counts as made since and is hidden, the safe direction; the sentence says only that the backup has no page at that place.",
+      "wording": {
+        "title": "Restore {CODE} from this backup?",
+        "message": "This backup was made {MADE_BY}, on {WHEN}.\n\nRestore Section {N} puts back that section alone: its pages, its settings on the pages every section shares, its class dates and its record of what was published. Your other sections are not touched. Anything changed in Section {N} since then goes back too, including work done in Obsidian.\n\nRestore Whole Course puts every section back to how it was then.\n\nEither way, nothing is lost: the course as it is now moves to Archived, at the bottom of the sidebar, where you can get it back. This backup is kept.",
+        "restoreSectionButton": "Restore Section {N}",
+        "restoreWholeCourseButton": "Restore Whole Course",
+        "doneTitle": "Section {N} of {CODE} is back",
+        "done": "Section {N} is back to how it was on {WHEN}. Nothing in your other sections changed.",
+        "hiddenSinceOne": "One shared page that is not in the backup is now hidden from Section {N}, because the backup has no page at that place.",
+        "hiddenSinceMany": "{COUNT} shared pages that are not in the backup are now hidden from Section {N}, because the backup has no pages at those places.",
+        "notPutBackOne": "One shared page kept the setting it has now for Section {N}: the settings at the top of it are written in a way Plantoir cannot add to, so that page was left exactly as it is.",
+        "notPutBackMany": "{COUNT} shared pages kept the settings they have now for Section {N}: the settings at the top of them are written in a way Plantoir cannot add to, so those pages were left exactly as they are.",
+        "notSavedOne": "One shared page could not be saved, so it was left as it is. Its setting for Section {N} may not be what the backup had.",
+        "notSavedMany": "{COUNT} shared pages could not be saved, so they were left as they are. Their settings for Section {N} may not be what the backup had.",
+        "websiteUnchanged": "Section {N} still goes to the website address it has now. A restore does not change where students read it.",
+        "notMadeForThisSection": "This backup was not made for Section {N}. Restore Whole Course puts every section back together instead.",
+        "foldersChanged": "Section {N} cannot be put back on its own, because a folder this backup's course had has been renamed or removed in {CODE} since. Restore Whole Course puts every section back together instead.",
+        "namingChanged": "Section {N} cannot be put back on its own, because the class pages of {CODE} are named differently now than they were in this backup. Restore Whole Course puts every section back together instead.",
+        "sectionNotInCourse": "{CODE} has no Section {N} now, so there is nowhere to put it back. Restore Whole Course puts every section back together instead.",
+        "busy": "Section {N} of {CODE} is being changed right now. Wait for that to finish, then restore.",
+        "leftAsItWas": "Section {N} was left as it was, because the restore could not finish: {REASON}",
+        "stoppedPartWay": "The restore of Section {N} stopped part way, so Section {N} may now hold some files from the backup and some as they were. Nothing was deleted: the files that were set aside are in the folder \"{KEPT}\" inside your working folder.",
+        "stoppedPartWayNothingToOpen": "The restore of Section {N} stopped part way, so Section {N} may now hold some files from the backup and some as they were. Nothing was deleted, and none of your pages are left set aside.",
+        "stoppedPartWayArchived": "The course as it was before you pressed Restore is in Archived, at the bottom of the sidebar.",
+        "renameUnfinished": "Section {N} cannot be put back on its own while a rename in {CODE} has not finished. Finish it in Course Settings, or Restore Whole Course instead.",
+        "doneJoin": "The finished line is done, then each of hiddenSince, notPutBack, notSaved and websiteUnchanged that applies, in that order, each after a blank line (two newlines). websiteUnchanged applies when the section has a live website marker and the backup's (compared as parsed JSON) is missing or different; with no live marker nothing is said. stoppedPartWay (or stoppedPartWayNothingToOpen, when the kept folder holds no file whose path has no part starting with a dot: every page went back and only hidden records are left) is followed by a space and stoppedPartWayArchived on this route, and stands alone in the assistant window, which archives nothing first and does NOT put its own 'Nothing was put back:' before it. {KEPT} is a path inside the working folder. The default button is restoreSectionButton; restoreWholeCourseButton and Cancel are the others."
+      }
     }
   },
   "courseCode": {

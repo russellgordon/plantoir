@@ -112,8 +112,12 @@ nonisolated enum ActivityTrail {
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"
         /// A teacher put a section back to how it was when an assistant
-        /// conversation started ("Restore Section N…"). Carries the course,
-        /// the section and the backup's FILE NAME — never a page.
+        /// conversation started ("Restore Section N…"), or, since #897 C,
+        /// from Restore from Backup…'s "Restore Section N" for a backup made
+        /// for one section (`restoredOneSectionFromTheMenuLine`: the archive
+        /// made first, how many shared pages made since the backup were
+        /// hidden, and how many shared pages could not be saved, too). Carries the course, the section and the backup's
+        /// FILE NAME — never a page.
         ///
         /// It is the one line that explains a section whose pages are older
         /// than the conversation that changed them. Without it the trail shows
@@ -125,6 +129,14 @@ nonisolated enum ActivityTrail {
         /// Windows recorded this first (`AssistWindow.xaml.cs`); the mac had
         /// the same button and wrote nothing.
         case sectionRestored = "section restored"
+        /// A one-section restore (from Restore from Backup… or the assistant
+        /// window's "Restore Section N…") failed part way AND could not move
+        /// every file back (#897 C). The section may hold some files from the
+        /// backup and some as they were. Carries the course, the section and
+        /// where the set-aside files were kept, as a path inside the working
+        /// folder, never a page. Without it the trail shows nothing at all
+        /// for the one restore outcome that leaves a section changed.
+        case sectionRestoreStoppedPartWay = "section restore stopped part way"
         /// A teacher added a section to a course ("Add Section…"). Carries
         /// the course, the new section, and how many pages shared by every
         /// section were given a date and a published-or-hidden setting for
@@ -1621,6 +1633,40 @@ nonisolated enum ActivityTrail {
             }
         }
         return nil
+    }
+
+    /// The words for `sectionRestored` when Restore from Backup… put ONE
+    /// section back (#897 C): the backup's file name, the archive made of the
+    /// whole course first, and how many shared pages made since the backup
+    /// were hidden from the section. File names and a count, never a page.
+    static func restoredOneSectionFromTheMenuLine(
+        backupFileName: String,
+        archiveFileName: String?,
+        pagesMadeSinceHidden: Int,
+        pagesNotSaved: Int = 0
+    ) -> String {
+        var line: String = "put the section back from \(backupFileName), from Restore from Backup…"
+        if let archiveFileName {
+            line += "; the course as it was is in Archived as \(archiveFileName)"
+        }
+        if pagesMadeSinceHidden == 1 {
+            line += "; 1 shared page made since the backup is now hidden from this section"
+        } else if pagesMadeSinceHidden > 1 {
+            line += "; \(pagesMadeSinceHidden) shared pages made since the backup are now hidden from this section"
+        }
+        if pagesNotSaved == 1 {
+            line += "; 1 shared page could not be saved and is as it was"
+        } else if pagesNotSaved > 1 {
+            line += "; \(pagesNotSaved) shared pages could not be saved and are as they were"
+        }
+        return line
+    }
+
+    /// The words for `sectionRestoreStoppedPartWay`: what may be mixed, and
+    /// where the set-aside files are. A path, never a page.
+    static func sectionRestoreStoppedPartWayLine(keptAt: String) -> String {
+        return "a section restore stopped part way and could not move every file back; the section may hold "
+             + "some files from the backup and some as they were; the files set aside are kept in " + keptAt
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and
