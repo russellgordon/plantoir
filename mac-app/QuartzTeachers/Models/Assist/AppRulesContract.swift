@@ -122,7 +122,8 @@ enum AppRulesContract {
         let committed: Data? = try? Data(contentsOf: url)
         if let data = committed,
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            rules = existing
+            // A generated key the app no longer writes leaves the file (#866).
+            rules = ContractText.withoutGeneratedKeys(existing)
         }
         for (key, value) in generated() {
             rules[key] = value
@@ -139,7 +140,11 @@ enum AppRulesContract {
         do {
             // Over the committed text (#866): the authored keys keep their
             // authors' order, so a run that changes nothing changes no byte.
-            try AssistContract.encode(rules, keepingTheTextOf: committed).write(to: url)
+            // The generated keys are always written in the generator's own text.
+            try AssistContract.encode(
+                rules, keepingTheTextOf: committed,
+                generatedKeys: Set(generatedKeys + ["generated"])
+            ).write(to: url)
         } catch {
             return "Could not write the app rules: \(error.localizedDescription)"
         }

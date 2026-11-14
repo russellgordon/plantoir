@@ -21,6 +21,15 @@ import Foundation
 /// where the sorted order would put it). A run that changes nothing changes
 /// no byte, and a second run is always byte for byte the first.
 ///
+/// Keeping text is for AUTHORED keys only (the batch review of #866). A
+/// GENERATED key, one the caller names in `generatedKeys`, is always written
+/// in the generator's own text, so a hand edit that changed only its spacing
+/// or escaping is rewritten rather than kept; "generated, never hand-edited"
+/// then holds for the form as well as the meaning. And a generated key Swift
+/// no longer writes is removed from the file rather than left to look
+/// authored: `withoutGeneratedKeys` takes out every key the committed file's
+/// own `generated.keys` names before the generator's values go in.
+///
 /// Anything it cannot read in that shape, or a result that does not mean
 /// exactly what the generator meant, falls back to the plain sorted
 /// encoding: keeping text is never allowed to change what the file says.
@@ -53,8 +62,13 @@ nonisolated enum ContractText {
 
     /// `value` written over `existing` (the file as it is committed, or nil
     /// when there is none), keeping the committed text of every top-level
-    /// key whose value is unchanged.
-    static func encode(_ value: [String: Any], keepingTheTextOf existing: Data?) throws -> Data {
+    /// authored key whose value is unchanged. A key in `generatedKeys` is
+    /// always written in the generator's own text.
+    static func encode(
+        _ value: [String: Any],
+        keepingTheTextOf existing: Data?,
+        generatedKeys: Set<String> = []
+    ) throws -> Data {
         let fresh: Data = try sortedEncoding(value)
         guard let existing,
               let oldText = String(data: existing, encoding: .utf8),
@@ -104,7 +118,8 @@ nonisolated enum ContractText {
         var pieces: [String] = []
         for key in order {
             var text: String = newTextByKey[key] ?? ""
-            if let committed = oldTextByKey[key],
+            if !generatedKeys.contains(key),
+               let committed = oldTextByKey[key],
                let wanted = value[key],
                try means(committed, key: key, theSameAs: wanted) {
                 text = committed
@@ -120,6 +135,23 @@ nonisolated enum ContractText {
             return fresh
         }
         return writtenData
+    }
+
+    /// `rules` (a committed file, read) without the keys its own
+    /// `generated.keys` names, so that a generated key the generator no longer
+    /// writes leaves the file instead of staying behind looking authored. The
+    /// generator then puts back every key it still writes. A file with no
+    /// `generated.keys` is returned as it is.
+    static func withoutGeneratedKeys(_ rules: [String: Any]) -> [String: Any] {
+        guard let generated = rules["generated"] as? [String: Any],
+              let keys = generated["keys"] as? [String] else {
+            return rules
+        }
+        var kept: [String: Any] = rules
+        for key in keys {
+            kept.removeValue(forKey: key)
+        }
+        return kept
     }
 
     /// The top-level members of a pretty-printed JSON object, or nil when the

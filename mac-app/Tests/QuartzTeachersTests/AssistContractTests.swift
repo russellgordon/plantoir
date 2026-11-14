@@ -174,6 +174,85 @@ final class AssistContractTests: XCTestCase {
         )
     }
 
+    /// A GENERATED key is always written in the generator's own text, so a
+    /// hand edit that changed only its spacing or escaping does not survive,
+    /// while the same edit in an AUTHORED key does; and a generated key the
+    /// committed `generated.keys` names but the generator no longer writes
+    /// leaves the file (#866, the batch review).
+    func testAGeneratedKeyIsWrittenInTheGeneratorsTextAndAStaleOneLeaves() throws {
+        let committedText: String = """
+        {
+          "authored":   {
+            "name" : "a case written by hand"
+          },
+          "generated" : {
+            "keys" : [
+              "readout",
+              "stale"
+            ]
+          },
+          "readout":  [
+            "caf\\u00e9 \\/ bar"
+          ],
+          "stale" : [
+            "left behind"
+          ]
+        }
+
+        """
+        let committed: Data = Data(committedText.utf8)
+        let existing: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: committed) as? [String: Any]
+        )
+
+        // What the writers do: take out every key generated.keys names, then
+        // put back the ones the generator still writes.
+        var rules: [String: Any] = ContractText.withoutGeneratedKeys(existing)
+        XCTAssertNil(rules["stale"])
+        XCTAssertNil(rules["readout"])
+        XCTAssertNotNil(rules["authored"])
+        rules["readout"] = ["café / bar"]
+        rules["generated"] = ["keys": ["readout"]]
+
+        let written: String = String(
+            decoding: try ContractText.encode(
+                rules, keepingTheTextOf: committed, generatedKeys: ["readout", "generated"]
+            ),
+            as: UTF8.self
+        )
+        let expected: String = """
+        {
+          "authored":   {
+            "name" : "a case written by hand"
+          },
+          "generated" : {
+            "keys" : [
+              "readout"
+            ]
+          },
+          "readout" : [
+            "café / bar"
+          ]
+        }
+
+        """
+        XCTAssertEqual(written, expected)
+
+        // Without naming it generated, the same readout keeps its hand text:
+        // the rule is the caller's list, not the value.
+        var asAuthored: [String: Any] = existing
+        asAuthored.removeValue(forKey: "stale")
+        asAuthored["generated"] = ["keys": ["readout"]]
+        let kept: String = String(
+            decoding: try ContractText.encode(asAuthored, keepingTheTextOf: committed), as: UTF8.self
+        )
+        XCTAssertTrue(kept.contains("\"readout\":  [\n    \"caf\\u00e9 \\/ bar\"\n  ]"), kept)
+
+        // A file with no generated.keys is left as it is.
+        let plain: [String: Any] = ["a": 1]
+        XCTAssertEqual(ContractText.withoutGeneratedKeys(plain)["a"] as? Int, 1)
+    }
+
     /// The hand-written half is still there.
     ///
     /// This is the failure a careless regeneration produces, and it would

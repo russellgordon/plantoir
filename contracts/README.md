@@ -409,6 +409,26 @@ and that the next hand edit would undo), and a test that requires authored
 keys to be sorted (it would make every author re-sort by hand what nobody
 reads in sorted order).
 
+**Keeping text is for AUTHORED keys only** (the batch review, 2026-11-14). A
+GENERATED key (every key the file's `generated.keys` names, and `generated`
+itself) is always written in the generator's own text, so a hand edit that
+changed only its spacing or its escaping (`\/`, `\u2014`) is rewritten on the
+next run rather than kept, and "generated, never hand-edited" holds for the
+form as well as the meaning. A generated key the app no longer writes is
+REMOVED: each writer first takes out every key the committed file's own
+`generated.keys` names (`ContractText.withoutGeneratedKeys`), then puts back
+the ones it still writes, so a retired readout cannot stay behind looking
+authored. Measured with the writer compiled standalone on `origin/dev`
+86ae77e53's `app-rules.json` and `assist-cases.json`: both came back byte for
+byte, twice. On doctored copies, a spacing edit inside `milestones` and an
+escaping edit inside `tools` were rewritten, a stale `staleReadout` named in
+`generated.keys` was removed, and the same spacing edit inside the authored
+`outsideAgents` was kept. Pinned by
+`AssistContractTests.testAGeneratedKeyIsWrittenInTheGeneratorsTextAndAStaleOneLeaves`.
+The keeping is per top-level key: a key that held both a readout and authored
+text would be rewritten whole when the readout moved, and no key is mixed
+today.
+
 That diff is how the change TRAVELS, and the issue is how the other side finds
 out — see "A change here is a handover" above. Committing one without opening
 the other leaves a suite that goes red for reasons its reader has no way to
@@ -1942,6 +1962,7 @@ After the second fix round: still **552** (no list added; `whileUnitPlansAreShar
 
 **Re-taken 2026-11-13 for #850 (Open in Browser for a deployed folder)**, on `issue/850-open-in-browser` with `origin/dev` 743ff01ee merged, which read **555** (one more than #783's 554, from the pieces merged after it): **560** (re-taken with the walker on the merged tree). Five lists added, all AUTHORED, in `shared-rules.json` → `deployedFolderInBrowser`: `offeredCases` (6), `address.cases` (4), `connectionCases` (7) and `resolution.cases` (76), run on the mac by `DeployedFolderOfferTests` and `DeployedFolderResolutionTests`; and `stopCases` (10), which is prose (`when`/`then`) that no test runs, and is EXEMPT (the table below). Grown: `quittingWhileWorkIsUnderWay.cases` 9 → 10 and `subjectMenus.cases` 21 → 24 (with #783, every case carries `sectionReviseWithCopilot` where it applies). `activityTrail.mustRecord` is 181 (178 + #850's three).
 **Re-taken 2026-11-14 for #879, #887, #791 and #866** (one branch, `issue/879-small-mac-four` off `origin/dev` 86ae77e53, which read **576**): **578**. Two lists added, both AUTHORED. `shared-rules.json` → `activityTrail.lineShape.placeCases.cases` (5, #879), run on the mac by `ActivityTrailPlaceTests`. `app-rules.json` → `outsideAgents.greetingMustSay` (8, #791), which was a list of strings that no suite read (the 707a paragraph above) and is now a list of `{key, says, where}` entries run on the mac by `AppRulesContractTests.testEveryDoorsGreetingSaysWhatTheContractSays` against the greeting each Revise door's script really carries, with `greetingMustNotSay` (Russell's ruling on #750) checked against the same greetings. Both are owed on Windows by the `windows` issue for this batch. `activityTrail.mustRecord` unchanged at 194: no event was added ("build declined, course busy elsewhere" changed its `carries`).
+After the batch review: still **578**. `greetingMustNotSay` gained `mustMatch` (7) and `mustNotMatch` (4), lists of strings rather than of objects, so the walker does not count them; they are run on the mac by `AppRulesContractTests.testTheGreetingsForbiddenExpressionsCatchTheirCases` and owed on Windows by the same `windows` issue. `mustRecord` unchanged.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
