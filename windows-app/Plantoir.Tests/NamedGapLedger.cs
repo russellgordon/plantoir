@@ -161,6 +161,9 @@ internal static class NamedGapLedger
     /// <summary><c>shared-rules.json</c> → <c>specialNames.platformWording.machine.usedIn</c>, by entry (<c>MachineWordContractTests.EverySentenceTheContractWritesWithTheMachineIsSaidFilled</c>).</summary>
     internal const string MachineWordUsedIn = "shared-rules.json → specialNames.platformWording.machine.usedIn";
 
+    /// <summary><c>app-rules.json</c> → <c>outsideAgents.planAUnit.buttons</c>, by <c>assistant</c> (<c>PlanAUnitTests.TheWordsAreTheContracts</c>).</summary>
+    internal const string PlanAUnitButtons = "app-rules.json → outsideAgents.planAUnit.buttons";
+
     // Wired in by #884's first part (2026-11-13, after the mac's #783 and
     // #850 merged): each area below holds only what #884 or #889 builds.
 
@@ -196,6 +199,18 @@ internal static class NamedGapLedger
     /// for, and <c>CLOSED</c> (a failure) the day it passes.
     /// </summary>
     internal const string LauncherRunnerRows = "windows-app/test_launcher_rules.ps1 → Report rows";
+
+    // Wired in by #868's held-by-name piece (2026-11-13, after the mac's
+    // #835 part 3, #855, #839 and #902 merged).
+
+    /// <summary>
+    /// <c>shared-rules.json</c> → <c>quittingWhileWorkIsUnderWay.cases</c>, by case
+    /// <c>name</c>: a case naming <c>assistantsBeingSetUp</c>, which this app
+    /// cannot have yet (<c>QuitConfirmationTests.EveryQuitCaseIsDecidedAsTheContractSays</c>).
+    /// A held case must name a set-up and must still be decided DIFFERENTLY
+    /// here; every other case is asserted exactly.
+    /// </summary>
+    internal const string QuitCases = "shared-rules.json → quittingWhileWorkIsUnderWay.cases";
 
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
     // parses each entry's milestone as a version and requires it to be LATER
@@ -257,6 +272,7 @@ internal static class NamedGapLedger
     private const string Reason824 = "sharing a course's unit plans (with #848's look before a share) is #824's piece of v2.0.0, not built here yet";
     private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
     private const string Reason827 = "the groups a teacher makes on the reference shelf are #827's piece of v2.0.0, not built here yet";
+    private const string Reason884 = "GitHub Copilot as a third outside assistant (the mac's #783) is #884's piece of v2.0.0; Windows has no Copilot door yet";
 
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
     private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
@@ -264,6 +280,10 @@ internal static class NamedGapLedger
     private const string Reason885 = "what plantoir-mcp answers a call that names no section (or no howMany) is #885's piece of v2.0.0 (the mac's #865): measured first, then these sentences where it mis-answers; not built here yet";
     private const string Reason895 = "every outside door's greeting saying it can make printed handouts (greetingHandoutsSentence, the mac's #859 piece A) is #895's piece of v2.0.0, not built here yet";
     private const string Reason889 ="Open in Browser for a section deployed to a folder is #889's piece of v2.0.0 (the mac's #850), not built here yet";
+
+    // #868's held-by-name piece (2026-11-13): the mac's #835 part 3 and #855 merged into dev.
+    private const string Reason868Sections = "a build, preview or deploy holding only its own section (a work lease's sixth line, the mac's #835 part 3) is #868's piece of v2.0.0; until it lands every Windows lease holds the whole course and a lease's sixth line is read as course-wide, so no hold here is ever on one section and the course-wide sentence is the true one";
+    private const string Reason903 = "setting up Claude Code, Codex or GitHub Copilot from Settings (the mac's #855) is #903's piece of v2.0.0; Windows has no set-up yet, so none can be under way, recorded or quit through";
 
     /// <summary>
     /// The outside doors the contract names that this app does not have,
@@ -301,6 +321,8 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 799, V200, Reason799, "site built again before deploying"),
         Owed(ActivityTrailEvents, 801, V200, Reason801, "looked at a course's unit plans", "asked an assistant to plan a unit"),
         Owed(ActivityTrailEvents, 820, V200, Reason820, "opened a unit plan in the browser"),
+        // 790a (2026-11-13): Plan a Unit's third button arrived with the mac's #783.
+        Owed(PlanAUnitButtons, 884, V200, Reason884, "copilot"),
         Owed(ActivityTrailEvents, 811, V200, Reason811,
              "looked at a section's curriculum coverage", "asked to make a section's coverage map again"),
         Owed(ActivityTrailEvents, 824, V200, Reason824,
@@ -372,6 +394,16 @@ internal static class NamedGapLedger
              "a refusal beside a figure needs a preview and a deploy, said in one sentence",
              "a semicolon a row brings is written as a comma, and a very long course name is cut",
              "a row's own braces are handed over as written, and a double quote becomes an apostrophe"),
+
+        // ---- #868's held-by-name piece (2026-11-13): what the mac's #835
+        // part 3 (holds narrow to the section) and #855 (Set Up an
+        // Assistant…) brought. #839's Help and #902 turned nothing red here.
+        Owed(AssistWordingKeys, 868, V200, Reason868Sections, "sectionIsBeingBuiltElsewhere"),
+        Owed(ActivityTrailEvents, 903, V200, Reason903,
+             "outside assistant set-up opened", "outside assistant set-up record set aside", "outside assistant set-up started",
+             "outside assistant set up", "outside assistant could not be set up", "outside assistant set-up settled",
+             "outside assistant sign-in opened", "outside assistant sign-in checked", "outside assistant removed"),
+        Owed(QuitCases, 903, V200, Reason903, "an outside assistant is being set up"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
