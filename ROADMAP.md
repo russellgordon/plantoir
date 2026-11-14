@@ -126,12 +126,10 @@ ready.
   teacher at the quick start.
   ([#851](https://github.com/russellgordon/plantoir/issues/851))
 - **plantoir.app, rewritten in plain words**, showing what Plantoir can do,
-  printable pages, runnable Python and maths included; the notes for every
+  printable pages, runnable Python, maths and science included; the notes for every
   past release are rewritten the same way. Help is on the website too, with
   a switch between the Mac's steps and Windows'.
   ([#840](https://github.com/russellgordon/plantoir/issues/840), [#486](https://github.com/russellgordon/plantoir/issues/486), [#841](https://github.com/russellgordon/plantoir/issues/841))
-- **plantoir.app shows off science**, alongside the maths and coding it
-  already shows ([#485](https://github.com/russellgordon/plantoir/issues/485)).
 - **My Progress, settings and more.** A switch and the list of
   success-criteria headings in Course Settings, a way for students to narrow
   the page to a date or a unit, and a check that it prints well.
