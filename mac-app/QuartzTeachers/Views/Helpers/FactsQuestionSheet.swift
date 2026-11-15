@@ -154,8 +154,5 @@ struct FactsQuestionSheet: View {
                 .accessibilityIdentifier("\(identifier)Message")
         })
         .frame(width: FactsQuestionSheet.width)
-        .onExitCommand {
-            cancel()
-        }
     }
 }
