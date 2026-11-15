@@ -1053,6 +1053,16 @@ else
   cat /tmp/verify_lock_test.log
 fi
 
+# An empty answer (lsof, grep, find or docker port finding nothing) is not
+# the end of a run under pipefail, and the #684 port check's retry loop
+# really looks again (GitHub #972).
+if (cd scripts && python3 test_verify_empty_looks.py) >/tmp/verify_empty_looks_test.log 2>&1; then
+  pass "an empty answer does not end verify.sh, and the port check's retry loop looks again (scripts/test_verify_empty_looks.py, #972)"
+else
+  fail "an empty answer does not end verify.sh, and the port check's retry loop looks again (scripts/test_verify_empty_looks.py, #972)"
+  cat /tmp/verify_empty_looks_test.log
+fi
+
 # preview.sh announces the address the app opens, or says it cannot and stops;
 # it never announces a port it guessed (GitHub #235). Runs the launcher's own
 # functions with docker answering as told, so it needs no Docker at all.
@@ -6703,8 +6713,11 @@ else
     RENDERED_STATUS=0
     run_check node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
       >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
-    RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
-    RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p')"
+    # A checker that died before its DONE line leaves grep nothing to find,
+    # which is grep's exit 1; `|| true` keeps that from ending the run under
+    # pipefail before the fail line below can say so (#972).
+    RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //' || true)"
+    RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p' || true)"
     if [[ "$RENDERED_STATUS" == "3" ]] && ! grep -q '^OK: ' /tmp/verify_rendered_features.log; then
       # No engine at all: skips only, and no pass line (a SKIP is never a pass).
       rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
@@ -6722,7 +6735,7 @@ else
       RED_STATUS=0
       run_check node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
         >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
-      RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
+      RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //' || true)"
       if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
         pass "the rendered check sees, $(rendered_engines /tmp/verify_rendered_red.log): in each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) runs, $(grep '^OK: sabotage ' /tmp/verify_rendered_red.log | sed 's/ \[.*//' | sort -u | wc -l | tr -d ' ') sabotages over the engines each applies to, the row aimed at failed for its own reason and the page's other rows stayed green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
         rendered_lines SKIPPED /tmp/verify_rendered_red.log skip
@@ -6773,7 +6786,10 @@ fi
 # the first build said (read from it, not a number written here: the quiz
 # playground's two programs, #563, made a written "8 of 9" wrong), and the
 # Swift page came out the same.
-SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1)"
+# A first build that never said it is grep's exit 1, which `|| true` turns
+# into the empty answer the check below fails on, rather than a silent end
+# of the run under pipefail (#972).
+SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1 || true)"
 if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
    && [[ -n "$SWIFT_READY_FIRST" ]] && grep -q "$SWIFT_READY_FIRST" /tmp/verify_figures_second.log \
    && same_page_but_for_quartz_ids "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html; then
@@ -7114,11 +7130,16 @@ print(entry["marker"]["prefix"] + " thisMacOnly EXC2O/1")')"
   # What this Mac actually listens on for the new site address: 127.0.0.1,
   # and never *: the forward appears a moment after the start, so ask for up
   # to ten seconds.
-  _site_port="$(docker port "$CONTAINER_NAME" 8081/tcp 2>/dev/null | head -1 | sed 's/.*://')"
-  _ws_port="$(docker port "$CONTAINER_NAME" 9081/tcp 2>/dev/null | head -1 | sed 's/.*://')"
+  # Each look ends in `|| true` because an empty answer is an answer here:
+  # `docker port` exits 1 for a port with no forward and `lsof` exits 1 when
+  # nothing listens, and under pipefail and set -e either one ended the
+  # whole run on the spot, with no FAIL line, before the loop could look a
+  # second time (#972). The check below says what an empty answer means.
+  _site_port="$(docker port "$CONTAINER_NAME" 8081/tcp 2>/dev/null | head -1 | sed 's/.*://' || true)"
+  _ws_port="$(docker port "$CONTAINER_NAME" 9081/tcp 2>/dev/null | head -1 | sed 's/.*://' || true)"
   _listening=""
   for _try in 1 2 3 4 5 6 7 8 9 10; do
-    _listening="$(lsof -nP -iTCP:"${_site_port:-0}" -iTCP:"${_ws_port:-0}" -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { print $9 }' | sort -u | tr '\n' ' ')"
+    _listening="$(lsof -nP -iTCP:"${_site_port:-0}" -iTCP:"${_ws_port:-0}" -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { print $9 }' | sort -u | tr '\n' ' ' || true)"
     [[ -n "$_listening" ]] && break
     sleep 1
   done
@@ -7364,8 +7385,10 @@ else
   fail "a folder publish from it, to a relative folder with a colon, did not finish"
   tail -20 /tmp/verify_colon_folder_publish.log
 fi
-COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
-COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+# A folder the publish never made is find's exit 1; `|| true` lets the count
+# read 0 and the check below fail, rather than pipefail ending the run (#972).
+COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ' || true)"
+COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ' || true)"
 if [[ -f "$VERIFY_COLON_DIR/out 26:27/section1/index.html" && "$COLON_PUBLISHED_PAGES" == "$COLON_BUILT_PAGES" ]]; then
   pass "and every page (${COLON_PUBLISHED_PAGES} of ${COLON_BUILT_PAGES}) is in that folder, inside the working folder"
 else
