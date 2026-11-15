@@ -5337,6 +5337,20 @@ cannot be answered: the check and the page server run on, and a check that
 is then killed the same way leaves its browser for the next run's leftover
 line to name.
 
+**An empty answer is not the end of a run (#972).** `verify.sh` runs under
+`set -euo pipefail`, and `lsof`, `grep`, `find` and `docker port` each exit 1
+when they have nothing to report. Where such a command opens a pipeline
+inside `$( )` and finding nothing is an answer the next check can read, the
+substitution ends in `|| true`; without it the run ended on the spot, with
+no FAIL line and no Result block. That is how the #684 port check's retry
+loop died on its first look on a Mac whose port forward comes up a moment
+late, and never looked a second time. `scripts/test_verify_empty_looks.py`
+holds it: it cuts those lines and the loop out of `verify.sh` itself and
+runs them against stand-ins that find nothing, and checks that the loop
+looks ten times when nothing listens and stops as soon as a late forward
+answers. A new lookup of this shape needs the same ending and a line in
+that test's list.
+
 **Rejected.** Starting each browser in a process group of its own and ending
 the group, as the issue first proposed: a browser in the check's own group
 already receives a signal sent to the whole group, SIGKILL included, so
