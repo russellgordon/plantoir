@@ -46,7 +46,18 @@ nonisolated struct FactsQuestion: Equatable, Sendable {
 /// `documentation/09-mac-app.md` → "Return and Escape in this release's
 /// questions"). A sheet can have both: Cancel is the default button
 /// (`.defaultButton(isEnabled:)`, Return) and the sheet's own Escape is
-/// Cancel too (`.onExitCommand`). The button that goes ahead takes no key.
+/// Cancel too. The button that goes ahead takes no key.
+///
+/// **Escape is a key equivalent, not only `.onExitCommand` (#973).**
+/// `.onExitCommand` fires only while something inside the sheet holds the
+/// keys. With Keyboard Navigation off, the macOS default, the sheet's window
+/// itself holds them, nothing in it answered Escape, and SwiftUI closed the
+/// sheet through its binding without running `cancel`. So Escape is
+/// `.keyboardShortcut(.cancelAction)`: on Cancel when going ahead is the
+/// default, and otherwise, since Cancel holds Return and a button carries
+/// one key, on an invisible button behind Cancel that runs `cancel` too.
+/// `.onExitCommand` stays as the second way in. `QuestionKeysTests` presses
+/// Escape on each question and checks `cancel` ran.
 ///
 /// The facts are a grouped `Form`, the system's own form styling, with
 /// scrolling off and its height its rows': `FactsQuestionTests` measures
@@ -105,6 +116,7 @@ struct FactsQuestionSheet: View {
                     Button(question.cancel, role: .cancel) {
                         cancel()
                     }
+                    .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("\(identifier)Cancel")
                     Button(question.action) {
                         goAhead()
@@ -121,6 +133,18 @@ struct FactsQuestionSheet: View {
                     }
                     .defaultButton(isEnabled: true)
                     .accessibilityIdentifier("\(identifier)Cancel")
+                    // Cancel holds Return, and a button carries one key, so
+                    // Escape goes on a button nobody sees or hears, behind
+                    // it (#973).
+                    .background {
+                        Button("") {
+                            cancel()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                        .accessibilityHidden(true)
+                    }
                 }
             }
             .padding([.horizontal, .bottom], 20)

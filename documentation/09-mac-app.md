@@ -1456,7 +1456,9 @@ Cancel answers Return and Escape.
 
 **A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
 (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives the sheet
-Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
+Escape, which its `.interactiveDismissDisabled()` had taken away. (That works
+there because its search field holds the keys; `.onExitCommand` alone is not
+enough on a sheet where nothing does, #973, below.) The share's
 console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
 own), measured and pinned, not changed.
 
@@ -1477,8 +1479,31 @@ the action and Cancel. A fact that is missing is no row, never a blank one
 (Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
 accessibility element, so VoiceOver reads the title, the message, then
 "label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
-the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
-the action takes no key.
+Escape is Cancel too, so it answers Return and Escape; the action takes no
+key.
+
+**Escape is a key equivalent, not only `.onExitCommand` (#973).** The first
+version gave the sheet Escape through `.onExitCommand` alone, which fires only
+while something inside the sheet holds the keys. With Keyboard Navigation off
+(System Settings ▸ Keyboard, `AppleKeyboardUIMode` unset, the macOS default
+and what most teachers have) the sheet's window itself is first responder, no
+button answered Escape, and SwiftUI closed the sheet through its binding
+without running `cancel`: measured on the second Mac, where the answer the
+test read was `""`, not `cancel`. The main Mac has Keyboard Navigation on,
+focus lands on a button, `.onExitCommand` fires, and its suite was green.
+Now Escape is `.keyboardShortcut(.cancelAction)`: on Cancel when going ahead
+is the default (after Change Password, where Share Again takes Return), and
+otherwise, since Cancel holds Return and a button carries one key, on an
+invisible, unlabelled button behind Cancel that runs the same `cancel`.
+`.onExitCommand` stays as a second way in. `QuestionKeysTests` presses Escape
+on every such question in a sheet whose `cancel` writes its answer and
+requires that answer, because the real presenters' `cancel` clears the same
+state SwiftUI's own dismissal clears, so "the sheet closed" could not tell
+them apart. **The lesson for any sheet, on either platform: a test of a key
+that passes only where focus lands on a control proves nothing for a teacher
+with default settings.** Rejected, not tried: making the sheet's content focusable so
+`.onExitCommand` fires (it would change what Tab and the focus ring do on a sheet
+whose only controls are its buttons, and still depends on where focus lands).
 
 Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
 `message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
