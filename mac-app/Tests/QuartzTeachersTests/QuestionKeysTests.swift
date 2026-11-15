@@ -27,9 +27,13 @@ import XCTest
 ///
 /// **Since #834** Replace It…, Remove Group and Start the Groups Again are
 /// `FactsQuestionSheet`s, where Cancel answers BOTH keys (`.defaultButton`
-/// for Return, the sheet's `.onExitCommand` for Escape) and the action takes
-/// none, as Russell first asked. Since #833 the public-address warning is
-/// one too, after the two tables, and the dialog after Change Password is
+/// for Return, `.keyboardShortcut(.cancelAction)` for Escape since #973)
+/// and the action takes none, as Russell first asked. Each test checks that
+/// Escape ran the sheet's `cancel`, not only that the sheet closed: with
+/// Keyboard Navigation off (the macOS default) `.onExitCommand` alone never
+/// fired, and SwiftUI closed the sheet around `cancel` (#973, measured on
+/// the second Mac; the main Mac has Keyboard Navigation on and hid it).
+/// Since #833 the public-address warning is one too, after the two tables, and the dialog after Change Password is
 /// one whose Share Again is the default (Russell) and Later is Escape.
 ///
 /// Measured failing on the code before #832: put
@@ -133,6 +137,19 @@ final class QuestionKeysTests: XCTestCase {
         return lists
     }
 
+    /// Replace It…'s question, as `ReplacePage` asks it.
+    static func replaceQuestion() -> FactsQuestion {
+        return FactsQuestion(
+            title: "Replace EXC2O in 2025–26?",
+            message: ReferenceReplaceWording.message,
+            rows: ReferenceReplaceWording.rows(
+                sections: "1 section", pages: "2 pages", size: "4 KB", date: "12 November 2026", folder: "EXC2O"
+            ),
+            action: ReferenceReplaceWording.confirmButton,
+            cancel: ReferenceReplaceWording.cancelButton
+        )
+    }
+
     /// The share's console, presented as `PlanShareBar` presents it.
     struct ConsolePage: View {
 
@@ -162,15 +179,7 @@ final class QuestionKeysTests: XCTestCase {
 
         @State var warning: ReferenceReplacer.Warning? = ReferenceReplacer.Warning(
             folderName: "EXC2O", title: "Replace EXC2O in 2025–26?",
-            question: FactsQuestion(
-                title: "Replace EXC2O in 2025–26?",
-                message: ReferenceReplaceWording.message,
-                rows: ReferenceReplaceWording.rows(
-                    sections: "1 section", pages: "2 pages", size: "4 KB", date: "12 November 2026", folder: "EXC2O"
-                ),
-                action: ReferenceReplaceWording.confirmButton,
-                cancel: ReferenceReplaceWording.cancelButton
-            )
+            question: QuestionKeysTests.replaceQuestion()
         )
 
         let replaced: Answers
@@ -320,8 +329,16 @@ final class QuestionKeysTests: XCTestCase {
     /// Escape each close it through Cancel, and neither goes ahead. Each key
     /// is pressed on a question opened afresh by `open`, which hands back
     /// the window, whether it is still asked, and whether it went ahead.
+    ///
+    /// Closing is not enough (#973): SwiftUI closes a sheet on Escape by
+    /// itself, through its binding, without running `cancel`, and the real
+    /// presenters' `cancel` clears the same state the binding does, so they
+    /// cannot tell the two apart. So each key is pressed again on the same
+    /// `question` in `FactsPage`, whose `cancel` writes its answer, and the
+    /// answer must be `cancel`.
     func checkCancelAnswersBothKeys(
         what: String,
+        question: FactsQuestion,
         open: () throws -> (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool)
     ) rethrows {
         for key in [Key.returnKey, Key.escape] {
@@ -333,6 +350,24 @@ final class QuestionKeysTests: XCTestCase {
             XCTAssertFalse(shown.wentAhead(), "\(what): \(key) went ahead instead of cancelling")
             close(shown.window)
         }
+        for key in [Key.returnKey, Key.escape] {
+            checkTheAnswer(to: question, goAheadIsTheDefault: false, key: key, is: "cancel", what: what)
+        }
+    }
+
+    /// Presses `key` on `question` in `FactsPage` and checks which of the
+    /// sheet's closures answered: `go`, `cancel`, or nothing ("") when the
+    /// sheet was closed around them (#973).
+    func checkTheAnswer(
+        to question: FactsQuestion, goAheadIsTheDefault: Bool, key: Key, is expected: String, what: String
+    ) {
+        let answers: Answers = Answers()
+        let page: FactsPage = FactsPage(question: question, goAheadIsTheDefault: goAheadIsTheDefault, answers: answers)
+        let window: NSWindow = windowShowing(page)
+        press(key, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(what): \(key) did not answer the question")
+        XCTAssertEqual(answers.answer, expected, "\(what): \(key)")
+        close(window)
     }
 
     /// The trail as it stands, so a test can tell whether going ahead wrote
@@ -346,7 +381,8 @@ final class QuestionKeysTests: XCTestCase {
     func testReturnAndEscapeAreCancelOnTheRemoveGroupQuestion() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        try checkCancelAnswersBothKeys(what: "Remove Group") {
+        let question: FactsQuestion = ReferenceGroupWording.removeGroupQuestion(group: "Electives", courseCount: 0)
+        try checkCancelAnswersBothKeys(what: "Remove Group", question: question) {
             let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
             workspace.workspaceURL = root
             workspace.removeGroupRequest = ReferenceShelfGroup(
@@ -364,7 +400,7 @@ final class QuestionKeysTests: XCTestCase {
     func testReturnAndEscapeAreCancelOnStartTheGroupsAgain() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        try checkCancelAnswersBothKeys(what: "Start the Groups Again") {
+        try checkCancelAnswersBothKeys(what: "Start the Groups Again", question: ReferenceGroupWording.startAgainQuestion) {
             let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
             workspace.workspaceURL = root
             workspace.isAskingToStartReferenceGroupsAgain = true
@@ -377,7 +413,7 @@ final class QuestionKeysTests: XCTestCase {
     }
 
     func testReturnAndEscapeAreCancelOnTheReplaceWarning() {
-        checkCancelAnswersBothKeys(what: "Replace It…") {
+        checkCancelAnswersBothKeys(what: "Replace It…", question: QuestionKeysTests.replaceQuestion()) {
             let replaced: Answers = Answers()
             let page: ReplacePage = ReplacePage(replaced: replaced)
             let window: NSWindow = windowShowing(page)
@@ -408,10 +444,11 @@ final class QuestionKeysTests: XCTestCase {
     /// Return (the note in #832). Since #833 it comes after the two tables,
     /// on #834's sheet, where Cancel answers Return and Escape.
     func testReturnAndEscapeAreCancelOnThePublicAddressWarning() {
-        checkCancelAnswersBothKeys(what: "the public-address warning") {
+        let question: FactsQuestion = PlanSharing.warningQuestion(shared: 3, heldBack: 1, keysInShared: 1)
+        checkCancelAnswersBothKeys(what: "the public-address warning", question: question) {
             let answers: Answers = Answers()
             let page: FactsPage = FactsPage(
-                question: PlanSharing.warningQuestion(shared: 3, heldBack: 1, keysInShared: 1),
+                question: question,
                 goAheadIsTheDefault: false,
                 answers: answers
             )
@@ -425,20 +462,9 @@ final class QuestionKeysTests: XCTestCase {
     /// After Change Password (#833): Share Again is the default, Russell's
     /// choice, and Escape is Later.
     func testReturnIsShareAgainAndEscapeIsLaterAfterChangePassword() {
-        let expected: [(Key, String)] = [(Key.returnKey, "go"), (Key.escape, "cancel")]
-        for (key, answer) in expected {
-            let answers: Answers = Answers()
-            let page: FactsPage = FactsPage(
-                question: PlanSharing.newPasswordQuestion(earlierYearShared: true),
-                goAheadIsTheDefault: true,
-                answers: answers
-            )
-            let window: NSWindow = windowShowing(page)
-            press(key, in: window)
-            XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(key) did not answer the dialog")
-            XCTAssertEqual(answers.answer, answer, "\(key) after Change Password")
-            close(window)
-        }
+        let question: FactsQuestion = PlanSharing.newPasswordQuestion(earlierYearShared: true)
+        checkTheAnswer(to: question, goAheadIsTheDefault: true, key: Key.returnKey, is: "go", what: "after Change Password")
+        checkTheAnswer(to: question, goAheadIsTheDefault: true, key: Key.escape, is: "cancel", what: "after Change Password")
     }
 
     func testTheTwoListsSheetTakesReturnAndEscapeAsCancel() {
