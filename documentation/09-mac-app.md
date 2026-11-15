@@ -1442,30 +1442,33 @@ A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
 a Return given to it later is dropped. So "Cancel is the default" and "Escape
 closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
 kept the first and lost the second without anybody noticing: the structure
-test pinned the modifier, not the key. The questions now use the destructive
-row of the table: **Escape is Cancel, and Return presses neither button**, so
-a Return typed out of habit still removes, replaces, starts again or shares
-nothing. That was #832's answer for Remove Group, Start the Groups Again,
-Replace It… and the public-address warning, whose Share Without a Password
-used to take Return. **Since #834 the first three are sheets, where Cancel
-answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
-below), and so, since #833, is the public-address warning: it comes after
-the two tables before a share and is a `FactsQuestionSheet` too, so its
-Cancel answers Return and Escape.
-`QuestionKeysTests` presses both keys on each, through the real modifiers.
+test pinned the modifier, not the key. #832 then used the destructive row of
+the table: **Escape is Cancel, and Return presses neither button**, so a
+Return typed out of habit removes, replaces, starts again or shares nothing.
+That was its answer for Remove Group, Start the Groups Again, Replace It… and
+the public-address warning, whose Share Without a Password used to take
+Return. Since #834 the first three are sheets (`FactsQuestionSheet`, below),
+and since #833 so are the public-address warning and the dialog after Change
+Password. From #834 until #973 Cancel on those sheets answered Return AND
+Escape, as Russell first asked. **Since #973 (Russell, 2026-11-15) the sheets
+follow Apple's Human Interface Guidelines, and on the risky questions Return
+does nothing again**: "Return does nothing on risky questions" below.
+`QuestionKeysTests` presses the keys on each, through the real modifiers.
 
-**A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
-(`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives the sheet
-Escape, which its `.interactiveDismissDisabled()` had taken away. (That works
-there because its search field holds the keys; `.onExitCommand` alone is not
-enough on a sheet where nothing does, #973, below.) The share's
-console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
-own), measured and pinned, not changed.
+**The two-lists sheet is not a facts sheet and is unchanged by #973:** Cancel
+keeps Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives
+the sheet Escape, which its `.interactiveDismissDisabled()` had taken away.
+(That works there because its search field holds the keys; `.onExitCommand`
+alone is not enough on a sheet where nothing does, #973, below.) Whether its
+Cancel should stay the default is part of the interface audit, #975. The
+share's console already closed on Escape (SwiftUI closes a sheet with no
+Cancel of its own), measured and pinned, not changed.
 
 **Rejected in #832:** turning the questions into sheets only so that Cancel
 could keep Return as well; and Cancel with Return and no Escape, which is what
 shipped to `dev` and what Russell reported. #834 then made three of them
-sheets for a reason of its own (below), and with that Cancel got both keys.
+sheets for a reason of its own (below), and with that Cancel got both keys
+until #973 took Return away from it.
 
 ### Questions as one sentence and labelled facts (#834)
 
@@ -1478,9 +1481,36 @@ in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
 the action and Cancel. A fact that is missing is no row, never a blank one
 (Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
 accessibility element, so VoiceOver reads the title, the message, then
-"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
-Escape is Cancel too, so it answers Return and Escape; the action takes no
-key.
+"label, value". The buttons and their keys are the next paragraphs.
+
+#### Return does nothing on risky questions (#973)
+
+**Ruled by Russell, 2026-11-15, from Apple's Human Interface Guidelines.** The
+Alerts page (https://developer.apple.com/design/human-interface-guidelines/alerts,
+revised 2024-02-02) says: "Note that you don't want to make a Cancel button the
+default button", and "If you want to encourage people to read an alert and not
+just automatically press Return to dismiss it, avoid making any button the
+default button." It also says Escape and Command-Period are the standard ways
+to cancel, "Always place the default button on the trailing side of a row",
+and "Cancel buttons are typically on the leading side". The Buttons page
+(https://developer.apple.com/design/human-interface-guidelines/buttons,
+revised 2025-12-16) says the primary button is "the button people are most
+likely to choose" and responds to Return, and "Don't assign the primary role to
+a button that performs a destructive action, even if that action is the most
+likely choice." Russell's rulings: on the risky questions **Return does
+nothing**, with no default button; and titles defer to the HIG (not changed in
+this piece; every question's titles are listed for him under #975).
+
+So `FactsQuestionSheet` has two layouts, and in both each visible button
+carries at most one key and the cancelling button leads, the action trails:
+
+| layout | cancelling button | action | Return | Escape |
+|---|---|---|---|---|
+| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | `role: .destructive`, no key | **nothing**: the sheet stays and nothing is answered | Cancel |
+| going ahead is the default (`goAheadIsTheDefault` true): after Change Password | `role: .cancel`, `.keyboardShortcut(.cancelAction)` (Later) | `.defaultButton(isEnabled: true)`, Return (Share Again) | the action | the cancelling button |
+
+Before #973 the risky layout put the action first and Cancel second, on the
+trailing side, with Cancel the default; the order now follows the Alerts page.
 
 **Escape is a key equivalent, not only `.onExitCommand` (#973).** The first
 version gave the sheet Escape through `.onExitCommand` alone, which fires only
@@ -1490,20 +1520,39 @@ and what most teachers have) the sheet's window itself is first responder, no
 button answered Escape, and SwiftUI closed the sheet through its binding
 without running `cancel`: measured on the second Mac, where the answer the
 test read was `""`, not `cancel`. The main Mac has Keyboard Navigation on,
-focus lands on a button, `.onExitCommand` fires, and its suite was green.
-Now Escape is `.keyboardShortcut(.cancelAction)`: on Cancel when going ahead
-is the default (after Change Password, where Share Again takes Return), and
-otherwise, since Cancel holds Return and a button carries one key, on an
-invisible, unlabelled button behind Cancel that runs the same `cancel`.
-`.onExitCommand` stays as a second way in. `QuestionKeysTests` presses Escape
-on every such question in a sheet whose `cancel` writes its answer and
-requires that answer, because the real presenters' `cancel` clears the same
-state SwiftUI's own dismissal clears, so "the sheet closed" could not tell
-them apart. **The lesson for any sheet, on either platform: a test of a key
+focus lands on a button, `.onExitCommand` fires, and its suite was green. With
+Cancel no longer holding Return, Cancel itself carries Escape in both layouts.
+`.onExitCommand` stays on the sheet as a second way in: whether Escape and
+Command-Period work without it, in both layouts, with Keyboard Navigation off,
+has not been measured yet (the second Mac was needed elsewhere on 2026-11-15),
+and it comes out only when that run shows it is not needed.
+
+**Rejected:** the first #973 fix, which kept Cancel the default and put Escape
+on an invisible, zero-size, unlabelled button behind it, because a button
+carries one key. Russell stopped it before the merge as bad interface design:
+no hidden controls. Also rejected, not tried: making the sheet's content
+focusable so `.onExitCommand` fires (it would change what Tab and the focus
+ring do on a sheet whose only controls are its buttons, and still depends on
+where focus lands).
+
+**Tests.** `QuestionKeysTests` presses each key on every such question in a
+sheet whose closures write their answer, and checks the answer, because the
+real presenters' `cancel` clears the same state SwiftUI's own dismissal
+clears, so "the sheet closed" could not tell them apart: on a risky question
+Return leaves the sheet showing and answers nothing and Escape answers
+`cancel`; after Change Password Return answers `go` and Escape `cancel`;
+Command-Period answers `cancel` in both layouts; and each button's key is read
+off the `NSButton` AppKit draws. None of it depends on Keyboard Navigation
+being on. **The lesson for any sheet, on either platform: a test of a key
 that passes only where focus lands on a control proves nothing for a teacher
-with default settings.** Rejected, not tried: making the sheet's content focusable so
-`.onExitCommand` fires (it would change what Tab and the focus ring do on a sheet
-whose only controls are its buttons, and still depends on where focus lands).
+with default settings.**
+
+**Windows** shares the sentences, not the keys' mechanics: the rule sentences
+in `contracts/shared-rules.json` (`referenceCourses.groups.wording.rule`,
+`referenceCourses.replacing.wording.rule`, the public-address warning's rule
+and the shelf's menu lines) now say no button is the default, Return does
+nothing and Cancel answers Escape. Where Microsoft's guidance differs is a
+question for #975.
 
 Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
 `message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
