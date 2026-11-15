@@ -11492,8 +11492,9 @@ warning, a facts sheet since #834: title `wording.title`, the sentence
 `wording.message`, and rows for the sections, pages and size, the day the
 folder was made (absent when it cannot be read), the name the backup will
 have in Backups (the folder's), and that restoring that backup undoes it
-(plan review M9). Cancel is the default and answers Return and Escape (see
-"Questions as one sentence and labelled facts (#834)"). Composed by
+(plan review M9). No button is the default, so Return does nothing, and
+Cancel answers Escape (see "Return and Escape in this release's questions"
+and "Questions as one sentence and labelled facts (#834)"). Composed by
 `ReferenceReplacer.offer`; presented by the shared
 `ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
@@ -11685,7 +11686,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
+read, asked first (a facts sheet with no default button, #834 and #973). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by
@@ -18025,7 +18026,8 @@ this is the app's half.
   `goAheadIsTheDefault`: Share Again takes Return (Russell's choice; it goes
   through `PlanShareRunner.shareAgain`, the bar's own path, the tables first)
   and Later takes Escape. `goAheadIsTheDefault` is false for every other
-  question, which keeps Cancel on Return and Escape.
+  question, where no button is the default, Return does nothing and Cancel
+  takes Escape (#973).
   The bar shows `words.newPasswordNotInUse` while the marker says
   `newPasswordWaiting`, so a relaunch, a failed share or a declined one
   keeps it; `changePasswordNote` stays as the button's tooltip, no longer the

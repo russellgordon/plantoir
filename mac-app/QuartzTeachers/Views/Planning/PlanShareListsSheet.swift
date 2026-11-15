@@ -88,9 +88,10 @@ struct PlanShareListsSheet: View {
             onCancel()
         }
         .sheet(isPresented: $isShowingWarning) {
-            // #834's one component for a question with its facts: Cancel
-            // answers Return and Escape, and goes back to the tables, whose
-            // own Cancel shares nothing.
+            // #834's one component for a question with its facts: no button
+            // is the default, so Return does nothing (#973); Cancel answers
+            // Escape and goes back to the tables, whose own Cancel shares
+            // nothing.
             FactsQuestionSheet(
                 question: PlanSharing.warningQuestion(
                     shared: model.sharedCount,

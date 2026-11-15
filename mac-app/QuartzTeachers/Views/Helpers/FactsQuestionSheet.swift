@@ -41,23 +41,35 @@ nonisolated struct FactsQuestion: Equatable, Sendable {
 /// The sheet every such question is shown in (#834): Replace It…, Remove
 /// Group and Start the Groups Again.
 ///
-/// **Cancel answers Return AND Escape.** In an alert a button carries one
-/// key, so Cancel could have Return or Escape and not both (measured, #832:
-/// `documentation/09-mac-app.md` → "Return and Escape in this release's
-/// questions"). A sheet can have both: Cancel is the default button
-/// (`.defaultButton(isEnabled:)`, Return) and the sheet's own Escape is
-/// Cancel too. The button that goes ahead takes no key.
+/// **The keys follow Apple's Human Interface Guidelines (#973, Russell
+/// 2026-11-15).** Each visible button carries at most one key, and there is
+/// no hidden control.
 ///
-/// **Escape is a key equivalent, not only `.onExitCommand` (#973).**
+/// - On a question before something hard to take back
+///   (`goAheadIsTheDefault` false) there is NO default button, so Return
+///   does nothing: the sheet stays open and nothing is answered. Alerts,
+///   https://developer.apple.com/design/human-interface-guidelines/alerts:
+///   "Note that you don't want to make a Cancel button the default button",
+///   and "If you want to encourage people to read an alert and not just
+///   automatically press Return to dismiss it, avoid making any button the
+///   default button." The cancelling button carries Escape
+///   (`.keyboardShortcut(.cancelAction)`); the action carries no key.
+/// - Where going ahead is the default (`goAheadIsTheDefault` true), the
+///   action is the default button (Return) and the cancelling button
+///   carries Escape. Buttons,
+///   https://developer.apple.com/design/human-interface-guidelines/buttons:
+///   the primary button is "the button people are most likely to choose".
+///
+/// The cancelling button leads and the action trails in both: "Always place
+/// the default button on the trailing side of a row"; "Cancel buttons are
+/// typically on the leading side" (Alerts).
+///
+/// Escape is a key equivalent, not `.onExitCommand` alone (#973):
 /// `.onExitCommand` fires only while something inside the sheet holds the
-/// keys. With Keyboard Navigation off, the macOS default, the sheet's window
-/// itself holds them, nothing in it answered Escape, and SwiftUI closed the
-/// sheet through its binding without running `cancel`. So Escape is
-/// `.keyboardShortcut(.cancelAction)`: on Cancel when going ahead is the
-/// default, and otherwise, since Cancel holds Return and a button carries
-/// one key, on an invisible button behind Cancel that runs `cancel` too.
-/// `.onExitCommand` stays as the second way in. `QuestionKeysTests` presses
-/// Escape on each question and checks `cancel` ran.
+/// keys, and with Keyboard Navigation off, the macOS default, nothing does,
+/// so SwiftUI closed the sheet through its binding without running `cancel`.
+/// `QuestionKeysTests` presses each key on each question and checks which
+/// closure answered.
 ///
 /// The facts are a grouped `Form`, the system's own form styling, with
 /// scrolling off and its height its rows': `FactsQuestionTests` measures
@@ -76,8 +88,9 @@ struct FactsQuestionSheet: View {
     /// True only for a question whose going ahead is the safe and expected
     /// answer, so it is the default and takes Return (#833: after Change
     /// Password, Share Again sends the new password, and Russell made it the
-    /// default). Cancel then answers Escape alone. False for every question
-    /// before something hard to take back.
+    /// default). False for every question before something hard to take
+    /// back, where no button is the default and Return does nothing (#973).
+    /// The cancelling button answers Escape either way.
     var goAheadIsTheDefault: Bool = false
 
     let goAhead: () -> Void
@@ -111,40 +124,27 @@ struct FactsQuestionSheet: View {
             .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                // The default button sits on the right, as macOS places it.
+                // Cancel leads and the action trails, as the Alerts page
+                // places them (#973). Cancel carries Escape and nothing else.
+                Button(question.cancel, role: .cancel) {
+                    cancel()
+                }
+                .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("\(identifier)Cancel")
                 if goAheadIsTheDefault {
-                    Button(question.cancel, role: .cancel) {
-                        cancel()
-                    }
-                    .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("\(identifier)Cancel")
+                    // The default button: Return, and nothing else.
                     Button(question.action) {
                         goAhead()
                     }
                     .defaultButton(isEnabled: true)
                     .accessibilityIdentifier("\(identifier)GoAhead")
                 } else {
+                    // No default button at all, so a Return typed out of
+                    // habit answers nothing (Russell's ruling 1 on #973).
                     Button(question.action, role: .destructive) {
                         goAhead()
                     }
                     .accessibilityIdentifier("\(identifier)GoAhead")
-                    Button(question.cancel, role: .cancel) {
-                        cancel()
-                    }
-                    .defaultButton(isEnabled: true)
-                    .accessibilityIdentifier("\(identifier)Cancel")
-                    // Cancel holds Return, and a button carries one key, so
-                    // Escape goes on a button nobody sees or hears, behind
-                    // it (#973).
-                    .background {
-                        Button("") {
-                            cancel()
-                        }
-                        .keyboardShortcut(.cancelAction)
-                        .opacity(0)
-                        .frame(width: 0, height: 0)
-                        .accessibilityHidden(true)
-                    }
                 }
             }
             .padding([.horizontal, .bottom], 20)

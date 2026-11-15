@@ -26,15 +26,17 @@ import XCTest
 /// its own), measured, so it is pinned here and not changed.
 ///
 /// **Since #834** Replace It…, Remove Group and Start the Groups Again are
-/// `FactsQuestionSheet`s, where Cancel answers BOTH keys (`.defaultButton`
-/// for Return, `.keyboardShortcut(.cancelAction)` for Escape since #973)
-/// and the action takes none, as Russell first asked. Each test checks that
-/// Escape ran the sheet's `cancel`, not only that the sheet closed: with
-/// Keyboard Navigation off (the macOS default) `.onExitCommand` alone never
-/// fired, and SwiftUI closed the sheet around `cancel` (#973, measured on
-/// the second Mac; the main Mac has Keyboard Navigation on and hid it).
-/// Since #833 the public-address warning is one too, after the two tables, and the dialog after Change Password is
-/// one whose Share Again is the default (Russell) and Later is Escape.
+/// `FactsQuestionSheet`s, and since #833 so are the public-address warning
+/// and the dialog after Change Password. **Since #973 (Russell, 2026-11-15,
+/// following Apple's Human Interface Guidelines)** the risky ones have no
+/// default button: Return leaves the sheet showing and answers nothing, and
+/// Escape runs the sheet's `cancel`. After Change Password, Share Again is
+/// the default (Return) and Later is Escape. Each test checks which closure
+/// answered, not only that the sheet closed: with Keyboard Navigation off
+/// (the macOS default) `.onExitCommand` alone never fired, and SwiftUI
+/// closed the sheet around `cancel` (#973, measured on the second Mac; the
+/// main Mac has Keyboard Navigation on and hid it). Nothing here depends on
+/// Keyboard Navigation being on.
 ///
 /// Measured failing on the code before #832: put
 /// `.keyboardShortcut(.defaultAction)` back under any question's Cancel
@@ -50,6 +52,7 @@ final class QuestionKeysTests: XCTestCase {
     enum Key {
         case escape
         case returnKey
+        case commandPeriod
     }
 
     /// A sheet's two possible answers, written by the sheet's closures.
@@ -262,6 +265,7 @@ final class QuestionKeysTests: XCTestCase {
         }
         let characters: String
         let code: UInt16
+        var modifiers: NSEvent.ModifierFlags = []
         switch key {
         case .escape:
             characters = "\u{1b}"
@@ -269,9 +273,13 @@ final class QuestionKeysTests: XCTestCase {
         case .returnKey:
             characters = "\r"
             code = 36
+        case .commandPeriod:
+            characters = "."
+            code = 47
+            modifiers = [.command]
         }
         guard let event = NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
             windowNumber: sheet.windowNumber, context: nil,
             characters: characters, charactersIgnoringModifiers: characters,
             isARepeat: false, keyCode: code
@@ -325,34 +333,54 @@ final class QuestionKeysTests: XCTestCase {
         XCTAssertFalse(actedOn(), "\(what): Escape pressed \(action)")
     }
 
-    /// A facts sheet's keys as a teacher meets them (#834): Return and
-    /// Escape each close it through Cancel, and neither goes ahead. Each key
-    /// is pressed on a question opened afresh by `open`, which hands back
-    /// the window, whether it is still asked, and whether it went ahead.
+    /// A risky facts sheet's keys as a teacher meets them (#973): Return
+    /// leaves the question showing and goes ahead with nothing, and Escape
+    /// closes it through Cancel without going ahead. Each key is pressed on
+    /// a question opened afresh by `open`, which hands back the window,
+    /// whether it is still asked, and whether it went ahead.
     ///
     /// Closing is not enough (#973): SwiftUI closes a sheet on Escape by
     /// itself, through its binding, without running `cancel`, and the real
     /// presenters' `cancel` clears the same state the binding does, so they
     /// cannot tell the two apart. So each key is pressed again on the same
-    /// `question` in `FactsPage`, whose `cancel` writes its answer, and the
-    /// answer must be `cancel`.
-    func checkCancelAnswersBothKeys(
+    /// `question` in `FactsPage`, whose closures write their answer: Escape
+    /// must answer `cancel`, and Return must answer nothing.
+    func checkReturnDoesNothingAndEscapeCancels(
         what: String,
         question: FactsQuestion,
         open: () throws -> (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool)
     ) rethrows {
-        for key in [Key.returnKey, Key.escape] {
-            let shown: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
-            XCTAssertTrue(shown.stillAsked(), "\(what): the question was not asked")
-            press(key, in: shown.window)
-            XCTAssertTrue(runUntil(timeout: 3) { !shown.stillAsked() }, "\(what): \(key) did not close the question")
-            _ = runUntil(timeout: 0.3) { false }
-            XCTAssertFalse(shown.wentAhead(), "\(what): \(key) went ahead instead of cancelling")
-            close(shown.window)
-        }
-        for key in [Key.returnKey, Key.escape] {
-            checkTheAnswer(to: question, goAheadIsTheDefault: false, key: key, is: "cancel", what: what)
-        }
+        let afterReturn: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
+        XCTAssertTrue(afterReturn.stillAsked(), "\(what): the question was not asked")
+        press(.returnKey, in: afterReturn.window)
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertTrue(afterReturn.stillAsked(), "\(what): Return closed the question")
+        XCTAssertFalse(afterReturn.wentAhead(), "\(what): Return went ahead")
+        close(afterReturn.window)
+
+        let afterEscape: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
+        XCTAssertTrue(afterEscape.stillAsked(), "\(what): the question was not asked")
+        press(.escape, in: afterEscape.window)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterEscape.stillAsked() }, "\(what): Escape did not close the question")
+        _ = runUntil(timeout: 0.3) { false }
+        XCTAssertFalse(afterEscape.wentAhead(), "\(what): Escape went ahead instead of cancelling")
+        close(afterEscape.window)
+
+        checkTheAnswer(to: question, goAheadIsTheDefault: false, key: Key.escape, is: "cancel", what: what)
+        checkReturnAnswersNothing(to: question, what: what)
+    }
+
+    /// Presses Return on a risky `question` in `FactsPage`: the sheet must
+    /// still be showing and neither closure may have answered (#973).
+    func checkReturnAnswersNothing(to question: FactsQuestion, what: String) {
+        let answers: Answers = Answers()
+        let page: FactsPage = FactsPage(question: question, goAheadIsTheDefault: false, answers: answers)
+        let window: NSWindow = windowShowing(page)
+        press(.returnKey, in: window)
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertTrue(answers.showing, "\(what): Return closed the sheet")
+        XCTAssertEqual(answers.answer, "", "\(what): Return answered the question")
+        close(window)
     }
 
     /// Presses `key` on `question` in `FactsPage` and checks which of the
@@ -378,11 +406,11 @@ final class QuestionKeysTests: XCTestCase {
 
     // MARK: - Tests
 
-    func testReturnAndEscapeAreCancelOnTheRemoveGroupQuestion() throws {
+    func testReturnDoesNothingAndEscapeIsCancelOnTheRemoveGroupQuestion() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
         let question: FactsQuestion = ReferenceGroupWording.removeGroupQuestion(group: "Electives", courseCount: 0)
-        try checkCancelAnswersBothKeys(what: "Remove Group", question: question) {
+        try checkReturnDoesNothingAndEscapeCancels(what: "Remove Group", question: question) {
             let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
             workspace.workspaceURL = root
             workspace.removeGroupRequest = ReferenceShelfGroup(
@@ -397,10 +425,10 @@ final class QuestionKeysTests: XCTestCase {
         }
     }
 
-    func testReturnAndEscapeAreCancelOnStartTheGroupsAgain() throws {
+    func testReturnDoesNothingAndEscapeIsCancelOnStartTheGroupsAgain() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        try checkCancelAnswersBothKeys(what: "Start the Groups Again", question: ReferenceGroupWording.startAgainQuestion) {
+        try checkReturnDoesNothingAndEscapeCancels(what: "Start the Groups Again", question: ReferenceGroupWording.startAgainQuestion) {
             let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
             workspace.workspaceURL = root
             workspace.isAskingToStartReferenceGroupsAgain = true
@@ -412,8 +440,8 @@ final class QuestionKeysTests: XCTestCase {
         }
     }
 
-    func testReturnAndEscapeAreCancelOnTheReplaceWarning() {
-        checkCancelAnswersBothKeys(what: "Replace It…", question: QuestionKeysTests.replaceQuestion()) {
+    func testReturnDoesNothingAndEscapeIsCancelOnTheReplaceWarning() {
+        checkReturnDoesNothingAndEscapeCancels(what: "Replace It…", question: QuestionKeysTests.replaceQuestion()) {
             let replaced: Answers = Answers()
             let page: ReplacePage = ReplacePage(replaced: replaced)
             let window: NSWindow = windowShowing(page)
@@ -423,29 +451,59 @@ final class QuestionKeysTests: XCTestCase {
         }
     }
 
-    /// The facts sheet itself: its action button carries no key, and Cancel
-    /// is the default, measured on the buttons AppKit draws for it.
-    func testTheFactsSheetsActionTakesNoKey() {
+    /// The facts sheet itself, measured on the buttons AppKit draws for it
+    /// (#973): on a risky question the action carries no key and Cancel
+    /// carries Escape alone, so no button is the default; after Change
+    /// Password, Share Again carries Return and Later carries Escape.
+    func testEachButtonCarriesAtMostOneKey() {
         let replaced: Answers = Answers()
         let window: NSWindow = windowShowing(ReplacePage(replaced: replaced))
-        defer {
-            close(window)
-        }
         let keys: [String: String] = buttonKeys(in: window)
+        close(window)
         if let action = keys[ReferenceReplaceWording.confirmButton] {
             XCTAssertEqual(action, "", "Replace answers a key (\(keys))")
         }
         if let cancel = keys[ReferenceReplaceWording.cancelButton] {
-            XCTAssertEqual(cancel, "\r", "Cancel is not the default (\(keys))")
+            XCTAssertEqual(cancel, "\u{1b}", "Cancel is not Escape alone (\(keys))")
         }
+        for (title, key) in keys {
+            XCTAssertNotEqual(key, "\r", "\(title) is a default button on a risky question (\(keys))")
+        }
+
+        let answers: Answers = Answers()
+        let page: FactsPage = FactsPage(
+            question: PlanSharing.newPasswordQuestion(earlierYearShared: false),
+            goAheadIsTheDefault: true,
+            answers: answers
+        )
+        let passwordWindow: NSWindow = windowShowing(page)
+        let passwordKeys: [String: String] = buttonKeys(in: passwordWindow)
+        close(passwordWindow)
+        if let shareAgain = passwordKeys[PlanSharingWording.shareAgain] {
+            XCTAssertEqual(shareAgain, "\r", "Share Again is not the default (\(passwordKeys))")
+        }
+        if let later = passwordKeys[PlanSharingWording.later] {
+            XCTAssertEqual(later, "\u{1b}", "Later is not Escape (\(passwordKeys))")
+        }
+    }
+
+    /// Command-Period is the other standard way to cancel (Alerts, Human
+    /// Interface Guidelines). Measured, not assumed (#973): pressed on both
+    /// layouts, it must run `cancel`.
+    func testCommandPeriodIsCancelInBothLayouts() {
+        let risky: FactsQuestion = QuestionKeysTests.replaceQuestion()
+        checkTheAnswer(to: risky, goAheadIsTheDefault: false, key: Key.commandPeriod, is: "cancel", what: "Replace It…")
+        let ordinary: FactsQuestion = PlanSharing.newPasswordQuestion(earlierYearShared: true)
+        checkTheAnswer(to: ordinary, goAheadIsTheDefault: true, key: Key.commandPeriod, is: "cancel", what: "after Change Password")
     }
 
     /// The public-address warning: Share Without a Password used to take
     /// Return (the note in #832). Since #833 it comes after the two tables,
-    /// on #834's sheet, where Cancel answers Return and Escape.
-    func testReturnAndEscapeAreCancelOnThePublicAddressWarning() {
+    /// on #834's sheet, and since #973 Return answers nothing there and
+    /// Escape is Cancel.
+    func testReturnDoesNothingAndEscapeIsCancelOnThePublicAddressWarning() {
         let question: FactsQuestion = PlanSharing.warningQuestion(shared: 3, heldBack: 1, keysInShared: 1)
-        checkCancelAnswersBothKeys(what: "the public-address warning", question: question) {
+        checkReturnDoesNothingAndEscapeCancels(what: "the public-address warning", question: question) {
             let answers: Answers = Answers()
             let page: FactsPage = FactsPage(
                 question: question,
