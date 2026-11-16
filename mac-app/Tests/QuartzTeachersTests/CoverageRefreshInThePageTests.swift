@@ -47,6 +47,7 @@ final class CoverageRefreshInThePageTests: XCTestCase {
         previousStore = ActivityTrail.store
         let trail: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("coverage-refresh-trail-\(UUID().uuidString)", isDirectory: true)
+        removeWhenTestEnds(trail)
         ActivityTrail.store = ProblemReportStore(folderURL: trail)
         SectionCoverage.shared.reset()
         SectionProblems.shared.reset()

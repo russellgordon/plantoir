@@ -12,6 +12,7 @@ final class CourseArchiverTests: XCTestCase {
         let coursesURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cq4t-archive-\(UUID().uuidString)")
             .appendingPathComponent("courses")
+        removeWhenTestEnds(coursesURL.deletingLastPathComponent())
         let courseURL: URL = coursesURL.appendingPathComponent("ICS3U")
         try FileManager.default.createDirectory(at: courseURL.appendingPathComponent("section1"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: courseURL.appendingPathComponent("section2"), withIntermediateDirectories: true)
