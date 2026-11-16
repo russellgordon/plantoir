@@ -1522,10 +1522,37 @@ without running `cancel`: measured on the second Mac, where the answer the
 test read was `""`, not `cancel`. The main Mac has Keyboard Navigation on,
 focus lands on a button, `.onExitCommand` fires, and its suite was green. With
 Cancel no longer holding Return, Cancel itself carries Escape in both layouts.
-`.onExitCommand` stays on the sheet as a second way in: whether Escape and
-Command-Period work without it, in both layouts, with Keyboard Navigation off,
-has not been measured yet (the second Mac was needed elsewhere on 2026-11-15),
-and it comes out only when that run shows it is not needed.
+`.onExitCommand` stays on the sheet as a second way in. Measured on the second
+Mac on 2026-11-16 (157109fc4, without it): Escape answered `cancel` in both
+layouts all the same, and Command-Period failed with or without it, so it is
+not what makes either key work there; whether to take it out is left open.
+
+**Closing without an answer is Cancel (#973, Russell 2026-11-16).** Measured
+on the second Mac (Keyboard Navigation off) on 1f15343b9: Escape and Return
+behaved, but Command-Period closed both layouts' sheets without running
+`cancel` (the answer the test read was `""`), and taking `.onExitCommand` off
+(157109fc4) changed nothing. Rather than catch each key, the rule is now
+structural: every question is presented with `.factsQuestionSheet(isPresented:)`
+or `.factsQuestionSheet(item:)` (`FactsQuestionPresentation` and
+`FactsQuestionItemPresentation`, in `Views/Helpers/FactsQuestionSheet.swift`),
+never a bare `.sheet`. The binding those hand to `.sheet` runs the question's
+`cancel` when SwiftUI sets it to false while the question is unanswered, before
+the presenter's own state is cleared, which is the route Escape, Command-Period
+and anything else the system does to end a sheet all take; `onDismiss` checks
+the same fact for a sheet that went away by any other route, then resets it for
+the next showing. An `answered` flag, set by both buttons (and
+`.onExitCommand`) before their closures run, is what makes a second `cancel`
+impossible: Cancel or Escape and then the closing runs `cancel` once, and going
+ahead and then the closing runs nothing more. Nothing is timed, and nothing a
+teacher sees changed. Apple's guidance agrees: the Sheets page says "The Cancel
+(or Close) button dismisses a sheet without saving any changes", and Alerts and
+Keyboards give Escape and Command-Period as ways to cancel. Not chosen,
+and not measured: a `.onDisappear` inside the sheet, or `onDismiss` alone.
+Both are told after the sheet has gone, so the presenter's state would already
+read "not asked" with no answer recorded, and anything reading it in between
+(the tests do) would see a question closed and unanswered.
+Windows owes the same rule: a question dialog closed without an answer is
+Cancel, once.
 
 **Rejected:** the first #973 fix, which kept Cancel the default and put Escape
 on an invisible, zero-size, unlabelled button behind it, because a button
@@ -1541,8 +1568,11 @@ real presenters' `cancel` clears the same state SwiftUI's own dismissal
 clears, so "the sheet closed" could not tell them apart: on a risky question
 Return leaves the sheet showing and answers nothing and Escape answers
 `cancel`; after Change Password Return answers `go` and Escape `cancel`;
-Command-Period answers `cancel` in both layouts; and each button's key is read
-off the `NSButton` AppKit draws. None of it depends on Keyboard Navigation
+Command-Period answers `cancel` in both layouts; a sheet closed with no answer
+(by its presenter, Command-Period or Escape) answers `cancel` exactly once, and
+one answered by going ahead runs `cancel` never; every question in the app is
+presented through `.factsQuestionSheet` (a source scan); and each button's key
+is read off the `NSButton` AppKit draws. None of it depends on Keyboard Navigation
 being on. **The lesson for any sheet, on either platform: a test of a key
 that passes only where focus lands on a control proves nothing for a teacher
 with default settings.**

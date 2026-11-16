@@ -87,7 +87,7 @@ struct PlanShareListsSheet: View {
         .onExitCommand {
             onCancel()
         }
-        .sheet(isPresented: $isShowingWarning) {
+        .factsQuestionSheet(isPresented: $isShowingWarning) {
             // #834's one component for a question with its facts: no button
             // is the default, so Return does nothing (#973); Cancel answers
             // Escape and goes back to the tables, whose own Cancel shares

@@ -63,6 +63,9 @@ final class QuestionKeysTests: XCTestCase {
 
         var showing: Bool = true
         var answer: String = ""
+
+        /// How many times `cancel` ran (#973: exactly once per question).
+        var cancelCount: Int = 0
     }
 
     /// The two-lists sheet, presented as `TaskProgressView` presents it.
@@ -96,7 +99,8 @@ final class QuestionKeysTests: XCTestCase {
 
     /// A question with its facts, as the tables' sheet presents the
     /// public-address warning and the console presents the dialog after
-    /// Change Password (#833, on #834's sheet).
+    /// Change Password (#833, on #834's sheet), through
+    /// `.factsQuestionSheet`, as every presenter does since #973.
     struct FactsPage: View {
 
         // MARK: - Stored properties
@@ -110,7 +114,7 @@ final class QuestionKeysTests: XCTestCase {
         var body: some View {
             @Bindable var answers = answers
             Color.white
-                .sheet(isPresented: $answers.showing) {
+                .factsQuestionSheet(isPresented: $answers.showing) {
                     FactsQuestionSheet(
                         question: question,
                         identifier: "test",
@@ -121,6 +125,7 @@ final class QuestionKeysTests: XCTestCase {
                         },
                         cancel: {
                             answers.answer = "cancel"
+                            answers.cancelCount += 1
                             answers.showing = false
                         }
                     )
@@ -495,6 +500,79 @@ final class QuestionKeysTests: XCTestCase {
         checkTheAnswer(to: risky, goAheadIsTheDefault: false, key: Key.commandPeriod, is: "cancel", what: "Replace It…")
         let ordinary: FactsQuestion = PlanSharing.newPasswordQuestion(earlierYearShared: true)
         checkTheAnswer(to: ordinary, goAheadIsTheDefault: true, key: Key.commandPeriod, is: "cancel", what: "after Change Password")
+    }
+
+    /// A question that goes away without an answer has been cancelled, by
+    /// whatever route it went away (#973, Russell 2026-11-16), and `cancel`
+    /// runs exactly once: closed by its presenter with nothing pressed, by
+    /// Command-Period, and by Escape (where Cancel itself answers first and
+    /// the sheet's closing must not answer again), in both layouts.
+    func testASheetClosedWithNoAnswerIsCancelledOnce() {
+        let questions: [(question: FactsQuestion, goAheadIsTheDefault: Bool, what: String)] = [
+            (question: QuestionKeysTests.replaceQuestion(), goAheadIsTheDefault: false, what: "Replace It…"),
+            (question: PlanSharing.newPasswordQuestion(earlierYearShared: true), goAheadIsTheDefault: true, what: "after Change Password"),
+        ]
+        for asked in questions {
+            for route in ["closed by its presenter", "Command-Period", "Escape"] {
+                let answers: Answers = Answers()
+                let page: FactsPage = FactsPage(question: asked.question, goAheadIsTheDefault: asked.goAheadIsTheDefault, answers: answers)
+                let window: NSWindow = windowShowing(page)
+                if route == "Command-Period" {
+                    press(.commandPeriod, in: window)
+                } else if route == "Escape" {
+                    press(.escape, in: window)
+                } else {
+                    answers.showing = false
+                }
+                XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "\(asked.what), \(route): the sheet did not go away")
+                // Long enough for the sheet's own dismissal to have finished
+                // and reported, so a second `cancel` would be counted.
+                _ = runUntil(timeout: 0.5) { false }
+                XCTAssertEqual(answers.answer, "cancel", "\(asked.what), \(route): closing with no answer is not Cancel")
+                XCTAssertEqual(answers.cancelCount, 1, "\(asked.what), \(route): cancel ran \(answers.cancelCount) times")
+                close(window)
+            }
+        }
+    }
+
+    /// A question that was answered records nothing more when its sheet
+    /// goes away (#973): after Change Password, Return is Share Again, the
+    /// sheet closes, and `cancel` never runs. (A risky question's action
+    /// carries no key, and SwiftUI draws its buttons without an `NSButton`
+    /// to press, so going ahead is pressed here where it has a key.)
+    func testAnAnsweredSheetRecordsNothingMoreWhenItCloses() {
+        let ordinary: FactsQuestion = PlanSharing.newPasswordQuestion(earlierYearShared: true)
+        let ordinaryAnswers: Answers = Answers()
+        let ordinaryWindow: NSWindow = windowShowing(FactsPage(question: ordinary, goAheadIsTheDefault: true, answers: ordinaryAnswers))
+        press(.returnKey, in: ordinaryWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { ordinaryWindow.attachedSheet == nil }, "after Change Password: Return did not close the sheet")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(ordinaryAnswers.answer, "go", "after Change Password: Return was not Share Again")
+        XCTAssertEqual(ordinaryAnswers.cancelCount, 0, "after Change Password: the sheet closing after Share Again ran cancel")
+        close(ordinaryWindow)
+    }
+
+    /// Every question with its facts is presented through
+    /// `.factsQuestionSheet`, which makes closing without an answer Cancel
+    /// (#973); a bare `.sheet` around one would lose that silently.
+    func testEveryQuestionIsPresentedSoThatClosingIsCancel() throws {
+        let app: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers")
+        let sheetItself: String = app.appendingPathComponent("Views/Helpers/FactsQuestionSheet.swift").path
+        var questionsFound: Int = 0
+        var presentedSo: Int = 0
+        let walker: FileManager.DirectoryEnumerator? = FileManager.default.enumerator(at: app, includingPropertiesForKeys: nil)
+        while let file = walker?.nextObject() as? URL {
+            if file.pathExtension != "swift" || file.path == sheetItself {
+                continue
+            }
+            let text: String = try String(contentsOf: file, encoding: .utf8)
+            questionsFound += text.components(separatedBy: "FactsQuestionSheet(").count - 1
+            presentedSo += text.components(separatedBy: ".factsQuestionSheet(").count - 1
+        }
+        XCTAssertEqual(questionsFound, 5, "the five questions: Remove Group, Start the Groups Again, Replace It…, the public-address warning, after Change Password")
+        XCTAssertEqual(presentedSo, questionsFound, "a question is presented with a bare .sheet")
     }
 
     /// The public-address warning: Share Without a Password used to take

@@ -71,6 +71,14 @@ nonisolated struct FactsQuestion: Equatable, Sendable {
 /// `QuestionKeysTests` presses each key on each question and checks which
 /// closure answered.
 ///
+/// **Closing without an answer is Cancel (#973, Russell 2026-11-16).** The
+/// keys are not the whole story: with Keyboard Navigation off, Command-Period
+/// closed the sheet through its binding and `cancel` never ran. So a question
+/// is always presented with `.factsQuestionSheet(isPresented:)` or
+/// `.factsQuestionSheet(item:)`, never a bare `.sheet`: if the sheet goes
+/// away by any route before one of its buttons answered, its `cancel` runs,
+/// exactly once. See `FactsQuestionPresentation`.
+///
 /// The facts are a grouped `Form`, the system's own form styling, with
 /// scrolling off and its height its rows': `FactsQuestionTests` measures
 /// that the form shows all of what it holds (a fixed height per row cut the
@@ -157,5 +165,192 @@ struct FactsQuestionSheet: View {
         .onExitCommand {
             cancel()
         }
+    }
+}
+
+/// Presents a `FactsQuestionSheet` so that closing it without an answer is
+/// answering Cancel (#973, Russell 2026-11-16: "make it structural").
+///
+/// Escape, Command-Period, and whatever else macOS does to end a sheet all
+/// close it by setting the presentation's binding to false; with Keyboard
+/// Navigation off, Command-Period did only that, and the question was left
+/// unanswered. So the binding handed to `.sheet` is this one: when the
+/// system sets it to false while the question is still unanswered, the
+/// sheet's `cancel` runs first, then the presenter's own state is cleared.
+/// `onDismiss` checks the same fact, for a sheet that went away by any
+/// other route, and then gets ready for the next time the question is
+/// asked.
+///
+/// `answered` is what makes a second run impossible: both buttons (and
+/// `.onExitCommand`) set it before their closure runs, and nothing runs
+/// `cancel` once it is set. So Cancel or Escape followed by the sheet
+/// closing runs `cancel` once, and going ahead followed by the sheet
+/// closing runs nothing more. Nothing is timed. Nothing a teacher sees
+/// changes: the sheet, its buttons and their keys are exactly as before.
+struct FactsQuestionPresentation: ViewModifier {
+
+    // MARK: - Stored properties
+
+    /// The presenter's own state: true while the question is asked.
+    @Binding var isPresented: Bool
+
+    /// The question as the presenter writes it.
+    let makeSheet: () -> FactsQuestionSheet
+
+    /// True once this showing of the question has been answered, by one of
+    /// its buttons or by Cancel run for it here.
+    @State private var answered: Bool = false
+
+    // MARK: - Computed properties
+
+    /// The binding SwiftUI closes the sheet through. A close that arrives
+    /// while the question is unanswered is Cancel.
+    private var closingIsCancel: Binding<Bool> {
+        return Binding(
+            get: {
+                return isPresented
+            },
+            set: { (showing: Bool) in
+                if !showing && isPresented {
+                    cancelIfUnanswered()
+                }
+                isPresented = showing
+            }
+        )
+    }
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: closingIsCancel, onDismiss: {
+                cancelIfUnanswered()
+                // Ready for the next time the question is asked.
+                answered = false
+            }, content: {
+                FactsQuestionPresentation.answering(makeSheet(), answered: $answered)
+            })
+    }
+
+    /// Runs the question's `cancel`, unless it has already been answered.
+    private func cancelIfUnanswered() {
+        if answered {
+            return
+        }
+        answered = true
+        makeSheet().cancel()
+    }
+
+    /// `sheet` with each of its answers first marking the question
+    /// answered.
+    static func answering(_ sheet: FactsQuestionSheet, answered: Binding<Bool>) -> FactsQuestionSheet {
+        return FactsQuestionSheet(
+            question: sheet.question,
+            identifier: sheet.identifier,
+            goAheadIsTheDefault: sheet.goAheadIsTheDefault,
+            goAhead: {
+                answered.wrappedValue = true
+                sheet.goAhead()
+            },
+            cancel: {
+                if answered.wrappedValue {
+                    return
+                }
+                answered.wrappedValue = true
+                sheet.cancel()
+            }
+        )
+    }
+}
+
+/// `FactsQuestionPresentation` for a question shown for an item, as
+/// Replace It… is shown for its warning: the same rule, that closing
+/// without an answer is Cancel, exactly once (#973).
+struct FactsQuestionItemPresentation<Item: Identifiable>: ViewModifier {
+
+    // MARK: - Stored properties
+
+    /// The presenter's own state: the item the question is asked about, or
+    /// nil.
+    @Binding var item: Item?
+
+    /// The question as the presenter writes it for an item.
+    let makeSheet: (Item) -> FactsQuestionSheet
+
+    /// True once this showing of the question has been answered.
+    @State private var answered: Bool = false
+
+    /// The item last asked about, so `onDismiss` still has its question
+    /// after the presenter's state is cleared.
+    @State private var askedAbout: Item?
+
+    // MARK: - Computed properties
+
+    /// The binding SwiftUI closes the sheet through. A close that arrives
+    /// while the question is unanswered is Cancel.
+    private var closingIsCancel: Binding<Item?> {
+        return Binding(
+            get: {
+                return item
+            },
+            set: { (shown: Item?) in
+                if shown == nil, let current = item {
+                    cancelIfUnanswered(about: current)
+                }
+                item = shown
+            }
+        )
+    }
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: closingIsCancel, onDismiss: {
+                if let askedAbout {
+                    cancelIfUnanswered(about: askedAbout)
+                }
+                // Ready for the next time the question is asked.
+                answered = false
+                askedAbout = nil
+            }, content: { (shown: Item) in
+                FactsQuestionPresentation.answering(makeSheet(shown), answered: $answered)
+            })
+            .onChange(of: item?.id, initial: true) {
+                if let item {
+                    askedAbout = item
+                }
+            }
+    }
+
+    /// Runs the question's `cancel` for `shown`, unless it has already been
+    /// answered.
+    private func cancelIfUnanswered(about shown: Item) {
+        if answered {
+            return
+        }
+        answered = true
+        makeSheet(shown).cancel()
+    }
+}
+
+extension View {
+
+    /// Shows a question with its facts while `isPresented` is true; closed
+    /// without an answer, by any route, it is answered Cancel (#973).
+    func factsQuestionSheet(
+        isPresented: Binding<Bool>,
+        content: @escaping () -> FactsQuestionSheet
+    ) -> some View {
+        return modifier(FactsQuestionPresentation(isPresented: isPresented, makeSheet: content))
+    }
+
+    /// Shows a question with its facts about `item` while it is set; closed
+    /// without an answer, by any route, it is answered Cancel (#973).
+    func factsQuestionSheet<Item: Identifiable>(
+        item: Binding<Item?>,
+        content: @escaping (Item) -> FactsQuestionSheet
+    ) -> some View {
+        return modifier(FactsQuestionItemPresentation(item: item, makeSheet: content))
     }
 }

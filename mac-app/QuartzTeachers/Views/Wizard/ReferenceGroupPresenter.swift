@@ -97,7 +97,7 @@ struct ReferenceGroupPresenter: ViewModifier {
             // Sheets since #834: one sentence, then the facts as rows. No
             // button is the default, so Return does nothing; Cancel answers
             // Escape and the action takes no key (#973).
-            .sheet(isPresented: isAskingToRemove) {
+            .factsQuestionSheet(isPresented: isAskingToRemove) {
                 FactsQuestionSheet(
                     question: ReferenceGroupWording.removeGroupQuestion(
                         group: workspace.removeGroupRequest?.title ?? "", courseCount: removeGroupCourseCount
@@ -114,7 +114,7 @@ struct ReferenceGroupPresenter: ViewModifier {
                     }
                 )
             }
-            .sheet(isPresented: isAskingToStartAgain) {
+            .factsQuestionSheet(isPresented: isAskingToStartAgain) {
                 FactsQuestionSheet(
                     question: ReferenceGroupWording.startAgainQuestion,
                     identifier: "startReferenceGroupsAgainQuestion",

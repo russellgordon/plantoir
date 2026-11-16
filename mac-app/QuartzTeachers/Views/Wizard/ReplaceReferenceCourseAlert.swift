@@ -26,7 +26,7 @@ struct ReplaceReferenceCourseAlert: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $warning) { (shown: ReferenceReplacer.Warning) in
+            .factsQuestionSheet(item: $warning) { (shown: ReferenceReplacer.Warning) in
                 FactsQuestionSheet(
                     question: shown.question,
                     identifier: "replaceReferenceCourse",
