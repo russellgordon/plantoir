@@ -68,15 +68,42 @@ internal static class Steps_
             size = now;
             return steady;
         }, TimeSpan.FromMinutes(2), IsBrowserWindow);
+        // Edge writes the mark as the download completes, a moment after the
+        // file has its name; asked again for up to half a minute.
         string zone = "";
-        try { zone = File.ReadAllText(found + ":Zone.Identifier"); } catch (Exception error) { zone = "(none: " + error.Message + ")"; }
-        string zoneLine = zone.Split('\n').FirstOrDefault(line => line.StartsWith("ZoneId", StringComparison.Ordinal))?.Trim() ?? "no ZoneId line";
+        Program.Watch.WaitFor(() => (zone = ZoneOf(found)).Contains("ZoneId=", StringComparison.Ordinal),
+                              TimeSpan.FromSeconds(30), IsBrowserWindow);
+        string zoneLine = zone.Split('\n').FirstOrDefault(line => line.StartsWith("ZoneId", StringComparison.Ordinal))?.Trim() ?? zone.Trim();
         Program.Note($"downloaded {Path.GetFileName(found)}, {size:N0} bytes; its mark of the web: {zoneLine}");
         if (!zone.Contains("ZoneId=3", StringComparison.Ordinal))
             throw Stopped.Driver($"the download carries no \"from the internet\" mark ({zoneLine}), so SmartScreen would not be exercised");
         Program.Shot("downloaded");
         CloseBrowser();
         return found;
+    }
+
+    /// <summary>
+    /// The file's Zone.Identifier stream, the "from the internet" mark. Read
+    /// directly, and through PowerShell's -Stream if the runtime refuses the
+    /// stream path; the reason is kept when neither can read it.
+    /// </summary>
+    private static string ZoneOf(string file)
+    {
+        string why;
+        try { return File.ReadAllText(file + ":Zone.Identifier"); }
+        catch (Exception error) { why = error.GetType().Name + ": " + error.Message; }
+        try
+        {
+            var start = new ProcessStartInfo("powershell.exe", $"-NoProfile -Command \"Get-Content -Raw -Stream Zone.Identifier -LiteralPath '{file}'\"")
+            { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            using var process = Process.Start(start)!;
+            string text = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(30000);
+            if (text.Contains("ZoneId=", StringComparison.Ordinal)) return text;
+            why += "; PowerShell read: " + text.Trim() + process.StandardError.ReadToEnd().Trim();
+        }
+        catch (Exception error) { why += "; PowerShell: " + error.Message; }
+        return "(no mark read: " + why + ")";
     }
 
     private static bool IsBrowserWindow(SeenWindow window) =>
