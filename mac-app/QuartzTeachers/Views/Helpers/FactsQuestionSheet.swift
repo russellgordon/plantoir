@@ -271,7 +271,36 @@ extension FactsQuestionSheet {
 /// `FactsQuestionPresentation` for a question shown for an item, as
 /// Replace It… is shown for its warning: the same rule, that closing
 /// without an answer is Cancel, exactly once (#973).
+///
+/// Two routes, each tested on its own (the #973 review):
+///
+/// - The system closes the sheet through the binding handed to `.sheet`:
+///   the showing question's `cancel` runs first, as in
+///   `FactsQuestionPresentation`.
+/// - The presenter's own item changes, to nil or to another item: the
+///   question that WAS showing went away, so `onChange` cancels that one,
+///   if it is unanswered. SwiftUI swaps a sheet's content when the item
+///   changes and does not dismiss it (measured), so no `onDismiss` comes
+///   for the old one; and a dismissal by any route ends with the item nil,
+///   so `onChange` sees every one. That makes an `onDismiss` here
+///   redundant, and it was taken out rather than left untested.
+///
+/// The record of what is showing is replaced only in `onChange`, AFTER the
+/// old one is settled, so a question can only ever be cancelled as itself:
+/// when the item changes from A to B, A is cancelled, never B.
 struct FactsQuestionItemPresentation<Item: Identifiable>: ViewModifier {
+
+    // MARK: - Types
+
+    /// The item a question is showing for, and whether that showing has
+    /// been answered.
+    struct Asking {
+
+        // MARK: - Stored properties
+
+        let item: Item
+        var answered: Bool
+    }
 
     // MARK: - Stored properties
 
@@ -282,12 +311,8 @@ struct FactsQuestionItemPresentation<Item: Identifiable>: ViewModifier {
     /// The question as the presenter writes it for an item.
     let makeSheet: (Item) -> FactsQuestionSheet
 
-    /// True once this showing of the question has been answered.
-    @State private var answered: Bool = false
-
-    /// The item last asked about, so `onDismiss` still has its question
-    /// after the presenter's state is cleared.
-    @State private var askedAbout: Item?
+    /// The showing now on screen, or nil.
+    @State private var asking: Asking?
 
     // MARK: - Computed properties
 
@@ -299,8 +324,8 @@ struct FactsQuestionItemPresentation<Item: Identifiable>: ViewModifier {
                 return item
             },
             set: { (shown: Item?) in
-                if shown == nil, let current = item {
-                    cancelIfUnanswered(about: current)
+                if shown == nil {
+                    cancelIfUnanswered()
                 }
                 item = shown
             }
@@ -311,31 +336,48 @@ struct FactsQuestionItemPresentation<Item: Identifiable>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: closingIsCancel, onDismiss: {
-                if let askedAbout {
-                    cancelIfUnanswered(about: askedAbout)
-                }
-                // Ready for the next time the question is asked.
-                answered = false
-                askedAbout = nil
-            }) { (shown: Item) in
-                FactsQuestionSheet(answering: makeSheet(shown), answered: $answered)
+            .sheet(item: closingIsCancel) { (shown: Item) in
+                FactsQuestionSheet(answering: makeSheet(shown), answered: answered(for: shown))
             }
-            .onChange(of: item?.id, initial: true) {
+            .onChange(of: item?.id, initial: true) { (previous: Item.ID?, current: Item.ID?) in
+                if previous != current {
+                    // The question that was showing went away.
+                    cancelIfUnanswered()
+                }
                 if let item {
-                    askedAbout = item
+                    asking = Asking(item: item, answered: false)
+                } else {
+                    asking = nil
                 }
             }
     }
 
-    /// Runs the question's `cancel` for `shown`, unless it has already been
-    /// answered.
-    private func cancelIfUnanswered(about shown: Item) {
-        if answered {
+    /// Whether the showing for `shown` has been answered. Setting it marks
+    /// that showing, and no other.
+    private func answered(for shown: Item) -> Binding<Bool> {
+        return Binding(
+            get: {
+                guard let asking, asking.item.id == shown.id else {
+                    return false
+                }
+                return asking.answered
+            },
+            set: { (isAnswered: Bool) in
+                if let current = asking, current.item.id == shown.id {
+                    asking = Asking(item: current.item, answered: isAnswered)
+                }
+            }
+        )
+    }
+
+    /// Runs `cancel` for the showing on record, unless it has been
+    /// answered; it is then answered, so `cancel` never runs for it twice.
+    private func cancelIfUnanswered() {
+        guard let current = asking, !current.answered else {
             return
         }
-        answered = true
-        makeSheet(shown).cancel()
+        asking = Asking(item: current.item, answered: true)
+        makeSheet(current.item).cancel()
     }
 }
 

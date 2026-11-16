@@ -1535,12 +1535,24 @@ behaved, but Command-Period closed both layouts' sheets without running
 structural: every question is presented with `.factsQuestionSheet(isPresented:)`
 or `.factsQuestionSheet(item:)` (`FactsQuestionPresentation` and
 `FactsQuestionItemPresentation`, in `Views/Helpers/FactsQuestionSheet.swift`),
-never a bare `.sheet`. The binding those hand to `.sheet` runs the question's
-`cancel` when SwiftUI sets it to false while the question is unanswered, before
-the presenter's own state is cleared, which is the route Escape, Command-Period
-and anything else the system does to end a sheet all take; `onDismiss` checks
-the same fact for a sheet that went away by any other route, then resets it for
-the next showing. An `answered` flag, set by both buttons (and
+never a bare `.sheet`. Escape answers through Cancel's own key equivalent, as
+above, so it never needs this. The binding those hand to `.sheet` runs the
+question's `cancel` when SwiftUI itself sets it to false while the question is
+unanswered, before the presenter's own state is cleared: that is the route
+Command-Period took on the second Mac, where nothing in the sheet held the keys,
+and the route any other system dismissal takes (a test drives it on both Macs
+with `cancelOperation` on the sheet's window, and checks the answer is already
+`cancel` at the moment the presenter's state reads closed; with the setter's
+`cancel` taken out it read `""`). In the `isPresented:` presenter, `onDismiss`
+checks the same fact for a sheet its presenter closed with no answer, then
+resets it for the next showing. The item presenter has no `onDismiss`: an
+`onChange` of the item's id cancels the question that WAS showing whenever the
+item becomes nil or another item, which covers the presenter closing it and
+(measured) the case `onDismiss` cannot, because SwiftUI swaps a sheet's
+content when the item changes from A to B and never dismisses A. Its record of
+what is showing is replaced only there, after the old one is settled, so A is
+cancelled as itself and B stays asked. Each of these paths was taken out in
+turn on 2026-11-16 and a test in `QuestionKeysTests` failed for each. An `answered` flag, set by both buttons (and
 `.onExitCommand`) before their closures run, is what makes a second `cancel`
 impossible: Cancel or Escape and then the closing runs `cancel` once, and going
 ahead and then the closing runs nothing more. Nothing is timed, and nothing a
@@ -1571,9 +1583,13 @@ Return leaves the sheet showing and answers nothing and Escape answers
 Command-Period answers `cancel` in both layouts; a sheet closed with no answer
 (by its presenter, Command-Period or Escape) answers `cancel` exactly once, and
 one answered by going ahead runs `cancel` never; every question in the app is
-presented through `.factsQuestionSheet` (a source scan); and each button's key
-is read off the `NSButton` AppKit draws. None of it depends on Keyboard Navigation
-being on. **The lesson for any sheet, on either platform: a test of a key
+presented through `.factsQuestionSheet` (a source scan). The item presenter is
+driven on its own (`ItemPage`), including an item that changes while its
+question is open. Which button holds which key is NOT read off the drawn
+buttons: SwiftUI draws a sheet's buttons without `NSButton`s, so
+`buttonKeys(in:)` finds none and `testEachButtonCarriesAtMostOneKey` checks
+nothing today (#977); the keys are proved only by pressing them.
+None of it depends on Keyboard Navigation being on. **The lesson for any sheet, on either platform: a test of a key
 that passes only where focus lands on a control proves nothing for a teacher
 with default settings.**
 

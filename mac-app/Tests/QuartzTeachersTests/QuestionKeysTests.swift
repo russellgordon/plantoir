@@ -61,11 +61,81 @@ final class QuestionKeysTests: XCTestCase {
 
         // MARK: - Stored properties
 
-        var showing: Bool = true
+        var showing: Bool = true {
+            didSet {
+                if oldValue && !showing {
+                    answerWhenClosed = answer
+                }
+            }
+        }
+
         var answer: String = ""
 
         /// How many times `cancel` ran (#973: exactly once per question).
         var cancelCount: Int = 0
+
+        /// The answer as it stood at the moment the presenter's state said
+        /// the question was closed, or nil before it closed (#973 review:
+        /// only the binding route answers before that moment).
+        var answerWhenClosed: String?
+
+        /// The item `ItemPage` asks about, or nil.
+        var asked: Asked? {
+            didSet {
+                if oldValue != nil && asked == nil {
+                    answerWhenClosed = answer
+                }
+            }
+        }
+
+        /// The ids of the items whose `cancel` ran, in order.
+        var cancelled: [String] = []
+    }
+
+    /// An item a question is shown for, as Replace It… is shown for its
+    /// warning.
+    struct Asked: Identifiable {
+
+        // MARK: - Stored properties
+
+        let id: String
+        let question: FactsQuestion
+        let goAheadIsTheDefault: Bool
+    }
+
+    /// A question shown for an item, through `.factsQuestionSheet(item:)`
+    /// as `ReplaceReferenceCourseAlert` shows Replace It… (#973 review).
+    /// Its `cancel` clears only its own item, as that presenter's does.
+    struct ItemPage: View {
+
+        // MARK: - Stored properties
+
+        let answers: Answers
+
+        // MARK: - Body
+
+        var body: some View {
+            @Bindable var answers = answers
+            Color.white
+                .factsQuestionSheet(item: $answers.asked) { (shown: Asked) in
+                    FactsQuestionSheet(
+                        question: shown.question,
+                        identifier: "test",
+                        goAheadIsTheDefault: shown.goAheadIsTheDefault,
+                        goAhead: {
+                            answers.answer = "go"
+                            answers.asked = nil
+                        },
+                        cancel: {
+                            answers.answer = "cancel"
+                            answers.cancelled.append(shown.id)
+                            if answers.asked?.id == shown.id {
+                                answers.asked = nil
+                            }
+                        }
+                    )
+                }
+        }
     }
 
     /// The two-lists sheet, presented as `TaskProgressView` presents it.
@@ -550,6 +620,142 @@ final class QuestionKeysTests: XCTestCase {
         XCTAssertEqual(ordinaryAnswers.answer, "go", "after Change Password: Return was not Share Again")
         XCTAssertEqual(ordinaryAnswers.cancelCount, 0, "after Change Password: the sheet closing after Share Again ran cancel")
         close(ordinaryWindow)
+    }
+
+    /// The same rule through `.factsQuestionSheet(item:)`, the presenter
+    /// Replace It… uses (#973 review): closed with no answer, by its
+    /// presenter, Command-Period or Escape, the question's `cancel` runs
+    /// exactly once, for that item, in both layouts.
+    func testAnItemQuestionClosedWithNoAnswerIsCancelledOnce() {
+        let layouts: [(question: FactsQuestion, goAheadIsTheDefault: Bool, what: String)] = [
+            (question: QuestionKeysTests.replaceQuestion(), goAheadIsTheDefault: false, what: "Replace It…"),
+            (question: PlanSharing.newPasswordQuestion(earlierYearShared: true), goAheadIsTheDefault: true, what: "after Change Password"),
+        ]
+        for layout in layouts {
+            for route in ["closed by its presenter", "Command-Period", "Escape"] {
+                let answers: Answers = Answers()
+                answers.asked = Asked(id: "A", question: layout.question, goAheadIsTheDefault: layout.goAheadIsTheDefault)
+                let window: NSWindow = windowShowing(ItemPage(answers: answers))
+                if route == "Command-Period" {
+                    press(.commandPeriod, in: window)
+                } else if route == "Escape" {
+                    press(.escape, in: window)
+                } else {
+                    answers.asked = nil
+                }
+                XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "\(layout.what), \(route): the sheet did not go away")
+                _ = runUntil(timeout: 0.5) { false }
+                XCTAssertEqual(answers.cancelled, ["A"], "\(layout.what), \(route): cancel ran for \(answers.cancelled)")
+                XCTAssertNil(answers.asked, "\(layout.what), \(route): the question is still asked")
+                close(window)
+            }
+        }
+    }
+
+    /// An item question that was answered records nothing more when its
+    /// sheet goes away (#973 review): Return is Share Again after Change
+    /// Password, and `cancel` never runs.
+    func testAnAnsweredItemQuestionRecordsNothingMoreWhenItCloses() {
+        let answers: Answers = Answers()
+        answers.asked = Asked(id: "A", question: PlanSharing.newPasswordQuestion(earlierYearShared: true), goAheadIsTheDefault: true)
+        let window: NSWindow = windowShowing(ItemPage(answers: answers))
+        press(.returnKey, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "Return did not close the sheet")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(answers.answer, "go", "Return was not Share Again")
+        XCTAssertEqual(answers.cancelled, [], "the sheet closing after Share Again ran cancel")
+        close(window)
+    }
+
+    /// When the item changes from A to B while A's question is open, A's
+    /// dismissal cancels A, the question that was showing, and B stays
+    /// asked (#973 review: the presenter once remembered only the newest
+    /// item, so A's dismissal cancelled B). Then B, closed unanswered, is
+    /// cancelled once as itself.
+    func testChangingTheItemCancelsOnlyTheQuestionThatWasShowing() {
+        let question: FactsQuestion = QuestionKeysTests.replaceQuestion()
+        let answers: Answers = Answers()
+        answers.asked = Asked(id: "A", question: question, goAheadIsTheDefault: false)
+        let window: NSWindow = windowShowing(ItemPage(answers: answers))
+        answers.asked = Asked(id: "B", question: question, goAheadIsTheDefault: false)
+        XCTAssertTrue(runUntil(timeout: 3) { answers.cancelled == ["A"] }, "A's dismissal did not cancel A (cancelled \(answers.cancelled))")
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet != nil }, "B's question is not showing")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(answers.cancelled, ["A"], "A's dismissal cancelled \(answers.cancelled)")
+        XCTAssertEqual(answers.asked?.id, "B", "B is no longer asked")
+        XCTAssertNotNil(window.attachedSheet, "B's question closed with A's")
+        answers.asked = nil
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "B's sheet did not go away")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(answers.cancelled, ["A", "B"], "closing B with no answer: cancel ran for \(answers.cancelled)")
+        close(window)
+    }
+
+    /// The system closing a sheet answers Cancel BEFORE the presenter's
+    /// state reads closed (#973 review). `cancelOperation` on the sheet's
+    /// window is the route Command-Period took on the second Mac, measured:
+    /// SwiftUI sets the presentation's binding to false and runs no button.
+    /// The binding route answers at that moment; `onDismiss` alone would
+    /// answer only after the presenter's state already read closed with no
+    /// answer (measured with the setter's `cancel` taken out: the answer
+    /// read at closing was ""). Checked for both presenters.
+    func testTheSystemClosingASheetAnswersCancelBeforeThePresenterSeesItClosed() {
+        let question: FactsQuestion = QuestionKeysTests.replaceQuestion()
+
+        let answers: Answers = Answers()
+        let window: NSWindow = windowShowing(FactsPage(question: question, goAheadIsTheDefault: false, answers: answers))
+        window.attachedSheet?.cancelOperation(nil)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "isPresented: the system did not close the sheet")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(answers.answerWhenClosed, "cancel", "isPresented: the presenter saw the question closed before it was answered")
+        XCTAssertEqual(answers.cancelCount, 1, "isPresented: cancel ran \(answers.cancelCount) times")
+        close(window)
+
+        let itemAnswers: Answers = Answers()
+        itemAnswers.asked = Asked(id: "A", question: question, goAheadIsTheDefault: false)
+        let itemWindow: NSWindow = windowShowing(ItemPage(answers: itemAnswers))
+        itemWindow.attachedSheet?.cancelOperation(nil)
+        XCTAssertTrue(runUntil(timeout: 3) { itemWindow.attachedSheet == nil }, "item: the system did not close the sheet")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(itemAnswers.answerWhenClosed, "cancel", "item: the presenter saw the question closed before it was answered")
+        XCTAssertEqual(itemAnswers.cancelled, ["A"], "item: cancel ran for \(itemAnswers.cancelled)")
+        close(itemWindow)
+    }
+
+    /// A question asked again after it was answered is a new question
+    /// (#973 review): its Cancel runs again, once. Checked for both
+    /// presenters, since each keeps its "answered" fact per showing.
+    func testAQuestionAskedAgainCanBeCancelledAgain() {
+        let question: FactsQuestion = QuestionKeysTests.replaceQuestion()
+
+        let answers: Answers = Answers()
+        let window: NSWindow = windowShowing(FactsPage(question: question, goAheadIsTheDefault: false, answers: answers))
+        press(.escape, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "isPresented: the first Escape did not close the question")
+        _ = runUntil(timeout: 0.5) { false }
+        answers.showing = true
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet != nil }, "isPresented: the question was not asked again")
+        _ = runUntil(timeout: 0.7) { false }
+        press(.escape, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "isPresented: the second Escape did not close the question")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(answers.cancelCount, 2, "isPresented: cancel ran \(answers.cancelCount) times for two showings")
+        close(window)
+
+        let itemAnswers: Answers = Answers()
+        itemAnswers.asked = Asked(id: "A", question: question, goAheadIsTheDefault: false)
+        let itemWindow: NSWindow = windowShowing(ItemPage(answers: itemAnswers))
+        press(.escape, in: itemWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { itemWindow.attachedSheet == nil }, "item: the first Escape did not close the question")
+        _ = runUntil(timeout: 0.5) { false }
+        itemAnswers.asked = Asked(id: "A", question: question, goAheadIsTheDefault: false)
+        XCTAssertTrue(runUntil(timeout: 3) { itemWindow.attachedSheet != nil }, "item: the question was not asked again")
+        _ = runUntil(timeout: 0.7) { false }
+        press(.escape, in: itemWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { itemWindow.attachedSheet == nil }, "item: the second Escape did not close the question")
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertEqual(itemAnswers.cancelled, ["A", "A"], "item: cancel ran for \(itemAnswers.cancelled) over two showings")
+        close(itemWindow)
     }
 
     /// Every question with its facts is presented through

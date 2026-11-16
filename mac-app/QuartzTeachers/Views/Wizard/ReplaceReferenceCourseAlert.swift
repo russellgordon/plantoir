@@ -35,7 +35,12 @@ struct ReplaceReferenceCourseAlert: ViewModifier {
                         onReplace(shown.folderName)
                     },
                     cancel: {
-                        warning = nil
+                        // Only this warning's own answer clears it: a
+                        // dismissal settles the question that was showing,
+                        // never a newer one (#973).
+                        if warning?.id == shown.id {
+                            warning = nil
+                        }
                     }
                 )
             }
