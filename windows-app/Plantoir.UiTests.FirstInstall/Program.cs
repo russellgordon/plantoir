@@ -134,8 +134,11 @@ internal static class Program
         {
             Console.WriteLine($"(no screenshot {name}: {error.Message})");
         }
-        return name;
+        return "shot-" + Path.GetFileNameWithoutExtension(name);   // kept on the Mac as shot-NN-label.jpg
     }
+
+    /// <summary>Sends a file the driver wrote to the Mac as well.</summary>
+    internal static void Keep(string path, string name) => Send(path, name);
 
     private static void Send(string path, string name)
     {

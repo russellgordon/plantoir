@@ -463,6 +463,9 @@ internal static class Steps_
             AnswerPlantoirQuestion(window);
             string phase = ById(window, "taskPhaseLabel")?.Name ?? "";
             string milestone = ById(window, "taskMilestoneLabel")?.Name ?? "";
+            // "Gathering your content… still working… (4s)" counts up every second; the step is what matters.
+            int working = milestone.IndexOf(" still working", StringComparison.Ordinal);
+            if (working > 0) milestone = milestone[..working];
             if (milestone.Length > 0 && milestone != lastMilestone)
             {
                 lastMilestone = milestone;
@@ -523,14 +526,21 @@ internal static class Steps_
                 if (text.Length > longest.Length) longest = text;
             }
             var lines = longest.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            // The lines that say what failed: errors, and the module that would not load.
             var picked = new List<string>();
-            foreach (string line in lines)
-                if (line.Contains("ERR_", StringComparison.Ordinal) || line.Contains("could not be found", StringComparison.OrdinalIgnoreCase)
-                    || line.Contains("Error", StringComparison.Ordinal) || line.Contains(".node", StringComparison.Ordinal))
-                    if (!picked.Contains(line.Trim())) picked.Add(line.Trim());
-            var tail = lines.Skip(Math.Max(0, lines.Length - 4)).Select(line => line.Trim());
-            File.WriteAllText(Path.Combine(Program.Out, "details.txt"), longest);
-            return "\"" + string.Join(" / ", picked.Take(8).Concat(tail)) + "\" (the whole of it is in details.txt)";
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                bool telling = line.StartsWith("Error", StringComparison.Ordinal) || line.Contains("ERR_", StringComparison.Ordinal)
+                               || line.EndsWith(".node", StringComparison.Ordinal) || line.StartsWith("subprocess.CalledProcessError", StringComparison.Ordinal);
+                if (telling && !picked.Contains(line)) picked.Add(line.Length > 240 ? line[..240] + "…" : line);
+            }
+            if (picked.Count == 0)
+                foreach (string line in lines.Skip(Math.Max(0, lines.Length - 3))) picked.Add(line.Trim());
+            string path = Path.Combine(Program.Out, "details.txt");
+            File.WriteAllText(path, longest);
+            Program.Keep(path, "details.txt");
+            return "\"" + string.Join(" / ", picked.Take(7)) + "\" (the whole of it is in details.txt)";
         }
         catch (Exception error) { return "(could not read the details: " + error.Message + ")"; }
     }
