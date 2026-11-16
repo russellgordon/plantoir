@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The first-install rehearsal driver (#976). It runs INSIDE a clean Windows
+    machine's logged-in desktop session and does what a teacher does: downloads
+    PlantoirSetup.exe through the browser, runs it, opens Plantoir, sets up a
+    new working folder, adds the example course and previews it. It answers
+    only the windows on its allow-list and fails on any other.
+
+    Test tooling only. It is in no solution and no suite, references nothing in
+    this repository (the machine it runs on has only the released app), and
+    changes nothing in the app, the installer or any test.
+
+    Published self-contained as one file, so the clean machine never receives
+    .NET. Built for win-arm64 because the rehearsal VM is Windows 11 on ARM;
+    the app it drives is win-x64 under emulation, which UI Automation reads
+    across. To build it (on any machine with the .NET 9 SDK):
+
+      dotnet publish windows-app\Plantoir.UiTests.FirstInstall -c Release -r win-arm64 -o <out>
+
+    The folder name starts with Plantoir.UiTests so the source scans in
+    Plantoir.Tests that skip the UI harness skip this too.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>PlantoirFirstInstall</AssemblyName>
+    <RootNamespace>Plantoir.FirstInstall</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" Version="5.0.0" />
+  </ItemGroup>
+
+</Project>
