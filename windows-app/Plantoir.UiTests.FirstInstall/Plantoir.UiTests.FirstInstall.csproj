@@ -18,6 +18,13 @@
 
       dotnet publish windows-app\Plantoir.UiTests.FirstInstall -c Release -r win-arm64 -o <out>
 
+    It also builds on a Mac (dotnet publish ... -p:EnableWindowsTargeting=true),
+    which is how vm-tools/win-rehearsal.py builds it.
+
+    Its allow-list is WindowRules.cs, which holds no UI Automation; the plain
+    tests beside it, Plantoir.UiTests.FirstInstall.Tests, compile that one
+    file and run on any machine with the .NET 9 SDK.
+
     The folder name starts with Plantoir.UiTests so the source scans in
     Plantoir.Tests that skip the UI harness skip this too.
   -->

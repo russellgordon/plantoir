@@ -12,34 +12,22 @@ internal sealed record SeenWindow(IntPtr Handle, string Title, string Class, str
 }
 
 /// <summary>
-/// Watches every top-level window on the desktop. The windows open when the
-/// driver starts are the desktop and are left alone. A window that appears
-/// later must be ALLOWED: by the current step's own list (the windows that
-/// step expects and answers), or by the short list of the desktop's own
-/// passing windows below. Anything else ends the run, named, with a
-/// screenshot and the words it showed.
+/// Watches every top-level window on the desktop, and every dialog inside
+/// Plantoir's window. The windows open when the driver starts are the desktop
+/// and are left alone. A window that appears later is judged by
+/// <see cref="WindowRules"/> for the current <see cref="Stage"/>: the stage
+/// names the windows it expects, and anything else ends the run, named, with
+/// a screenshot and the words it showed.
 /// </summary>
 internal sealed class WindowWatch
 {
     private readonly UIA3Automation _automation;
     private readonly HashSet<IntPtr> _baseline = new();
     private readonly HashSet<IntPtr> _reported = new();
+    private readonly HashSet<string> _allowedSeen = new();
     private readonly List<string> _baselineNames = new();
 
-    /// <summary>
-    /// Windows of the desktop itself that can come and go during any step and
-    /// say nothing about Plantoir: the taskbar, Start and search, the
-    /// notification area's pop-ups, the input panel, and Parallels' own tools.
-    /// Matched by process, because a title is the part that changes.
-    /// </summary>
-    private static readonly string[] DesktopProcesses =
-    {
-        "explorer:Shell_TrayWnd", "explorer:Shell_SecondaryTrayWnd", "explorer:Progman", "explorer:WorkerW",
-        "explorer:NotifyIconOverflowWindow", "explorer:Xaml_WindowedPopupClass", "explorer:TopLevelWindowForOverflowXamlIsland",
-        "ShellExperienceHost:", "StartMenuExperienceHost:", "SearchHost:", "SearchApp:", "TextInputHost:",
-        "ShellHost:", "LockApp:", "prl_cc:", "prl_tools:", "prl_tools_service:", "ApplicationFrameHost:Windows.UI.Core.CoreWindow",
-        "PlantoirFirstInstall:",
-    };
+    private static readonly string[] DialogButtonIds = { "PrimaryButton", "SecondaryButton", "CloseButton" };
 
     public WindowWatch(UIA3Automation automation)
     {
@@ -52,6 +40,15 @@ internal sealed class WindowWatch
     }
 
     public string BaselineDescription => string.Join("; ", _baselineNames);
+
+    /// <summary>The stage whose allow-list applies. Set by each step as it starts.</summary>
+    public Stage Stage { get; set; } = Stage.Starting;
+
+    /// <summary>Plantoir's main window once it is open; its dialogs are judged too.</summary>
+    public AutomationElement? PlantoirWindow { get; set; }
+
+    /// <summary>How many times the desktop has been looked at, for the log.</summary>
+    public int Looks { get; private set; }
 
     /// <summary>Every top-level window now, skipping any that vanish while being read.</summary>
     public List<SeenWindow> TopLevel()
@@ -85,53 +82,78 @@ internal sealed class WindowWatch
         return result;
     }
 
-    private static bool IsDesktopWindow(SeenWindow window)
+    /// <summary>
+    /// Looks once. Each new window is judged for the current stage; an
+    /// expected one is handed to <paramref name="answer"/> with its kind (the
+    /// step answers it there), anything else ends the run. Then the dialogs
+    /// inside Plantoir's window are judged the same way.
+    /// </summary>
+    public void Check(Action<SeenWindow, string>? answer)
     {
-        // Parallels Tools updating itself in a terminal window: the virtual
-        // machine's own plumbing, which a teacher's PC does not have.
-        if (window.Process.Equals("WindowsTerminal", StringComparison.OrdinalIgnoreCase)
-            && window.Title.Contains(@"Parallels\Parallels Tools", StringComparison.OrdinalIgnoreCase))
-            return true;
-        foreach (string entry in DesktopProcesses)
+        Looks++;
+        foreach (var window in New())
         {
-            int colon = entry.IndexOf(':');
-            string process = entry[..colon];
-            string windowClass = entry[(colon + 1)..];
-            if (string.Equals(window.Process, process, StringComparison.OrdinalIgnoreCase)
-                && (windowClass.Length == 0 || window.Class == windowClass))
-                return true;
+            var facts = new WindowFacts(window.Title, window.Class, window.Process, () => Words(window.Element));
+            var judgement = WindowRules.Judge(Stage, facts);
+            switch (judgement.Verdict)
+            {
+                case Verdict.Desktop:
+                    continue;
+                case Verdict.Empty:
+                    if (_reported.Add(window.Handle))
+                        Program.Note($"note: an empty untitled window appeared, {window}; watching it");
+                    continue;
+                case Verdict.Blocked:
+                    throw Stopped.Product($"Windows put up {judgement.Kind}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("windows-notice")}]");
+                case Verdict.Unexpected:
+                    throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
+            }
+            if (_allowedSeen.Add($"{Stage}|{window.Handle}"))
+                Program.Note($"window allowed at {Stage} as {judgement.Kind}: {window}");
+            try { answer?.Invoke(window, judgement.Kind); }
+            catch (Stopped) { throw; }
+            catch (Exception error) { throw Stopped.Driver($"answering {window} failed: {error.Message}"); }
         }
-        return false;
+        CheckDialogs();
     }
 
     /// <summary>
-    /// Looks once. Each new window is offered to <paramref name="expected"/>,
-    /// which answers it and returns true when the step knows it. A window
-    /// nobody knows ends the run. Returns the new windows the step knew.
+    /// Plantoir's own dialogs. UI Automation shows a ContentDialog as a
+    /// Window of class Popup named by its title, beside empty popups; a
+    /// dialog is told apart by holding a dialog's buttons (as the UI suite's
+    /// DrivenApp.OpenDialog does). Expected questions are answered with their
+    /// Close button and recorded; any other dialog ends the run.
     /// </summary>
-    public List<SeenWindow> Check(Func<SeenWindow, bool> expected)
+    private void CheckDialogs()
     {
-        var known = new List<SeenWindow>();
-        foreach (var window in New())
+        if (PlantoirWindow is not { } window) return;
+        AutomationElement[] popups;
+        try { popups = window.FindAllDescendants(cf => cf.ByClassName("Popup").And(cf.ByControlType(ControlType.Window))); }
+        catch { return; }
+        foreach (var popup in popups)
         {
-            if (IsDesktopWindow(window)) continue;
-            bool knew;
-            try { knew = expected(window); }
-            catch (Stopped) { throw; }
-            catch (Exception error) { throw Stopped.Driver($"answering {window} failed: {error.Message}"); }
-            if (knew) { known.Add(window); continue; }
-            // A window with no title and nothing in it, of a process already
-            // allowed in this step, is a frame being drawn; look again later.
-            if (window.Title.Length == 0 && Words(window.Element).Length == 0)
+            string title;
+            bool isDialog = false, isNewCourseSheet;
+            AutomationElement? close = null;
+            try
             {
-                if (_reported.Add(window.Handle))
-                    Program.Note($"note: an empty untitled window appeared, {window}; watching it");
-                continue;
+                title = popup.Properties.Name.ValueOrDefault ?? "";
+                foreach (string id in DialogButtonIds)
+                    if (popup.FindFirstDescendant(cf => cf.ByAutomationId(id)) is not null) isDialog = true;
+                isNewCourseSheet = popup.FindFirstDescendant(cf => cf.ByAutomationId("newCourseDialog")) is not null;
+                if (isNewCourseSheet) isDialog = true;
+                close = popup.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"));
             }
-            string shot = Program.Shot("unexpected");
-            throw Stopped.Product($"an unexpected window appeared: {window}, saying \"{Words(window.Element)}\" [screenshot {shot}]");
+            catch { continue; }
+            if (!isDialog) continue;
+            string? kind = WindowRules.DialogKind(Stage, title, isNewCourseSheet);
+            if (kind is null)
+                throw Stopped.Product($"Plantoir showed a dialog not expected at {Stage}: \"{title}\", saying \"{Words(popup)}\" [screenshot {Program.Shot("unexpected-dialog")}]");
+            if (!kind.StartsWith("question", StringComparison.Ordinal)) continue;
+            if (close is null || !close.IsEnabled) continue;
+            Program.Note($"FINDING: Plantoir asked ({kind}) \"{title}: {Words(popup)}\"; answered with \"{close.Name}\" [screenshot {Program.Shot("question")}]");
+            if (close.Patterns.Invoke.TryGetPattern(out var invoke)) invoke.Invoke();
         }
-        return known;
     }
 
     /// <summary>The words a window shows, as UI Automation reads them (text, buttons, links), in tree order.</summary>
@@ -161,15 +183,15 @@ internal sealed class WindowWatch
 
     /// <summary>
     /// Wait for <paramref name="done"/>, checking the desktop every second,
-    /// answering what the step expects and ending the run on anything else.
+    /// answering what the stage expects and ending the run on anything else.
     /// Returns false when the time ran out.
     /// </summary>
-    public bool WaitFor(Func<bool> done, TimeSpan within, Func<SeenWindow, bool> expected)
+    public bool WaitFor(Func<bool> done, TimeSpan within, Action<SeenWindow, string>? answer = null)
     {
         var until = DateTime.UtcNow + within;
         while (DateTime.UtcNow < until)
         {
-            Check(expected);
+            Check(answer);
             bool finished;
             try { finished = done(); }
             catch (Stopped) { throw; }
@@ -177,7 +199,7 @@ internal sealed class WindowWatch
             if (finished) return true;
             Thread.Sleep(1000);
         }
-        Check(expected);
+        Check(answer);
         try { return done(); } catch (Stopped) { throw; } catch { return false; }
     }
 }

@@ -57,6 +57,14 @@ internal static class Program
             _watch = new WindowWatch(_automation);
             Note($"driver started as {Environment.UserName} on {Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.OSArchitecture}");
             Note($"windows already open, taken as the desktop: {_watch.BaselineDescription}");
+            // Recorded because an elevated driver would start the installer
+            // elevated too, and then no UAC question could ever appear.
+            using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+            {
+                bool elevated = new System.Security.Principal.WindowsPrincipal(identity)
+                    .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+                Note($"the driver runs {(elevated ? "ELEVATED (an administrator's full token)" : "not elevated (a standard token, as a double-click from the desktop has)")}");
+            }
             Steps1To6(url);
             return Finish(Outcome.Passed, "Plantoir was downloaded, installed, opened, set up a working folder, added the example course and served its preview");
         }
