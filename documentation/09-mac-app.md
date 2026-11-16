@@ -16414,6 +16414,70 @@ it, and the scheduled-publish path registers a real Task Scheduler task. The
 `windows` issue for this asks for the intent — redirect `AppDataRoot` in the
 test assembly and add a source-scan test — not the Swift mechanism.
 
+## Testing: a test removes the temporary folders it makes (#978)
+
+**What happened.** Every full run of the unit suite left its scratch folders
+in the user temp folder (`getconf DARWIN_USER_TEMP_DIR`). Measured on the
+second Mac on 2026-11-16, `dev` 2c16ed77e, listing that folder immediately
+before and after one full run: **189 new test-made entries, 277.9 MB**. The
+biggest were `WorkspaceInitializationTests` (4 folders, 172 MB: the two
+initialisation tests copy a whole `.toolchain/` in), `CloudSyncedFolderTests`
+(13, 86 MB) and `FixtureWorkspace` copies that eight window classes never
+removed (18, 11 MB); the rest were small and many (`ScheduledDeployTests` 40,
+`cq4t-builds-` 27, `AssistFixture` 20, the configuration round-trip files of
+`CloudflareDeployTests`, `AdditionalDeployTargetsTests` and
+`CourseConfigurationTests`, and trail folders in five classes).
+`ReferenceShelfTests` did remove its folder, but the removal failed silently
+on the files a reference lock had marked `uchg`. The second Mac, with 31 GB
+free, had 660 such folders by then.
+
+**The rule.** A test that makes a folder or file outside its own process
+removes it when the test ends, whether it passed, failed or threw — so not a
+line at the end of the test body, which a failed `XCTUnwrap` skips.
+`Tests/QuartzTeachersTests/TemporaryFolders.swift` is the one place that does
+it:
+
+- `makeTemporaryFolder(prefix:)` makes `<prefix>-<UUID>` and registers its
+  removal; `removeWhenTestEnds(_:)` registers the removal of something else
+  made the folder (`FixtureWorkspace.materialize()`, a `.json` a round-trip
+  test writes). Both are `addTeardownBlock`, which XCTest runs on every
+  outcome.
+- The removal (`TemporaryFolders.unlockAndRemove`) clears the user flags on
+  every entry first, because nothing inside a `uchg` folder, and no `uchg`
+  file, can be deleted.
+- `TemporaryFolders.removeWhenThisTestEnds(_:)` is for a static helper with
+  no test case to hand (`AssistFixture.makeRunner`); `TemporaryFolderSweeper`,
+  an `XCTestObservation` registered by the bundle's principal class, removes
+  those when each test finishes.
+- The same sweeper removes, when the bundle finishes, the four folders the
+  APP points at for the whole run while it is a test host —
+  `RealHome.homeWhileTesting`, `BuildOutputLocation.buildsRootWhileTesting`,
+  `ClaudeCodeLauncher.supportDirectoryWhileTesting` and
+  `ProblemReportStore.throwawayFolderURL`. They are one per run on purpose
+  (a test writing through one door reads back through another), so they can
+  only go after the last test.
+
+*Rejected: a sweep of old `<prefix>-<UUID>` folders by age* (the second Mac's
+`tidy.py` does that today, as a stopgap): it hides a new leak instead of
+naming it, and needs every machine that runs the suite to carry it.
+*Rejected: having the app remove its per-run test folders itself*: app code
+for a test-only concern; the test bundle owns its own mess. *Rejected:
+changing `FixtureWorkspace.materialize()` to register its own removal*: it is
+shared with the UI target, which has no such observer, and the call sites
+that already removed their copy would have removed it twice.
+
+**Keeping it fixed.** The second Mac's `run27.sh` ends every run with a line
+in `result.txt`, `test temp folders left by this run: N, M MB (prefix
+counts)`, from `temp-growth.py`, which counts only names shaped the way the
+suite names its folders. It is a number, never a failure. After the fix, the
+same before-and-after listing on the second Mac (branch head c251102e6, one
+full run, 3,675 tests) found **0 test-made entries, 0 MB**; the only new
+entries were the system's own (`TemporaryDirectory.*`, `BlobRegistryFiles-*`,
+and a `<UUID>-<pid>-…` folder of Xcode's), which the count leaves out.
+
+**Windows.** Nothing to do: it shares no test code, and its xUnit fixtures
+are its own question.
+
 ## Testing: the UI target keeps its state in `--state-dir` (#154)
 
 **Read this first: the launchers the app runs are NOT redirected.** A child
