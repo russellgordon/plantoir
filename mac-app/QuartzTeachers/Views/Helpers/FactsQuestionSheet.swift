@@ -227,9 +227,9 @@ struct FactsQuestionPresentation: ViewModifier {
                 cancelIfUnanswered()
                 // Ready for the next time the question is asked.
                 answered = false
-            }, content: {
-                FactsQuestionPresentation.answering(makeSheet(), answered: $answered)
-            })
+            }) {
+                FactsQuestionSheet(answering: makeSheet(), answered: $answered)
+            }
     }
 
     /// Runs the question's `cancel`, unless it has already been answered.
@@ -240,11 +240,16 @@ struct FactsQuestionPresentation: ViewModifier {
         answered = true
         makeSheet().cancel()
     }
+}
+
+extension FactsQuestionSheet {
+
+    // MARK: - Initializer
 
     /// `sheet` with each of its answers first marking the question
-    /// answered.
-    static func answering(_ sheet: FactsQuestionSheet, answered: Binding<Bool>) -> FactsQuestionSheet {
-        return FactsQuestionSheet(
+    /// `answered` (#973), so the presentation never cancels it again.
+    init(answering sheet: FactsQuestionSheet, answered: Binding<Bool>) {
+        self.init(
             question: sheet.question,
             identifier: sheet.identifier,
             goAheadIsTheDefault: sheet.goAheadIsTheDefault,
@@ -313,9 +318,9 @@ struct FactsQuestionItemPresentation<Item: Identifiable>: ViewModifier {
                 // Ready for the next time the question is asked.
                 answered = false
                 askedAbout = nil
-            }, content: { (shown: Item) in
-                FactsQuestionPresentation.answering(makeSheet(shown), answered: $answered)
-            })
+            }) { (shown: Item) in
+                FactsQuestionSheet(answering: makeSheet(shown), answered: $answered)
+            }
             .onChange(of: item?.id, initial: true) {
                 if let item {
                     askedAbout = item
