@@ -42,6 +42,7 @@ final class InAppUserInterfaceTests: XCTestCase {
             fixtureURL = URL(fileURLWithPath: fixturePath)
         } else {
             fixtureURL = try FixtureWorkspace.materialize()
+            removeWhenTestEnds(fixtureURL)
         }
         // Drive the model the WINDOW is showing. Creating a separate one
         // would leave the interface displaying whatever folder the teacher

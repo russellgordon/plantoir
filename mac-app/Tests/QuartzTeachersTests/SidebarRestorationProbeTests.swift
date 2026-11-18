@@ -14,6 +14,7 @@ final class SidebarRestorationProbeTests: XCTestCase {
     @MainActor
     func testProgrammaticExpansionUnfoldsTheRealSidebar() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -49,6 +50,7 @@ final class SidebarRestorationProbeTests: XCTestCase {
         // sidebar created. A freshly created DisclosureGroup must honour
         // an initial binding of true.
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return

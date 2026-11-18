@@ -40,11 +40,9 @@ final class CloudSyncedFolderTests: XCTestCase {
         }
     }
 
+    /// Removed when the test ends, whatever its outcome (#978).
     func makeTemporaryFolder() throws -> URL {
-        let url: URL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cloud-sync-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try makeTemporaryFolder(prefix: "cloud-sync")
     }
 
     /// Makes every folder read as synced by the named service.
