@@ -55,6 +55,15 @@ extension XCTestCase {
     /// Two teardown blocks, registered removal first: XCTest runs them last
     /// registered first, so the restore runs before the removal whatever the
     /// test's outcome.
+    ///
+    /// What this cannot close: something that copied the folder's path
+    /// before the restore and writes after the removal. Inside the app every
+    /// trail write reads `ActivityTrail.store` at the moment of writing
+    /// (`ActivityTrail.note`), so none does; the one copy the app makes is
+    /// `HelperPrograms.environment`, which hands a launcher
+    /// `PLANTOIR_TRAIL_DIR`, and a launcher still running after the test
+    /// could make the folder again. None of the classes using this starts a
+    /// launcher.
     @discardableResult
     func useThrowawayTrail(prefix: String) -> URL {
         let previousStore: ProblemReportStore = ActivityTrail.store
@@ -72,16 +81,22 @@ extension XCTestCase {
     /// (`WorkspaceModel.windowModels`): when this test ends, every window
     /// still showing it is first pointed at the run's resting folder, and
     /// only then is the fixture removed. One block, in that order, so the
-    /// window never shows a folder that has gone.
+    /// window never shows a folder that has gone. If no resting folder can
+    /// be made, the fixture is left in place and the test fails saying so.
     func removeWhenTestEndsAfterTheWindowLetsGo(_ folderURL: URL) {
         addTeardownBlock { @MainActor in
             let windowsLetGo: Bool = TemporaryFolders.pointWindowsAway(from: folderURL)
             if windowsLetGo {
                 TemporaryFolders.unlockAndRemove(folderURL)
             } else {
-                // No resting folder could be made, so a window may still
-                // show this one: leave it for the end of the run.
-                TemporaryFolders.removeWhenThisTestEnds(folderURL)
+                // No resting folder could be made, so a window still shows
+                // this one. It is NOT removed (not now, not later in the
+                // run, while the window may still show it): it is left
+                // behind, and the test says so rather than leaking quietly.
+                XCTFail(
+                    "No resting folder could be made, so the fixture a window still shows was left in place: "
+                        + folderURL.path
+                )
             }
         }
     }
@@ -329,20 +344,116 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
         return errno == ESRCH
     }
 
+    /// The names a run's folders carry, split into the two shapes they come
+    /// in, read from THIS run's own folders so the list cannot drift from
+    /// `runFolders`: the stems of the `...-under-test-<pid>` names (the pid
+    /// left off), and the prefixes of the `...-<UUID>` names (the UUID left
+    /// off).
+    static func runFolderNameShapes() -> (processStems: [String], uuidPrefixes: [String]) {
+        let ownSuffix: String = String(ProcessInfo.processInfo.processIdentifier)
+        var processStems: [String] = []
+        var uuidPrefixes: [String] = []
+        for folderURL in runFolders {
+            let name: String = folderURL.lastPathComponent
+            if name.hasSuffix("-under-test-" + ownSuffix) {
+                processStems.append(String(name.dropLast(ownSuffix.count)))
+                continue
+            }
+            let uuidLength: Int = 36
+            if name.count > uuidLength {
+                let uuidText: String = String(name.suffix(uuidLength))
+                if isWellFormedUUID(uuidText) {
+                    uuidPrefixes.append(String(name.dropLast(uuidLength)))
+                }
+            }
+        }
+        return (processStems, uuidPrefixes)
+    }
+
+    /// True for the upper-case form `UUID().uuidString` writes, and nothing
+    /// else.
+    static func isWellFormedUUID(_ text: String) -> Bool {
+        guard let parsed = UUID(uuidString: text) else {
+            return false
+        }
+        return parsed.uuidString == text
+    }
+
+    /// True when `name` is one a run with process id `processIdentifier`
+    /// makes: a stem followed by exactly that pid, or a UUID prefix
+    /// followed by a well-formed UUID. Anything else (`.`, `..`, a name
+    /// with a `/`, another pid's name, a truncated one) is false.
+    static func isRunFolderName(_ name: String, forProcess processIdentifier: Int32) -> Bool {
+        let shapes = runFolderNameShapes()
+        for stem in shapes.processStems {
+            if name == stem + String(processIdentifier) {
+                return true
+            }
+        }
+        for prefix in shapes.uuidPrefixes {
+            if name.hasPrefix(prefix) {
+                let rest: String = String(name.dropFirst(prefix.count))
+                if isWellFormedUUID(rest) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// The process id a run record's name carries, or nil when the name is
+    /// not exactly `plantoir-run-record-under-test-<pid>` with a positive
+    /// decimal pid above 1 written the way `String(pid)` writes it.
+    static func processIdentifier(ofRecordNamed name: String) -> Int32? {
+        if name.hasPrefix(runRecordPrefix) == false {
+            return nil
+        }
+        let processText: String = String(name.dropFirst(runRecordPrefix.count))
+        guard let processIdentifier = Int32(processText) else {
+            return nil
+        }
+        if processIdentifier <= 1 || String(processIdentifier) != processText {
+            return nil
+        }
+        return processIdentifier
+    }
+
+    /// True when the entry at `path` is a regular file, checked without
+    /// following a link.
+    static func isRegularFile(atPath path: String) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return false
+        }
+        let entryType: FileAttributeType? = attributes[FileAttributeKey.type] as? FileAttributeType
+        return entryType == FileAttributeType.typeRegular
+    }
+
     /// Removes, for every run record in `folder` whose process has gone,
-    /// the folders it names and then the record. A record names only
-    /// folders directly inside `folder`; any other line is ignored.
+    /// the run folders it names and then the record.
+    ///
+    /// **What it will remove, and nothing else.** A line is acted on only
+    /// when it is, as a plain string, `folder`'s path, a `/`, and a name
+    /// `isRunFolderName(_:forProcess:)` accepts for THAT record's pid; the
+    /// path removed is built from `folder` and the checked name, never taken
+    /// from the file. The entry is examined without following a link
+    /// (`unlockAndRemove`), so a link planted at a valid name goes as a link.
+    ///
+    /// **Whose run it is.** A record is swept only when `kill(pid, 0)`
+    /// answers `ESRCH`. A pid that has been reused by ANY live process, this
+    /// account's or another's, reads as alive and the record is skipped
+    /// until that process too has gone. Two runs going at once under one
+    /// account (a gate and another test run) each skip the other's record,
+    /// because the other is alive, and their own; and a record only ever
+    /// names folders carrying its own pid or a UUID its run made, so one
+    /// run's sweep cannot reach another run's folders.
     static func removeWhatFinishedRunsLeft(inFolder folder: URL, exceptProcess ownProcess: Int32) {
         let fileManager: FileManager = FileManager.default
-        guard let names = try? fileManager.contentsOfDirectory(atPath: folder.path) else {
+        let folderPath: String = folder.path
+        guard let names = try? fileManager.contentsOfDirectory(atPath: folderPath) else {
             return
         }
         for name in names {
-            if name.hasPrefix(runRecordPrefix) == false {
-                continue
-            }
-            let processText: String = String(name.dropFirst(runRecordPrefix.count))
-            guard let processIdentifier = Int32(processText) else {
+            guard let processIdentifier = processIdentifier(ofRecordNamed: name) else {
                 continue
             }
             if processIdentifier == ownProcess {
@@ -351,20 +462,27 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
             if processHasGone(processIdentifier) == false {
                 continue
             }
-            let recordURL: URL = folder.appendingPathComponent(name)
-            let recordText: String = (try? String(contentsOf: recordURL, encoding: .utf8)) ?? ""
-            let folderPath: String = folder.standardizedFileURL.path
-            for line in recordText.components(separatedBy: "\n") {
-                if line.isEmpty {
-                    continue
-                }
-                let namedURL: URL = URL(fileURLWithPath: line)
-                if namedURL.deletingLastPathComponent().standardizedFileURL.path != folderPath {
-                    continue
-                }
-                TemporaryFolders.unlockAndRemove(namedURL)
+            let recordPath: String = folderPath + "/" + name
+            if isRegularFile(atPath: recordPath) == false {
+                continue
             }
-            try? fileManager.removeItem(at: recordURL)
+            let recordText: String = (try? String(contentsOfFile: recordPath, encoding: .utf8)) ?? ""
+            for line in recordText.components(separatedBy: "\n") {
+                let lineStart: String = folderPath + "/"
+                if line.hasPrefix(lineStart) == false {
+                    continue
+                }
+                let namedEntry: String = String(line.dropFirst(lineStart.count))
+                if isRunFolderName(namedEntry, forProcess: processIdentifier) == false {
+                    continue
+                }
+                let builtPath: String = folderPath + "/" + namedEntry
+                if builtPath != line {
+                    continue
+                }
+                TemporaryFolders.unlockAndRemove(URL(fileURLWithPath: builtPath))
+            }
+            try? fileManager.removeItem(atPath: recordPath)
         }
     }
 }

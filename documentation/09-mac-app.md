@@ -16576,13 +16576,21 @@ it:
   would have made the folder again. `useThrowawayTrail(prefix:)` registers
   the removal and then the restore of `ActivityTrail.store`, so the restore
   runs first (`CoverageRefreshInThePageTests`, `DetailTabsLayoutTests`,
-  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`).
+  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`). What order
+  cannot close is a writer that copied the folder's path before the restore:
+  every trail write in the app reads `ActivityTrail.store` when it writes,
+  and the one copy it makes is `HelperPrograms.environment`'s
+  `PLANTOIR_TRAIL_DIR` for a launcher, so a launcher still running after
+  the test could make the folder again. None of those four classes starts
+  one.
   `removeWhenTestEndsAfterTheWindowLetsGo(_:)` is for a fixture shown in the
   app's own window (the nine classes that drive `WorkspaceModel.windowModels`):
   one block points every window still showing it at the run's resting
   folder (`plantoir-resting-folder-under-test-<pid>`, a fixture copy made on
   first need) through `chooseWorkspace(at:)`, so the window lets go the way
   it does when a teacher opens another folder, and only then removes it.
+  If no resting folder can be made, the fixture is left in place and the
+  test fails saying so, rather than being removed under the window.
   The tests' own in-body `removeItem` of a fixture still on screen went.
 - `TemporaryFolders.removeWhenThisTestEnds(_:)` is for a static helper with
   no test case to hand (`AssistFixture.makeRunner`); `TemporaryFolderSweeper`,
@@ -16601,9 +16609,21 @@ it:
   folders are removed there AND named in a run record,
   `plantoir-run-record-under-test-<pid>`, written when the bundle starts and
   left behind on purpose. The next run, when its bundle starts, reads every
-  record whose process has gone (`kill(pid, 0)` answers `ESRCH`; a live
-  process, or one of another account's, is left alone), removes the folders
-  it names (only ones directly in the temp folder), then the record. A run
+  record named exactly `plantoir-run-record-under-test-<pid>` (a plain
+  decimal pid above 1, a regular file, not a link) whose process has gone:
+  `kill(pid, 0)` answers `ESRCH`. Any live process holding that pid, a
+  reused pid included, means the record is skipped until it too has gone,
+  so a gate and another test run going at once under one account each skip
+  the other's record. A line is acted on only if it is, as a plain string,
+  the temp folder's path, `/`, and one of the names a run makes for THAT
+  record's pid (the stems are read from the run's own folders:
+  `plantoir-{home,builds,assist,resting-folder}-under-test-<pid>`) or
+  `Plantoir-tests-<UUID>` with a well-formed upper-case UUID; the path
+  removed is built from the temp folder and the checked name, never read
+  from the file, and examined without following a link. So `.`, `..`, a
+  trailing slash, another pid's name, a truncated name or any unrelated
+  entry are skipped (each has a test in `TemporaryFoldersTests`, run on a
+  scratch folder standing in for the temp folder). Then the record goes. A run
   therefore leaves one record of a few hundred bytes, plus anything its host
   wrote after the bundle finished, until the next run on the same Mac; the
   record matches `temp-growth.py`'s `-under-test-<pid>` shape, so the
