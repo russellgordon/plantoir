@@ -91,6 +91,7 @@ internal sealed class WindowWatch
     public void Check(Action<SeenWindow, string>? answer)
     {
         Looks++;
+        var contentWindows = new List<AutomationElement>();
         foreach (var window in New())
         {
             var facts = new WindowFacts(window.Title, window.Class, window.Process, () => Words(window.Element));
@@ -108,13 +109,18 @@ internal sealed class WindowWatch
                 case Verdict.Unexpected:
                     throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
             }
+            if (judgement.Kind == "plantoir content") contentWindows.Add(window.Element);
             if (_allowedSeen.Add($"{Stage}|{window.Handle}"))
-                Program.Note($"window allowed at {Stage} as {judgement.Kind}: {window}");
+                Program.Note($"window allowed at {Stage} as {judgement.Kind}: {window}"
+                             + (judgement.Kind is "plantoir content" or "plantoir popup" ? $", showing \"{facts.Words}\"" : ""));
             try { answer?.Invoke(window, judgement.Kind); }
             catch (Stopped) { throw; }
             catch (Exception error) { throw Stopped.Driver($"answering {window} failed: {error.Message}"); }
         }
-        CheckDialogs();
+        if (PlantoirWindow is { } main) CheckDialogs(main);
+        // Plantoir's content seen outside its window (WindowRules.IsPlantoirContent):
+        // a dialog in it is judged exactly as one in the main window.
+        foreach (var content in contentWindows) CheckDialogs(content);
     }
 
     /// <summary>
@@ -124,9 +130,8 @@ internal sealed class WindowWatch
     /// DrivenApp.OpenDialog does). Expected questions are answered with their
     /// Close button and recorded; any other dialog ends the run.
     /// </summary>
-    private void CheckDialogs()
+    private void CheckDialogs(AutomationElement window)
     {
-        if (PlantoirWindow is not { } window) return;
         AutomationElement[] popups;
         try { popups = window.FindAllDescendants(cf => cf.ByClassName("Popup").And(cf.ByControlType(ControlType.Window))); }
         catch { return; }

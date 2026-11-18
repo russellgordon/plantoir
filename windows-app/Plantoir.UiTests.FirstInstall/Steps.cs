@@ -369,7 +369,8 @@ internal static class Steps_
     private static AutomationElement? PlantoirWindow()
     {
         foreach (var window in Program.Watch.New())
-            if (window.Process.Equals("Plantoir", StringComparison.OrdinalIgnoreCase) && window.Class == "WinUIDesktopWin32WindowClass")
+            if (window.Process.Equals("Plantoir", StringComparison.OrdinalIgnoreCase) && window.Class == "WinUIDesktopWin32WindowClass"
+                && window.Title == "Plantoir")
                 return window.Element;
         return null;
     }

@@ -119,8 +119,43 @@ internal static class WindowRules
     private static bool IsInstaller(WindowFacts window) =>
         window.Process.StartsWith("PlantoirSetup", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Plantoir's main window, by its fixed title (MainWindow.xaml, Title="Plantoir").
+    /// Its other windows (Settings, the assistant's "Revise …") share the class
+    /// and are not part of a first install, so they are not let through by it.
+    /// </summary>
     private static bool IsPlantoirMain(WindowFacts window) =>
-        Is(window.Process, "Plantoir") && window.Class == "WinUIDesktopWin32WindowClass";
+        Is(window.Process, "Plantoir") && window.Class == "WinUIDesktopWin32WindowClass" && window.Title == "Plantoir";
+
+    /// <summary>
+    /// The input site of the main window's WinUI content (class
+    /// InputSiteWindowClass, no title). Normally a child of the main window,
+    /// two levels down (vm-tools/runs/win-explore, every UI tree read there);
+    /// rehearsal 2026-11-16-134814 saw it once as a top-level window during the
+    /// first seconds after launch, showing the first screen's own words. It is
+    /// Plantoir's content, not a window of its own: the dialogs inside it are
+    /// judged as the main window's are (<see cref="WindowWatch"/>).
+    /// </summary>
+    public static bool IsPlantoirContent(WindowFacts window) =>
+        Is(window.Process, "Plantoir") && window.Class == "InputSiteWindowClass" && window.Title.Length == 0;
+
+    /// <summary>
+    /// A windowed popup of Plantoir's (WinUI draws a tooltip, a menu bar menu
+    /// or a flyout in a window of this class so it can reach past the main
+    /// window's edge). Not yet seen in a rehearsal; named because step 6 opens
+    /// the section with a real click on a sidebar row that has a tooltip.
+    /// Its words are recorded when it is allowed.
+    /// </summary>
+    private static bool IsPlantoirPopup(WindowFacts window) =>
+        Is(window.Process, "Plantoir") && window.Class == "Microsoft.UI.Content.PopupWindowSiteBridge";
+
+    /// <summary>
+    /// The User Account Control prompt. With PromptOnSecureDesktop 0 (as
+    /// snapshot 00 has) it draws on the ordinary desktop, in consent.exe; on
+    /// the secure desktop the driver cannot see it and the Mac's consent.exe
+    /// probe reports it instead.
+    /// </summary>
+    private static bool IsUacPrompt(WindowFacts window) => Is(window.Process, "consent");
 
     private static bool IsDesktopFurniture(WindowFacts window)
     {
@@ -150,6 +185,9 @@ internal static class WindowRules
         if (window.Title.Contains("Security Warning", StringComparison.OrdinalIgnoreCase))
             return stage == Stage.Install ? Judgement.Of(Verdict.Expected, "security warning") : Judgement.Of(Verdict.Unexpected);
 
+        // Never expected: no step of a first install asks for elevation.
+        if (IsUacPrompt(window)) return Judgement.Of(Verdict.Blocked, "a User Account Control prompt");
+
         if (IsDesktopFurniture(window))
         {
             // A toast is furniture unless it says Windows stopped something.
@@ -172,20 +210,27 @@ internal static class WindowRules
                 // Inno Setup's application window: it carries the title only.
                 if (IsInstaller(window) && window.Class == "TApplication") return Judgement.Of(Verdict.Expected, "installer application window");
                 if (stage == Stage.InstallFinished && IsPlantoirMain(window)) return Judgement.Of(Verdict.Expected, "plantoir");
+                if (stage == Stage.InstallFinished && IsPlantoirContent(window)) return Judgement.Of(Verdict.Expected, "plantoir content");
                 break;
             case Stage.OpenPlantoir:
                 if (IsPlantoirMain(window)) return Judgement.Of(Verdict.Expected, "plantoir");
+                if (IsPlantoirContent(window)) return Judgement.Of(Verdict.Expected, "plantoir content");
+                if (IsPlantoirPopup(window)) return Judgement.Of(Verdict.Expected, "plantoir popup");
                 // The wizard is still closing during the first seconds.
                 if (IsInstaller(window) && window.Class is "TWizardForm" or "TApplication") return Judgement.Of(Verdict.Expected, "installer closing");
                 break;
             case Stage.WorkingFolder:
                 if (IsPlantoirMain(window)) return Judgement.Of(Verdict.Expected, "plantoir");
+                if (IsPlantoirContent(window)) return Judgement.Of(Verdict.Expected, "plantoir content");
+                if (IsPlantoirPopup(window)) return Judgement.Of(Verdict.Expected, "plantoir popup");
                 if (window.Class == "#32770" && (Is(window.Process, "PickerHost") || Is(window.Process, "Plantoir")))
                     return Judgement.Of(Verdict.Expected, "folder picker");
                 break;
             case Stage.ExampleCourse:
             case Stage.Preview:
                 if (IsPlantoirMain(window)) return Judgement.Of(Verdict.Expected, "plantoir");
+                if (IsPlantoirContent(window)) return Judgement.Of(Verdict.Expected, "plantoir content");
+                if (IsPlantoirPopup(window)) return Judgement.Of(Verdict.Expected, "plantoir popup");
                 break;
         }
 

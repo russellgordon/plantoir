@@ -61,6 +61,52 @@ public class WindowRulesTests
     }
 
     [Fact]
+    public void PlantoirsContentSeenOutsideItsWindowIsExpectedFromFinishOn()
+    {
+        // Rehearsal 2026-11-16-134814, step 3: the main window's WinUI input
+        // site, seen once as a top-level window, showing the first screen.
+        var content = Window("", "InputSiteWindowClass", "Plantoir",
+                             "Choose Your Working Folder | Pick the folder where your course notes live | Choose Folder…");
+        foreach (var stage in new[] { Stage.InstallFinished, Stage.OpenPlantoir, Stage.WorkingFolder, Stage.ExampleCourse, Stage.Preview })
+            Assert.Equal(new Judgement(Verdict.Expected, "plantoir content"), WindowRules.Judge(stage, content));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Install, content));
+        // Only that class, untitled, of Plantoir's own process.
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.OpenPlantoir, Window("Plantoir", "InputSiteWindowClass", "Plantoir", "words")));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.OpenPlantoir, Window("", "InputSiteWindowClass", "Notepad", "words")));
+    }
+
+    [Fact]
+    public void PlantoirsOtherWindowsAreNotTakenForItsMainWindow()
+    {
+        var settings = Window("Settings", "WinUIDesktopWin32WindowClass", "Plantoir", "Settings");
+        var assistant = Window("Revise EXC2O Section 1", "WinUIDesktopWin32WindowClass", "Plantoir", "Revise");
+        foreach (var stage in new[] { Stage.OpenPlantoir, Stage.WorkingFolder, Stage.ExampleCourse, Stage.Preview })
+        {
+            Assert.Equal(Verdict.Unexpected, VerdictOf(stage, settings));
+            Assert.Equal(Verdict.Unexpected, VerdictOf(stage, assistant));
+        }
+    }
+
+    [Fact]
+    public void APopupOfPlantoirsIsExpectedOnlyOnceItIsOpen()
+    {
+        var tooltip = Window("", "Microsoft.UI.Content.PopupWindowSiteBridge", "Plantoir", "EXC2O Section 1");
+        foreach (var stage in new[] { Stage.OpenPlantoir, Stage.WorkingFolder, Stage.ExampleCourse, Stage.Preview })
+            Assert.Equal(new Judgement(Verdict.Expected, "plantoir popup"), WindowRules.Judge(stage, tooltip));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Install, tooltip));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Preview, Window("", "Microsoft.UI.Content.PopupWindowSiteBridge", "msedge", "words")));
+    }
+
+    [Fact]
+    public void AUacPromptEndsTheRunAtEveryStageAndIsNamed()
+    {
+        var consent = Window("User Account Control", "Credential Dialog Xaml Host", "consent",
+                             "User Account Control | Do you want to allow this app to make changes to your device? | Yes | No");
+        foreach (Stage stage in Enum.GetValues<Stage>())
+            Assert.Equal(new Judgement(Verdict.Blocked, "a User Account Control prompt"), WindowRules.Judge(stage, consent));
+    }
+
+    [Fact]
     public void TheFolderPickerIsExpectedOnlyWhileChoosingTheWorkingFolder()
     {
         Assert.Equal(new Judgement(Verdict.Expected, "folder picker"), WindowRules.Judge(Stage.WorkingFolder, Picker));
