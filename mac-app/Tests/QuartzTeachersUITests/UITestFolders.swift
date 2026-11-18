@@ -1,3 +1,4 @@
+import CryptoKit
 import Darwin
 import XCTest
 
@@ -31,6 +32,11 @@ import XCTest
 /// linked into a state folder one file at a time) is removed as a link, and
 /// the file it points at is not touched.
 ///
+/// The state folder's preferences live outside it, in
+/// `/private/tmp/plantoir-state-preferences-<16 hex>` (the only place the
+/// preferences daemon honours a path suite); that folder is built here by
+/// the app's rule from the state folder's path and removed last.
+///
 /// The work happens in `testCaseDidFinish`, after the test's `tearDown`
 /// (which reaps any stub launcher it started), whether the test passed,
 /// failed, threw or skipped.
@@ -44,6 +50,14 @@ final class UITestFolders: NSObject, XCTestObservation {
     /// The prefixes a folder this file may remove starts with.
     static let fixturePrefix: String = "cq4t-fixture-"
     static let statePrefix: String = "plantoir-state-"
+
+    /// Where a state-folder launch keeps its preferences: the one parent the
+    /// preferences daemon honours a path suite under (the app's
+    /// `PlantoirDefaults.honouredParent`), so never inside the state folder.
+    /// The UI target's entitlements give the runner write access here
+    /// (`QuartzTeachersUITests.entitlements`), for this removal alone.
+    static let preferencesParentPath: String = "/private/tmp"
+    static let preferencesPrefix: String = "plantoir-state-preferences-"
 
     /// How long a launched app is given to end once asked. A ceiling on a
     /// wait for a state XCTest reports, not a pause: the wait ends the
@@ -92,11 +106,26 @@ final class UITestFolders: NSObject, XCTestObservation {
     /// loudly, so a mistake shows the day it is made.
     static func removeWhenThisTestEnds(_ folderURL: URL) {
         guard isRemovableName(folderURL) else {
-            XCTFail("UITestFolders will not remove \(folderURL.path): only <temp>/\(fixturePrefix)<UUID> and <temp>/\(statePrefix)<UUID> folders this run made.")
+            XCTFail("UITestFolders will not remove \(folderURL.path): only <temp>/\(fixturePrefix)<UUID>, <temp>/\(statePrefix)<UUID> and \(preferencesParentPath)/\(preferencesPrefix)<16 hex> folders this run made.")
             return
         }
         register()
         shared?.pendingFolders.append(folderURL)
+    }
+
+    /// The preferences folder the app makes for a state folder: the rule of
+    /// the app's `PlantoirDefaults.preferencesPath(inStateDirectory:)`, built
+    /// here from the state folder this run made rather than read back from
+    /// the note the app leaves (a UI target cannot import the app). The
+    /// first 16 hex digits of the SHA-256 of the state folder's path.
+    static func preferencesFolder(forStateDirectory stateDirectory: URL) -> URL {
+        let digest: SHA256.Digest = SHA256.hash(data: Data(stateDirectory.standardizedFileURL.path.utf8))
+        var hex: String = ""
+        for byte in digest {
+            hex += String(format: "%02x", byte)
+        }
+        return URL(fileURLWithPath: preferencesParentPath, isDirectory: true)
+            .appendingPathComponent(preferencesPrefix + String(hex.prefix(16)), isDirectory: true)
     }
 
     /// Registers a launched app, to be quit before the running test's folders
@@ -106,10 +135,39 @@ final class UITestFolders: NSObject, XCTestObservation {
         shared?.launchedApplications.append(application)
     }
 
+    /// True for `/private/tmp/plantoir-state-preferences-` followed by
+    /// exactly 16 lower-case hex digits. Pure.
+    static func isPreferencesFolderName(_ folderURL: URL) -> Bool {
+        let parentPath: String = folderURL.deletingLastPathComponent().standardizedFileURL.path
+        if parentPath != URL(fileURLWithPath: preferencesParentPath).standardizedFileURL.path {
+            return false
+        }
+        let name: String = folderURL.lastPathComponent
+        if name.hasPrefix(preferencesPrefix) == false {
+            return false
+        }
+        let rest: String = String(name.dropFirst(preferencesPrefix.count))
+        if rest.count != 16 {
+            return false
+        }
+        for character in rest {
+            let isDigit: Bool = character >= "0" && character <= "9"
+            let isLowerHex: Bool = character >= "a" && character <= "f"
+            if isDigit == false && isLowerHex == false {
+                return false
+            }
+        }
+        return true
+    }
+
     /// True when the folder sits directly in the runner's temp folder and its
     /// name is one of the two prefixes followed by an upper-case UUID and
-    /// nothing else. Pure: it checks the spelling, not the disk.
+    /// nothing else, or is a state folder's preferences folder
+    /// (`isPreferencesFolderName`). Pure: it checks the spelling, not the disk.
     static func isRemovableName(_ folderURL: URL) -> Bool {
+        if isPreferencesFolderName(folderURL) {
+            return true
+        }
         let parentPath: String = folderURL.deletingLastPathComponent().standardizedFileURL.path
         if parentPath != temporaryFolderURL.standardizedFileURL.path {
             return false
@@ -137,21 +195,15 @@ final class UITestFolders: NSObject, XCTestObservation {
     }
 
     /// Clears the user flags on the folder and everything in it, without
-    /// following a link, then removes it. A locked (`uchg`) entry cannot be
+    /// following a link (`UserFlagClearing`), then removes it. A locked (`uchg`) entry cannot be
     /// deleted, and the app's reference locks set that flag.
     static func unlockAndRemove(_ folderURL: URL) {
         let path: String = folderURL.path
         guard isRemovableName(folderURL), isRealFolder(atPath: path) else {
             return
         }
-        lchflags(path, 0)
-        // A directory enumerator lists a link as an entry and does not
-        // descend through it; `lchflags` changes the link itself.
-        if let enumerator = FileManager.default.enumerator(atPath: path) {
-            for case let relativePath as String in enumerator {
-                lchflags(folderURL.appendingPathComponent(relativePath).path, 0)
-            }
-        }
+        // By file descriptor, so nothing swapped for a link is followed.
+        UserFlagClearing.clearFlags(inFolderAtPath: path)
         // `removeItem` removes a link inside the folder as a link.
         do {
             try FileManager.default.removeItem(atPath: path)
@@ -186,6 +238,19 @@ final class UITestFolders: NSObject, XCTestObservation {
             }
             print("UITestFolders left \(folders.count) folder(s) because the app under test did not quit: \(paths)")
             return
+        }
+        // Then what the app started and a terminate() left running (a model
+        // server, a stub launcher), found by this test's own folders in its
+        // arguments, never by name (`LaunchProcesses`).
+        var launchFolderPaths: [String] = []
+        for folderURL in folders {
+            if UITestFolders.isPreferencesFolderName(folderURL) == false {
+                launchFolderPaths.append(folderURL.path)
+            }
+        }
+        let endedCount: Int = LaunchProcesses.end(processesNaming: launchFolderPaths)
+        if endedCount > 0 {
+            print("UITestFolders ended \(endedCount) process(es) the app under test had started.")
         }
         for application in applications {
             if IsolatedLaunch.lastLaunched === application {

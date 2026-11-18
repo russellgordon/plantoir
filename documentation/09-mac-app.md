@@ -16608,10 +16608,21 @@ it:
   `testBundleDidFinish`, the last callback the bundle gets. So the run's
   folders are removed there, and anything the host makes again afterwards
   is removed by the NEXT run, when its bundle starts, **by name alone**:
-  every per-run folder carries its run's process id in its name
-  (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>` and
-  `Plantoir-tests-<pid>-<UUID>`; the trail folder took the pid in the #978
-  follow-ups, one line in `ProblemReportStore.throwawayFolderURL`). The
+  every per-run folder ends with its run's `RealHome.testRunIdentifier`,
+  `<pid>-<UUID>` (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>-<UUID>`
+  and `Plantoir-tests-<pid>-<UUID>`; one UUID per run, made once per
+  process, since #978c). The pid says when the run has finished; the UUID
+  makes the name ONE run's. Before #978c the first four ended in the pid
+  alone, and the third review found what that cost: a new run given a dead
+  run's pid between the sweep's liveness check and its removal could have
+  its fresh folders removed, and a run reusing a dead run's pid wrote into,
+  and inherited, that run's leftover home, builds and assist folders. With
+  the UUID, a later run with the same pid makes different names, which are
+  never in the listing a sweep is working through. The change is in app
+  code (`RealHome`, `BuildOutputLocation`, `ClaudeCodeLauncher`,
+  `ProblemReportStore`), in names read only when the process is a test
+  host or a UI test with no state folder, so a teacher's app never makes
+  one. The
   sweep lists the temp folder and acts only on an entry whose whole name is
   one of those shapes with a plain decimal pid above 1 that is not its own
   process, and only when `kill(pid, 0)` answers `ESRCH`. Any other answer,
@@ -16624,11 +16635,21 @@ it:
   from any file (the run record of the first follow-up was removed after
   the second review: a record could name another live run's folder, and
   reading it raced with a new run reusing the pid). The entry is removed
-  without following a link, and the flag-clearing walk inside a folder
-  checks each item without following it and never enters a link; the one
-  window left, a folder swapped for a link between its check and its
-  listing, needs something writing inside the user's own temp folder and
-  could only clear flags elsewhere, never remove. So **one run leaves
+  without following a link, and the flag-clearing walk inside a folder goes
+  by file descriptor (`Tests/Shared/UserFlagClearing.swift`, shared with the
+  UI target): the folder is opened once with `O_NOFOLLOW | O_DIRECTORY`,
+  each entry is looked at with `fstatat(…, AT_SYMLINK_NOFOLLOW)` relative to
+  it, a subfolder is opened with `openat(…, O_NOFOLLOW | O_DIRECTORY)`, any
+  other entry with `openat(…, O_SYMLINK)` (the link itself), and flags are
+  changed through the descriptor with `fchflags`. No path is resolved
+  twice, so an entry swapped for a link at any moment is refused or opened
+  as the link. (Until #978c the walk listed folders by path: a folder
+  swapped for a link between its check and its listing had the flags of the
+  link's whole target cleared, never removed, by something writing in the
+  user's own temp folder.) Older names the sweep no longer recognises,
+  `Plantoir-tests-<UUID>` without a pid and the pid-only
+  `…-under-test-<pid>` of the first follow-ups, are never swept by it: the
+  second Mac's `tidy.py` age sweep takes them. So **one run leaves
   nothing listed anywhere**; what can remain after a run is its own per-run
   folders, if the host wrote again after the last callback, and the next
   run on the same Mac removes them.

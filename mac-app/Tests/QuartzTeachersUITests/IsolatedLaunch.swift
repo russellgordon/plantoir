@@ -121,6 +121,7 @@ struct IsolatedLaunch {
             .appendingPathComponent("plantoir-state-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         UITestFolders.removeWhenThisTestEnds(stateDirectory)
+        UITestFolders.removeWhenThisTestEnds(UITestFolders.preferencesFolder(forStateDirectory: stateDirectory))
 
         // The frame goes in the ARGUMENT domain, which outranks the saved one
         // for reading and is never written: every launch opens at 1100×720

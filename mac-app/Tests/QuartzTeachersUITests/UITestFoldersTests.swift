@@ -118,4 +118,53 @@ final class UITestFoldersTests: XCTestCase {
         UITestFolders.unlockAndRemove(otherURL)
         XCTAssertTrue(FileManager.default.fileExists(atPath: otherURL.path))
     }
+    /// The preferences folder is built by the app's rule from the state
+    /// folder, and only that exact shape under `/private/tmp` is removable.
+    func testThePreferencesFolderIsTheAppsShapeAndOnlyThatIsRemovable() {
+        let stateURL: URL = temporaryFolderURL.appendingPathComponent("plantoir-state-\(UUID().uuidString)")
+        let preferencesURL: URL = UITestFolders.preferencesFolder(forStateDirectory: stateURL)
+        XCTAssertEqual(preferencesURL.deletingLastPathComponent().path, "/private/tmp")
+        XCTAssertTrue(preferencesURL.lastPathComponent.hasPrefix("plantoir-state-preferences-"))
+        XCTAssertTrue(UITestFolders.isRemovableName(preferencesURL))
+        XCTAssertNotEqual(preferencesURL, UITestFolders.preferencesFolder(
+            forStateDirectory: temporaryFolderURL.appendingPathComponent("plantoir-state-\(UUID().uuidString)")
+        ))
+
+        let tmp: URL = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+        XCTAssertFalse(UITestFolders.isRemovableName(tmp))
+        XCTAssertFalse(UITestFolders.isRemovableName(tmp.appendingPathComponent("plantoir-state-preferences-0123456789ABCDEF")))
+        XCTAssertFalse(UITestFolders.isRemovableName(tmp.appendingPathComponent("plantoir-state-preferences-0123456789abcde")))
+        XCTAssertFalse(UITestFolders.isRemovableName(tmp.appendingPathComponent("plantoir-state-preferences-0123456789abcdef0")))
+        XCTAssertFalse(UITestFolders.isRemovableName(tmp.appendingPathComponent("cq4t-fixture-\(UUID().uuidString)")))
+        XCTAssertFalse(UITestFolders.isRemovableName(
+            temporaryFolderURL.appendingPathComponent("plantoir-state-preferences-0123456789abcdef")
+        ))
+        XCTAssertFalse(UITestFolders.isRemovableName(
+            tmp.appendingPathComponent("x").appendingPathComponent("plantoir-state-preferences-0123456789abcdef")
+        ))
+    }
+
+    /// A process is matched by a launch folder in its arguments, as the
+    /// folder itself or a path inside it, never by a longer name that only
+    /// starts the same way.
+    func testAProcessIsMatchedOnlyByTheLaunchsOwnFolder() {
+        let stateURL: URL = temporaryFolderURL.appendingPathComponent("plantoir-state-\(UUID().uuidString)")
+        let modelArgument: String = stateURL.path + "/Library/Application Support/Plantoir/models/small.gguf"
+        XCTAssertTrue(LaunchProcesses.argumentsName(["llama-server", "--model", modelArgument], folder: stateURL.path))
+        XCTAssertTrue(LaunchProcesses.argumentsName(["Plantoir", "--state-dir", stateURL.path], folder: stateURL.path))
+        XCTAssertFalse(LaunchProcesses.argumentsName(["llama-server", "--model", stateURL.path + "X/m.gguf"], folder: stateURL.path))
+        XCTAssertFalse(LaunchProcesses.argumentsName(
+            ["llama-server", "--model", "/Users/teacher/Library/Application Support/Plantoir/models/small.gguf"],
+            folder: stateURL.path
+        ))
+    }
+
+    /// The runner can read a process's arguments from the kernel: its own,
+    /// at least, which is what the matching above is fed.
+    func testTheRunnerCanReadAProcesssArguments() {
+        let ownArguments: [String] = LaunchProcesses.arguments(ofProcess: getpid())
+        XCTAssertFalse(ownArguments.isEmpty, "KERN_PROCARGS2 gave nothing for this runner")
+        XCTAssertFalse(LaunchProcesses.processIdentifiersOfThisAccount().isEmpty)
+        XCTAssertEqual(LaunchProcesses.processes(naming: [temporaryFolderURL.appendingPathComponent("plantoir-state-\(UUID().uuidString)").path]), [])
+    }
 }
