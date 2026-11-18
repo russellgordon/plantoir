@@ -16565,7 +16565,25 @@ it:
   outcome.
 - The removal (`TemporaryFolders.unlockAndRemove`) clears the user flags on
   every entry first, because nothing inside a `uchg` folder, and no `uchg`
-  file, can be deleted.
+  file, can be deleted. A symbolic link handed in is removed as a link:
+  the entry is examined without following it, so nothing in its target is
+  unlocked or removed (`TemporaryFoldersTests` proves it with a real link
+  to a locked folder).
+- **Whatever points at a folder lets go before the folder goes, by order,
+  never by a delay.** XCTest runs teardown blocks last-registered first,
+  and all of them before the class's own `tearDown`, so a store put back in
+  `tearDown` was put back AFTER its folder had gone, and a late trail line
+  would have made the folder again. `useThrowawayTrail(prefix:)` registers
+  the removal and then the restore of `ActivityTrail.store`, so the restore
+  runs first (`CoverageRefreshInThePageTests`, `DetailTabsLayoutTests`,
+  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`).
+  `removeWhenTestEndsAfterTheWindowLetsGo(_:)` is for a fixture shown in the
+  app's own window (the nine classes that drive `WorkspaceModel.windowModels`):
+  one block points every window still showing it at the run's resting
+  folder (`plantoir-resting-folder-under-test-<pid>`, a fixture copy made on
+  first need) through `chooseWorkspace(at:)`, so the window lets go the way
+  it does when a teacher opens another folder, and only then removes it.
+  The tests' own in-body `removeItem` of a fixture still on screen went.
 - `TemporaryFolders.removeWhenThisTestEnds(_:)` is for a static helper with
   no test case to hand (`AssistFixture.makeRunner`); `TemporaryFolderSweeper`,
   an `XCTestObservation` registered by the bundle's principal class, removes
@@ -16574,9 +16592,37 @@ it:
   APP points at for the whole run while it is a test host —
   `RealHome.homeWhileTesting`, `BuildOutputLocation.buildsRootWhileTesting`,
   `ClaudeCodeLauncher.supportDirectoryWhileTesting` and
-  `ProblemReportStore.throwawayFolderURL`. They are one per run on purpose
-  (a test writing through one door reads back through another), so they can
-  only go after the last test.
+  `ProblemReportStore.throwawayFolderURL` — and the resting folder. They are
+  one per run on purpose (a test writing through one door reads back
+  through another), so they can only go after the last test.
+- **No point inside a run comes after the host's last write.** The test host
+  is the app; it keeps running (its tasks, a launcher it started) after
+  `testBundleDidFinish`, the last callback the bundle gets. So the run's
+  folders are removed there AND named in a run record,
+  `plantoir-run-record-under-test-<pid>`, written when the bundle starts and
+  left behind on purpose. The next run, when its bundle starts, reads every
+  record whose process has gone (`kill(pid, 0)` answers `ESRCH`; a live
+  process, or one of another account's, is left alone), removes the folders
+  it names (only ones directly in the temp folder), then the record. A run
+  therefore leaves one record of a few hundred bytes, plus anything its host
+  wrote after the bundle finished, until the next run on the same Mac; the
+  record matches `temp-growth.py`'s `-under-test-<pid>` shape, so the
+  bench's count shows it as 1 rather than hiding it.
+- `InAppUserInterfaceTests` writes its six screenshots to a folder of its
+  own, removed when it ends, unless `UITEST_SCREENSHOT_DIR` names one (which
+  is kept). They used to go to the temp folder's root under fixed names;
+  nothing in the repository, its scripts or the bench read them there.
+
+**The UI target (`QuartzTeachersUITests`) is not covered.** No reason is
+written down for leaving it out beyond its being part of no gate; what it
+leaves does not land in the user temp folder at all, because its runner is
+sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s `plantoir-state-`
+folders go to `~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`.
+Measured on the main Mac on 2026-11-18: 717 `cq4t-fixture-` and 151
+`plantoir-state-` entries there, 1.9 GB. A fix would have to quit the
+launched app (`XCUIApplication.terminate()`) before removing its folders,
+for the same reason the window lets go above, and could only be proved by
+running that target alone on a quiet machine.
 
 *Rejected: a sweep of old `<prefix>-<UUID>` folders by age* (the second Mac's
 `tidy.py` does that today, as a stopgap): it hides a new leak instead of
@@ -16595,6 +16641,8 @@ same before-and-after listing on the second Mac (branch head c251102e6, one
 full run, 3,675 tests) found **0 test-made entries, 0 MB**; the only new
 entries were the system's own (`TemporaryDirectory.*`, `BlobRegistryFiles-*`,
 and a `<UUID>-<pid>-…` folder of Xcode's), which the count leaves out.
+Since the #978 follow-ups a run's count is 1, not 0: its own run record
+(above), which the next run removes along with any late write it names.
 
 **Windows.** Nothing to do: it shares no test code, and its xUnit fixtures
 are its own question.

@@ -672,28 +672,14 @@ final class SiteHealthRepairTests: XCTestCase {
 @MainActor
 final class RepairChangesTheEditedMarkerTests: XCTestCase {
 
-    // MARK: - Stored properties
-
-    private var previousTrail: ProblemReportStore?
-
     // MARK: - Functions
 
     override func setUp() {
         super.setUp()
         // These repairs write trail lines. Left alone they land in the real
         // ~/Library/Logs/Plantoir/activity.txt — somebody's actual machine.
-        previousTrail = ActivityTrail.store
-        let trailURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("repair-marker-trail-\(UUID().uuidString)")
-        removeWhenTestEnds(trailURL)
-        ActivityTrail.store = ProblemReportStore(folderURL: trailURL)
-    }
-
-    override func tearDown() {
-        if let previousTrail {
-            ActivityTrail.store = previousTrail
-        }
-        super.tearDown()
+        // The store is put back before the folder goes (#978 follow-ups).
+        useThrowawayTrail(prefix: "repair-marker-trail")
     }
 
     private func makeCourse() throws -> (URL, Course) {

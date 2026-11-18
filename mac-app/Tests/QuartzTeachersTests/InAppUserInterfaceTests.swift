@@ -12,13 +12,16 @@ final class InAppUserInterfaceTests: XCTestCase {
 
     // MARK: - Functions
 
-    /// Where screenshots land for review.
-    var screenshotDirectory: String {
+    /// Where screenshots land for review: the folder `UITEST_SCREENSHOT_DIR`
+    /// names, which is kept, or else a folder of this test's own, removed
+    /// when it ends. (They went into the temp folder's root until the #978
+    /// follow-ups; nothing read them there.)
+    func makeScreenshotDirectory() throws -> String {
         let environment: [String: String] = ProcessInfo.processInfo.environment
         if let stored = environment["UITEST_SCREENSHOT_DIR"] {
             return stored
         }
-        return NSTemporaryDirectory()
+        return try makeTemporaryFolder(prefix: "in-app-screenshots").path
     }
 
     /// The fixture workspace path supplied by the test invocation.
@@ -35,6 +38,7 @@ final class InAppUserInterfaceTests: XCTestCase {
 
     @MainActor
     func testWalkThroughRealInterface() async throws {
+        let screenshotDirectory: String = try makeScreenshotDirectory()
         // Use the supplied workspace when given; otherwise build a fresh
         // disposable one, so plain Cmd-U needs no setup.
         var fixtureURL: URL
@@ -42,7 +46,7 @@ final class InAppUserInterfaceTests: XCTestCase {
             fixtureURL = URL(fileURLWithPath: fixturePath)
         } else {
             fixtureURL = try FixtureWorkspace.materialize()
-            removeWhenTestEnds(fixtureURL)
+            removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         }
         // Drive the model the WINDOW is showing. Creating a separate one
         // would leave the interface displaying whatever folder the teacher
