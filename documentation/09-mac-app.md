@@ -16608,10 +16608,21 @@ it:
   `testBundleDidFinish`, the last callback the bundle gets. So the run's
   folders are removed there, and anything the host makes again afterwards
   is removed by the NEXT run, when its bundle starts, **by name alone**:
-  every per-run folder carries its run's process id in its name
-  (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>` and
-  `Plantoir-tests-<pid>-<UUID>`; the trail folder took the pid in the #978
-  follow-ups, one line in `ProblemReportStore.throwawayFolderURL`). The
+  every per-run folder ends with its run's `RealHome.testRunIdentifier`,
+  `<pid>-<UUID>` (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>-<UUID>`
+  and `Plantoir-tests-<pid>-<UUID>`; one UUID per run, made once per
+  process, since #978c). The pid says when the run has finished; the UUID
+  makes the name ONE run's. Before #978c the first four ended in the pid
+  alone, and the third review found what that cost: a new run given a dead
+  run's pid between the sweep's liveness check and its removal could have
+  its fresh folders removed, and a run reusing a dead run's pid wrote into,
+  and inherited, that run's leftover home, builds and assist folders. With
+  the UUID, a later run with the same pid makes different names, which are
+  never in the listing a sweep is working through. The change is in app
+  code (`RealHome`, `BuildOutputLocation`, `ClaudeCodeLauncher`,
+  `ProblemReportStore`), in names read only when the process is a test
+  host or a UI test with no state folder, so a teacher's app never makes
+  one. The
   sweep lists the temp folder and acts only on an entry whose whole name is
   one of those shapes with a plain decimal pid above 1 that is not its own
   process, and only when `kill(pid, 0)` answers `ESRCH`. Any other answer,
@@ -16624,11 +16635,26 @@ it:
   from any file (the run record of the first follow-up was removed after
   the second review: a record could name another live run's folder, and
   reading it raced with a new run reusing the pid). The entry is removed
-  without following a link, and the flag-clearing walk inside a folder
-  checks each item without following it and never enters a link; the one
-  window left, a folder swapped for a link between its check and its
-  listing, needs something writing inside the user's own temp folder and
-  could only clear flags elsewhere, never remove. So **one run leaves
+  without following a link, and the flag-clearing walk inside a folder goes
+  by file descriptor (`Tests/Shared/UserFlagClearing.swift`, shared with the
+  UI target): the folder is opened once with `O_NOFOLLOW | O_DIRECTORY`,
+  each entry is looked at with `fstatat(…, AT_SYMLINK_NOFOLLOW)` relative to
+  it, a subfolder is opened with `openat(…, O_NOFOLLOW | O_DIRECTORY)`, any
+  other entry with `openat(…, O_SYMLINK)` (the link itself), and flags are
+  changed through the descriptor with `fchflags`. No path is resolved
+  twice, so an entry swapped for a link at any moment is refused or opened
+  as the link. (Until #978c the walk listed folders by path: a folder
+  swapped for a link between its check and its listing had the flags of the
+  link's whole target cleared, never removed, by something writing in the
+  user's own temp folder.) Older names the sweep no longer recognises,
+  `Plantoir-tests-<UUID>` without a pid and the pid-only
+  `…-under-test-<pid>` of the first follow-ups, are never swept by it.
+  The bench's `vm-tools/tidy.py` takes only some of them: a
+  `Plantoir-tests-<pid>-<UUID>` folder whose pid has gone, an older
+  `Plantoir-tests-<UUID>` while no Plantoir is running, each over a day
+  old, and its fixed list of `<prefix>-<UUID>` test folders. A pid-only
+  `…-under-test-<pid>` folder is in none of those, so nothing removes it;
+  a person deletes any that are left. So **one run leaves
   nothing listed anywhere**; what can remain after a run is its own per-run
   folders, if the host wrote again after the last callback, and the next
   run on the same Mac removes them.
@@ -16637,16 +16663,149 @@ it:
   is kept). They used to go to the temp folder's root under fixed names;
   nothing in the repository, its scripts or the bench read them there.
 
-**The UI target (`QuartzTeachersUITests`) is not covered.** No reason is
-written down for leaving it out beyond its being part of no gate; what it
-leaves does not land in the user temp folder at all, because its runner is
-sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s `plantoir-state-`
-folders go to `~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`.
-Measured on the main Mac on 2026-11-18: 717 `cq4t-fixture-` and 151
-`plantoir-state-` entries there, 1.9 GB. A fix would have to quit the
-launched app (`XCUIApplication.terminate()`) before removing its folders,
-for the same reason the window lets go above, and could only be proved by
-running that target alone on a quiet machine.
+**The UI target (`QuartzTeachersUITests`), since #978c.** It was left out
+of the first pass with no reason written down beyond its being part of no
+gate. What it leaves does not land in the user temp folder, because its
+runner is sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s
+`plantoir-state-` folders go to
+`~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`,
+which nothing measured. Measured on the main Mac on 2026-11-18, before the
+fix: 717 `cq4t-fixture-<UUID>` and 151 `plantoir-state-<UUID>` entries there
+(1.9 GB, almost all of it the website builder the app copies into each
+fixture, about 68 MB a copy), dated 2026-08-09 to 2026-11-01. Attributed by
+what each fixture holds: 587 plain fixtures from a launch with no working
+folder handed in (`QuartzTeachersUITests.launchApp()`, `UnitWordRowUITests`,
+`StateDirectoryUITests`), 62 with a stub preview (`QuartzTeachersUITests`'
+preview and publish tests), 28 `ContainerIdentifiersUITests`, 19
+`AssistantRolloverUITests`, 16 `NewSiteDialogUITests`, 5
+`TodaysClassOnTheFrontPageUITests`.
+
+`Tests/QuartzTeachersUITests/UITestFolders.swift` now removes them. Every
+UI test makes its fixture through `UITestFolders.makeFixture()` (which calls
+`FixtureWorkspace.materialize()` and registers the copy), and
+`IsolatedLaunch.launch` registers its state folder, the fixture it made when
+none was handed in, and the app it launched. `UITestFolders` is an
+`XCTestObservation`, registered on first use; in `testCaseDidFinish`, after
+the test's `tearDown` has reaped its stub launchers and whatever the
+outcome, it:
+
+1. **quits every app that test launched** (`terminate()` unless already
+   ended) and waits for XCTest to report `.notRunning`. The app is a separate
+   process writing into both folders (its trail, the website builder it
+   mirrors in) until it ends, so the order is the point, not a pause. If any
+   app has not ended within 30 seconds, that test's folders are left and the
+   console says so: never removed under a running app;
+2. **then ends what that app started and `terminate()` left running**
+   (`LaunchProcesses`). `terminate()` skips the app's own quit path, so a
+   `llama-server` an `AssistantRolloverUITests` launch started outlived the
+   app, reparented to `launchd` (seen 2026-11-18: two of them after the
+   class). A process is chosen only when one of its arguments is, or lies
+   inside, a folder this test made (`<runner temp>/plantoir-state-<UUID>`,
+   where `--model` points through the weights' links, or
+   `<runner temp>/cq4t-fixture-<UUID>`, where a stub launcher runs), and only
+   this account's processes, never the runner. Never by program name: a
+   model server of the teacher's own Plantoir names their real home, so it
+   cannot match. The sandboxed runner cannot spawn `ps`, so the list and each
+   process's arguments come from the kernel (`sysctl` `KERN_PROC_UID`,
+   `KERN_PROCARGS2`). `SIGTERM`, a wait until each has gone (a ceiling of 10
+   seconds, not a pause), and `SIGKILL` only for one whose arguments still
+   name the folder;
+3. **then removes that test's folders**, each only if it is still, at that
+   moment, exactly `<runner temp>/cq4t-fixture-<UUID>` or
+   `<runner temp>/plantoir-state-<UUID>` (upper-case UUID, nothing after it)
+   and a real folder by `lstat`, so a symbolic link of that name is left
+   alone. User flags are cleared inside it without following links (a state
+   folder holds links to the real assistant weights,
+   `linkRealAssistantWeights`), and `removeItem` removes a link as a link.
+   Nothing is read back from a file or the environment: the folder
+   `UITEST_WORKSPACE` names is never registered, and a registration with
+   any other name is refused with a failure the day it is written. Last,
+   the launch's preferences folder,
+   `/private/tmp/plantoir-state-preferences-<16 hex>`: the only parent the
+   preferences daemon honours a path suite under, so outside the state
+   folder (see "Testing: the UI target keeps its state in `--state-dir`").
+   Its name is built here by the app's rule (the first 16 hex digits of the
+   SHA-256 of the state folder's path) from the state folder this run made,
+   never read from the note the app leaves; a name that is not exactly that
+   shape directly in `/private/tmp` is refused. The runner's sandbox writes
+   only its container, so the UI target's entitlements
+   (`QuartzTeachersUITests.entitlements`) add a read-write exception for
+   `/private/tmp/`, for this removal alone.
+
+**It never ends a copy of Plantoir it did not launch, and no test skips
+because another Plantoir is open** (Russell, 2026-11-18). XCUITest's
+`launch()` ends a running copy of the bundle it launches; measured on
+2026-11-18 it goes by path, so a copy started from another folder (as
+`/Applications/Plantoir.app` is) stays running and a copy started from the
+build's own `Plantoir.app` would be ended. The second is the teacher's own
+copy whenever the Dock points at the build folder the tests run from (the
+default DerivedData Debug build), or a copy under Xcode's debugger. So
+before each launch `IsolatedLaunch` lists this account's running copies at
+the build's own path (`appUnderTestURL`), and if one is not this run's the
+test FAILS there, before anything is launched, naming the path and pid and
+saying that the run will not end a Plantoir it did not start and that
+whoever opened the copy must close it; the copy is never quit. A copy this
+run launched is recorded by more than its path: after each launch, the one
+running Plantoir whose arguments name that launch's own state folder is
+recorded by its pid AND its start time (`ProcessStamp`, from `sysctl`), so
+a copy opened at the same moment from the same build, or a later process
+given a pid this run used, is never taken for the run's own; a record is
+dropped once its process has ended. **A tripwire guards every other copy
+without resting on that measurement:** immediately before each launch
+`IsolatedLaunch` records every running Plantoir this run did not launch
+(pid, start time and path, wherever it was opened from), and immediately
+after it fails the test, naming the path and pid, if any of them is no
+longer the same process, because the launch ended a Plantoir the run did
+not start. It never skips, quits or relaunches that copy; a copy at another
+path otherwise does not touch these tests (element queries go to the
+launched bundle), so they run beside it. **One skip is left as it was, for
+Russell to rule on:** `StateDirectoryUITests.testALaunchKeepsItsStateInItsOwnFolder`
+skips while any Plantoir of this account is open, because it asserts that
+the teacher's REAL trail, preferences and Application Support did not
+change during the launch, and another copy's own writes to them cannot be
+told apart from a leak without a design change (attributing each write to
+a process). Before #978c the way to run the target was to quit the
+teacher's Plantoir first; an agent must not do that. *Rejected: giving the
+test build its own bundle identifier*: a project change to every Debug
+build, which is also the build the Dock opens. The marketing captures make
+their own `XCUIApplication`, are opt-in and drive the real toolchain, and
+carry no such check.
+
+`UITestFoldersTests` (in the UI target, launches nothing) pins the name
+check, that a link with a removable name is not followed, and that a link
+inside a fixture goes as a link while the locked file it points at stays
+locked; and, since #978c, the preferences folder's shape, that a process is
+matched only by a launch's own folder, and that the runner can read a
+process's arguments at all (a sandbox that refused would leave every model
+server running and every other check green).
+
+**Measured after the fix** (main Mac, 2026-11-18, the container's tmp,
+`/private/tmp` and the user temp folder listed before and after each run).
+On the first commit of the fix: the changed classes with
+`PLANTOIR_UI_TESTS=1` (31 tests, the rollover with real weights included)
+and then the whole target once (49 tests, 25 opt-in skips) each added
+**0 entries** to the container's tmp, but each launch still left a
+`plantoir-state-preferences-` folder in `/private/tmp` (49 by then) and the
+rollover class left two `llama-server`s running, as the base branch `dev`
+e028ded80 does too. On the branch's final head, with the process ending,
+the preferences removal and the launch check above: the changed classes
+(31 tests, 0 skipped) and then the whole target with `PLANTOIR_UI_TESTS=1`
+(52 tests, 18 skipped, every one of them a marketing capture without
+`MARKETING_WORKSPACE`) each added **0 entries** to the container's tmp and
+**0** to `/private/tmp`, and left **no `llama-server`** running
+(`pgrep -x llama-server` empty; the console says how many processes each
+test ended). The user temp folder gained only the system's own entries
+(`BlobRegistryFiles-*`, a `<UUID>` folder of Xcode's, a
+`CFNetworkDownload_*.tmp`). The 49 older preferences folders, from runs
+before this, were left for a person to remove. Two tests in
+`QuartzTeachersUITests` (`testCourseCodeRevealButtonReopensAfterEscape`,
+`testDecliningTheSkeletonPutsTheDefaultFoldersBack`) fail, and fail the
+same way on the base branch's build: #981 and #982.
+
+*Rejected: deleting the
+existing 1.9 GB from the code*: a sweep of whatever is in the folder would
+be a path the code did not build for this run. It is listed for a person to
+remove instead.
 
 *Rejected: a sweep of old `<prefix>-<UUID>` folders by age* (the second Mac's
 `tidy.py` does that today, as a stopgap): it hides a new leak instead of
@@ -16770,7 +16929,7 @@ in `IsolatedLaunch.swift` and `MarketingScreenshotTests.swift`.
 | `__CFPREFERENCES_AVOID_DAEMON=1` with it? | The write went nowhere at all. Unusable. |
 | `UserDefaults(suiteName: "/abs/path/<name>")`? | **Works** from a probe process: writes `/abs/path/<name>.plist`, creating the folders; reads back. |
 | …with `<name>` = the app's OWN bundle identifier, inside the app? | **No — it is the real domain.** In the unit host, `…/ca.russellgordon.Plantoir` created no file and `UserDefaults.standard` saw the write (caught by `StateDirectoryTests`, 2026-09-26; the probe key was removed and the real domain checked clean). |
-| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch leaves that small folder behind (`IsolatedLaunch` never deletes it); macOS empties `/private/tmp` at restart, which is all the tidying it needs. The unit test asserts the file appears where the note says and that the standard store never sees the write. |
+| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch makes that small folder; since #978c `UITestFolders` removes it once the app has quit, building its name by the app's rule from the state folder it made (before that it was left, for macOS to empty `/private/tmp` at restart). The unit test asserts the file appears where the note says and that the standard store never sees the write. |
 | Does a path suite see the argument domain? | Yes: `-assistantAsksBeforeChanging YES` reads, and is not written into the file. |
 | And the global domain? | Yes: `AppleLocale`, `NSQuitAlwaysKeepsWindows`, `AppleInterfaceStyle`. Reading creates no file. |
 | Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. Measured green on 2026-09-26: every read of the real trail, `runs/`, `scheduled/`, `assist/`, `builds/`, `LaunchAgents` and the real preferences file succeeded. |
