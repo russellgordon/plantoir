@@ -16576,13 +16576,21 @@ it:
   would have made the folder again. `useThrowawayTrail(prefix:)` registers
   the removal and then the restore of `ActivityTrail.store`, so the restore
   runs first (`CoverageRefreshInThePageTests`, `DetailTabsLayoutTests`,
-  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`).
+  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`). What order
+  cannot close is a writer already past its read of the store:
+  `ActivityTrail.note` reads `ActivityTrail.store` and then appends, so a
+  note in progress on another thread when the store is put back can still
+  append after the removal and make the folder again; so can a launcher
+  still running after the test, handed the path as `PLANTOIR_TRAIL_DIR` by
+  `HelperPrograms.environment`. None of those four classes starts one.
   `removeWhenTestEndsAfterTheWindowLetsGo(_:)` is for a fixture shown in the
   app's own window (the nine classes that drive `WorkspaceModel.windowModels`):
   one block points every window still showing it at the run's resting
   folder (`plantoir-resting-folder-under-test-<pid>`, a fixture copy made on
   first need) through `chooseWorkspace(at:)`, so the window lets go the way
   it does when a teacher opens another folder, and only then removes it.
+  If no resting folder can be made, the fixture is left in place and the
+  test fails saying so, rather than being removed under the window.
   The tests' own in-body `removeItem` of a fixture still on screen went.
 - `TemporaryFolders.removeWhenThisTestEnds(_:)` is for a static helper with
   no test case to hand (`AssistFixture.makeRunner`); `TemporaryFolderSweeper`,
@@ -16598,16 +16606,32 @@ it:
 - **No point inside a run comes after the host's last write.** The test host
   is the app; it keeps running (its tasks, a launcher it started) after
   `testBundleDidFinish`, the last callback the bundle gets. So the run's
-  folders are removed there AND named in a run record,
-  `plantoir-run-record-under-test-<pid>`, written when the bundle starts and
-  left behind on purpose. The next run, when its bundle starts, reads every
-  record whose process has gone (`kill(pid, 0)` answers `ESRCH`; a live
-  process, or one of another account's, is left alone), removes the folders
-  it names (only ones directly in the temp folder), then the record. A run
-  therefore leaves one record of a few hundred bytes, plus anything its host
-  wrote after the bundle finished, until the next run on the same Mac; the
-  record matches `temp-growth.py`'s `-under-test-<pid>` shape, so the
-  bench's count shows it as 1 rather than hiding it.
+  folders are removed there, and anything the host makes again afterwards
+  is removed by the NEXT run, when its bundle starts, **by name alone**:
+  every per-run folder carries its run's process id in its name
+  (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>` and
+  `Plantoir-tests-<pid>-<UUID>`; the trail folder took the pid in the #978
+  follow-ups, one line in `ProblemReportStore.throwawayFolderURL`). The
+  sweep lists the temp folder and acts only on an entry whose whole name is
+  one of those shapes with a plain decimal pid above 1 that is not its own
+  process, and only when `kill(pid, 0)` answers `ESRCH`. Any other answer,
+  a live process (a run still going, or an unrelated process holding a
+  reused pid) or one it cannot ask about, leaves the entry; so a gate and
+  another test run going at once under one account each leave the other's
+  folders. The shapes are read from the run's own folder URLs, where the
+  names are made, so the names recognised cannot drift from the names
+  given. Nothing is written to say what a run made and nothing is read back
+  from any file (the run record of the first follow-up was removed after
+  the second review: a record could name another live run's folder, and
+  reading it raced with a new run reusing the pid). The entry is removed
+  without following a link, and the flag-clearing walk inside a folder
+  checks each item without following it and never enters a link; the one
+  window left, a folder swapped for a link between its check and its
+  listing, needs something writing inside the user's own temp folder and
+  could only clear flags elsewhere, never remove. So **one run leaves
+  nothing listed anywhere**; what can remain after a run is its own per-run
+  folders, if the host wrote again after the last callback, and the next
+  run on the same Mac removes them.
 - `InAppUserInterfaceTests` writes its six screenshots to a folder of its
   own, removed when it ends, unless `UITEST_SCREENSHOT_DIR` names one (which
   is kept). They used to go to the temp folder's root under fixed names;
@@ -16687,8 +16711,9 @@ same before-and-after listing on the second Mac (branch head c251102e6, one
 full run, 3,675 tests) found **0 test-made entries, 0 MB**; the only new
 entries were the system's own (`TemporaryDirectory.*`, `BlobRegistryFiles-*`,
 and a `<UUID>-<pid>-…` folder of Xcode's), which the count leaves out.
-Since the #978 follow-ups a run's count is 1, not 0: its own run record
-(above), which the next run removes along with any late write it names.
+Since the #978 follow-ups a run's count is 0 unless its host wrote again
+after the bundle finished; any such folder carries the run's pid and the
+next run removes it.
 
 **Windows.** Nothing to do: it shares no test code, and its xUnit fixtures
 are its own question.
