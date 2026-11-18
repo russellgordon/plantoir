@@ -50,16 +50,49 @@ internal static class Steps_
         Program.Note($"opening {url} in the default browser");
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         string? found = null;
+        // Edge's own download warnings (its SmartScreen is on in snapshot 00)
+        // are a finding, not part of "the browser is expected here": in an
+        // untitled flyout the rules name them ("browser warning"); in a page
+        // window they are searched for every five seconds.
+        var warned = new HashSet<string>();
+        DateTime? firstWarning = null;
+        DateTime lastPageSearch = DateTime.MinValue;
+        void RecordWarning(SeenWindow window, string words)
+        {
+            if (!warned.Add($"{window.Handle}|{WindowRules.EdgeWarningIn(words)}")) return;
+            firstWarning ??= DateTime.UtcNow;
+            Program.Note($"FINDING: Edge warned about the download: {window}, saying \"{words}\" [screenshot {Program.Shot("edge-warning")}]");
+        }
+        void Answer(SeenWindow window, string kind)
+        {
+            if (kind == "browser warning") RecordWarning(window, WindowWatch.Words(window.Element, 80));
+        }
         bool arrived = Program.Watch.WaitFor(() =>
         {
+            if (DateTime.UtcNow - lastPageSearch > TimeSpan.FromSeconds(5))
+            {
+                lastPageSearch = DateTime.UtcNow;
+                foreach (var window in Program.Watch.New())
+                {
+                    if (!IsBrowserWindow(window) || window.Title.Length == 0) continue;
+                    string words = WindowWatch.Words(window.Element, 400);
+                    if (WindowRules.EdgeWarningIn(words) is not null) RecordWarning(window, words);
+                }
+            }
             foreach (string file in Directory.GetFiles(Downloads, "PlantoirSetup*.exe"))
             {
                 // Edge writes to a .crdownload (or a "Unconfirmed" name) and renames at the end.
                 found = file;
                 return true;
             }
+            // A warning that holds the download back (Keep / Delete) leaves no
+            // PlantoirSetup.exe: a minute after it, the run stops on it rather
+            // than waiting out the ten minutes.
+            if (firstWarning is { } since && DateTime.UtcNow - since > TimeSpan.FromMinutes(1))
+                throw Stopped.Product("Edge warned about the download and PlantoirSetup.exe did not arrive in the minute after; the browser showed: "
+                                      + BrowserWords() + $" [screenshot {Program.Shot("edge-held")}]");
             return false;
-        }, TimeSpan.FromMinutes(10));
+        }, TimeSpan.FromMinutes(10), Answer);
         if (!arrived || found is null)
             throw Stopped.Product("PlantoirSetup.exe did not arrive in Downloads within ten minutes; the browser showed: "
                                   + BrowserWords() + $" [screenshot {Program.Shot("no-download")}]");
@@ -192,11 +225,18 @@ internal static class Steps_
         DateTime? launchReturned = null;
         Exception? launchError = null;
         int looksAtLaunch = Program.Watch.Looks;
+        int looksAtReturn = -1;
         var launch = new Thread(() =>
         {
             try { Process.Start(new ProcessStartInfo(installer) { UseShellExecute = true, WorkingDirectory = Downloads }); }
             catch (Exception error) { launchError = error; }
-            finally { launchReturned = DateTime.UtcNow; }
+            finally
+            {
+                // Read here, as the call returns, so the count is exactly the
+                // real looks made while it was running.
+                Volatile.Write(ref looksAtReturn, Program.Watch.Looks);
+                launchReturned = DateTime.UtcNow;
+            }
         }) { IsBackground = true, Name = "installer launch" };
         launch.SetApartmentState(ApartmentState.STA);
         launch.Start();
@@ -271,15 +311,24 @@ internal static class Steps_
         {
             if (launchReturned is null)
             {
-                looksDuringLaunch = Program.Watch.Looks - looksAtLaunch;
                 if (Process.GetProcessesByName("smartscreen").Length > 0) smartScreenDuring = true;
             }
             else if (!launchReported)
             {
                 launchReported = true;
-                Program.Note($"the launch call returned after {(launchReturned.Value - launchStarted).TotalSeconds:0.0} s; "
-                             + $"the watcher looked {looksDuringLaunch} times while it was inside the call; "
+                double seconds = (launchReturned.Value - launchStarted).TotalSeconds;
+                looksDuringLaunch = Volatile.Read(ref looksAtReturn) - looksAtLaunch;
+                // Enforced, not only reported (the review of 2026-11-18): the
+                // point of the launch thread is that the watcher keeps looking
+                // while Windows checks the file. At least one real look, and
+                // one for every three seconds of the call.
+                int required = Math.Max(1, (int)(seconds / 3));
+                Program.Note($"the launch call returned after {seconds:0.0} s; "
+                             + $"the watcher looked {looksDuringLaunch} times while it was inside the call (at least {required} required; "
+                             + $"{Program.Watch.FailedLooks} looks so far could not read the desktop and are not counted); "
                              + $"smartscreen.exe running before the launch: {(smartScreenBefore ? "yes" : "no")}, during it: {(smartScreenDuring ? "yes" : "no")}");
+                if (looksDuringLaunch < required)
+                    throw Stopped.Driver($"the watcher made only {looksDuringLaunch} real looks in the {seconds:0.0} s the installer's launch call ran (at least {required} required), so a question Windows asked then could have gone unseen");
                 if (launchError is not null)
                     throw Stopped.Product($"Windows would not start the installer: {launchError.GetType().Name}: {launchError.Message} [screenshot {Program.Shot("no-launch")}]");
             }
@@ -413,8 +462,11 @@ internal static class Steps_
             select = picker.FindFirstChild(cf => cf.ByAutomationId("1"));
             return folderBox is not null && select is not null;
         }, TimeSpan.FromSeconds(30));
-        if (folderBox is null || select is null)
-            throw Stopped.Driver("the folder picker has no Folder box or Select Folder button where expected: " + WindowWatch.Words(picker));
+        if (folderBox is null || select is null || !(select.Name ?? "").Replace("&", "").Equals("Select Folder", StringComparison.OrdinalIgnoreCase))
+            // What opened is a dialog of the picker's class without the
+            // picker's controls: an error box, say. That is the product's
+            // answer to Choose Folder…, not the driver losing its way.
+            throw Stopped.Product($"Choose Folder… opened a dialog that is not the folder picker (no Folder box and Select Folder button): \"{picker.Name}\", saying \"{WindowWatch.Words(picker)}\" [screenshot {Program.Shot("not-the-picker")}]");
         SendMessage(folderBox.Properties.NativeWindowHandle.ValueOrDefault, WM_SETTEXT, IntPtr.Zero, WorkingFolder);
         Program.Note($"folder picker: typed {WorkingFolder} into Folder and pressed Select Folder");
         PostMessage(select.Properties.NativeWindowHandle.ValueOrDefault, BM_CLICK, IntPtr.Zero, IntPtr.Zero);

@@ -13,6 +13,13 @@ internal enum Stage
     WorkingFolder,
     ExampleCourse,
     Preview,
+    /// <summary>
+    /// After the last step succeeded: the desktop is watched for
+    /// <see cref="WindowRules.FinalWatchLength"/> before PASSED is written, with the
+    /// preview's allow-list (a firewall alert raised when the preview server
+    /// binds would otherwise come a second after the run said PASSED).
+    /// </summary>
+    FinalWatch,
 }
 
 /// <summary>What the rules make of a new top-level window.</summary>
@@ -22,12 +29,19 @@ internal enum Verdict
     Desktop,
     /// <summary>A window this stage names; <see cref="Judgement.Kind"/> says which.</summary>
     Expected,
-    /// <summary>No title and no words yet: a frame being drawn, looked at again next time.</summary>
+    /// <summary>
+    /// No title and no words yet: a frame being drawn, looked at again next
+    /// time, and unexpected if it is still so after <see cref="WindowRules.EmptyLimit"/>
+    /// (an elevated or custom-drawn prompt whose words UI Automation cannot read
+    /// must not be tolerated for ever).
+    /// </summary>
     Empty,
     /// <summary>
     /// A window of Plantoir's whose class or title UI Automation cannot read
-    /// yet (a window being created): judged again at the next look, and
-    /// unexpected if it is still so after <see cref="WindowRules.SettlingLimit"/>.
+    /// yet (a window being created), or a dialog at the working-folder step
+    /// that does not yet hold the folder picker's controls: judged again at
+    /// the next look, and unexpected if it is still so after
+    /// <see cref="WindowRules.SettlingLimit"/>.
     /// </summary>
     Settling,
     /// <summary>Not on this stage's list: the run ends, naming it.</summary>
@@ -49,20 +63,26 @@ internal readonly record struct Judgement(Verdict Verdict, string Kind)
 internal sealed class WindowFacts
 {
     private readonly Func<string> _readWords;
+    private readonly Func<string, string?> _controlName;
     private string? _words;
 
-    public WindowFacts(string title, string windowClass, string process, Func<string> readWords)
+    public WindowFacts(string title, string windowClass, string process, Func<string> readWords,
+                       Func<string, string?>? controlName = null)
     {
         Title = title;
         Class = windowClass;
         Process = process;
         _readWords = readWords;
+        _controlName = controlName ?? (_ => null);
     }
 
     public string Title { get; }
     public string Class { get; }
     public string Process { get; }
     public string Words => _words ??= _readWords();
+
+    /// <summary>The name of the control with this automation id inside the window, or null when it has none.</summary>
+    public string? ControlName(string automationId) => _controlName(automationId);
 
     public override string ToString() => $"\"{Title}\" (class {Class}, process {Process})";
 }
@@ -84,31 +104,69 @@ internal static class WindowRules
 {
     /// <summary>
     /// Windows of the desktop itself that can come and go during any step and
-    /// say nothing about Plantoir, by process and (where given) class. A toast
-    /// or flyout of these processes is still read for words that say Windows
-    /// blocked or warned about something (<see cref="BlockWords"/>).
+    /// say nothing about Plantoir, by process and (where given) class. Those
+    /// marked <c>Read</c> can carry a notice (a toast, a flyout, the search or
+    /// lock screen, the touch keyboard's host) and are read for words that say
+    /// Windows blocked or warned about something (<see cref="BlockWords"/>):
+    /// the review of 2026-11-18 found SearchHost, ShellHost, LockApp and
+    /// TextInputHost let through by process alone. The shell's fixed frames
+    /// (taskbar, desktop) and Parallels' own tools are not read.
     /// </summary>
-    private static readonly (string Process, string Class)[] DesktopWindows =
+    private static readonly (string Process, string Class, bool Read)[] DesktopWindows =
     {
-        ("explorer", "Shell_TrayWnd"), ("explorer", "Shell_SecondaryTrayWnd"), ("explorer", "Progman"), ("explorer", "WorkerW"),
-        ("explorer", "NotifyIconOverflowWindow"), ("explorer", "Xaml_WindowedPopupClass"), ("explorer", "TopLevelWindowForOverflowXamlIsland"),
-        ("ShellExperienceHost", ""), ("StartMenuExperienceHost", ""), ("SearchHost", ""), ("SearchApp", ""), ("TextInputHost", ""),
-        ("ShellHost", ""), ("LockApp", ""), ("prl_cc", ""), ("prl_tools", ""), ("prl_tools_service", ""),
-        ("ApplicationFrameHost", "Windows.UI.Core.CoreWindow"),
+        ("explorer", "Shell_TrayWnd", false), ("explorer", "Shell_SecondaryTrayWnd", false), ("explorer", "Progman", false),
+        ("explorer", "WorkerW", false), ("explorer", "NotifyIconOverflowWindow", true), ("explorer", "Xaml_WindowedPopupClass", true),
+        ("explorer", "TopLevelWindowForOverflowXamlIsland", true),
+        ("ShellExperienceHost", "", true), ("StartMenuExperienceHost", "", true), ("SearchHost", "", true), ("SearchApp", "", true),
+        ("TextInputHost", "", true), ("ShellHost", "", true), ("LockApp", "", true),
+        ("prl_cc", "", false), ("prl_tools", "", false), ("prl_tools_service", "", false),
+        ("ApplicationFrameHost", "Windows.UI.Core.CoreWindow", true),
     };
+
+    /// <summary>How long a <see cref="Verdict.Settling"/> window may stay unreadable before it is unexpected.</summary>
+    public static readonly TimeSpan SettlingLimit = TimeSpan.FromSeconds(20);
+
+    /// <summary>How long a <see cref="Verdict.Empty"/> window may stay without a title or words before it is unexpected.</summary>
+    public static readonly TimeSpan EmptyLimit = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// How long the desktop is watched after the last step succeeded, before
+    /// PASSED (the review of 2026-11-18: nothing was watched after the check
+    /// that found the preview). Windows raises the Defender Firewall's
+    /// "Windows Security Alert" on a program's first listen on a network
+    /// address, within a second or two of the bind, but the preview brings up
+    /// its web server and its live-reload server separately, the web view's
+    /// first load makes the server do more work after the address first
+    /// answers, and Windows' own notices (Defender, Smart App Control) arrive
+    /// as toasts some seconds after the event. A minute covers all of those
+    /// with room over, is about ten of the Mac's five-second looks (so its UAC
+    /// watch sees the same minute), and costs one minute a run. This is a
+    /// deliberate observation window, not a pause standing in for a condition.
+    /// </summary>
+    public static readonly TimeSpan FinalWatchLength = TimeSpan.FromSeconds(60);
 
     /// <summary>
     /// Words that mean Windows itself stopped or questioned something, in a
     /// toast or any desktop window: Smart App Control's block notice comes
     /// through ShellExperienceHost, not the smartscreen process.
     /// </summary>
-    /// <summary>How long a <see cref="Verdict.Settling"/> window may stay unreadable before it is unexpected.</summary>
-    public static readonly TimeSpan SettlingLimit = TimeSpan.FromSeconds(20);
-
     public static readonly string[] BlockWords =
     {
         "Smart App Control", "SmartScreen", "Windows protected your PC", "blocked", "Controlled folder access",
         "Unauthorized changes", "Windows Security Alert", "Firewall",
+    };
+
+    /// <summary>
+    /// Words of Edge's own download warnings (Edge's SmartScreen is on in
+    /// snapshot 00): "isn't commonly downloaded", "can harm your device", "was
+    /// blocked", "might be harmful". Edge draws them inside its windows, so the
+    /// browser being expected at the download step must not hide them; seen,
+    /// they are a finding (<see cref="Judge"/>, kind "browser warning").
+    /// </summary>
+    public static readonly string[] EdgeWarningWords =
+    {
+        "isn't commonly downloaded", "isn\u2019t commonly downloaded", "can harm your device", "could harm your device",
+        "was blocked", "might be harmful", "may be harmful", "Microsoft Defender SmartScreen", "unsafe to download", "Make sure you trust",
     };
 
     /// <summary>The questions Plantoir may ask while a preview starts, by the title its dialog shows.</summary>
@@ -166,17 +224,37 @@ internal static class WindowRules
     /// </summary>
     private static bool IsUacPrompt(WindowFacts window) => Is(window.Process, "consent");
 
-    private static bool IsDesktopFurniture(WindowFacts window)
+    /// <summary>Null when the window is not the desktop's furniture; otherwise whether its words are read for <see cref="BlockWords"/>.</summary>
+    private static bool? DesktopFurniture(WindowFacts window)
     {
         // Parallels Tools updating itself in a terminal window: the virtual
         // machine's own plumbing, which a teacher's PC does not have.
         if (Is(window.Process, "WindowsTerminal") && window.Title.Contains(@"Parallels\Parallels Tools", StringComparison.OrdinalIgnoreCase))
-            return true;
-        foreach (var (process, windowClass) in DesktopWindows)
+            return false;
+        foreach (var (process, windowClass, read) in DesktopWindows)
             if (Is(window.Process, process) && (windowClass.Length == 0 || window.Class == windowClass))
-                return true;
-        return false;
+                return read;
+        return null;
     }
+
+    /// <summary>The first of <see cref="EdgeWarningWords"/> the text holds, or null.</summary>
+    public static string? EdgeWarningIn(string text)
+    {
+        foreach (string word in EdgeWarningWords)
+            if (text.Contains(word, StringComparison.OrdinalIgnoreCase)) return word;
+        return null;
+    }
+
+    /// <summary>
+    /// The folder picker (Windows.Storage.Pickers.FolderPicker, which
+    /// Plantoir's Choose Folder… opens), known by what makes it the picker:
+    /// its Folder box (id 1152) and its Select Folder button (id 1), the
+    /// controls step 4 drives. A Win32 error box of the same class has neither.
+    /// </summary>
+    public static bool IsFolderPicker(WindowFacts window) =>
+        window.Class == "#32770" && (Is(window.Process, "PickerHost") || Is(window.Process, "Plantoir"))
+        && window.ControlName("1152") is not null && window.ControlName("1") is { } select
+        && select.Replace("&", "").Equals("Select Folder", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The first of <see cref="BlockWords"/> the text holds, or null.</summary>
     public static string? BlockWordIn(string text)
@@ -186,8 +264,12 @@ internal static class WindowRules
         return null;
     }
 
-    /// <summary>Judges one new top-level window at one stage.</summary>
-    public static Judgement Judge(Stage stage, WindowFacts window)
+    /// <summary>
+    /// Judges one new top-level window at one stage. <paramref name="seenFor"/>
+    /// is how long the watcher has seen this window: a window still settling
+    /// or still empty past its limit is unexpected.
+    /// </summary>
+    public static Judgement Judge(Stage stage, WindowFacts window, TimeSpan seenFor = default)
     {
         // Asked first, whoever owns it: ShellExecute draws this question in
         // the CALLER's process, which is the driver itself.
@@ -197,11 +279,11 @@ internal static class WindowRules
         // Never expected: no step of a first install asks for elevation.
         if (IsUacPrompt(window)) return Judgement.Of(Verdict.Blocked, "a User Account Control prompt");
 
-        if (IsDesktopFurniture(window))
+        if (DesktopFurniture(window) is { } read)
         {
-            // A toast is furniture unless it says Windows stopped something.
-            if (Is(window.Process, "ShellExperienceHost") || Is(window.Process, "explorer") && window.Class == "Xaml_WindowedPopupClass")
-                return BlockWordIn(window.Words) is null ? Judgement.Of(Verdict.Desktop) : Judgement.Of(Verdict.Blocked, "a notice from Windows");
+            // A toast, flyout or shell surface is furniture unless it says
+            // Windows stopped or questioned something.
+            if (read && BlockWordIn(window.Words) is not null) return Judgement.Of(Verdict.Blocked, "a notice from Windows");
             return Judgement.Of(Verdict.Desktop);
         }
 
@@ -211,7 +293,16 @@ internal static class WindowRules
         switch (stage)
         {
             case Stage.Download:
-                if (Is(window.Process, "msedge")) return Judgement.Of(Verdict.Expected, "browser");
+                if (Is(window.Process, "msedge"))
+                {
+                    // Its untitled windows are its flyouts and bubbles, where
+                    // Edge puts a download warning: read, and a warning is a
+                    // finding. (Its titled windows are pages, searched for the
+                    // same words by the step itself.)
+                    if (window.Title.Length == 0 && EdgeWarningIn(window.Words) is not null)
+                        return Judgement.Of(Verdict.Expected, "browser warning");
+                    return Judgement.Of(Verdict.Expected, "browser");
+                }
                 break;
             case Stage.Install:
             case Stage.InstallFinished:
@@ -232,11 +323,17 @@ internal static class WindowRules
                 if (IsPlantoirMain(window)) return Judgement.Of(Verdict.Expected, "plantoir");
                 if (IsPlantoirContent(window)) return Judgement.Of(Verdict.Expected, "plantoir content");
                 if (IsPlantoirPopup(window)) return Judgement.Of(Verdict.Expected, "plantoir popup");
+                if (IsFolderPicker(window)) return Judgement.Of(Verdict.Expected, "folder picker");
+                // The picker's window comes before its controls: judged again
+                // until they are there, for at most SettlingLimit, so an error
+                // box of the same class is not taken for it.
                 if (window.Class == "#32770" && (Is(window.Process, "PickerHost") || Is(window.Process, "Plantoir")))
-                    return Judgement.Of(Verdict.Expected, "folder picker");
+                    return seenFor < SettlingLimit ? Judgement.Of(Verdict.Settling)
+                                                   : Judgement.Of(Verdict.Unexpected, $"not the folder picker after {SettlingLimit.TotalSeconds:0} s");
                 break;
             case Stage.ExampleCourse:
             case Stage.Preview:
+            case Stage.FinalWatch:
                 if (IsPlantoirMain(window)) return Judgement.Of(Verdict.Expected, "plantoir");
                 if (IsPlantoirContent(window)) return Judgement.Of(Verdict.Expected, "plantoir content");
                 if (IsPlantoirPopup(window)) return Judgement.Of(Verdict.Expected, "plantoir popup");
@@ -247,14 +344,19 @@ internal static class WindowRules
         // 2026-11-18-102329 read its main window, a second after launch, with
         // no class and no title, showing only its caption buttons ("Minimize |
         // Maximize | Close"). Judged again until it reads as what it is.
-        if (stage is Stage.InstallFinished or Stage.OpenPlantoir or Stage.WorkingFolder or Stage.ExampleCourse or Stage.Preview
+        if (stage is Stage.InstallFinished or Stage.OpenPlantoir or Stage.WorkingFolder or Stage.ExampleCourse or Stage.Preview or Stage.FinalWatch
             && Is(window.Process, "Plantoir")
             && (window.Class.Length == 0 || window.Class == "WinUIDesktopWin32WindowClass" && window.Title.Length == 0))
-            return Judgement.Of(Verdict.Settling);
+            return seenFor < SettlingLimit ? Judgement.Of(Verdict.Settling)
+                                           : Judgement.Of(Verdict.Unexpected, $"still without a readable class or title after {SettlingLimit.TotalSeconds:0} s");
 
         // A window with no title and nothing in it is a frame being drawn;
-        // it is judged again when it has something to show.
-        if (window.Title.Length == 0 && window.Words.Length == 0) return Judgement.Of(Verdict.Empty);
+        // it is judged again when it has something to show, for at most
+        // EmptyLimit: one that stays so (an elevated or custom-drawn prompt
+        // UI Automation cannot read) ends the run.
+        if (window.Title.Length == 0 && window.Words.Length == 0)
+            return seenFor < EmptyLimit ? Judgement.Of(Verdict.Empty)
+                                        : Judgement.Of(Verdict.Unexpected, $"untitled, with no words UI Automation could read, for {EmptyLimit.TotalSeconds:0} s");
         return Judgement.Of(Verdict.Unexpected);
     }
 
@@ -267,7 +369,7 @@ internal static class WindowRules
     public static string? DialogKind(Stage stage, string title, bool isNewCourseSheet)
     {
         if (isNewCourseSheet && stage is Stage.WorkingFolder or Stage.ExampleCourse) return "new course sheet";
-        if (stage == Stage.Preview)
+        if (stage is Stage.Preview or Stage.FinalWatch)
             foreach (var (pattern, kind) in PreviewQuestions)
                 if (pattern.IsMatch(title)) return "question: " + kind;
         return null;

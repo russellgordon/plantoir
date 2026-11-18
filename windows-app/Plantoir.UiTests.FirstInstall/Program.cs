@@ -24,10 +24,20 @@ namespace Plantoir.FirstInstall;
 ///   PlantoirFirstInstall.exe --url &lt;PlantoirSetup.exe address&gt; --out C:\rehearsal
 ///                            [--report http://10.211.55.2:8766/up/]
 ///
+///   PlantoirFirstInstall.exe --self-test-final-watch --out C:\rehearsal --report …
+///                            the final watch alone, for win-rehearsal.py's
+///                            final-watch self-test; never says PASSED
+///
+/// PASSED is written only after the last step succeeded AND the desktop was
+/// then watched for <see cref="WindowRules.FinalWatchLength"/> with nothing
+/// unexpected (step 7). One driver runs at a time: a second one started while
+/// the first is alive does nothing and writes nothing.
+///
 /// Writes steps.log (a line per event), result.txt (the outcome, last) and
 /// shots\NN-label.png into --out, and PUTs each to --report as it is written,
 /// so the Mac has the evidence even if the machine stops answering.
-/// Exit code: 0 passed, 2 product stopped, 1 driver problem.
+/// Exit code: 0 passed, 2 product stopped, 1 driver problem, 3 the final-watch
+/// self-test ended with nothing seen, 4 another driver was already running.
 /// </summary>
 internal static class Program
 {
@@ -44,11 +54,21 @@ internal static class Program
     public static int Main(string[] args)
     {
         string url = "https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe";
+        bool watchOnly = Array.IndexOf(args, "--self-test-final-watch") >= 0;
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "--url") url = args[i + 1];
             if (args[i] == "--out") _out = args[i + 1];
             if (args[i] == "--report") _report = args[i + 1];
+        }
+        // One driver at a time in the session (the Mac retries a refused
+        // launch; the review of 2026-11-18 asked that a late first attempt can
+        // never run beside the second). Checked before anything is written.
+        using var single = new Mutex(true, @"Local\PlantoirFirstInstallDriver", out bool onlyOne);
+        if (!onlyOne)
+        {
+            Console.WriteLine("another PlantoirFirstInstall is already running in this session; this one does nothing");
+            return 4;
         }
         Directory.CreateDirectory(Path.Combine(_out, "shots"));
         try
@@ -65,8 +85,16 @@ internal static class Program
                     .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
                 Note($"the driver runs {(elevated ? "ELEVATED (an administrator's full token)" : "not elevated (a standard token, as a double-click from the desktop has)")}");
             }
+            if (watchOnly)
+            {
+                Note("SELF-TEST: steps 1 to 6 are not run; only the final watch, which must catch a window planted during it");
+                int selfTestLooks = FinalWatch();
+                return Finish(Outcome.SelfTestOnly, $"the final watch saw nothing unexpected in {WindowRules.FinalWatchLength.TotalSeconds:0} s ({selfTestLooks} looks); no steps were run, so this is no rehearsal");
+            }
             Steps1To6(url);
-            return Finish(Outcome.Passed, "Plantoir was downloaded, installed, opened, set up a working folder, added the example course and served its preview");
+            int looks = FinalWatch();
+            return Finish(Outcome.Passed, "Plantoir was downloaded, installed, opened, set up a working folder, added the example course and served its preview, "
+                                          + $"and nothing unexpected appeared in the {WindowRules.FinalWatchLength.TotalSeconds:0} s watched after ({looks} looks)");
         }
         catch (Stopped stop)
         {
@@ -97,6 +125,28 @@ internal static class Program
 
         Step("preview the example course");
         Steps_.Preview(window, code);
+    }
+
+    /// <summary>
+    /// Step 7: the desktop watched for <see cref="WindowRules.FinalWatchLength"/>
+    /// after the last step succeeded, with the preview's allow-list, before
+    /// PASSED. "FINAL WATCH BEGINS" and "FINAL WATCH ENDED" are read by the
+    /// Mac, which keeps its own UAC watch going through the same minute and
+    /// requires that it did. At least one real look per three seconds, or the
+    /// watch did not happen and the run is a DRIVER PROBLEM.
+    /// </summary>
+    private static int FinalWatch()
+    {
+        Step($"watch the desktop for {WindowRules.FinalWatchLength.TotalSeconds:0} s after the last step");
+        _watch.Stage = Stage.FinalWatch;
+        Note($"FINAL WATCH BEGINS: {WindowRules.FinalWatchLength.TotalSeconds:0} s");
+        int looks = _watch.Observe(WindowRules.FinalWatchLength);
+        int required = (int)(WindowRules.FinalWatchLength.TotalSeconds / 3);
+        Note($"FINAL WATCH ENDED: nothing unexpected; {looks} real looks (at least {required} required), {_watch.FailedLooks} looks in the whole run could not read the desktop, {_watch.Unreadable} windows could not be read");
+        if (looks < required)
+            throw Stopped.Driver($"the final watch made only {looks} real looks in {WindowRules.FinalWatchLength.TotalSeconds:0} s (at least {required} required), so it did not really watch");
+        Shot("final-watch");
+        return looks;
     }
 
     // ---- Evidence ------------------------------------------------------------
@@ -166,19 +216,20 @@ internal static class Program
         {
             Outcome.Passed => "PASSED",
             Outcome.ProductStopped => "PRODUCT STOPPED",
+            Outcome.SelfTestOnly => "SELF-TEST WATCH CLEAN",
             _ => "DRIVER PROBLEM",
         };
-        string where = outcome == Outcome.Passed ? "" : $" at step {_stepNumber} ({_stepName})";
+        string where = outcome is Outcome.Passed or Outcome.SelfTestOnly ? "" : $" at step {_stepNumber} ({_stepName})";
         string line = $"RESULT: {word}{where}: {reason} [screenshot {shot}]";
         Note(line);
         string path = Path.Combine(_out, "result.txt");
         File.WriteAllText(path, line + Environment.NewLine);
         Send(path, "result.txt");
-        return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, _ => 1 };
+        return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, Outcome.SelfTestOnly => 3, _ => 1 };
     }
 }
 
-internal enum Outcome { Passed, ProductStopped, DriverProblem }
+internal enum Outcome { Passed, ProductStopped, DriverProblem, SelfTestOnly }
 
 /// <summary>Ends the run with an outcome. Thrown from any step.</summary>
 internal sealed class Stopped : Exception

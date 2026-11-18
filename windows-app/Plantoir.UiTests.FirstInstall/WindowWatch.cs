@@ -25,15 +25,21 @@ internal sealed class WindowWatch
     private readonly HashSet<IntPtr> _baseline = new();
     private readonly HashSet<IntPtr> _reported = new();
     private readonly HashSet<string> _allowedSeen = new();
-    private readonly Dictionary<IntPtr, DateTime> _settlingSince = new();
+    private readonly Dictionary<IntPtr, DateTime> _firstSeen = new();
+    private readonly HashSet<string> _unreadableNoted = new();
     private readonly List<string> _baselineNames = new();
+    private int _looks;
+    private int _failedLooks;
+    private int _unreadable;
 
     private static readonly string[] DialogButtonIds = { "PrimaryButton", "SecondaryButton", "CloseButton" };
 
     public WindowWatch(UIA3Automation automation)
     {
         _automation = automation;
-        foreach (var window in TopLevel())
+        var (windows, read) = Desktop();
+        if (!read) throw Stopped.Driver("the desktop could not be read when the driver started, so no baseline of its windows exists");
+        foreach (var window in windows)
         {
             _baseline.Add(window.Handle);
             _baselineNames.Add(window.ToString());
@@ -48,31 +54,66 @@ internal sealed class WindowWatch
     /// <summary>Plantoir's main window once it is open; its dialogs are judged too.</summary>
     public AutomationElement? PlantoirWindow { get; set; }
 
-    /// <summary>How many times the desktop has been looked at, for the log.</summary>
-    public int Looks { get; private set; }
+    /// <summary>
+    /// How many REAL looks there have been: a look whose reading of the
+    /// desktop failed is not counted (the review of 2026-11-18). Read from the
+    /// installer's launch thread too, hence the volatile read.
+    /// </summary>
+    public int Looks => Volatile.Read(ref _looks);
 
-    /// <summary>Every top-level window now, skipping any that vanish while being read.</summary>
-    public List<SeenWindow> TopLevel()
+    /// <summary>Looks whose reading of the desktop failed, for the log.</summary>
+    public int FailedLooks => Volatile.Read(ref _failedLooks);
+
+    /// <summary>Top-level windows that could not be read, each noted in the log.</summary>
+    public int Unreadable => _unreadable;
+
+    /// <summary>
+    /// Every top-level window now, and whether the desktop itself could be
+    /// read. A window that cannot be read is noted (once per window and
+    /// reason), never skipped in silence.
+    /// </summary>
+    private (List<SeenWindow> Windows, bool Read) Desktop()
     {
         var found = new List<SeenWindow>();
         AutomationElement[] children;
         try { children = _automation.GetDesktop().FindAllChildren(); }
-        catch (System.Runtime.InteropServices.COMException) { return found; }
+        catch (Exception error)
+        {
+            NoteUnreadable("desktop|" + error.GetType().Name, $"note: the desktop could not be read at this look ({error.GetType().Name}: {error.Message}); not counted as a look");
+            return (found, false);
+        }
         foreach (var child in children)
         {
+            IntPtr handle = IntPtr.Zero;
             try
             {
-                IntPtr handle = child.Properties.NativeWindowHandle.ValueOrDefault;
+                handle = child.Properties.NativeWindowHandle.ValueOrDefault;
                 int pid = child.Properties.ProcessId.ValueOrDefault;
                 string process = "";
                 try { process = Process.GetProcessById(pid).ProcessName; } catch { }
                 found.Add(new SeenWindow(handle, child.Properties.Name.ValueOrDefault ?? "",
                                          child.Properties.ClassName.ValueOrDefault ?? "", process, pid, child));
             }
-            catch { }
+            catch (Exception error)
+            {
+                // Gone between the listing and the reading is the usual cause;
+                // a window of a higher integrity level is the one that matters.
+                if (handle != IntPtr.Zero && _baseline.Contains(handle)) continue;
+                _unreadable++;
+                NoteUnreadable($"{handle}|{error.GetType().Name}",
+                               $"note: a top-level window could not be read (handle 0x{handle.ToInt64():X}, {error.GetType().Name}: {error.Message})");
+            }
         }
-        return found;
+        return (found, true);
     }
+
+    private void NoteUnreadable(string key, string line)
+    {
+        if (_unreadableNoted.Add(key)) Program.Note(line);
+    }
+
+    /// <summary>Every top-level window now (for the steps' own searches).</summary>
+    public List<SeenWindow> TopLevel() => Desktop().Windows;
 
     /// <summary>Windows that were not there when the driver started.</summary>
     public List<SeenWindow> New()
@@ -91,38 +132,42 @@ internal sealed class WindowWatch
     /// </summary>
     public void Check(Action<SeenWindow, string>? answer)
     {
-        Looks++;
-        var contentWindows = new List<AutomationElement>();
-        foreach (var window in New())
+        var (windows, read) = Desktop();
+        if (!read)
         {
-            var facts = new WindowFacts(window.Title, window.Class, window.Process, () => Words(window.Element));
-            var judgement = WindowRules.Judge(Stage, facts);
+            Interlocked.Increment(ref _failedLooks);
+            return;
+        }
+        var contentWindows = new List<AutomationElement>();
+        foreach (var window in windows)
+        {
+            if (_baseline.Contains(window.Handle)) continue;
+            if (!_firstSeen.TryGetValue(window.Handle, out DateTime firstSeen))
+                _firstSeen[window.Handle] = firstSeen = DateTime.UtcNow;
+            var facts = new WindowFacts(window.Title, window.Class, window.Process, () => Words(window.Element),
+                                        id => ControlName(window.Element, id));
+            var judgement = WindowRules.Judge(Stage, facts, DateTime.UtcNow - firstSeen);
             switch (judgement.Verdict)
             {
                 case Verdict.Desktop:
                     continue;
                 case Verdict.Settling:
-                    if (!_settlingSince.TryGetValue(window.Handle, out DateTime since))
-                    {
-                        _settlingSince[window.Handle] = DateTime.UtcNow;
-                        Program.Note($"note: a window of Plantoir's is still being made, {window}, showing \"{facts.Words}\"; judged again at each look");
-                        continue;
-                    }
-                    if (DateTime.UtcNow - since < WindowRules.SettlingLimit) continue;
-                    throw Stopped.Product($"a window of Plantoir's stayed without a readable class or title for {WindowRules.SettlingLimit.TotalSeconds:0} s at {Stage}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
+                    if (_reported.Add(window.Handle))
+                        Program.Note($"note: a window is still being made, {window}, showing \"{facts.Words}\"; judged again at each look for up to {WindowRules.SettlingLimit.TotalSeconds:0} s");
+                    continue;
                 case Verdict.Empty:
                     if (_reported.Add(window.Handle))
-                        Program.Note($"note: an empty untitled window appeared, {window}; watching it");
+                        Program.Note($"note: an empty untitled window appeared, {window}; judged again at each look for up to {WindowRules.EmptyLimit.TotalSeconds:0} s");
                     continue;
                 case Verdict.Blocked:
                     throw Stopped.Product($"Windows put up {judgement.Kind}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("windows-notice")}]");
                 case Verdict.Unexpected:
-                    throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
+                    throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}{(judgement.Kind.Length > 0 ? " (" + judgement.Kind + ")" : "")}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
             }
             if (judgement.Kind == "plantoir content") contentWindows.Add(window.Element);
             if (_allowedSeen.Add($"{Stage}|{window.Handle}"))
                 Program.Note($"window allowed at {Stage} as {judgement.Kind}: {window}"
-                             + (judgement.Kind is "plantoir content" or "plantoir popup" ? $", showing \"{facts.Words}\"" : ""));
+                             + (judgement.Kind is "plantoir content" or "plantoir popup" or "browser warning" ? $", showing \"{facts.Words}\"" : ""));
             try { answer?.Invoke(window, judgement.Kind); }
             catch (Stopped) { throw; }
             catch (Exception error) { throw Stopped.Driver($"answering {window} failed: {error.Message}"); }
@@ -131,6 +176,39 @@ internal sealed class WindowWatch
         // Plantoir's content seen outside its window (WindowRules.IsPlantoirContent):
         // a dialog in it is judged exactly as one in the main window.
         foreach (var content in contentWindows) CheckDialogs(content);
+        // Counted only now: a look that ended the run, or could not read the
+        // desktop, is not a look the run can lean on.
+        Interlocked.Increment(ref _looks);
+    }
+
+    /// <summary>The name of the control with this automation id, or null when the window has none.</summary>
+    private static string? ControlName(AutomationElement window, string automationId)
+    {
+        try
+        {
+            var control = window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+            return control is null ? null : control.Properties.Name.ValueOrDefault ?? "";
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Watches the desktop for <paramref name="period"/>, a look a second, and
+    /// returns how many real looks there were. Used once, after the last step
+    /// (<see cref="WindowRules.FinalWatchLength"/>): a deliberate observation
+    /// window, not a wait for a condition.
+    /// </summary>
+    public int Observe(TimeSpan period, Action<SeenWindow, string>? answer = null)
+    {
+        int before = Looks;
+        var until = DateTime.UtcNow + period;
+        while (DateTime.UtcNow < until)
+        {
+            Check(answer);
+            Thread.Sleep(1000);
+        }
+        Check(answer);
+        return Looks - before;
     }
 
     /// <summary>
@@ -144,7 +222,11 @@ internal sealed class WindowWatch
     {
         AutomationElement[] popups;
         try { popups = window.FindAllDescendants(cf => cf.ByClassName("Popup").And(cf.ByControlType(ControlType.Window))); }
-        catch { return; }
+        catch (Exception error)
+        {
+            NoteUnreadable("dialogs|" + error.GetType().Name, $"note: the dialogs inside Plantoir's window could not be read at this look ({error.GetType().Name}: {error.Message})");
+            return;
+        }
         foreach (var popup in popups)
         {
             string title;
@@ -163,7 +245,12 @@ internal sealed class WindowWatch
                 if (isNewCourseSheet) isDialog = true;
                 close = popup.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"));
             }
-            catch { continue; }
+            catch (Exception error)
+            {
+                _unreadable++;
+                NoteUnreadable("dialog|" + error.GetType().Name, $"note: a popup inside Plantoir's window could not be read ({error.GetType().Name}: {error.Message})");
+                continue;
+            }
             if (!isDialog) continue;
             string? kind = WindowRules.DialogKind(Stage, title, isNewCourseSheet);
             if (kind is null)

@@ -10,15 +10,21 @@ namespace Plantoir.FirstInstall.Tests;
 /// </summary>
 public class WindowRulesTests
 {
-    private static WindowFacts Window(string title, string windowClass, string process, string words = "") =>
-        new(title, windowClass, process, () => words);
+    private static WindowFacts Window(string title, string windowClass, string process, string words = "",
+                                      Dictionary<string, string>? controls = null) =>
+        new(title, windowClass, process, () => words,
+            id => controls is not null && controls.TryGetValue(id, out string? name) ? name : null);
 
-    private static Verdict VerdictOf(Stage stage, WindowFacts window) => WindowRules.Judge(stage, window).Verdict;
+    private static Verdict VerdictOf(Stage stage, WindowFacts window, double seenForSeconds = 0) =>
+        WindowRules.Judge(stage, window, TimeSpan.FromSeconds(seenForSeconds)).Verdict;
+
+    private static readonly Dictionary<string, string> PickerControls = new() { ["1152"] = "Course Notes", ["1"] = "Select Folder" };
 
     private static readonly WindowFacts PlantoirMain = Window("Plantoir", "WinUIDesktopWin32WindowClass", "Plantoir");
     private static readonly WindowFacts Wizard = Window("Setup - Plantoir version 1.9.3", "TWizardForm", "PlantoirSetup.tmp");
     private static readonly WindowFacts InnoErrorBox = Window("Setup", "#32770", "PlantoirSetup.tmp", "Setup | An error occurred while trying to replace the existing file");
-    private static readonly WindowFacts Picker = Window("Choose your working folder", "#32770", "PickerHost");
+    // vm-tools/runs/win-explore/up/pick3.txt: the picker's Folder box (id 1152) and Select Folder (id 1).
+    private static readonly WindowFacts Picker = Window("Select Folder", "#32770", "PickerHost", "", PickerControls);
     private static readonly WindowFacts Notepad = Window("Untitled - Notepad", "Notepad", "Notepad");
     private static readonly WindowFacts Edge = Window("New tab - Microsoft Edge", "Chrome_WidgetWin_1", "msedge");
 
@@ -127,9 +133,36 @@ public class WindowRulesTests
     public void TheFolderPickerIsExpectedOnlyWhileChoosingTheWorkingFolder()
     {
         Assert.Equal(new Judgement(Verdict.Expected, "folder picker"), WindowRules.Judge(Stage.WorkingFolder, Picker));
+        Assert.Equal(new Judgement(Verdict.Expected, "folder picker"),
+                     WindowRules.Judge(Stage.WorkingFolder, Window("Select Folder", "#32770", "Plantoir", "", PickerControls)));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.ExampleCourse, Picker));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Preview, Picker));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.WorkingFolder, Window("Something", "Chrome_WidgetWin_1", "PickerHost", "words")));
+    }
+
+    [Fact]
+    public void ADialogOfThePickersClassIsNotThePickerWithoutItsControls()
+    {
+        // The review of 2026-11-18: any #32770 of Plantoir passed as the picker.
+        // A Win32 error box, and the picker's own task dialog (pick7.txt: titled
+        // "Select Folder", one OK button), are judged again while the picker's
+        // controls may still be coming, then refused.
+        var errorBox = Window("Plantoir", "#32770", "Plantoir", "Plantoir | The folder could not be opened | OK");
+        var taskDialog = Window("Select Folder", "#32770", "PickerHost", "Select Folder | You can't use this folder | OK",
+                                new Dictionary<string, string> { ["CommandButton_1"] = "OK" });
+        foreach (var window in new[] { errorBox, taskDialog })
+        {
+            Assert.Equal(Verdict.Settling, VerdictOf(Stage.WorkingFolder, window));
+            Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.WorkingFolder, window, WindowRules.SettlingLimit.TotalSeconds));
+        }
+        // Both controls are needed, and the button must be Select Folder.
+        Assert.Equal(Verdict.Settling, VerdictOf(Stage.WorkingFolder, Window("Select Folder", "#32770", "PickerHost", "",
+                                                  new Dictionary<string, string> { ["1152"] = "" })));
+        Assert.Equal(Verdict.Settling, VerdictOf(Stage.WorkingFolder, Window("Select Folder", "#32770", "PickerHost", "",
+                                                  new Dictionary<string, string> { ["1152"] = "", ["1"] = "OK" })));
+        Assert.True(WindowRules.IsFolderPicker(Window("Select Folder", "#32770", "PickerHost", "",
+                                               new Dictionary<string, string> { ["1152"] = "", ["1"] = "&Select Folder" })));
+        Assert.False(WindowRules.IsFolderPicker(Window("Select Folder", "#32770", "Notepad", "", PickerControls)));
     }
 
     [Fact]
@@ -142,9 +175,31 @@ public class WindowRulesTests
     [Fact]
     public void TheBrowserIsExpectedOnlyWhileDownloading()
     {
-        Assert.Equal(Verdict.Expected, VerdictOf(Stage.Download, Edge));
+        Assert.Equal(new Judgement(Verdict.Expected, "browser"), WindowRules.Judge(Stage.Download, Edge));
+        Assert.Equal(new Judgement(Verdict.Expected, "browser"), WindowRules.Judge(Stage.Download, Window("", "Chrome_WidgetWin_1", "msedge", "Downloads | PlantoirSetup.exe")));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Install, Edge));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Preview, Edge));
+    }
+
+    [Theory]
+    [InlineData("PlantoirSetup.exe isn't commonly downloaded. Make sure you trust PlantoirSetup.exe before you open it. | Delete | Keep")]
+    [InlineData("PlantoirSetup.exe isn\u2019t commonly downloaded | More actions")]
+    [InlineData("PlantoirSetup.exe was blocked because it could harm your device | Delete")]
+    [InlineData("Microsoft Defender SmartScreen couldn't verify if this file is safe")]
+    public void EdgesOwnDownloadWarningIsAFinding(string words)
+    {
+        // The review of 2026-11-18: any msedge window was expected at Download,
+        // so Edge's own warning (its SmartScreen is on in snapshot 00) was never recorded.
+        Assert.Equal(new Judgement(Verdict.Expected, "browser warning"),
+                     WindowRules.Judge(Stage.Download, Window("", "Chrome_WidgetWin_1", "msedge", words)));
+        Assert.NotNull(WindowRules.EdgeWarningIn(words));
+    }
+
+    [Fact]
+    public void AnOrdinaryBrowserFlyoutIsNoWarning()
+    {
+        Assert.Null(WindowRules.EdgeWarningIn("Downloads | PlantoirSetup.exe | 23.1 MB | Open file"));
+        Assert.Null(WindowRules.EdgeWarningIn(""));
     }
 
     [Fact]
@@ -202,10 +257,66 @@ public class WindowRulesTests
     }
 
     [Fact]
-    public void AnEmptyUntitledWindowIsWatchedNotJudged()
+    public void AnEmptyUntitledWindowIsWatchedForAWhileThenRefused()
     {
-        Assert.Equal(Verdict.Empty, VerdictOf(Stage.Preview, Window("", "Chrome_WidgetWin_1", "Notepad")));
+        var empty = Window("", "Chrome_WidgetWin_1", "Notepad");
+        Assert.Equal(Verdict.Empty, VerdictOf(Stage.Preview, empty));
+        Assert.Equal(Verdict.Empty, VerdictOf(Stage.Preview, empty, WindowRules.EmptyLimit.TotalSeconds - 1));
+        // The review of 2026-11-18: an untitled window whose words UI
+        // Automation cannot read (an elevated or custom-drawn prompt) was
+        // tolerated for ever. Past the limit it ends the run.
+        foreach (Stage stage in Enum.GetValues<Stage>())
+            Assert.Equal(Verdict.Unexpected, VerdictOf(stage, empty, WindowRules.EmptyLimit.TotalSeconds));
         Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Preview, Window("", "Chrome_WidgetWin_1", "Notepad", "Save changes?")));
+    }
+
+    [Fact]
+    public void PlantoirsWindowBeingMadeIsRefusedPastItsLimit()
+    {
+        var beingMade = Window("", "", "Plantoir", "Minimize | Maximize | Close");
+        Assert.Equal(Verdict.Settling, VerdictOf(Stage.OpenPlantoir, beingMade, WindowRules.SettlingLimit.TotalSeconds - 1));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.OpenPlantoir, beingMade, WindowRules.SettlingLimit.TotalSeconds));
+    }
+
+    [Theory]
+    [InlineData("SearchHost")]
+    [InlineData("ShellHost")]
+    [InlineData("LockApp")]
+    [InlineData("TextInputHost")]
+    [InlineData("StartMenuExperienceHost")]
+    public void ShellSurfacesAreFurnitureUnlessTheySayWindowsBlockedSomething(string process)
+    {
+        // The review of 2026-11-18: these were allowed by process alone.
+        Assert.Equal(Verdict.Desktop, VerdictOf(Stage.Preview, Window("", "Windows.UI.Core.CoreWindow", process, "Search | Apps")));
+        Assert.Equal(Verdict.Blocked, VerdictOf(Stage.Preview, Window("", "Windows.UI.Core.CoreWindow", process,
+                                                                        "Windows Security Alert | Windows Defender Firewall has blocked some features of this app")));
+        Assert.Equal(Verdict.Blocked, VerdictOf(Stage.Install, Window("Notification", "Windows.UI.Core.CoreWindow", process, "Smart App Control blocked an app")));
+    }
+
+    [Fact]
+    public void TheTaskbarIsNotReadForWords()
+    {
+        int reads = 0;
+        var taskbar = new WindowFacts("", "Shell_TrayWnd", "explorer", () => { reads++; return "Firewall"; });
+        Assert.Equal(Verdict.Desktop, WindowRules.Judge(Stage.Preview, taskbar).Verdict);
+        Assert.Equal(0, reads);
+    }
+
+    [Fact]
+    public void TheFinalWatchExpectsWhatThePreviewDoesAndNothingElse()
+    {
+        Assert.Equal(Verdict.Expected, VerdictOf(Stage.FinalWatch, PlantoirMain));
+        Assert.Equal(Verdict.Expected, VerdictOf(Stage.FinalWatch, Window("", "Microsoft.UI.Content.PopupWindowSiteBridge", "Plantoir", "tip")));
+        // A firewall alert a second after the preview server binds: the case the watch exists for.
+        var firewallAlert = Window("Windows Security Alert", "#32770", "rundll32",
+                                   "Windows Defender Firewall has blocked some features of this app | Allow | Cancel");
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, firewallAlert));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, Notepad));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, Edge));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, Picker));
+        Assert.Equal("question: today's class", WindowRules.DialogKind(Stage.FinalWatch, "Show Day 3 on the front page?", isNewCourseSheet: false));
+        Assert.Null(WindowRules.DialogKind(Stage.FinalWatch, "Something went wrong", isNewCourseSheet: false));
+        Assert.True(WindowRules.FinalWatchLength >= TimeSpan.FromSeconds(30));
     }
 
     [Fact]
