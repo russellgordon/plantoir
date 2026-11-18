@@ -415,7 +415,7 @@
   "npmAudit": {
     "note": "#667 (v1.9.0): what `npm audit` reports against the image's JavaScript, and which findings are accepted and why. verify.sh audits every tree below inside the image, with the image's own npm, and FAILS on a high or critical advisory that is not accepted here for that tree, or that is accepted at a LOWER severity than the database gives it now (re-decide). Low and moderate advisories that are not accepted are reported, not failed; an accepted advisory no longer reported is stale, said and not failed. Offline it SKIPS, saying no tree counts as audited until every tree can be. A top-level key, deliberately NOT under `pins`: both apps' pin tests read every pin as a Dockerfile line. Every current advisory is listed, low and moderate included, with the severity it has today, so a later raise fails. `exposure` and `reason` are decided per tree, because one advisory can be harmless in one tree and not in another. Windows audits its runtime's copies of the same trees (`windowsRuntime`) against this same list. scripts/npm_audit.py is the comparator; research/npm-audit/<date>.md is the record of each run; RELEASING.md step 2 revisits it at every cut. REJECTED: upgrading now (the ruling on #667: no upgrades this release; Quartz's tree moves with Quartz 5, #512, and wrangler's moved with its own piece, #699, whose 4.156.0 has no advisory, so wrangler has no accepted entry today); `npm audit --audit-level=high` alone, which cannot say 'accepted', so every run would be red; auditing in the image build, which would need the network on every build and fail a teacher's first build the day an advisory is published.",
     "failsOn": ["high", "critical"],
-    "reviewed": "2026-10-31",
+    "reviewed": "2026-11-18",
     "trees": [
       {"tree": "quartz", "image": "/opt/quartz", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\quartz", "exposure": "Quartz v4.5.0 and every dependency its lockfile installs, dev dependencies included. Runs in the container on the teacher's Mac: the build, and the preview server while a preview runs. A built site carries Quartz's own client scripts and stylesheets."},
       {"tree": "tikz-engine", "image": "/opt/vendor/tikz-engine", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\vendor\\tikz-engine", "exposure": "node-tikzjax and its locked dependencies (support/figures/package-lock.json, npm ci --omit=dev). Build only: a site carries the SVG it draws, never the engine."},
@@ -540,10 +540,11 @@
         "tree": "quartz",
         "package": "picomatch",
         "exposure": "the teacher's build only",
-        "reason": "ReDoS and wrong matches on crafted glob patterns (globby, fast-glob, micromatch). The patterns are Quartz's own.",
+        "reason": "ReDoS and wrong matches on crafted glob patterns (globby, fast-glob, micromatch). The patterns are Quartz's own. GHSA-fc5q-39xc-vjpf (high, published 2026-10-19 and every picomatch up to 4.0.7, so on 2026-11-18 there was no patched version to take) is exponential backtracking when the PATTERN holds a single-branch repeated extglob such as `+(*)`. The tree's one picomatch, 2.3.1, is reached only through micromatch 4.0.8 under fast-glob 3.3.3 under globby 14.1.0, and the patterns it compiles are fixed in code: `**/*.*` (build.ts) and `**` (the Assets emitter and plantoirAssets.ts), `**/*.md`, Quartz's ignorePatterns `private`, `templates` and `.obsidian` (quartz.config.ts, which build_site.py does not touch there), the watcher's own list in handlers.js, and globby's `**/.gitignore` and default ignores, none with an extglob. A course folder's .gitignore lines go to the `ignore` package, not picomatch; file names and paths are only ever the text matched, never compiled; and the preview server's request matching is serve-handler's minimatch (read 2026-11-18 in Quartz v4.5.0, globby 14.1.0 and fast-glob 3.3.3).",
         "advisories": [
           {"id": "GHSA-3v7f-55p6-f55p", "severity": "moderate"},
-          {"id": "GHSA-c2c7-rcm5-vvqj", "severity": "high"}
+          {"id": "GHSA-c2c7-rcm5-vvqj", "severity": "high"},
+          {"id": "GHSA-fc5q-39xc-vjpf", "severity": "high"}
         ]
       },
       {
