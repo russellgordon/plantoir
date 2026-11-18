@@ -90,26 +90,19 @@ final class DetailTabsLayoutTests: XCTestCase {
     // MARK: - Stored properties
 
     nonisolated(unsafe) private var rootURLs: [URL] = []
-    nonisolated(unsafe) private var previousStore: ProblemReportStore?
 
     static let sizes: [NSSize] = [NSSize(width: 1100, height: 720), NSSize(width: 1440, height: 860)]
 
     // MARK: - Functions
 
     override func setUp() async throws {
-        previousStore = ActivityTrail.store
-        let trail: URL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("tabs-layout-trail-\(UUID().uuidString)", isDirectory: true)
-        removeWhenTestEnds(trail)
-        ActivityTrail.store = ProblemReportStore(folderURL: trail)
+        // The store is put back before the folder goes (#978 follow-ups).
+        useThrowawayTrail(prefix: "tabs-layout-trail")
         SectionCoverage.shared.reset()
         SectionProblems.shared.reset()
     }
 
     override func tearDown() async throws {
-        if let previousStore {
-            ActivityTrail.store = previousStore
-        }
         SectionCoverage.shared.reset()
         SectionProblems.shared.reset()
         for url in rootURLs {

@@ -275,21 +275,15 @@ final class QuestionKeysTests: XCTestCase {
     // MARK: - Stored properties
 
     nonisolated(unsafe) private var rootURL: URL?
-    nonisolated(unsafe) private var previousStore: ProblemReportStore?
 
     // MARK: - Functions
 
     override func setUp() async throws {
-        previousStore = ActivityTrail.store
-        let trail: URL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("question-keys-trail-\(UUID().uuidString)", isDirectory: true)
-        ActivityTrail.store = ProblemReportStore(folderURL: trail)
+        // Removed when the test ends, after the store is put back (#978).
+        useThrowawayTrail(prefix: "question-keys-trail")
     }
 
     override func tearDown() async throws {
-        if let previousStore {
-            ActivityTrail.store = previousStore
-        }
         if let rootURL {
             try? FileManager.default.removeItem(at: rootURL)
         }

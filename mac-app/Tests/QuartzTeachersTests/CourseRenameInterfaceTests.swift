@@ -52,7 +52,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testTheRowTurnsIntoAFieldWhileRenamingAndBackAfterwards() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(fixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -75,7 +75,6 @@ final class CourseRenameInterfaceTests: XCTestCase {
         }
         XCTAssertTrue(renamingHasField, "The row should have become a text field: \(renaming)")
 
-        try? FileManager.default.removeItem(at: fixtureURL)
     }
 
     // MARK: - Through the real window
@@ -83,7 +82,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testRenamingMovesTheCourseAndTheSidebarFollowsIt() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(fixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -136,7 +135,6 @@ final class CourseRenameInterfaceTests: XCTestCase {
             "the folder really moved, contents and all"
         )
 
-        try? FileManager.default.removeItem(at: fixtureURL)
     }
 
     /// A busy course is not renamed out from under its own preview, and the
@@ -145,7 +143,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testACourseThatIsPreviewingIsNotRenamed() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(fixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -178,7 +176,6 @@ final class CourseRenameInterfaceTests: XCTestCase {
         workspace.renameProblem = nil
         XCTAssertTrue(FileManager.default.fileExists(atPath: course.directoryURL.path))
 
-        try? FileManager.default.removeItem(at: fixtureURL)
     }
 
     /// A code the rule refuses never gets as far as the file system, and its
@@ -200,7 +197,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(fixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -237,7 +234,6 @@ final class CourseRenameInterfaceTests: XCTestCase {
         )
 
         workspace.renamingCourseCode = nil
-        try? FileManager.default.removeItem(at: fixtureURL)
     }
 
     // MARK: - The Return key
