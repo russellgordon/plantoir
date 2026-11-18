@@ -50,6 +50,17 @@ internal enum Verdict
     Blocked,
 }
 
+/// <summary>What <see cref="WindowRules.Settle"/> says a watch or a step may do at a look.</summary>
+internal enum Settling
+{
+    /// <summary>No window is in a grace state: it may finish.</summary>
+    Done,
+    /// <summary>A window is still in a grace state: look again.</summary>
+    KeepLooking,
+    /// <summary>Windows were still in a grace state after <see cref="WindowRules.SettleLimit"/>: the run ends, not PASSED.</summary>
+    OutOfTime,
+}
+
 internal readonly record struct Judgement(Verdict Verdict, string Kind)
 {
     public static Judgement Of(Verdict verdict, string kind = "") => new(verdict, kind);
@@ -389,6 +400,25 @@ internal static class WindowRules
     }
 
     /// <summary>
+    /// How long a watch or a step may go on looking, after it would otherwise
+    /// have finished, for windows still in a grace period to be judged (the
+    /// fourth review: the final watch could end, and PASSED be written, with an
+    /// unreadable, empty or settling window still on screen). The final
+    /// watch's own length: every grace is 20 s, so a window that reaches this
+    /// is one that keeps coming back, and the run is not PASSED.
+    /// </summary>
+    public static readonly TimeSpan SettleLimit = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// The rule a watch or a step ends by: it may say it is finished only when
+    /// no window is in a grace state (tolerated for now is not allowed).
+    /// <paramref name="pending"/> is how many are, at the last look; <paramref name="waited"/>
+    /// how long it has gone on looking past its own end.
+    /// </summary>
+    public static Settling Settle(int pending, TimeSpan waited) =>
+        pending == 0 ? Settling.Done : waited >= SettleLimit ? Settling.OutOfTime : Settling.KeepLooking;
+
+    /// <summary>
     /// Whether the watcher looked enough during a stretch of time: at least
     /// one real look, and one for every three seconds (the installer's launch
     /// call, Steps.cs; the final watch, Program.cs). False means the stretch
@@ -433,9 +463,18 @@ internal enum UnreadableChange
     Gone,
     /// <summary>Still unreadable at the limit: the run ends, not PASSED.</summary>
     TooLong,
+    /// <summary>
+    /// At least one unreadable window has been on screen at every look for
+    /// the limit, whichever windows they were: the run ends, not PASSED. Asked
+    /// independently of identity, so a window whose comparison throws or never
+    /// matches itself (and so gets a new number at each look) is still caught.
+    /// </summary>
+    PresentTooLong,
+    /// <summary>Comparing two windows threw at this look; recorded, with how many times.</summary>
+    ComparisonFailed,
 }
 
-/// <summary>One thing to record about an unreadable window. <see cref="Number"/> is its number in this run, from 1.</summary>
+/// <summary>One thing to record about an unreadable window. <see cref="Number"/> is its number in this run, from 1 (0 for the events about no one window).</summary>
 internal readonly record struct UnreadableEvent(UnreadableChange Change, int Number, TimeSpan SeenFor, int Sightings, string Error);
 
 /// <summary>
@@ -447,6 +486,11 @@ internal readonly record struct UnreadableEvent(UnreadableChange Change, int Num
 /// never by its handle, which reads 0x0 for every such window. Every window
 /// is recorded when it appears and when it stops being unreadable; one still
 /// unreadable after <see cref="WindowRules.UnreadableLimit"/> ends the run.
+///
+/// Two rules hold whatever the comparison says (the fourth review): a single
+/// clock runs while at least one unreadable window is present at every look,
+/// and it ends the run at the same limit; and a comparison that throws is
+/// recorded, counted as "not the same window", never hidden.
 /// No UI Automation in it, so the tests can drive it with plain values.
 /// </summary>
 internal sealed class UnreadableWindows<T>
@@ -463,26 +507,54 @@ internal sealed class UnreadableWindows<T>
     private readonly Func<T, T, bool> _sameWindow;
     private readonly List<Tracked> _tracked = new();
     private int _numbered;
+    private DateTime? _presentSince;
+    private int _presentLooks;
+    private int _comparisonFailures;
+    private string _lastComparisonError = "";
 
     public UnreadableWindows(Func<T, T, bool> sameWindow) => _sameWindow = sameWindow;
 
     /// <summary>How many different unreadable windows this run has seen.</summary>
     public int Seen => _numbered;
 
+    /// <summary>How many comparisons threw in this run.</summary>
+    public int ComparisonFailures => _comparisonFailures;
+
+    /// <summary>
+    /// Whether an unreadable window is still inside its grace: one is being
+    /// tracked, or one was present at the last look. While true, no watch or
+    /// step may be declared finished (<see cref="WindowRules.Settle"/>).
+    /// </summary>
+    public bool Pending => _tracked.Count > 0 || _presentSince is not null;
+
+    private bool Same(T first, T second, ref int failures)
+    {
+        try { return _sameWindow(first, second); }
+        catch (Exception error)
+        {
+            failures++;
+            _comparisonFailures++;
+            _lastComparisonError = error.GetType().Name + ": " + error.Message;
+            return false;
+        }
+    }
+
     /// <summary>
     /// One look: the windows that could not be read at it (with the error),
     /// and the windows that could. Returns what to record, in order; a
-    /// <see cref="UnreadableChange.TooLong"/> event means the run must end.
+    /// <see cref="UnreadableChange.TooLong"/> or <see cref="UnreadableChange.PresentTooLong"/>
+    /// event means the run must end.
     /// </summary>
     public List<UnreadableEvent> Look(IReadOnlyList<(T Window, string Error)> unreadable, IReadOnlyList<T> readable, DateTime now)
     {
         var events = new List<UnreadableEvent>();
         var stillUnreadable = new List<Tracked>();
+        int failures = 0;
         foreach (var (window, error) in unreadable)
         {
             Tracked? known = null;
             foreach (var tracked in _tracked)
-                if (!stillUnreadable.Contains(tracked) && _sameWindow(tracked.Window, window)) { known = tracked; break; }
+                if (!stillUnreadable.Contains(tracked) && Same(tracked.Window, window, ref failures)) { known = tracked; break; }
             if (known is null)
             {
                 known = new Tracked { Window = window, Number = ++_numbered, FirstSeen = now, Error = error };
@@ -504,10 +576,26 @@ internal sealed class UnreadableWindows<T>
             }
             bool nowReadable = false;
             foreach (var window in readable)
-                if (_sameWindow(tracked.Window, window)) { nowReadable = true; break; }
+                if (Same(tracked.Window, window, ref failures)) { nowReadable = true; break; }
             events.Add(new UnreadableEvent(nowReadable ? UnreadableChange.BecameReadable : UnreadableChange.Gone,
                                            tracked.Number, seenFor, tracked.Sightings, tracked.Error));
             _tracked.Remove(tracked);
+        }
+        if (failures > 0)
+            events.Add(new UnreadableEvent(UnreadableChange.ComparisonFailed, 0, TimeSpan.Zero, failures, _lastComparisonError));
+        // The clock that does not depend on telling windows apart.
+        if (unreadable.Count > 0)
+        {
+            _presentSince ??= now;
+            _presentLooks++;
+            TimeSpan present = now - _presentSince.Value;
+            if (present >= WindowRules.UnreadableLimit)
+                events.Add(new UnreadableEvent(UnreadableChange.PresentTooLong, 0, present, _presentLooks, unreadable[0].Error));
+        }
+        else
+        {
+            _presentSince = null;
+            _presentLooks = 0;
         }
         return events;
     }

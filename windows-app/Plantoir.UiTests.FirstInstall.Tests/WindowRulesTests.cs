@@ -418,8 +418,9 @@ public class WindowRulesTests
         tracker.Look(Listing(prompt), NoneReadable, Start);
         Assert.Empty(tracker.Look(Listing(prompt), NoneReadable, Start + WindowRules.UnreadableLimit - TimeSpan.FromSeconds(1)));
         var late = tracker.Look(Listing(prompt), NoneReadable, Start + WindowRules.UnreadableLimit);
-        var change = Assert.Single(late);
-        Assert.Equal(UnreadableChange.TooLong, change.Change);
+        // Both clocks run out at the same look: this window's, and "an unreadable window was present".
+        Assert.Contains(late, change => change.Change == UnreadableChange.PresentTooLong);
+        var change = Assert.Single(late, change => change.Change == UnreadableChange.TooLong);
         Assert.Equal(3, change.Sightings);
         Assert.Contains("access denied", change.Error);
         Assert.Equal(TimeSpan.FromSeconds(20), WindowRules.UnreadableLimit);
@@ -444,8 +445,7 @@ public class WindowRulesTests
         Assert.Equal(new[] { UnreadableChange.Gone }, firstGone.ConvertAll(change => change.Change).ToArray());
         Assert.Equal(1, firstGone[0].Number);
         var secondLate = tracker.Look(Listing(second), NoneReadable, Start + TimeSpan.FromSeconds(25));
-        Assert.Equal(UnreadableChange.TooLong, Assert.Single(secondLate).Change);
-        Assert.Equal(2, secondLate[0].Number);
+        Assert.Equal(2, Assert.Single(secondLate, change => change.Change == UnreadableChange.TooLong).Number);
     }
 
     [Fact]
@@ -478,5 +478,88 @@ public class WindowRulesTests
         Assert.False(WindowRules.LookedEnough(19, WindowRules.FinalWatchLength, out int required));
         Assert.Equal(20, required);
         Assert.True(WindowRules.LookedEnough(20, WindowRules.FinalWatchLength, out _));
+    }
+
+    // ---- The presence clock and the comparison (the fourth review) -----------
+
+    private static bool ThrowingCompare(Unreadable first, Unreadable second) =>
+        throw new InvalidOperationException("CompareElements failed");
+
+    [Fact]
+    public void AComparerThatAlwaysThrowsStillStopsTheRunAfterTheGrace()
+    {
+        var tracker = new UnreadableWindows<Unreadable>(ThrowingCompare);
+        var prompt = new Unreadable("a");
+        var events = new List<UnreadableEvent>();
+        for (int second = 0; second <= 20; second += 2)
+            events.AddRange(tracker.Look(Listing(prompt), NoneReadable, Start + TimeSpan.FromSeconds(second)));
+        // Each look it gets a new number (the comparison never answers), so no
+        // single window reaches TooLong; the presence clock does.
+        Assert.DoesNotContain(events, change => change.Change == UnreadableChange.TooLong);
+        Assert.Contains(events, change => change.Change == UnreadableChange.ComparisonFailed && change.Error.Contains("CompareElements failed"));
+        var stop = Assert.Single(events, change => change.Change == UnreadableChange.PresentTooLong);
+        Assert.Equal(TimeSpan.FromSeconds(20), stop.SeenFor);
+        Assert.True(tracker.ComparisonFailures > 0);
+        Assert.True(tracker.Pending);
+    }
+
+    [Fact]
+    public void AComparerThatNeverMatchesStillStopsTheRunAfterTheGrace()
+    {
+        var tracker = new UnreadableWindows<Unreadable>((first, second) => false);
+        var prompt = new Unreadable("a");
+        var events = new List<UnreadableEvent>();
+        for (int second = 0; second < 20; second += 2)
+            events.AddRange(tracker.Look(Listing(prompt), NoneReadable, Start + TimeSpan.FromSeconds(second)));
+        Assert.DoesNotContain(events, change => change.Change is UnreadableChange.TooLong or UnreadableChange.PresentTooLong);
+        var late = tracker.Look(Listing(prompt), NoneReadable, Start + TimeSpan.FromSeconds(20));
+        Assert.Contains(late, change => change.Change == UnreadableChange.PresentTooLong);
+    }
+
+    [Fact]
+    public void ThePresenceClockStartsAgainWhenNoUnreadableWindowIsPresent()
+    {
+        var tracker = new UnreadableWindows<Unreadable>((first, second) => false);
+        var prompt = new Unreadable("a");
+        tracker.Look(Listing(prompt), NoneReadable, Start);
+        tracker.Look(Listing(), NoneReadable, Start + TimeSpan.FromSeconds(15));
+        Assert.False(tracker.Pending);
+        var events = tracker.Look(Listing(prompt), NoneReadable, Start + TimeSpan.FromSeconds(25));
+        Assert.DoesNotContain(events, change => change.Change == UnreadableChange.PresentTooLong);
+        Assert.True(tracker.Pending);
+    }
+
+    // ---- A watch or step may finish only when nothing is in a grace state ----
+
+    [Fact]
+    public void AWatchMayNotFinishWhileAWindowIsInAGraceState()
+    {
+        Assert.Equal(Settling.Done, WindowRules.Settle(0, TimeSpan.Zero));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(1, TimeSpan.Zero));
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(2, WindowRules.SettleLimit - TimeSpan.FromSeconds(1)));
+        Assert.Equal(Settling.OutOfTime, WindowRules.Settle(1, WindowRules.SettleLimit));
+        Assert.Equal(TimeSpan.FromSeconds(60), WindowRules.SettleLimit);
+    }
+
+    [Fact]
+    public void AnUnreadableWindowSeenInTheLastLookOfAWatchIsPending()
+    {
+        var tracker = Tracker();
+        tracker.Look(Listing(new Unreadable("late")), NoneReadable, Start);
+        Assert.True(tracker.Pending);
+        Assert.Equal(Settling.KeepLooking, WindowRules.Settle(tracker.Pending ? 1 : 0, TimeSpan.Zero));
+        tracker.Look(Listing(), NoneReadable, Start + TimeSpan.FromSeconds(3));
+        Assert.False(tracker.Pending);
+    }
+
+    [Fact]
+    public void AnEmptyOrSettlingWindowIsAGraceStateNotAnAllowedOne()
+    {
+        var empty = Window("", "Window", "powershell");
+        Assert.Equal(Verdict.Empty, VerdictOf(Stage.FinalWatch, empty, 5));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, empty, WindowRules.EmptyLimit.TotalSeconds));
+        var making = Window("", "", "Plantoir");
+        Assert.Equal(Verdict.Settling, VerdictOf(Stage.FinalWatch, making, 5));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, making, WindowRules.SettlingLimit.TotalSeconds));
     }
 }

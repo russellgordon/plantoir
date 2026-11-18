@@ -30,6 +30,7 @@ internal sealed class WindowWatch
     private readonly List<string> _baselineNames = new();
     private readonly List<AutomationElement> _baselineUnreadable = new();
     private readonly UnreadableWindows<AutomationElement> _unreadableWindows;
+    private readonly List<string> _pending = new();
     private int _looks;
     private int _failedLooks;
     private int _unreadable;
@@ -60,13 +61,19 @@ internal sealed class WindowWatch
     /// Whether two elements are the same window, by UI Automation's own
     /// comparison (CompareElements). Not by handle: every window whose
     /// properties cannot be read gives 0x0, and the review of 2026-11-18 found
-    /// that made two of them look like one.
+    /// that made two of them look like one. It may throw: the tracker records
+    /// a comparison that throws, and its presence clock does not depend on it.
     /// </summary>
-    private bool SameElement(AutomationElement first, AutomationElement second)
-    {
-        try { return _automation.Compare(first, second); }
-        catch { return false; }
-    }
+    private bool SameElement(AutomationElement first, AutomationElement second) => _automation.Compare(first, second);
+
+    /// <summary>
+    /// The windows still in a grace state at the last look (settling, empty,
+    /// or unreadable). While any is, no watch or step may finish (<see cref="Settle"/>).
+    /// </summary>
+    public IReadOnlyList<string> Pending => _pending;
+
+    /// <summary>Set while a watch or step is looking on past its end for windows still in a grace state; Program.Finish records it.</summary>
+    public string? SettlingAfter { get; private set; }
 
     public string BaselineDescription => string.Join("; ", _baselineNames);
 
@@ -151,13 +158,22 @@ internal sealed class WindowWatch
     private void JudgeUnreadable(List<(AutomationElement Element, string Error)> unreadable, List<SeenWindow> readable)
     {
         var fresh = new List<(AutomationElement Window, string Error)>();
+        int baselineFailures = 0;
+        string baselineError = "";
         foreach (var (element, error) in unreadable)
         {
             bool atStart = false;
             foreach (var known in _baselineUnreadable)
-                if (SameElement(known, element)) { atStart = true; break; }
+            {
+                // A comparison that throws is "not the desktop's": the window
+                // is judged rather than excused.
+                try { if (SameElement(known, element)) { atStart = true; break; } }
+                catch (Exception compareError) { baselineFailures++; baselineError = compareError.GetType().Name + ": " + compareError.Message; }
+            }
             if (!atStart) fresh.Add((element, error));
         }
+        if (baselineFailures > 0)
+            Program.Note($"note: comparing an unreadable window with the desktop's own threw {baselineFailures} times at this look ({baselineError}); it is judged as new");
         var readableElements = new List<AutomationElement>();
         foreach (var window in readable) readableElements.Add(window.Element);
         foreach (var change in _unreadableWindows.Look(fresh, readableElements, DateTime.UtcNow))
@@ -174,12 +190,20 @@ internal sealed class WindowWatch
                 case UnreadableChange.Gone:
                     Program.Note($"note: unreadable window {change.Number} is gone after {change.SeenFor.TotalSeconds:0} s ({change.Sightings} looks)");
                     break;
+                case UnreadableChange.ComparisonFailed:
+                    Program.Note($"note: comparing unreadable windows threw {change.Sightings} times at this look ({change.Error}); each such comparison counts as a different window, and the presence clock still runs");
+                    break;
                 case UnreadableChange.TooLong:
                     throw Stopped.Product($"a window UI Automation could not read stayed up at {Stage} for {change.SeenFor.TotalSeconds:0} s "
                                           + $"(unreadable window {change.Number}, {change.Sightings} looks; {change.Error}): a window of a higher integrity level, such as an elevation prompt, "
-                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]");
+                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]", "unreadable-window");
+                case UnreadableChange.PresentTooLong:
+                    throw Stopped.Product($"at least one window UI Automation could not read was on screen at every look for {change.SeenFor.TotalSeconds:0} s at {Stage} "
+                                          + $"({change.Sightings} looks; {change.Error}), whichever windows they were: a window of a higher integrity level, such as an elevation prompt, "
+                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]", "unreadable-window");
             }
         }
+        if (_unreadableWindows.Pending) _pending.Add("an unreadable window (inside its 20 s)");
     }
 
     /// <summary>Windows that were not there when the driver started.</summary>
@@ -205,6 +229,7 @@ internal sealed class WindowWatch
             Interlocked.Increment(ref _failedLooks);
             return;
         }
+        _pending.Clear();
         JudgeUnreadable(unreadable, windows);
         var contentWindows = new List<AutomationElement>();
         foreach (var window in windows)
@@ -220,17 +245,21 @@ internal sealed class WindowWatch
                 case Verdict.Desktop:
                     continue;
                 case Verdict.Settling:
+                    _pending.Add($"settling: {window}");
                     if (_reported.Add(window.Handle))
                         Program.Note($"note: a window is still being made, {window}, showing \"{facts.Words}\"; judged again at each look for up to {WindowRules.SettlingLimit.TotalSeconds:0} s");
                     continue;
                 case Verdict.Empty:
+                    _pending.Add($"empty: {window}");
                     if (_reported.Add(window.Handle))
                         Program.Note($"note: an empty untitled window appeared, {window}; judged again at each look for up to {WindowRules.EmptyLimit.TotalSeconds:0} s");
                     continue;
                 case Verdict.Blocked:
-                    throw Stopped.Product($"Windows put up {judgement.Kind}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("windows-notice")}]");
+                    throw Stopped.Product($"Windows put up {judgement.Kind}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("windows-notice")}]",
+                                          "blocked", window.Process);
                 case Verdict.Unexpected:
-                    throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}{(judgement.Kind.Length > 0 ? " (" + judgement.Kind + ")" : "")}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
+                    throw Stopped.Product($"an unexpected window appeared at {Stage}: {window}{(judgement.Kind.Length > 0 ? " (" + judgement.Kind + ")" : "")}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]",
+                                          UnexpectedCause(facts), window.Process);
             }
             if (judgement.Kind == "plantoir content") contentWindows.Add(window.Element);
             if (_allowedSeen.Add($"{Stage}|{window.Handle}"))
@@ -247,6 +276,19 @@ internal sealed class WindowWatch
         // Counted only now: a look that ended the run, or could not read the
         // desktop, is not a look the run can lean on.
         Interlocked.Increment(ref _looks);
+    }
+
+    /// <summary>
+    /// The fixed word for an unexpected window, for result.txt: one that
+    /// outlasted the Empty grace (no title, no words) or Plantoir's Settling
+    /// grace, or any other.
+    /// </summary>
+    private static string UnexpectedCause(WindowFacts facts)
+    {
+        if (facts.Title.Length == 0 && facts.Words.Length == 0) return "empty-window";
+        if (string.Equals(facts.Process, "Plantoir", StringComparison.OrdinalIgnoreCase)
+            && (facts.Class.Length == 0 || facts.Class == "WinUIDesktopWin32WindowClass" && facts.Title.Length == 0)) return "settling-window";
+        return "unexpected-window";
     }
 
     /// <summary>The name of the control with this automation id, or null when the window has none.</summary>
@@ -276,7 +318,44 @@ internal sealed class WindowWatch
             Thread.Sleep(1000);
         }
         Check(answer);
-        return Looks - before;
+        int looks = Looks - before;
+        Settle($"the {period.TotalSeconds:0} s watch", answer);
+        return looks;
+    }
+
+    /// <summary>
+    /// The rule every watch and every finished step ends by (the fourth
+    /// review): it may finish only when no window is in a grace state at the
+    /// last look. Until then it goes on looking, a look a second, so each such
+    /// window becomes readable and is judged, goes, or outlasts its grace and
+    /// ends the run; at <see cref="WindowRules.SettleLimit"/> the run ends too,
+    /// not PASSED. Returns at once when nothing is pending.
+    /// </summary>
+    public void Settle(string what, Action<SeenWindow, string>? answer = null)
+    {
+        var started = DateTime.UtcNow;
+        bool noted = false;
+        while (true)
+        {
+            var decision = WindowRules.Settle(_pending.Count, DateTime.UtcNow - started);
+            if (decision == Settling.Done) break;
+            if (decision == Settling.OutOfTime)
+                throw Stopped.Product($"{what} could not finish: after {WindowRules.SettleLimit.TotalSeconds:0} s more, windows were still in a grace state ({string.Join("; ", _pending)}) [screenshot {Program.Shot("unsettled")}]",
+                                      "unsettled");
+            if (!noted)
+            {
+                noted = true;
+                SettlingAfter = what;
+                Program.Note($"SETTLING: {what} is over, but {_pending.Count} window(s) are still in a grace state ({string.Join("; ", _pending)}); looking on until each is judged, for at most {WindowRules.SettleLimit.TotalSeconds:0} s");
+            }
+            Thread.Sleep(1000);
+            Check(answer);
+        }
+        if (noted)
+        {
+            Program.Note($"SETTLED: {what}: no window is in a grace state after {(DateTime.UtcNow - started).TotalSeconds:0} s more");
+            SettlingAfter = null;
+        }
     }
 
     /// <summary>
@@ -322,7 +401,7 @@ internal sealed class WindowWatch
             if (!isDialog) continue;
             string? kind = WindowRules.DialogKind(Stage, title, isNewCourseSheet);
             if (kind is null)
-                throw Stopped.Product($"Plantoir showed a dialog not expected at {Stage}: \"{title}\", saying \"{Words(popup)}\" [screenshot {Program.Shot("unexpected-dialog")}]");
+                throw Stopped.Product($"Plantoir showed a dialog not expected at {Stage}: \"{title}\", saying \"{Words(popup)}\" [screenshot {Program.Shot("unexpected-dialog")}]", "unexpected-dialog", "Plantoir");
             if (!kind.StartsWith("question", StringComparison.Ordinal)) continue;
             if (close is null || !close.IsEnabled) continue;
             Program.Note($"FINDING: Plantoir asked ({kind}) \"{title}: {Words(popup)}\"; answered with \"{close.Name}\" [screenshot {Program.Shot("question")}]");
@@ -370,10 +449,17 @@ internal sealed class WindowWatch
             try { finished = done(); }
             catch (Stopped) { throw; }
             catch { finished = false; }
-            if (finished) return true;
+            if (finished)
+            {
+                Settle($"a step at {Stage}", answer);
+                return true;
+            }
             Thread.Sleep(1000);
         }
         Check(answer);
-        try { return done(); } catch (Stopped) { throw; } catch { return false; }
+        bool last;
+        try { last = done(); } catch (Stopped) { throw; } catch { last = false; }
+        if (last) Settle($"a step at {Stage}", answer);
+        return last;
     }
 }

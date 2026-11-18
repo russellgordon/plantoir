@@ -99,7 +99,7 @@ internal static class Program
         }
         catch (Stopped stop)
         {
-            return Finish(stop.Outcome, stop.Message);
+            return Finish(stop.Outcome, stop.Message, stop.Cause, stop.WindowProcess);
         }
         catch (Exception error)
         {
@@ -211,7 +211,7 @@ internal static class Program
         catch { /* the Mac collects the folder at the end too */ }
     }
 
-    private static int Finish(Outcome outcome, string reason)
+    private static int Finish(Outcome outcome, string reason, string cause = "", string process = "")
     {
         string shot = Shot("result");
         string word = outcome switch
@@ -236,8 +236,15 @@ internal static class Program
         };
         string line = $"DRIVER RESULT (the driver's own; the Mac's final outcome is the last line of its report): {word}{where}: {reason} [screenshot {shot}]";
         Note(line);
+        // Fixed fields the Mac's self-tests decide by, never the sentence.
+        var fields = new StringBuilder();
+        fields.Append("status: " + status + Environment.NewLine);
+        fields.Append("stage: " + (_watch?.Stage.ToString() ?? "Starting") + Environment.NewLine);
+        fields.Append("cause: " + (cause.Length > 0 ? cause : "none") + Environment.NewLine);
+        fields.Append("window-process: " + (process.Length > 0 ? process : "none") + Environment.NewLine);
+        fields.Append("settling-after: " + (_watch?.SettlingAfter ?? "none") + Environment.NewLine);
         string path = Path.Combine(_out, "result.txt");
-        File.WriteAllText(path, "status: " + status + Environment.NewLine + line + Environment.NewLine);
+        File.WriteAllText(path, fields + line + Environment.NewLine);
         Send(path, "result.txt");
         return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, Outcome.SelfTestOnly => 3, _ => 1 };
     }
@@ -249,8 +256,17 @@ internal enum Outcome { Passed, ProductStopped, DriverProblem, SelfTestOnly }
 internal sealed class Stopped : Exception
 {
     public Outcome Outcome { get; }
-    public Stopped(Outcome outcome, string message) : base(message) => Outcome = outcome;
+    /// <summary>A fixed word for why ("unexpected-window", "unreadable-window", "blocked", "unsettled"), or empty.</summary>
+    public string Cause { get; }
+    /// <summary>The process of the window the run stopped on, or empty.</summary>
+    public string WindowProcess { get; }
+    public Stopped(Outcome outcome, string message, string cause = "", string windowProcess = "") : base(message)
+    {
+        Outcome = outcome;
+        Cause = cause;
+        WindowProcess = windowProcess;
+    }
 
-    public static Stopped Product(string message) => new(Outcome.ProductStopped, message);
+    public static Stopped Product(string message, string cause = "", string windowProcess = "") => new(Outcome.ProductStopped, message, cause, windowProcess);
     public static Stopped Driver(string message) => new(Outcome.DriverProblem, message);
 }
