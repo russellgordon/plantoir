@@ -145,7 +145,11 @@ internal sealed class WindowWatch
                 title = popup.Properties.Name.ValueOrDefault ?? "";
                 foreach (string id in DialogButtonIds)
                     if (popup.FindFirstDescendant(cf => cf.ByAutomationId(id)) is not null) isDialog = true;
-                isNewCourseSheet = popup.FindFirstDescendant(cf => cf.ByAutomationId("newCourseDialog")) is not null;
+                // The sheet's id is on the ContentDialog itself (NewCourseDialog.cs),
+                // which UI Automation shows as the popup: asked of the popup first.
+                // Rehearsal 2026-11-18-093556 stopped on the sheet for want of this.
+                isNewCourseSheet = popup.Properties.AutomationId.ValueOrDefault == "newCourseDialog"
+                                   || popup.FindFirstDescendant(cf => cf.ByAutomationId("newCourseDialog")) is not null;
                 if (isNewCourseSheet) isDialog = true;
                 close = popup.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"));
             }
