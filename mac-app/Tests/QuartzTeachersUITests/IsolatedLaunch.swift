@@ -61,6 +61,11 @@ struct IsolatedLaunch {
     /// (XCUITest leaves it running after a test that did not quit it).
     nonisolated(unsafe) static var lastLaunched: XCUIApplication?
 
+    /// The process ids of every copy of the app this runner has launched, so
+    /// the check before a launch can tell this runner's copies from a copy
+    /// somebody else opened from the same bundle (#978c).
+    nonisolated(unsafe) static var processIdentifiersLaunchedHere: Set<Int32> = []
+
     // MARK: - Computed properties
 
     /// The trail this launch writes: the redirected one.
@@ -147,17 +152,76 @@ struct IsolatedLaunch {
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = workspaceURL.path
         application.launchArguments += arguments
+        // XCUITest's launch ends any running copy of the bundle it launches,
+        // so a copy this runner did not start is a reason to skip, never to
+        // be quit (#978c).
+        try requireNoCopyThisRunnerDidNotLaunch(among: runningCopiesOfTheAppUnderTest())
         // Registered before the launch, so an app that starts and then
         // fails the test is still quit before its folders go (#978).
         UITestFolders.quitWhenThisTestEnds(application)
         application.launch()
         lastLaunched = application
+        for copy in runningCopiesOfTheAppUnderTest() {
+            processIdentifiersLaunchedHere.insert(copy.processIdentifier)
+        }
         return IsolatedLaunch(
             application: application,
             stateDirectory: stateDirectory,
             workspaceURL: workspaceURL,
             modelChoiceNote: modelChoiceNote
         )
+    }
+
+    /// The app bundle this runner launches: the `Plantoir.app` beside the
+    /// runner's own bundle in the build's products folder, which is where
+    /// Xcode puts the UI target's target application.
+    static var appUnderTestURL: URL {
+        return Bundle.main.bundleURL.deletingLastPathComponent()
+            .appendingPathComponent("Plantoir.app", isDirectory: true)
+    }
+
+    /// This account's running copies of the app opened from the bundle this
+    /// runner launches. A copy opened from anywhere else (`/Applications`, a
+    /// second build folder) is not among them: measured on 2026-11-18, a
+    /// launch here left such a copy running, because XCUITest ends only
+    /// copies of the bundle it launches, by path.
+    static func runningCopiesOfTheAppUnderTest() -> [NSRunningApplication] {
+        let targetPath: String = appUnderTestURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let running: [NSRunningApplication] = NSRunningApplication.runningApplications(
+            withBundleIdentifier: "ca.russellgordon.Plantoir"
+        )
+        var copies: [NSRunningApplication] = []
+        for application in running {
+            guard let bundleURL = application.bundleURL else {
+                continue
+            }
+            if bundleURL.standardizedFileURL.resolvingSymlinksInPath().path != targetPath {
+                continue
+            }
+            if LaunchProcesses.owner(ofProcess: application.processIdentifier) == getuid() {
+                copies.append(application)
+            }
+        }
+        return copies
+    }
+
+    /// Skips the test when a copy of the app under test is running that this
+    /// runner did not launch, such as a teacher's copy opened from the Dock
+    /// when the Dock points at this same build, or one under Xcode's debugger.
+    /// XCUITest's `launch()` would end it, and it is not this run's to end.
+    static func requireNoCopyThisRunnerDidNotLaunch(among copies: [NSRunningApplication]) throws {
+        var described: [String] = []
+        for copy in copies {
+            if processIdentifiersLaunchedHere.contains(copy.processIdentifier) == false {
+                described.append("pid \(copy.processIdentifier)")
+            }
+        }
+        if described.isEmpty == false {
+            throw XCTSkip(
+                "Quit the Plantoir opened from \(appUnderTestURL.path) first (\(described.joined(separator: ", "))): "
+                + "launching the app under test would end it, and this run did not open it."
+            )
+        }
     }
 
     /// The lines of the redirected trail, or none when it is not there yet.

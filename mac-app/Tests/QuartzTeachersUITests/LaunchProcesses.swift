@@ -131,6 +131,18 @@ enum LaunchProcesses {
         return matching
     }
 
+    /// The user id a process runs as, asked of the kernel. Nil when no
+    /// process holds that id.
+    static func owner(ofProcess processIdentifier: Int32) -> uid_t? {
+        var selector: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processIdentifier]
+        var processInfo: kinfo_proc = kinfo_proc()
+        var infoSize: Int = MemoryLayout<kinfo_proc>.stride
+        if sysctl(&selector, 4, &processInfo, &infoSize, nil, 0) != 0 || infoSize == 0 {
+            return nil
+        }
+        return processInfo.kp_eproc.e_ucred.cr_uid
+    }
+
     /// True once no process has this id.
     static func hasGone(_ processIdentifier: Int32) -> Bool {
         if kill(processIdentifier, 0) == 0 {

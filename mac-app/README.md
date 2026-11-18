@@ -150,9 +150,12 @@ reasons.** Why, and what was rejected:
 and a window on another Space or a locked screen (#249, #315)".
 
 > **Tip:** stop any copy of the app running under Xcode's debugger (⏹)
-> before running the UI tests — a debugged instance cannot be terminated
-> by the test runner, which fails the first UI test with
-> "Failed to terminate ca.russellgordon.Plantoir".
+> before running the in-process tests — a debugged instance cannot be
+> terminated by the test runner, which fails the first test with
+> "Failed to terminate ca.russellgordon.Plantoir". The XCUITest target
+> below never ends a copy it did not launch: a copy opened from the same
+> build folder (the Dock, the debugger) makes each of its tests skip,
+> saying so, and a copy opened from anywhere else is left alone (#978c).
 
 **The test bundle changes one thing about AppKit, on purpose.** Its
 `NSPrincipalClass` (`INFOPLIST_KEY_NSPrincipalClass` in `project.yml`) is
