@@ -16685,11 +16685,26 @@ check, that a link with a removable name is not followed, and that a link
 inside a fixture goes as a link while the locked file it points at stays
 locked.
 
+**Measured after the fix** (main Mac, 2026-11-18, the container's tmp listed
+before and after each run): the changed classes with `PLANTOIR_UI_TESTS=1`
+(31 tests, the rollover with real weights included) and then the whole
+target once (49 tests, 25 opt-in skips) each added **0 entries**; the
+folder stayed at 1,949,296 KB. Two tests in `QuartzTeachersUITests`
+(`testCourseCodeRevealButtonReopensAfterEscape`,
+`testDecliningTheSkeletonPutsTheDefaultFoldersBack`) fail, and fail the
+same way on the base branch's build.
+
 What it still leaves: the small preferences folder the app makes in
 `/private/tmp` for each launch (`plantoir-state-preferences-<hex>`, see
 "Testing: the UI target keeps its state in `--state-dir`"). The runner
 cannot remove it (its sandbox reads `/` and writes only its container),
-and macOS empties `/private/tmp` at restart. *Rejected: deleting the
+and macOS empties `/private/tmp` at restart. Also not handled: a
+`terminate()` skips the app's own quit path, so the `llama-server` an
+`AssistantRolloverUITests` launch starts outlives the app (seen 2026-11-18:
+two servers, parent `launchd`, still running after the class finished,
+their weights' links already removed with the state folder; they were
+ended by hand). Whether the base branch leaves them too was not measured;
+the app was terminated there as well, by the next test's launch. *Rejected: deleting the
 existing 1.9 GB from the code*: a sweep of whatever is in the folder would
 be a path the code did not build for this run. It is listed for a person to
 remove instead.
