@@ -217,10 +217,12 @@ internal static class WindowRules
         Is(window.Process, "Plantoir") && window.Class == "Microsoft.UI.Content.PopupWindowSiteBridge";
 
     /// <summary>
-    /// The User Account Control prompt. With PromptOnSecureDesktop 0 (as
-    /// snapshot 00 has) it draws on the ordinary desktop, in consent.exe; on
-    /// the secure desktop the driver cannot see it and the Mac's consent.exe
-    /// probe reports it instead.
+    /// The User Account Control prompt, by its process. Kept, but NOT relied
+    /// on: in the uac self-test of 2026-11-18 (run
+    /// win-rehearsal-2026-11-18-132158-selftest-uac, PromptOnSecureDesktop 0)
+    /// the prompt was on the ordinary desktop and the Mac's capture, yet this
+    /// driver went on for 20 s without UI Automation listing its window. The
+    /// Mac's consent.exe probe, asked as SYSTEM, is the proven detection.
     /// </summary>
     private static bool IsUacPrompt(WindowFacts window) => Is(window.Process, "consent");
 
