@@ -16648,8 +16648,13 @@ it:
   link's whole target cleared, never removed, by something writing in the
   user's own temp folder.) Older names the sweep no longer recognises,
   `Plantoir-tests-<UUID>` without a pid and the pid-only
-  `…-under-test-<pid>` of the first follow-ups, are never swept by it: the
-  second Mac's `tidy.py` age sweep takes them. So **one run leaves
+  `…-under-test-<pid>` of the first follow-ups, are never swept by it.
+  The bench's `vm-tools/tidy.py` takes only some of them: a
+  `Plantoir-tests-<pid>-<UUID>` folder whose pid has gone, an older
+  `Plantoir-tests-<UUID>` while no Plantoir is running, each over a day
+  old, and its fixed list of `<prefix>-<UUID>` test folders. A pid-only
+  `…-under-test-<pid>` folder is in none of those, so nothing removes it;
+  a person deletes any that are left. So **one run leaves
   nothing listed anywhere**; what can remain after a run is its own per-run
   folders, if the host wrote again after the last callback, and the next
   run on the same Mac removes them.
@@ -16727,28 +16732,44 @@ outcome, it:
    (`QuartzTeachersUITests.entitlements`) add a read-write exception for
    `/private/tmp/`, for this removal alone.
 
-**It never ends a copy of Plantoir it did not launch.** XCUITest's
-`launch()` ends any running copy of the bundle it launches, and it goes by
-path: measured on 2026-11-18, a copy started from another folder (as
-`/Applications/Plantoir.app` is) stayed running through a UI test that
-launched the app and passed, while a copy started from the build's own
-`Plantoir.app` would be ended. That second case is the teacher's own copy
-whenever the Dock points at the same build folder the tests run from (the
+**It never ends a copy of Plantoir it did not launch, and no test skips
+because another Plantoir is open** (Russell, 2026-11-18). XCUITest's
+`launch()` ends a running copy of the bundle it launches; measured on
+2026-11-18 it goes by path, so a copy started from another folder (as
+`/Applications/Plantoir.app` is) stays running and a copy started from the
+build's own `Plantoir.app` would be ended. The second is the teacher's own
+copy whenever the Dock points at the build folder the tests run from (the
 default DerivedData Debug build), or a copy under Xcode's debugger. So
-`IsolatedLaunch.launch` lists this account's running copies of the bundle
-beside the runner (`appUnderTestURL`), and if any is not one this runner
-launched (`processIdentifiersLaunchedHere`) the test SKIPS, naming the pid,
-rather than ending it; measured the same day, the skip came and the copy
-was still running. A copy at any other path does not interfere with these
-tests (element queries go to the launched bundle); only
-`StateDirectoryUITests` skips for one, because that copy's writes to the
-real trail cannot be told apart from a leak. Before #978c the way to run
-the target was to quit the teacher's Plantoir first; that is no longer
-needed and must not be done by an agent. *Rejected: giving the test build
-its own bundle identifier*: a project change to every Debug build, which is
-also the build the Dock opens. The marketing captures make their own
-`XCUIApplication`, are opt-in and drive the real toolchain, and carry no
-such check.
+before each launch `IsolatedLaunch` lists this account's running copies at
+the build's own path (`appUnderTestURL`), and if one is not this run's the
+test FAILS there, before anything is launched, naming the path and pid and
+saying that the run will not end a Plantoir it did not start and that
+whoever opened the copy must close it; the copy is never quit. A copy this
+run launched is recorded by more than its path: after each launch, the one
+running Plantoir whose arguments name that launch's own state folder is
+recorded by its pid AND its start time (`ProcessStamp`, from `sysctl`), so
+a copy opened at the same moment from the same build, or a later process
+given a pid this run used, is never taken for the run's own; a record is
+dropped once its process has ended. **A tripwire guards every other copy
+without resting on that measurement:** immediately before each launch
+`IsolatedLaunch` records every running Plantoir this run did not launch
+(pid, start time and path, wherever it was opened from), and immediately
+after it fails the test, naming the path and pid, if any of them is no
+longer the same process, because the launch ended a Plantoir the run did
+not start. It never skips, quits or relaunches that copy; a copy at another
+path otherwise does not touch these tests (element queries go to the
+launched bundle), so they run beside it. **One skip is left as it was, for
+Russell to rule on:** `StateDirectoryUITests.testALaunchKeepsItsStateInItsOwnFolder`
+skips while any Plantoir of this account is open, because it asserts that
+the teacher's REAL trail, preferences and Application Support did not
+change during the launch, and another copy's own writes to them cannot be
+told apart from a leak without a design change (attributing each write to
+a process). Before #978c the way to run the target was to quit the
+teacher's Plantoir first; an agent must not do that. *Rejected: giving the
+test build its own bundle identifier*: a project change to every Debug
+build, which is also the build the Dock opens. The marketing captures make
+their own `XCUIApplication`, are opt-in and drive the real toolchain, and
+carry no such check.
 
 `UITestFoldersTests` (in the UI target, launches nothing) pins the name
 check, that a link with a removable name is not followed, and that a link

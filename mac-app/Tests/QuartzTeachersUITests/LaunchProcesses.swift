@@ -151,32 +151,136 @@ enum LaunchProcesses {
         return errno == ESRCH
     }
 
-    /// Asks each process to end (`SIGTERM`), waits until it has gone, and
-    /// kills one that has not gone within `endTimeout`. Returns how many
-    /// were found.
+    /// True when the process's arguments, read now, still name one of the
+    /// folders: checked again right before every signal, so an id that has
+    /// been given to another process since the list was read is never sent
+    /// one.
+    static func stillNames(_ processIdentifier: Int32, oneOf folderPaths: [String]) -> Bool {
+        let currentArguments: [String] = arguments(ofProcess: processIdentifier)
+        for folderPath in folderPaths {
+            if argumentsName(currentArguments, folder: folderPath) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Waits until every process in the list has exited, or until the
+    /// deadline, whichever comes first, by asking the kernel to report each
+    /// one's exit (`kqueue`, `EVFILT_PROC` with `NOTE_EXIT`): a wait on the
+    /// event itself, not a poll and not a pause. The processes are not this
+    /// runner's children (a model server is reparented to `launchd`), so
+    /// `waitpid` cannot be used. Returns the ids that had not exited.
+    static func waitForExit(of processIdentifiers: [Int32], until deadline: Date) -> [Int32] {
+        var stillRunning: Set<Int32> = []
+        let queue: Int32 = kqueue()
+        if queue < 0 {
+            for processIdentifier in processIdentifiers {
+                if hasGone(processIdentifier) == false {
+                    stillRunning.insert(processIdentifier)
+                }
+            }
+            return Array(stillRunning)
+        }
+        defer {
+            close(queue)
+        }
+        for processIdentifier in processIdentifiers {
+            var change: kevent = kevent(
+                ident: UInt(processIdentifier),
+                filter: Int16(EVFILT_PROC),
+                flags: UInt16(EV_ADD | EV_ONESHOT),
+                fflags: NOTE_EXIT,
+                data: 0,
+                udata: nil
+            )
+            if kevent(queue, &change, 1, nil, 0, nil) == 0 {
+                stillRunning.insert(processIdentifier)
+            } else if errno != ESRCH {
+                // Not watchable (refused): counted as running, so the kill
+                // below still considers it, after its own re-check.
+                stillRunning.insert(processIdentifier)
+            }
+            // ESRCH: it had already exited.
+        }
+        // Registered only after the watch, so an exit between the two
+        // calls cannot be missed: check what is already gone.
+        for processIdentifier in stillRunning {
+            if hasGone(processIdentifier) {
+                stillRunning.remove(processIdentifier)
+            }
+        }
+        while stillRunning.isEmpty == false {
+            let remaining: TimeInterval = deadline.timeIntervalSinceNow
+            if remaining <= 0 {
+                break
+            }
+            let wholeSeconds: Int = Int(remaining)
+            let nanoseconds: Int = Int((remaining - Double(wholeSeconds)) * 1_000_000_000)
+            var limit: timespec = timespec(tv_sec: wholeSeconds, tv_nsec: nanoseconds)
+            var reported: kevent = kevent()
+            let count: Int32 = kevent(queue, nil, 0, &reported, 1, &limit)
+            if count > 0 {
+                stillRunning.remove(Int32(reported.ident))
+            } else if count == 0 {
+                break
+            } else if errno != EINTR {
+                break
+            }
+        }
+        return Array(stillRunning)
+    }
+
+    /// Asks each process to end (`SIGTERM`), waits for its exit, and kills
+    /// one that has not exited within `endTimeout`. Before each signal the
+    /// process's arguments are read again and must still name one of the
+    /// folders. Returns how many were found.
     @discardableResult
     static func end(processesNaming folderPaths: [String]) -> Int {
         let found: [Int32] = processes(naming: folderPaths)
+        var signalled: [Int32] = []
         for processIdentifier in found {
-            kill(processIdentifier, SIGTERM)
+            if stillNames(processIdentifier, oneOf: folderPaths) {
+                kill(processIdentifier, SIGTERM)
+                signalled.append(processIdentifier)
+            }
         }
         let deadline: Date = Date().addingTimeInterval(endTimeout)
-        for processIdentifier in found {
-            while hasGone(processIdentifier) == false && Date() < deadline {
-                usleep(50_000)
-            }
-            if hasGone(processIdentifier) == false {
-                // Checked again before the kill, so the id is still a
-                // process naming this launch's folder and not a reused one.
-                let stillNaming: [String] = arguments(ofProcess: processIdentifier)
-                for folderPath in folderPaths {
-                    if argumentsName(stillNaming, folder: folderPath) {
-                        kill(processIdentifier, SIGKILL)
-                        break
-                    }
-                }
+        let notExited: [Int32] = waitForExit(of: signalled, until: deadline)
+        for processIdentifier in notExited {
+            if stillNames(processIdentifier, oneOf: folderPaths) {
+                kill(processIdentifier, SIGKILL)
             }
         }
         return found.count
     }
+
+    /// When a process started, from the kernel, so a record of a process
+    /// cannot be mistaken for a later process given the same id. Nil when no
+    /// process holds that id.
+    static func stamp(ofProcess processIdentifier: Int32) -> ProcessStamp? {
+        var selector: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processIdentifier]
+        var processInfo: kinfo_proc = kinfo_proc()
+        var infoSize: Int = MemoryLayout<kinfo_proc>.stride
+        if sysctl(&selector, 4, &processInfo, &infoSize, nil, 0) != 0 || infoSize == 0 {
+            return nil
+        }
+        let started: timeval = processInfo.kp_proc.p_un.__p_starttime
+        return ProcessStamp(
+            processIdentifier: processIdentifier,
+            startSeconds: Int(started.tv_sec),
+            startMicroseconds: Int(started.tv_usec)
+        )
+    }
+}
+
+/// One process, named by its id AND the moment it started, which together
+/// no later process can share (#978c).
+struct ProcessStamp: Hashable {
+
+    // MARK: - Stored properties
+
+    let processIdentifier: Int32
+    let startSeconds: Int
+    let startMicroseconds: Int
 }

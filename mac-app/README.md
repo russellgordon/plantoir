@@ -154,8 +154,9 @@ and a window on another Space or a locked screen (#249, #315)".
 > terminated by the test runner, which fails the first test with
 > "Failed to terminate ca.russellgordon.Plantoir". The XCUITest target
 > below never ends a copy it did not launch: a copy opened from the same
-> build folder (the Dock, the debugger) makes each of its tests skip,
-> saying so, and a copy opened from anywhere else is left alone (#978c).
+> build folder (the Dock, the debugger) makes each test that launches the
+> app fail before launching, saying so, and a test fails if its launch ever
+> ends any other copy (#978c).
 
 **The test bundle changes one thing about AppKit, on purpose.** Its
 `NSPrincipalClass` (`INFOPLIST_KEY_NSPrincipalClass` in `project.yml`) is
