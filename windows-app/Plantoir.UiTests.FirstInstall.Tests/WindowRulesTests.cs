@@ -76,6 +76,23 @@ public class WindowRulesTests
     }
 
     [Fact]
+    public void PlantoirsWindowBeingMadeIsJudgedAgainNotPassed()
+    {
+        // Rehearsal 2026-11-18-102329, step 3: no class, no title, caption buttons only.
+        var beingMade = Window("", "", "Plantoir", "Minimize | Maximize | Close");
+        var untitledMain = Window("", "WinUIDesktopWin32WindowClass", "Plantoir", "Minimize | Maximize | Close");
+        foreach (var stage in new[] { Stage.InstallFinished, Stage.OpenPlantoir, Stage.WorkingFolder, Stage.ExampleCourse, Stage.Preview })
+        {
+            Assert.Equal(Verdict.Settling, VerdictOf(stage, beingMade));
+            Assert.Equal(Verdict.Settling, VerdictOf(stage, untitledMain));
+        }
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Install, beingMade));
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.OpenPlantoir, Window("", "", "Notepad", "Minimize | Maximize | Close")));
+        // A titled window of another class is judged at once, not left settling.
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.Preview, Window("Plantoir", "#32770", "Plantoir", "OK")));
+    }
+
+    [Fact]
     public void PlantoirsOtherWindowsAreNotTakenForItsMainWindow()
     {
         var settings = Window("Settings", "WinUIDesktopWin32WindowClass", "Plantoir", "Settings");

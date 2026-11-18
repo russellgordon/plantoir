@@ -24,6 +24,12 @@ internal enum Verdict
     Expected,
     /// <summary>No title and no words yet: a frame being drawn, looked at again next time.</summary>
     Empty,
+    /// <summary>
+    /// A window of Plantoir's whose class or title UI Automation cannot read
+    /// yet (a window being created): judged again at the next look, and
+    /// unexpected if it is still so after <see cref="WindowRules.SettlingLimit"/>.
+    /// </summary>
+    Settling,
     /// <summary>Not on this stage's list: the run ends, naming it.</summary>
     Unexpected,
     /// <summary>Windows says it blocked or warned about something: the run ends, naming it.</summary>
@@ -96,6 +102,9 @@ internal static class WindowRules
     /// toast or any desktop window: Smart App Control's block notice comes
     /// through ShellExperienceHost, not the smartscreen process.
     /// </summary>
+    /// <summary>How long a <see cref="Verdict.Settling"/> window may stay unreadable before it is unexpected.</summary>
+    public static readonly TimeSpan SettlingLimit = TimeSpan.FromSeconds(20);
+
     public static readonly string[] BlockWords =
     {
         "Smart App Control", "SmartScreen", "Windows protected your PC", "blocked", "Controlled folder access",
@@ -233,6 +242,15 @@ internal static class WindowRules
                 if (IsPlantoirPopup(window)) return Judgement.Of(Verdict.Expected, "plantoir popup");
                 break;
         }
+
+        // Plantoir's own window while it is being created: rehearsal
+        // 2026-11-18-102329 read its main window, a second after launch, with
+        // no class and no title, showing only its caption buttons ("Minimize |
+        // Maximize | Close"). Judged again until it reads as what it is.
+        if (stage is Stage.InstallFinished or Stage.OpenPlantoir or Stage.WorkingFolder or Stage.ExampleCourse or Stage.Preview
+            && Is(window.Process, "Plantoir")
+            && (window.Class.Length == 0 || window.Class == "WinUIDesktopWin32WindowClass" && window.Title.Length == 0))
+            return Judgement.Of(Verdict.Settling);
 
         // A window with no title and nothing in it is a frame being drawn;
         // it is judged again when it has something to show.

@@ -25,6 +25,7 @@ internal sealed class WindowWatch
     private readonly HashSet<IntPtr> _baseline = new();
     private readonly HashSet<IntPtr> _reported = new();
     private readonly HashSet<string> _allowedSeen = new();
+    private readonly Dictionary<IntPtr, DateTime> _settlingSince = new();
     private readonly List<string> _baselineNames = new();
 
     private static readonly string[] DialogButtonIds = { "PrimaryButton", "SecondaryButton", "CloseButton" };
@@ -100,6 +101,15 @@ internal sealed class WindowWatch
             {
                 case Verdict.Desktop:
                     continue;
+                case Verdict.Settling:
+                    if (!_settlingSince.TryGetValue(window.Handle, out DateTime since))
+                    {
+                        _settlingSince[window.Handle] = DateTime.UtcNow;
+                        Program.Note($"note: a window of Plantoir's is still being made, {window}, showing \"{facts.Words}\"; judged again at each look");
+                        continue;
+                    }
+                    if (DateTime.UtcNow - since < WindowRules.SettlingLimit) continue;
+                    throw Stopped.Product($"a window of Plantoir's stayed without a readable class or title for {WindowRules.SettlingLimit.TotalSeconds:0} s at {Stage}: {window}, saying \"{facts.Words}\" [screenshot {Program.Shot("unexpected")}]");
                 case Verdict.Empty:
                     if (_reported.Add(window.Handle))
                         Program.Note($"note: an empty untitled window appeared, {window}; watching it");
