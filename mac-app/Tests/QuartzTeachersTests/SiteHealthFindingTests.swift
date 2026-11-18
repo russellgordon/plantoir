@@ -222,6 +222,7 @@ final class SiteHealthFindingTests: XCTestCase {
     func testEveryFindingReachesTheActivityTrail() throws {
         let folderURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("health-trail-\(UUID().uuidString)")
+        removeWhenTestEnds(folderURL)
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
         let previous: ProblemReportStore = ActivityTrail.store
         ActivityTrail.store = store

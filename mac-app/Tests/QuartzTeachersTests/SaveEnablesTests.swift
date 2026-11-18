@@ -373,6 +373,7 @@ final class SaveEnablesTests: XCTestCase {
     /// case's configuration, shows the course's settings and lets them settle.
     func openInTheRealWindow(_ testCase: [String: Any], workspace: WorkspaceModel) async throws -> Course {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         let courseFolder: URL = fixtureURL.appendingPathComponent("courses/EXC2O")
         _ = try writeConfiguration(for: testCase, code: "EXC2O", into: courseFolder)
         workspace.chooseWorkspace(at: fixtureURL)

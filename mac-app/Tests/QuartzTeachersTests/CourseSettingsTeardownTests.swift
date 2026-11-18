@@ -68,6 +68,7 @@ final class CourseSettingsTeardownTests: XCTestCase {
     @MainActor
     func showSettingsOfTheFirstCourse() async throws -> (workspace: WorkspaceModel, course: Course, fixtureURL: URL) {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         let workspace: WorkspaceModel = try XCTUnwrap(
             WorkspaceModel.windowModels.first,
             "No window model registered; the interface is not on screen"
@@ -123,6 +124,7 @@ final class CourseSettingsTeardownTests: XCTestCase {
     func testOpeningAnotherWorkingFolderFromCourseSettingsDoesNotCrash() async throws {
         let shown = try await showSettingsOfTheFirstCourse()
         let otherFixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(otherFixtureURL)
 
         shown.workspace.chooseWorkspace(at: otherFixtureURL)
         await settle()

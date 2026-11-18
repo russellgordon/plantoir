@@ -41,7 +41,7 @@ final class ReferenceShelfTests: XCTestCase {
             MainActor.assumeIsolated {
                 ActivityTrail.store = previousStore
             }
-            try? FileManager.default.removeItem(at: root)
+            TemporaryFolders.unlockAndRemove(root)
         }
     }
 

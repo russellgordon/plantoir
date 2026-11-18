@@ -683,10 +683,10 @@ final class RepairChangesTheEditedMarkerTests: XCTestCase {
         // These repairs write trail lines. Left alone they land in the real
         // ~/Library/Logs/Plantoir/activity.txt — somebody's actual machine.
         previousTrail = ActivityTrail.store
-        ActivityTrail.store = ProblemReportStore(
-            folderURL: URL(fileURLWithPath: NSTemporaryDirectory())
-                .appendingPathComponent("repair-marker-trail-\(UUID().uuidString)")
-        )
+        let trailURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("repair-marker-trail-\(UUID().uuidString)")
+        removeWhenTestEnds(trailURL)
+        ActivityTrail.store = ProblemReportStore(folderURL: trailURL)
     }
 
     override func tearDown() {

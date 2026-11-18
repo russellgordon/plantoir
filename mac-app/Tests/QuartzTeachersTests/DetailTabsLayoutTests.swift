@@ -100,6 +100,7 @@ final class DetailTabsLayoutTests: XCTestCase {
         previousStore = ActivityTrail.store
         let trail: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("tabs-layout-trail-\(UUID().uuidString)", isDirectory: true)
+        removeWhenTestEnds(trail)
         ActivityTrail.store = ProblemReportStore(folderURL: trail)
         SectionCoverage.shared.reset()
         SectionProblems.shared.reset()

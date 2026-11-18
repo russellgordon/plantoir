@@ -52,6 +52,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testTheRowTurnsIntoAFieldWhileRenamingAndBackAfterwards() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -82,6 +83,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testRenamingMovesTheCourseAndTheSidebarFollowsIt() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -143,6 +145,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testACourseThatIsPreviewingIsNotRenamed() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
@@ -197,6 +200,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
     @MainActor
     func testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEnds(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return
