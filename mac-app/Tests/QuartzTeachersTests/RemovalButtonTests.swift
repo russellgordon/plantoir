@@ -19,7 +19,7 @@ final class RemovalButtonTests: XCTestCase {
     @MainActor
     func testMinusButtonAsksBeforeRemoving() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(fixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         guard let workspace = WorkspaceModel.windowModels.first else {
             XCTFail("No window model registered; the interface is not on screen")
             return

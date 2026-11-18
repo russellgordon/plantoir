@@ -68,7 +68,7 @@ final class CourseSettingsTeardownTests: XCTestCase {
     @MainActor
     func showSettingsOfTheFirstCourse() async throws -> (workspace: WorkspaceModel, course: Course, fixtureURL: URL) {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(fixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
         let workspace: WorkspaceModel = try XCTUnwrap(
             WorkspaceModel.windowModels.first,
             "No window model registered; the interface is not on screen"
@@ -99,7 +99,6 @@ final class CourseSettingsTeardownTests: XCTestCase {
         await settle()
 
         XCTAssertNil(shown.workspace.selection, "the page was left, and the app is still here to say so")
-        try? FileManager.default.removeItem(at: shown.fixtureURL)
     }
 
     /// Clicking one of the course's own sections: the path a teacher takes
@@ -115,7 +114,6 @@ final class CourseSettingsTeardownTests: XCTestCase {
         XCTAssertEqual(shown.workspace.selection, SidebarSelection.section(shown.course.code, sectionNumber))
         shown.workspace.selection = nil
         await settle()
-        try? FileManager.default.removeItem(at: shown.fixtureURL)
     }
 
     /// Opening another working folder, which lets go of the selection — how
@@ -124,13 +122,11 @@ final class CourseSettingsTeardownTests: XCTestCase {
     func testOpeningAnotherWorkingFolderFromCourseSettingsDoesNotCrash() async throws {
         let shown = try await showSettingsOfTheFirstCourse()
         let otherFixtureURL: URL = try FixtureWorkspace.materialize()
-        removeWhenTestEnds(otherFixtureURL)
+        removeWhenTestEndsAfterTheWindowLetsGo(otherFixtureURL)
 
         shown.workspace.chooseWorkspace(at: otherFixtureURL)
         await settle()
 
         XCTAssertNil(shown.workspace.selection, "a different folder starts with nothing selected")
-        try? FileManager.default.removeItem(at: shown.fixtureURL)
-        try? FileManager.default.removeItem(at: otherFixtureURL)
     }
 }
