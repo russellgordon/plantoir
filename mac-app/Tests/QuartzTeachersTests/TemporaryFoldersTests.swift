@@ -6,8 +6,8 @@ import XCTest
 /// The test helper that removes the suite's temporary folders
 /// (`TemporaryFolders.swift`, #978 and its follow-ups) is itself tested here:
 /// a symbolic link handed to it never reaches its target, things that point
-/// at a folder let go before it is removed, and a finished run's record is
-/// swept by the next run.
+/// at a folder let go before it is removed, and a finished run's folders are
+/// recognised by name alone and removed by the next run.
 final class TemporaryFoldersTests: XCTestCase {
 
     // MARK: - Functions
@@ -39,17 +39,18 @@ final class TemporaryFoldersTests: XCTestCase {
         throw XCTSkip("every process id tried is in use")
     }
 
-    /// A process id above 1 that a live process other than this one holds.
-    func processIdentifierThatIsAlive() throws -> Int32 {
-        let ownProcess: Int32 = ProcessInfo.processInfo.processIdentifier
-        var candidate: Int32 = 2
-        while candidate < 99_999 {
-            if candidate != ownProcess && TemporaryFolderSweeper.processHasGone(candidate) == false {
-                return candidate
-            }
-            candidate += 1
+    /// Starts a child process that stays alive until this test ends, and
+    /// returns its id: a live process other than this one.
+    func startLiveChildProcess() throws -> Int32 {
+        let child: Process = Process()
+        child.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        child.arguments = ["600"]
+        try child.run()
+        addTeardownBlock {
+            child.terminate()
+            child.waitUntilExit()
         }
-        throw XCTSkip("no other live process was found")
+        return child.processIdentifier
     }
 
     /// A scratch folder standing in for the temp folder, with a sentinel
@@ -59,15 +60,6 @@ final class TemporaryFoldersTests: XCTestCase {
         let sentinelURL: URL = folderURL.appendingPathComponent("sentinel.txt")
         try "still here".write(to: sentinelURL, atomically: true, encoding: .utf8)
         return (folderURL, sentinelURL)
-    }
-
-    /// Writes a record into the scratch folder, exactly as given.
-    func writeRecord(_ text: String, forProcess processIdentifier: Int32, in folderURL: URL) throws -> URL {
-        let recordURL: URL = folderURL.appendingPathComponent(
-            TemporaryFolderSweeper.runRecordPrefix + String(processIdentifier)
-        )
-        try text.write(to: recordURL, atomically: true, encoding: .utf8)
-        return recordURL
     }
 
     /// Makes a folder in the scratch folder with a locked file inside.
@@ -203,167 +195,140 @@ final class TemporaryFoldersTests: XCTestCase {
         XCTAssertEqual(workspace.workspaceURL?.path, fixtureURL.path)
     }
 
-    /// The next run removes what a finished run's record names, locked files
-    /// and all, then the record.
-    func testAFinishedRunsRecordIsSweptByTheNextRun() throws {
+    /// Every shape a run makes, for a process that has gone: removed,
+    /// locked files and all. The sentinel beside them stays.
+    func testAFinishedRunsFoldersAreRemovedByName() throws {
         let scratch = try makeScratchTemporaryFolder()
         let goneProcess: Int32 = try processIdentifierThatHasGone()
-        let homeURL: URL = try makeLockedFolder(named: "plantoir-home-under-test-\(goneProcess)", in: scratch.folder)
-        let restingURL: URL = try makeLockedFolder(named: "plantoir-resting-folder-under-test-\(goneProcess)", in: scratch.folder)
-        let throwawayURL: URL = try makeLockedFolder(named: "Plantoir-tests-\(UUID().uuidString)", in: scratch.folder)
-        let recordURL: URL = try writeRecord(
-            homeURL.path + "\n" + restingURL.path + "\n" + throwawayURL.path + "\n",
-            forProcess: goneProcess, in: scratch.folder
-        )
+        var madeURLs: [URL] = []
+        for name in [
+            "plantoir-home-under-test-\(goneProcess)",
+            "plantoir-builds-under-test-\(goneProcess)",
+            "plantoir-assist-under-test-\(goneProcess)",
+            "plantoir-resting-folder-under-test-\(goneProcess)",
+            "Plantoir-tests-\(goneProcess)-\(UUID().uuidString)",
+        ] {
+            madeURLs.append(try makeLockedFolder(named: name, in: scratch.folder))
+        }
 
         sweep(scratch.folder)
 
-        XCTAssertFalse(somethingIsAt(homeURL.path))
-        XCTAssertFalse(somethingIsAt(restingURL.path))
-        XCTAssertFalse(somethingIsAt(throwawayURL.path))
-        XCTAssertFalse(somethingIsAt(recordURL.path), "the finished run's record should be gone")
+        for madeURL in madeURLs {
+            XCTAssertFalse(somethingIsAt(madeURL.path), madeURL.lastPathComponent + " should be gone")
+        }
         XCTAssertTrue(somethingIsAt(scratch.sentinel.path))
     }
 
-    /// `<T>/.` and `<T>/x/..` both name the temp folder itself: skipped.
-    func testALineNamingTheTemporaryFolderItselfIsSkipped() throws {
+    /// A live process's folders (a child this test keeps alive, standing for
+    /// a run still going or a reused pid) and this run's own are left.
+    func testALiveProcessesAndThisRunsFoldersAreLeft() throws {
         let scratch = try makeScratchTemporaryFolder()
-        let goneProcess: Int32 = try processIdentifierThatHasGone()
-        _ = try writeRecord(
-            scratch.folder.path + "/.\n" + scratch.folder.path + "/x/..\n" + scratch.folder.path + "/\n"
-                + scratch.folder.path + "\n",
-            forProcess: goneProcess, in: scratch.folder
-        )
-        try FileManager.default.createDirectory(
-            at: scratch.folder.appendingPathComponent("x"), withIntermediateDirectories: true
-        )
-
-        sweep(scratch.folder)
-
-        XCTAssertTrue(somethingIsAt(scratch.folder.path), "the temp folder itself must never be removed")
-        XCTAssertTrue(somethingIsAt(scratch.sentinel.path), "nothing in the temp folder may be removed")
-        XCTAssertTrue(somethingIsAt(scratch.folder.appendingPathComponent("x").path))
-    }
-
-    /// An unrelated entry, a truncated name, another pid's name, and a run
-    /// folder named with a trailing slash or a path under it: all skipped.
-    func testALineNamingAnythingButThatRunsFoldersIsSkipped() throws {
-        let scratch = try makeScratchTemporaryFolder()
-        let goneProcess: Int32 = try processIdentifierThatHasGone()
-        let otherGoneProcess: Int32 = try processIdentifierThatHasGone(after: goneProcess)
-        let unrelatedURL: URL = try makeLockedFolder(named: "somebody-elses-folder", in: scratch.folder)
-        let truncatedURL: URL = try makeLockedFolder(named: "plantoir-home-under-test-", in: scratch.folder)
-        let shortenedURL: URL = try makeLockedFolder(named: "plantoir-home-under-te", in: scratch.folder)
-        let otherProcessURL: URL = try makeLockedFolder(
-            named: "plantoir-home-under-test-\(otherGoneProcess)", in: scratch.folder
-        )
-        let badUUIDURL: URL = try makeLockedFolder(named: "Plantoir-tests-not-a-uuid", in: scratch.folder)
-        let lowerUUIDURL: URL = try makeLockedFolder(
-            named: "Plantoir-tests-\(UUID().uuidString.lowercased())", in: scratch.folder
-        )
-        let homeURL: URL = try makeLockedFolder(named: "plantoir-home-under-test-\(goneProcess)", in: scratch.folder)
-        var lines: String = ""
-        for namedURL in [unrelatedURL, truncatedURL, shortenedURL, otherProcessURL, badUUIDURL, lowerUUIDURL] {
-            lines += namedURL.path + "\n"
+        let liveProcess: Int32 = try startLiveChildProcess()
+        XCTAssertFalse(TemporaryFolderSweeper.processHasGone(liveProcess))
+        let ownProcess: Int32 = ProcessInfo.processInfo.processIdentifier
+        var keptURLs: [URL] = []
+        for processIdentifier in [liveProcess, ownProcess] {
+            keptURLs.append(try makeLockedFolder(named: "plantoir-home-under-test-\(processIdentifier)", in: scratch.folder))
+            keptURLs.append(try makeLockedFolder(
+                named: "Plantoir-tests-\(processIdentifier)-\(UUID().uuidString)", in: scratch.folder
+            ))
         }
-        lines += homeURL.path + "/\n"
-        lines += homeURL.path + "/trail.txt\n"
-        lines += scratch.sentinel.path + "\n"
-        _ = try writeRecord(lines, forProcess: goneProcess, in: scratch.folder)
 
         sweep(scratch.folder)
 
-        for keptURL in [unrelatedURL, truncatedURL, shortenedURL, otherProcessURL, badUUIDURL, lowerUUIDURL, homeURL] {
+        for keptURL in keptURLs {
             XCTAssertTrue(somethingIsAt(keptURL.path), keptURL.lastPathComponent + " should be left alone")
         }
-        XCTAssertTrue(somethingIsAt(homeURL.appendingPathComponent("trail.txt").path))
+    }
+
+    /// Names that are not exactly a run-folder shape with a plain pid: a
+    /// sign, a leading zero, 0, 1, non-digits, extra text, a truncated name,
+    /// the old pid-less `Plantoir-tests-<UUID>`, a bad or lower-case UUID,
+    /// and an unrelated entry. All left.
+    func testANameThatIsNotExactlyARunFolderIsLeft() throws {
+        let scratch = try makeScratchTemporaryFolder()
+        let goneProcess: Int32 = try processIdentifierThatHasGone()
+        let uuidText: String = UUID().uuidString
+        let names: [String] = [
+            "plantoir-home-under-test-+\(goneProcess)",
+            "plantoir-home-under-test--\(goneProcess)",
+            "plantoir-home-under-test-0\(goneProcess)",
+            "plantoir-home-under-test-0",
+            "plantoir-home-under-test-1",
+            "plantoir-home-under-test-abc",
+            "plantoir-home-under-test-\(goneProcess)x",
+            "plantoir-home-under-test-\(goneProcess).old",
+            "plantoir-home-under-test-",
+            "plantoir-home-under-te",
+            "Plantoir-tests-\(uuidText)",
+            "Plantoir-tests-\(goneProcess)-not-a-uuid",
+            "Plantoir-tests-\(goneProcess)-\(uuidText.lowercased())",
+            "Plantoir-tests-\(goneProcess)-\(uuidText)-extra",
+            "Plantoir-tests-0\(goneProcess)-\(uuidText)",
+            "somebody-elses-folder-under-test-\(goneProcess)",
+        ]
+        var keptURLs: [URL] = []
+        for name in names {
+            keptURLs.append(try makeLockedFolder(named: name, in: scratch.folder))
+        }
+
+        sweep(scratch.folder)
+
+        for keptURL in keptURLs {
+            XCTAssertTrue(somethingIsAt(keptURL.path), keptURL.lastPathComponent + " should be left alone")
+        }
         XCTAssertTrue(somethingIsAt(scratch.sentinel.path))
     }
 
-    /// A link planted at a valid name, pointing at a folder of locked files:
-    /// the link goes, the target keeps every file and flag.
-    func testALinkPlantedAtARunFolderNameIsRemovedAsALink() throws {
+    /// A plain file at a matching name is removed as a file; a link at one,
+    /// pointing at a folder of locked files, is removed as a link and its
+    /// target keeps every file and flag.
+    func testAFileOrALinkAtARunFolderNameIsNeverFollowed() throws {
         let scratch = try makeScratchTemporaryFolder()
         let goneProcess: Int32 = try processIdentifierThatHasGone()
+        let fileURL: URL = scratch.folder.appendingPathComponent("plantoir-assist-under-test-\(goneProcess)")
+        try "a file, not a folder".write(to: fileURL, atomically: true, encoding: .utf8)
         let targetURL: URL = try makeLockedFolder(named: "link-target", in: try makeTemporaryFolder(prefix: "temp-helper-target"))
         let lockedFileURL: URL = targetURL.appendingPathComponent("trail.txt")
         let linkURL: URL = scratch.folder.appendingPathComponent("plantoir-builds-under-test-\(goneProcess)")
         try FileManager.default.createSymbolicLink(atPath: linkURL.path, withDestinationPath: targetURL.path)
-        _ = try writeRecord(linkURL.path + "\n", forProcess: goneProcess, in: scratch.folder)
 
         sweep(scratch.folder)
 
+        XCTAssertFalse(somethingIsAt(fileURL.path), "the file should be gone")
         XCTAssertFalse(somethingIsAt(linkURL.path), "the link itself should be gone")
         XCTAssertTrue(FileManager.default.fileExists(atPath: lockedFileURL.path), "the link's target must not be touched")
         XCTAssertNotEqual(userFlags(atPath: lockedFileURL.path) & UInt32(UF_IMMUTABLE), 0, "the target must stay locked")
     }
 
-    /// An empty record and a garbage record remove nothing but themselves.
-    func testAnEmptyOrGarbageRecordRemovesNothingElse() throws {
-        let scratch = try makeScratchTemporaryFolder()
-        let goneProcess: Int32 = try processIdentifierThatHasGone()
-        let otherGoneProcess: Int32 = try processIdentifierThatHasGone(after: goneProcess)
-        let emptyRecordURL: URL = try writeRecord("", forProcess: goneProcess, in: scratch.folder)
-        let garbageRecordURL: URL = try writeRecord(
-            "\u{0}\u{1}garbage\n\n../../..\n/\n~\n*\n", forProcess: otherGoneProcess, in: scratch.folder
-        )
+    /// An empty folder: nothing to do, nothing goes wrong.
+    func testAnEmptyFolderIsSweptWithoutTrouble() throws {
+        let folderURL: URL = try makeTemporaryFolder(prefix: "temp-helper-empty")
 
-        sweep(scratch.folder)
+        sweep(folderURL)
 
-        XCTAssertFalse(somethingIsAt(emptyRecordURL.path))
-        XCTAssertFalse(somethingIsAt(garbageRecordURL.path))
-        XCTAssertTrue(somethingIsAt(scratch.sentinel.path))
+        XCTAssertTrue(somethingIsAt(folderURL.path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folderURL.path), [])
     }
 
-    /// A record whose process is alive (the first live process found other
-    /// than this one, which stands for a pid reused by an unrelated process
-    /// as well as for a run still going) is left alone, and so are its folders; so are records whose
-    /// names do not carry a pid written plainly.
-    func testALiveRunsRecordAndMisnamedRecordsAreLeftAlone() throws {
-        let scratch = try makeScratchTemporaryFolder()
-        let liveProcess: Int32 = try processIdentifierThatIsAlive()
-        XCTAssertFalse(TemporaryFolderSweeper.processHasGone(liveProcess))
-        let liveHomeURL: URL = try makeLockedFolder(named: "plantoir-home-under-test-\(liveProcess)", in: scratch.folder)
-        let liveRecordURL: URL = try writeRecord(liveHomeURL.path + "\n", forProcess: liveProcess, in: scratch.folder)
-
-        let goneProcess: Int32 = try processIdentifierThatHasGone()
-        let goneHomeURL: URL = try makeLockedFolder(named: "plantoir-home-under-test-\(goneProcess)", in: scratch.folder)
-        var misnamedRecordURLs: [URL] = []
-        for misnamed in ["0\(goneProcess)", "+\(goneProcess)", "\(goneProcess).txt", "0", "1", "-5"] {
-            let recordURL: URL = scratch.folder.appendingPathComponent(TemporaryFolderSweeper.runRecordPrefix + misnamed)
-            try (goneHomeURL.path + "\n").write(to: recordURL, atomically: true, encoding: .utf8)
-            misnamedRecordURLs.append(recordURL)
-        }
-
-        sweep(scratch.folder)
-
-        XCTAssertTrue(somethingIsAt(liveHomeURL.path), "a live process's folder is left alone")
-        XCTAssertTrue(somethingIsAt(liveRecordURL.path), "a live process's record is left alone")
-        XCTAssertTrue(somethingIsAt(goneHomeURL.path), "a misnamed record is never read")
-        for recordURL in misnamedRecordURLs {
-            XCTAssertTrue(somethingIsAt(recordURL.path), recordURL.lastPathComponent + " should be left alone")
-        }
-    }
-
-    /// The names the sweep accepts are read from this run's own folders:
-    /// four stems that take a pid, and one prefix that takes a UUID.
+    /// The shapes are read from this run's own folders, where the names are
+    /// made: four that end in the pid and one that adds a UUID. Every run
+    /// folder of this run is recognised as this run's.
     func testTheSweepKnowsTheRunsFolderNames() {
-        let shapes = TemporaryFolderSweeper.runFolderNameShapes()
-        XCTAssertEqual(shapes.processStems.count, 4, "home, builds, assistant support and the resting folder")
-        XCTAssertTrue(shapes.processStems.contains("plantoir-home-under-test-"))
-        XCTAssertTrue(shapes.processStems.contains("plantoir-resting-folder-under-test-"))
-        XCTAssertEqual(shapes.uuidPrefixes, ["Plantoir-tests-"])
-        XCTAssertFalse(TemporaryFolderSweeper.isRunFolderName(".", forProcess: 12_345))
-        XCTAssertFalse(TemporaryFolderSweeper.isRunFolderName("..", forProcess: 12_345))
-        XCTAssertFalse(TemporaryFolderSweeper.isRunFolderName("plantoir-home-under-test-12345/..", forProcess: 12_345))
-        XCTAssertTrue(TemporaryFolderSweeper.isRunFolderName("plantoir-home-under-test-12345", forProcess: 12_345))
-    }
-
-    /// This run has written its own record, naming its per-run folders.
-    func testThisRunHasARecordNamingItsFolders() throws {
-        let recordText: String = try String(contentsOf: TemporaryFolderSweeper.runRecordURL, encoding: .utf8)
+        let shapes: [TemporaryFolderSweeper.RunFolderNameShape] = TemporaryFolderSweeper.runFolderNameShapes()
+        XCTAssertEqual(shapes.count, 5, "home, builds, assistant support, the resting folder and the trail")
+        XCTAssertTrue(shapes.contains(TemporaryFolderSweeper.RunFolderNameShape(stem: "plantoir-home-under-test-", endsWithUUID: false)))
+        XCTAssertTrue(shapes.contains(TemporaryFolderSweeper.RunFolderNameShape(stem: "Plantoir-tests-", endsWithUUID: true)))
+        let ownProcess: Int32 = ProcessInfo.processInfo.processIdentifier
         for folderURL in TemporaryFolderSweeper.runFolders {
-            XCTAssertTrue(recordText.contains(folderURL.path + "\n"), "the record should name " + folderURL.lastPathComponent)
+            XCTAssertEqual(
+                TemporaryFolderSweeper.processIdentifier(inRunFolderNamed: folderURL.lastPathComponent), ownProcess,
+                folderURL.lastPathComponent + " should be recognised as this run's"
+            )
         }
+        XCTAssertNil(TemporaryFolderSweeper.processIdentifier(inRunFolderNamed: "."))
+        XCTAssertNil(TemporaryFolderSweeper.processIdentifier(inRunFolderNamed: ".."))
+        XCTAssertNil(TemporaryFolderSweeper.processIdentifier(inRunFolderNamed: "plantoir-home-under-test-12345/.."))
+        XCTAssertEqual(TemporaryFolderSweeper.processIdentifier(inRunFolderNamed: "plantoir-home-under-test-12345"), 12_345)
     }
 }

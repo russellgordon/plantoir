@@ -56,13 +56,13 @@ extension XCTestCase {
     /// registered first, so the restore runs before the removal whatever the
     /// test's outcome.
     ///
-    /// What this cannot close: something that copied the folder's path
-    /// before the restore and writes after the removal. Inside the app every
-    /// trail write reads `ActivityTrail.store` at the moment of writing
-    /// (`ActivityTrail.note`), so none does; the one copy the app makes is
-    /// `HelperPrograms.environment`, which hands a launcher
-    /// `PLANTOIR_TRAIL_DIR`, and a launcher still running after the test
-    /// could make the folder again. None of the classes using this starts a
+    /// What this cannot close: a writer already past its read of the store.
+    /// `ActivityTrail.note` reads `ActivityTrail.store` and then appends, so
+    /// a note in progress on another thread when the store is put back can
+    /// still append to this folder after it is removed, and make it again.
+    /// The same goes for a launcher still running after the test, which was
+    /// handed the folder's path as `PLANTOIR_TRAIL_DIR` by
+    /// `HelperPrograms.environment`. None of the classes using this starts a
     /// launcher.
     @discardableResult
     func useThrowawayTrail(prefix: String) -> URL {
@@ -120,32 +120,62 @@ enum TemporaryFolders {
     /// can anything inside a locked folder, so the unlocking comes first.
     ///
     /// A symbolic link handed in is removed as a link: nothing in the folder
-    /// it points at is unlocked, listed or removed. The link is examined
+    /// it points at is unlocked, listed or removed. Every entry is examined
     /// with `lstat` semantics (`attributesOfItem` does not follow the last
     /// component), so a dangling link is removed too.
     static func unlockAndRemove(_ folderURL: URL) {
         let fileManager: FileManager = FileManager.default
-        guard let attributes = try? fileManager.attributesOfItem(atPath: folderURL.path) else {
+        guard let entryType = entryTypeWithoutFollowing(folderURL.path) else {
             return
         }
-        let entryType: FileAttributeType? = attributes[FileAttributeKey.type] as? FileAttributeType
         if entryType == FileAttributeType.typeSymbolicLink {
             lchflags(folderURL.path, 0)
             try? fileManager.removeItem(atPath: folderURL.path)
             return
         }
-        lchflags(folderURL.path, 0)
-        if entryType == FileAttributeType.typeDirectory {
-            // The enumerator does not descend through a symbolic link inside
-            // the folder, and `lchflags` on one changes the link itself.
-            if let enumerator = fileManager.enumerator(atPath: folderURL.path) {
-                for case let relativePath as String in enumerator {
-                    let entryPath: String = folderURL.appendingPathComponent(relativePath).path
-                    lchflags(entryPath, 0)
-                }
-            }
-        }
+        unlockWithoutFollowingLinks(folderURL.path, entryType: entryType)
+        // `removeItem` removes a link inside the folder as a link.
         try? fileManager.removeItem(at: folderURL)
+    }
+
+    /// The type of the entry at `path`, the entry itself and not what a link
+    /// points at; nil when nothing is there.
+    static func entryTypeWithoutFollowing(_ path: String) -> FileAttributeType? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return nil
+        }
+        return attributes[FileAttributeKey.type] as? FileAttributeType
+    }
+
+    /// Clears the flags on `path` and, if it is a real folder, on everything
+    /// inside, checking each item without following it before touching it.
+    /// A link met on the way has its own flags cleared (`lchflags` never
+    /// follows) and is not entered, so the walk cannot be led outside.
+    ///
+    /// What remains: a folder swapped for a link between its check here and
+    /// the listing of it would be listed through the link, and the items
+    /// found there would have their flags cleared (never removed; the
+    /// removal does not follow links). That needs something writing inside
+    /// the user's own temp folder during the few microseconds between the two.
+    static func unlockWithoutFollowingLinks(_ path: String, entryType: FileAttributeType) {
+        lchflags(path, 0)
+        if entryType != FileAttributeType.typeDirectory {
+            return
+        }
+        guard let childNames = try? FileManager.default.contentsOfDirectory(atPath: path) else {
+            return
+        }
+        for childName in childNames {
+            let childPath: String = path + "/" + childName
+            guard let childType = entryTypeWithoutFollowing(childPath) else {
+                continue
+            }
+            if childType == FileAttributeType.typeSymbolicLink {
+                lchflags(childPath, 0)
+                continue
+            }
+            unlockWithoutFollowingLinks(childPath, entryType: childType)
+        }
     }
 
     /// For a helper with no test case to hand (`AssistFixture.makeRunner`,
@@ -221,24 +251,31 @@ enum TemporaryFolders {
 /// IS the app, and it keeps running (its timers, its tasks, a launcher it
 /// started) after `testBundleDidFinish`, the last callback the bundle gets.
 /// So the run's folders are removed there, which catches nearly everything,
-/// AND named in a run record, `plantoir-run-record-under-test-<pid>`, which
-/// is left behind on purpose. The next run, at its start, reads every record
-/// whose process has gone (`kill(pid, 0)` answers `ESRCH`) and removes the
-/// folders it names, then the record: by then the old host cannot write
-/// anything. A run therefore leaves one record of a few hundred bytes, plus
-/// whatever its host wrote after the bundle finished, until the next run on
-/// the same Mac.
+/// and whatever the host makes again afterwards is removed by the NEXT run,
+/// at its start, by name alone: every one of these folders carries its
+/// run's process id in its name, and a folder whose process has gone
+/// (`kill(pid, 0)` answers `ESRCH`) cannot be written by it any more.
+/// Nothing is written to say what a run made, and nothing is read back.
 ///
 /// Registered from the bundle's principal class (`PlantoirTestBundleSetup`).
 final class TemporaryFolderSweeper: NSObject, XCTestObservation {
+
+    // MARK: - Nested types
+
+    /// One shape of run-folder name: a stem, the process id, and (for the
+    /// one folder that also takes a UUID) `-<UUID>`.
+    struct RunFolderNameShape: Equatable {
+
+        // MARK: - Stored properties
+
+        let stem: String
+        let endsWithUUID: Bool
+    }
 
     // MARK: - Stored properties
 
     /// The one observer, once registered.
     nonisolated(unsafe) static var shared: TemporaryFolderSweeper? = nil
-
-    /// The name every run record starts with; the process id follows.
-    static let runRecordPrefix: String = "plantoir-run-record-under-test-"
 
     /// Where this run's resting folder goes, named like the app's own
     /// per-run folders so it is attributable to its process.
@@ -265,12 +302,6 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
             ProblemReportStore.throwawayFolderURL,
             restingFolderURLForThisRun,
         ]
-    }
-
-    /// This run's record.
-    static var runRecordURL: URL {
-        return FileManager.default.temporaryDirectory
-            .appendingPathComponent(runRecordPrefix + String(ProcessInfo.processInfo.processIdentifier))
     }
 
     // MARK: - Functions
@@ -307,10 +338,6 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
             inFolder: FileManager.default.temporaryDirectory,
             exceptProcess: ProcessInfo.processInfo.processIdentifier
         )
-        TemporaryFolderSweeper.writeRunRecord(
-            naming: TemporaryFolderSweeper.runFolders,
-            to: TemporaryFolderSweeper.runRecordURL
-        )
     }
 
     func testCaseDidFinish(_ testCase: XCTestCase) {
@@ -322,21 +349,13 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
         for folderURL in TemporaryFolderSweeper.runFolders {
             TemporaryFolders.unlockAndRemove(folderURL)
         }
-        // The run record stays: the next run removes anything the host
-        // writes after this point, once this process has gone.
-    }
-
-    /// Writes one path per line.
-    static func writeRunRecord(naming folders: [URL], to recordURL: URL) {
-        var text: String = ""
-        for folderURL in folders {
-            text += folderURL.path + "\n"
-        }
-        try? text.write(to: recordURL, atomically: true, encoding: .utf8)
+        // Anything the host makes again after this point carries this
+        // process's id in its name, and the next run removes it.
     }
 
     /// True when no process has this id any more. `EPERM` means one does,
-    /// owned by somebody else, so only `ESRCH` counts as gone.
+    /// owned by somebody else, and any other answer means it could not be
+    /// asked, so only `ESRCH` counts as gone.
     static func processHasGone(_ processIdentifier: Int32) -> Bool {
         if kill(processIdentifier, 0) == 0 {
             return false
@@ -344,30 +363,32 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
         return errno == ESRCH
     }
 
-    /// The names a run's folders carry, split into the two shapes they come
-    /// in, read from THIS run's own folders so the list cannot drift from
-    /// `runFolders`: the stems of the `...-under-test-<pid>` names (the pid
-    /// left off), and the prefixes of the `...-<UUID>` names (the UUID left
-    /// off).
-    static func runFolderNameShapes() -> (processStems: [String], uuidPrefixes: [String]) {
-        let ownSuffix: String = String(ProcessInfo.processInfo.processIdentifier)
-        var processStems: [String] = []
-        var uuidPrefixes: [String] = []
+    /// The ONE list of name shapes, read from this run's own folders
+    /// (`runFolders`), which are where the names are made: so the shapes
+    /// recognised can never drift from the names given. Each name is a
+    /// stem, this process's id, and, for `Plantoir-tests-`, `-<UUID>`.
+    static func runFolderNameShapes() -> [RunFolderNameShape] {
+        let ownProcessText: String = String(ProcessInfo.processInfo.processIdentifier)
+        var shapes: [RunFolderNameShape] = []
         for folderURL in runFolders {
-            let name: String = folderURL.lastPathComponent
-            if name.hasSuffix("-under-test-" + ownSuffix) {
-                processStems.append(String(name.dropLast(ownSuffix.count)))
+            var name: String = folderURL.lastPathComponent
+            var endsWithUUID: Bool = false
+            let uuidLength: Int = 36
+            if name.count > uuidLength + 1 && isWellFormedUUID(String(name.suffix(uuidLength))) {
+                name = String(name.dropLast(uuidLength))
+                if name.hasSuffix("-") == false {
+                    continue
+                }
+                name = String(name.dropLast())
+                endsWithUUID = true
+            }
+            if name.hasSuffix("-" + ownProcessText) == false {
                 continue
             }
-            let uuidLength: Int = 36
-            if name.count > uuidLength {
-                let uuidText: String = String(name.suffix(uuidLength))
-                if isWellFormedUUID(uuidText) {
-                    uuidPrefixes.append(String(name.dropLast(uuidLength)))
-                }
-            }
+            let stem: String = String(name.dropLast(ownProcessText.count))
+            shapes.append(RunFolderNameShape(stem: stem, endsWithUUID: endsWithUUID))
         }
-        return (processStems, uuidPrefixes)
+        return shapes
     }
 
     /// True for the upper-case form `UUID().uuidString` writes, and nothing
@@ -379,81 +400,71 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
         return parsed.uuidString == text
     }
 
-    /// True when `name` is one a run with process id `processIdentifier`
-    /// makes: a stem followed by exactly that pid, or a UUID prefix
-    /// followed by a well-formed UUID. Anything else (`.`, `..`, a name
-    /// with a `/`, another pid's name, a truncated one) is false.
-    static func isRunFolderName(_ name: String, forProcess processIdentifier: Int32) -> Bool {
-        let shapes = runFolderNameShapes()
-        for stem in shapes.processStems {
-            if name == stem + String(processIdentifier) {
-                return true
-            }
-        }
-        for prefix in shapes.uuidPrefixes {
-            if name.hasPrefix(prefix) {
-                let rest: String = String(name.dropFirst(prefix.count))
-                if isWellFormedUUID(rest) {
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    /// The process id a run record's name carries, or nil when the name is
-    /// not exactly `plantoir-run-record-under-test-<pid>` with a positive
-    /// decimal pid above 1 written the way `String(pid)` writes it.
-    static func processIdentifier(ofRecordNamed name: String) -> Int32? {
-        if name.hasPrefix(runRecordPrefix) == false {
+    /// A process id written plainly: ASCII digits only, no sign, no leading
+    /// zero, above 1. Nil for anything else.
+    static func plainProcessIdentifier(_ text: String) -> Int32? {
+        if text.isEmpty {
             return nil
         }
-        let processText: String = String(name.dropFirst(runRecordPrefix.count))
-        guard let processIdentifier = Int32(processText) else {
+        for character in text {
+            if character < "0" || character > "9" {
+                return nil
+            }
+        }
+        guard let processIdentifier = Int32(text) else {
             return nil
         }
-        if processIdentifier <= 1 || String(processIdentifier) != processText {
+        if processIdentifier <= 1 || String(processIdentifier) != text {
             return nil
         }
         return processIdentifier
     }
 
-    /// True when the entry at `path` is a regular file, checked without
-    /// following a link.
-    static func isRegularFile(atPath path: String) -> Bool {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
-            return false
+    /// The process id in `name` when the WHOLE name is one of the run-folder
+    /// shapes; nil for anything else (`.`, `..`, a truncated name, extra
+    /// text, a pid with a sign or a leading zero, an unrelated entry).
+    static func processIdentifier(inRunFolderNamed name: String) -> Int32? {
+        for shape in runFolderNameShapes() {
+            if name.hasPrefix(shape.stem) == false {
+                continue
+            }
+            let rest: String = String(name.dropFirst(shape.stem.count))
+            if shape.endsWithUUID {
+                guard let dashIndex = rest.firstIndex(of: "-") else {
+                    continue
+                }
+                let processText: String = String(rest[rest.startIndex..<dashIndex])
+                let uuidText: String = String(rest[rest.index(after: dashIndex)...])
+                if isWellFormedUUID(uuidText) == false {
+                    continue
+                }
+                if let processIdentifier = plainProcessIdentifier(processText) {
+                    return processIdentifier
+                }
+            } else {
+                if let processIdentifier = plainProcessIdentifier(rest) {
+                    return processIdentifier
+                }
+            }
         }
-        let entryType: FileAttributeType? = attributes[FileAttributeKey.type] as? FileAttributeType
-        return entryType == FileAttributeType.typeRegular
+        return nil
     }
 
-    /// Removes, for every run record in `folder` whose process has gone,
-    /// the run folders it names and then the record.
+    /// Removes every entry directly in `folder` whose NAME is a run-folder
+    /// shape for a process that has gone. This process's own, and any whose
+    /// process is alive (a run still going, or an unrelated process that
+    /// has been given a reused pid) or cannot be asked about, are left.
+    /// Nothing is read from any file; nothing but names is looked at; the
+    /// entry is removed without following a link.
     ///
-    /// **What it will remove, and nothing else.** A line is acted on only
-    /// when it is, as a plain string, `folder`'s path, a `/`, and a name
-    /// `isRunFolderName(_:forProcess:)` accepts for THAT record's pid; the
-    /// path removed is built from `folder` and the checked name, never taken
-    /// from the file. The entry is examined without following a link
-    /// (`unlockAndRemove`), so a link planted at a valid name goes as a link.
-    ///
-    /// **Whose run it is.** A record is swept only when `kill(pid, 0)`
-    /// answers `ESRCH`. A pid that has been reused by ANY live process, this
-    /// account's or another's, reads as alive and the record is skipped
-    /// until that process too has gone. Two runs going at once under one
-    /// account (a gate and another test run) each skip the other's record,
-    /// because the other is alive, and their own; and a record only ever
-    /// names folders carrying its own pid or a UUID its run made, so one
-    /// run's sweep cannot reach another run's folders.
+    /// Two runs going at once under one account (a gate and another test
+    /// run) each leave the other's folders, because the other is alive.
     static func removeWhatFinishedRunsLeft(inFolder folder: URL, exceptProcess ownProcess: Int32) {
-        let fileManager: FileManager = FileManager.default
-        let folderPath: String = folder.path
-        guard let names = try? fileManager.contentsOfDirectory(atPath: folderPath) else {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
             return
         }
         for name in names {
-            guard let processIdentifier = processIdentifier(ofRecordNamed: name) else {
+            guard let processIdentifier = processIdentifier(inRunFolderNamed: name) else {
                 continue
             }
             if processIdentifier == ownProcess {
@@ -462,27 +473,7 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
             if processHasGone(processIdentifier) == false {
                 continue
             }
-            let recordPath: String = folderPath + "/" + name
-            if isRegularFile(atPath: recordPath) == false {
-                continue
-            }
-            let recordText: String = (try? String(contentsOfFile: recordPath, encoding: .utf8)) ?? ""
-            for line in recordText.components(separatedBy: "\n") {
-                let lineStart: String = folderPath + "/"
-                if line.hasPrefix(lineStart) == false {
-                    continue
-                }
-                let namedEntry: String = String(line.dropFirst(lineStart.count))
-                if isRunFolderName(namedEntry, forProcess: processIdentifier) == false {
-                    continue
-                }
-                let builtPath: String = folderPath + "/" + namedEntry
-                if builtPath != line {
-                    continue
-                }
-                TemporaryFolders.unlockAndRemove(URL(fileURLWithPath: builtPath))
-            }
-            try? fileManager.removeItem(atPath: recordPath)
+            TemporaryFolders.unlockAndRemove(URL(fileURLWithPath: folder.path + "/" + name))
         }
     }
 }
