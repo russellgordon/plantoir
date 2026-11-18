@@ -24,7 +24,7 @@ final class TodaysClassOnTheFrontPageUITests: XCTestCase {
     // MARK: - Tests
 
     func testPreviewAsksShowsAndRemembersNotToday() throws {
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
         let sectionURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/section1")
         let classesURL: URL = sectionURL.appendingPathComponent("All Classes")
         try FileManager.default.createDirectory(at: classesURL, withIntermediateDirectories: true)

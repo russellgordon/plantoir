@@ -196,6 +196,8 @@ from its environment), so these tests run stub launchers only. The marketing
 captures (`MarketingScreenshotTests`) are the named exception — they drive the
 real toolchain and still write the real trail. `UITestLaunchTripwireTests`, in
 the unit suite, fails if any other UI test creates an `XCUIApplication` itself.
+When each test ends, `UITestFolders` quits the app it launched and only then
+removes that test's state folder and fixture (#978).
 `StateDirectoryUITests` proves the redirect through the window and SKIPS while
 another Plantoir is running — quit yours first. Why, and what was measured:
 `documentation/09-mac-app.md` → "Testing: the UI target keeps its state in

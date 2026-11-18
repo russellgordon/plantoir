@@ -16613,16 +16613,62 @@ it:
   is kept). They used to go to the temp folder's root under fixed names;
   nothing in the repository, its scripts or the bench read them there.
 
-**The UI target (`QuartzTeachersUITests`) is not covered.** No reason is
-written down for leaving it out beyond its being part of no gate; what it
-leaves does not land in the user temp folder at all, because its runner is
-sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s `plantoir-state-`
-folders go to `~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`.
-Measured on the main Mac on 2026-11-18: 717 `cq4t-fixture-` and 151
-`plantoir-state-` entries there, 1.9 GB. A fix would have to quit the
-launched app (`XCUIApplication.terminate()`) before removing its folders,
-for the same reason the window lets go above, and could only be proved by
-running that target alone on a quiet machine.
+**The UI target (`QuartzTeachersUITests`), since #978c.** It was left out
+of the first pass with no reason written down beyond its being part of no
+gate. What it leaves does not land in the user temp folder, because its
+runner is sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s
+`plantoir-state-` folders go to
+`~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`,
+which nothing measured. Measured on the main Mac on 2026-11-18, before the
+fix: 717 `cq4t-fixture-<UUID>` and 151 `plantoir-state-<UUID>` entries there
+(1.9 GB, almost all of it the website builder the app copies into each
+fixture, about 68 MB a copy), dated 2026-08-09 to 2026-11-01. Attributed by
+what each fixture holds: 587 plain fixtures from a launch with no working
+folder handed in (`QuartzTeachersUITests.launchApp()`, `UnitWordRowUITests`,
+`StateDirectoryUITests`), 62 with a stub preview (`QuartzTeachersUITests`'
+preview and publish tests), 28 `ContainerIdentifiersUITests`, 19
+`AssistantRolloverUITests`, 16 `NewSiteDialogUITests`, 5
+`TodaysClassOnTheFrontPageUITests`.
+
+`Tests/QuartzTeachersUITests/UITestFolders.swift` now removes them. Every
+UI test makes its fixture through `UITestFolders.makeFixture()` (which calls
+`FixtureWorkspace.materialize()` and registers the copy), and
+`IsolatedLaunch.launch` registers its state folder, the fixture it made when
+none was handed in, and the app it launched. `UITestFolders` is an
+`XCTestObservation`, registered on first use; in `testCaseDidFinish`, after
+the test's `tearDown` has reaped its stub launchers and whatever the
+outcome, it:
+
+1. **quits every app that test launched** (`terminate()` unless already
+   ended) and waits for XCTest to report `.notRunning`. The app is a separate
+   process writing into both folders (its trail, the website builder it
+   mirrors in) until it ends, so the order is the point, not a pause. If any
+   app has not ended within 30 seconds, that test's folders are left and the
+   console says so: never removed under a running app;
+2. **then removes that test's folders**, each only if it is still, at that
+   moment, exactly `<runner temp>/cq4t-fixture-<UUID>` or
+   `<runner temp>/plantoir-state-<UUID>` (upper-case UUID, nothing after it)
+   and a real folder by `lstat`, so a symbolic link of that name is left
+   alone. User flags are cleared inside it without following links (a state
+   folder holds links to the real assistant weights,
+   `linkRealAssistantWeights`), and `removeItem` removes a link as a link.
+   Nothing is read back from a file or the environment: the folder
+   `UITEST_WORKSPACE` names is never registered, and a registration with
+   any other name is refused with a failure the day it is written.
+
+`UITestFoldersTests` (in the UI target, launches nothing) pins the name
+check, that a link with a removable name is not followed, and that a link
+inside a fixture goes as a link while the locked file it points at stays
+locked.
+
+What it still leaves: the small preferences folder the app makes in
+`/private/tmp` for each launch (`plantoir-state-preferences-<hex>`, see
+"Testing: the UI target keeps its state in `--state-dir`"). The runner
+cannot remove it (its sandbox reads `/` and writes only its container),
+and macOS empties `/private/tmp` at restart. *Rejected: deleting the
+existing 1.9 GB from the code*: a sweep of whatever is in the folder would
+be a path the code did not build for this run. It is listed for a person to
+remove instead.
 
 *Rejected: a sweep of old `<prefix>-<UUID>` folders by age* (the second Mac's
 `tidy.py` does that today, as a stopgap): it hides a new leak instead of

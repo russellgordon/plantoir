@@ -92,6 +92,11 @@ struct IsolatedLaunch {
     /// `workspace` nil means the one named by this runner's own
     /// `UITEST_WORKSPACE`, or a fresh fixture — so plain Cmd-U needs no setup.
     ///
+    /// When the test ends, `UITestFolders` quits the app and then removes the
+    /// state folder, and the fixture if this made it (#978). A `workspace`
+    /// handed in is the caller's: made through `UITestFolders.makeFixture()`
+    /// it goes too, and the one `UITEST_WORKSPACE` names is never removed.
+    ///
     /// `linkRealAssistantWeights` links each real `*.gguf` into the state
     /// folder, ONE FILE AT A TIME: a link to the whole models folder would let
     /// a Settings "Remove" delete the teacher's real weights and put a
@@ -109,12 +114,13 @@ struct IsolatedLaunch {
         } else if let fixturePath = ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] {
             workspaceURL = URL(fileURLWithPath: fixturePath)
         } else {
-            workspaceURL = try FixtureWorkspace.materialize()
+            workspaceURL = try UITestFolders.makeFixture()
         }
 
         let stateDirectory: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("plantoir-state-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+        UITestFolders.removeWhenThisTestEnds(stateDirectory)
 
         // The frame goes in the ARGUMENT domain, which outranks the saved one
         // for reading and is never written: every launch opens at 1100×720
@@ -140,6 +146,9 @@ struct IsolatedLaunch {
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = workspaceURL.path
         application.launchArguments += arguments
+        // Registered before the launch, so an app that starts and then
+        // fails the test is still quit before its folders go (#978).
+        UITestFolders.quitWhenThisTestEnds(application)
         application.launch()
         lastLaunched = application
         return IsolatedLaunch(
