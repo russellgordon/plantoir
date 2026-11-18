@@ -33,7 +33,8 @@ namespace Plantoir.FirstInstall;
 /// unexpected (step 7). One driver runs at a time: a second one started while
 /// the first is alive does nothing and writes nothing.
 ///
-/// Writes steps.log (a line per event), result.txt (the outcome, last) and
+/// Writes steps.log (a line per event), result.txt (the outcome, last: a
+/// "status:" line the Mac decides by, then the "DRIVER RESULT:" line) and
 /// shots\NN-label.png into --out, and PUTs each to --report as it is written,
 /// so the Mac has the evidence even if the machine stops answering.
 /// Exit code: 0 passed, 2 product stopped, 1 driver problem, 3 the final-watch
@@ -141,9 +142,10 @@ internal static class Program
         _watch.Stage = Stage.FinalWatch;
         Note($"FINAL WATCH BEGINS: {WindowRules.FinalWatchLength.TotalSeconds:0} s");
         int looks = _watch.Observe(WindowRules.FinalWatchLength);
-        int required = (int)(WindowRules.FinalWatchLength.TotalSeconds / 3);
-        Note($"FINAL WATCH ENDED: nothing unexpected; {looks} real looks (at least {required} required), {_watch.FailedLooks} looks in the whole run could not read the desktop, {_watch.Unreadable} windows could not be read");
-        if (looks < required)
+        bool enough = WindowRules.LookedEnough(looks, WindowRules.FinalWatchLength, out int required);
+        Note($"FINAL WATCH ENDED: nothing unexpected; {looks} real looks (at least {required} required), {_watch.FailedLooks} looks in the whole run could not read the desktop, "
+             + $"{_watch.Unreadable} different top-level windows could not be read at some look (each recorded above), {_watch.UnreadablePopups} popups inside Plantoir's window could not be read");
+        if (!enough)
             throw Stopped.Driver($"the final watch made only {looks} real looks in {WindowRules.FinalWatchLength.TotalSeconds:0} s (at least {required} required), so it did not really watch");
         Shot("final-watch");
         return looks;
@@ -220,10 +222,22 @@ internal static class Program
             _ => "DRIVER PROBLEM",
         };
         string where = outcome is Outcome.Passed or Outcome.SelfTestOnly ? "" : $" at step {_stepNumber} ({_stepName})";
-        string line = $"RESULT: {word}{where}: {reason} [screenshot {shot}]";
+        // "DRIVER RESULT", not "RESULT": the Mac's report carries this line and
+        // then its own final outcome, which can override it (a UAC prompt the
+        // Mac saw, a final watch it did not cover), so a reader must not take
+        // this one for the outcome. The status is a fixed word the Mac decides
+        // by; it never searches the sentence (the review of 2026-11-18).
+        string status = outcome switch
+        {
+            Outcome.Passed => "passed",
+            Outcome.ProductStopped => "product-stopped",
+            Outcome.SelfTestOnly => "self-test-watch-clean",
+            _ => "driver-problem",
+        };
+        string line = $"DRIVER RESULT (the driver's own; the Mac's final outcome is the last line of its report): {word}{where}: {reason} [screenshot {shot}]";
         Note(line);
         string path = Path.Combine(_out, "result.txt");
-        File.WriteAllText(path, line + Environment.NewLine);
+        File.WriteAllText(path, "status: " + status + Environment.NewLine + line + Environment.NewLine);
         Send(path, "result.txt");
         return outcome switch { Outcome.Passed => 0, Outcome.ProductStopped => 2, Outcome.SelfTestOnly => 3, _ => 1 };
     }

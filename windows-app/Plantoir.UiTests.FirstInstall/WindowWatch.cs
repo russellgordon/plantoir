@@ -28,6 +28,8 @@ internal sealed class WindowWatch
     private readonly Dictionary<IntPtr, DateTime> _firstSeen = new();
     private readonly HashSet<string> _unreadableNoted = new();
     private readonly List<string> _baselineNames = new();
+    private readonly List<AutomationElement> _baselineUnreadable = new();
+    private readonly UnreadableWindows<AutomationElement> _unreadableWindows;
     private int _looks;
     private int _failedLooks;
     private int _unreadable;
@@ -37,13 +39,33 @@ internal sealed class WindowWatch
     public WindowWatch(UIA3Automation automation)
     {
         _automation = automation;
-        var (windows, read) = Desktop();
+        _unreadableWindows = new UnreadableWindows<AutomationElement>(SameElement);
+        var (windows, unreadable, read) = Desktop();
         if (!read) throw Stopped.Driver("the desktop could not be read when the driver started, so no baseline of its windows exists");
         foreach (var window in windows)
         {
             _baseline.Add(window.Handle);
             _baselineNames.Add(window.ToString());
         }
+        // Already up when the driver started, so the desktop's, not the run's;
+        // named in the baseline so a reader knows they were there.
+        foreach (var (element, error) in unreadable)
+        {
+            _baselineUnreadable.Add(element);
+            _baselineNames.Add($"a window that could not be read ({error})");
+        }
+    }
+
+    /// <summary>
+    /// Whether two elements are the same window, by UI Automation's own
+    /// comparison (CompareElements). Not by handle: every window whose
+    /// properties cannot be read gives 0x0, and the review of 2026-11-18 found
+    /// that made two of them look like one.
+    /// </summary>
+    private bool SameElement(AutomationElement first, AutomationElement second)
+    {
+        try { return _automation.Compare(first, second); }
+        catch { return false; }
     }
 
     public string BaselineDescription => string.Join("; ", _baselineNames);
@@ -64,23 +86,28 @@ internal sealed class WindowWatch
     /// <summary>Looks whose reading of the desktop failed, for the log.</summary>
     public int FailedLooks => Volatile.Read(ref _failedLooks);
 
-    /// <summary>Top-level windows that could not be read, each noted in the log.</summary>
-    public int Unreadable => _unreadable;
+    /// <summary>Different top-level windows that could not be read in this run, each recorded in the log and judged.</summary>
+    public int Unreadable => _unreadableWindows.Seen;
+
+    /// <summary>Popups inside Plantoir's window that could not be read, each noted.</summary>
+    public int UnreadablePopups => _unreadable;
 
     /// <summary>
-    /// Every top-level window now, and whether the desktop itself could be
-    /// read. A window that cannot be read is noted (once per window and
-    /// reason), never skipped in silence.
+    /// Every top-level window now; those whose properties could not be read,
+    /// with the error; and whether the desktop itself could be read. Nothing
+    /// is noted here: <see cref="Check"/> records and judges the unreadable
+    /// ones, through <see cref="UnreadableWindows{T}"/>.
     /// </summary>
-    private (List<SeenWindow> Windows, bool Read) Desktop()
+    private (List<SeenWindow> Windows, List<(AutomationElement Element, string Error)> Unreadable, bool Read) Desktop()
     {
         var found = new List<SeenWindow>();
+        var unreadable = new List<(AutomationElement, string)>();
         AutomationElement[] children;
         try { children = _automation.GetDesktop().FindAllChildren(); }
         catch (Exception error)
         {
             NoteUnreadable("desktop|" + error.GetType().Name, $"note: the desktop could not be read at this look ({error.GetType().Name}: {error.Message}); not counted as a look");
-            return (found, false);
+            return (found, unreadable, false);
         }
         foreach (var child in children)
         {
@@ -98,13 +125,12 @@ internal sealed class WindowWatch
             {
                 // Gone between the listing and the reading is the usual cause;
                 // a window of a higher integrity level is the one that matters.
+                // Either way it is judged (Check), not skipped.
                 if (handle != IntPtr.Zero && _baseline.Contains(handle)) continue;
-                _unreadable++;
-                NoteUnreadable($"{handle}|{error.GetType().Name}",
-                               $"note: a top-level window could not be read (handle 0x{handle.ToInt64():X}, {error.GetType().Name}: {error.Message})");
+                unreadable.Add((child, $"handle 0x{handle.ToInt64():X}, {error.GetType().Name}: {error.Message}"));
             }
         }
-        return (found, true);
+        return (found, unreadable, true);
     }
 
     private void NoteUnreadable(string key, string line)
@@ -114,6 +140,47 @@ internal sealed class WindowWatch
 
     /// <summary>Every top-level window now (for the steps' own searches).</summary>
     public List<SeenWindow> TopLevel() => Desktop().Windows;
+
+    /// <summary>
+    /// Records and judges the top-level windows that could not be read at
+    /// this look (the review of 2026-11-18: they were noted once, then never
+    /// judged). Each is recorded when it appears and when it stops being
+    /// unreadable; one still unreadable after <see cref="WindowRules.UnreadableLimit"/>
+    /// ends the run, at any stage, the final watch included.
+    /// </summary>
+    private void JudgeUnreadable(List<(AutomationElement Element, string Error)> unreadable, List<SeenWindow> readable)
+    {
+        var fresh = new List<(AutomationElement Window, string Error)>();
+        foreach (var (element, error) in unreadable)
+        {
+            bool atStart = false;
+            foreach (var known in _baselineUnreadable)
+                if (SameElement(known, element)) { atStart = true; break; }
+            if (!atStart) fresh.Add((element, error));
+        }
+        var readableElements = new List<AutomationElement>();
+        foreach (var window in readable) readableElements.Add(window.Element);
+        foreach (var change in _unreadableWindows.Look(fresh, readableElements, DateTime.UtcNow))
+        {
+            switch (change.Change)
+            {
+                case UnreadableChange.Appeared:
+                    Program.Note($"note: unreadable window {change.Number} appeared at {Stage}: UI Automation lists it but cannot read it ({change.Error}); "
+                                 + $"judged at each look, and it ends the run if still unreadable after {WindowRules.UnreadableLimit.TotalSeconds:0} s");
+                    break;
+                case UnreadableChange.BecameReadable:
+                    Program.Note($"note: unreadable window {change.Number} can be read after {change.SeenFor.TotalSeconds:0} s ({change.Sightings} looks); from now on judged by the ordinary rules");
+                    break;
+                case UnreadableChange.Gone:
+                    Program.Note($"note: unreadable window {change.Number} is gone after {change.SeenFor.TotalSeconds:0} s ({change.Sightings} looks)");
+                    break;
+                case UnreadableChange.TooLong:
+                    throw Stopped.Product($"a window UI Automation could not read stayed up at {Stage} for {change.SeenFor.TotalSeconds:0} s "
+                                          + $"(unreadable window {change.Number}, {change.Sightings} looks; {change.Error}): a window of a higher integrity level, such as an elevation prompt, "
+                                          + $"is the usual cause [screenshot {Program.Shot("unreadable-window")}]");
+            }
+        }
+    }
 
     /// <summary>Windows that were not there when the driver started.</summary>
     public List<SeenWindow> New()
@@ -132,12 +199,13 @@ internal sealed class WindowWatch
     /// </summary>
     public void Check(Action<SeenWindow, string>? answer)
     {
-        var (windows, read) = Desktop();
+        var (windows, unreadable, read) = Desktop();
         if (!read)
         {
             Interlocked.Increment(ref _failedLooks);
             return;
         }
+        JudgeUnreadable(unreadable, windows);
         var contentWindows = new List<AutomationElement>();
         foreach (var window in windows)
         {

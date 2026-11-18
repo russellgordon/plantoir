@@ -130,6 +130,17 @@ internal static class WindowRules
     public static readonly TimeSpan EmptyLimit = TimeSpan.FromSeconds(20);
 
     /// <summary>
+    /// How long a top-level window whose properties cannot be read at all may
+    /// stay up before it ends the run (<see cref="UnreadableWindows{T}"/>). The
+    /// same 20 s as <see cref="SettlingLimit"/>: a window being made or closed
+    /// is unreadable for a look or two; one unreadable for longer is a window
+    /// of a higher integrity level, which is exactly what the run must not miss
+    /// (the uac self-test of 2026-11-18 noted one, handle 0x0, 2 s before the
+    /// Mac saw consent.exe).
+    /// </summary>
+    public static readonly TimeSpan UnreadableLimit = TimeSpan.FromSeconds(20);
+
+    /// <summary>
     /// How long the desktop is watched after the last step succeeded, before
     /// PASSED (the review of 2026-11-18: nothing was watched after the check
     /// that found the preview). Windows raises the Defender Firewall's
@@ -378,6 +389,18 @@ internal static class WindowRules
     }
 
     /// <summary>
+    /// Whether the watcher looked enough during a stretch of time: at least
+    /// one real look, and one for every three seconds (the installer's launch
+    /// call, Steps.cs; the final watch, Program.cs). False means the stretch
+    /// was not really watched and the run is a DRIVER PROBLEM.
+    /// </summary>
+    public static bool LookedEnough(int realLooks, TimeSpan stretch, out int required)
+    {
+        required = Math.Max(1, (int)(stretch.TotalSeconds / 3));
+        return realLooks >= required;
+    }
+
+    /// <summary>
     /// The middle of a box, for a real click, refused where it would land
     /// somewhere else — the rule of <c>DrivenApp.MiddleWithin</c> in the UI
     /// suite (documentation/12-windows-app.md: a bare <c>element.Click()</c>
@@ -396,5 +419,96 @@ internal static class WindowRules
             return null;
         }
         return (x, y);
+    }
+}
+
+/// <summary>What happened to an unreadable top-level window at one look.</summary>
+internal enum UnreadableChange
+{
+    /// <summary>First seen unreadable at this look; recorded, and given <see cref="WindowRules.UnreadableLimit"/>.</summary>
+    Appeared,
+    /// <summary>Readable now, within the limit: from here it is judged by the ordinary rules.</summary>
+    BecameReadable,
+    /// <summary>No longer listed, within the limit (a window that closed).</summary>
+    Gone,
+    /// <summary>Still unreadable at the limit: the run ends, not PASSED.</summary>
+    TooLong,
+}
+
+/// <summary>One thing to record about an unreadable window. <see cref="Number"/> is its number in this run, from 1.</summary>
+internal readonly record struct UnreadableEvent(UnreadableChange Change, int Number, TimeSpan SeenFor, int Sightings, string Error);
+
+/// <summary>
+/// Judges the top-level windows UI Automation lists but cannot read (their
+/// properties throw), which the review of 2026-11-18 found were noted once and
+/// then never judged: one could stay up through the final watch and the run
+/// still say PASSED. Each is told apart from the others by
+/// <c>sameWindow</c> (UI Automation's own element comparison in the driver),
+/// never by its handle, which reads 0x0 for every such window. Every window
+/// is recorded when it appears and when it stops being unreadable; one still
+/// unreadable after <see cref="WindowRules.UnreadableLimit"/> ends the run.
+/// No UI Automation in it, so the tests can drive it with plain values.
+/// </summary>
+internal sealed class UnreadableWindows<T>
+{
+    private sealed class Tracked
+    {
+        public required T Window { get; init; }
+        public required int Number { get; init; }
+        public required DateTime FirstSeen { get; init; }
+        public int Sightings { get; set; }
+        public string Error { get; set; } = "";
+    }
+
+    private readonly Func<T, T, bool> _sameWindow;
+    private readonly List<Tracked> _tracked = new();
+    private int _numbered;
+
+    public UnreadableWindows(Func<T, T, bool> sameWindow) => _sameWindow = sameWindow;
+
+    /// <summary>How many different unreadable windows this run has seen.</summary>
+    public int Seen => _numbered;
+
+    /// <summary>
+    /// One look: the windows that could not be read at it (with the error),
+    /// and the windows that could. Returns what to record, in order; a
+    /// <see cref="UnreadableChange.TooLong"/> event means the run must end.
+    /// </summary>
+    public List<UnreadableEvent> Look(IReadOnlyList<(T Window, string Error)> unreadable, IReadOnlyList<T> readable, DateTime now)
+    {
+        var events = new List<UnreadableEvent>();
+        var stillUnreadable = new List<Tracked>();
+        foreach (var (window, error) in unreadable)
+        {
+            Tracked? known = null;
+            foreach (var tracked in _tracked)
+                if (!stillUnreadable.Contains(tracked) && _sameWindow(tracked.Window, window)) { known = tracked; break; }
+            if (known is null)
+            {
+                known = new Tracked { Window = window, Number = ++_numbered, FirstSeen = now, Error = error };
+                _tracked.Add(known);
+                events.Add(new UnreadableEvent(UnreadableChange.Appeared, known.Number, TimeSpan.Zero, 1, error));
+            }
+            known.Sightings++;
+            known.Error = error;
+            stillUnreadable.Add(known);
+        }
+        foreach (var tracked in _tracked.ToList())
+        {
+            TimeSpan seenFor = now - tracked.FirstSeen;
+            if (stillUnreadable.Contains(tracked))
+            {
+                if (seenFor >= WindowRules.UnreadableLimit)
+                    events.Add(new UnreadableEvent(UnreadableChange.TooLong, tracked.Number, seenFor, tracked.Sightings, tracked.Error));
+                continue;
+            }
+            bool nowReadable = false;
+            foreach (var window in readable)
+                if (_sameWindow(tracked.Window, window)) { nowReadable = true; break; }
+            events.Add(new UnreadableEvent(nowReadable ? UnreadableChange.BecameReadable : UnreadableChange.Gone,
+                                           tracked.Number, seenFor, tracked.Sightings, tracked.Error));
+            _tracked.Remove(tracked);
+        }
+        return events;
     }
 }

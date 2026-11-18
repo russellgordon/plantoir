@@ -367,4 +367,116 @@ public class WindowRulesTests
         Assert.Null(WindowRules.MiddleWithin(100, 900, 100, 40, false, window, out string outside));
         Assert.Contains("outside", outside);
     }
+
+    // ---- Unreadable top-level windows (the review of 2026-11-18) -------------
+
+    /// <summary>
+    /// Stands for a window UI Automation cannot read: every one of them has
+    /// handle 0x0, so the handle is the same in all of them on purpose and
+    /// only the identity (UI Automation's element comparison) tells them apart.
+    /// </summary>
+    private sealed record Unreadable(string Identity)
+    {
+        public IntPtr Handle => IntPtr.Zero;
+    }
+
+    private static UnreadableWindows<Unreadable> Tracker() =>
+        new((first, second) => first.Identity == second.Identity);
+
+    private static readonly DateTime Start = new(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly Unreadable[] NoneReadable = Array.Empty<Unreadable>();
+
+    private static List<(Unreadable, string)> Listing(params Unreadable[] windows)
+    {
+        var listing = new List<(Unreadable, string)>();
+        foreach (var window in windows) listing.Add((window, "COMException: access denied"));
+        return listing;
+    }
+
+    [Fact]
+    public void AnUnreadableWindowThatBecomesReadableWithinTheGraceIsToleratedThenJudgedByTheOrdinaryRules()
+    {
+        var tracker = Tracker();
+        var prompt = new Unreadable("a");
+        var first = tracker.Look(Listing(prompt), NoneReadable, Start);
+        Assert.Equal(UnreadableChange.Appeared, Assert.Single(first).Change);
+        Assert.Empty(tracker.Look(Listing(prompt), NoneReadable, Start + TimeSpan.FromSeconds(10)));
+        var readable = tracker.Look(Listing(), new[] { prompt }, Start + TimeSpan.FromSeconds(12));
+        var change = Assert.Single(readable);
+        Assert.Equal(UnreadableChange.BecameReadable, change.Change);
+        Assert.Equal(1, change.Number);
+        Assert.Equal(2, change.Sightings);
+        // From then on the ordinary rules judge it: Notepad, readable, is unexpected.
+        Assert.Equal(Verdict.Unexpected, VerdictOf(Stage.FinalWatch, Notepad));
+    }
+
+    [Fact]
+    public void AnUnreadableWindowPastTheGraceStopsTheRun()
+    {
+        var tracker = Tracker();
+        var prompt = new Unreadable("a");
+        tracker.Look(Listing(prompt), NoneReadable, Start);
+        Assert.Empty(tracker.Look(Listing(prompt), NoneReadable, Start + WindowRules.UnreadableLimit - TimeSpan.FromSeconds(1)));
+        var late = tracker.Look(Listing(prompt), NoneReadable, Start + WindowRules.UnreadableLimit);
+        var change = Assert.Single(late);
+        Assert.Equal(UnreadableChange.TooLong, change.Change);
+        Assert.Equal(3, change.Sightings);
+        Assert.Contains("access denied", change.Error);
+        Assert.Equal(TimeSpan.FromSeconds(20), WindowRules.UnreadableLimit);
+    }
+
+    [Fact]
+    public void TwoUnreadableWindowsInOneRunAreBothRecordedThoughBothHaveHandleZero()
+    {
+        var tracker = Tracker();
+        var first = new Unreadable("a");
+        var second = new Unreadable("b");
+        Assert.Equal(first.Handle, second.Handle);
+        var atFirst = tracker.Look(Listing(first), NoneReadable, Start);
+        Assert.Equal(UnreadableChange.Appeared, Assert.Single(atFirst).Change);
+        var atSecond = tracker.Look(Listing(first, second), NoneReadable, Start + TimeSpan.FromSeconds(5));
+        var appeared = Assert.Single(atSecond);
+        Assert.Equal(UnreadableChange.Appeared, appeared.Change);
+        Assert.Equal(2, appeared.Number);
+        Assert.Equal(2, tracker.Seen);
+        // The first one going does not hide the second, which still runs out its own time.
+        var firstGone = tracker.Look(Listing(second), NoneReadable, Start + TimeSpan.FromSeconds(8));
+        Assert.Equal(new[] { UnreadableChange.Gone }, firstGone.ConvertAll(change => change.Change).ToArray());
+        Assert.Equal(1, firstGone[0].Number);
+        var secondLate = tracker.Look(Listing(second), NoneReadable, Start + TimeSpan.FromSeconds(25));
+        Assert.Equal(UnreadableChange.TooLong, Assert.Single(secondLate).Change);
+        Assert.Equal(2, secondLate[0].Number);
+    }
+
+    [Fact]
+    public void AnUnreadableWindowThatComesBackIsRecordedAgain()
+    {
+        var tracker = Tracker();
+        var prompt = new Unreadable("a");
+        tracker.Look(Listing(prompt), NoneReadable, Start);
+        Assert.Equal(UnreadableChange.Gone, Assert.Single(tracker.Look(Listing(), NoneReadable, Start + TimeSpan.FromSeconds(2))).Change);
+        var back = tracker.Look(Listing(prompt), NoneReadable, Start + TimeSpan.FromSeconds(4));
+        Assert.Equal(UnreadableChange.Appeared, Assert.Single(back).Change);
+        Assert.Equal(2, back[0].Number);
+    }
+
+    // ---- Enough looks (Steps.cs, the installer's launch call; Program.cs, the final watch) ----
+
+    [Fact]
+    public void TooFewRealLooksDuringTheLaunchCallFailTheCheck()
+    {
+        Assert.False(WindowRules.LookedEnough(0, TimeSpan.FromSeconds(1), out int atLeastOne));
+        Assert.Equal(1, atLeastOne);
+        Assert.False(WindowRules.LookedEnough(3, TimeSpan.FromSeconds(12.2), out int forTwelve));
+        Assert.Equal(4, forTwelve);
+        Assert.True(WindowRules.LookedEnough(4, TimeSpan.FromSeconds(12.2), out _));
+    }
+
+    [Fact]
+    public void TooFewRealLooksDuringTheFinalWatchFailTheCheck()
+    {
+        Assert.False(WindowRules.LookedEnough(19, WindowRules.FinalWatchLength, out int required));
+        Assert.Equal(20, required);
+        Assert.True(WindowRules.LookedEnough(20, WindowRules.FinalWatchLength, out _));
+    }
 }
