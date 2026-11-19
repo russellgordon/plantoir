@@ -149,9 +149,18 @@ final class CancelOperationResponder: NSResponder {
         return !CancelOperationResponder.somethingElseWantsTheKey(in: window)
     }
 
-    override func responds(to selector: Selector!) -> Bool {
+    /// `NSObject` declares this nonisolated. AppKit asks it on the main
+    /// thread while it walks the chain for a key; asked anywhere else, the
+    /// answer is no.
+    nonisolated override func responds(to selector: Selector!) -> Bool {
         if selector == #selector(NSResponder.cancelOperation(_:)) {
-            return takesCancelOperation()
+            if !Thread.isMainThread {
+                return false
+            }
+            let takesIt: Bool = MainActor.assumeIsolated {
+                return takesCancelOperation()
+            }
+            return takesIt
         }
         return super.responds(to: selector)
     }
