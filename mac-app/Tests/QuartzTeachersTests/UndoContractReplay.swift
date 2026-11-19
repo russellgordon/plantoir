@@ -465,9 +465,16 @@ nonisolated enum UndoContractReplay {
     static func listing(from tree: [String: Any]) -> UndoTreeListing {
         var files: [UndoTreeListing.File] = []
         for (path, text) in tree["files"] as? [String: String] ?? [:] {
+            if (path as NSString).lastPathComponent == UndoTreeListing.ignoredName {
+                continue
+            }
             files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: Data(text.utf8))))
         }
-        return UndoTreeListing(folders: tree["folders"] as? [String] ?? [], files: files)
+        var folders: [String] = []
+        for folder in tree["folders"] as? [String] ?? [] where (folder as NSString).lastPathComponent != UndoTreeListing.ignoredName {
+            folders.append(folder)
+        }
+        return UndoTreeListing(folders: folders, files: files)
     }
 
     /// An external place holding one value, for a case.

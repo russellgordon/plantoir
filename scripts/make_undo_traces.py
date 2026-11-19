@@ -391,9 +391,14 @@ def listing_text(tree):
     UTF-8 bytes, each ending in a line feed. tree: {"folders": [...],
     "files": {path: text}}."""
     entries = []
+    ignored = ".DS_Store"   # the Finder's own record, never listed
     for folder in tree.get("folders", []):
+        if folder.split("/")[-1] == ignored:
+            continue
         entries.append((folder.encode("utf-8"), "folder " + folder + "\n"))
     for path, text in tree.get("files", {}).items():
+        if path.split("/")[-1] == ignored:
+            continue
         entries.append((path.encode("utf-8"), "file " + sha(text) + " " + path + "\n"))
     entries.sort()
     return "".join(line for _, line in entries)

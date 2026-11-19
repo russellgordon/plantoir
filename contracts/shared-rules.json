@@ -49885,9 +49885,25 @@
         },
         "listing": "file 73cb3858a687a8494ca3323053016282f3dad39d42cf62ca4e79dda2aac7d9ac .hidden\nfile fd6641673e7f3bf6e80e4bc5401fcb2821a1e117206c8e1c65cef23a58dc37ff page.md\n",
         "listingSha": "1aae0977e35ed6e7ea0c6a6e2f77b5d4869ced59eb6b466eff5f8d14b54ad1f1"
+      },
+      {
+        "name": "the Finder's .DS_Store is never listed, at any depth",
+        "tree": {
+          "folders": [
+            "sub"
+          ],
+          "files": {
+            ".DS_Store": "Bud1 finder\n",
+            "sub/.DS_Store": "Bud1\n",
+            "a.md": "A\n"
+          }
+        },
+        "listing": "file 06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0 a.md\nfolder sub\n",
+        "listingSha": "06a2abe5e7f29eee718a2e6bfd0e80acf9dc26b2def756a6c6c21664d433b267",
+        "why": "A folder the teacher opened in the Finder gains a .DS_Store; listing it would make every folder looked at in the Finder one Undo could not take back."
       }
     ],
-    "listingCasesHow": "A folder's listing (file-formats.json -> undoJournal.opKinds.createTree): tree is the folder's content (folders, and files with their text); listing is the exact text both platforms must make from it, and listingSha its SHA-256. One line per item inside the folder, each ending in a line feed: `folder <path>` or `file <sha256 of its bytes> <path>`, path relative to the folder with forward slashes, spelled as the file system gives it; lines in the order of the paths' UTF-8 bytes; the folder itself is not listed, and an empty folder's listing is empty.",
+    "listingCasesHow": "A folder's listing (file-formats.json -> undoJournal.opKinds.createTree): tree is the folder's content (folders, and files with their text); listing is the exact text both platforms must make from it, and listingSha its SHA-256. One line per item inside the folder, each ending in a line feed: `folder <path>` or `file <sha256 of its bytes> <path>`, path relative to the folder with forward slashes, spelled as the file system gives it; lines in the order of the paths' UTF-8 bytes; the folder itself is not listed, and an empty folder's listing is empty. A file named .DS_Store (the Finder's record of a window), at any depth, is never listed, and is removed with the folder when the folder is taken out.",
     "stackCases": [
       {
         "name": "three steps: the newest is the head",

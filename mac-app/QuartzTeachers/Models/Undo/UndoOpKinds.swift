@@ -461,6 +461,10 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
 
     let files: [File]
 
+    /// The one name a listing passes over, wherever it is: the Finder's
+    /// `.DS_Store`.
+    static let ignoredName: String = ".DS_Store"
+
     // MARK: - Computed properties
 
     /// The listing's text, in its one order.
@@ -590,6 +594,13 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             return false
         }
         for name in names {
+            // The Finder's own record of a window it opened is not the
+            // teacher's work: a folder looked at in the Finder must not
+            // become one Undo cannot take back (the hard review of U2b,
+            // LOW b). Never listed, and taken out with the folder.
+            if name == UndoTreeListing.ignoredName {
+                continue
+            }
             let url: URL = folder.appendingPathComponent(name)
             let path: String = prefix.isEmpty ? name : prefix + "/" + name
             var information: stat = stat()
