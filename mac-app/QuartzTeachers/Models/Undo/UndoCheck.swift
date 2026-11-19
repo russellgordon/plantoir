@@ -367,9 +367,9 @@ nonisolated enum UndoCheck {
             }
             let makes: Bool = (op.knownKind == .createTree) == (direction == .forward)
             let url: URL = root.appendingPathComponent(path)
-            if !makes {
-                return UndoSwapTarget(url: url, relativePath: path, change: .takeTree(listingSha: listingSha))
-            }
+            // Whether the folder is made or taken out, the list must hold
+            // everything needed to make it: a folder is never taken out
+            // unless the list can put it back (the hard review of U2b, HIGH 2).
             guard let listingData = try journal.blobContent(sha: listingSha),
                   let listing = UndoTreeListing.parse(listingData), listing.sha == listingSha else {
                 return nil
@@ -380,6 +380,9 @@ nonisolated enum UndoCheck {
                     return nil
                 }
                 contents[file.path] = data
+            }
+            if !makes {
+                return UndoSwapTarget(url: url, relativePath: path, change: .takeTree(listingSha: listingSha))
             }
             return UndoSwapTarget(url: url, relativePath: path, change: .makeTree(listing, contents: contents))
         case .external:
