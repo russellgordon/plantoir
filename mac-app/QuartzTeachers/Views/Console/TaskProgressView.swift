@@ -110,10 +110,6 @@ struct TaskProgressView: View {
     /// Makes Cancel act once per run, however it is pressed (#988 review).
     @State var cancelOnce: CancelOncePerRun = CancelOncePerRun()
 
-    /// Hears Escape and Command-Period from the window's responder chain
-    /// and presses Cancel (#988): `CancelOperationResponder`. Not a view.
-    @State var cancelResponder: CancelOperationResponder = CancelOperationResponder()
-
     /// Showing "Stop the deploy?" (`asksBeforeStopping`).
     @State var isAskingToStop: Bool = false
 
@@ -243,16 +239,6 @@ struct TaskProgressView: View {
             onCancel()
         } else {
             runner.cancelByUser()
-        }
-    }
-
-    /// Tells the responder what the keys do now. Called whenever what it
-    /// depends on changes, because the responder lives outside SwiftUI's
-    /// updates.
-    func updateTheCancelKeys() {
-        cancelResponder.isEnabled = cancelKeysAreLive
-        cancelResponder.pressCancel = {
-            pressCancel()
         }
     }
 
@@ -578,26 +564,15 @@ struct TaskProgressView: View {
                 }
             )
         }
-        // The keys reach Cancel through the window's responder chain, not
-        // through a view (#988 review): the responder joins the chain once
-        // this panel is in a window, and leaves it when the panel goes.
-        .background(WindowAccessor { (window: NSWindow) in
-            cancelResponder.install(in: window)
-            updateTheCancelKeys()
-        })
-        .onAppear {
-            cancelResponder.reinstall()
-            updateTheCancelKeys()
-        }
-        .onDisappear {
-            cancelResponder.uninstall()
-        }
-        .onChange(of: cancelKeysAreLive) {
-            updateTheCancelKeys()
-        }
-        .onChange(of: ObjectIdentifier(runner)) {
-            updateTheCancelKeys()
-        }
+        // Escape and Command-Period reach Cancel as AppKit's
+        // cancelOperation(_:), through the window's responder chain (#988
+        // review): `CancelOperationResponder` joins the chain while this
+        // panel is in a window, and leaves it when the panel goes.
+        .background(
+            CancelOperationInstaller(isEnabled: cancelKeysAreLive) {
+                pressCancel()
+            }
+        )
         .onChange(of: runIsUnderWay) {
             // A deploy that ends while its question is open has nothing
             // left to stop: the question goes.

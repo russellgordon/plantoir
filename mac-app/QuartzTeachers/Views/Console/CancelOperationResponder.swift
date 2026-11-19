@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import SwiftUI
 
 /// Remembers that Cancel was pressed for one run of a task, so Cancel acts
 /// once per run however it is pressed: a click, Escape, Command-Period, or a
@@ -115,14 +116,6 @@ final class CancelOperationResponder: NSResponder {
         holdTheWindowsOwnPlaceIfLive()
     }
 
-    /// Puts this responder back into the window it was last in, if that
-    /// window is still there (the panel appeared again).
-    func reinstall() {
-        if let window {
-            install(in: window)
-        }
-    }
-
     /// Takes this responder out of its window's chain, leaving the chain
     /// joined up as it was, and gives the window back its own place.
     func uninstall() {
@@ -131,8 +124,15 @@ final class CancelOperationResponder: NSResponder {
         if let window, window.firstResponder === self {
             _ = window.makeFirstResponder(nil)
         }
-        if let contentView, contentView.nextResponder === self {
-            contentView.nextResponder = self.nextResponder
+        if let contentView {
+            var previous: NSResponder = contentView
+            while let next = previous.nextResponder {
+                if next === self {
+                    previous.nextResponder = self.nextResponder
+                    break
+                }
+                previous = next
+            }
         }
         self.nextResponder = nil
         self.contentView = nil
@@ -227,6 +227,86 @@ final class CancelOperationResponder: NSResponder {
         }
         if let next = nextResponder {
             next.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: sender)
+        }
+    }
+}
+
+/// Puts the panel's `CancelOperationResponder` into the chain of the window
+/// the panel is in, and keeps it told what the keys do (#988).
+///
+/// It draws nothing, takes no clicks, is not an accessibility element and
+/// carries no key: the keys reach the responder through AppKit's own
+/// `cancelOperation(_:)`, not through this view. It exists because AppKit's
+/// view life cycle is the one that says, exactly, when the panel joins and
+/// leaves a window (`viewDidMoveToWindow`, `dismantleNSView`), and
+/// `updateNSView` hands the responder the panel's current state on every
+/// update. Measured: a responder kept in the panel's `@State` and installed
+/// from `WindowAccessor` stayed in the chain after the panel had gone, and
+/// Escape still stopped the task (`988-classes-6`).
+struct CancelOperationInstaller: NSViewRepresentable {
+
+    // MARK: - Stored properties
+
+    /// Whether Escape and Command-Period press Cancel now.
+    let isEnabled: Bool
+
+    /// What they do: what clicking Cancel does.
+    let pressCancel: () -> Void
+
+    // MARK: - Functions
+
+    func makeCoordinator() -> CancelOperationResponder {
+        return CancelOperationResponder()
+    }
+
+    func makeNSView(context: Context) -> InstallerView {
+        let view: InstallerView = InstallerView()
+        view.responder = context.coordinator
+        context.coordinator.pressCancel = pressCancel
+        context.coordinator.isEnabled = isEnabled
+        return view
+    }
+
+    func updateNSView(_ nsView: InstallerView, context: Context) {
+        context.coordinator.pressCancel = pressCancel
+        context.coordinator.isEnabled = isEnabled
+    }
+
+    static func dismantleNSView(_ nsView: InstallerView, coordinator: CancelOperationResponder) {
+        coordinator.isEnabled = false
+        coordinator.pressCancel = nil
+        coordinator.uninstall()
+    }
+
+    // MARK: - Types
+
+    /// Joins the responder to its window's chain while it is in a window.
+    final class InstallerView: NSView {
+
+        // MARK: - Stored properties
+
+        var responder: CancelOperationResponder?
+
+        // MARK: - Functions
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let responder else {
+                return
+            }
+            if let window {
+                responder.install(in: window)
+            } else {
+                responder.uninstall()
+            }
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            return nil
+        }
+
+        override func isAccessibilityElement() -> Bool {
+            return false
         }
     }
 }

@@ -1703,11 +1703,22 @@ A plan share's console, a share rather than a deploy, stops at once as before.
 #988 review). AppKit turns Escape and Command-Period into one action message,
 `cancelOperation(_:)`, sent to the window's first responder and passed up the
 chain until something answers. `CancelOperationResponder`, an `NSResponder`
-that is not a view and draws nothing, is put into the window's chain just
-after the window (`install(in:)`, through the existing `WindowAccessor`) while
-the panel shows, and taken out, the chain joined up as it was, when the panel
-goes. It hears the message only when nothing nearer the focus answered it, and
-it answers only while the Cancel button shows, the run is under way, nothing
+that is not a view and draws nothing, sits in the window's chain between the
+content view and the window while the panel shows, and is taken out, the chain
+joined up as it was, when the panel goes. **Measured on the second Mac
+(`988-diag-3`, 2026-11-19): `NSWindow` answers `cancelOperation(_:)` itself
+and does nothing with it**, so a responder after the window never hears the
+keys; and with focus nowhere (Keyboard Navigation off, the macOS default) the
+window is its own first responder, so the message starts at the window. So
+while the keys are live the responder also takes the first-responder place the
+window would otherwise hold itself, and hands it back when they are not (every
+other key it is sent goes on to the window). `CancelOperationInstaller`, a
+representable that draws nothing, takes no clicks and carries no key, joins
+and removes it as AppKit's view life cycle says the panel joins and leaves a
+window: a responder kept in the panel's `@State` and installed through
+`WindowAccessor` stayed in the chain after the panel went, and Escape still
+stopped the task (`988-classes-6`). It hears the message only when nothing
+nearer the focus answered it, and it answers only while the Cancel button shows, the run is under way, nothing
 covers the panel (below), and `somethingElseWantsTheKey(in:)` is false: text
 being edited (`NSText`, the field editor every text field, search field and
 text view edits through), a visible child window (a popover), or an attached
