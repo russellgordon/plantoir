@@ -113,6 +113,14 @@ public static class CourseActivity
         Assist.WorkLease.IsHeld(folderPath, courseCode, Assist.WorkLease.Building);
 
     /// <summary>
+    /// The reason under an item greyed while this course deploys (the mac's
+    /// <c>CourseActivity.availableOnceDeployCompleted</c>); the deployed folder's
+    /// Open in Browser shows it too (#889, <c>offeredCases</c> "a deploy of the
+    /// section is running").
+    /// </summary>
+    public const string AvailableOnceDeployCompleted = "Available once deploy completed";
+
+    /// <summary>
     /// The short line naming what stands in the way of structural work on
     /// this course, or null when it is free.
     /// </summary>
@@ -122,7 +130,7 @@ public static class CourseActivity
         bool publishing = IsPublishing(folderPath, courseCode);
         if (previewing && publishing) return "Available once preview and deploy complete";
         if (previewing) return "Available once preview completed";
-        if (publishing) return "Available once deploy completed";
+        if (publishing) return AvailableOnceDeployCompleted;
         // Said in the app's voice, naming the thing the teacher started rather
         // than the process that holds the lease — and since #468 naming WHICH
         // thing: an outside session, or this app's own assistant window.

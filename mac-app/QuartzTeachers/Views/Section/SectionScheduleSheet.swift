@@ -355,6 +355,7 @@ struct SectionScheduleSheet: View {
             Button("Cancel", role: .cancel) {
                 dismiss()
             }
+            .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("sectionScheduleCancelButton")
 
             if let plan {

@@ -63,16 +63,24 @@ public class QuitConfirmationTests
     }
 
     [Fact]
-    public void KeepWorkingIsTheDefaultAndAPublishIsNamedFirst()
+    public void NoButtonIsTheDefaultCancelKeepsWorkingAndAPublishIsNamedFirst()
     {
+        // #987: no default button, Escape is Cancel, and Cancel keeps working.
         var buttons = ContractLoader.LoadJson("shared-rules.json")["quittingWhileWorkIsUnderWay"]!["buttons"]!;
-        Assert.Equal("keepWorking", buttons["default"]!.ToString());
+        Assert.Null(buttons["default"]);
+        Assert.Equal("keepWorking", buttons["escape"]!.ToString());
+        Assert.Equal(buttons["titles"]!["keepWorking"]!.ToString(), QuitConfirmation.KeepWorking);
+        Assert.Equal(buttons["titles"]!["quitAnyway"]!.ToString(), QuitConfirmation.QuitAnyway);
+        string window = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "MainWindow.xaml.cs"));
+        Assert.Contains("CloseButtonText = QuitConfirmation.KeepWorking,\n                            DefaultButton = ContentDialogButton.None,",
+                        window.Replace("\r\n", "\n"));
         var both = new QuitConfirmation.UnderWay(1, 0, 1, 0);
         Assert.Equal("a deploy", QuitConfirmation.WhatIsUnderWay(both));
         Assert.Contains("could leave it unfinished", QuitConfirmation.Question(both).Message);
         Assert.Contains("Nothing on the class website changes",
             QuitConfirmation.Question(new QuitConfirmation.UnderWay(0, 0, 1, 0)).Message);
-        Assert.Contains(QuitConfirmation.KeepWorking, QuitConfirmation.TrailLine(both, quitAnyway: false));
+        Assert.EndsWith("— the teacher chose to keep working", QuitConfirmation.TrailLine(both, quitAnyway: false));
+        Assert.EndsWith("— the teacher chose to quit anyway", QuitConfirmation.TrailLine(both, quitAnyway: true));
     }
 
     [Fact]

@@ -7,12 +7,17 @@ here. Cloudflare's redirect codes are not the test; this crawl is.
 
     crawl_deployed_folder.py --app <Plantoir.app> <folder>
     crawl_deployed_folder.py --plain-server <folder>     # the must-fail
+    crawl_deployed_folder.py --url <address> <folder>    # a server already running
 
 --app starts `<app>/Contents/MacOS/Plantoir --serve-deployed-folder <folder>`
 and FAILS (exit 2) when the bundle is not there: a check that was asked to
 run and could not is a failure, never a skip. --plain-server serves the same
 folder with `python3 -m http.server`, which adds no `.html`, and is expected
 to FAIL at the first page link: that is the proof this crawl can fail.
+--url crawls a server that is ALREADY serving <folder> at <address>
+(http://127.0.0.1:<port>/) and starts nothing: how Windows measures its own
+server (#889), which has no --serve-deployed-folder; nothing is stopped at
+the end either.
 
 Prints one summary line and exits 0 only when nothing was missing.
 """
@@ -136,6 +141,7 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--app")
     group.add_argument("--plain-server", action="store_true")
+    group.add_argument("--url")
     parser.add_argument("folder")
     arguments = parser.parse_args()
     folder = os.path.realpath(arguments.folder)
@@ -145,6 +151,8 @@ def main():
 
     if arguments.app:
         process, base = start_app(arguments.app, folder)
+    elif arguments.url:
+        process, base = None, arguments.url if arguments.url.endswith("/") else arguments.url + "/"
     else:
         process, base = start_plain(folder)
 
@@ -174,12 +182,13 @@ def main():
                     if status < 200 or status >= 400:
                         missing.append((here, link, status))
     finally:
-        if process.stdin:
-            process.stdin.close()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
+        if process is not None:
+            if process.stdin:
+                process.stdin.close()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
 
     print(f"{pages} pages, {links} links, {len(cache)} distinct addresses, {len(missing)} not found")
     for here, link, status in missing[:10]:
