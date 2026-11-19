@@ -14099,6 +14099,158 @@ is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
 
+## The launchers refuse an overlapping build (#828, mac #729), and #835's scheduled-deploy words (#854, #868)
+
+The first of #828's two pieces (828a). The second, Deploy greying while
+another program holds the course, is 828b and is not described here yet.
+
+### What was built
+
+- **`preview.ps1 --for-deploy`.** A deploy's own build leg says so on its
+  command line, so another launcher's guard reads it as a deploy rather than
+  as a rebuild (`app-rules.json` → `launcherFlags.preview`). It changes
+  nothing the build does and is not handed to `build_site.py`. Without
+  `--build-only` it is refused at the flags with the contract's line, exit 1.
+- **The shared guard block** (`deploy.ps1` and `preview.ps1`, byte for byte)
+  answers `later`, `another` or `building`. A deploy's build leg is
+  `another`; any other `preview.ps1 C S --build-only` in this folder that is
+  not `--stop` is `building`. Precedence later > another > building, whatever
+  order the rows arrive in. #386's preview guard counts `later` and
+  `another` only, so the assistant's rebuild still does not refuse a preview.
+  `Get-DeployRefusalSentence` maps who and leg to the contract's sentence key;
+  `preview.ps1` asks as `deploy-build` when it carries `--for-deploy`, which
+  prints `buildingDeploy` when another build is in the way. Details in
+  [03](03-launcher-scripts.md) → "A section still being deployed is not
+  deployed again".
+- **One builder for the app's build lines**, `PreviewCommand.BuildOnlyArguments`
+  (`Plantoir.Core/Scripting/PreviewCommand.cs`), with `forADeploy` REQUIRED,
+  as the mac's `buildArguments(forADeploy:)` is: true on
+  `MultiDestinationDeployRunner`'s build leg (the window's Deploy) and
+  `AssistWorkspace.Deploy` (both assistants); false on `RebuildPreview`,
+  `Apply` and `ApplyWholeUnit`. The scheduled wrapper's build
+  (`TaskScheduling`) keeps a plain `--build-only`: its own script already
+  counts as `later`. #799's `deploy.ps1` rebuild stays plain too: the
+  `deploy.ps1` that started it is an ancestor, and anyone else sees the pair
+  as `another`. `PreviewCommandTests.EveryBuildOnlyLineComesFromTheBuilder`
+  fails on a `"--build-only"` string literal anywhere else in `Plantoir.Core`,
+  `Plantoir` or `Plantoir.Mcp` (comment lines skipped, review L3), and on
+  `--for-deploy` in the wrapper's source. Only the body of
+  `TaskScheduling.WriteWrapperScript` is exempt, not the rest of that file
+  (implementation review L5; measured: a `"--build-only"` constant planted
+  just above the method fails the test, naming its line).
+- **An older launcher is never handed the flag (review M4).** `plantoir-mcp`
+  never refreshes a folder's launchers (only the window's
+  `ToolchainReadiness.Ensure` does), and an older `preview.ps1` refuses the
+  flag: measured, `origin/dev`'s `preview.ps1 ICS4U 2 --build-only
+  --for-deploy` printed `Unknown option: --for-deploy` and exited 1. So the
+  builder adds the flag only when the folder's own `preview.ps1` contains
+  `'--for-deploy'` (one shared-open read; a missing or unreadable file means
+  no). That older launcher's guard cannot count the flag anyway, so nothing
+  is lost. This is the Windows twin of the contract's knownLimits item about
+  two copies of Plantoir of different ages; here the second, non-mirroring
+  copy is `plantoir-mcp`. Rejected: the server calling `RefreshLaunchers`
+  itself, which would write the folder from a second process while the window
+  may be running `Ensure` on it. The other half of two copies of different
+  ages (review L4, reasoned from `LauncherRunner.cs` and the guard, not
+  driven): a `plantoir-mcp` still running from before an update builds a
+  deploy's build leg without the flag, so the new guards count it as
+  `building`, not `another`, and a serving preview pressed during that
+  deploy's build leg is not refused until that assistant session restarts.
+  Pinned by
+  `AssistWorkspaceTests.ADeploysBuildLegSaysItIsADeployOnlyWhereTheLauncherTakesIt`
+  and `PreviewCommandTests.AnOlderLauncherIsNotHandedTheFlag`.
+- **`FailureExplainer`** reads the two building lines (two more markers;
+  `SectionDeployRefusal.ByAnotherBuild`, from "is already being built"), and
+  `MultiDestinationDeployRunner.RefusalAnswer` says
+  `wording.deployRefusedWhileItsSectionIsBeingBuilt` for them; the window,
+  the in-app assistant and `plantoir-mcp` all answer through it.
+- **#835's words (#854).** The `later` lines and trail line, and
+  `AssistWording.DeployRefusedWhileALaterDeployWorks` and
+  `CourseIsBeingBuiltElsewhere`, say "a scheduled deploy that is still
+  running". `FailureExplainer.LaterDeployMarker` follows the new line and
+  `OlderLaterDeployMarker` still reads the old one, for a folder holding an
+  older launcher.
+
+### The runner (`windows-app/test_launcher_rules.ps1`)
+
+- **The translator gives a case's `cwd` precedence over a `{here}` path
+  (review M1).** Rows written `{here}/preview.sh` with cwd `elsewhere` are
+  another folder's run on the mac, where lsof's answer is the folder; on
+  Windows the script's path is the only folder evidence, so `elsewhere` is
+  written into it. With the old order, exactly three rows failed, whatever
+  the guard did (measured: "a deploy's build leg in ANOTHER folder does not
+  count" on each launcher, and the preview guard's "…in ANOTHER working
+  folder does not refuse").
+- Section 5 runs the `deploy-build` leg, three Windows-only build rows (a
+  rebuild started by `preview.bat`, whose `cmd.exe /c` line names no program;
+  a quoted spaced course on a deploy's build leg; a `-Command` build, the
+  known limit), every (who, leg) pair the cases name through the launcher's
+  own `Get-DeployRefusalSentence`, and the nine pairs `launcherCasesShape`
+  describes, and the third trail line.
+- **Section 11 reads the REAL process table.** A stand-in build, really
+  running as `powershell -File <folder>\preview.ps1 ICS4U 2 --build-only
+  [--for-deploy]`, against a copy of each launcher cut off right after its
+  guard (so a guard made wrong reaches no credential, build or network):
+  `buildingDeploy` and `anotherDeploy` from `deploy.ps1`, `buildingDeploy`
+  from `preview.ps1 --build-only --for-deploy`, each with its trail line in
+  `PLANTOIR_TRAIL_DIR`; a stand-in in another folder refuses nothing; each
+  copy passes alone; the real `preview.ps1` refuses `--for-deploy` alone.
+- Must-fail, by copy-and-restore in a scratch copy of the pure sections:
+  `origin/dev`'s guard block fails 32 rows (the 7 #729 cases on each
+  launcher, the preview guard's build-leg case, the Windows build rows, and
+  the sentences and trail lines); a `Get-DeployRefusalSentence` that ignores
+  `deploy-build` fails the fixed pair on each launcher; a preview guard
+  truthy on `building` fails "a build with --build-only is not a deploy" and
+  the `preview.bat` row; the old translator fails the three M1 rows;
+  `origin/dev`'s `MultiDestinationDeployRunner` fails the source scan and
+  the two refusal-answer tests.
+
+### Measured: two builds started at once (knownLimits L-a2, the Windows number)
+
+Real processes: two `powershell -File <folder>\preview.ps1 ICS4U 2
+--build-only`, each a copy of the REAL `preview.ps1` cut off after its guard
+(it then sleeps 5 s; refused, it exits 1), started N ms apart, 10 trials per
+gap (a scratch harness, not committed). Lenovo 20QES70500
+(i5-8365U, 16 GB, Windows 11 Pro 26200), Defender on, CPU at 60% from other
+agents' builds when it began, 2026-11-13.
+
+| Started apart | Both refused | One refused | None refused |
+|---|---|---|---|
+| 0 ms | 10 | 0 | 0 |
+| 250 ms | 10 | 0 | 0 |
+| 500 ms | 10 | 0 | 0 |
+| 1000 ms | 1 | 9 | 0 |
+| 2000 ms | 0 | 10 | 0 |
+| 4000 ms | 0 | 9 | 1 |
+
+The guard's own time, from the start of `Get-ProcessTable` to its answer,
+120 runs: median 810 ms, fastest 492 ms, slowest 1,777 ms. So the window in
+which both refuse is as long as the first launcher's look takes: about one
+second on this PC (median 810 ms, up to 1.8 s under load; both refused 10 of
+10 at 500 ms and 1 of 10 at 1 s), against "a
+few milliseconds" on the Mac (both refused 20 of 20 together, exactly one at
+50 ms and up): PowerShell's start plus the `Win32_Process` query is that
+long. The overlap never got through while both were starting: each look saw
+the other. The one "none refused" at 4 s is most likely the first stand-in
+having finished its 5 s before the second's look, which needs the second's
+start and look to have taken about 1.8 s or more (the first's look plus
+5 s, less the 4 s gap), at the edge of the slowest measured; this is
+reasoned, not measured (the harness kept no timestamps for that trial). The consequence
+(review L5), written down rather than built: two rebuilds asked of one
+`plantoir-mcp` in parallel tool calls, or a rebuild and a deploy pressed
+within about a second, are BOTH refused, in words ("already being built"),
+and nothing is built or sent; asking again goes ahead. The contract's
+`knownLimits` text stays the Mac's; no tie-break was added, for the reason it
+gives.
+
+### Rejected
+
+- Fixing M1's three red rows in the guard: the guard was right, the
+  translator wrote another folder's run into this one.
+- A `--for-deploy` on the scheduled wrapper's build or on `deploy.ps1`'s own
+  rebuild (`notUsedFor`): both are already counted through their ancestors.
+- Refreshing launchers from `plantoir-mcp` (above).
+
 ## A deployed folder opened in the browser (#889, the mac's #850)
 
 The mac's #850 (`09-mac-app.md` → "A deployed folder opened in the browser
@@ -14441,16 +14593,18 @@ Also owed by 889b, from the surface above and the fixes review:
 
 The mac's journal core is described in `documentation/09-mac-app.md` →
 "Undo and Redo: one list for the app (#899)", with what was measured and
-what was rejected. **Do not start it until U1's fix reviews have cleared**:
-the format changed after U1's two reviews and again after its two fix
+what was rejected. U1 merged into `dev` at cadd8eb11 on 2026-11-14 and the
+`windows` issue for it is #949, so steps 1 to 8 below may be built (this
+paragraph said "do not start it until U1's fix reviews have cleared" until
+then). The format changed after U1's two reviews and again after its two fix
 reviews (Russell's rulings 17 to 20 and the director's rulings on them),
 before any Windows reader existed, so that it would not change again under
-one, and the issue says when that is settled. The third round (2026-11-14)
-changed no byte a v1 line holds: it stated what a reader does with a
-`cleared` line, a `note`'s required keys and a segment with no time, and
-what `rule.deployed` reads. The Fable sweep the same day added four
-sentences a reader needs, with cases, and no byte of a v1 line changed
-either: the second bullet below. Steps 1 to 8 may start once U1 merges.
+one. The third round (2026-11-14) changed no byte a v1 line holds: it stated
+what a reader does with a `cleared` line, a `note`'s required keys and a
+segment with no time, and what `rule.deployed` reads. The Fable sweep the
+same day added four sentences a reader needs, with cases, and no byte of a
+v1 line changed either: the second bullet below. What Windows has built so
+far, and the pieces still to come, are the two sections after this one.
 
 Windows inherits free: the format (`contracts/file-formats.json` →
 `undoJournal`, which a reader is meant to be built from alone), the rule and
@@ -14574,7 +14728,8 @@ It owes, in this order (the contract review's recommendation):
 8. `deployedCases`: a pure function, for U6's offer to deploy. It needs the
    section's destinations as Windows knows them (primary and additional, by
    type) and whether each has a site marker, read from the same
-   `firstDeployMarkers` paths the scheduled deploy reads.
+   `firstDeployMarkers` paths the scheduled deploy reads. Built
+   2026-11-14 (W5): "Step 8 built: was it deployed?" below.
 
 Until each is built it is a named gap. What goes red on that side the day
 U1 merges, measured by reading the tests rather than running them: the
@@ -14593,3 +14748,322 @@ and only `begin`, `undoing` and `redoing` need the expensive flush
 byte-order mark (`String(contentsOf:)` does, as `File.ReadAllText` does),
 and the traces' writer does the same, so the BOM page in the fixture is
 rewritten without it on both platforms.
+
+### Step 8 built: was it deployed? (#899 piece W5, 2026-11-14)
+
+`Plantoir.Core/Undo/UndoWebsite.cs` answers `undo.rule.deployed` and
+nothing else: given the pages an Undo or a Redo changes (each with whether
+students can see it before and after), whether it also changes what a page
+says, the section's published-pages record, the destinations it deploys to
+now and which of them have a site marker, it says `OfferToDeploy`,
+`NoOffer` or `CannotTell`. It reads no journal, writes nothing, shows
+nothing and offers nothing; nothing calls it until W10 (U6) makes the
+offer. No statics and no clock: `Answer` is pure, and `Inputs(course,
+section)` is the one reader of the disk, taking the course it reads.
+
+**The record it reads, and why that one.** The contract means
+`courses\<CODE>\.publish_state\section<N>.published-pages\`, one fragment
+`yyyyMMddTHHmmssZ-<destination>.json` per destination a deploy reached,
+read by its `places` only. On Windows it is written by `deploy.py`'s
+`record_published_pages` after each Netlify (`-netlify.json`) or
+Cloudflare (`-cloudflare.json`) upload, and by `deploy.ps1`'s
+`Record-PublishedPages` after a folder publish (`-folder.json`, the
+folder branch never entering `deploy.py`), each copying the build's
+`.visible-pages.json` only when its `buildId` matches `.build-id`. So the
+app's button, a scheduled deploy and a deploy typed at the command line
+leave the same trace, and #799's per-host builds (each host built for its
+own address) each leave their own fragment after their own upload. #799's
+freshness records (`BuildFreshness`, the build-started marker, the
+preview stamp) say whether the LAST BUILD reflects the course, not what any
+website shows, so they are not this record. `LinksChecklist.PublishedPlaces`
+reads the same folder as a UNION of every fragment of every destination,
+which is the right question for "has this page ever been on a site" and
+the wrong one here: it is not reused, and a must-fail below shows why.
+
+**Inputs, as Windows spells them.** The destinations are
+`CourseConfiguration.AllDeployDestinations` (primary first, then
+additional), mapped `netlify` (or absent) → `netlify`, `cloudflare_pages`
+→ `cloudflare`, `local_folder` → `folder` (the plan review's L7: the
+fragment says `folder`). A type no deploy accepts maps to nothing and is
+not read, since `deploy.ps1` refuses it. The markers are
+`DeployCommand.FirstDeployMarkerPath`'s, the ones the scheduled deploy
+reads. Only the newest fragment of each destination read is OPENED: a
+year of deploys is hundreds of fragments, and an older one cannot change
+the answer.
+
+**What the cases do not say, and what Windows does** (tests named
+`Proposed_`, proposed to the Mac as authored cases, not written into the
+contract): a record folder that cannot be listed is `CannotTell` for every
+destination (none: `NoOffer`); a fragment is read by its `places`
+whatever its `version` says, absent included; a fragment whose `places`
+is missing, not a list, or holds a non-string is unreadable, and so is
+one whose bytes are not valid UTF-8 or whose text holds half of a
+surrogate pair (only matters when it is the newest; before the W5
+review's M1 those two threw out of `Inputs` instead); an op path not of
+the shape `courses/<CODE>/<place>.md`, or one holding half of a surrogate
+pair (NTFS allows it in a name, and it has no normalization form C), is
+`CannotTell`; a change to what a page says
+in a section never deployed is `NoOffer` (the rule's own NO OFFER sentence
+comes first); a destination type no deploy accepts is not read. Also
+pinned, from the rule's words: a missing record folder is no fragments; a
+fragment held open by another program, or with a byte-order mark; two web
+hosts in different states, each read on its own.
+
+**Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200):
+the 18 `deployedCases` pass twice, through `Answer` and through a real
+course folder read by `Inputs` (`UndoWebsiteContractTests`). Each of
+nineteen plausible wrong implementations, put in place one at a time,
+turns named cases red; the list is in #899's closing comment for W5.
+Among them: reading every destination (the contract review's I1 case),
+the union of fragments, ordinal without NFC (the composed and decomposed
+name), the primary destination only, a folder counted as always deployed
+(which is what `firstDeployMarkers` says of a folder for the scheduled
+deploy's question, and wrong here), and an answer read from the journal
+(which no deploy writes: every offer case red).
+
+### What Windows has built: W1, reading the journal (#899, #949)
+
+Piece W1 (branch `issue/899-w1-reading-the-journal`, 2026-11-14) is the
+READING half of steps 1, 2 and 4 above. Nothing in it writes a journal,
+takes the lock or changes a page; nothing a teacher sees changed; no menu,
+no switch, no trail line (it makes no teacher-visible behaviour, so rule 5
+has nothing to record), and no tool, description, schema or phrasing of the
+built-in assistant moved. Everything is in `windows-app/Plantoir.Core/Undo/`
+and nothing in the app calls it yet.
+
+- **`UndoFormat`**: one line read with `JsonDocument`, never a typed
+  deserialiser, and never throwing. Bytes are decoded as STRICT UTF-8 (a line
+  that is not is unreadable, and the blob names in its bytes are kept). A
+  line, step or op it cannot read comes back marked unreadable with whatever
+  could be read of its seq and its blob names, so the fold KEEPS it. Every
+  sentence of `unknown`, `eventKeys`, `events.note`, `stepKeys` and `opKinds`
+  is one test in `UndoFormatTests`, the four Fable-sweep sentences included
+  (an unknown `maintainer` and an unknown `holds` are barriers; `madeBy`,
+  `class` and `action.key` are open strings; an unknown key on a known op is
+  ignored; `madeBy` split at its ends).
+- **`UndoFold`**: the lines into steps. `UndoFold.Moves` is the contract's
+  `folding.moves` table as text, and `UndoFoldMovesContractTests` compares it
+  with the JSON row for row (a row the mac adds is red here) and exercises
+  every row, the state each must reach read from the row. A clearing marks a
+  step in flight, which leaves the list when its work ends in done or undone;
+  a barrier with no seq stands between the step numbered by the highest seq
+  before it and the next.
+- **`UndoLimits.Offer`**: what Undo and Redo act on, with the 50 steps and 30
+  days judged when the list is read, the step time as the latest `madeAt`
+  so far, and the moment judged at as the clock or a step time up to a day
+  ahead of it; a newer step in flight refuses both, or greys both when its
+  process is gone and its folder cannot be reached.
+- **`UndoPruning`**: pruning (one oldest run; a dead process's step in flight
+  there closed `unsettled`, a running one stopping the run; nothing for age
+  while the clock is behind the journal) and deletion (segments from the
+  oldest end only; one holding a line this version cannot read kept until its
+  own newest `at`, or the first later segment's, is past 60 days; a blob kept
+  while anything on the list or anything unreadable in a kept segment names
+  it), both as PURE decisions. W2 carries them out under the lock.
+- **`UndoEntries` and `UndoCheck`**: the `editLine` entry model (the block
+  found by `PageVisibilityReader.FenceIndices`, used unchanged, the plan
+  review's L5; the entry rule is the reference model's `Layout`), its pure
+  `Move` in either direction, the state of one op against what is on the disk
+  now, and `UndoCheck.Plan`, the all-or-nothing check of a whole step that
+  works out every file's new bytes and writes nothing. U1's F2 is built in
+  from the start: a line op that cannot be placed is `changedSince`, and a
+  page in the way is reported before missing content.
+- **`UndoCurrent.Read`, and what Windows does with a read that fails.** The
+  check reads asking only to READ and sharing everything
+  (`FileShare.ReadWrite | FileShare.Delete`), never with write or delete
+  access. A page held with no read sharing, a cloud file not available
+  offline or a network error is `CannotReadNow`, and it ends as the
+  contract's `fileIsInUse` ends: refused, named, nothing on the list changed
+  (the plan review's M3). It is NEVER `changedSince`, which would clear the
+  whole list under ruling 13 for a file that was merely busy. The contract
+  has no case for it yet: the tests are named `Proposed_*`, and the proposed
+  authored cases (with a failing staging write and the read-only bit) are a
+  `mac` issue. A holder that shares reading (Word, many editors) does not stop
+  a read, measured (the review's M2): only a swap is refused under it, which
+  is W2's.
+- **`FolderIdentityFile`**: `folder-id` and `computer-id`, written lower case
+  with one LF and no BOM, made exclusively (temp, then `CreateHardLinkW` onto
+  the name, 183 meaning another made it; `FileMode.CreateNew` in one write
+  where there are no links), read leniently, an empty file under ten seconds
+  old by the injected clock a creator at work, a damaged one set aside only
+  while it is still the same file (volume serial and file index) and put back
+  if it holds an identifier.
+- **`UndoJournal`**, an INSTANCE (the plan review's H1): its folder, clock
+  (`System.TimeProvider`, the smallest seam: it is in the BCL, so nothing was
+  added to `Plantoir.Core`'s references), liveness, reach and switch are all
+  constructor arguments, and nothing in `Undo/` is static state. Only the
+  app's start-up will hand it the real state folder (W4). Segments are read
+  with delete sharing; a sharing violation is retried for a bounded time
+  (two seconds in the app, zero in tests) and then the reading is the LAST
+  state read, marked not fresh, never "unreadable" and never reset. Lines are
+  split at LF only (a CR before it is JSON white space); bytes after the last
+  LF are a torn line and are not counted. Liveness is `WorkLease.OwnerIsAlive`'s
+  rule (`UndoJournalChecks.ProcessIsAlive`; `WorkLease.StartMoment` did not
+  need to change); a step with no readable `process` is judged gone for the
+  offer and for pruning, so nothing stays in flight for ever, but
+  `UndoJournalChecks.RecoveryMaySettle` says recovery never settles it (the
+  review's M3, below).
+  Reach is "the folder is at `pathAtTheTime` and its `folder-id` is the
+  step's"; U7 adds the recent folders.
+
+**Walked from the contract, never retyped:** `checkCases` (30, each page
+written to the disk from `text` or `bytesHex` and read back through
+`UndoCurrent.Read`), `folding.moves` (20 rows), `stackCases` (all 46) and
+`undo-traces.json` (all 20 traces, all 612 calls, every `expect`, `head` and
+`redo`, and `afterUndoingAll` and `final` as page hashes, the pages written
+from `utf8Hex`). The stack cases and traces run through `UndoScribe`, a
+TEST-ONLY stand-in for W2's door that appends the lines the contract says a
+door writes; every decision it acts on is the product's (`Offer`, `Plan`,
+`Decide`, `Deletable`, `NextSeq`), and the journal is read back from the disk
+after every line. The traces' writer (`settingEntry`) and the op derivation
+(`line_ops`) are test-only too (`UndoLineOps`), ported from
+`scripts/make_undo_traces.py`; W2 moves the writer into the product as
+`JournaledSetting`. What the scribe does NOT have is everything W2 owns: no
+lock, no staged swap, no flush, one process. Each count is asserted at or
+above its value today, so a list cannot silently fall to zero.
+
+**Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
+.NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
+the spread is wide): a whole read, fold and offer of one segment, by a scratch
+harness outside the gate (`work\899w1\measure`), 11 runs each, the first in a
+fresh process:
+
+| Segment | Steps | First | Then (median, min to max) |
+|---|---|---|---|
+| 1.00 MiB of one-page steps | 1,665 | 413 ms | 253 ms (128 to 302) |
+| 1.04 MiB of 233-page steps | 28 | 119 ms | 95 ms (80 to 106) |
+| 4.00 MiB of one-page steps | 6,642 | 538 ms | 433 ms (386 to 493) |
+| 4.03 MiB of 233-page steps | 109 | 339 ms | 178 ms (126 to 311) |
+
+Linear in the bytes and the lines, and slower than the mac's first reads
+(50.8 ms at 1 MB, 170.9 ms at 4 MB, M4 Pro), which read on from where they
+stopped: W1 reads whole, every time. Reading on (W2a's `UndoStore`) is what
+makes the ordinary step cheap; measure the door's first step against these.
+Scanning every line for blob names, which only an unreadable line needs, was
+made lazy after the first measurement (1 MiB one-page: 281 ms to 253 ms
+median, inside the noise). The undo test classes run in about 25 s together
+(the 20 traces about 19 s alone).
+
+**Must-fail proofs** (each wrong implementation put in place, the filtered
+undo tests run, the file put back and touched; 308 tests in the filter):
+a reader that SKIPS what it cannot read (20 red: format, reading, pruning and
+stack cases); a culture-aware compare (1: the "same title in another Unicode
+form" check case); `File.ReadAllText` for the current page (10: check cases,
+the traces, the ReadWrite-holder test); a failed read taken as changed since
+(5: every `Proposed_*` read test); a clearing that checks its reason (8); a
+step's time as its own `madeAt` only (1: "a clock set back for one step");
+deletion that forgets what an unreadable line keeps (2); a clearing that
+leaves a step in flight alone (6); any `recompute` maintainer read as
+readable (4); the next number counted from readable lines only (4).
+
+**Rejected:** a typed deserialiser (the mac's first bug: it threw and the line
+was skipped); a fourth verdict word of Windows' own for a failed read (M3: the
+contract's `fileIsInUse` already says what happens); probing a page with an
+exclusive open to find holders (M2: every page Obsidian has open would be
+refused); `File.ReadAllText` anywhere in a check (it drops a BOM and replaces
+bad bytes without a word); a culture-aware compare anywhere (it calls a
+precomposed é equal to a decomposed one); a static journal, a static clock or
+a static switch (H1: test classes run in parallel); changing
+`PageVisibilityReader` for the BOM case (L5: its publish-path callers pass
+text with no BOM).
+
+**The implementation review's fixes (2026-11-19).** The review (Opus,
+2026-11-14, `reviews\899-w1-impl-review.md` of the v2.0.0 Windows run)
+found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
+
+- **H1, a good `folder-id` set aside.** `SetAside` took the file's identity
+  at the moment of the call and compared the file with itself, so the
+  "still the file inspected" guard always passed, and a good identifier
+  another process had just made could be moved aside and lost (measured by
+  the review: 3,000 of 3,000 moved under a concurrent maker), greying Undo
+  for that folder for good. `Read()` now takes the identity (volume serial,
+  file index) from the SAME handle it read the bytes through, and
+  `SetAside(inspected)` opens the name once with delete access (sharing
+  everything), compares THAT handle with the identity inspected, reads it
+  again, and renames through it (`SetFileInformationByHandle`,
+  `FileRenameInfo`, never replacing). The first fix compared by path and
+  then moved by path, which the review's second round showed still lets
+  another process set the damaged file aside and make a good one between
+  the two, so the good one was moved (and a move back fails once a third has
+  made its own). Through the handle, what is moved is provably the file
+  inspected, wherever it now is. `AFileSetAsideByAnotherProcessBetweenThe
+  CheckAndTheRenameIsNeverTheGoodOne` runs exactly that interleaving
+  through a seam between the check and the rename, and a second seam
+  straight after the rename lets a third process make its own identifier
+  if the name is free. The third maker is what makes the test bite: without
+  it the compare-by-path code moved the good file aside, saw it was not the
+  file inspected and moved it back unharmed, so the test passed with the
+  fix reverted (found by the fix review). With it, that code fails (VM run
+  on 41831de19, 2026-11-19: the name held the third identifier, the good
+  one stranded aside), and the handle rename passes. A creator still writing
+  holds its file with no sharing, so the open fails and nothing moves. The
+  mac's equivalent (compare and rename by descriptor) is #1004, item 1.
+- **M1, a page gone with its drive.** A page whose folder is not there reads
+  `Absent`, which is `changedSince`, and ruling 13 would clear the whole list.
+  `UndoCheck.Plan` takes `folderIsReachable` and asks it again when every page
+  in the way is absent; when the folder cannot be reached the answer is
+  `FolderCannotBeReached` (greyed, nothing cleared). W2's door must pass it.
+  This follows the rule the mac adopts in U2b (#899): a failed read or a
+  folder that cannot be reached is "cannot tell now", refused without
+  clearing the list.
+- **M2, a stale reading.** A reading that is not fresh holds the LAST state
+  read (empty on a first read) beside the segments on the disk now, and
+  deletion decided from that mix made live blobs deletable. Pruning and
+  deletion now take one `UndoReading` (fold and segments from the same read)
+  and decide nothing from one that is not fresh; `UndoJournal.Offer(reading)`
+  greys both Undo and Redo for it rather than saying "Nothing to undo".
+- **M3, a process that cannot be identified.** Judged gone for pruning, which
+  is right, but recovery (W3) writes pages, and a live process of another
+  version might still be swapping files: `RecoveryMaySettle(null)` is false.
+  Proposed to the mac as a `recoveryCases` row.
+- **M4, a `madeAt` that does not parse.** Its time was the oldest moment
+  there is, so it expired at once: no barrier, pruned on the next step. It
+  now does what the mac's `effectiveTimes` does: it carries the previous
+  step's time, or has none, and a step with none never ages out (it stands
+  as a barrier and is not pruned for age). The first fix took the begin's
+  `at`, else the clock, which made that step and every later one never age
+  out; the second round removed it. A `madeAt` (or `at`) with an offset such
+  as `+00:00` IS a moment, read into UTC as the mac's `UndoMoment.date`
+  reads it; before, Windows made such a step unreadable. Settling this for
+  both in the contract is #1004, item 4.
+
+**The mac's U2a read rule**, applied at the same time: a file of the list that
+is there and cannot be opened or read is never an empty or shorter list. A
+segment that cannot be read, a folder that cannot be listed, or a NEWEST
+segment gone since the listing makes the reading not fresh; only an older
+segment pruned since the listing is passed over. A blob that is there and
+cannot be read throws `UndoListUnreadableException` (never content missing,
+which clears the list), and so does a content folder that cannot be listed.
+Neither folder is asked `Directory.Exists` first, which answers false for a
+folder it could not look at: only `DirectoryNotFoundException` is "not
+there". Here Windows is stricter than the mac today: a newest segment gone,
+and these listings, are #1004 items 2 and the closing paragraph.
+`UndoJournal` takes an `open` seam for the tests of each.
+
+**Known differences to KNOW** (not to do): a key twice in one object is read
+as unreadable at that level (JSON does not say which is meant); a
+`writeFile`'s `beforeSha`/`afterSha`, when present, must be 64 lower-case hex
+characters; FAT and exFAT file indexes across a re-open were NOT measured (no
+such volume on this PC), which matters only to W2's reading on.
+
+### The pieces still owed for #899 on Windows, and what each waits for
+
+The plan (`plans/899-plan.md` of the v2.0.0 Windows run) as amended by its
+review: W2 is split in two (M8), and W4 no longer records publish and hide in
+shadow (M1: #949 says Windows records nothing in shadow before U3), so that
+recording and the trail event `undo could not record a step` move to W7.
+
+| Piece | What | Waits for |
+|---|---|---|
+| W2a | `UndoLock` (`LockFileEx` without `LOCKFILE_FAIL_IMMEDIATELY` on a `CreateFileW` overlapped handle .NET never binds), `UndoStore` (segments, the LF-only append, the torn line cut inside the lock, reading on, blobs by a no-overwrite rename), pruning and deletion carried out, `UndoJournalLocation` | W1 merged |
+| W2b | `UndoSwap` (the POSIX-semantics rename, `MoveFileEx` only on 87 / not supported; the page's own attributes and creation time copied onto the staged file before its rename; the read-only bit classified; staged files removed on every failure path, F1), `UndoDoor` (step, undo, redo, refusal, clearing, dropping), `JournaledSetting`; `stepCases`, the stack cases and traces through the real door instead of the scribe | W2a merged |
+| W3 | recovery, the refused-swap schedule, `interrupted` and `unsettled` closed, staged files tidied; `recoveryCases`; the kill harness outside the gate; the ledger entry for `undo rolled back` out | W2b merged |
+| W4 | doc 12's step 7 and the scaffolding: where the list lives (following `--state-dir`), `madeBy` from `AssistWorkspace.Surface` (L1), the writer scan | W2a merged; no longer after W3 |
+| W5 | `rule.deployed` as a pure function, `deployedCases` (18), `local_folder` read as `folder` (L7) | nothing; beside W1 |
+| W6 | the reserved op kinds and running `recompute` | the mac's U2 |
+| W7 | every daily page action through the door, publish and hide recorded (M1), `undo could not record a step` | the mac's U3, and #900 and #927 where they rewrite a writer |
+| W8 | settings (`editJSON`, never `writeFile`, on `course_config.json`), renames, New Course, reference courses; rollover and restore | the mac's U4; #897 B; #909 and #873 |
+| W9 | Delete Backup and Delete Archive to the Recycle Bin | the mac's U5 and Windows' 785a (#912) |
+| W10 | the offer to deploy after an Undo or Redo | the mac's U6, and W5 |
+| W11a | the flip, recovery at a windowed launch, holds, reach, titles, `undo_last_change`'s body, today's three histories retired | the mac's U7; #904/#829 |
+| W11b | Edit ▸ Undo and Redo, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, typing first, the two-process UI test | W11a |

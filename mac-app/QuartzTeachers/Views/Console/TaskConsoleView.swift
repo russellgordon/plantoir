@@ -48,8 +48,8 @@ struct TaskConsoleView: View {
                         Label(ScriptRunner.closedForADeployOutcome, systemImage: "stop.circle.fill")
                             .foregroundStyle(.secondary)
                     } else {
-                        Label("Failed (exit \(exitCode))", systemImage: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                        Label("Failed (exit \(exitCode))", systemImage: StatusColour.blocking.filledSymbolName)
+                            .foregroundStyle(StatusColour.blocking.style)
                     }
                 }
             }
@@ -84,8 +84,7 @@ struct TaskConsoleView: View {
             .background(.background.secondary)
 
             if let problem = runner.launchProblem {
-                Text(problem)
-                    .foregroundStyle(.red)
+                StatusColour.blocking.sentence(problem)
                     .padding(8)
             }
 

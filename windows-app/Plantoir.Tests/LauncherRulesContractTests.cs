@@ -74,7 +74,10 @@ public class LauncherRulesContractTests
         Assert.Contains($"ledger: {held.Count} held pairs read", output);
         Assert.Equal(held.Count, output.Split('\n').Count(line => line.StartsWith("ledgered [", StringComparison.Ordinal)));
 
-        Assert.Contains(" 0 failed", output);
+        // Say WHICH rows failed: the output's head is the port walk's skips,
+        // so a Contains failure would show nothing useful.
+        Assert.True(output.Contains(" 0 failed", StringComparison.Ordinal),
+            string.Join("\n", output.Split('\n').Where(line => line.StartsWith("FAIL", StringComparison.Ordinal) || line.Contains(" passed, ", StringComparison.Ordinal))));
         Assert.DoesNotContain("FAIL", output);
         // A runner that skipped everything would also say "0 failed".
         Assert.Matches(@"(\d{2,}) passed", output);
@@ -167,7 +170,7 @@ public class LauncherRulesContractTests
                 yield return Row("deployWhileItsSectionDeploys.sentences/" + launcher, key);
                 yield return Row("deployWhileItsSectionDeploys.sentences/" + launcher, key + " (second line)");
             }
-            foreach (string field in new[] { "launcherLineWhenALaterDeployIsStillWorking", "launcherLineWhenItsSectionIsAlreadyBeingDeployed" })
+            foreach (string field in new[] { "launcherLineWhenALaterDeployIsStillWorking", "launcherLineWhenItsSectionIsAlreadyBeingDeployed", "launcherLineWhenItsSectionIsAlreadyBeingBuilt" })
                 if (declined[field] is not null)
                     yield return Row("activityTrail/" + launcher, field);
         }
@@ -297,7 +300,8 @@ public class LauncherRulesContractTests
         Assert.True(at < deploy.IndexOf("$py = Enter-NativeRuntime", StringComparison.Ordinal), "asked after the runtime is entered");
 
         string preview = Launcher("preview.ps1");
-        const string previewCall = "if ($BUILD_ONLY -and -not $STOP_MODE) {\n    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) 'build'\n}";
+        // A deploy's own build leg (--for-deploy, #828 / mac #729) asks as 'deploy-build'.
+        const string previewCall = "if ($BUILD_ONLY -and -not $STOP_MODE) {\n    $guardLeg = 'build'; if ($FOR_DEPLOY) { $guardLeg = 'deploy-build' }\n    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) $guardLeg\n}";
         Assert.Single(Occurrences(preview, "Stop-WhileThisSectionDeploys $"));
         int build = preview.IndexOf(previewCall, StringComparison.Ordinal);
         Assert.True(build > 0, "preview.ps1 no longer asks on a --build-only run");

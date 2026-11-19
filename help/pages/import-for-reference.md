@@ -70,7 +70,7 @@ You can also put a ready-made course straight onto the shelf, to read and copy f
 
 - **You pressed {{control:importForReferenceSheetStopButton}} while courses were being copied.** The courses already imported are kept. The one that was being copied is not.
 - **Nothing is ticked.** The sheet asks you to tick the courses you want.
-- **An orange sentence says you already have that course kept for reference from that year.** Choose a different school year, or press {{control:referenceCourseReplaceItButton}}. See [Replace a reference course](page:replace-reference-course).
+- **A sentence says you already have that course kept for reference from that year.** Choose a different school year, or press {{control:referenceCourseReplaceItButton}}. See [Replace a reference course](page:replace-reference-course).
 - **You chose the working folder you have open.** The sheet tells you to use {{menu:courseKeepACopyForReference}} instead. A folder inside the open working folder, or one that holds it, is refused too.
 - **A backup or archive cannot be opened**, or it holds no course, or more than one. The sheet says which.
 - **There is too little room on this {{machine}}**, or a course's settings cannot be read. The sheet says so.

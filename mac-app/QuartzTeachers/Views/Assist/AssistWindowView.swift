@@ -632,7 +632,7 @@ private struct AssistRestoreNoteView: View {
     var body: some View {
         Label(note.text, systemImage: note.isProblem ? "exclamationmark.triangle" : "clock.arrow.circlepath")
             .font(.callout)
-            .foregroundStyle(note.isProblem ? Color.orange : Color.secondary)
+            .foregroundStyle(note.isProblem ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.secondary))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("assistRestoreNote")
@@ -733,7 +733,7 @@ private struct AssistEntryView: View {
         case .problem:
             HStack {
                 Label(entry.text, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(StatusColour.warning.style)
                     .textSelection(.enabled)
                     .padding(.leading, 12)
                     .padding(.trailing, 9)

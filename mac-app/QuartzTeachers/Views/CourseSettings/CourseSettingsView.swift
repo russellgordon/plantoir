@@ -405,13 +405,12 @@ struct CourseSettingsView: View {
                 // it explains (#373). It used to be said only under
                 // Deploying, screens away from a section's settings.
                 if let saveProblem {
-                    Text(saveProblem)
-                        .foregroundStyle(.red)
+                    StatusColour.blocking.sentence(saveProblem)
                         .font(.callout)
                 } else if saveIsHeldBack, let holdingProblem {
-                    Text(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
+                    // It stops Save, so the stopping red and its symbol (#994).
+                    StatusColour.blocking.sentence(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
                         .font(.callout)
-                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("saveHeldBackReason")
                 }
@@ -529,9 +528,8 @@ struct CourseSettingsView: View {
             ExampleCaption(HowITeachButtonWording.caption)
                 .accessibilityIdentifier("howITeachCaption")
             if let howITeachProblem {
-                Text(howITeachProblem)
+                StatusColour.blocking.sentence(howITeachProblem)
                     .font(.caption)
-                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("howITeachProblem")
             }
