@@ -1174,7 +1174,7 @@ nonisolated enum UndoContractReplay {
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
-        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace",
+        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace", "nextWrite", "ordinaryWriteOn",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1380,9 +1380,14 @@ nonisolated enum UndoContractReplay {
                 )
             } else if recoveredBy == "anOrdinaryWrite" {
                 // A write through U1's door, whose recovery cannot re-derive:
-                // it leaves the step for one that will.
-                let thirdChanges: [UndoFileChange] = changes(setting: [(path: otherPage, key: "publish", line: "publish: true")], in: root)
-                _ = JournaledWrite.perform(draft(changes: thirdChanges, root: root, action: "publishPages"), in: survivor, mode: .live)
+                // it refuses while the step waits for one that will.
+                let onPage: String = string(testCase["ordinaryWriteOn"]) == "first" ? first : otherPage
+                let thirdChanges: [UndoFileChange] = changes(setting: [(path: onPage, key: "title", line: "title: Written over")], in: root)
+                let written: JournaledWriteOutcome = JournaledWrite.perform(draft(changes: thirdChanges, root: root, action: "publishPages"), in: survivor, mode: .live)
+                let word: String = written == .anotherChangeIsUnderWay ? "anotherChangeIsUnderWay" : (written == .changedNothing ? "changedNothing" : "\(written)")
+                if let wanted = string(testCase["nextWrite"]), wanted != word {
+                    failures.append("recoveryCases '\(name)': the ordinary write came to \(word), not \(wanted)")
+                }
             } else if mode == .live {
                 // As the app recovers: under the lock, then the re-derivation
                 // of what it settled, awaited outside it.

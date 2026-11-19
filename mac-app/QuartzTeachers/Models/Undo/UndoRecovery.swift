@@ -281,6 +281,23 @@ nonisolated enum UndoRecovery {
         return kept
     }
 
+    /// The number of a step a dead process left in flight that keeps a file
+    /// true by a rule, on this course (any course when none is given): the
+    /// plain doors refuse while one waits, because only a recovery that
+    /// re-derives may settle it (the third hard review of U2b, LOW 1).
+    static func deadStepThatKeepsAFileTrue(_ writer: UndoJournalWriter, course: String?) -> Int? {
+        for record in writer.fold.inFlight where UndoRecovery.keepsAFileTrue(record.step) {
+            guard let process = record.process, !writer.journal.processIsAlive(process) else {
+                continue
+            }
+            if let course, let stepCourse = record.step.course, course != stepCourse {
+                continue
+            }
+            return record.step.seq
+        }
+        return nil
+    }
+
     /// Whether a step holds a `recompute` op.
     static func keepsAFileTrue(_ step: UndoStep) -> Bool {
         for op in step.ops where op.knownKind == .recompute {

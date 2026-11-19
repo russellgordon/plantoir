@@ -87,6 +87,12 @@ nonisolated enum JournaledWriteOutcome: Equatable, Sendable {
     /// Live mode, and the list could not be written: nothing was changed.
     case couldNotRecordTheStep
 
+    /// Live mode, and a step that keeps a file true by a rule was left part
+    /// way by a process that died, on the same course: it must be settled
+    /// and re-derived first (`performAndRederive`, `undoNewestAndRederive`),
+    /// so this door changes nothing (the third hard review of U2b, LOW 1).
+    case anotherChangeIsUnderWay
+
     /// Something was in the way, and nothing was changed.
     case refused(UndoRefusal)
 
@@ -214,6 +220,8 @@ nonisolated enum JournaledWrite {
         let seq: Int
         do {
             seq = try begin(draft, ops: ops, in: journal, mode: mode)
+        } catch UndoJournalError.notTheNewestStep where mode == .live {
+            return .anotherChangeIsUnderWay
         } catch {
             UndoTrailHook.couldNotRecord(draft: draft, mode: mode, problem: error)
             if mode == .live {
@@ -265,6 +273,9 @@ nonisolated enum JournaledWrite {
         let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
         return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
             UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root)
+            if mode == .live, let waiting = UndoRecovery.deadStepThatKeepsAFileTrue(writer, course: draft.course) {
+                throw UndoJournalError.notTheNewestStep(waiting)
+            }
             var wholeFilePaths: Set<String> = []
             for op in ops where op.knownKind == .writeFile {
                 if let path = op.path {
@@ -381,6 +392,8 @@ nonisolated enum JournaledWrite {
         let seq: Int
         do {
             seq = try beginOps(draft, in: journal, mode: mode, places: places)
+        } catch UndoJournalError.notTheNewestStep where mode == .live {
+            return .anotherChangeIsUnderWay
         } catch {
             return .couldNotRecordTheStep
         }
@@ -522,6 +535,9 @@ nonisolated enum JournaledWrite {
         let wait: Double = mode == .live ? UndoSwitch.lockWaitSeconds : UndoSwitch.shadowLockWaitSeconds
         return try journal.withLock(waitingAtMost: wait, inShadow: mode == .shadow) { writer in
             UndoRecovery.run(writer, mode: mode, trySwapsNow: false, resolveRoot: UndoReach.root, places: places)
+            if mode == .live, let waiting = UndoRecovery.deadStepThatKeepsAFileTrue(writer, course: draft.course) {
+                throw UndoJournalError.notTheNewestStep(waiting)
+            }
             for blob in draft.blobs {
                 try writer.writeBlob(blob)
             }
