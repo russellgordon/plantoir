@@ -2936,13 +2936,17 @@ struct SectionRowWarningBadge: View {
 
     // MARK: - Computed properties
 
-    var body: some View {
+    /// White with the row's words on a selected row; the caution orange
+    /// otherwise.
+    var badgeStyle: AnyShapeStyle {
         if SidebarView.warningBadgeFollowsTheRow(prominence: prominence) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.foreground)
-        } else {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(StatusColour.warning.color)
+            return AnyShapeStyle(.foreground)
         }
+        return AnyShapeStyle(StatusColour.warning.color)
+    }
+
+    var body: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundStyle(badgeStyle)
     }
 }
