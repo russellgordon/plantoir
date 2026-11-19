@@ -1,5 +1,4 @@
 import Observation
-import SwiftUI
 
 /// The progress panel's stop question while it is being asked (#988, the
 /// fourth review): whether it is open, and its "Don't ask again" box. The
@@ -11,7 +10,8 @@ import SwiftUI
 /// on to stop; Cancel remembers nothing; each question has its own setting;
 /// while a question is off, Cancel stops that task at once, as a preview's
 /// does. Alerts, https://developer.apple.com/design/human-interface-guidelines/alerts:
-/// the stopping button is the default, so Return stops.
+/// the stopping button is the default, so Return stops (its key is written
+/// on the button in `TaskProgressView`, where the shortcut scan reads it).
 @Observable
 final class StopQuestionAsking {
 
@@ -30,12 +30,6 @@ final class StopQuestionAsking {
     /// The question's "Don't ask again" box. Unticked each time the question
     /// opens, and read only by `chooseStop()`.
     var dontAskAgain: Bool = false
-
-    /// The stopping button's key: Return, as the default button.
-    let stopButtonShortcut: KeyboardShortcut = KeyboardShortcut.defaultAction
-
-    /// Cancel's keys in the question: Escape and Command-Period.
-    let cancelButtonShortcut: KeyboardShortcut = KeyboardShortcut.cancelAction
 
     // MARK: - Computed properties
 

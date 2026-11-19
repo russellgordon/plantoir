@@ -65,8 +65,6 @@ final class StopQuestionTests: XCTestCase {
         XCTAssertTrue(code.contains("Button(questionShown.stopButton) {\n                                        chooseStop()"), "the stopping button reads the box")
         XCTAssertTrue(code.contains("func chooseStop() {\n        asking.chooseStop()\n        stopTheTask()"), "Stop: the model, then the stop")
         XCTAssertTrue(code.contains("Button(questionShown.cancelButton, role: .cancel) {\n                                        asking.chooseCancel()\n                                    }"), "the question's Cancel is the model's")
-        XCTAssertTrue(code.contains(".keyboardShortcut(asking.stopButtonShortcut)"), "the stopping button's key is the model's")
-        XCTAssertTrue(code.contains(".keyboardShortcut(asking.cancelButtonShortcut)"), "the question's Cancel's key is the model's")
         XCTAssertTrue(code.contains("isPresented: $asking.isAsking"), "the question shows while the model asks")
         XCTAssertEqual(code.components(separatedBy: "stopWasChosen(").count - 1, 0, "only the model remembers the box")
         // The Cancel button's modifiers run from its identifier to the end
@@ -164,13 +162,17 @@ final class StopQuestionTests: XCTestCase {
     }
 
     /// Return is the stopping button's, the default; Escape and
-    /// Command-Period are Cancel's.
+    /// Command-Period are the question's Cancel's. The pressed-key proof is
+    /// `ProgressCancelKeysTests` (the gate runs it); this holds the buttons'
+    /// keys in every suite.
     func testReturnsDefaultIsStop() throws {
-        let asking: StopQuestionAsking = StopQuestionAsking(question: .deploy, settings: try freshSettings())
-        XCTAssertEqual(asking.stopButtonShortcut, KeyboardShortcut.defaultAction)
-        XCTAssertEqual(asking.stopButtonShortcut.key, KeyEquivalent.return)
-        XCTAssertEqual(asking.cancelButtonShortcut, KeyboardShortcut.cancelAction)
-        XCTAssertEqual(asking.cancelButtonShortcut.key, KeyEquivalent.escape)
+        let source: String = try String(contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Console/TaskProgressView.swift"), encoding: .utf8)
+        let code: String = TextFieldStyleScanTests.codeWithoutComments(source)
+        let stopButton: String = "Button(questionShown.stopButton) {\n                                        chooseStop()\n                                    }\n                                    .keyboardShortcut(.defaultAction)"
+        XCTAssertTrue(code.contains(stopButton), "the stopping button is the default, so Return stops")
+        let cancelButton: String = "asking.chooseCancel()\n                                    }\n                                    .keyboardShortcut(.cancelAction)"
+        XCTAssertTrue(code.contains(cancelButton), "the question's Cancel holds Escape and Command-Period")
+        XCTAssertEqual(code.components(separatedBy: ".keyboardShortcut(.defaultAction)").count - 1, 1, "one default button in the panel's question")
     }
 
     /// Each setting silences only its own question.

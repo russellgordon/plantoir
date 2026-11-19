@@ -409,13 +409,13 @@ struct TaskProgressView: View {
                                     Button(questionShown.stopButton) {
                                         chooseStop()
                                     }
-                                    .keyboardShortcut(asking.stopButtonShortcut)
+                                    .keyboardShortcut(.defaultAction)
                                     .accessibilityIdentifier(questionShown.stopButtonIdentifier)
                                     // Cancel remembers nothing, the box included (ruling 3).
                                     Button(questionShown.cancelButton, role: .cancel) {
                                         asking.chooseCancel()
                                     }
-                                    .keyboardShortcut(asking.cancelButtonShortcut)
+                                    .keyboardShortcut(.cancelAction)
                                     .accessibilityIdentifier(questionShown.cancelButtonIdentifier)
                                 } message: {
                                     Text(questionShown.message)
