@@ -49719,9 +49719,121 @@
         },
         "undo": "notReadable",
         "redo": "notReadable"
+      },
+      {
+        "name": "a page that is there and cannot be read just now (no permission): cannot tell, never changed since",
+        "op": {
+          "kind": "editLine",
+          "key": "publish",
+          "before": "publish: false",
+          "after": "publish: true",
+          "afterKey": "title",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "---\ntitle: Unit 1, Day 1\npublish: true\n---\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell",
+        "why": "The director's ruling on U2b's review: a read of the teacher's file that fails (EACCES, EIO, a cloud file not downloaded yet) is refused without clearing the list, to be tried again; only content that was read and differs is changed since."
+      },
+      {
+        "name": "whole file: cannot be read just now",
+        "op": {
+          "kind": "writeFile",
+          "beforeText": "old\n",
+          "afterText": "new\n",
+          "path": "page.md"
+        },
+        "current": {
+          "text": "new\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "replaceText: the page cannot be read just now",
+        "op": {
+          "kind": "replaceText",
+          "path": "page.md",
+          "before": "old",
+          "after": "new",
+          "contextBefore": "Line one: ",
+          "contextAfter": ".\n"
+        },
+        "current": {
+          "text": "Line one: new.\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "editJSON: the file cannot be read just now",
+        "op": {
+          "kind": "editJSON",
+          "path": "course_config.json",
+          "keyPath": [
+            "school_year"
+          ],
+          "before": "2025-2026",
+          "after": "2026-2027"
+        },
+        "current": {
+          "text": "{\"school_year\": \"2026-2027\"}\n",
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "move: the moved copy cannot be read just now",
+        "op": {
+          "kind": "move",
+          "from": "courses/TST1O/.netlify_sites/section1.json",
+          "to": "courses/TST1O/.netlify_sites/section1.previous-20261118T120000Z.json",
+          "contentText": "{\"site_id\": \"aaa-111\"}\n"
+        },
+        "current": {
+          "atFrom": {
+            "absent": true
+          },
+          "atTo": {
+            "text": "{\"site_id\": \"aaa-111\"}\n",
+            "cannotBeRead": true
+          }
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
+      },
+      {
+        "name": "createTree: the folder cannot be listed just now",
+        "op": {
+          "kind": "createTree",
+          "path": "courses/NEW1O",
+          "listing": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          }
+        },
+        "current": {
+          "tree": {
+            "folders": [],
+            "files": {
+              "a.md": "A\n"
+            }
+          },
+          "cannotBeRead": true
+        },
+        "undo": "cannotTell",
+        "redo": "cannotTell"
       }
     ],
-    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. undo and redo are the verdicts: canUndo, alreadyBack, changedSince, notReadable (undo); canRedo, alreadyRedone, changedSince, notReadable (redo). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText).",
+    "checkCasesHow": "op is an op of file-formats.json -> undoJournal.opKinds, at path page.md unless it names its own, with writeFile's two SHA-256s given as the texts they hash (beforeText/afterText; null: absent), a move's file hash as the text it hashes (contentText), and a folder's listingSha as the folder it lists (listing: {folders, files: {path: text}}, listed by listingCases' rule; for createTree and removeTree its blobs are then the listing's hash and every file's). current is what is at the op's path now: text (UTF-8), absent, a folder (an empty one), raw bytes (bytesHex, used for every page with a byte-order mark, because Foundation's JSON reader drops one inside a string), or a tree (the same shape as listing). For a move, current names each side: atFrom (where the step took it from) and atTo (where it put it), each one of those. For an external op, current is the target's value now: preference (any JSON), absent (not set), or unreadable (something JSON cannot hold, such as a date). An editJSON's or an external op's before and after are any JSON, null included: a JSON null is a member (or a preference) holding null, and an op with no before (or no after) means none was there. why, when present, says why the verdict is right; it is never compared. cannotBeRead: true on a place (or on a side of a move) makes what is there unreadable just now (on the mac and in Python: its permissions taken away; a folder then cannot be listed). undo and redo are the verdicts: canUndo, alreadyBack, changedSince, cannotTell, notReadable (undo); canRedo, alreadyRedone, changedSince, cannotTell, notReadable (redo). cannotTell: something the op must read is there and could not be read now, so Undo and Redo are refused (refusal cannotTellNow) WITHOUT clearing the list, and recovery leaves the step as it is and tries again on its schedule; only content that was read and differs is changedSince (the director's ruling on U2b's review, 2026-11-19). notReadable: the op is not one this version can read (undoJournal.unknown). U2 added the rows for replaceText, editJSON, move, createTree, removeTree and external (one kind of each this version does not know is still one it cannot read: the row 'an op of a kind this version does not know' uses aKindNobodyKnows, where U1's used replaceText).",
     "listingCases": [
       {
         "name": "an empty folder: an empty listing",

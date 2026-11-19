@@ -8,6 +8,12 @@ nonisolated enum UndoOpState: String, Equatable, Sendable {
     case before
     /// Neither: changed since, missing, a folder, or not readable as text.
     case neither
+    /// The teacher's file is there and could not be read just now (no
+    /// permission, a disk error, a cloud file not downloaded yet): cannot
+    /// tell now. Never "changed since": only content that was read and
+    /// differs is (the director's ruling on U2b's review). Refused without
+    /// clearing the list, to be tried again.
+    case cannotTell
 }
 
 /// What the contract's `undo.checkCases` call a verdict.
@@ -17,6 +23,8 @@ nonisolated enum UndoCheckVerdict: String, Equatable, Sendable {
     case changedSince
     case canRedo
     case alreadyRedone
+    /// A file it must read could not be read now (`UndoOpState.cannotTell`).
+    case cannotTell
 }
 
 /// Which way a step is being moved.
@@ -31,8 +39,11 @@ nonisolated enum UndoDirection: Sendable {
 nonisolated enum UndoItem: Equatable, Sendable {
     case absent
     case file(Data)
-    /// A folder, a link, or a file that cannot be read.
+    /// A folder or a link: something that is not a file.
     case notAFile
+    /// Something is there and could not be read (EACCES, EIO, a file a
+    /// cloud service has not downloaded): cannot tell now.
+    case unreadable
 
     static func read(at url: URL) -> UndoItem {
         var information: stat = stat()
@@ -46,13 +57,13 @@ nonisolated enum UndoItem: Equatable, Sendable {
             if errno == ENOENT || errno == ENOTDIR {
                 return .absent
             }
-            return .notAFile
+            return .unreadable
         }
         if (information.st_mode & S_IFMT) != S_IFREG {
             return .notAFile
         }
         guard let data = try? Data(contentsOf: url) else {
-            return .notAFile
+            return .unreadable
         }
         return .file(data)
     }
@@ -74,6 +85,9 @@ nonisolated enum UndoCheck {
     /// external op is judged on the disk as a whole (`wholeState`), never
     /// here.
     static func state(of op: UndoOp, in item: UndoItem) -> UndoOpState {
+        if item == .unreadable && op.knownKind != .recompute {
+            return .cannotTell
+        }
         switch op.knownKind {
         case .writeFile:
             let currentSha: String?
@@ -82,7 +96,7 @@ nonisolated enum UndoCheck {
                 currentSha = nil
             case .file(let data):
                 currentSha = UndoHash.sha256(of: data)
-            case .notAFile:
+            case .notAFile, .unreadable:
                 return .neither
             }
             // Before wins when both match: then nothing need be written.
@@ -131,6 +145,8 @@ nonisolated enum UndoCheck {
             return .alreadyRedone
         case (.neither, _):
             return .changedSince
+        case (.cannotTell, _):
+            return .cannotTell
         }
     }
 
@@ -192,6 +208,7 @@ nonisolated enum UndoCheck {
         var pathsWithMissingContent: Set<String> = []
         var recomputes: [UndoOp] = []
         var wholeTargets: [UndoSwapTarget] = []
+        var cannotTellPath: String? = nil
 
         for op in ordered {
             guard let kind = op.knownKind else {
@@ -207,6 +224,12 @@ nonisolated enum UndoCheck {
                 let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places)
                 let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
                 if verdict == .alreadyBack || verdict == .alreadyRedone {
+                    continue
+                }
+                if verdict == .cannotTell {
+                    if cannotTellPath == nil {
+                        cannotTellPath = op.placeName
+                    }
                     continue
                 }
                 if verdict == .changedSince {
@@ -248,6 +271,13 @@ nonisolated enum UndoCheck {
             if verdict == .alreadyBack || verdict == .alreadyRedone {
                 continue
             }
+            if verdict == .cannotTell {
+                if cannotTellPath == nil {
+                    cannotTellPath = path
+                }
+                pathsWithMissingContent.insert(path)
+                continue
+            }
             if verdict == .changedSince {
                 if !inTheWay.contains(path) {
                     inTheWay.append(path)
@@ -287,6 +317,9 @@ nonisolated enum UndoCheck {
 
         if let first = inTheWay.first {
             return .refused(.changedSince(firstPath: first, others: inTheWay.count - 1))
+        }
+        if let cannotTellPath {
+            return .refused(.cannotTellNow(path: cannotTellPath))
         }
         if let missingContentPath {
             return .refused(.contentMissing(path: missingContentPath))
@@ -640,7 +673,11 @@ nonisolated enum UndoSwap {
             case .moveHere(let from, _, let op):
                 // The pair once more, just before the rename: the content at
                 // the place it leaves, nothing where it goes.
-                if UndoMoveSide.read(op, at: from) != .holdsTheContent || UndoMoveSide.read(op, at: target.url) != .free {
+                let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: from)
+                let atTarget: UndoMoveSide = UndoMoveSide.read(op, at: target.url)
+                if atFrom == .cannotRead || atTarget == .cannotRead {
+                    refusal = .cannotTellNow(path: target.relativePath)
+                } else if atFrom != .holdsTheContent || atTarget != .free {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else {
                     try? FileManager.default.createDirectory(
@@ -651,7 +688,10 @@ nonisolated enum UndoSwap {
                     }
                 }
             case .makeTree:
-                if UndoTreeReading.read(at: target.url) != .absent {
+                let there: UndoTreeReading = UndoTreeReading.read(at: target.url)
+                if there == .cannotRead {
+                    refusal = .cannotTellNow(path: target.relativePath)
+                } else if there != .absent {
                     refusal = .changedSince(firstPath: target.relativePath, others: 0)
                 } else if let stagedURL = staged[index], UndoSwap.renameExclusively(stagedURL, onto: target.url) {
                     staged[index] = nil
@@ -716,6 +756,9 @@ nonisolated enum UndoSwap {
         originals: inout [URL?]
     ) -> UndoRefusal? {
         let now: UndoItem = UndoItem.read(at: target.url)
+        if now == .unreadable {
+            return .cannotTellNow(path: target.relativePath)
+        }
         if now.data != target.expected || (target.expected == nil && now != .absent) {
             return .changedSince(firstPath: target.relativePath, others: 0)
         }
@@ -1158,7 +1201,7 @@ nonisolated extension UndoJournal {
                 return false
             }
             reason = .contentMissing
-        case .fileIsInUse, .couldNotWrite, .notReadable:
+        case .fileIsInUse, .couldNotWrite, .notReadable, .cannotTellNow:
             return false
         }
         if direction == .backward {

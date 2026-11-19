@@ -109,6 +109,12 @@ nonisolated enum UndoRefusal: Equatable, Sendable {
     /// reversed (`undo.wording.fileIsInUse`).
     case fileIsInUse(path: String)
 
+    /// A file it must read is there and could not be read just now (no
+    /// permission, a disk error, a cloud file not downloaded): cannot tell
+    /// whether it was changed, so refused for now and never a reason to
+    /// clear the list (the director's ruling on U2b's review).
+    case cannotTellNow(path: String)
+
     /// A new content could not be written beside its page: the disk is
     /// full, or the folder will not take a new file (read-only, no
     /// permission). Nothing was swapped and nothing of the step is left

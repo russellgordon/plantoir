@@ -373,6 +373,15 @@ class ContractCaseTests(unittest.TestCase):
                     continue
                 current = case["current"]
                 kind = op["kind"]
+                unreadable_now = current.get("cannotBeRead") or any(
+                    isinstance(side, dict) and side.get("cannotBeRead")
+                    for side in (current.get("atFrom"), current.get("atTo")))
+                if kind != "recompute" and kind != "external" and unreadable_now:
+                    # The director's ruling on U2b's review: a read that
+                    # fails is "cannot tell now", never changed since.
+                    self.assertEqual(case["undo"], "cannotTell")
+                    self.assertEqual(case["redo"], "cannotTell")
+                    continue
                 if kind == "recompute":
                     # No check (opKinds.recompute): re-derived, never compared.
                     state = "after"

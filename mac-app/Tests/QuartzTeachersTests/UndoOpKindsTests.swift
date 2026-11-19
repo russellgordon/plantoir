@@ -226,6 +226,29 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("a.md")), Data("kept\n".utf8))
     }
 
+    /// The director's ruling on U2b's review: a page that cannot be read
+    /// just now is "cannot tell", never changed since. Undo is refused
+    /// without clearing the list, and works once the page can be read.
+    /// FAILED before the ruling, when the read failure counted as a hand
+    /// edit and cleared the list (UndoItem.read gave notAFile).
+    func testAPageThatCannotBeReadNowIsRefusedWithoutClearingTheList() throws {
+        let made = try UndoContractReplay.scratch(under: scratchURL, named: "unreadable")
+        let root: URL = made.root
+        let path: String = "courses/TST1O/page.md"
+        try UndoContractReplay.write("---\ntitle: Day\npublish: false\n---\nBody.\n", to: path, in: root)
+        let journal: UndoJournal = UndoJournal(folderURL: made.journalFolder)
+        let changes: [UndoFileChange] = UndoContractReplay.changes(setting: [(path: path, key: "publish", line: "publish: true")], in: root)
+        XCTAssertEqual(JournaledWrite.perform(UndoContractReplay.draft(changes: changes, root: root, action: "publishPages"), in: journal, mode: .live), .applied(seq: 1))
+        let url: URL = root.appendingPathComponent(path)
+        XCTAssertEqual(chmod(url.path, 0), 0)
+
+        let refused: UndoOutcome = journal.undoNewest(resolveRoot: { _ in root })
+        _ = chmod(url.path, 0o644)
+
+        XCTAssertEqual(refused, .refused(.cannotTellNow(path: path), clearedTheList: false))
+        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }), .undone(seq: 1))
+    }
+
     /// Without a runner for its maintainer, a step holding a `recompute` is
     /// not available: it is never undone with its re-derivation skipped.
     func testAStepWhoseMaintainerHasNoRunnerIsNotAvailable() throws {

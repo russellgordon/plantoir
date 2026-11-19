@@ -194,7 +194,9 @@ nonisolated enum UndoRecovery {
             }
             let state: UndoOpState = UndoCheck.state(of: op, in: items[path] ?? .absent)
             if let earlier = states[path] {
-                if earlier != state {
+                if earlier == .cannotTell || state == .cannotTell {
+                    states[path] = .cannotTell
+                } else if earlier != state {
                     states[path] = .neither
                 }
             } else {
@@ -219,7 +221,7 @@ nonisolated enum UndoRecovery {
                 before += 1
             case .after:
                 after += 1
-            case .neither:
+            case .neither, .cannotTell:
                 neither += 1
             }
         }
@@ -266,6 +268,13 @@ nonisolated enum UndoRecovery {
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
         let startState: UndoOpState = startedFromBefore ? .before : .after
         let files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places)
+        // A file that could not be read now is never judged changed by hand:
+        // the step is left as it is and tried again on the schedule, as for
+        // a file in use (the director's ruling on U2b's review).
+        for file in files where file.state == .cannotTell {
+            swapRefused = true
+            return nil
+        }
         var atStart: Int = 0
         var atEnd: Int = 0
         var inTheWay: [String] = []

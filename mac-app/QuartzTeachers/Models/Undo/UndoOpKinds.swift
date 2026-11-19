@@ -532,8 +532,10 @@ nonisolated struct UndoTreeListing: Equatable, Sendable {
 /// What is at a folder's place now.
 nonisolated enum UndoTreeReading: Equatable, Sendable {
     case absent
-    /// A file, a link, or a folder holding something that cannot be listed.
+    /// A file, a link, or a folder holding a link.
     case notATree
+    /// Something there could not be read or listed just now: cannot tell.
+    case cannotRead
     case tree(UndoTreeListing, contents: [String: Data])
 
     // MARK: - Computed properties
@@ -560,7 +562,7 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
             if errno == ENOENT || errno == ENOTDIR {
                 return .absent
             }
-            return .notATree
+            return .cannotRead
         }
         if (information.st_mode & S_IFMT) != S_IFDIR {
             return .notATree
@@ -568,8 +570,9 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         var folders: [String] = []
         var files: [UndoTreeListing.File] = []
         var contents: [String: Data] = [:]
-        if !walk(url, prefix: "", folders: &folders, files: &files, contents: &contents) {
-            return .notATree
+        var couldNotRead: Bool = false
+        if !walk(url, prefix: "", folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
+            return couldNotRead ? .cannotRead : .notATree
         }
         return .tree(UndoTreeListing(folders: folders, files: files), contents: contents)
     }
@@ -579,9 +582,11 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
         prefix: String,
         folders: inout [String],
         files: inout [UndoTreeListing.File],
-        contents: inout [String: Data]
+        contents: inout [String: Data],
+        couldNotRead: inout Bool
     ) -> Bool {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            couldNotRead = true
             return false
         }
         for name in names {
@@ -595,16 +600,18 @@ nonisolated enum UndoTreeReading: Equatable, Sendable {
                 return lstat(fileSystemPath, &information)
             }
             if found != 0 {
+                couldNotRead = true
                 return false
             }
             let type: mode_t = information.st_mode & S_IFMT
             if type == S_IFDIR {
                 folders.append(path)
-                if !walk(url, prefix: path, folders: &folders, files: &files, contents: &contents) {
+                if !walk(url, prefix: path, folders: &folders, files: &files, contents: &contents, couldNotRead: &couldNotRead) {
                     return false
                 }
             } else if type == S_IFREG {
                 guard let data = try? Data(contentsOf: url) else {
+                    couldNotRead = true
                     return false
                 }
                 files.append(UndoTreeListing.File(path: path, sha: UndoHash.sha256(of: data)))
@@ -685,6 +692,9 @@ nonisolated extension UndoCheck {
             }
             let atFrom: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(from))
             let atTo: UndoMoveSide = UndoMoveSide.read(op, at: root.appendingPathComponent(to))
+            if atFrom == .cannotRead || atTo == .cannotRead {
+                return .cannotTell
+            }
             if atFrom == .free && atTo == .holdsTheContent {
                 return .after
             }
@@ -703,6 +713,8 @@ nonisolated extension UndoCheck {
                 present = false
             case .notATree:
                 return .neither
+            case .cannotRead:
+                return .cannotTell
             case .tree(let listing, _):
                 if listing.sha != listingSha {
                     return .neither
@@ -753,6 +765,8 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
     case holdsTheContent
     /// Something else.
     case holdsSomethingElse
+    /// Something there that could not be read just now.
+    case cannotRead
 
     // MARK: - Functions
 
@@ -765,6 +779,8 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
                 return UndoHash.sha256(of: data) == sha ? .holdsTheContent : .holdsSomethingElse
             case .notAFile:
                 return .holdsSomethingElse
+            case .unreadable:
+                return .cannotRead
             }
         }
         switch UndoTreeReading.read(at: url) {
@@ -772,6 +788,8 @@ nonisolated enum UndoMoveSide: Equatable, Sendable {
             return .free
         case .notATree:
             return .holdsSomethingElse
+        case .cannotRead:
+            return .cannotRead
         case .tree(let listing, _):
             return listing.sha == op.listingSha ? .holdsTheContent : .holdsSomethingElse
         }

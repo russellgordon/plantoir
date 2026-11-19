@@ -218,6 +218,8 @@ nonisolated enum UndoContractReplay {
                 return "changedSince"
             case .fileIsInUse:
                 return "fileIsInUse"
+            case .cannotTellNow:
+                return "cannotTellNow"
             case .couldNotWrite:
                 return "couldNotWrite"
             case .contentMissing:
@@ -437,6 +439,22 @@ nonisolated enum UndoContractReplay {
                 try Data(text.utf8).write(to: fileURL)
             }
         }
+        if current["cannotBeRead"] as? Bool == true {
+            // Unreadable just now: no permission (`cannotBeRead`).
+            _ = chmod(url.path, 0)
+            madeUnreadable.append(url)
+        }
+    }
+
+    /// Places a case made unreadable, given their permissions back once
+    /// the case is checked, so the scratch folder can be removed.
+    nonisolated(unsafe) static var madeUnreadable: [URL] = []
+
+    static func giveBackPermissions() {
+        for url in madeUnreadable {
+            _ = chmod(url.path, 0o755)
+        }
+        madeUnreadable = []
     }
 
     /// A case's `listing` (or `tree`) as the listing this version makes.
@@ -555,6 +573,7 @@ nonisolated enum UndoContractReplay {
                 undo = UndoCheck.verdict(for: state, direction: .backward).rawValue
                 redo = UndoCheck.verdict(for: state, direction: .forward).rawValue
             }
+            giveBackPermissions()
             if undo != string(testCase["undo"]) {
                 failures.append("checkCases '\(name)': undo is \(undo), not \(string(testCase["undo"]) ?? "?")")
             }

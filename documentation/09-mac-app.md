@@ -19484,6 +19484,18 @@ off.
   `createTree` for that folder (the folder is left, empty, by an undo), or
   records the folder's move whole.
 
+**A file that cannot be read now is "cannot tell", never "changed since"**
+(the director's ruling on U2b's review, 2026-11-19, for every kind and for
+U1's own `UndoItem.read`, which until then read a failing read as a file
+changed by hand and so CLEARED the list). Something the op must read that
+is there and fails to read (no permission, a disk error, a file a cloud
+service has not downloaded) gives the state `cannotTell`: Undo and Redo are
+refused with `cannotTellNow`, the list is left as it is, and recovery
+leaves the step in flight and tries again on its schedule, as for a file in
+use. Only content that was read and differs is `changedSince`, and that
+still clears the list (ruling 13). `checkCases` rows with `cannotBeRead`
+pin it for each kind.
+
 **`recompute` is run** (`UndoMaintainers`). Undo, Redo and the door run each
 `recompute` op's maintainer after the swaps, and recovery re-derives a
 step's `recompute` files whenever it settles the step, whichever way
