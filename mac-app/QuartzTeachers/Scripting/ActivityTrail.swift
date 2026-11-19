@@ -1257,6 +1257,12 @@ nonisolated enum ActivityTrail {
         /// left part way when it stopped (#899): the course and section, which
         /// of the three, and how many files. Never page text.
         case undoRolledBack = "undo rolled back"
+        /// Recovery found a teacher's folder a step that died had set aside
+        /// (#899, U2b): being put back in its place though it changed while
+        /// aside, with what changed, or kept under a visible name beside its
+        /// place because something else holds that place, both named.
+        /// Written just before the rename. Never page text.
+        case undoFoundAFolderSetAside = "undo found a folder set aside"
         /// Setting up an outside assistant was opened (#855): from where (the
         /// Settings pane, the Help menu, Revise With), so a report shows how
         /// the teacher got there.

@@ -337,6 +337,22 @@ public class NamedGapLedgerTests
     }
 
     /// <summary>
+    /// The held-theory-case hook (U2b's undo rows, 2026-11-19): a held case
+    /// passes only while it still fails for its named gap; it fails once the
+    /// case passes (the gap closing) and when it fails for another reason.
+    /// </summary>
+    [Fact]
+    public void AHeldCaseMustStillStopAtItsGapAndAtNothingElse()
+    {
+        var held = Made(NamedGapLedger.UndoTraces, "trace-made-up");
+        NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => Assert.Fail("call 3 (move): a call this replay does not know"), "a call this replay does not know");
+        var closed = Assert.ThrowsAny<Exception>(() => NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => { }, "a call this replay does not know"));
+        Assert.Contains("now EXISTS on this side", closed.Message);
+        var otherReason = Assert.ThrowsAny<Exception>(() => NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => Assert.Fail("head 3, expected 2"), "a call this replay does not know"));
+        Assert.Contains("failed for another reason", otherReason.Message);
+    }
+
+    /// <summary>
     /// The renamed-menu-item area (the fourth hold, 2026-11-14): each entry has
     /// exactly one older name, and no older name is left without its entry,
     /// so the map cannot outlive the hold it serves.

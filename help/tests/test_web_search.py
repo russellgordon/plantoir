@@ -134,7 +134,7 @@ class WebTests(unittest.TestCase):
         def search_for(query: str):
             completed = subprocess.run(
                 [NODE, str(script), str(index), str(search), query],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
             )
             self.assertEqual(completed.returncode, 0, completed.stdout)
             return json.loads(completed.stdout)
@@ -237,7 +237,7 @@ class WebTests(unittest.TestCase):
         script.write_text(NODE_SEARCH, encoding="utf-8")
         completed = subprocess.run(
             [NODE, str(script), str(self.web / "assets" / "search-index.js"), str(self.web / "assets" / "search.js"), "GitHub Copilot"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8",
         )
         self.assertEqual(json.loads(completed.stdout)[0], "helper-page")
 
@@ -326,7 +326,7 @@ class WebTests(unittest.TestCase):
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
         server = subprocess.Popen(
             [sys.executable, "-I", "-B", str(BUILD_HELP), "--serve", str(self.web)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", env=environment,
         )
         try:
             line = server.stdout.readline()

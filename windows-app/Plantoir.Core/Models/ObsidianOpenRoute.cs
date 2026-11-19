@@ -8,6 +8,9 @@ public sealed record ObsidianAddOnsRequest(Course Course, string Folder, IReadOn
 {
     /// <summary>Open or cannot tell: nothing is written into the course, and Add Them goes the reopen way.</summary>
     public bool CourseIsOpen => OpenState != ObsidianFigureAddOnsOffer.CourseOpenState.Closed;
+
+    /// <summary>The offer's yes: "Close Obsidian and Add Them" whenever that yes closes Obsidian, "Add Them" otherwise (#1003, the mac's #995).</summary>
+    public string AddButtonTitle => CourseIsOpen ? ObsidianClosingWording.OfferAddClosingObsidian : ObsidianFigureAddOnsWording.OfferAdd;
 }
 
 /// <summary>
@@ -63,12 +66,28 @@ public interface IObsidianWorld
     /// <summary>
     /// Opens a folder in Obsidian - or <paramref name="page"/>, a file, when one
     /// is named (the page door, #681) - registering the course first when
-    /// Obsidian has never seen it.
+    /// Obsidian has never seen it and is NOT running. Never closes Obsidian
+    /// (#1003): false means nothing was handed over, because Obsidian is
+    /// running and does not know the course, so the route asks first.
     /// </summary>
-    Task OpenAsync(string folder, string vault, string? page = null);
+    Task<bool> OpenAsync(string folder, string vault, string? page = null);
 
-    /// <summary>Asks Obsidian to quit and waits for it to be gone, or for the wait to run out.</summary>
+    /// <summary>Asks Obsidian to quit and waits for it to be gone, or for the wait to run out. Called only on an answer that said Obsidian closes.</summary>
     Task QuitAndWaitAsync();
+
+    /// <summary>
+    /// The answer Close Obsidian and Open (#1003): closes Obsidian, adds the
+    /// course to its list and opens again what its list marked open
+    /// (<see cref="ObsidianClosingRule.CloseAndRegisterAsync"/>). False:
+    /// Obsidian did not close, and nothing was written or handed over.
+    /// </summary>
+    Task<bool> CloseAndRegisterAsync(string vault);
+
+    /// <summary>Shows "Close Obsidian to open {course}?": true is Close Obsidian and Open, false is Cancel (Escape too).</summary>
+    Task<bool> AskClosingAsync(ObsidianClosingRequest request);
+
+    /// <summary>Shows "Could not open {course} in Obsidian", one sentence and OK, for an answer that could not finish (Russell's ruling 2 on #995).</summary>
+    Task ShowCouldNotOpenAsync(ObsidianClosingRequest request, ObsidianClosingTrail.Outcome outcome);
 
     /// <summary>Opens these vaults again, in order, so the last is in front.</summary>
     Task ReopenAsync(IReadOnlyList<string> vaultPaths);
@@ -148,7 +167,7 @@ public sealed class ObsidianOpenRoute
             if (!ObsidianFigureAddOnsOffer.Scans(reference, _world.IsInstalled(), _world.Answer, ObsidianFigureAddOnsThisRun.Suppressed))
             {
                 NoteThePress(answer, course, section);
-                await OpenThenReportAsync(press, folder, coursePath, page);
+                await OpenThenReportAsync(press, course, folder, page);
                 return true;
             }
             if (!ObsidianFigureAddOnsThisRun.BeingOpened.Add(coursePath))
@@ -194,10 +213,90 @@ public sealed class ObsidianOpenRoute
         if (answer is not null && section is int number) PreviewedPageSource.NoteThePress(answer, course.Code, number);
     }
 
-    private async Task OpenThenReportAsync(Pressing press, string folder, string coursePath, string? page)
+    /// <summary>
+    /// Opens without the add-ons scan, through the closing question: Course
+    /// Settings' How I Teach row (the mac's <c>openHowITeachPageInObsidian</c>)
+    /// and a course kept for reference once its note is answered (step 1 stays
+    /// the caller's). <paramref name="report"/>, when handed, says what the
+    /// press came to as soon as it is known, as <see cref="Press"/>'s does.
+    /// </summary>
+    public Task OpenWithoutTheScanAsync(Course course, string folder, string? page,
+                                        PreviewedPageSource.Answer? answer = null,
+                                        TaskCompletionSource<OpenInObsidianPress>? report = null)
     {
-        await _world.OpenAsync(folder, coursePath, page);
-        press.Report.TrySetResult(new OpenInObsidianPress.Opened(press.Answer));
+        var press = new Pressing(answer, report ?? new TaskCompletionSource<OpenInObsidianPress>(TaskCreationOptions.RunContinuationsAsynchronously));
+        return OpenThenReportAsync(press, course, folder, page);
+    }
+
+    /// <summary>
+    /// Every open in the route comes here (#1003, the mac's #995): when
+    /// handing Obsidian the file means closing a running Obsidian first - a
+    /// course it has never seen - nothing is opened or closed, and the closing
+    /// question is asked instead. Obsidian starting between this check and
+    /// the open is caught too: the open hands nothing over and answers false,
+    /// and the question is asked rather than the press doing nothing.
+    /// </summary>
+    private async Task OpenThenReportAsync(Pressing press, Course course, string folder, string? page)
+    {
+        if (!MustCloseObsidian(course, folder, page) && await _world.OpenAsync(folder, course.DirectoryPath, page))
+        {
+            press.Report.TrySetResult(new OpenInObsidianPress.Opened(press.Answer));
+            return;
+        }
+        await AskClosingAsync(press, new ObsidianClosingRequest(course, folder, page));
+    }
+
+    /// <summary><see cref="ObsidianClosingRule.MustAsk"/> for the file this open hands Obsidian, read now.</summary>
+    private bool MustCloseObsidian(Course course, string folder, string? page) =>
+        ObsidianClosingRule.MustAsk(page ?? _world.TargetFor(folder, course.DirectoryPath), _world.IsRunning(), _world.RegistryText());
+
+    /// <summary>
+    /// "Close Obsidian to open {course}?" and its answer (the mac's
+    /// <c>answerObsidianClosing</c>). Cancel opens nothing and closes nothing.
+    /// Close Obsidian and Open looks again first: if Obsidian has quit
+    /// meanwhile, or now knows the course, it simply opens and nothing is
+    /// closed. If Obsidian does not close, nothing is written or handed to it;
+    /// if it closed but the course still cannot be handed over (its list
+    /// could not be written), nothing more is tried. Each answer leaves one
+    /// trail line, and each of the two failures its alert.
+    /// </summary>
+    private async Task AskClosingAsync(Pressing press, ObsidianClosingRequest request)
+    {
+        string coursePath = request.Course.DirectoryPath;
+        string code = request.Course.Code;
+        Asking(press, coursePath);
+        bool close;
+        try { close = await _world.AskClosingAsync(request); }
+        finally { ObsidianFigureAddOnsThisRun.Asking.Remove(coursePath); }
+        if (!close)
+        {
+            ObsidianClosingTrail.Note(ObsidianClosingTrail.Outcome.Cancelled, code);
+            return;
+        }
+        if (!MustCloseObsidian(request.Course, request.Folder, request.Page))
+        {
+            ObsidianClosingTrail.Note(ObsidianClosingTrail.Outcome.NotNeeded, code);
+            await OpenThenReportAsync(press, request.Course, request.Folder, request.Page);
+            return;
+        }
+        if (!await _world.CloseAndRegisterAsync(coursePath))
+        {
+            await CouldNotOpenAsync(request, ObsidianClosingTrail.Outcome.DidNotClose);
+            return;
+        }
+        if (!await _world.OpenAsync(request.Folder, coursePath, request.Page))
+        {
+            await CouldNotOpenAsync(request, ObsidianClosingTrail.Outcome.NotAdded);
+            return;
+        }
+        ObsidianClosingTrail.Note(ObsidianClosingTrail.Outcome.Opened, code);
+    }
+
+    /// <summary>The trail line first, so it is written even if the alert cannot be shown; then the alert.</summary>
+    private async Task CouldNotOpenAsync(ObsidianClosingRequest request, ObsidianClosingTrail.Outcome outcome)
+    {
+        ObsidianClosingTrail.Note(outcome, request.Course.Code);
+        await _world.ShowCouldNotOpenAsync(request, outcome);
     }
 
     /// <summary>A question is about to be shown: the press is waiting for its answer.</summary>
@@ -243,7 +342,7 @@ public sealed class ObsidianOpenRoute
         {
             case ObsidianFigureAddOnsOffer.Decision.NotTheVault:
                 ObsidianFigureAddOnsThisRun.NoteNotTheVault(course.Code);
-                await OpenThenReportAsync(press, folder, coursePath, page);
+                await OpenThenReportAsync(press, course, folder, page);
                 break;
             case ObsidianFigureAddOnsOffer.Decision.Offer:
             case ObsidianFigureAddOnsOffer.Decision.OfferWhileOpen:
@@ -251,13 +350,13 @@ public sealed class ObsidianOpenRoute
                 break;
             case ObsidianFigureAddOnsOffer.Decision.InstallThenOpen:
                 await AddAsync(course, needed, ObsidianFigureAddOnsTrail.Trigger.OpenInObsidian);
-                await OpenThenReportAsync(press, folder, coursePath, page);
+                await OpenThenReportAsync(press, course, folder, page);
                 break;
             case ObsidianFigureAddOnsOffer.Decision.AskReopen:
                 await AskReopenAsync(press, new ObsidianAddOnsRequest(course, folder, needed, openState, page));
                 break;
             default:
-                await OpenThenReportAsync(press, folder, coursePath, page);
+                await OpenThenReportAsync(press, course, folder, page);
                 break;
         }
     }
@@ -274,10 +373,19 @@ public sealed class ObsidianOpenRoute
         {
             case ObsidianFigureAddOnsTrail.Answered.AddThem:
                 _world.Answer = ObsidianFigureAddOnsAnswer.Yes;
-                // Asked again NOW: the course may have been opened in Obsidian while the question was up.
-                if (request.CourseIsOpen || CourseIsOpenInObsidian(request.Course.DirectoryPath))
+                // The offer was shown with "Close Obsidian and Add Them": that answer closes Obsidian.
+                if (request.CourseIsOpen)
                 {
                     await ReopenWithAddOnsAsync(press, request);
+                    return;
+                }
+                // Asked again NOW: the course may have been opened in Obsidian
+                // while the question was up. The button pressed said "Add Them",
+                // not that Obsidian would close, so the reopen question asks
+                // first (#1003, the mac's #995; sequence step 6).
+                if (CourseIsOpenInObsidian(request.Course.DirectoryPath))
+                {
+                    await AskReopenAsync(press, request);
                     return;
                 }
                 await AddAsync(request.Course, request.Needed, ObsidianFigureAddOnsTrail.Trigger.OpenInObsidian);
@@ -289,7 +397,7 @@ public sealed class ObsidianOpenRoute
                 _world.Answer = ObsidianFigureAddOnsAnswer.No;
                 break;
         }
-        await OpenThenReportAsync(press, request.Folder, request.Course.DirectoryPath, request.Page);
+        await OpenThenReportAsync(press, request.Course, request.Folder, request.Page);
     }
 
     private async Task AskReopenAsync(Pressing press, ObsidianAddOnsRequest request)
@@ -305,7 +413,7 @@ public sealed class ObsidianOpenRoute
         }
         ObsidianFigureAddOnsThisRun.ReopenDeclined.Add(request.Course.DirectoryPath);
         ActivityTrail.Note(ActivityTrail.Event.ObsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.ReopenDeclined(request.Course.Code));
-        await OpenThenReportAsync(press, request.Folder, request.Course.DirectoryPath, request.Page);
+        await OpenThenReportAsync(press, request.Course, request.Folder, request.Page);
     }
 
     /// <summary>
@@ -320,14 +428,14 @@ public sealed class ObsidianOpenRoute
         if (_world.IsRunning())
         {
             ActivityTrail.Note(ActivityTrail.Event.ObsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.DidNotClose(request.Course.Code));
-            await OpenThenReportAsync(press, request.Folder, request.Course.DirectoryPath, request.Page);
+            await OpenThenReportAsync(press, request.Course, request.Folder, request.Page);
             return;
         }
         await AddAsync(request.Course, request.Needed, ObsidianFigureAddOnsTrail.Trigger.AfterReopening);
         ActivityTrail.Note(ActivityTrail.Event.ObsidianReopenedForAddOns, ObsidianFigureAddOnsTrail.Reopened(request.Course.Code));
         var others = wereOpen.Where(path => !ObsidianFigureAddOnsOffer.SamePath(path, request.Course.DirectoryPath)).ToList();
         await _world.ReopenAsync(others);
-        await OpenThenReportAsync(press, request.Folder, request.Course.DirectoryPath, request.Page);
+        await OpenThenReportAsync(press, request.Course, request.Folder, request.Page);
     }
 
     private bool CourseIsOpenInObsidian(string coursePath) =>
