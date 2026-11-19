@@ -19265,8 +19265,14 @@ off.
   since. A folder to take out is renamed aside under a staged name and
   removed only once every change of the step has gone in, so a later swap
   that is refused puts it back whole (`UndoOpKindsTests`); a folder to make
-  is built beside its place and renamed in, never over anything. `heldBy`
-  (content held in a backup zip) is U5's.
+  is built beside its place and renamed in, never over anything. A process
+  that dies with a folder set aside never has it deleted by recovery's
+  tidying, as a staged file is: it is renamed back where it was when that
+  place is free (and recovery then judges the step as the work found it),
+  and left aside, whole, when something holds its place
+  (`UndoOpKindsTests.testAFolderSetAsideByADeadProcessIsPutBackNeverDeleted`).
+  The list's copy of the content is never the only one while the folder
+  still exists. `heldBy` (content held in a backup zip) is U5's.
 - **`external`**: something outside every working folder, `<family>:<name>`;
   this version knows `preference:<name>`, the app's own `UserDefaults`
   (`UndoAppPreferences`), and a step of external ops alone needs no working

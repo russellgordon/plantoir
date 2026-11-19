@@ -139,6 +139,41 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertEqual(UndoContractKinds.stagedLeftovers(in: root), [])
     }
 
+    /// A process that died with a teacher's folder renamed aside (a tree
+    /// taken out) never has that folder deleted by recovery's tidying: it
+    /// is put back where it was, so it is judged as the work found it, even
+    /// when the list's copy of its content is gone. MUST FAIL with the
+    /// tidying of U1, which removed every staged item it found.
+    func testAFolderSetAsideByADeadProcessIsPutBackNeverDeleted() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("kept\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "5-undo", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+
+        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
+
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("a.md")), Data("kept\n".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
+    }
+
+    /// And when something now holds its place, the folder is left aside,
+    /// still whole, rather than deleted.
+    func testAFolderSetAsideIsLeftWhenItsPlaceIsTaken() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("kept\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "5-undo", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        XCTAssertFalse(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
+
+        XCTAssertEqual(try Data(contentsOf: aside.appendingPathComponent("a.md")), Data("kept\n".utf8))
+    }
+
     /// Without a runner for its maintainer, a step holding a `recompute` is
     /// not available: it is never undone with its re-derivation skipped.
     func testAStepWhoseMaintainerHasNoRunnerIsNotAvailable() throws {

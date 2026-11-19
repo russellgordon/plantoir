@@ -728,6 +728,22 @@ nonisolated enum UndoSwap {
         return target.deletingLastPathComponent().appendingPathComponent(name)
     }
 
+    /// Whether a staged item is a folder kept aside as an original (`-orig`):
+    /// a folder a tree op took out, which holds the teacher's files.
+    static func isAFolderSetAside(_ url: URL) -> Bool {
+        if !url.lastPathComponent.hasSuffix("-orig") {
+            return false
+        }
+        var information: stat = stat()
+        let found: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return lstat(path, &information)
+        }
+        return found == 0 && (information.st_mode & S_IFMT) == S_IFDIR
+    }
+
     /// Whether a file name is one a swap for this label left.
     static func isStaged(_ name: String, label: String) -> Bool {
         return name.hasPrefix(".") && name.contains(stagedMarker + label + "-")
@@ -817,7 +833,27 @@ nonisolated enum UndoSwap {
                 continue
             }
             for name in names where UndoSwap.isStaged(name, label: label) {
-                if !UndoSwap.removeStaged(folder.appendingPathComponent(name)) {
+                let stagedURL: URL = folder.appendingPathComponent(name)
+                if UndoSwap.isAFolderSetAside(stagedURL) {
+                    // A teacher's folder a dead process renamed aside (a
+                    // tree taken out, U2): never deleted here. Put back
+                    // where it was when that place is free, so recovery
+                    // judges it as the work found it; otherwise left aside.
+                    let suffix: String = stagedMarker + label + "-orig"
+                    var original: String = name
+                    if original.hasSuffix(suffix) {
+                        original = String(original.dropLast(suffix.count))
+                    }
+                    if original.hasPrefix(".") {
+                        original = String(original.dropFirst())
+                    }
+                    let originalURL: URL = folder.appendingPathComponent(original)
+                    if original.isEmpty || !UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
+                        allGone = false
+                    }
+                    continue
+                }
+                if !UndoSwap.removeStaged(stagedURL) {
                     allGone = false
                 }
             }

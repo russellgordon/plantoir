@@ -258,6 +258,19 @@ nonisolated enum UndoRecovery {
         var atEnd: Int = 0
         var inTheWay: [String] = []
         var endPaths: Set<String> = []
+        // An `interrupted` line names files inside the working folder: an
+        // external op's target is no path, so it is never named there.
+        var externalTargets: Set<String> = []
+        for op in step.ops where op.knownKind == .external {
+            externalTargets.insert(op.placeName)
+        }
+        func pathsOnly(_ places: [String]) -> [String] {
+            var result: [String] = []
+            for place in places where !externalTargets.contains(place) {
+                result.append(place)
+            }
+            return result
+        }
         for file in files {
             if file.state == .neither {
                 inTheWay.append(file.path)
@@ -308,7 +321,7 @@ nonisolated enum UndoRecovery {
                         leftPartWay.append(path)
                     }
                     let closing: [UndoEventLine] = [
-                        UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "couldNotPutBack", paths: leftPartWay),
+                        UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "couldNotPutBack", paths: pathsOnly(leftPartWay)),
                         UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue),
                     ]
                     if !UndoRecovery.write(closing, step: step, writer) {
@@ -331,11 +344,11 @@ nonisolated enum UndoRecovery {
             } else if inTheWay.isEmpty {
                 // Shadow: recorded, never repaired.
                 outcome = .leftAlone
-                events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "partlyTookEffect", paths: Array(endPaths).sorted()))
+                events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "partlyTookEffect", paths: pathsOnly(Array(endPaths).sorted())))
                 events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
             } else {
                 outcome = .interrupted(filesInTheWay: inTheWay.count, filesPutBack: putBack)
-                events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "changedByHand", paths: inTheWay))
+                events.append(UndoEventLine(seq: step.seq, event: .interrupted, phase: phase, reason: "changedByHand", paths: pathsOnly(inTheWay)))
                 events.append(UndoEventLine(seq: step.seq, event: .cleared, reason: UndoClearing.interrupted.rawValue))
                 if mode == .live {
                     // In shadow nothing was put back and nothing offered was
