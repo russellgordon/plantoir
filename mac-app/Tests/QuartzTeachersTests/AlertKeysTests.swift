@@ -12,9 +12,10 @@ import XCTest
 ///   away, nor does `.keyboardShortcut(.cancelAction)` on the Cancel. Only
 ///   the destructive role leaves the go-ahead with no key. So an alert cannot
 ///   have both "not red" and "no default button", which is why the alerts
-///   for deliberately chosen actions (Remove, Delete, Cancel It, Stop
-///   Sharing) keep their red and are a question for Russell on #987, while
-///   `FactsQuestionSheet`, a sheet, has both.
+///   for deliberately chosen actions (Remove, Delete, Remove for a
+///   scheduled deploy, Stop Sharing) keep their red, an open point until the
+///   question sheet is redesigned (#1000), while `FactsQuestionSheet`, a
+///   sheet, has both.
 ///
 /// Whether a picker field's open list still gets the first Escape once its
 /// sheet's Cancel carries `.cancelAction` cannot be measured here: a window

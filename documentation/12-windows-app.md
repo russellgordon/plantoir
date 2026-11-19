@@ -6116,7 +6116,7 @@ Deploy…, Rename (the File menu item, F2 and the context menu all ask
 `CourseThatCanBeRenamed`), Add Section…, Keep a Copy…, every Revise item,
 the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
 refuses on its own), and the Course Settings form, replaced by
-`ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
+`ReferenceSummaryView`. Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) stays (gate by direction).
 On a reference course's SECTION, the − button, the Delete key and the
 section's menu offer no removal at all (− is greyed, Delete does nothing, the
 menu has no Remove Section…); the course row's Remove Course… removes it all.
@@ -7651,7 +7651,7 @@ when they land.
 |---|---|
 | File | Open Working Folder… (Ctrl+O), Open Recent ▸, New Window (Ctrl+N), New Course… (Ctrl+Shift+N) · Import Courses for Reference…, Restore from Archive…, Reload Courses (Ctrl+Shift+R) · Settings… (a window of its own since #491 — "The Settings window, Plantoir Help and the Account ID's refusals" below), Check for Updates… (only while the updater has a feed) |
 | Course | Add Section…, Copy a Page from This Course… · Save Course Settings (Ctrl+S), Revert Course Settings · Rename (F2) and its reason line, Set School Year…, Keep a Copy for Reference… · Back Up Now, Restore from Backup… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O), Show in File Explorer, Open in Terminal · Delete Backup…, Delete Archive…, Remove Course… |
-| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Cancel Scheduled Deploy… · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
+| Section | Preview / Stop Preview (Ctrl+Shift+P), and since #514 its second item Preview at Last Viewed / Preview (no key; absent while a preview runs — "Preview at Last Viewed on Windows" below), Deploy… (Ctrl+Shift+D), Open in Browser · (2B) Publish Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview (Ctrl+Shift+B), Undo Last Change · Add Next Class, Re-date Classes…, Make Room for Classes…, Class Dates… · Schedule Deploy…, Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) · Get Ready for the Start of the Year…, Undo Getting Ready for the Start of the Year…, Publish Pages That Links Lead To… · Revise With ▸, Open in Obsidian (Ctrl+Shift+O when a section is selected), Show in File Explorer, Open in Terminal · Remove Section… |
 | View | Back (Alt+Left), Forward (Alt+Right) · Reload Page (Ctrl+R) |
 | Help | Plantoir Help (F1, since #491) · Publishing and Deploying… · Report a Problem… · About Plantoir |
 
@@ -7839,7 +7839,7 @@ the `mac` issue:** the section row keeps **Change Deploy Time (…)…**, which
 Deploy… greyed while one is set, Cancel live).
 
 **There were two until #527 (2026-11-13).** A reference section's row also
-kept **Cancel Scheduled Deploy…**, which the menu bar greys, on the reasoning
+kept **Remove Scheduled Deploy…** (then Cancel Scheduled Deploy…), which the menu bar greys, on the reasoning
 (written for #488 on 2026-10-15) that Windows did not turn such a schedule off
 by itself and the row was the teacher's only way to stop it. That reasoning
 was already stale when #527 was opened: since #241 every read of the working

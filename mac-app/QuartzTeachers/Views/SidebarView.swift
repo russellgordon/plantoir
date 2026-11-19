@@ -609,20 +609,24 @@ struct SidebarView: View {
             }
         }
         .alert(
-            "Cancel this scheduled deploy?",
+            ScheduledDeployRemovalWording.question,
             isPresented: cancelScheduleRequestIsPresented,
             presenting: cancelScheduleRequest
         ) { request in
-            Button("Cancel It", role: .destructive) {
-                cancelScheduledDeploy(request)
-            }
-            // Cancel, not "Leave It Scheduled" (#987): the teacher started
-            // this.
-            // Alerts: "Always use 'Cancel' to title a button that cancels the
-            // alert's action."
-            Button("Cancel", role: .cancel) {
+            // Cancel leads and answers Escape; Remove trails (#987, Russell
+            // 2026-11-18). Cancel, not "Leave It Scheduled": the teacher
+            // started this, and Alerts says "Always use 'Cancel' to title a
+            // button that cancels the alert's action." Remove, so the two
+            // buttons do not share a verb (until #987 both said cancel). Remove keeps the
+            // destructive role, the only way a SwiftUI alert's action takes
+            // no Return (`AlertKeysTests`); whether these alerts stay red is
+            // open, #1000.
+            Button(ScheduledDeployRemovalWording.cancelButton, role: .cancel) {
             }
             .keyboardShortcut(.cancelAction)
+            Button(ScheduledDeployRemovalWording.removeButton, role: .destructive) {
+                cancelScheduledDeploy(request)
+            }
         } message: { request in
             Text(cancelMessage(for: request))
         }
@@ -1078,9 +1082,14 @@ struct SidebarView: View {
     /// What cancelling would mean, stated rather than implied.
     func cancelMessage(for request: ScheduledDeployRequest) -> String {
         guard let when = request.when else {
-            return "This section will no longer deploy on its own."
+            return ScheduledDeployRemovalWording.messageWithoutTime
         }
-        return "\(request.course.displayCode) Section \(request.sectionNumber) is set to deploy on its own at \(ScheduledDeploy.timeText(when)) on \(ScheduledDeploy.dayText(when)). Cancelling means it will not go out then, and the site stays as it is until you deploy it yourself."
+        return ScheduledDeployRemovalWording.message(
+            courseCode: request.course.displayCode,
+            sectionNumber: request.sectionNumber,
+            time: ScheduledDeploy.timeText(when),
+            day: ScheduledDeploy.dayText(when)
+        )
     }
 
     func cancelScheduledDeploy(_ request: ScheduledDeployRequest) {
@@ -1819,7 +1828,7 @@ struct SidebarView: View {
         // set before the course was kept
         // must still be turnable off.
         if let scheduledFor {
-            Button("Cancel Deploy at \(ScheduledDeploy.timeText(scheduledFor))…", systemImage: "clock") {
+            Button(ScheduledDeployRemovalWording.menuItem, systemImage: "clock") {
                 select(row)
                 cancelScheduleRequest = ScheduledDeployRequest(
                     course: course,

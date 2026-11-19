@@ -4707,7 +4707,7 @@ for each section. The mac does it in `ReferenceCourseUpkeep` through
 `ReferenceCourseUpkeep.BringUpToDate` since #241. The row "already on disk,
 firing" above is the backstop for a task the read has not reached.
 
-So **neither platform offers Cancel Scheduled Deploy… on a reference
+So **neither platform offers Remove Scheduled Deploy… (Cancel Scheduled Deploy… until #987) on a reference
 section**: the menu bar greys it (`subjectMenus`), and since #527 (2026-11-13)
 Windows' sidebar row leaves it out too, as the mac's always did. Until then
 the Windows row kept it, on the stale belief that Windows did not turn such a
@@ -5200,7 +5200,7 @@ shown at all.
 
 **A working folder that has MOVED loses its clock and its Cancel item.**
 `nextRun` answers nil when the plist's stored path no longer resolves to the
-open folder, and the context menu offers "Cancel Deploy at …" only when it does
+open folder, and the context menu offers "Remove Scheduled Deploy…" ("Cancel Deploy at …" until #987) only when it does
 not. So after a teacher moves their working folder, an existing scheduled deploy
 becomes invisible and un-cancellable from the app. Bounded rather than fixed:
 the job's own wrapper path moved too, so it cannot deploy anything, and the

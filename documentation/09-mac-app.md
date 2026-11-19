@@ -1733,8 +1733,9 @@ presses Escape, Command-Period and Return on the real alert shown as a sheet.
 Group, Start the Groups Again, Share Without a Password) is a plain button
 now, still with no key. Alerts: "Use the destructive style to identify a
 button that performs a destructive action people didn't deliberately
-choose." **The SwiftUI alerts were left red**, and this is a question for
-Russell (#987): measured (`AlertKeysTests`), in a SwiftUI `.alert` a plain
+choose." **The SwiftUI alerts were left red, a known open point: Russell
+wants the question sheet itself redesigned first (#1000), and until then the
+alerts stay exactly as they are here, none moved to a sheet.** Measured (`AlertKeysTests`), in a SwiftUI `.alert` a plain
 button beside a Cancel takes Return whatever is written on it
 (`.keyboardShortcut(nil)` does not take it away, nor a `.cancelAction` on the
 Cancel); only the destructive role leaves the go-ahead with no key. So an alert
@@ -1743,9 +1744,13 @@ points two ways: Alerts' Empty Trash sentence says the deliberately chosen
 action is not red and "the convenience of pressing Return to confirm" it
 outweighs the warning, while Buttons ▸ Role says not to make a destructive
 action primary. The alerts concerned: Remove (course or section), Delete
-(backup, backups, archive), Cancel It (a scheduled deploy), Remove (a token,
+(backup, backups, archive), Remove (a scheduled deploy), Remove (a token,
 an assistant, a Course Settings list entry), Stop Sharing, the assistant's
 put-back (D1) and the new Remove for a downloaded model (D22).
+
+**Ruled since, by the director on 2026-11-18:** the quit question keeps no
+default button, as built; the Plan Share tables (D4) keep no default; the
+links checklist's Not Now stays until #991.
 
 **Titles** (Q2). Alerts: "Always use 'Cancel' to title a button that cancels
 the alert's action." Retitled: Keep My Old Token and Don't Save It → Cancel
@@ -1759,7 +1764,12 @@ Again after Change Password) → Not Now. D9: the assistant's dates offer's Yes
 title that describes the result", "avoiding 'Yes' and 'No'", and the ellipsis
 because it opens the class-dates sheet (Buttons ▸ macOS). Left as they were,
 and listed as questions: the links checklist's Not Now (the same sheet opens
-by itself after a build and from the menu), and Cancel It beside a Cancel.
+by itself after a build and from the menu), ruled since: it stays as it is
+until #991 stops that sheet opening by itself. The scheduled deploy's question
+is ruled too (Russell, 2026-11-18): its verb is Remove, so the command is
+Remove Scheduled Deploy…, the question "Remove the scheduled deploy?", and its
+buttons Cancel (leading, Escape) and Remove
+(`ScheduledDeployRemovalWording`, `scheduledDeployCancellation.removingOne`).
 
 **D22.** Removing a downloaded assistant in Settings ▸ Assistant asks first,
 as Alerts asks for "an uncommon destructive action that they can't undo".
@@ -7253,7 +7263,7 @@ be opened with no course behind it. `FileCommands` replaces `.newItem`:
 ### A course kept for reference: the menu bar and its rows agree
 
 Two disagreements the implementation review found, both decided by the
-director: **Section ▸ Cancel Deploy at…** is greyed on a course kept for
+director: **Section ▸ Remove Scheduled Deploy…** (Cancel Deploy at… until #987) is greyed on a course kept for
 reference — its section row's context menu has no Cancel, nothing deploys from
 a kept course, and Plantoir turns any schedule it still has off itself
 (`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`); the plan's

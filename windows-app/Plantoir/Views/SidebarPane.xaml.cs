@@ -1149,7 +1149,7 @@ public sealed partial class SidebarPane : UserControl
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
 
         // Only shown when there is one to cancel. A permanently greyed-out
-        // "Cancel Scheduled Deploy…" on every section would teach teachers to
+        // "Remove Scheduled Deploy…" on every section would teach teachers to
         // ignore the line, which is the opposite of what it is for.
         // Scheduling without going through the assistant: the same act, and
         // most teachers setting a 6:30 deploy know exactly what they want and
@@ -1164,7 +1164,7 @@ public sealed partial class SidebarPane : UserControl
             // side moves), so the row keeps the one route to it.
             menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
                                      Selecting(row, () => AskWhenToDeploy(course, number, existing: when))));
-            menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
+            menu.Items.Add(MenuItem("Remove Scheduled Deploy…", Glyphs.Remove,
                                      Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
         }
         else
@@ -1374,12 +1374,12 @@ public sealed partial class SidebarPane : UserControl
         string? askedIn = Workspace.WorkspacePath;
         var dialog = new ContentDialog
         {
-            Title = "Cancel this scheduled deploy?",
+            Title = "Remove the scheduled deploy?",
             Content = $"{course.Code} Section {number} is set to deploy automatically at " +
-                      $"{when:h:mm tt} on {when:dddd d MMMM}. Cancelling means it will not go out then, " +
+                      $"{when:h:mm tt} on {when:dddd d MMMM}. Removing it means it will not go out then, " +
                       "and the site stays as it is until you deploy it yourself.",
-            PrimaryButtonText = "Cancel It",
-            CloseButtonText = "Leave It Scheduled",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;

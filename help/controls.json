@@ -386,24 +386,24 @@
    },
    "windows": null
   },
-  "cancelScheduledDeployQuestion": {
-   "label": "Cancel this scheduled deploy?",
+  "removeScheduledDeployQuestion": {
+   "label": "Remove the scheduled deploy?",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.question"
    },
    "windows": null
   },
-  "cancelIt": {
-   "label": "Cancel It",
+  "removeScheduledDeployButton": {
+   "label": "Remove",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.removeButton"
    },
    "windows": null
   },
-  "leaveItScheduled": {
+  "removeScheduledDeployCancel": {
    "label": "Cancel",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.cancelButton"
    },
    "windows": null
   },

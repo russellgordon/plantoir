@@ -299,8 +299,8 @@ enum QuitConfirmation {
     /// button the default button", and Quit Anyway can leave a deploy part
     /// way (Buttons ▸ Role: "Don't assign the primary role to a button that
     /// performs a destructive action"). Until #987 Keep Working was first
-    /// and the default. Which answer, if any, Return should give is one of
-    /// #987's questions for Russell.
+    /// and the default. No default was kept on review (#987, the director's
+    /// call, 2026-11-18).
     static let buttonsInOrder: [Button] = [
         Button(title: quitAnywayButton, choice: .quitAnyway, keyEquivalent: ""),
         Button(title: keepWorkingButton, choice: .keepWorking, keyEquivalent: "\u{1b}")

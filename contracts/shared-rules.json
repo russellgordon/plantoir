@@ -4442,6 +4442,17 @@
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
   "scheduledDeployCancellation": {
+    "removingOne": {
+      "rule": "#987 (Russell, 2026-11-18): the verb for taking away a scheduled deploy is Remove, not cancel. The command (the menu bar's and a section's right-click menu) is menuItem; it asks question, with message (or messageWithoutTime) under it; its buttons are cancelButton, leading, which answers Escape and Command-Period, and removeButton, trailing. Neither is the default. Until #987 the command, the question and both of its buttons used the verb cancel, so the button that backed out and the button that went ahead said the same word.",
+      "words": {
+        "menuItem": "Remove Scheduled Deploy…",
+        "question": "Remove the scheduled deploy?",
+        "message": "{course} Section {section} is set to deploy on its own at {time} on {day}. Removing it means it will not go out then, and the site stays as it is until you deploy it yourself.",
+        "messageWithoutTime": "This section will no longer deploy on its own.",
+        "cancelButton": "Cancel",
+        "removeButton": "Remove"
+      }
+    },
     "note": "Which acts turn a scheduled deploy off without being asked, which deliberately turn none off, and how late is too late for one to still run. The MECHANISM is not shared and never was - launchd against Task Scheduler - but which act cancels what is a rule with inputs and outputs, it is true of both products, and on 2026-09-20 the two apps disagreed about it by accident rather than by decision: Windows cancels when a SECTION is removed and does not when a COURSE is (Plantoir.Core/Models/CourseArchiver.cs), and the mac did neither. That is exactly the quiet difference this folder exists to catch.",
     "theFault": "A scheduled deploy outliving the course it was set for. The alarm lives OUTSIDE the working folder and is addressed by the course code (and, until #237, by nothing else), so removing the course left it standing, and on the mac StartCalendarInterval carries no year - so a job that never ran came due on the same date twelve months later, against whatever was in the folder by then. Which direction it errs in was MEASURED on the mac, 2026-09-20, and it is worse than it first looked: a course that publishes to NETLIFY refuses (scripts/deploy.py:1204, refuse_to_ask, exit 3) because the site marker lived inside the course folder and went with it; a course that publishes to CLOUDFLARE PAGES does NOT refuse - publish_to_cloudflare contains no refuse_to_ask at all, the teacher's surname is read from courses/.internal/profile.json which is in the WORKING folder and survives the removal, and suggest_pages_name is deterministic - so it builds the new course, creates or reuses a Pages project and reports success; and a course that publishes to a FOLDER does not refuse either, because a folder destination asks nothing ever. So the failure that REPORTS SUCCESS is not a rare edge: it is every folder and every Cloudflare course.",
     "order": "CANCEL FIRST, then archive and remove - and this is the opposite of a RENAME's order, deliberately. A rename that cancelled before a failed move would silently drop a deploy for a course still sitting there under its old name, so it archives first; a REMOVAL that archived before a failed cancel would leave the very thing this rule exists to prevent, a course that is gone with a live alarm still addressed to it. So: a cancel that FAILS stops the removal, and the teacher is told in a plain sentence. If the removal then fails, the deploy stays cancelled and the sentence says so.",
@@ -15156,7 +15167,7 @@
       "order": ["keepWorking", "quitAnyway"],
       "orderWhy": "Leading to trailing, as the teacher sees them (#987). Alerts: \"Cancel buttons are typically on the leading side of a row.\" On the mac NSAlert puts the first button it is given on the trailing side, so it is given quitAnyway first.",
       "default": null,
-      "defaultWhy": "No button is the default (#987), so a Return pressed without reading does nothing. Alerts: \"Note that you don't want to make a Cancel button the default button\"; Buttons, Role: \"Don't assign the primary role to a button that performs a destructive action\", and quitting can leave a deploy part way. Until #987 keepWorking was the default. Whether quitAnyway should take Return (Alerts' Empty Trash sentence, for an action chosen on purpose) is an open question for Russell on #987.",
+      "defaultWhy": "No button is the default (#987), so a Return pressed without reading does nothing. Alerts: \"Note that you don't want to make a Cancel button the default button\"; Buttons, Role: \"Don't assign the primary role to a button that performs a destructive action\", and quitting can leave a deploy part way. Until #987 keepWorking was the default. Kept on review (#987, the director's call, 2026-11-18): quitAnyway takes no Return either.",
       "escape": "keepWorking",
       "escapeWhy": "Escape and Command-Period are Cancel, which is keepWorking. Alerts: \"Provide alternative ways to cancel an alert\", pressing Escape or Command-Period.",
       "keepWorking": "the app stays open and nothing is stopped or released",
@@ -16489,7 +16500,7 @@
       "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
       "whatIsWithheld": [
         "the section window's Deploy button",
-        "Schedule Deploy... (Cancel Deploy at... is always offered - gate by direction)",
+        "Schedule Deploy... (Remove Scheduled Deploy..., Cancel Deploy at... until #987, is always offered - gate by direction)",
         "Rename (Course ▸ Rename and the row's menu; \"Rename Course\" before the HIG sweep, #457) (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
         "Add Section...",
         "Remove Section N (removing the whole course stays)",

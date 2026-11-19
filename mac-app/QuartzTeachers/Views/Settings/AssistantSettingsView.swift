@@ -59,8 +59,8 @@ struct AssistantSettingsView: View {
         // #987, D22. Drawn like the app's other removal alerts: Cancel
         // answers Escape, and Remove is destructive so that it takes no
         // Return (in a SwiftUI alert only that role keeps Return off it,
-        // `AlertKeysTests`); whether those alerts keep their red is a
-        // question for Russell on #987.
+        // `AlertKeysTests`); whether those alerts keep their red waits on
+        // the question sheet's redesign (#1000).
         .alert(
             AssistModelLibrary.removeQuestion(for: removing ?? .small),
             isPresented: Binding(

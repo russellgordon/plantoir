@@ -59,7 +59,8 @@ nonisolated struct FactsQuestion: Equatable, Sendable {
 ///   a button that performs a destructive action people didn't deliberately
 ///   choose." In a sheet a plain button takes no key of its own, so the
 ///   action is plain; in a SwiftUI `.alert` it would take Return (measured,
-///   `AlertKeysTests`), which is why the alerts are a question (#987).
+///   `AlertKeysTests`), which is why the alerts stay red until the question
+///   sheet is redesigned (#1000).
 /// - Where going ahead is the default (`goAheadIsTheDefault` true), the
 ///   action is the default button (Return) and the cancelling button
 ///   carries Escape. Buttons,
