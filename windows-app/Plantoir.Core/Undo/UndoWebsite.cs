@@ -241,7 +241,9 @@ public static class UndoWebsite
     /// hundreds of files); it is not <see cref="Assist.LinksChecklist.PublishedPlaces"/>,
     /// which is the union of every fragment and the wrong question here.
     /// </summary>
-    public static UndoWebsiteInputs Inputs(Course course, int section)
+    /// <param name="listFiles">A seam for tests: lists the record folder's files (a folder that refuses
+    /// to be listed, which a deny ACE cannot show under an administrator's token); the real listing by default.</param>
+    public static UndoWebsiteInputs Inputs(Course course, int section, Func<string, IEnumerable<string>>? listFiles = null)
     {
         var destinations = new List<string>();
         var markers = new List<string>();
@@ -259,7 +261,7 @@ public static class UndoWebsite
         try
         {
             names = Directory.Exists(folder)
-                ? Directory.EnumerateFiles(folder).Select(file => System.IO.Path.GetFileName(file)).ToList()
+                ? (listFiles ?? (path => Directory.EnumerateFiles(path)))(folder).Select(file => System.IO.Path.GetFileName(file)).ToList()
                 : new List<string>();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)

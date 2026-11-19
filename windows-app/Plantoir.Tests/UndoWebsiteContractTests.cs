@@ -274,7 +274,29 @@ public class UndoWebsiteContractTests : IDisposable
         Assert.Equal(UndoWebsiteAnswer.NoOffer,
             UndoWebsite.Answer(new[] { HideDay1 }, false, null, Array.Empty<string>(), Array.Empty<string>()));
 
-        // On disk: the folder denies listing to this account.
+        // On disk, through the listing seam: a folder that refuses to be
+        // listed (as a deny ACE does) is every destination unread. Green
+        // under any token, which the ACL fact below is not (the W5 review's
+        // second round: an administrator's token over SSH passes a deny ACE).
+        foreach (Exception refusal in new Exception[] { new UnauthorizedAccessException("denied"), new IOException("the network went away") })
+        {
+            var course = Course("netlify");
+            WriteFragment(Fragment(course, "20261113T090000Z-netlify.json"), new[] { "Section 1/index" });
+            var inputs = UndoWebsite.Inputs(course, 1, _ => throw refusal);
+            Assert.Null(inputs.Record);
+            Assert.Equal(UndoWebsiteAnswer.CannotTell,
+                UndoWebsite.Answer(new[] { HideDay1 }, false, inputs.Record, inputs.Destinations, inputs.SiteMarkers));
+        }
+    }
+
+    /// <summary>
+    /// The same through a real deny ACE on the folder. Skipped, saying why,
+    /// where this account's token passes over a deny ACE (an administrator's
+    /// over SSH), so the totals line counts it as not run rather than failed.
+    /// </summary>
+    [DenyBitesFact]
+    public void ARecordFolderThatDeniesListingCannotTell()
+    {
         var course = Course("netlify");
         string folder = UndoWebsite.RecordFolder(course.DirectoryPath, 1);
         WriteFragment(Fragment(course, "20261113T090000Z-netlify.json"), new[] { "Section 1/index" });
@@ -295,6 +317,25 @@ public class UndoWebsiteContractTests : IDisposable
             rights.RemoveAccessRule(deny);
             info.SetAccessControl(rights);
         }
+    }
+
+    [Fact]
+    public void Proposed_APageWhoseNameEndsInUpperCaseMdIsAPageAsOnTheMac()
+    {
+        // The Mac's UndoWebsite.place(ofPath:) lowercases before the .md test.
+        Assert.Equal(Day1, UndoWebsite.PlaceOf("courses/TST1O/Section 1/Classes/Day 1.MD"));
+        Assert.Equal(Day1, UndoWebsite.PlaceOf("courses/TST1O/Section 1/Classes/Day 1.Md"));
+    }
+
+    [Fact]
+    public void AFragmentNameHasAsciiDigitsOnlyAsOnTheMac()
+    {
+        // Arabic-Indic digits are \d to .NET but not a moment the writers spell.
+        string arabic = string.Concat(Enumerable.Repeat("\u0661", 8)) + "T" + string.Concat(Enumerable.Repeat("\u0661", 6)) + "Z-netlify.json";
+        var record = new[] { new UndoWebsiteFragment(arabic, new[] { Day1 }) };
+        Assert.Empty(UndoWebsite.NewestFragments(record, new[] { "netlify" }));
+        var ascii = new[] { new UndoWebsiteFragment("20261113T090000Z-netlify.json", new[] { Day1 }) };
+        Assert.Single(UndoWebsite.NewestFragments(ascii, new[] { "netlify" }));
     }
 
     [Fact]
@@ -484,5 +525,51 @@ public class UndoWebsiteContractTests : IDisposable
         var before = Files();
         Assert.Equal(UndoWebsiteAnswer.OfferToDeploy, AnswerFor(course));
         Assert.Equal(before, Files());
+    }
+}
+
+/// <summary>
+/// A fact that needs a deny ACE to stop this account listing a folder:
+/// SKIPPED, saying why, when it does not (an administrator's token, as over
+/// SSH, passes over it), so the totals line counts it as not run rather than
+/// failed, the convention of <see cref="FileLinkFactAttribute"/>. The probe
+/// makes a temporary folder, denies itself listing, tries, and removes both.
+/// </summary>
+public sealed class DenyBitesFactAttribute : FactAttribute
+{
+    private static readonly Lazy<bool> DenyBites = new(Probe);
+
+    public DenyBitesFactAttribute()
+    {
+        if (!DenyBites.Value)
+            Skip = "A deny ACE does not stop this account listing a folder (an administrator's token, as over SSH), so "
+                 + "'a record folder that denies listing cannot tell' cannot be tried on the disk here; "
+                 + "Proposed_ARecordFolderThatCannotBeListedCannotTell covers it through the listing seam.";
+    }
+
+    private static bool Probe()
+    {
+        string folder = Directory.CreateTempSubdirectory("deny-probe-").FullName;
+        var info = new DirectoryInfo(folder);
+        var rights = info.GetAccessControl();
+        var deny = new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!, FileSystemRights.ListDirectory, AccessControlType.Deny);
+        try
+        {
+            rights.AddAccessRule(deny);
+            info.SetAccessControl(rights);
+            try
+            {
+                _ = Directory.EnumerateFiles(folder).ToList();
+                return false;
+            }
+            catch (UnauthorizedAccessException) { return true; }
+            catch (IOException) { return true; }
+        }
+        catch { return false; }
+        finally
+        {
+            try { rights.RemoveAccessRule(deny); info.SetAccessControl(rights); } catch { }
+            try { Directory.Delete(folder); } catch { }
+        }
     }
 }
