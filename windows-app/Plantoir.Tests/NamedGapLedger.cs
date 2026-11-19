@@ -372,8 +372,8 @@ internal static class NamedGapLedger
     private const string Reason928 = "a preview start that does nothing while the window's own start waits, a run that never started, and a repair's Preview Again that does not survive its stop (the mac's #812 and #813) are #928's piece of v2.0.0, not built here yet";
     private const string Reason936 = "PhET simulations and the kept-downloads folder (the mac's #674) are #936's piece of v2.0.0; until it lands Windows reads no PLANTOIR_DOWNLOADED: line, explains no stop for a simulation (the raw output is shown) and has no Science simulation row on the Problems tab";
     // The same hold, after the mac's stack 13 (956defd43, #800, #829, #897 piece B, #904).
-    private const string Reason897RollOver = "Section ▸ Roll Over to a New Year… with its sheet (the mac's #897 piece B) is #897's piece of v2.0.0 on Windows, not built here yet; until it lands Windows' menus have no Roll Over item and none of its sentences, and the built-in assistant's roll_over_section is unchanged";
-    private const string Reason829 = "a lease whose start is in WHOLE seconds, compared on whole seconds (the one deploy.sh writes since the mac's #829), is #829's piece of v2.0.0 on Windows; until it lands nothing on Windows writes such a lease (deploy.ps1 takes none yet, and this app's own leases carry the start to the microsecond), so no hold here is read as gone this way";
+    private const string Reason897RollOver = "Section ▸ Roll Over to a New Year… with its sheet (the mac's #897 piece B) is #954's piece of v2.0.0 (Windows' issue for #897 piece B), not built here yet; until it lands Windows' menus have no Roll Over item and none of its sentences, and the built-in assistant's roll_over_section is unchanged";
+    private const string Reason829 = "a lease whose start is in WHOLE seconds, compared on whole seconds (the one deploy.sh writes since the mac's #829), is #956's piece of v2.0.0 (Windows' issue for the mac's #829, now closed); until it lands nothing on Windows writes such a lease (deploy.ps1 takes none yet, and this app's own leases carry the start to the microsecond), so no hold here is read as gone this way";
     private const string Reason946 ="the guidance sheet naming GitHub Copilot beside Claude Code and Codex (the mac's #887) is #946's piece of v2.0.0, with #879's trail prefix and #791's greeting check; until it lands the sheet names the two assistants Windows opens today";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
@@ -565,8 +565,8 @@ internal static class NamedGapLedger
              "menuAddButton", "menuDuplicateButton", "duplicatedFromTheMenu",
              "theCopyCouldNotBeMadeHiddenFromTheMenu", "menuTheNextPageIsAlreadyThere"),
         // The mac's stack 13 (956defd43), folded into the same hold.
-        Owed(SubjectMenuItems, 897, V200, Reason897RollOver, "rollOverToANewYear"),
-        Owed(AssistWordingKeys, 897, V200, Reason897RollOver,
+        Owed(SubjectMenuItems, 954, V200, Reason897RollOver, "rollOverToANewYear"),
+        Owed(AssistWordingKeys, 954, V200, Reason897RollOver,
              "menuRollOverTitle", "menuRollOverIntro", "menuRollOverIntroForAMeeting",
              "menuRollOverDates", "menuRollOverDatesForAMeeting", "menuRollOverDatesAreOld", "menuRollOverDatesAreOldForAMeeting",
              "menuRollOverKeepWebsite", "menuRollOverNewWebsite", "menuRollOverANewWebsiteWouldReuseItsAddress",
@@ -575,7 +575,7 @@ internal static class NamedGapLedger
              "rolloverANewWebsiteIsMadeAtTheNextDeploy", "rolloverCouldNotStartANewWebsiteFromTheMenu",
              "rolloverDeploysToAFolderFromTheMenu", "rolloverStartedANewWebsiteFromTheMenu",
              "rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder"),
-        Owed(LeaseLivenessCases, 829, V200, Reason829,
+        Owed(LeaseLivenessCases, 956, V200, Reason829,
              "#829: a deploy typed in Terminal - bash, its start in whole seconds - is alive while that bash runs"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started

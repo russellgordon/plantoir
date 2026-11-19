@@ -153,7 +153,7 @@ public class WorkLeaseContractTests
             bool alive = WorkLease.IsAlive(c["pid"]!.GetValue<int>(), signal, answer, entry,
                 c["lease"]?["name"]?.ToString(), c["lease"]?["start"]?.ToString());
             string decided = alive ? "alive" : "gone";
-            // A case this app decides the other way until #829 compares a
+            // A case this app decides the other way until #956 compares a
             // whole-second start on whole seconds is held by name: it must
             // still be decided opposite, and the entry fails the day it is not.
             if (NamedGapLedger.Holding(NamedGapLedger.LeaseLivenessCases, c["name"]!.ToString()) is { } held)
