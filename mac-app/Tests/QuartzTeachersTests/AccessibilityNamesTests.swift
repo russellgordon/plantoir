@@ -177,7 +177,7 @@ final class AccessibilityNamesTests: XCTestCase {
         XCTAssertFalse(AssistTypingIndicator.breathes(whenReduceMotionIsOn: true))
         let view: String = try AccessibilityNamesTests.source("Views/Assist/AssistChatBubble.swift")
         XCTAssertNotNil(view.range(of: "@Environment(\\.accessibilityReduceMotion)"))
-        XCTAssertNotNil(view.range(of: "reducesMotion ? nil : .easeInOut"))
+        XCTAssertNotNil(view.range(of: "reducesMotion ? nil : Animation.easeInOut"))
     }
 
     /// A view's source, read from the app's own folder.
@@ -262,19 +262,19 @@ final class AccessibilityNamesTests: XCTestCase {
         guard let object = element as? NSObject else {
             return nil
         }
-        if object.responds(to: #selector(NSAccessibilityProtocol.accessibilityIdentifier)) {
-            let elementIdentifier: String? = object.perform(#selector(NSAccessibilityProtocol.accessibilityIdentifier))?.takeUnretainedValue() as? String
+        if object.responds(to: NSSelectorFromString("accessibilityIdentifier")) {
+            let elementIdentifier: String? = object.perform(NSSelectorFromString("accessibilityIdentifier"))?.takeUnretainedValue() as? String
             if elementIdentifier == identifier {
-                if object.responds(to: #selector(NSAccessibilityProtocol.accessibilityLabel)) {
-                    return object.perform(#selector(NSAccessibilityProtocol.accessibilityLabel))?.takeUnretainedValue() as? String
+                if object.responds(to: NSSelectorFromString("accessibilityLabel")) {
+                    return object.perform(NSSelectorFromString("accessibilityLabel"))?.takeUnretainedValue() as? String
                 }
                 return nil
             }
         }
-        guard object.responds(to: #selector(NSAccessibilityProtocol.accessibilityChildren)) else {
+        guard object.responds(to: NSSelectorFromString("accessibilityChildren")) else {
             return nil
         }
-        guard let children = object.perform(#selector(NSAccessibilityProtocol.accessibilityChildren))?.takeUnretainedValue() as? [Any] else {
+        guard let children = object.perform(NSSelectorFromString("accessibilityChildren"))?.takeUnretainedValue() as? [Any] else {
             return nil
         }
         for child in children {

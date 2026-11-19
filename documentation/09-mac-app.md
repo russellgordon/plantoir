@@ -19951,3 +19951,50 @@ page until then, with the anchor on the trail either way.
 How a set-up runs, what it records, what was measured and what was rejected
 are in `documentation/10-local-ai-assistant.md` → "Setting up an outside
 assistant (#855)".
+
+## Names VoiceOver reads, and state in more than colour (#993)
+
+Part of the Mac HIG review (#975, findings D16 to D20, D40, D41). Apple's
+VoiceOver page asks an app to "provide alternative labels for all key
+interface elements" and to "exclude purely decorative images from
+VoiceOver"; its Accessibility page asks it to "convey information with more
+than color alone" and, under Reduce Motion, to reduce "automatic and
+repetitive animations".
+
+- **One home for the names.** `AccessibilityNames` (`Views/Helpers/`) holds
+  every name given to a control whose visible title is empty, hidden or only
+  a symbol, so the wording can be read in one place. A name is the control's
+  visible title or a plain two- or three-word label, never its kind
+  ("button"), which VoiceOver says itself. A control whose row already prints
+  its label (`LabeledContent`, a Course Settings row) is named with that same
+  text.
+- **Why names were wrong rather than missing.** An icon-only button with no
+  label is named by SwiftUI from its symbol: the send button read "Arrow Up
+  Circle", the emoji button "face.smiling", the unsaved-settings icon
+  "Info". `DetailTabs` now takes a `name` ("Section View", "Course View"),
+  because a segmented `Picker("")` with hidden labels gave its radio group
+  no name although each segment had one.
+- **Decorative icons are hidden.** An `info.circle` (or the token notice's
+  triangle) beside a sentence that says everything is `accessibilityHidden`,
+  so VoiceOver reads the sentence alone.
+- **State in words.** The multi-destination deploy checklist names each
+  destination's state ("Waiting", "Deploying", "Done", "Failed",
+  `DeployDestinationChecklist.stateName`) and reads as one element per
+  destination; Copy a Page's orange problem line carries a warning symbol
+  named "Warning".
+- **Reduce Motion.** The assistant's breathing dots stand still and dim
+  while Reduce Motion is on (`AssistTypingIndicator.breathes`), and turning
+  it on mid-wait removes the repeating animation rather than leaving it
+  running.
+- **Not done here, and why.** The About window's credit links are inline
+  Markdown links in a `Text`, which SwiftUI reports to accessibility as
+  disabled links (D46); fixing that means drawing them as separate `Link`
+  views, a change to the window's look, so it waits for a ruling. Plan
+  Share's status lines (part of D19) wait for the Plan Share sheet (#992).
+- **Tests.** `AccessibilityNamesTests`: the tab bar's and the emoji field's
+  names are read back from the accessibility tree AppKit builds for a hosted
+  view; controls deep inside sheets are checked by reading the view source
+  for the naming modifier on the line above the control's identifier.
+
+**For Windows:** each name here has a WinUI counterpart in
+`AutomationProperties.Name`; stage 3 of #975 mirrors this piece.

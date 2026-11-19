@@ -323,7 +323,7 @@ struct AssistTypingIndicator: View {
                         // No animation at all under Reduce Motion, so
                         // turning it on mid-wait stops the repeating one.
                         .animation(
-                            reducesMotion ? nil : .easeInOut(duration: 0.6)
+                            reducesMotion ? nil : Animation.easeInOut(duration: 0.6)
                                 .repeatForever(autoreverses: true)
                                 .delay(Double(index) * 0.18),
                             value: isBreathing
