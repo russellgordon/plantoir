@@ -14483,6 +14483,22 @@ which is still safe (a barrier); the rows say what it should answer once it
 reads them. The mac's reasons and what was rejected are in
 `documentation/09-mac-app.md` → "The kinds U2 adds, and `recompute` run".
 
+After U2b's hard review (2026-11-19) five more things bind Windows, each
+with cases: a read of the teacher's file that FAILS (access denied, an I/O
+error, a OneDrive placeholder not yet downloaded) is `cannotTell`, refused
+without clearing the list and retried by recovery, never "changed since"
+(`checkCases` with `cannotBeRead`; on Windows deny read with an ACL);
+`editJSON` changes only the member's bytes (`undo.editJSONCases`, the exact
+bytes, with a Python reference: do not re-serialise the file with
+`System.Text.Json`); places are compared without regard to case; a
+listing never holds a `.DS_Store` (and the Windows twin, `desktop.ini` and
+`Thumbs.db`, is a question for the Windows port to raise, not assumed); and
+a folder set aside by a dead process is renamed back only when its listing
+is the step's, never deleted (`undo.rule.recovery`, `recoveryCases` with
+`withATree`). The door for a step given as ops refuses before anything
+changes when the step would not read back readable, names a path outside
+the working folder (links resolved), or names a blob it was not given.
+
 Six things in the format are easy to get wrong and are the reason it was
 revised:
 
