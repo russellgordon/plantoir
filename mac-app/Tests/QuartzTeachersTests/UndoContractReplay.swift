@@ -1168,6 +1168,7 @@ nonisolated enum UndoContractReplay {
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
+        "withATree", "withAPreference", "folderKept", "preference",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1237,8 +1238,26 @@ nonisolated enum UndoContractReplay {
             // and the section's front page kept by its rule, as one step
             // through the door that plans its ops forward.
             let withAMove: Bool = testCase["withAMove"] as? Bool == true
+            let withATree: Bool = testCase["withATree"] as? Bool == true
+            let withAPreference: Bool = testCase["withAPreference"] as? Bool == true
+            let places: UndoMemoryPlaces = UndoMemoryPlaces()
+            _ = places.write(UndoContractKinds.preference, .string("a"))
+            var treeBlobs: [Data] = []
+            var treeOp: UndoOp? = nil
+            if withATree {
+                for (path, content) in UndoContractKinds.extraFiles {
+                    try write(content, to: UndoContractKinds.extraFolder + "/" + path, in: root)
+                }
+                if case .tree(let listing, let contents) = UndoTreeReading.read(at: root.appendingPathComponent(UndoContractKinds.extraFolder)) {
+                    treeBlobs.append(listing.data)
+                    for (_, data) in contents {
+                        treeBlobs.append(data)
+                    }
+                    treeOp = UndoOp.tree(.removeTree, path: UndoContractKinds.extraFolder, listing: listing)
+                }
+            }
             func makeTheStep() -> JournaledWriteOutcome {
-                if !withAMove {
+                if !withAMove && !withATree && !withAPreference {
                     return JournaledWrite.perform(stepDraft, in: dying, mode: mode)
                 }
                 var ops: [UndoOp] = []
@@ -1256,15 +1275,28 @@ nonisolated enum UndoContractReplay {
                         }
                     }
                 }
-                ops.append(UndoOp.moveFile(
-                    from: UndoContractKinds.markerFrom, to: UndoContractKinds.markerTo,
-                    sha: UndoHash.sha256(of: Data(UndoContractKinds.oldMarker.utf8))
-                ))
-                ops.append(UndoOp.recompute(path: "courses/TST1O/Section 1/index.md", maintainer: "sectionFrontPage", section: 1))
+                if withAPreference {
+                    ops.append(UndoOp.external(target: UndoContractKinds.preference, before: .string("a"), after: .string("b")))
+                }
+                if let treeOp {
+                    ops.append(treeOp)
+                    for blob in treeBlobs {
+                        blobs.append(blob)
+                    }
+                }
+                if withAMove || withATree {
+                    ops.append(UndoOp.moveFile(
+                        from: UndoContractKinds.markerFrom, to: UndoContractKinds.markerTo,
+                        sha: UndoHash.sha256(of: Data(UndoContractKinds.oldMarker.utf8))
+                    ))
+                }
+                if withAMove {
+                    ops.append(UndoOp.recompute(path: "courses/TST1O/Section 1/index.md", maintainer: "sectionFrontPage", section: 1))
+                }
                 let opsDraft: UndoOpsDraft = UndoContractKinds.draft(ops: ops, blobs: blobs, root: root, action: "rollOver")
-                return JournaledWrite.perform(ops: opsDraft, in: dying, mode: mode)
+                return JournaledWrite.perform(ops: opsDraft, in: dying, mode: mode, places: places)
             }
-            if withAMove {
+            if withAMove || withATree {
                 try write(UndoContractKinds.oldMarker, to: UndoContractKinds.markerFrom, in: root)
             }
 
@@ -1282,12 +1314,12 @@ nonisolated enum UndoContractReplay {
                 _ = makeTheStep()
                 afterHashes = [hash(of: first, in: root), hash(of: second, in: root)]
                 if work == "redo" {
-                    _ = dying.undoNewest(resolveRoot: { _ in root })
+                    _ = dying.undoNewest(resolveRoot: { _ in root }, places: places)
                 }
                 UndoKillPoints.hook = { point in point == stopAt }
                 let outcome: UndoOutcome = work == "undo"
-                    ? dying.undoNewest(resolveRoot: { _ in root })
-                    : dying.redoNewest(resolveRoot: { _ in root })
+                    ? dying.undoNewest(resolveRoot: { _ in root }, places: places)
+                    : dying.redoNewest(resolveRoot: { _ in root }, places: places)
                 UndoKillPoints.hook = nil
                 if outcome != .stoppedByATest {
                     failures.append("recoveryCases '\(name)': the \(work) was not stopped (\(outcome))")
@@ -1320,7 +1352,7 @@ nonisolated enum UndoContractReplay {
             if mode == .live {
                 // As the app recovers: under the lock, then the re-derivation
                 // of what it settled, awaited outside it.
-                await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil })
+                await UndoRecovery.recoverAndRederive(survivor, resolveRoot: { _ in reachable ? root : nil }, places: places)
             } else {
                 try survivor.withLock { writer in
                     UndoRecovery.run(writer, mode: mode, resolveRoot: resolveRoot)
@@ -1333,6 +1365,16 @@ nonisolated enum UndoContractReplay {
             }
             if let wanted = string(testCase["markers"]), UndoContractKinds.markers(in: root) != wanted {
                 failures.append("recoveryCases '\(name)': the markers are \(UndoContractKinds.markers(in: root)), not \(wanted)")
+            }
+            if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
+                failures.append("recoveryCases '\(name)': the folder is there: \(!kept)")
+            }
+            if let wanted = string(testCase["preference"]), places.read(UndoContractKinds.preference) != .value(.string(wanted)) {
+                failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")
+            }
+            let leftovers: [String] = UndoContractKinds.stagedLeftovers(in: root)
+            if withATree && !leftovers.isEmpty {
+                failures.append("recoveryCases '\(name)': staged items left: \(leftovers)")
             }
             if let heldChange {
                 try (heldChange.after ?? Data()).write(to: root.appendingPathComponent(heldChange.relativePath))

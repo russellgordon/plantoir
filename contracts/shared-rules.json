@@ -51524,9 +51524,63 @@
         ],
         "markers": "bothKept",
         "rederived": 1
+      },
+      {
+        "name": "U2: a step that removes a folder dies with the folder set aside and its marker not yet moved: the folder put back from where it was set aside (its listing the step's), the pages put back, rolled back",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "folderKept": true,
+        "markers": "movedBack",
+        "why": "The step swaps first, second, then takes the folder aside, then moves the marker. Recovery finds the folder under its hidden staged name with exactly the listing the step recorded and its place free, so it renames it back (undo.rule.recovery): the folder is before, the pages after, so the pages are put back."
+      },
+      {
+        "name": "U2: the same step dies after every change, before applied: completed, the folder gone, nothing staged left",
+        "work": "step",
+        "withATree": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "folderKept": false,
+        "markers": "moved"
+      },
+      {
+        "name": "U2: its undo dies with the pages and the marker back and the folder not yet made: the folder made beside its place is removed, and the undo rolled back",
+        "work": "undo",
+        "withATree": true,
+        "stopAt": "beforeSwap:3",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "folderKept": false,
+        "markers": "moved"
+      },
+      {
+        "name": "U2: a step that sets a preference dies with its pages swapped and the preference not yet set: rolled back, the preference as it was",
+        "work": "step",
+        "withAPreference": true,
+        "stopAt": "beforeSwap:2",
+        "files": "before",
+        "phase": "rolledBack",
+        "head": null,
+        "preference": "a"
+      },
+      {
+        "name": "U2: the same step dies after the preference is set, before applied: completed",
+        "work": "step",
+        "withAPreference": true,
+        "stopAt": "beforeApplied",
+        "files": "after",
+        "phase": "done",
+        "head": 1,
+        "preference": "b"
       }
     ],
-    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared.",
+    "recoveryCasesHow": "A step publishing two pages, `first` (A) and `second` (B), or the undo or redo of one, stopped at stopAt as a process killed there would stop (beforeSwap:N is before the Nth file is swapped in, from 0: a step swaps first then second, an undo second then first), then optionally handEdit (that page's publish line changed by hand), then recovery run by another process that sees the first as gone (unless processAlive). wholeFile: the step also adds a line to each page's body, so each page is one writeFile op whose content is a blob; contentRemovedBeforeRecovery: content/ is removed before recovery; fileInUseDuringRecovery: every swap recovery makes is refused as a file in use, for that recovery only; anotherStepInFlight: a RUNNING process begins a step on a third page before the work (so the work's step is number 2) and finishes it after recovery, and stepInFlight is where that step then stands. files: before / after (every page exactly as before or after the step), asLeft (exactly as the stopped work left them), firstBeforeSecondEdited / secondAfterFirstEdited (the page not in the way put back, the other as edited), unchecked. phase is where the step stands after recovery; head the step number of the head (null: none); cleared the reason of the clearing recovery wrote; pathsNamed the pages the interrupted line names; afterAnOrdinaryStep: right after recovery another step, on a third page, is made at once through the door (the ordinary path), and this is where the work's step then stands; undo what an undo comes to after recovery (after that step, when there is one). U2: withAMove makes the step the same two pages through JournaledWrite.perform(ops:) plus a `move` of courses/TST1O/.netlify_sites/section1.json (holding {\"site_id\": \"aaa-111\"}) to section1.previous.json and a `recompute` of the section's front page (sectionFrontPage), the files staged and swapped first, second, then the move (an undo: second, first, then the move); deployBeforeRecovery writes a new marker ({\"site_id\": \"bbb-222\"}) where the move emptied, as a deploy would; markers is what the two marker places then hold (moved, movedBack: only the original place, bothKept), and rederived how many times RECOVERY ran the front page's maintainer: once whenever it settles the step, whichever way (laterPieces.U2). why, when present, says why; it is never compared. withATree: the step also removes courses/TST1O/extra (a.md, sub/b.md: one removeTree, its content in the list) and moves the marker, so it swaps first, second, the folder aside, then the move (an undo: second, first, the move back, then the folder made); folderKept whether the folder is there after recovery. withAPreference: the step also sets the preference undoCasesPreference from a to b (one external op, its place after the pages); preference is its value after recovery.",
     "deployedCases": [
       {
         "name": "never deployed: no fragment, no offer",
