@@ -101,7 +101,8 @@ class TheBuildNotesWhenItStarted(unittest.TestCase):
         source = (scripts_dir / "build_site.py").read_text(encoding="utf-8")
         body = source[source.index("def build_section_site("):]
         marked = body.index("_mark_build_starting(host_output_dir)")
-        read = body.index("with open(config_file")
+        # The build's one reading of the settings (#999).
+        read = body.index("BuildSettings.read_from(config_file)")
         self.assertLess(marked, read)
         # And the start becomes the site's only where the site was copied out
         # (#901: after the check of the site's files, inside one function the
