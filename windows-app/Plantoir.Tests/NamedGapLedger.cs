@@ -375,6 +375,9 @@ internal static class NamedGapLedger
     private const string Reason897RollOver = "Section ▸ Roll Over to a New Year… with its sheet (the mac's #897 piece B) is #954's piece of v2.0.0 (Windows' issue for #897 piece B), not built here yet; until it lands Windows' menus have no Roll Over item and none of its sentences, and the built-in assistant's roll_over_section is unchanged";
     private const string Reason829 = "a lease whose start is in WHOLE seconds, compared on whole seconds (the one deploy.sh writes since the mac's #829), is #956's piece of v2.0.0 (Windows' issue for the mac's #829, now closed); until it lands nothing on Windows writes such a lease (deploy.ps1 takes none yet, and this app's own leases carry the start to the microsecond), so no hold here is read as gone this way";
     private const string Reason946 ="the guidance sheet naming GitHub Copilot beside Claude Code and Codex (the mac's #887) is #946's piece of v2.0.0, with #879's trail prefix and #791's greeting check; until it lands the sheet names the two assistants Windows opens today";
+    // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
+    private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
+    private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
     /// <summary>
@@ -577,6 +580,12 @@ internal static class NamedGapLedger
              "rolloverStartedANewWebsiteFromTheMenuDeployingToAFolder"),
         Owed(LeaseLivenessCases, 956, V200, Reason829,
              "#829: a deploy typed in Terminal - bash, its start in whole seconds - is alive while that bash runs"),
+        // Stack 14 (dev 39d83a0a7), folded into the same hold on 2026-11-18.
+        Owed(ActivityTrailEvents, 901, V200, Reason901, "site leaves off files no published page uses"),
+        Owed(FailureExplanationCases, 901, V200, Reason901,
+             "#901 piece 901a, shared-rules.json -> siteFiles.followed.limitsRule",
+             "The same stop in a preview (siteFiles.words.followLimitStoppedPreview), lifted the same way."),
+        Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921NetlifyStep, "netlifyToken"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
