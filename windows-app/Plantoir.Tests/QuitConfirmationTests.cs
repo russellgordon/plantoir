@@ -79,7 +79,8 @@ public class QuitConfirmationTests
         Assert.Contains("could leave it unfinished", QuitConfirmation.Question(both).Message);
         Assert.Contains("Nothing on the class website changes",
             QuitConfirmation.Question(new QuitConfirmation.UnderWay(0, 0, 1, 0)).Message);
-        Assert.Contains(QuitConfirmation.KeepWorking, QuitConfirmation.TrailLine(both, quitAnyway: false));
+        Assert.EndsWith("— the teacher chose to keep working", QuitConfirmation.TrailLine(both, quitAnyway: false));
+        Assert.EndsWith("— the teacher chose to quit anyway", QuitConfirmation.TrailLine(both, quitAnyway: true));
     }
 
     [Fact]
