@@ -1180,14 +1180,14 @@
      "anchor": "schedule-deploy",
      "title": "Schedule a deploy for later",
      "question": "Can a section deploy itself tomorrow morning?",
-     "about": "Schedule Deploy (Deploy at), the clock in the sidebar, the notification, Cancel Deploy at, and how late it may still run.",
+     "about": "Schedule Deploy (Deploy at), the clock in the sidebar, the notification, Remove Scheduled Deploy, and how late it may still run.",
      "steps": [
       "Select the section",
       "Section > Schedule Deploy… (also in the section row's right-click menu)",
       "In Schedule a deploy, set Deploy at (it starts at tomorrow, 6:30), then Schedule",
       "A clock appears beside the section in the sidebar; its hover text says when, and that this Mac must be on and awake",
       "A notification says how it went; click it to open that section",
-      "Section > Cancel Deploy at (the time)… removes it, after asking",
+      "Section > Remove Scheduled Deploy… removes it, after asking",
       "Course Settings' How late a scheduled deploy may still run"
      ],
      "pictures": [
@@ -1220,7 +1220,7 @@
      "id": "schedule-deploy",
      "section": "Every week",
      "status": "amended",
-     "v4": "Field is Deploy at; a clock with hover text, no 'Deploys at' label; Cancel Deploy at carries the time (FS-3 corrections 7, 8).",
+     "v4": "Field is Deploy at; a clock with hover text, no 'Deploys at' label; the command that removes it carried the time until #987 renamed it Remove Scheduled Deploy (FS-3 corrections 7, 8).",
      "factSheets": [
       "FS-3-every-week.md"
      ],
@@ -2169,7 +2169,7 @@
       "Plantoir > Settings > Deploying: a Netlify part and a Cloudflare Pages part",
       "The status line: Connected, the end date where Cloudflare gives one, or what is wrong; Check Again",
       "Change Token...: the same steps a first deploy shows, then Check and Save; Cancel waits while the token is checked",
-      "A new token that cannot reach your class websites: Keep My Old Token (or Don't Save It), or Use the New Token",
+      "A new token that cannot reach your class websites: Cancel, or Use the New Token",
       "Remove Token, and what it means for a deploy set for later",
       "The Deploy screen's warning when a Cloudflare token ends in under 30 days, with Open Settings..."
      ],
@@ -2213,7 +2213,7 @@
        "shows": "The question asked when a new token cannot reach some class websites",
        "labels": [
         "The sections",
-        "Keep My Old Token",
+        "Cancel",
         "Use the New Token"
        ],
        "scene": "deploy-tokens-2"
@@ -4461,10 +4461,10 @@
      "anchor": "quitting",
      "title": "Quitting while something is running",
      "question": "Plantoir asked before quitting: what happens if I quit anyway?",
-     "about": "The quit question: what Plantoir asks about, Keep Working and Quit Anyway, and when it never asks.",
+     "about": "The quit question: what Plantoir asks about, Cancel and Quit Anyway, and when it never asks.",
      "steps": [
       "What Plantoir asks about: deploying, building a preview until its page first answers, saving a copy of a course, sharing unit plans",
-      "Keep Working (the default) or Quit Anyway, and what each does",
+      "Cancel or Quit Anyway, and what each does",
       "When it never asks: a preview that is only open, another program's work, and logging out, restarting or shutting down"
      ],
      "scenes": 1,
@@ -4496,7 +4496,7 @@
       {
        "shows": "The question Plantoir asks when quitting during a deploy",
        "labels": [
-        "Keep Working",
+        "Cancel",
         "Quit Anyway"
        ],
        "scene": "quitting-1"

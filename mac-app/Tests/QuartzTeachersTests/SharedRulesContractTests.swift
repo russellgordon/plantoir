@@ -1154,6 +1154,21 @@ final class SharedRulesContractTests: XCTestCase {
             }
         }
 
+        // #987, D22: removing asks first, in the contract's words.
+        if removal["asksFirst"] as? Bool == true {
+            let words: [String: String] = try XCTUnwrap(removal["words"] as? [String: String])
+            for each in [AssistModelTier.small, AssistModelTier.large] {
+                let question: String = try XCTUnwrap(words["question"]).replacingOccurrences(of: "{assistant}", with: each.displayName)
+                XCTAssertEqual(AssistModelLibrary.removeQuestion(for: each), question)
+                let size: String = ByteCountFormatter.string(fromByteCount: each.downloadBytes, countStyle: .file)
+                let message: String = try XCTUnwrap(words["message"])
+                    .replacingOccurrences(of: "{size}", with: size)
+                    .replacingOccurrences(of: "{machine}", with: "Mac")
+                XCTAssertEqual(AssistModelLibrary.removeMessage(for: each), message)
+            }
+            XCTAssertEqual(AssistModelLibrary.removeButton, words["removeButton"])
+        }
+
         if removal["theCurrentlyChosenOneMayBeRemoved"] as? Bool == true {
             XCTAssertEqual(panel.chosenTier, tier, "This test only means something for the chosen rung")
             XCTAssertTrue(panel.mayRemove(tier))

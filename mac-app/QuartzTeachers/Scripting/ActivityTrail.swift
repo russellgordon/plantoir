@@ -135,7 +135,7 @@ nonisolated enum ActivityTrail {
         /// A new token not saved from Settings ▸ Deploying (#696): the
         /// destination and the problem key the teacher was shown.
         case deployTokenChangeRefused = "deploy token change refused in Settings"
-        /// Keep My Old Token, after a new one could not reach the folder's
+        /// Cancel (Keep My Old Token until #987), after a new one could not reach the folder's
         /// class websites (#696, the second ruling): the destination and how
         /// many websites, never which.
         case deployTokenKeptOld = "old deploy token kept in Settings"

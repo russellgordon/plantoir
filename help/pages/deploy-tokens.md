@@ -69,7 +69,7 @@ So Plantoir asks before it saves such a token. The question names the sections t
 {{picture:deploy-tokens-2}}
 alt: The question asked when a new token cannot reach some class websites, with the sections named and a button for each choice.
 
-- **{{control:deployTokensKeepMyOldToken}}** changes nothing. When no token was saved before, this button reads {{control:deployTokensDontSaveIt}}.
+- **{{control:deployTokensKeepMyOldToken}}** changes nothing. Pressing Escape chooses it too. Pressing Return chooses neither button.
 - **{{control:deployTokensUseTheNewToken}}** saves the new token anyway. Choose it only when you mean those sections to go to new websites, for example because the old ones were deleted on purpose.
 
 ## Remove a token

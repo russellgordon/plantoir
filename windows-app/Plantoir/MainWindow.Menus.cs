@@ -156,7 +156,7 @@ public sealed partial class MainWindow
         Add(section, "Class Dates…", "sectionClassDates", Item.ClassDates);
         section.Add(new MenuFlyoutSeparator());
         Add(section, "Schedule Deploy…", "sectionScheduleDeploy", Item.ScheduleDeploy);
-        Add(section, "Cancel Scheduled Deploy…", "sectionCancelScheduledDeploy", Item.CancelScheduledDeploy);
+        Add(section, ScheduledDeployRemovalWording.MenuItem, "sectionCancelScheduledDeploy", Item.CancelScheduledDeploy);
         section.Add(new MenuFlyoutSeparator());
         Add(section, StartOfYearWording.MenuItem, "sectionGetReady", Item.GetReadyForTheStartOfTheYear);
         Add(section, StartOfYearWording.UndoMenuItem, "sectionUndoGettingReady", Item.UndoGettingReady);

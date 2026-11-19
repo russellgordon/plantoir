@@ -53,7 +53,14 @@ nonisolated struct FactsQuestion: Equatable, Sendable {
 ///   and "If you want to encourage people to read an alert and not just
 ///   automatically press Return to dismiss it, avoid making any button the
 ///   default button." The cancelling button carries Escape
-///   (`.keyboardShortcut(.cancelAction)`); the action carries no key.
+///   (`.keyboardShortcut(.cancelAction)`); the action carries no key, and
+///   is not drawn red (#987, Russell's ruling Q1 on #975): the teacher chose
+///   it deliberately, and Alerts says "Use the destructive style to identify
+///   a button that performs a destructive action people didn't deliberately
+///   choose." In a sheet a plain button takes no key of its own, so the
+///   action is plain; in a SwiftUI `.alert` it would take Return (measured,
+///   `AlertKeysTests`), which is why the alerts stay red until the question
+///   sheet is redesigned (#1000).
 /// - Where going ahead is the default (`goAheadIsTheDefault` true), the
 ///   action is the default button (Return) and the cancelling button
 ///   carries Escape. Buttons,
@@ -149,7 +156,11 @@ struct FactsQuestionSheet: View {
                 } else {
                     // No default button at all, so a Return typed out of
                     // habit answers nothing (Russell's ruling 1 on #973).
-                    Button(question.action, role: .destructive) {
+                    // Not red either (#987): the teacher chose this action
+                    // on purpose. Alerts: "Use the destructive style to
+                    // identify a button that performs a destructive action
+                    // people didn't deliberately choose."
+                    Button(question.action) {
                         goAhead()
                     }
                     .accessibilityIdentifier("\(identifier)GoAhead")

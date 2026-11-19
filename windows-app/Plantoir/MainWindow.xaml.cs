@@ -518,7 +518,9 @@ public sealed partial class MainWindow : Window
     /// The quit question (#231; <c>quittingWhileWorkIsUnderWay</c>). Only when
     /// closing THIS window quits the app, only for the teacher's own quit, and
     /// only for a publish or a preview being BUILT — never a preview merely
-    /// open. Keep Working is the default: Return without reading keeps the work.
+    /// open. No button is the default (#987, <c>buttons.default</c> is null):
+    /// Enter pressed without reading does nothing, and Escape is Cancel, which
+    /// keeps working. Until #987 Keep Working was the default.
     ///
     /// <para>Then, since #484 (Russell's ruling 2026-10-15, the mac's #476): a
     /// close that quits while the tools are being COPIED into a folder keeps
@@ -526,7 +528,7 @@ public sealed partial class MainWindow : Window
     /// copy has finished, and then quits. Ended part-way, the copy leaves
     /// <c>.toolchain\</c> half old and half new for a scheduled run or a
     /// launcher typed at a prompt to build from. The question comes FIRST, so
-    /// Keep Working still leaves everything as it was; Quit Anyway skips only
+    /// Cancel still leaves everything as it was; Quit Anyway skips only
     /// the question, never the wait (the plan review's H1). Never while
     /// Windows is ending the session: it ends the process at sign-out whatever
     /// the window does, and holding the close only shows "this app is
@@ -567,7 +569,7 @@ public sealed partial class MainWindow : Window
                             Content = message,
                             PrimaryButtonText = QuitConfirmation.QuitAnyway,
                             CloseButtonText = QuitConfirmation.KeepWorking,
-                            DefaultButton = ContentDialogButton.Close,
+                            DefaultButton = ContentDialogButton.None,
                             XamlRoot = Content.XamlRoot,
                         };
                         AutomationProperties.SetAutomationId(dialog, "quitQuestionDialog");
@@ -623,7 +625,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// A close that waited for the copy did not quit after all (Keep Working
+    /// A close that waited for the copy did not quit after all (Cancel
     /// when asked again, another window opened meanwhile, or the handler
     /// failed): release the copies its wait held back, and let a later close
     /// wait again. Without this the hold stays set for the life of the process

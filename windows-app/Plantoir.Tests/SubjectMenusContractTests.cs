@@ -24,6 +24,13 @@ public class SubjectMenusContractTests
         // the same order, as before.
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.SubjectMenuItems, named, here);
         named = named.Where(name => !deferred.Contains(name)).ToList();
+        // An item the contract renamed that this app still carries under its
+        // older name (#897's Add Class…, owed by #927) stands in its place:
+        // the older name must be here and gone from the contract, and it is
+        // compared in the held name's position, so the order still holds.
+        var contractNames = named.ToList();
+        NamedGapLedger.StillNamed(NamedGapLedger.SubjectMenuItemsUnderAnOlderName, contractNames);
+        named = contractNames.Select(name => SaidHereAs(name, contractNames, here)).ToList();
         Assert.Equal(named, here);   // the same names, in the same order
         foreach (string name in named)
             Assert.Equal(name, SubjectMenuRules.ContractName(SubjectMenuRules.ItemNamed(name)!.Value));
@@ -63,11 +70,19 @@ public class SubjectMenusContractTests
         // enabled here: it is taken out of what each case expects, and
         // everything else is compared as before.
         var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItems).Select(entry => entry.Key).ToHashSet();
+        // A renamed item held under its older name is expected under that
+        // name, in exactly the cases that enable the contract's (#927).
+        var olderNames = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItemsUnderAnOlderName)
+            .ToDictionary(entry => entry.Key, entry => NamedGapLedger.SubjectMenuItemsOlderNames[entry.Key]);
         int notRun = 0;
+        int renamedEnabled = 0;
         foreach (var c in cases)
         {
             if (!CanBeIn(c["situation"]!.AsObject())) { notRun++; continue; }
-            var expected = c["enabled"]!.AsArray().Select(n => n!.ToString()).Where(n => !held.Contains(n)).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            var expected = c["enabled"]!.AsArray().Select(n => n!.ToString()).Where(n => !held.Contains(n))
+                .Select(n => olderNames.TryGetValue(n, out string? older) ? older : n)
+                .OrderBy(n => n, StringComparer.Ordinal).ToList();
+            renamedEnabled += c["enabled"]!.AsArray().Count(n => olderNames.ContainsKey(n!.ToString()));
             var actual = SubjectMenuRules.Enabled(Situation(c["situation"]!.AsObject()))
                 .Select(SubjectMenuRules.ContractName).OrderBy(n => n, StringComparer.Ordinal).ToList();
             if (!expected.SequenceEqual(actual))
@@ -75,6 +90,30 @@ public class SubjectMenusContractTests
         }
         Assert.True(failures.Count == 0, string.Join("\n", failures));
         Assert.True(cases.Count - notRun >= 21, $"only {cases.Count - notRun} cases run ({notRun} name a situation held open)");
+        // Add Class… is enabled in five cases (#927: cases 7, 8, 16, 21 and
+        // 22), three of them run here while #889's two situation keys are
+        // held: a held rename that no case run enabled would hold nothing.
+        if (olderNames.Count > 0)
+            Assert.True(renamedEnabled >= 3, $"a renamed item held under its older name is enabled in only {renamedEnabled} of the cases run here (3 when this was written)");
+    }
+
+    /// <summary>
+    /// <paramref name="name"/>, or the older name this app still carries it
+    /// under when <see cref="NamedGapLedger.SubjectMenuItemsUnderAnOlderName"/>
+    /// holds it: closed the day the contract's name is an item here, and
+    /// refused if the older name is not an item here or is still one of the
+    /// contract's (the caller checks the withdrawn direction with StillNamed).
+    /// </summary>
+    internal static string SaidHereAs(string name, IReadOnlyCollection<string> contractNames, IReadOnlyCollection<string> here)
+    {
+        var entry = NamedGapLedger.Holding(NamedGapLedger.SubjectMenuItemsUnderAnOlderName, name);
+        if (entry is null) return name;
+        Assert.False(here.Contains(name), NamedGapLedger.ClosedMessage(entry));
+        Assert.True(NamedGapLedger.SubjectMenuItemsOlderNames.TryGetValue(name, out string? older),
+            $"\"{name}\" is held under an older name, and NamedGapLedger.SubjectMenuItemsOlderNames gives none");
+        Assert.True(here.Contains(older!), $"\"{name}\" is held as said here under \"{older}\", which is no item here");
+        Assert.False(contractNames.Contains(older!), $"\"{name}\" is held as said here under \"{older}\", which the contract still names: that is no rename");
+        return older!;
     }
 
     /// <summary>

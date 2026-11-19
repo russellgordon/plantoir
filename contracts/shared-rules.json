@@ -1520,6 +1520,14 @@
       "refusedWhileAnyAssistantWindowIsOpen": true,
       "messageNamesTheSectionToClose": true,
       "theCurrentlyChosenOneMayBeRemoved": true,
+      "asksFirst": true,
+      "asksFirstWhy": "#987 (finding D22; Apple's HIG, Alerts: when people take an uncommon destructive action that they can't undo, it's important to display an alert in case they initiated the action accidentally). Remove… beside a download asks words.question, with words.message under it; Cancel answers Escape and Command-Period, and Remove takes no Return.",
+      "words": {
+        "question": "Remove {assistant}?",
+        "message": "Its {size} download is deleted from this {machine}. To use it again, download it again here.",
+        "removeButton": "Remove",
+        "fill": "{assistant} is the assistant's name in a sentence (the small assistant, the larger assistant); {size} is its download's size as the platform writes a file size; the computer's name in message is specialNames.platformWording.machine's placeholder (Mac, PC)."
+      },
       "why": "The refusal is about ANY open assistant, not about whether that window happens to use that rung: working out which file is genuinely mapped means tracking state neither app keeps, and getting it wrong deletes weights out from under a running engine. Removing the CHOSEN one is allowed on purpose - it is not a broken state, it is the state every machine is in before its first download, and refusing would trap a teacher who wants their disk space back behind a choice they did not want to change."
     },
     "guidance": {
@@ -4434,6 +4442,17 @@
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
   "scheduledDeployCancellation": {
+    "removingOne": {
+      "rule": "#987 (Russell, 2026-11-18): the verb for taking away a scheduled deploy is Remove, not cancel. The command (the menu bar's and a section's right-click menu) is menuItem; it asks question, with message (or messageWithoutTime) under it; its buttons are cancelButton, leading, which answers Escape and Command-Period, and removeButton, trailing. Neither is the default. Until #987 the command, the question and both of its buttons used the verb cancel, so the button that backed out and the button that went ahead said the same word.",
+      "words": {
+        "menuItem": "Remove Scheduled Deploy…",
+        "question": "Remove the scheduled deploy?",
+        "message": "{course} Section {section} is set to deploy on its own at {time} on {day}. Removing it means it will not go out then, and the site stays as it is until you deploy it yourself.",
+        "messageWithoutTime": "This section will no longer deploy on its own.",
+        "cancelButton": "Cancel",
+        "removeButton": "Remove"
+      }
+    },
     "note": "Which acts turn a scheduled deploy off without being asked, which deliberately turn none off, and how late is too late for one to still run. The MECHANISM is not shared and never was - launchd against Task Scheduler - but which act cancels what is a rule with inputs and outputs, it is true of both products, and on 2026-09-20 the two apps disagreed about it by accident rather than by decision: Windows cancels when a SECTION is removed and does not when a COURSE is (Plantoir.Core/Models/CourseArchiver.cs), and the mac did neither. That is exactly the quiet difference this folder exists to catch.",
     "theFault": "A scheduled deploy outliving the course it was set for. The alarm lives OUTSIDE the working folder and is addressed by the course code (and, until #237, by nothing else), so removing the course left it standing, and on the mac StartCalendarInterval carries no year - so a job that never ran came due on the same date twelve months later, against whatever was in the folder by then. Which direction it errs in was MEASURED on the mac, 2026-09-20, and it is worse than it first looked: a course that publishes to NETLIFY refuses (scripts/deploy.py:1204, refuse_to_ask, exit 3) because the site marker lived inside the course folder and went with it; a course that publishes to CLOUDFLARE PAGES does NOT refuse - publish_to_cloudflare contains no refuse_to_ask at all, the teacher's surname is read from courses/.internal/profile.json which is in the WORKING folder and survives the removal, and suggest_pages_name is deterministic - so it builds the new course, creates or reuses a Pages project and reports success; and a course that publishes to a FOLDER does not refuse either, because a folder destination asks nothing ever. So the failure that REPORTS SUCCESS is not a rare edge: it is every folder and every Cloudflare course.",
     "order": "CANCEL FIRST, then archive and remove - and this is the opposite of a RENAME's order, deliberately. A rename that cancelled before a failed move would silently drop a deploy for a course still sitting there under its old name, so it archives first; a REMOVAL that archived before a failed cancel would leave the very thing this rule exists to prevent, a course that is gone with a live alarm still addressed to it. So: a cancel that FAILS stops the removal, and the teacher is told in a plain sentence. If the removal then fails, the deploy stays cancelled and the sentence says so.",
@@ -13170,6 +13189,7 @@
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
           "shared-rules.json:appUpdates.wording.elsewhereWork",
+          "shared-rules.json:assistantModelChoice.removal.words.message",
           "shared-rules.json:coverageTab.tab.words.cannotShowDescription",
           "shared-rules.json:deployTokens.words.problemCouldNotSave",
           "shared-rules.json:coverageTab.tab.words.noObsidian",
@@ -15141,15 +15161,16 @@
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
       "titles": {
-        "keepWorking": "Keep Working",
+        "keepWorking": "Cancel",
         "quitAnyway": "Quit Anyway"
       },
-      "firstButtonByQuestion": {
-        "whileAnAssistantIsSetUp": "Finish Setting Up"
-      },
-      "firstButtonByQuestionWhy": "#855, Russell 2026-11-13 evening: the quit question while an outside assistant is being set up has its own first button, Finish Setting Up, which means keepWorking. It is used when set-ups are the only work under way (the question then names them); with a publish, a preview build or a copy also under way the question names those and keeps Keep Working. The meanings and their order never change: only the first title does. Each case may say expectFirstButton.",
-      "default": "keepWorking",
-      "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
+      "titlesWhy": "#987 (Apple's HIG, Alerts): \"Always use 'Cancel' to title a button that cancels the alert's action.\" keepWorking was titled Keep Working, and Finish Setting Up while set-ups were all that was under way (#855); with no button titled Cancel, Escape had no button (finding D7). Both questions now say Cancel.",
+      "order": ["keepWorking", "quitAnyway"],
+      "orderWhy": "Leading to trailing, as the teacher sees them (#987). Alerts: \"Cancel buttons are typically on the leading side of a row.\" On the mac NSAlert puts the first button it is given on the trailing side, so it is given quitAnyway first.",
+      "default": null,
+      "defaultWhy": "No button is the default (#987), so a Return pressed without reading does nothing. Alerts: \"Note that you don't want to make a Cancel button the default button\"; Buttons, Role: \"Don't assign the primary role to a button that performs a destructive action\", and quitting can leave a deploy part way. Until #987 keepWorking was the default. Kept on review (#987, the director's call, 2026-11-18): quitAnyway takes no Return either.",
+      "escape": "keepWorking",
+      "escapeWhy": "Escape and Command-Period are Cancel, which is keepWorking. Alerts: \"Provide alternative ways to cancel an alert\", pressing Escape or Command-Period.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
@@ -15797,7 +15818,7 @@
       ]
     },
     "whileAnAssistantIsSetUp": {
-      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with its own first button (buttons.firstButtonByQuestion: Finish Setting Up, which is keepWorking) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
+      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with Cancel (keepWorking; its own first button, Finish Setting Up, until #987) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
       "words": {
         "settingUpOne": "setting up {tool}",
         "settingUpSeveral": "setting up {n} assistants",
@@ -15828,7 +15849,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Keep Working",
+        "expectCancelButton": "Cancel",
         "why": "The case this exists for."
       },
       {
@@ -15938,7 +15959,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Finish Setting Up",
+        "expectCancelButton": "Cancel",
         "why": "#855 (Russell, 2026-11-13). A set-up stopped part way can leave a half-written program in the home folder; the teacher is asked, and Quit Anyway stops it for the next launch to settle. assistantsBeingSetUp is 0 when a case leaves it out."
       },
       {
@@ -15965,8 +15986,8 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Keep Working",
-        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website, so it keeps Keep Working; Finish Setting Up is only for a question about set-ups alone (buttons.firstButtonByQuestionWhy)."
+        "expectCancelButton": "Cancel",
+        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website. Until #987 that kept Keep Working where a question about set-ups alone said Finish Setting Up; both say Cancel now (buttons.titlesWhy)."
       }
     ]
   },
@@ -16480,7 +16501,7 @@
       "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
       "whatIsWithheld": [
         "the section window's Deploy button",
-        "Schedule Deploy... (Cancel Deploy at... is always offered - gate by direction)",
+        "Schedule Deploy... (Remove Scheduled Deploy..., Cancel Deploy at... until #987, is always offered - gate by direction)",
         "Rename (Course ▸ Rename and the row's menu; \"Rename Course\" before the HIG sweep, #457) (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
         "Add Section...",
         "Remove Section N (removing the whole course stays)",
@@ -27120,7 +27141,7 @@
       ]
     },
     "reachability": {
-      "rule": "Before a pasted token is saved, it is tried against every class website this working folder has deployed to that destination, by the LIVE markers only: Netlify, courses/<COURSE>/.netlify_sites/section<N>.json, or for a section with none there the old place deploy.py still reads and moves, courses/<COURSE>/.merged_output/section<N>/.netlify_site.json (top-level id is the site); Cloudflare, courses/<COURSE>/.cloudflare_sites/section<N>.json and a course's shared unit plans, courses/<COURSE>/.cloudflare_sites/plans-<year>.json (top-level name is the project in the Account ID's account). A name in any other shape is not a live marker and is never tried: section<N>.previous-<stamp>.json is last year's, kept when a section is cut loose for a new year (file-formats.json -> firstDeployMarkers), and no deploy reads it (review W1: before this rule one deleted site from last year stopped every save after a rollover). A place is COURSE/SECTION, or COURSE/plans-<year> for unit plans. Netlify: GET /sites/{id}. Cloudflare: GET /accounts/{account}/pages/projects/{name}, and not asked without an Account ID. 2xx is reachable; the service's own 401, 403 or 404 (its refusal pattern in the body) is unreachable; a live marker that cannot be read, or names its site in a shape no host gives, is unheard rather than passed over (review I2); a live marker that names no site at all, a JSON object whose top level has no id (Netlify) or name (Cloudflare) or an empty one, is passed over (the fix review N1: the app writes a course's unit-plans marker holding only the teacher's choices before the share's question is answered, and share_plan.py and deploy.py both read it as naming no site), while a key holding anything but a string stays unheard; anything else is unheard. In Settings, any unreachable stops the save with tokenCannotReachSites and the list, and the teacher chooses Keep My Old Token (the default, nothing changed) or Use the New Token (--use-anyway); any unheard stops it with sitesNotChecked. At a deploy's own paste only THAT deploy's markers are tried (the section's, or for a share of unit plans the course's plans markers), and a deploy with no marker has nothing to try: unreachable and unheard each stop the deploy with their two lines (deployTimeRefusals) and nothing is saved. A case's releasedMarkers, legacyMarkers, planMarkers and unreadableMarkers are written beside its markers: section<N>.previous-<stamp>.json, the old Netlify place, plans-<year>.json (with no value, the app's own shape before a first share: {\"documents\": {…}} alone, pretty-printed with sorted keys), and a section<N>.json that is not JSON. A deploy case with plans true is a share of the course's unit plans (deploy.sh <COURSE> --plans), and its planMarker is written as planMarkers' are.",
+      "rule": "Before a pasted token is saved, it is tried against every class website this working folder has deployed to that destination, by the LIVE markers only: Netlify, courses/<COURSE>/.netlify_sites/section<N>.json, or for a section with none there the old place deploy.py still reads and moves, courses/<COURSE>/.merged_output/section<N>/.netlify_site.json (top-level id is the site); Cloudflare, courses/<COURSE>/.cloudflare_sites/section<N>.json and a course's shared unit plans, courses/<COURSE>/.cloudflare_sites/plans-<year>.json (top-level name is the project in the Account ID's account). A name in any other shape is not a live marker and is never tried: section<N>.previous-<stamp>.json is last year's, kept when a section is cut loose for a new year (file-formats.json -> firstDeployMarkers), and no deploy reads it (review W1: before this rule one deleted site from last year stopped every save after a rollover). A place is COURSE/SECTION, or COURSE/plans-<year> for unit plans. Netlify: GET /sites/{id}. Cloudflare: GET /accounts/{account}/pages/projects/{name}, and not asked without an Account ID. 2xx is reachable; the service's own 401, 403 or 404 (its refusal pattern in the body) is unreachable; a live marker that cannot be read, or names its site in a shape no host gives, is unheard rather than passed over (review I2); a live marker that names no site at all, a JSON object whose top level has no id (Netlify) or name (Cloudflare) or an empty one, is passed over (the fix review N1: the app writes a course's unit-plans marker holding only the teacher's choices before the share's question is answered, and share_plan.py and deploy.py both read it as naming no site), while a key holding anything but a string stays unheard; anything else is unheard. In Settings, any unreachable stops the save with tokenCannotReachSites and the list, and the teacher chooses Cancel (nothing changed; Keep My Old Token, the default, until #987; neither button is the default since, words.cancelButton and placeholders.apps) or Use the New Token (--use-anyway); any unheard stops it with sitesNotChecked. At a deploy's own paste only THAT deploy's markers are tried (the section's, or for a share of unit plans the course's plans markers), and a deploy with no marker has nothing to try: unreachable and unheard each stop the deploy with their two lines (deployTimeRefusals) and nothing is saved. A case's releasedMarkers, legacyMarkers, planMarkers and unreadableMarkers are written beside its markers: section<N>.previous-<stamp>.json, the old Netlify place, plans-<year>.json (with no value, the app's own shape before a first share: {\"documents\": {…}} alone, pretty-printed with sorted keys), and a section<N>.json that is not JSON. A deploy case with plans true is a share of the course's unit plans (deploy.sh <COURSE> --plans), and its planMarker is written as planMarkers' are.",
       "why": "Without it a token from another account makes the next deploy build a NEW site at a NEW address and report success (deploy.py: a 404 on the saved Netlify site prints 'Creating a fresh Netlify site for this section', and remake_pages_project_if_gone makes a Cloudflare project again under the same name), and the students' bookmarks stop working with nothing said. A 404 can also mean the teacher deleted the site on purpose; the list and the choice let them say so. Whether Netlify answers another account's site with 404 or with 401 is to be measured with two test accounts; both are read as unreachable.",
       "cases": [
         {"name": "Settings: no class websites yet, so nothing to try", "action": "save", "service": "netlify", "markers": [], "answers": {"netlifyUser": {"status": 200, "body": "{\"id\":\"5f1e\"}"}}, "expect": {"saved": true, "answer": "accepted", "endsOn": null, "problem": null, "unreachable": []}, "stored": true},
@@ -27243,9 +27264,8 @@
       "unreachableTitle": "That token cannot reach {count} of your class websites",
       "unreachableTitleOne": "That token cannot reach one of your class websites",
       "unreachableMessage": "Deployed with your old token: {sections}. A deploy with this one would make a new website at a new address, so students' links would stop working. The token may belong to another {service} account.",
-      "keepOldToken": "Keep My Old Token",
+      "cancelButton": "Cancel",
       "useNewToken": "Use the New Token",
-      "dontSaveNewToken": "Don't Save It",
       "placeSection": "{course} section {section}",
       "placeUnitPlans": "{course} unit plans for {year}",
       "deployScreenEndsSoon": "The Cloudflare token ends on {date}. Make a new one and change it in {deployingSettings} before then.",
@@ -27255,10 +27275,10 @@
     "placeholders": {
       "rule": "Two placeholders the words and the deploy-time lines carry besides {service}, {date}, {count}, {sections}, {course}, {section} and {year}. The computer's name is the contract's own machine placeholder (specialNames.platformWording.machine). {deployingSettings} is the path to the Deploying settings, which differs by platform; each app puts in its own (review W5).",
       "deployingSettings": {"mac": "Plantoir ▸ Settings ▸ Deploying", "windows": "File ▸ Settings ▸ Deploying"},
-      "apps": "dontSaveNewToken replaces keepOldToken on the question when no token was saved before the change (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
+      "apps": "The unreachable question's buttons (#987, Apple's HIG, Alerts): cancelButton, which answers Escape and Command-Period, then useNewToken, drawn as destructive; neither is the default, so Return does nothing, because the new token would move students' links. cancelButton replaced keepOldToken (\"Keep My Old Token\") and dontSaveNewToken (\"Don't Save It\"): \"Always use 'Cancel' to title a button that cancels the alert's action.\" Its trail line still depends on whether a token was saved before the change: keptOld when one was, refused with tokenCannotReachSites when none was (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
     },
     "trail": {
-      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Don't Save It writes the refused line with tokenCannotReachSites rather than keptOld.",
+      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Cancel on the unreachable question writes the refused line with tokenCannotReachSites rather than keptOld.",
       "lines": {
         "changed": "Settings ▸ Deploying — changed the {service} token",
         "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
@@ -37768,7 +37788,7 @@
       "reopenTitle": "Reopen Obsidian to show diagrams and graphs?",
       "reopenMessage": "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.",
       "reopen": "Reopen Obsidian",
-      "later": "Later",
+      "later": "Not Now",
       "paneTitle": "Obsidian",
       "settingLabel": "Add the add-ons that draw diagrams and graphs to courses that have them",
       "settingFooter": "Plantoir adds them when you open such a course in Obsidian from Plantoir, and after you preview it. The first time each course opens with them, Obsidian asks whether you trust its author: click “Trust author and enable plugins” — pressing Return chooses “Browse vault in Restricted Mode”. If a course still shows a drawing's text, open Obsidian's Settings ▸ “Community plugins” and click “Exit Restricted mode”. Turning this off adds nothing new and leaves what was added in place."
@@ -43761,7 +43781,7 @@
         "whatChangesItValue": "Sharing these plans again",
         "earlierYearsLabel": "Earlier years",
         "earlierYearsValue": "Keep the password they were shared with",
-        "later": "Later",
+        "later": "Not Now",
         "newPasswordNotInUse": "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
       },
       "refusals": {
