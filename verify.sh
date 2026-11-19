@@ -596,6 +596,19 @@ else
   cat /tmp/verify_deploy_while_its_section_deploys_test.log
 fi
 
+# A deploy typed in Terminal holds a build and a publish lease while it works,
+# so the app's Deploy greys for it (GitHub #829): the real deploy.sh to a
+# folder, every case of workLeases.launcherLeases, its two trail lines, the
+# six lines, the start read in UTC across the hour the clocks go back, no
+# lease when the start cannot be read, the ways out a trap sees, and kill -9
+# leaving leases whose owner is gone.
+if (cd scripts && python3 test_deploy_sh_work_leases.py) >/tmp/verify_deploy_sh_work_leases_test.log 2>&1; then
+  pass "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
+else
+  fail "deploy.sh typed in Terminal holds a build and a publish lease for its section while it works and gives them back, and none when the app holds them (scripts/test_deploy_sh_work_leases.py, #829)"
+  cat /tmp/verify_deploy_sh_work_leases_test.log
+fi
+
 if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then
   pass "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
 else
@@ -964,6 +977,17 @@ else
   cat /tmp/verify_course_names_test.log
 fi
 
+# A section's custom domain is read one way (GitHub #904): every case of
+# contracts/file-formats.json -> customDomainReading against
+# custom_domains.for_destination. Pure stdlib; build_site's use of it runs
+# against the real image further down (test_build_site_domain_resolution.py).
+if (cd scripts && python3 test_custom_domains.py) >/tmp/verify_custom_domains_test.log 2>&1; then
+  pass "a section's custom domain is read as the contract says, a folder never has one and a wrong type is none (scripts/test_custom_domains.py, #904)"
+else
+  fail "a section's custom domain is read as the contract says, a folder never has one and a wrong type is none (scripts/test_custom_domains.py, #904)"
+  cat /tmp/verify_custom_domains_test.log
+fi
+
 # A value from a course's settings is written into the site's TypeScript as an
 # escaped string (GitHub #871): every typescriptStrings case, and every writer
 # (title, locale, baseUrl, fonts, colours, footer) read back from its file and
@@ -1027,6 +1051,16 @@ if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; 
 else
   fail "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
   cat /tmp/verify_lock_test.log
+fi
+
+# An empty answer (lsof, grep, find or docker port finding nothing) is not
+# the end of a run under pipefail, and the #684 port check's retry loop
+# really looks again (GitHub #972).
+if (cd scripts && python3 test_verify_empty_looks.py) >/tmp/verify_empty_looks_test.log 2>&1; then
+  pass "an empty answer does not end verify.sh, and the port check's retry loop looks again (scripts/test_verify_empty_looks.py, #972)"
+else
+  fail "an empty answer does not end verify.sh, and the port check's retry loop looks again (scripts/test_verify_empty_looks.py, #972)"
+  cat /tmp/verify_empty_looks_test.log
 fi
 
 # preview.sh announces the address the app opens, or says it cannot and stops;
@@ -1777,6 +1811,29 @@ else
   cat /tmp/verify_video_rules_site.log
 fi
 
+# ---- The course's files a site carries (#901): the rules, where they run ----
+# siteFilesRules.ts and plantoirAssets.ts bundled with Quartz's own
+# FrontMatter, ObsidianFlavoredMarkdown, GitHubFlavoredMarkdown and
+# CrawlLinks: every slug, address and course case in siteFiles, each course
+# through the emitter at its first emit and at a rebuild, each that leaves a
+# file off proved to FAIL through Quartz's own Assets, and then
+# scripts/site_files.py's check over each built course, which must find no
+# hole and nothing unreferenced.
+echo ""
+echo "🔎 Checking which course files a site carries against what the site runs…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_site_files_rules_against_the_site.py" /opt/scripts/check_site_files_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_site_files_rules_against_the_site.py \
+  >/tmp/verify_site_files_rules_site.log 2>&1; then
+  pass "every siteFiles case holds in the site's own emitter over Quartz's own transformers, fails through Quartz's own Assets where it leaves a file off, and the check after the build agrees on every course (scripts/check_site_files_rules_against_the_site.py, #901)"
+  # The count, so a run shows what it held, not only that it passed (901a's
+  # Fable sweep).
+  grep -m1 "contract cases" /tmp/verify_site_files_rules_site.log | sed 's/^/   /'
+else
+  fail "a siteFiles case does not hold in the site's own code (scripts/check_site_files_rules_against_the_site.py, #901)"
+  cat /tmp/verify_site_files_rules_site.log
+fi
+
 # ---- Pictures sized in the HTML (#612): the reader, against Pillow ----
 # pictureSizes.js (the file the site's transformer imports) reads every
 # picture in scripts/fixtures/picture-sizes/ in Node; each answer must be
@@ -2135,6 +2192,7 @@ check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
 check_baked scripts/section_problems.py   /opt/scripts/section_problems.py
 check_baked scripts/course_names.py       /opt/scripts/course_names.py
+check_baked scripts/custom_domains.py     /opt/scripts/custom_domains.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
@@ -4437,6 +4495,41 @@ else
   pass "The build printed no Node deprecation into the console (#640)"
 fi
 
+# The course's files the main build carried (#901): one PLANTOIR_SITE_FILES:
+# line, Plantoir's emitter, and neither safety count above zero - a file a
+# page needed that the emitter left out, or one it carried that no page
+# names, is the emitter's fault, which the safety net must not hide. A build
+# that could not write the emitter's side file fails too
+# (siteFiles.sideFile.whenMissing), as every put-back does.
+if python3 - /tmp/verify_main_build.log contracts/shared-rules.json <<'SITEFILESPY'
+import json, re, sys
+said = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+words = json.load(open(sys.argv[2], encoding="utf-8"))["siteFiles"]["words"]
+if words["sideFileNotWritten"] in said:
+    print("   the build could not write the site's side file (siteFiles.words.sideFileNotWritten)")
+    sys.exit(1)
+lines = re.findall(r"PLANTOIR_SITE_FILES: (\{[^\r\n]*\})", said)
+if len(lines) != 1:
+    print(f"   the main build printed {len(lines)} PLANTOIR_SITE_FILES: lines, not one")
+    sys.exit(1)
+marker = json.loads(lines[0])
+wrong = []
+if marker.get("assetsEmitter") != "plantoir":
+    wrong.append(f"assetsEmitter {marker.get('assetsEmitter')}")
+for key in ("putBack", "putBackFailed", "unreferenced", "takenOut"):
+    if marker.get(key):
+        wrong.append(f"{key} {marker[key]}")
+if wrong:
+    print("   " + ", ".join(wrong))
+    sys.exit(1)
+print(f"   carried {marker['carried']}, left off {marker['leftOff']}")
+SITEFILESPY
+then
+  pass "the main build's site carries only the files its published pages use: Plantoir's emitter, nothing put back, nothing unreferenced, nothing taken out (#901)"
+else
+  fail "the main build's site files: see the line above (#901)"
+fi
+
 # -------------------- 6. Post-flight checks --------------------
 SITE_PUBLIC="courses/EXC2O/.merged_output/section1/public"
 SITE_INDEX="$SITE_PUBLIC/index.html"
@@ -6620,8 +6713,11 @@ else
     RENDERED_STATUS=0
     run_check node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
       >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
-    RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
-    RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p')"
+    # A checker that died before its DONE line leaves grep nothing to find,
+    # which is grep's exit 1; `|| true` keeps that from ending the run under
+    # pipefail before the fail line below can say so (#972).
+    RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //' || true)"
+    RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p' || true)"
     if [[ "$RENDERED_STATUS" == "3" ]] && ! grep -q '^OK: ' /tmp/verify_rendered_features.log; then
       # No engine at all: skips only, and no pass line (a SKIP is never a pass).
       rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
@@ -6639,7 +6735,7 @@ else
       RED_STATUS=0
       run_check node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
         >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
-      RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
+      RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //' || true)"
       if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
         pass "the rendered check sees, $(rendered_engines /tmp/verify_rendered_red.log): in each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) runs, $(grep '^OK: sabotage ' /tmp/verify_rendered_red.log | sed 's/ \[.*//' | sort -u | wc -l | tr -d ' ') sabotages over the engines each applies to, the row aimed at failed for its own reason and the page's other rows stayed green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
         rendered_lines SKIPPED /tmp/verify_rendered_red.log skip
@@ -6690,7 +6786,10 @@ fi
 # the first build said (read from it, not a number written here: the quiz
 # playground's two programs, #563, made a written "8 of 9" wrong), and the
 # Swift page came out the same.
-SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1)"
+# A first build that never said it is grep's exit 1, which `|| true` turns
+# into the empty answer the check below fails on, rather than a silent end
+# of the run under pipefail (#972).
+SWIFT_READY_FIRST="$(grep -Eo "[0-9]+ of [0-9]+ Swift programs on this site ready to run" /tmp/verify_main_build.log | tail -1 || true)"
 if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
    && [[ -n "$SWIFT_READY_FIRST" ]] && grep -q "$SWIFT_READY_FIRST" /tmp/verify_figures_second.log \
    && same_page_but_for_quartz_ids "$SITE_PUBLIC/Swift-Playground.html" /tmp/verify_swift_first.html; then
@@ -7031,11 +7130,16 @@ print(entry["marker"]["prefix"] + " thisMacOnly EXC2O/1")')"
   # What this Mac actually listens on for the new site address: 127.0.0.1,
   # and never *: the forward appears a moment after the start, so ask for up
   # to ten seconds.
-  _site_port="$(docker port "$CONTAINER_NAME" 8081/tcp 2>/dev/null | head -1 | sed 's/.*://')"
-  _ws_port="$(docker port "$CONTAINER_NAME" 9081/tcp 2>/dev/null | head -1 | sed 's/.*://')"
+  # Each look ends in `|| true` because an empty answer is an answer here:
+  # `docker port` exits 1 for a port with no forward and `lsof` exits 1 when
+  # nothing listens, and under pipefail and set -e either one ended the
+  # whole run on the spot, with no FAIL line, before the loop could look a
+  # second time (#972). The check below says what an empty answer means.
+  _site_port="$(docker port "$CONTAINER_NAME" 8081/tcp 2>/dev/null | head -1 | sed 's/.*://' || true)"
+  _ws_port="$(docker port "$CONTAINER_NAME" 9081/tcp 2>/dev/null | head -1 | sed 's/.*://' || true)"
   _listening=""
   for _try in 1 2 3 4 5 6 7 8 9 10; do
-    _listening="$(lsof -nP -iTCP:"${_site_port:-0}" -iTCP:"${_ws_port:-0}" -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { print $9 }' | sort -u | tr '\n' ' ')"
+    _listening="$(lsof -nP -iTCP:"${_site_port:-0}" -iTCP:"${_ws_port:-0}" -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { print $9 }' | sort -u | tr '\n' ' ' || true)"
     [[ -n "$_listening" ]] && break
     sleep 1
   done
@@ -7281,8 +7385,10 @@ else
   fail "a folder publish from it, to a relative folder with a colon, did not finish"
   tail -20 /tmp/verify_colon_folder_publish.log
 fi
-COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
-COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ')"
+# A folder the publish never made is find's exit 1; `|| true` lets the count
+# read 0 and the check below fail, rather than pipefail ending the run (#972).
+COLON_BUILT_PAGES="$(find "$VERIFY_COLON_BUILDS/EXC2O/section1/public" -name '*.html' 2>/dev/null | wc -l | tr -d ' ' || true)"
+COLON_PUBLISHED_PAGES="$(find "$VERIFY_COLON_DIR/out 26:27/section1" -name '*.html' 2>/dev/null | wc -l | tr -d ' ' || true)"
 if [[ -f "$VERIFY_COLON_DIR/out 26:27/section1/index.html" && "$COLON_PUBLISHED_PAGES" == "$COLON_BUILT_PAGES" ]]; then
   pass "and every page (${COLON_PUBLISHED_PAGES} of ${COLON_BUILT_PAGES}) is in that folder, inside the working folder"
 else

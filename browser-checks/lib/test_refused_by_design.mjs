@@ -121,6 +121,26 @@ expect("counted: the badge in a page and in its own simulation's frame is two do
 sorted = sortRefusedScripts({ documents: [{ policy: POLICY, received: SIM, served: SIM }, { policy: SIM_POLICY, received: SERVED, served: SERVED }], inTheDom: [] })
 judged = judgeRefusals(NETLIFY, { sorted, documents: read(2), ownHashes: [] }, [said(WEBKIT_FRAME, "about:srcdoc"), said(WEBKIT_FRAME, "about:srcdoc")])
 expect("a simulation's own script that its frame's policy does not list is the site's, and fails", sorted.own.length === 1 && judged.failures.length === 1 && /own inline script/.test(judged.failures[0]), JSON.stringify(judged))
+// The first deployed run with the frame (stack 12, 2026-11-14, both engines):
+// "2 refusal(s) ... where the 1 of 2 document(s) carrying its loader account
+// for 1", while the page held two #nl-badge-frame frames, each naming
+// FRAME_HASH. The simulation (gas-properties 1.1.12) holds eleven U+0130
+// letters in its translations, and lowercasing makes each two code units, so
+// the old reading looked for the loader 11 characters into the tag.
+const TURKISH = "İ".repeat(11)
+const REAL_SIM = `<!DOCTYPE HTML><html><head><script>${SIM_OWN};var strings={tr:"${TURKISH}stanbul"}</script></head><body>\n</body>\n</html>\n${LOADER}`
+expect("stack 12's run: a simulation whose text grows when lowercased still carries the loader after its </html>", loaderIn(ENTRY, REAL_SIM) === true, String(loaderIn(ENTRY, REAL_SIM)))
+expect("stack 12's run: the same letters before a loader's address in the page's own text still carry no loader", loaderIn(ENTRY, `<html><body>${TURKISH}<code>${LOADER}</code></body></html>`) === false, "")
+const twoRead = [{ url: "https://example.netlify.app/static/phet/gas-properties/?yotta=false", carriesLoader: loaderIn(ENTRY, REAL_SIM) }, { url: "https://example.netlify.app/Rendered-Check/Simulation", carriesLoader: loaderIn(ENTRY, SERVED) }]
+judged = judgeRefusals(NETLIFY, evidence(twoRead), [said(CHROMIUM_FRAME, "about:srcdoc"), said(CHROMIUM_FRAME, "about:srcdoc")])
+expect("stack 12's run [chromium]: the page and its simulation's frame, both read for the loader, account for its two refusals in about:srcdoc", judged.failures.length === 0 && judged.setAside.length === 2 && judged.allowed === 2, JSON.stringify(judged))
+counted = refusalMessages([WEBKIT_FRAME, WEBKIT_FRAME], [WEBKIT, WEBKIT], ["about:srcdoc", "about:srcdoc"])
+judged = judgeRefusals(NETLIFY, evidence(twoRead), counted.messages)
+expect("stack 12's run [webkit]: its two refusals, each recorded twice, are two messages and both set aside", counted.messages.length === 2 && judged.failures.length === 0 && judged.setAside.length === 2, JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(twoRead), [said(CHROMIUM_FRAME, "about:srcdoc"), said(CHROMIUM_FRAME, "about:srcdoc"), said(CHROMIUM_FRAME, "about:srcdoc")])
+expect("stack 12's run: a third refusal in about:srcdoc beside the two documents still fails, naming the count", judged.setAside.length === 0 && judged.failures.length === 1 && /^3 refusal\(s\) .* the 2 of 2 document\(s\) carrying its loader account for 2 .*more than the host's/.test(judged.failures[0]), JSON.stringify(judged))
+judged = judgeRefusals(NETLIFY, evidence(twoRead), [said(CHROMIUM_FRAME, "about:srcdoc"), said(WEBKIT, "https://example.netlify.app/static/phet/gas-properties/?yotta=false")])
+expect("stack 12's run: a refusal said in the simulation's own document is the site's and still fails, and the frame's one left is a refusal not seen", judged.setAside.length === 0 && judged.failures.length === 2 && /was not seen/.test(judged.failures[1]) && /said in https:\/\/example\.netlify\.app\/static\/phet\/.*the site's own/.test(judged.failures[0]), JSON.stringify(judged))
 const AT = " (https://example.netlify.app/Rendered-Check/Quiz)"
 counted = refusalMessages([WEBKIT + AT], [WEBKIT], [PAGE])
 expect("counted: WebKit's one refusal, recorded in the console with its address and again in the refused list, is one message", counted.messages.length === 1 && counted.twins.join() === "0" && counted.messages[0].at === PAGE, JSON.stringify(counted.messages))

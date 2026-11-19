@@ -48,13 +48,15 @@ Any other Drama code offers a starting point for the subject instead. Its folder
 {{picture:subject-drama-1}}
 alt: The part named Tableau on the professional stage, on the page Tableau on the class website, with the interview's player and what to listen for.
 
-The interview is not copied into the course. The player loads from YouTube when a student opens the page, and the interview plays when the student presses play. So it needs an internet connection. The page tells students so, under the interview.
+The interview is not copied into the course. The player loads from YouTube as the student scrolls near it, from the address YouTube gives for its privacy-enhanced mode. The interview plays when the student presses play. So it needs an internet connection. The page tells students so, under the interview.
 
 On the page, the interview is its address on a line of its own, in the form used for a picture:
 
 ```text wrap
 ![](https://www.youtube.com/watch?v=EIOxEqlYgXo)
 ```
+
+See [Put a video on a page](page:videos).
 
 - **A question students check themselves.** The page Thought Tracking, in Conventions, has one under the heading Check your ear. It describes a tableau of a family posed for a graduation photograph, and asks which of four lines is a thought and not a caption. A student picks one and presses {{control:quizCheck}}, or presses {{control:quizShowAnswer}}. An explanation named Why appears after the student answers. Nothing a student answers reaches you. See [Questions students check themselves](page:quizzes).
 

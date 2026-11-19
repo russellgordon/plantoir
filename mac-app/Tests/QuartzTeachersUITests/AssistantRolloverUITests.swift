@@ -200,7 +200,7 @@ final class AssistantRolloverUITests: XCTestCase {
     /// has no timetable and has never been published — and a rollover needs
     /// both, or it refuses before reaching anything worth testing.
     private func launchWithARolloverReadySection() throws -> XCUIApplication {
-        let workspaceURL: URL = try FixtureWorkspace.materialize()
+        let workspaceURL: URL = try UITestFolders.makeFixture()
         let courseURL: URL = workspaceURL
             .appendingPathComponent("courses").appendingPathComponent("EXC2O")
 

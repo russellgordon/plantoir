@@ -182,11 +182,21 @@ export function isRefusalLine(entry, text) {
 // `</html>`, which no page a site builds writes anything past, so a page
 // that merely mentions the address in its own text is not counted.
 // Answers null when there is no HTML to read.
+//
+// The last `</html>` is found in the HTML itself, never in a lowercased
+// copy: lowercasing can make a string LONGER (U+0130, "İ", becomes two code
+// units), so an index found in the copy points past the tag in the original.
+// The PhET simulation the Simulation page frames holds eleven of them in its
+// translations, so the first deployed run with a frame (stack 12,
+// 2026-11-14) read its loader 11 characters late, inside the tag, and
+// counted 1 of 2 documents where both carried it (measured again on a local
+// stand-in edge, both engines, with the real gas-properties 1.1.12).
 export function loaderIn(entry, html) {
   if (typeof html !== "string") return null
-  const end = html.toLowerCase().lastIndexOf("</html>")
-  if (end < 0) return false
-  return new RegExp(entry.loader).test(html.slice(end + "</html>".length))
+  let after = -1
+  for (const match of html.matchAll(/<\/html>/gi)) after = match.index + match[0].length
+  if (after < 0) return false
+  return new RegExp(entry.loader).test(html.slice(after))
 }
 
 // The hash Chromium names for the script it refused ("Either the

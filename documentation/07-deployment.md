@@ -589,10 +589,12 @@ cost, measured 2026-11-13: gas-properties adds 22 hashes, projectile-motion
 20, none shared, so each simulation adds about 1 KB to a header Netlify
 sends with EVERY file of the site; a site with gas-properties alone wrote a
 policy line of 1,247 characters. Netlify's limit on one `_headers` value was
-not found documented. It is measured before this piece merges, with a test site
-carrying twenty simulations' worth of hashes fetched back whole; if Netlify
-refuses or cuts it, the fallback is to move each simulation's inline scripts
-into files beside it at build. No host is added: a simulation loads no
+not found documented. Measured 2026-11-14 on a credentialed test site: a
+site of 20 stand-in simulations carrying 421 script hashes wrote one policy
+line of 22,766 characters, and Netlify took the deploy and sent that line
+whole, once, with each of three answers checked. Where Netlify's limit lies
+is not measured; for a site past it, the fallback is to move each
+simulation's inline scripts into files beside it at build. No host is added: a simulation loads no
 script from another site (`phetFences.download.checks`), and the analytics
 script PhET's servers sometimes add is taken out before it is kept.
 
@@ -3283,7 +3285,17 @@ script:
     own address, kept beside each line as `consoleWhere`. No page a site
     builds makes a srcdoc frame;
   - every document the page was sent could be read for the loader, which is
-    looked for only after the last `</html>`;
+    looked for only after the last `</html>`. That tag is found in the HTML
+    itself, never in a lowercased copy. The first deployed run with a
+    simulation's frame (stack 12, 2026-11-14) failed the Simulation page in
+    both engines with "the 1 of 2 document(s) carrying its loader account
+    for 1" while the page held two badge frames. The simulation
+    (gas-properties 1.1.12) holds eleven `İ` letters (U+0130) in its
+    translations, lowercasing makes each one two code units, and so the
+    index found in the lowercased copy fell 11 characters into the loader's
+    tag in the original. Measured again on a local stand-in edge that
+    appends the loader to every HTML document, with the real simulation:
+    1 of 2 before the fix and 2 of 2 after, in both engines;
   - there are exactly `refusalsPerDocument` (1) such messages for each
     document that carried the loader.
 

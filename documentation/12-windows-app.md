@@ -2561,6 +2561,272 @@ test). The other classes that walk `mustRecord` (`AgentGuidanceTests`,
 `CourseBackupTests`) passed, 123 of 123. `scripts/test_held_skills.py`, which
 reads `help/`, passed in 9 s.
 
+### After the mac's fourteen pieces: held by name a fourth time (2026-11-14)
+
+At about 05:15 EST the mac merged fourteen pieces into `dev`
+(d75c36543..cadd8eb11, 263 files): #899's journal core (switched off), #897
+pieces A and C, #785a, #597's second half, #891, #696, #812 and #813, the
+"checks that mislead" batch (#802, #905, #906, #907, #738), #674 (PhET), #692
+(video players), #853 and #876 (the redactor), and #879, #887, #791 and #866.
+Nothing under `windows-app/` changed. `verify-deploy.ps1` changed in one line
+(the surname prompt it expects, `deploy.py`'s new example). The shared Python
+it changed runs here today through `PythonToolchainTests`. A full suite on
+cadd8eb11 read `Failed: 19, Passed: 3809, Skipped: 1, Total: 3829, Duration:
+19 m 43 s`. It ran on this PC (a Lenovo 20QES70500, i5-8365U, 16 GB,
+Windows 11 Pro 26200) after a 92-minute wait for the suite lock. Each red is
+sorted below by the open `windows` issue of v2.0.0 whose body names it.
+
+Two of the 19 are not the mac's requests:
+- **`LastViewedPagesTests.OnlyTheNewestAreKept`** (`Actual: "P3"`, 25 s), the
+  ordering flake #916 already names.
+- **`PythonToolchainTests` on `scripts/test_deploy_tokens.py`.** #921 owns
+  it, and its body said to read a red there as a platform question first. It
+  is one. The file's `TheEndDateReading` (6 cases) and two more subtests pass
+  a JSON body to deploy.sh's cut-out functions as an ARGUMENT to Git Bash,
+  and Git Bash's own command-line reading changes such an argument before
+  bash sees it. Measured with `subprocess.run([Git Bash, "-c", 'printf "[%s]"
+  "$1"', "_", arg])` on the runtime's Python:
+  - `{"a":"b"}` arrives empty;
+  - `a"b` arrives as `a\b`;
+  - `{a:b}` arrives as `a:b`;
+  - `"status":"active"` arrives as `\status":"active"`.
+
+  The function itself reads the body right when it is typed into Git Bash
+  (`[active][2027-07-01T00:00:00Z]`). So the red is the shared test's way of
+  passing the body, not `deploy.sh` and not Windows. The fix is in shared
+  Python: hand the body over on standard input or in the environment. It is
+  owed by #921 with the mac, and left red here, because a shared test is not
+  held by name.
+
+**Held, 61 entries from these fourteen, all v2.0.0** (22 more from stack 13, below).
+
+| Issue | Entries | Area: what |
+|---|---|---|
+| #928 | 3 | `ActivityTrailEvents`: `preview already starting`, `preview again abandoned`, `preview could not start` |
+| #921 | 9 | `ActivityTrailEvents`: the four `deploy token …` events and `Cloudflare token end date learned`; `MachineWordUsedIn`: `deployTokens.words.problemCouldNotSave`; `CredentialRequestsSaidDifferently`: `cloudflareToken` (the TTL step now promises an end date in Settings and a warning, which Windows does not show yet); `FailureExplanationCases`: the two #696 refusals |
+| #936 | 8 | `ActivityTrailEvents`: `files for the site downloaded`, `… could not be downloaded`; `FailureExplanationCases`: the five PhET stops; `SectionProblemKinds`: `phetSimulationsNotReady` |
+| #899 | 2 | `ActivityTrailEvents`: `undo could not record a step`, `undo rolled back` (as #949 asks: the owner is the whole of Undo, of which #949 is the first Windows piece) |
+| #920 | 3 | `CredentialRequestsSaidDifferently`: `teacherSurname`, `siteName`, `siteNameConflict` (the invented sample names) |
+| #927 | 35 | `SubjectMenuItemsUnderAnOlderName`: `addClass`, said here as `addNextClass`; `AssistWordingKeys`: the 34 Add Class… sentences |
+| #946 | 1 | `AgentGuidanceWordsSaidDifferently`: `askFound` (it names GitHub Copilot) |
+
+The 34 Add Class… sentences are held, not added: nothing the built-in
+assistant is shown changes. `scripts/test_tool_surface_digest.py` and
+`research/ai-assist/toolhash.py` are untouched by the merge, so the digest's
+expectation did not move. The test passed in the baseline, so Windows'
+surface still matches it.
+Add Next Class is not renamed: the issue says renaming the item is the fix,
+and the item is a menu a teacher sees, so it waits for #927's dialog.
+
+**Five new areas, each read where its red was** (a sixth came with stack 13, below).
+- `SubjectMenuItemsUnderAnOlderName` (`subjectMenus.items`, with an older
+  name in `NamedGapLedger.SubjectMenuItemsOlderNames`). Both
+  `SubjectMenusContractTests` facts read the older name in the held name's
+  place. The older name must be an item here and gone from the contract, it
+  keeps the item list's order, and every case's `enabled` is compared exactly
+  with the held name read as the older one. At least three run cases must
+  enable it (five in the contract; two name #889's held situation keys).
+  `NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose` keeps
+  the map and the entries one to one.
+- `CredentialRequestsSaidDifferently` (`credentialRequests.requests`, by
+  name). A held request's title, label, secrecy, link and number of steps are
+  still compared exactly. Its explanation and steps together must still
+  differ. The number of held requests met must equal the entries.
+- `FailureExplanationCases` (`failureExplanations.cases`, by the case's `why`
+  up to its first colon, since the cases carry no name). A held key must name
+  exactly one case, and that case must be explained by NOTHING here: the
+  contract's honest fallback, the raw output shown. A sentence of another
+  kind fails as a wrong explanation, not a missing one.
+- `SectionProblemKinds` (`sectionProblems.kinds`, by kind; "has it" is
+  `SectionProblemsWording.KindLabels`). The sixteen kinds this app has are
+  still counted and compared label by label and scope by scope. A held kind
+  must be in none of this app's rule lists.
+- `AgentGuidanceWordsSaidDifferently` (`printablePages.agentGuidance.words`,
+  by key). A held sentence must still differ, it is still checked for the
+  machinery, and the count met must equal the entries.
+
+**Fixed in test code only, small and certain (#920 items 3 and 5).**
+`WizardSkeletonToggleTests` and `ClubWizardTests` read a case without
+`usesLCSTerminology` as the switch off, which is what the contract now means
+(there is no switch). A case that still carries the key is read as before.
+The toggle's floor is 15 cases (`contracts/README.md`'s census), and the
+school's list is compared only while the contract carries one: it has
+`factory` alone now. Every case's outcome is still compared exactly, and all
+15 pass with this app's switch off. `PreviewAppearanceTests.TheCloudflareMarkersExamplesAreRead`
+expects the marker example's new invented project name. No product code
+changed.
+
+**A defect, not held: the redactor (#941).** `LogRedactorTests` is red. Two
+of its tests fail: `LogRedactor_AllContractCases_Pass` (24 of the 50
+`problemReportRedaction.cases`, as #941 counts them) and
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 assembled cases
+expected, 12 found). The 24 are credential shapes and the second word of a
+two-word account name that today's Windows redactor writes into a trail line
+and a problem report. Those are shipped behaviour, so a ledger entry would
+ship the leak quietly. They stay red until #941 lands. **Measured for
+#941 on this PC:** #941's twelve C# patterns pasted verbatim into
+`PatternRules`, in the contract's order (a scratch copy, never committed).
+They pass all 50 `problemReportRedaction.cases`, all 15 `redactedAgainCases`,
+and both `ruleOrder.cases` under .NET's engine. That includes the case ending
+in a carriage return, which #941 feared would differ. With today's patterns,
+24 of 50, 8 of 15 and both rule-order cases differ, exactly as #941 counted
+under ICU. What is left for #941 is the two counts in
+`TheAssembledCasesAreFilledBeforeTheyAreRedacted` (3 to 12 and 1 to 3), the
+three tests it lists, and the linear-time bound, which is unmeasured on .NET.
+The port is kept at `S\work\hold4\LogRedactor.port.cs` for that piece.
+
+**No owner, left red: `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`.**
+#696 put `read -rsp "Paste the token: "` inside `deploy.sh`'s
+`run_token_mode()`, and that function does not start with `assert_can_ask`.
+The question cannot be reached by a scheduled deploy, read rather than run:
+token mode refuses every option but its own, `--non-interactive` included,
+and asks only on a terminal. No `windows` issue names it, and relaxing the
+test would soften it, so the director raises it with the mac.
+
+**Proved three ways** by mutation over the hooked classes, restoring
+`NamedGapLedger.cs` by writing its bytes back (`S\work\hold4\mutation-*.txt`).
+Each round ran the 94 tests of the hooked classes in about 7 s.
+- **Closed.** One entry per new area for something this app already has:
+  `undoLastChange` under an older name, `netlifyToken`, a failure case it
+  explains as the contract does, `mediaFolderMissing` and `askTitle`. Each
+  failed with the closed message ("… it now EXISTS on this side"): 7 failed.
+  The seventh was the menu cases' fact, which read the older name where
+  `undoLastChange` is enabled.
+- **Withdrawn.** One entry per new area for a key the contract lacks. Each
+  failed with the withdrawn message: 6 failed (the kind in both of its facts).
+- **Removal.** Taking out every entry this piece added brought back the ten
+  baseline reds of those classes: trail events, wording, the machine word,
+  the credential requests, the failure explanations, both kinds facts, both
+  menu facts and the guidance words.
+- **Restored:** `Passed! - Failed: 0, Passed: 94`.
+- **Counts that cannot fall to zero unseen.** The held credential requests,
+  failure cases and guidance words met must equal their entries, so an entry
+  that matches nothing fails. Sixteen problem kinds are still compared. At
+  least three run menu cases must enable the renamed item. An item held as
+  missing outright may not also be held under an older name
+  (`NamedGapLedgerTests.EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose`).
+
+**Then stack 13, folded into the same branch.** At about 06:30 EST `dev`
+moved again, to 956defd43: #800, #829 (a deploy typed in Terminal takes a
+work lease), #897 piece B (Roll Over to a New Year… on the Section menu),
+#904, and follow-ups to #674 and #597. Nothing under `windows-app/` changed.
+It turned four tests red here, held as 22 more entries:
+- **#897 (21).** The item `rollOverToANewYear` (`SubjectMenuItems`, so it is
+  taken out of every case's `enabled`) and its 20 sentences
+  (`AssistWordingKeys`).
+- **#829 (1).** The liveness case "#829: a deploy typed in Terminal - bash,
+  its start in whole seconds - is alive while that bash runs"
+  (`LeaseLivenessCases`, a sixth new area).
+
+Windows decides that liveness case as gone today, because `WorkLease.IsAlive`
+compares the start as text. It is held rather than called a defect because
+nothing on Windows writes a whole-second start: `deploy.ps1` takes no lease
+yet, and this app's own leases write six decimal places
+(`WorkLease.LeaseBody`). So no Windows hold is read as gone this way. When
+#829 has Windows write such a lease, Windows must also compare on whole
+seconds. A held liveness case must still be decided opposite to `expect`,
+the number of held cases met must equal the entries, and at least 17 cases
+are still decided exactly.
+
+Proved the same way (`mutation-closed2`, `-withdrawn2`, `-removal2`, 95
+tests):
+- An entry for the kill -9 case, which this app decides as the contract
+  does, failed with the closed message.
+- An entry for a case the contract lacks failed with the withdrawn message.
+- Taking out the 22 entries brought back the four reds.
+- Restored: `Passed! - Failed: 0, Passed: 95`.
+
+In all, the hold is 83 entries. Stack 13's other new lists have no Windows
+reader yet: `workLeases.launcherLeases`,
+`previewWhileItsSectionDeploys.leaseCases`, the two new
+`returningToASectionMidDeploy.heldElsewhere` cases,
+`subjectMenus.rollOverSheet`, `file-formats.json` → `customDomainReading`,
+and the trail lines `deploy.sh` writes beside `task started` and
+`task finished`.
+
+**Unrun rather than red**, read by key with no Windows reader yet:
+`activityTrail.lineShape.placeCases` (#946), `subjectMenus.addClassSheet` and
+`class-planning.json` → `duplicatingAsTheNextClass` (#927),
+`colourSchemePicker` (#920), `deployTokens` (#921), `keptDownloads`,
+`phetFences` and `buildOutputLocation.keptDownloadsSurviveTheSweep` (#936),
+`videoEmbeds` (#939), `quittingWhileWorkIsUnderWay.previewBuildRecord` (#928),
+`undo` and `undo-traces.json` (#949), and the `undoListDays` of 61 (#912).
+(`problemReportRedaction.redactedAgainCases` and `ruleOrder` were on this
+list until #941 landed on this branch; see below.)
+
+#### Brought up to `dev` 39d83a0a7, and the redactor fixed (2026-11-18)
+
+The branch waited four days while `dev` moved 94 commits (stack 14: #901a,
+#839, #952; #973, #974, #978, #980 and the roadmap). `dev` merged in without
+a conflict. Nothing under `windows-app/` had changed on `dev`. Before the
+merge, the Windows suite on `origin/dev` 39d83a0a7 read `Failed: 25, Passed:
+3811, Skipped: 0, Total: 3836` (17 m 58 s, over SSH on the PC). This
+section's measurements were made on the same PC, over SSH, in
+`plantoir-wt-compare`.
+
+**#941, the redactor, built from the fourth hold's port.** `PatternRules` is
+the mac's twelve patterns, byte for byte (compared by script against
+`LogRedactor.swift`), in `ruleOrder.order`, with `userFlag` new. `Redacting`
+gained the seam the mac's `redacting(_:applyingInOrder:)` has, and
+`LogRedactorTests` gained the four tests #941 lists: the names in the
+contract's order, `ruleOrder.cases` in the pinned order and with each
+`wrongOrder` move, `redactedAgainCases`, and the linear-time bound (the
+mac's eight slow shapes at 10,000 and 100,000 characters; growth at most 50,
+the best of up to three rounds). The two assembled counts moved from 3 to
+12 and from 1 to 3. Case 20, the line that ends in a carriage return,
+needed no .NET-specific change.
+
+**Two shared tests that were wrong on Windows, fixed in the test, not in the
+product.**
+- `scripts/test_deploy_tokens.py` (#921): the paste and end-date cases now
+  reach bash in the environment (`PLANTOIR_TEST_VALUE`), not as an argument,
+  because Git Bash re-reads its own command line (measured above). The same
+  cases and assertions run on the mac, where the file still passes (22
+  tests).
+- `scripts/freshness_cases.py`, the `pointTheLinkAtAnOlderCopy` change: it
+  renamed a new link over the course folder's link, the way `ln -sfn` does.
+  Windows refuses a rename over a directory link (`PermissionError: [WinError
+  5]`). The case runs only where links can be made: over SSH, with an
+  administrator token, they can, so `test_build_freshness_reuse.py` went red
+  there and nowhere else. On Windows the old link is now removed first
+  (`os.rmdir` removes the link, never what it points at). The mac's path is
+  unchanged (40 tests pass there).
+
+**Re-pointed entries.** The 21 Roll Over entries name #954, which is Windows'
+issue for #897 piece B. The whole-second liveness case names #956, because
+#829 is closed.
+
+**Stack 14's reds, held as four more entries.** Three tests went red from
+what `dev` brought:
+- **#901 (3).** The trail event "site leaves off files no published page
+  uses" (`ActivityTrailEvents`), and the two follow-limit stops in
+  `failureExplanations.cases`, held by `why` up to the first colon
+  (`FailureExplanationCases`). #901a is shared build code, so Windows' build
+  runs it already. What Windows lacks is the trail line and the explanation
+  of the stop: until #901 lands, a stopped build shows its raw output, which
+  is the contract's honest fallback. #901 is open on v2.0.0, and this brief
+  left it alone.
+- **#921 (1).** `netlifyToken` (`CredentialRequestsSaidDifferently`). #952
+  corrected the Netlify token's TTL step on the mac, which now says that the
+  next deploy names a token that no longer works and that Settings shows
+  whether it still works. Windows' Settings does neither until #921 lands, so
+  its older words are the true ones here. The title, label, link and number
+  of steps are still compared exactly.
+
+**Still red, and not held.** `PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`
+waits on the mac's answer on #963. Nothing has been posted there since the
+fourth hold filed it.
+
+**The result.** The whole suite on the branch at 1debb04d7, over SSH on the
+PC: `Failed: 6, Passed: 3835, Skipped: 0, Total: 3841, Duration: 15 m 13 s`.
+The six are #963's launcher-question test and five permission tests that
+fail only over SSH, where the token is an administrator's:
+`BuildOutputLocationTests.AFolderThatCannotBeListedMeansRebuild`,
+`ReuseTheLastBuildTests.AFolderThatCannotBeListedCountsAsChanged`,
+`ReopeningTheLastWorkingFolderTests.EveryFolderCaseIsDecidedOnARealFolder`
+and `ReferenceLockTests`' two. Those five were red on `dev` as well. The
+linear-time test took 1.0 s for all eight shapes.
+
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
 `PythonToolchainTests` runs every `scripts/test_*.py` here, so a shared test
@@ -3748,7 +4014,8 @@ What replaces the old container concepts:
   PROGRAMS' work leases only, never this program's own publishes, so another
   window of the app — or the in-app assistant's windowless deploy — deploying
   the same section did not refuse; (2) `preview.sh` started by hand checked
-  nothing, and a bare `deploy.sh` writes no lease. The mac's fixes, to match
+  nothing, and a bare `deploy.sh` wrote no lease (it takes them since #829,
+  `workLeases.launcherLeases`). The mac's fixes, to match
   in rule and not in mechanism: a check at the top of the one function every
   window preview goes through, reading the in-process publish record; and a
   check in the launcher, on serving runs only and before anything is changed,

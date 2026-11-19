@@ -68,11 +68,13 @@ On the page, each film is its address on a line of its own, in the form used for
 alt: The page Four Forms on Film in Obsidian, with the line that holds a film's address marked.
 
 - **Students see a YouTube player** where each address is.
-- **A film is not copied into the course.** The player loads from YouTube when a student opens the page, and the film plays when the student presses play. So the student needs an internet connection.
+- **A film is not copied into the course.** The player loads from YouTube as the student scrolls near it, from the address YouTube gives for its privacy-enhanced mode. The film plays when the student presses play. So the student needs an internet connection.
 - **The page tells students so.** It ends with a note named About these films. The note says that each film plays from YouTube, needs an internet connection and will not print. It adds that the four makers published their films under a Creative Commons Attribution licence.
 - **Watch each film through** before your class does. The films were chosen from what their YouTube pages say: the licence, the publisher, and that they can be shown in another page. They were not watched through when the course was written. The ballet class runs close to an hour.
 
 The class page for Unit 3, Day 3 links to Four Forms on Film in its agenda. So does the page Forms From Around the World, in Technique.
+
+[Put a video on a page](page:videos) has the steps, for YouTube and for Vimeo.
 
 A video file of your own is a different thing. It goes in the course's Media folder. See [Pictures, PDFs and the Media folder](page:media).
 

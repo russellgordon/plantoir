@@ -1181,6 +1181,18 @@ judge_og_image() {  # judge_og_image <label> <site address> <front page file> [<
   fi
 }
 
+# The launchers this run drives write their trail lines (note_on_the_trail)
+# into a folder of the run's own, never the teacher's real
+# ~/Library/Logs/Plantoir/activity.txt, as verify.sh and the launcher tests
+# (scripts/launcher_test_trail.py) already do. Since #829 every deploy.sh
+# typed outside the app writes two lines there, so each publish this run made
+# left two in the teacher's own trail (the Fable sweep of #829, F2).
+keep_the_launchers_trail_in() {
+  PLANTOIR_TRAIL_DIR="$1/trail"
+  export PLANTOIR_TRAIL_DIR
+  mkdir -p "$PLANTOIR_TRAIL_DIR"
+}
+
 # ----------------------------------------------------------------- self-test
 # The wait above, proved against a stub server on 127.0.0.1 that serves the
 # OLD bytes for the first K requests to a path and the NEW after: no
@@ -2246,6 +2258,33 @@ SCAN
 
   NS_PLAIN_FIRST=10
 
+  hdr "The launchers' trail stays in the run's own folder (#829's sweep, F2)"
+  # deploy.sh's own note_on_the_trail, run with a scratch HOME after the
+  # same call the real run makes: the line lands in the run's folder and
+  # nothing is written under HOME. Then the real run makes that call once,
+  # at the top level, straight after making its work folder and before any
+  # launcher is started.
+  said=$(
+    HOME="$ST_DIR/home"
+    unset PLANTOIR_TRAIL_DIR
+    keep_the_launchers_trail_in "$ST_DIR/run"
+    eval "$(awk '/^note_on_the_trail\(\) \{/,/^\}/' "$SCRIPT_REPO/deploy.sh")"
+    note_on_the_trail "ADA1O/1 · a line from the self-test"
+    if grep -q "a line from the self-test" "$ST_DIR/run/trail/activity.txt" 2>/dev/null \
+      && [ ! -e "$ST_DIR/home/Library/Logs/Plantoir" ]; then
+      echo kept
+    else
+      echo leaked
+    fi
+  )
+  calls=$(grep -c '^keep_the_launchers_trail_in "\$WORK"$' "$0")
+  after_mkdir=$(awk '/^mkdir -p "\$WORK"$/ { getline; print; exit }' "$0")
+  if [ "$said" = kept ] && [ "$calls" = 1 ] && [ "$after_mkdir" = 'keep_the_launchers_trail_in "$WORK"' ]; then
+    ok "every launcher this run starts writes its trail into the run's own folder, not the teacher's"
+  else
+    no "the launchers' trail is not kept in the run's folder (line: $said, calls: $calls, after mkdir: $after_mkdir)"
+  fi
+
   hdr "Result"
   echo "  $PASS passed, $FAIL failed, $SKIP skipped"
   [ "$FAIL" -eq 0 ] || exit 1
@@ -2256,6 +2295,7 @@ if [ "$SELF_TEST" = true ]; then
 fi
 
 mkdir -p "$WORK"
+keep_the_launchers_trail_in "$WORK"
 
 # Everything this script borrows is put back on ANY exit — including Ctrl-C and
 # a crash. It moves a section's `index.md` aside to test the refusal, and it

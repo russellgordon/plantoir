@@ -45,6 +45,8 @@ final class MenuVoiceTests: XCTestCase {
         ("pagesAChangeCouldNotFinishNamingSeveral", "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"),
         // #897: Section ▸ Duplicate as Next Class…'s copy that cannot be made hidden.
         ("theCopyCouldNotBeMadeHidden", "theCopyCouldNotBeMadeHiddenFromTheMenu"),
+        // #897 piece B: Section ▸ Roll Over to a New Year…'s marker that cannot be moved.
+        ("rolloverCouldNotStartANewWebsite", "rolloverCouldNotStartANewWebsiteFromTheMenu"),
     ]
 
     // MARK: - Set up and tear down

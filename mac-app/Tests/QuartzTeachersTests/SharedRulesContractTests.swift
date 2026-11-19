@@ -1317,6 +1317,7 @@ final class SharedRulesContractTests: XCTestCase {
         let folderURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("dialog-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        TemporaryFolders.removeWhenThisTestEnds(folderURL)
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
         store.appendActivityLine("2026-08-16 07:06:40 · started preview.sh COMP 1")
         if includingAPrompt {

@@ -2225,7 +2225,7 @@ struct SidebarView: View {
              .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder, .back, .forward, .reloadPage,
              .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
              .addClass,
-             .reDateClasses, .makeRoomForClasses, .classDates:
+             .reDateClasses, .makeRoomForClasses, .classDates, .rollOverToANewYear:
             // Not the sidebar's: File, Course Settings and the section
             // window own these — the assistant's functions run in the
             // section window, which shows their sheets (#457 batch B). Local

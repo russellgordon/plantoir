@@ -753,8 +753,9 @@ run exists.
   assistant, a command line) did not grey the button, because nothing in the
   app watched the leases. Since #729 a program that holds leases greys it
   ("Deploy waits for another program (#729)", next). A program that holds
-  none, such as a deploy typed in Terminal, still does not: a press then is
-  refused in words by the launcher.
+  none, such as a build typed in Terminal or a `deploy.sh` from before #829,
+  still does not: a press then is refused in words by the launcher. Since
+  #829 a deploy typed in Terminal holds leases and greys it.
 
 Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
 
@@ -917,10 +918,26 @@ notification.
 in reserve was not built.
 
 **What is still not seen.**
-- A program that holds no lease: a deploy typed in Terminal, or a leftover
-  run (#439). The launcher's guard refuses its press in words, and #729's
-  first part widened what that guard sees ([03](03-launcher-scripts.md) → "A
-  section being deployed cannot be deployed again (#439)").
+- A program that holds no lease: a build typed in Terminal
+  (`preview.sh --build-only`), or a `deploy.sh` from before #829. The
+  launcher's guard refuses its press in words, and #729's first part widened
+  what that guard sees ([03](03-launcher-scripts.md) → "A section being
+  deployed cannot be deployed again (#439)"). Since #829 a deploy typed in
+  Terminal takes a build and a publish lease from `deploy.sh` itself, naming
+  its section, so the button greys for it like any other program's ([03](03-launcher-scripts.md) → "A
+  deploy typed in Terminal takes a work lease (#829)"). The app's own children
+  take none: `HelperPrograms.environment` hands every launcher
+  `PLANTOIR_LEASES_HELD_BY`, the app's own id.
+- A leftover run of a deploy set for later (#439) whose `deploy.sh` was
+  already running when its app was ended. That `deploy.sh` read a live app
+  in the variable at its start and holds no lease (measured by the #829
+  implementation review: leases held `[]`); only a leg that starts after the
+  app has gone takes its own. The press meets the guard, in words. A
+  follow-up would have the app count a lease whose holder descends from it as
+  its own.
+- The help sentence does not name
+  a Terminal deploy among the programs it lists (a question for Russell on
+  #829).
 - A holder run by another account (its `Plantoir`, say). W7 shows that a
   watch on such a process arms without firing at once. That it fires when
   such a process ends was NOT measured, because no other account's process
@@ -939,9 +956,8 @@ in reserve was not built.
 - A trail line per grey and un-grey (#729 question 3). It is a state, not an
   act: a refused press is already on the trail.
 - `deploy.sh` taking a lease itself, so a deploy typed in Terminal greys the
-  button. It has real value and is a follow-up (#729 question 2). It touches
-  `ProcessLiveness` (a bash holder's name and start), `workLeases` on both
-  platforms and three launchers.
+  button, was left out of #729 as a follow-up (#729 question 2). It was built
+  by #829 (above).
 - The watcher creating the activity folder (above).
 
 **Tests.**
@@ -1036,7 +1052,12 @@ every lease.
 is `returningToASectionMidDeploy.heldElsewhere.helpForASection` when the
 lease names the section, and `help` when it names none. The window's Cannot
 Preview Yet says `wording.sectionIsBeingBuiltElsewhere` when the lease names
-the section. The in-app assistant is still told `courseIsBeingBuiltElsewhere`
+the section, and since #829's Fable sweep `wording.sectionIsBeingDeployed`
+when another program's publish lease names it (a deploy of that section, a
+`deploy.sh` typed in Terminal among them): the sentence this app's own deploy
+of the section is told with, chosen by `SectionDetailView
+.previewDeclinedSentence` over `WorkLeaseFiles.aDeployHolds`
+(`previewWhileItsSectionDeploys.leaseCases`). The in-app assistant is still told `courseIsBeingBuiltElsewhere`
 (nothing it is shown changes, the owner's instruction for this release), and
 an outside assistant `courseIsBeingBuilt`. The trail's "build declined,
 course busy elsewhere" line says "Section N of the course" when the lease
@@ -1421,28 +1442,33 @@ A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
 a Return given to it later is dropped. So "Cancel is the default" and "Escape
 closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
 kept the first and lost the second without anybody noticing: the structure
-test pinned the modifier, not the key. The questions now use the destructive
-row of the table: **Escape is Cancel, and Return presses neither button**, so
-a Return typed out of habit still removes, replaces, starts again or shares
-nothing. That was #832's answer for Remove Group, Start the Groups Again,
-Replace It… and the public-address warning, whose Share Without a Password
-used to take Return. **Since #834 the first three are sheets, where Cancel
-answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
-below), and so, since #833, is the public-address warning: it comes after
-the two tables before a share and is a `FactsQuestionSheet` too, so its
-Cancel answers Return and Escape.
-`QuestionKeysTests` presses both keys on each, through the real modifiers.
+test pinned the modifier, not the key. #832 then used the destructive row of
+the table: **Escape is Cancel, and Return presses neither button**, so a
+Return typed out of habit removes, replaces, starts again or shares nothing.
+That was its answer for Remove Group, Start the Groups Again, Replace It… and
+the public-address warning, whose Share Without a Password used to take
+Return. Since #834 the first three are sheets (`FactsQuestionSheet`, below),
+and since #833 so are the public-address warning and the dialog after Change
+Password. From #834 until #973 Cancel on those sheets answered Return AND
+Escape, as Russell first asked. **Since #973 (Russell, 2026-11-15) the sheets
+follow Apple's Human Interface Guidelines, and on the risky questions Return
+does nothing again**: "Return does nothing on risky questions" below.
+`QuestionKeysTests` presses the keys on each, through the real modifiers.
 
-**A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
-(`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives the sheet
-Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
-console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
-own), measured and pinned, not changed.
+**The two-lists sheet is not a facts sheet and is unchanged by #973:** Cancel
+keeps Return (`.keyboardShortcut(.defaultAction)`) and `.onExitCommand` gives
+the sheet Escape, which its `.interactiveDismissDisabled()` had taken away.
+(That works there because its search field holds the keys; `.onExitCommand`
+alone is not enough on a sheet where nothing does, #973, below.) Whether its
+Cancel should stay the default is part of the interface audit, #975. The
+share's console already closed on Escape (SwiftUI closes a sheet with no
+Cancel of its own), measured and pinned, not changed.
 
 **Rejected in #832:** turning the questions into sheets only so that Cancel
 could keep Return as well; and Cancel with Return and no Escape, which is what
 shipped to `dev` and what Russell reported. #834 then made three of them
-sheets for a reason of its own (below), and with that Cancel got both keys.
+sheets for a reason of its own (below), and with that Cancel got both keys
+until #973 took Return away from it.
 
 ### Questions as one sentence and labelled facts (#834)
 
@@ -1455,9 +1481,124 @@ in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
 the action and Cancel. A fact that is missing is no row, never a blank one
 (Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
 accessibility element, so VoiceOver reads the title, the message, then
-"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
-the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
-the action takes no key.
+"label, value". The buttons and their keys are the next paragraphs.
+
+#### Return does nothing on risky questions (#973)
+
+**Ruled by Russell, 2026-11-15, from Apple's Human Interface Guidelines.** The
+Alerts page (https://developer.apple.com/design/human-interface-guidelines/alerts,
+revised 2024-02-02) says: "Note that you don't want to make a Cancel button the
+default button", and "If you want to encourage people to read an alert and not
+just automatically press Return to dismiss it, avoid making any button the
+default button." It also says Escape and Command-Period are the standard ways
+to cancel, "Always place the default button on the trailing side of a row",
+and "Cancel buttons are typically on the leading side". The Buttons page
+(https://developer.apple.com/design/human-interface-guidelines/buttons,
+revised 2025-12-16) says the primary button is "the button people are most
+likely to choose" and responds to Return, and "Don't assign the primary role to
+a button that performs a destructive action, even if that action is the most
+likely choice." Russell's rulings: on the risky questions **Return does
+nothing**, with no default button; and titles defer to the HIG (not changed in
+this piece; every question's titles are listed for him under #975).
+
+So `FactsQuestionSheet` has two layouts, and in both each visible button
+carries at most one key and the cancelling button leads, the action trails:
+
+| layout | cancelling button | action | Return | Escape |
+|---|---|---|---|---|
+| risky (`goAheadIsTheDefault` false): Replace It…, Remove Group, Start the Groups Again, the public-address warning | `role: .cancel`, `.keyboardShortcut(.cancelAction)` | `role: .destructive`, no key | **nothing**: the sheet stays and nothing is answered | Cancel |
+| going ahead is the default (`goAheadIsTheDefault` true): after Change Password | `role: .cancel`, `.keyboardShortcut(.cancelAction)` (Later) | `.defaultButton(isEnabled: true)`, Return (Share Again) | the action | the cancelling button |
+
+Before #973 the risky layout put the action first and Cancel second, on the
+trailing side, with Cancel the default; the order now follows the Alerts page.
+
+**Escape is a key equivalent, not only `.onExitCommand` (#973).** The first
+version gave the sheet Escape through `.onExitCommand` alone, which fires only
+while something inside the sheet holds the keys. With Keyboard Navigation off
+(System Settings ▸ Keyboard, `AppleKeyboardUIMode` unset, the macOS default
+and what most teachers have) the sheet's window itself is first responder, no
+button answered Escape, and SwiftUI closed the sheet through its binding
+without running `cancel`: measured on the second Mac, where the answer the
+test read was `""`, not `cancel`. The main Mac has Keyboard Navigation on,
+focus lands on a button, `.onExitCommand` fires, and its suite was green. With
+Cancel no longer holding Return, Cancel itself carries Escape in both layouts.
+`.onExitCommand` stays on the sheet as a second way in. Measured on the second
+Mac on 2026-11-16 (157109fc4, without it): Escape answered `cancel` in both
+layouts all the same, and Command-Period failed with or without it, so it is
+not what makes either key work there; whether to take it out is left open.
+
+**Closing without an answer is Cancel (#973, Russell 2026-11-16).** Measured
+on the second Mac (Keyboard Navigation off) on 1f15343b9: Escape and Return
+behaved, but Command-Period closed both layouts' sheets without running
+`cancel` (the answer the test read was `""`), and taking `.onExitCommand` off
+(157109fc4) changed nothing. Rather than catch each key, the rule is now
+structural: every question is presented with `.factsQuestionSheet(isPresented:)`
+or `.factsQuestionSheet(item:)` (`FactsQuestionPresentation` and
+`FactsQuestionItemPresentation`, in `Views/Helpers/FactsQuestionSheet.swift`),
+never a bare `.sheet`. Escape answers through Cancel's own key equivalent, as
+above, so it never needs this. The binding those hand to `.sheet` runs the
+question's `cancel` when SwiftUI itself sets it to false while the question is
+unanswered, before the presenter's own state is cleared: that is the route
+Command-Period took on the second Mac, where nothing in the sheet held the keys,
+and the route any other system dismissal takes (a test drives it on both Macs
+with `cancelOperation` on the sheet's window, and checks the answer is already
+`cancel` at the moment the presenter's state reads closed; with the setter's
+`cancel` taken out it read `""`). In the `isPresented:` presenter, `onDismiss`
+checks the same fact for a sheet its presenter closed with no answer, then
+resets it for the next showing. The item presenter has no `onDismiss`: an
+`onChange` of the item's id cancels the question that WAS showing whenever the
+item becomes nil or another item, which covers the presenter closing it and
+(measured) the case `onDismiss` cannot, because SwiftUI swaps a sheet's
+content when the item changes from A to B and never dismisses A. Its record of
+what is showing is replaced only there, after the old one is settled, so A is
+cancelled as itself and B stays asked. Each of these paths was taken out in
+turn on 2026-11-16 and a test in `QuestionKeysTests` failed for each. An `answered` flag, set by both buttons (and
+`.onExitCommand`) before their closures run, is what makes a second `cancel`
+impossible: Cancel or Escape and then the closing runs `cancel` once, and going
+ahead and then the closing runs nothing more. Nothing is timed, and nothing a
+teacher sees changed. Apple's guidance agrees: the Sheets page says "The Cancel
+(or Close) button dismisses a sheet without saving any changes", and Alerts and
+Keyboards give Escape and Command-Period as ways to cancel. Not chosen,
+and not measured: a `.onDisappear` inside the sheet, or `onDismiss` alone.
+Both are told after the sheet has gone, so the presenter's state would already
+read "not asked" with no answer recorded, and anything reading it in between
+(the tests do) would see a question closed and unanswered.
+Windows owes the same rule: a question dialog closed without an answer is
+Cancel, once.
+
+**Rejected:** the first #973 fix, which kept Cancel the default and put Escape
+on an invisible, zero-size, unlabelled button behind it, because a button
+carries one key. Russell stopped it before the merge as bad interface design:
+no hidden controls. Also rejected, not tried: making the sheet's content
+focusable so `.onExitCommand` fires (it would change what Tab and the focus
+ring do on a sheet whose only controls are its buttons, and still depends on
+where focus lands).
+
+**Tests.** `QuestionKeysTests` presses each key on every such question in a
+sheet whose closures write their answer, and checks the answer, because the
+real presenters' `cancel` clears the same state SwiftUI's own dismissal
+clears, so "the sheet closed" could not tell them apart: on a risky question
+Return leaves the sheet showing and answers nothing and Escape answers
+`cancel`; after Change Password Return answers `go` and Escape `cancel`;
+Command-Period answers `cancel` in both layouts; a sheet closed with no answer
+(by its presenter, Command-Period or Escape) answers `cancel` exactly once, and
+one answered by going ahead runs `cancel` never; every question in the app is
+presented through `.factsQuestionSheet` (a source scan). The item presenter is
+driven on its own (`ItemPage`), including an item that changes while its
+question is open. Which button holds which key is NOT read off the drawn
+buttons: SwiftUI draws a sheet's buttons without `NSButton`s, so
+`buttonKeys(in:)` finds none and `testEachButtonCarriesAtMostOneKey` checks
+nothing today (#977); the keys are proved only by pressing them.
+None of it depends on Keyboard Navigation being on. **The lesson for any sheet, on either platform: a test of a key
+that passes only where focus lands on a control proves nothing for a teacher
+with default settings.**
+
+**Windows** shares the sentences, not the keys' mechanics: the rule sentences
+in `contracts/shared-rules.json` (`referenceCourses.groups.wording.rule`,
+`referenceCourses.replacing.wording.rule`, the public-address warning's rule
+and the shelf's menu lines) now say no button is the default, Return does
+nothing and Cancel answers Escape. Where Microsoft's guidance differs is a
+question for #975.
 
 Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
 `message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
@@ -7011,6 +7152,7 @@ all. They are Section menu items now, in two groups after Open in Browser:
 | Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |
 | Make Room for Classes… | the class a new one goes in front of, how many (1–10), then the plan | `plan_make_room_for_classes`, then `make_room_for_classes` |
 | Class Dates… | the class dates sheet (`SectionScheduleSheet`) | — |
+| Roll Over to a New Year… (since #897 piece B, in the group above Get Ready for the Start of the Year…) | the dates on file, the website question where there is a website, then the plan (the section "Roll Over to a New Year…" below) | `plan_re_date_classes`, then `re_date_classes`, with `rollover: "yes"` and `website: "new"` or `"same"` |
 
 Help ▸ Publishing and Deploying… says what the two words mean, in an alert of
 its own, with or without a window (`publishingAndDeployingExplained` — said
@@ -7055,8 +7197,8 @@ change made from the menu in THIS window (Russell's decision 4); the
 assistant's window keeps its own list. Opening another folder in the window
 makes a new runner, and the old folder's undo list goes with it.
 
-**Class dates first.** Add Class…, Re-date Classes… and Make Room for
-Classes… need them. With none on file the SECTION WINDOW shows its own class
+**Class dates first.** Add Class…, Re-date Classes…, Roll Over to a New
+Year… and Make Room for Classes… need them. With none on file the SECTION WINDOW shows its own class
 dates sheet with the reason line, and the item runs once they are written —
 never `SectionSchedulePrompt.shared`, whose offer only the assistant's window
 shows: an offer left there asked into nothing and then appeared, stale, the
@@ -7218,6 +7360,183 @@ lookup strips the folder); changing `duplicate` itself (the assistant's
 behaviour is frozen); offering other sections' or course-level pages (ruled
 out); numbered sources only (the plan review's amendment 8: numbering was
 needed only for the insertion the ruling rejected).
+
+### Roll Over to a New Year…: the rollover's website question in a sheet (#897 piece B)
+
+The built-in assistant's window rolls a section over in words: it re-dates,
+then asks "Should this be a new website, or the same one students used last
+year?" and acts on one of two sentences the teacher says (the section of 10
+on `rollover`). Before #897 piece B that was the ONLY way to roll a section
+over with the website settled, so a teacher who declined the assistant could
+re-date but never cut a section loose from last year's site. **Section ▸ Roll
+Over to a New Year…** (Russell's ruling, 2026-11-13: the Section menu, above
+Get Ready for the Start of the Year…, rolling the one section) runs the same
+call, `re_date_classes` with `rollover: "yes"` and `website`, after its plan
+twin. It is greyed exactly where Re-date Classes… is, with no situation key of
+its own, and it is not on the section row's right-click menu (once a year).
+
+**The sheet** (`SectionVerbSheetModel.Kind.rollOver`, drawn by
+`SectionVerbSheetRollOver.swift` so the sheet's main file changes by a case):
+the intro, the dates on file first to last (`menuRollOverDates`), a line when
+the last of them has passed (`menuRollOverDatesAreOld`, pointing at Section ▸
+Class Dates…; the commonest silent failure is a rollover onto last year's
+dates), then the website by ONE rule, `RollOverFromTheMenu.website`
+(`shared-rules.json` → `subjectMenus.rollOverSheet`):
+
+| The section | The sheet | The call sends |
+|---|---|---|
+| any marker on disk (`.netlify_sites`, `.cloudflare_sites`, or the legacy `.merged_output/section<N>/.netlify_site.json`; an unreadable one counts) | the window's question over two radio buttons, NOTHING chosen; Continue is off until one is | the answer |
+| no marker, a web host among its destinations | "not deployed yet", no question | `new` |
+| no marker, folders only | "deploys to a folder", no question | `same` |
+| Cloudflare among its destinations, and a record the section keeps there (its own, or one a rollover set aside) holds the name a new website would get THIS calendar year | "a new website would get the same address", no question | `same` |
+
+**The last row exists because a "new" Cloudflare website would not be new**
+(the implementation review's W1, measured with `deploy.py`'s own functions):
+`suggest_pages_name` names a new project for the course, the section and the
+calendar year, and `ensure_pages_project` reuses a project of that name, so a
+section first deployed in February and rolled over in September is given
+`ics3u-s1-2026-<surname>` both times and the "new" website is February's. A
+semestered teacher would overwrite the site last term's students read while
+the sheet said "leave last year's as it is". The fault is in the deploy path
+and its fix is GitHub #915; this piece only stops the sheet promising it. The
+app does not keep the surname (it is saved with the teacher's sign-in details,
+which the app does not read), so a kept name matches when it is the stem
+`<course>-s<section>-<year>`, cleaned as `sanitize_pages_name` cleans it, or
+begins with the stem and a hyphen (`RollOverFromTheMenu.aNewWebsiteWouldReuseItsAddress`,
+contract `cloudflareAddressReuse`). That errs toward keeping the website
+students use. A rollover in late December deployed in January is told the
+website is kept when the January deploy would in fact have made a new one; the
+year is read when the sheet opens because that is the only moment the app
+knows. Netlify is not affected: its names are global and a taken one is asked
+again. REJECTED: offering "new" with a warning beside it (an answer whose
+result is the opposite of its words is not an answer), and changing the name
+rule here (#915).
+
+**"Not on a website at the moment"** (`menuRollOverNotDeployedYet`, reworded
+after the review's W2): the first wording said the section "has not been
+deployed yet" and that Plantoir "asks what to call it". Both were false in
+cases that reach the row: Cloudflare asks for no name, a course that deploys
+to a folder AND a web host has deployed its folder half, and a section whose
+website an earlier rollover set aside was deployed before. The sentence now
+says only what is true of all of them, and it is also the finished line where
+the window would say `rolloverHadNoWebsiteYet` (whose Cloudflare clause is the
+window's, frozen).
+
+**The finished line for a new website** (`rolloverStartedANewWebsiteFromTheMenu`,
+the Fable sweep's T1) is the window's `rolloverStartedANewWebsite` with its last
+sentence replaced by `rolloverANewWebsiteIsMadeAtTheNextDeploy`. The window's
+ends by saying Plantoir will ask what to call the new website, which is true of
+Netlify and false of Cloudflare, where `deploy.py` names the website itself. It
+is the clause W2 removed from the row above. A course that now deploys only to a
+folder, with a marker an old web host left, ends on `menuRollOverDeploysToAFolder`
+instead, in the finished line and in the plan for either answer (the sweep's T7),
+because no website is made for it. Where the dates are already right the plan's
+line for "new" is `AssistToolRunner.menuRolloverStartsANewWebsite`, the line the
+other branch shows ("It would also start…"), not the window's imperative; the
+window's plan bytes are unchanged. Pinned by
+`RollOverFromTheMenuTests.testANewWebsiteFromTheMenuPromisesNoQuestionAboutItsName`.
+The window's `rolloverCouldNotTurnOffTheScheduledPublish` carries the same
+clause and is not twinned yet.
+
+**The reuse sentence ends with the way forward**: a new website can be started
+once the calendar year changes. That is true as the name rule stands: the name
+carries the year, so from January the kept names no longer match, the section
+with its own marker is asked again, and one with only a set-aside record is sent
+"new" (`RollOverFromTheMenuTests.testASetAsideRecordFromThisYearCountsToo`). The
+only way to start it is another rollover, which sets aside the published-pages
+record again; the sentence names no menu item for that reason.
+
+The marker test is `DeployCommand.sectionIsPinned`, over the same URLs
+`releaseSite` walks (its legacy path is now `legacyMarkerURL`, shared), so the
+sheet and the release cannot disagree. The call carries only "new" or "same",
+so the window's "say one of two sentences" answer never reaches a sheet.
+
+**What differs from the window, all on `.menu` only** (the plan review's
+amendment 1; the window and an outside assistant are unchanged, and
+`RolloverWebsiteTests` stays on `.local`):
+
+- **One undo entry, in both branches** ("rolled the section over to a new
+  year"): the re-date's files, the published-pages record set aside, and the
+  markers released, so Undo Last Change takes the whole year back at once. The
+  window records two (the re-date with the record, then the website), so its
+  Undo takes the website back and leaves the dates; with the dates already
+  right it records the record and the website apart. Measured by
+  `RollOverFromTheMenuTests` (one entry; the window's test pins two).
+- **A copy of the course first when the dates are already right** (amendment
+  11): the window's path saves none there, and a teacher who ran Re-date
+  Classes… first lands exactly there.
+- **No copy, no rollover** (the director's ruling on the review's I2): when
+  that copy cannot be saved (a full disk, a folder that cannot be written),
+  the rollover is REFUSED before the preview is stopped or a file is written,
+  with `startOfYearNeedsABackup`, the start of the year's sentence for the
+  same fact. The window's path says so in `detail` and goes on, as #457 set
+  it; the menu's errs toward refusing because it is the most consequential
+  item on the menu. Pinned by
+  `RollOverFromTheMenuSafetyTests.testARolloverWithNoCopyIsRefusedBeforeAnythingChanges`.
+- **The undo entry holds only the half of each marker's move that left the
+  marker's place** (`AssistToolRunner.onlyTheHalvesMovedAway`; the review's
+  I1, measured there and reproduced by
+  `RollOverFromTheMenuSafetyTests.testAnUndoAfterADeployNeverDeletesTheKeptMarker`).
+  With both halves recorded, a deploy between the rollover and Undo Last
+  Change wrote a new marker in the place, Undo left that alone as edited, and
+  DELETED the kept copy because it still matched, so last year's site id and
+  admin address survived only in the backup zip (and the legacy marker in
+  `.merged_output` in no backup at all). Now an undo puts a marker back only
+  where its place is empty and never deletes a kept copy; after an undo with
+  no deploy between, the kept copy stays beside the restored marker, where
+  nothing reads it. The window keeps both halves. #899's journal reverses a
+  move as a PAIR, never the destination half alone.
+- **The website is settled before the preview is rebuilt.** The measured
+  reason is Quit-safety (the implementation review): every write of the
+  menu's rollover follows its last `await`, so a Quit lands before any write
+  or after all of them, where the window's path awaits the rebuild between
+  the re-date and the website. A side effect is that the preview the menu
+  builds no longer bakes last year's address from the marker
+  (`build_site.resolve_section_domain`). The first reason written here, that
+  the legacy marker is read "before a rebuild can touch it", was not measured
+  and is not true of an ordinary rebuild, which does not clear
+  `.merged_output/section<N>/`.
+- **The plan's card says what happens to the website and what is set aside**
+  (amendment 14): for "same" the window's card is the plain re-date's.
+- **Its own sentences** where the window's speak in the first person
+  (`rolloverCouldNotStartANewWebsiteFromTheMenu`, amendment 13) or call a
+  folder a website (`rolloverDeploysToAFolderFromTheMenu`, amendment 12, also
+  for "same" on a course that deploys only to a folder when an old host's
+  marker made the question appear, the review's M2).
+- **The days are written as the re-date's plan writes them**,
+  "2026-09-08 (Tuesday)", so the dates line and the card after it read alike
+  (the review's M3).
+
+**A known limit.** A deploy scheduled from this folder is turned off by "new"
+(as in the window), and Undo Last Change does not set it again: the finished
+sheet says it was turned off and to set it again. Re-registering it is an
+operation #899's journal does not have yet (amendment 15), so it is listed for
+#899 rather than built here.
+
+The trail line is `ran from a menu` with "Section ▸ Roll Over to a New Year…"
+and the website in its counts ("website: new", "website: kept", "website: not
+deployed yet", "website: deploys to a folder", "website: kept, a new one would
+have the same address"), read from what the call sent, so an unanswered
+question can write no count `mustRecord` does not list (the review's M4). The
+tool's own `section kept its website` and `section started a new website`
+lines are the window's, except that from the menu a folder-only course writes
+"kept deploying the section to its folder", the address case says a new one
+would have had the same address, and a section not on a website "was not on a
+website at the moment" rather than "had not been deployed anywhere yet" (M1).
+
+**Left as it is, for Russell to rule** (drafted as follow-ups): a custom
+domain (`custom_domains.sections.section<N>` in `course_config.json`) survives
+"new", as it does from the window, so the new site names last year's address
+(I3); and `PublishedPagesRecord.release` skips a fragment it cannot move
+without a word (M6). Both are the window's behaviour too.
+
+REJECTED: deciding by markers alone (the plan's first version told every
+teacher who deploys to a folder that the section had never been deployed); a
+Change Class Dates… button inside the sheet that comes back to it (one sheet is
+up at a time, and Cancel there would lose the answer, amendment 16); the Course
+menu, rolling every section at once (Russell); folding the window's two
+entries into one too (the window's behaviour is frozen); a default answer (the
+2026-09-08 decision: neither is guessed).
 
 ### The plan as a table (#524)
 
@@ -11268,8 +11587,9 @@ warning, a facts sheet since #834: title `wording.title`, the sentence
 `wording.message`, and rows for the sections, pages and size, the day the
 folder was made (absent when it cannot be read), the name the backup will
 have in Backups (the folder's), and that restoring that backup undoes it
-(plan review M9). Cancel is the default and answers Return and Escape (see
-"Questions as one sentence and labelled facts (#834)"). Composed by
+(plan review M9). No button is the default, so Return does nothing, and
+Cancel answers Escape (see "Return and Escape in this release's questions"
+and "Questions as one sentence and labelled facts (#834)"). Composed by
 `ReferenceReplacer.offer`; presented by the shared
 `ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
@@ -11461,7 +11781,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
+read, asked first (a facts sheet with no default button, #834 and #973). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by
@@ -16215,6 +16535,302 @@ it, and the scheduled-publish path registers a real Task Scheduler task. The
 `windows` issue for this asks for the intent — redirect `AppDataRoot` in the
 test assembly and add a source-scan test — not the Swift mechanism.
 
+## Testing: a test removes the temporary folders it makes (#978)
+
+**What happened.** Every full run of the unit suite left its scratch folders
+in the user temp folder (`getconf DARWIN_USER_TEMP_DIR`). Measured on the
+second Mac on 2026-11-16, `dev` 2c16ed77e, listing that folder immediately
+before and after one full run: **189 new test-made entries, 277.9 MB**. The
+biggest were `WorkspaceInitializationTests` (4 folders, 172 MB: the two
+initialisation tests copy a whole `.toolchain/` in), `CloudSyncedFolderTests`
+(13, 86 MB) and `FixtureWorkspace` copies that eight window classes never
+removed (18, 11 MB); the rest were small and many (`ScheduledDeployTests` 40,
+`cq4t-builds-` 27, `AssistFixture` 20, the configuration round-trip files of
+`CloudflareDeployTests`, `AdditionalDeployTargetsTests` and
+`CourseConfigurationTests`, and trail folders in five classes).
+`ReferenceShelfTests` did remove its folder, but the removal failed silently
+on the files a reference lock had marked `uchg`. The second Mac, with 31 GB
+free, had 660 such folders by then.
+
+**The rule.** A test that makes a folder or file outside its own process
+removes it when the test ends, whether it passed, failed or threw — so not a
+line at the end of the test body, which a failed `XCTUnwrap` skips.
+`Tests/QuartzTeachersTests/TemporaryFolders.swift` is the one place that does
+it:
+
+- `makeTemporaryFolder(prefix:)` makes `<prefix>-<UUID>` and registers its
+  removal; `removeWhenTestEnds(_:)` registers the removal of something else
+  made the folder (`FixtureWorkspace.materialize()`, a `.json` a round-trip
+  test writes). Both are `addTeardownBlock`, which XCTest runs on every
+  outcome.
+- The removal (`TemporaryFolders.unlockAndRemove`) clears the user flags on
+  every entry first, because nothing inside a `uchg` folder, and no `uchg`
+  file, can be deleted. A symbolic link handed in is removed as a link:
+  the entry is examined without following it, so nothing in its target is
+  unlocked or removed (`TemporaryFoldersTests` proves it with a real link
+  to a locked folder).
+- **Whatever points at a folder lets go before the folder goes, by order,
+  never by a delay.** XCTest runs teardown blocks last-registered first,
+  and all of them before the class's own `tearDown`, so a store put back in
+  `tearDown` was put back AFTER its folder had gone, and a late trail line
+  would have made the folder again. `useThrowawayTrail(prefix:)` registers
+  the removal and then the restore of `ActivityTrail.store`, so the restore
+  runs first (`CoverageRefreshInThePageTests`, `DetailTabsLayoutTests`,
+  `RepairChangesTheEditedMarkerTests`, `QuestionKeysTests`). What order
+  cannot close is a writer already past its read of the store:
+  `ActivityTrail.note` reads `ActivityTrail.store` and then appends, so a
+  note in progress on another thread when the store is put back can still
+  append after the removal and make the folder again; so can a launcher
+  still running after the test, handed the path as `PLANTOIR_TRAIL_DIR` by
+  `HelperPrograms.environment`. None of those four classes starts one.
+  `removeWhenTestEndsAfterTheWindowLetsGo(_:)` is for a fixture shown in the
+  app's own window (the nine classes that drive `WorkspaceModel.windowModels`):
+  one block points every window still showing it at the run's resting
+  folder (`plantoir-resting-folder-under-test-<pid>`, a fixture copy made on
+  first need) through `chooseWorkspace(at:)`, so the window lets go the way
+  it does when a teacher opens another folder, and only then removes it.
+  If no resting folder can be made, the fixture is left in place and the
+  test fails saying so, rather than being removed under the window.
+  The tests' own in-body `removeItem` of a fixture still on screen went.
+- `TemporaryFolders.removeWhenThisTestEnds(_:)` is for a static helper with
+  no test case to hand (`AssistFixture.makeRunner`); `TemporaryFolderSweeper`,
+  an `XCTestObservation` registered by the bundle's principal class, removes
+  those when each test finishes.
+- The same sweeper removes, when the bundle finishes, the four folders the
+  APP points at for the whole run while it is a test host —
+  `RealHome.homeWhileTesting`, `BuildOutputLocation.buildsRootWhileTesting`,
+  `ClaudeCodeLauncher.supportDirectoryWhileTesting` and
+  `ProblemReportStore.throwawayFolderURL` — and the resting folder. They are
+  one per run on purpose (a test writing through one door reads back
+  through another), so they can only go after the last test.
+- **No point inside a run comes after the host's last write.** The test host
+  is the app; it keeps running (its tasks, a launcher it started) after
+  `testBundleDidFinish`, the last callback the bundle gets. So the run's
+  folders are removed there, and anything the host makes again afterwards
+  is removed by the NEXT run, when its bundle starts, **by name alone**:
+  every per-run folder ends with its run's `RealHome.testRunIdentifier`,
+  `<pid>-<UUID>` (`plantoir-{home,builds,assist,resting-folder}-under-test-<pid>-<UUID>`
+  and `Plantoir-tests-<pid>-<UUID>`; one UUID per run, made once per
+  process, since #978c). The pid says when the run has finished; the UUID
+  makes the name ONE run's. Before #978c the first four ended in the pid
+  alone, and the third review found what that cost: a new run given a dead
+  run's pid between the sweep's liveness check and its removal could have
+  its fresh folders removed, and a run reusing a dead run's pid wrote into,
+  and inherited, that run's leftover home, builds and assist folders. With
+  the UUID, a later run with the same pid makes different names, which are
+  never in the listing a sweep is working through. The change is in app
+  code (`RealHome`, `BuildOutputLocation`, `ClaudeCodeLauncher`,
+  `ProblemReportStore`), in names read only when the process is a test
+  host or a UI test with no state folder, so a teacher's app never makes
+  one. The
+  sweep lists the temp folder and acts only on an entry whose whole name is
+  one of those shapes with a plain decimal pid above 1 that is not its own
+  process, and only when `kill(pid, 0)` answers `ESRCH`. Any other answer,
+  a live process (a run still going, or an unrelated process holding a
+  reused pid) or one it cannot ask about, leaves the entry; so a gate and
+  another test run going at once under one account each leave the other's
+  folders. The shapes are read from the run's own folder URLs, where the
+  names are made, so the names recognised cannot drift from the names
+  given. Nothing is written to say what a run made and nothing is read back
+  from any file (the run record of the first follow-up was removed after
+  the second review: a record could name another live run's folder, and
+  reading it raced with a new run reusing the pid). The entry is removed
+  without following a link, and the flag-clearing walk inside a folder goes
+  by file descriptor (`Tests/Shared/UserFlagClearing.swift`, shared with the
+  UI target): the folder is opened once with `O_NOFOLLOW | O_DIRECTORY`,
+  each entry is looked at with `fstatat(…, AT_SYMLINK_NOFOLLOW)` relative to
+  it, a subfolder is opened with `openat(…, O_NOFOLLOW | O_DIRECTORY)`, any
+  other entry with `openat(…, O_SYMLINK)` (the link itself), and flags are
+  changed through the descriptor with `fchflags`. No path is resolved
+  twice, so an entry swapped for a link at any moment is refused or opened
+  as the link. (Until #978c the walk listed folders by path: a folder
+  swapped for a link between its check and its listing had the flags of the
+  link's whole target cleared, never removed, by something writing in the
+  user's own temp folder.) Older names the sweep no longer recognises,
+  `Plantoir-tests-<UUID>` without a pid and the pid-only
+  `…-under-test-<pid>` of the first follow-ups, are never swept by it.
+  The bench's `vm-tools/tidy.py` takes only some of them: a
+  `Plantoir-tests-<pid>-<UUID>` folder whose pid has gone, an older
+  `Plantoir-tests-<UUID>` while no Plantoir is running, each over a day
+  old, and its fixed list of `<prefix>-<UUID>` test folders. A pid-only
+  `…-under-test-<pid>` folder is in none of those, so nothing removes it;
+  a person deletes any that are left. So **one run leaves
+  nothing listed anywhere**; what can remain after a run is its own per-run
+  folders, if the host wrote again after the last callback, and the next
+  run on the same Mac removes them.
+- `InAppUserInterfaceTests` writes its six screenshots to a folder of its
+  own, removed when it ends, unless `UITEST_SCREENSHOT_DIR` names one (which
+  is kept). They used to go to the temp folder's root under fixed names;
+  nothing in the repository, its scripts or the bench read them there.
+
+**The UI target (`QuartzTeachersUITests`), since #978c.** It was left out
+of the first pass with no reason written down beyond its being part of no
+gate. What it leaves does not land in the user temp folder, because its
+runner is sandboxed: `FixtureWorkspace` copies and `IsolatedLaunch`'s
+`plantoir-state-` folders go to
+`~/Library/Containers/ca.russellgordon.QuartzTeachersUITests.xctrunner/Data/tmp`,
+which nothing measured. Measured on the main Mac on 2026-11-18, before the
+fix: 717 `cq4t-fixture-<UUID>` and 151 `plantoir-state-<UUID>` entries there
+(1.9 GB, almost all of it the website builder the app copies into each
+fixture, about 68 MB a copy), dated 2026-08-09 to 2026-11-01. Attributed by
+what each fixture holds: 587 plain fixtures from a launch with no working
+folder handed in (`QuartzTeachersUITests.launchApp()`, `UnitWordRowUITests`,
+`StateDirectoryUITests`), 62 with a stub preview (`QuartzTeachersUITests`'
+preview and publish tests), 28 `ContainerIdentifiersUITests`, 19
+`AssistantRolloverUITests`, 16 `NewSiteDialogUITests`, 5
+`TodaysClassOnTheFrontPageUITests`.
+
+`Tests/QuartzTeachersUITests/UITestFolders.swift` now removes them. Every
+UI test makes its fixture through `UITestFolders.makeFixture()` (which calls
+`FixtureWorkspace.materialize()` and registers the copy), and
+`IsolatedLaunch.launch` registers its state folder, the fixture it made when
+none was handed in, and the app it launched. `UITestFolders` is an
+`XCTestObservation`, registered on first use; in `testCaseDidFinish`, after
+the test's `tearDown` has reaped its stub launchers and whatever the
+outcome, it:
+
+1. **quits every app that test launched** (`terminate()` unless already
+   ended) and waits for XCTest to report `.notRunning`. The app is a separate
+   process writing into both folders (its trail, the website builder it
+   mirrors in) until it ends, so the order is the point, not a pause. If any
+   app has not ended within 30 seconds, that test's folders are left and the
+   console says so: never removed under a running app;
+2. **then ends what that app started and `terminate()` left running**
+   (`LaunchProcesses`). `terminate()` skips the app's own quit path, so a
+   `llama-server` an `AssistantRolloverUITests` launch started outlived the
+   app, reparented to `launchd` (seen 2026-11-18: two of them after the
+   class). A process is chosen only when one of its arguments is, or lies
+   inside, a folder this test made (`<runner temp>/plantoir-state-<UUID>`,
+   where `--model` points through the weights' links, or
+   `<runner temp>/cq4t-fixture-<UUID>`, where a stub launcher runs), and only
+   this account's processes, never the runner. Never by program name: a
+   model server of the teacher's own Plantoir names their real home, so it
+   cannot match. The sandboxed runner cannot spawn `ps`, so the list and each
+   process's arguments come from the kernel (`sysctl` `KERN_PROC_UID`,
+   `KERN_PROCARGS2`). `SIGTERM`, a wait until each has gone (a ceiling of 10
+   seconds, not a pause), and `SIGKILL` only for one whose arguments still
+   name the folder;
+3. **then removes that test's folders**, each only if it is still, at that
+   moment, exactly `<runner temp>/cq4t-fixture-<UUID>` or
+   `<runner temp>/plantoir-state-<UUID>` (upper-case UUID, nothing after it)
+   and a real folder by `lstat`, so a symbolic link of that name is left
+   alone. User flags are cleared inside it without following links (a state
+   folder holds links to the real assistant weights,
+   `linkRealAssistantWeights`), and `removeItem` removes a link as a link.
+   Nothing is read back from a file or the environment: the folder
+   `UITEST_WORKSPACE` names is never registered, and a registration with
+   any other name is refused with a failure the day it is written. Last,
+   the launch's preferences folder,
+   `/private/tmp/plantoir-state-preferences-<16 hex>`: the only parent the
+   preferences daemon honours a path suite under, so outside the state
+   folder (see "Testing: the UI target keeps its state in `--state-dir`").
+   Its name is built here by the app's rule (the first 16 hex digits of the
+   SHA-256 of the state folder's path) from the state folder this run made,
+   never read from the note the app leaves; a name that is not exactly that
+   shape directly in `/private/tmp` is refused. The runner's sandbox writes
+   only its container, so the UI target's entitlements
+   (`QuartzTeachersUITests.entitlements`) add a read-write exception for
+   `/private/tmp/`, for this removal alone.
+
+**It never ends a copy of Plantoir it did not launch, and no test skips
+because another Plantoir is open** (Russell, 2026-11-18). XCUITest's
+`launch()` ends a running copy of the bundle it launches; measured on
+2026-11-18 it goes by path, so a copy started from another folder (as
+`/Applications/Plantoir.app` is) stays running and a copy started from the
+build's own `Plantoir.app` would be ended. The second is the teacher's own
+copy whenever the Dock points at the build folder the tests run from (the
+default DerivedData Debug build), or a copy under Xcode's debugger. So
+before each launch `IsolatedLaunch` lists this account's running copies at
+the build's own path (`appUnderTestURL`), and if one is not this run's the
+test FAILS there, before anything is launched, naming the path and pid and
+saying that the run will not end a Plantoir it did not start and that
+whoever opened the copy must close it; the copy is never quit. A copy this
+run launched is recorded by more than its path: after each launch, the one
+running Plantoir whose arguments name that launch's own state folder is
+recorded by its pid AND its start time (`ProcessStamp`, from `sysctl`), so
+a copy opened at the same moment from the same build, or a later process
+given a pid this run used, is never taken for the run's own; a record is
+dropped once its process has ended. **A tripwire guards every other copy
+without resting on that measurement:** immediately before each launch
+`IsolatedLaunch` records every running Plantoir this run did not launch
+(pid, start time and path, wherever it was opened from), and immediately
+after it fails the test, naming the path and pid, if any of them is no
+longer the same process, because the launch ended a Plantoir the run did
+not start. It never skips, quits or relaunches that copy; a copy at another
+path otherwise does not touch these tests (element queries go to the
+launched bundle), so they run beside it. **One skip is left as it was, for
+Russell to rule on:** `StateDirectoryUITests.testALaunchKeepsItsStateInItsOwnFolder`
+skips while any Plantoir of this account is open, because it asserts that
+the teacher's REAL trail, preferences and Application Support did not
+change during the launch, and another copy's own writes to them cannot be
+told apart from a leak without a design change (attributing each write to
+a process). Before #978c the way to run the target was to quit the
+teacher's Plantoir first; an agent must not do that. *Rejected: giving the
+test build its own bundle identifier*: a project change to every Debug
+build, which is also the build the Dock opens. The marketing captures make
+their own `XCUIApplication`, are opt-in and drive the real toolchain, and
+carry no such check.
+
+`UITestFoldersTests` (in the UI target, launches nothing) pins the name
+check, that a link with a removable name is not followed, and that a link
+inside a fixture goes as a link while the locked file it points at stays
+locked; and, since #978c, the preferences folder's shape, that a process is
+matched only by a launch's own folder, and that the runner can read a
+process's arguments at all (a sandbox that refused would leave every model
+server running and every other check green).
+
+**Measured after the fix** (main Mac, 2026-11-18, the container's tmp,
+`/private/tmp` and the user temp folder listed before and after each run).
+On the first commit of the fix: the changed classes with
+`PLANTOIR_UI_TESTS=1` (31 tests, the rollover with real weights included)
+and then the whole target once (49 tests, 25 opt-in skips) each added
+**0 entries** to the container's tmp, but each launch still left a
+`plantoir-state-preferences-` folder in `/private/tmp` (49 by then) and the
+rollover class left two `llama-server`s running, as the base branch `dev`
+e028ded80 does too. On the branch's final head, with the process ending,
+the preferences removal and the launch check above: the changed classes
+(31 tests, 0 skipped) and then the whole target with `PLANTOIR_UI_TESTS=1`
+(52 tests, 18 skipped, every one of them a marketing capture without
+`MARKETING_WORKSPACE`) each added **0 entries** to the container's tmp and
+**0** to `/private/tmp`, and left **no `llama-server`** running
+(`pgrep -x llama-server` empty; the console says how many processes each
+test ended). The user temp folder gained only the system's own entries
+(`BlobRegistryFiles-*`, a `<UUID>` folder of Xcode's, a
+`CFNetworkDownload_*.tmp`). The 49 older preferences folders, from runs
+before this, were left for a person to remove. Two tests in
+`QuartzTeachersUITests` (`testCourseCodeRevealButtonReopensAfterEscape`,
+`testDecliningTheSkeletonPutsTheDefaultFoldersBack`) fail, and fail the
+same way on the base branch's build: #981 and #982.
+
+*Rejected: deleting the
+existing 1.9 GB from the code*: a sweep of whatever is in the folder would
+be a path the code did not build for this run. It is listed for a person to
+remove instead.
+
+*Rejected: a sweep of old `<prefix>-<UUID>` folders by age* (the second Mac's
+`tidy.py` does that today, as a stopgap): it hides a new leak instead of
+naming it, and needs every machine that runs the suite to carry it.
+*Rejected: having the app remove its per-run test folders itself*: app code
+for a test-only concern; the test bundle owns its own mess. *Rejected:
+changing `FixtureWorkspace.materialize()` to register its own removal*: it is
+shared with the UI target, which has no such observer, and the call sites
+that already removed their copy would have removed it twice.
+
+**Keeping it fixed.** The second Mac's `run27.sh` ends every run with a line
+in `result.txt`, `test temp folders left by this run: N, M MB (prefix
+counts)`, from `temp-growth.py`, which counts only names shaped the way the
+suite names its folders. It is a number, never a failure. After the fix, the
+same before-and-after listing on the second Mac (branch head c251102e6, one
+full run, 3,675 tests) found **0 test-made entries, 0 MB**; the only new
+entries were the system's own (`TemporaryDirectory.*`, `BlobRegistryFiles-*`,
+and a `<UUID>-<pid>-…` folder of Xcode's), which the count leaves out.
+Since the #978 follow-ups a run's count is 0 unless its host wrote again
+after the bundle finished; any such folder carries the run's pid and the
+next run removes it.
+
+**Windows.** Nothing to do: it shares no test code, and its xUnit fixtures
+are its own question.
+
 ## Testing: the UI target keeps its state in `--state-dir` (#154)
 
 **Read this first: the launchers the app runs are NOT redirected.** A child
@@ -16313,7 +16929,7 @@ in `IsolatedLaunch.swift` and `MarketingScreenshotTests.swift`.
 | `__CFPREFERENCES_AVOID_DAEMON=1` with it? | The write went nowhere at all. Unusable. |
 | `UserDefaults(suiteName: "/abs/path/<name>")`? | **Works** from a probe process: writes `/abs/path/<name>.plist`, creating the folders; reads back. |
 | …with `<name>` = the app's OWN bundle identifier, inside the app? | **No — it is the real domain.** In the unit host, `…/ca.russellgordon.Plantoir` created no file and `UserDefaults.standard` saw the write (caught by `StateDirectoryTests`, 2026-09-26; the probe key was removed and the real domain checked clean). |
-| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch leaves that small folder behind (`IsolatedLaunch` never deletes it); macOS empties `/private/tmp` at restart, which is all the tidying it needs. The unit test asserts the file appears where the note says and that the standard store never sees the write. |
+| …anywhere else? | **Only under `/private/tmp`.** A probe with the same name under `/private/tmp` wrote the file at the path; under `$TMPDIR` (`/var/folders/…`) or under the home folder — where a UI runner's temp folder is, inside its container — it silently wrote `~/Library/Preferences/<last component>.plist` instead, the REAL preferences folder. (The litter from that probe was deleted.) So a state folder's preferences live in `/private/tmp`, named by a hash of the state folder's path, and the state folder carries a note saying where (`PlantoirDefaults.honouredParent`, `locationNoteName`). Each launch makes that small folder; since #978c `UITestFolders` removes it once the app has quit, building its name by the app's rule from the state folder it made (before that it was left, for macOS to empty `/private/tmp` at restart). The unit test asserts the file appears where the note says and that the standard store never sees the write. |
 | Does a path suite see the argument domain? | Yes: `-assistantAsksBeforeChanging YES` reads, and is not written into the file. |
 | And the global domain? | Yes: `AppleLocale`, `NSQuitAlwaysKeepsWindows`, `AppleInterfaceStyle`. Reading creates no file. |
 | Can the sandboxed UI runner read the real Logs and Preferences? | Its entitlements carry `temporary-exception.files.absolute-path.read-only` for `/`, plus `(allow signal)`. `StateDirectoryUITests` FAILS rather than skips on any read that is refused, so this is re-measured on every run. Measured green on 2026-09-26: every read of the real trail, `runs/`, `scheduled/`, `assist/`, `builds/`, `LaunchAgents` and the real preferences file succeeded. |
@@ -17801,7 +18417,8 @@ this is the app's half.
   `goAheadIsTheDefault`: Share Again takes Return (Russell's choice; it goes
   through `PlanShareRunner.shareAgain`, the bar's own path, the tables first)
   and Later takes Escape. `goAheadIsTheDefault` is false for every other
-  question, which keeps Cancel on Return and Escape.
+  question, where no button is the default, Return does nothing and Cancel
+  takes Escape (#973).
   The bar shows `words.newPasswordNotInUse` while the marker says
   `newPasswordWaiting`, so a relaunch, a failed share or a declined one
   keeps it; `changePasswordNote` stays as the button's tooltip, no longer the

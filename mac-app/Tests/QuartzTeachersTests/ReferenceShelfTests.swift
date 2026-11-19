@@ -41,7 +41,7 @@ final class ReferenceShelfTests: XCTestCase {
             MainActor.assumeIsolated {
                 ActivityTrail.store = previousStore
             }
-            try? FileManager.default.removeItem(at: root)
+            TemporaryFolders.unlockAndRemove(root)
         }
     }
 
@@ -938,11 +938,11 @@ final class ReferenceShelfTests: XCTestCase {
         }
     }
 
-    /// Both of the groups' questions are facts sheets (#834), where Cancel
-    /// is the default and answers Return and Escape; the keys are pressed for
-    /// real in `QuestionKeysTests`. This pins the shape the contract's rule
-    /// names.
-    func testBothQuestionsAreFactsSheetsWithCancelTheDefault() throws {
+    /// Both of the groups' questions are facts sheets (#834), where no
+    /// button is the default and Cancel answers Escape (#973); the keys are
+    /// pressed for real in `QuestionKeysTests`. This pins the shape the
+    /// contract's rule names.
+    func testBothQuestionsAreFactsSheetsWithNoDefaultButton() throws {
         let url: URL = ReferenceShelfTests.repositoryURL()
             .appendingPathComponent("mac-app/QuartzTeachers/Views/Wizard/ReferenceGroupPresenter.swift")
         let text: String = try String(contentsOf: url, encoding: .utf8)
@@ -952,7 +952,7 @@ final class ReferenceShelfTests: XCTestCase {
         let rule: String = try XCTUnwrap(
             (try ReferenceShelfTests.groupRules()["wording"] as? [String: Any])?["rule"] as? String
         )
-        XCTAssertTrue(rule.contains("Cancel is the default and answers Return and Escape"), rule)
+        XCTAssertTrue(rule.contains("No button is the default, so Return does nothing; Cancel answers Escape"), rule)
     }
 
     // MARK: - The three arrival doors, for real (implementation review L5)

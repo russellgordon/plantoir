@@ -24,6 +24,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
+import custom_domains
 import reference_course
 import contracts
 import isolation_headers
@@ -277,29 +278,21 @@ def leg_custom_domain(course_dir: Path, section, leg_type: str) -> str:
     custom domain only once it is attached on Netlify's side, so the address a
     leg is built for is this one when it is set (#799's third review, H1:
     otherwise every rebuild baked the service's own host and the sharing
-    cards, sitemap and feed dropped the teacher's domain)."""
+    cards, sitemap and feed dropped the teacher's domain).
+
+    The rule itself is custom_domains.for_destination, the one Python reader
+    of the key (file-formats.json -> customDomainReading, #904), which
+    build_site.py asks for the primary. This kept its own copy when #799 and
+    #904 were written side by side; at their join the two differed on 4 of 24
+    shapes (the Fable sweep of the deploy-freshness batch), so it asks the
+    shared reader instead of keeping a second body that agrees by accident."""
     try:
         config = json.loads((Path(course_dir) / "course_config.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return ""
     if not isinstance(config, dict):
         return ""
-    custom_domains = config.get("custom_domains")
-    if not isinstance(custom_domains, dict):
-        return ""
-    sections = custom_domains.get("sections")
-    if not isinstance(sections, dict):
-        return ""
-    entry = sections.get(f"section{section}")
-    if isinstance(entry, dict):
-        value = entry.get(leg_type)
-    elif isinstance(entry, str) and (config.get("deploy_target") or "netlify") == leg_type:
-        value = entry
-    else:
-        value = None
-    if not isinstance(value, str):
-        return ""
-    return clean_base_url(value)
+    return clean_base_url(custom_domains.for_destination(config, section, leg_type))
 
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):

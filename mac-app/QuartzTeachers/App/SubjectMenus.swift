@@ -291,6 +291,11 @@ struct SectionMenu: Commands {
 
             Divider()
 
+            // #897 piece B (Russell's ruling): above Get Ready, since the
+            // year's order is the dates and the website, then the drafts.
+            // An ellipsis (a choice and a plan follow); no key; not on the
+            // row's right-click menu, being once a year.
+            item("Roll Over to a New Year…", .rollOverToANewYear, enabled)
             item(StartOfYearWording.menuItem, .getReadyForTheStartOfTheYear, enabled)
             item(StartOfYearWording.undoMenuItem, .undoGettingReady, enabled)
             item(LinksChecklistWording.menuItem, .publishPagesLinksLeadTo, enabled)
@@ -350,7 +355,7 @@ struct SectionMenu: Commands {
             case .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder,
                  .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
                  .addClass,
-                 .reDateClasses, .makeRoomForClasses, .classDates:
+                 .reDateClasses, .makeRoomForClasses, .classDates, .rollOverToANewYear:
                 site?.perform(item)
             default:
                 sidebar?.perform(item)

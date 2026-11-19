@@ -105,7 +105,10 @@ final class FactsQuestionTests: XCTestCase {
         XCTAssertNotNil(text.range(of: ".sheetTitle(question.title, identifier: \"\\(identifier)Title\", explanation: {\n            Text(question.message)"))
         XCTAssertNotNil(text.range(of: "LabeledContent(row.label)"))
         XCTAssertNotNil(text.range(of: ".accessibilityElement(children: .combine)"))
-        XCTAssertNotNil(text.range(of: ".defaultButton(isEnabled: true)"), "Cancel is the default")
+        // The keys themselves are pressed in `QuestionKeysTests` (#973).
+        XCTAssertNotNil(text.range(of: ".keyboardShortcut(.cancelAction)"), "Cancel carries Escape")
+        XCTAssertNil(text.range(of: "Button(\"\")"), "no hidden button (#973)")
+        XCTAssertNil(text.range(of: ".opacity(0)"), "no hidden button (#973)")
         XCTAssertNotNil(text.range(of: ".onExitCommand {\n            cancel()"), "Escape is Cancel")
     }
 

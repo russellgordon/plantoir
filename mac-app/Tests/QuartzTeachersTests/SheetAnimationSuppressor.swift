@@ -121,10 +121,12 @@ final class SheetAnimationSuppressor: NSObject {
     /// Named as the test bundle's `NSPrincipalClass`, which is instantiated
     /// when the bundle loads — before any test class is enumerated. It also
     /// registers the observer that gives the front back after a test leaves
-    /// the host active (`ActivationHandBack`, #633).
+    /// the host active (`ActivationHandBack`, #633), and the one that removes
+    /// the run's temporary folders (`TemporaryFolderSweeper`, #978).
     override init() {
         super.init()
         ActivationHandBack.register()
+        TemporaryFolderSweeper.register()
         SheetAnimationSuppressor.install()
     }
 
