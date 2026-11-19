@@ -477,7 +477,7 @@ class TheBuildStampsItsSite(unittest.TestCase):
         source = (REPOSITORY_ROOT / "scripts" / "build_site.py").read_text(encoding="utf-8")
         start = source.index("    _mark_build_starting(host_output_dir)\n")
         reading = source.index("_this_build_toolchain = toolchain_paths.current_toolchain_id()")
-        reading_the_settings = source.index("with open(config_file, \"r\", encoding=\"utf-8\") as f:", start)
+        reading_the_settings = source.index("BuildSettings.read_from(config_file)", start)  # the one reading, #999
         self.assertLess(start, reading)
         self.assertLess(reading, reading_the_settings, "read after the build began reading the course")
 

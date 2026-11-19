@@ -4505,7 +4505,10 @@ Two more things happen here, fresh on every build:
 Additionally, `course_config.json` itself is copied to
 `<output>/quartz/course_config.json` and the patched Explorer components'
 import paths are pointed at it — the Explorer *reads course configuration at
-site-build time* to know which folders are expandable.
+site-build time* to know which folders are expandable. Since #999 that copy,
+like the one at the output root, is the build's ONE reading of the settings
+(`BuildSettings`), not a fresh copy of the file: [08 → "One build reads the
+settings once (#999)"](08-course-config-reference.md#one-build-reads-the-settings-once-999).
 
 ### The social sharing card opens only Plantoir's own fonts (#766)
 
