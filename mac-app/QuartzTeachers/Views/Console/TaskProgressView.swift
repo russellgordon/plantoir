@@ -96,6 +96,7 @@ struct TaskProgressView: View {
         self.takesTheCancelKeys = takesTheCancelKeys
         self.stopQuestion = stopQuestion
         self.settings = settings
+        self._asking = State(initialValue: StopQuestionAsking(question: stopQuestion, settings: settings))
         self.hidesSiteLink = hidesSiteLink
         self.allLegs = allLegs
         self.onCancel = onCancel
@@ -118,12 +119,12 @@ struct TaskProgressView: View {
     /// Makes Cancel act once per run, however it is pressed (#988 review).
     @State var cancelOnce: CancelOncePerRun = CancelOncePerRun()
 
-    /// Showing the stop question (`stopQuestion`).
-    @State var isAskingToStop: Bool = false
-
-    /// The question's "Don't ask again" box, unticked each time it opens.
-    /// Read only when the teacher chooses to stop (ruling 3).
-    @State var dontAskAgain: Bool = false
+    /// The stop question while it is asked: whether it is showing, and its
+    /// "Don't ask again" box, unticked each time it opens and read only when
+    /// the teacher chooses to stop (ruling 3). A model of its own so what
+    /// each of the question's buttons remembers is tested in every suite
+    /// (`StopQuestionTests`, the fourth #988 review).
+    @State var asking: StopQuestionAsking
 
     /// Whether this panel's window is the key window. A sheet or an alert
     /// in front of it (one of its own questions included) is the key window
@@ -141,10 +142,7 @@ struct TaskProgressView: View {
     /// Cancel, Escape and Command-Period stop the task at once, as a
     /// preview's do.
     var asksBeforeStopping: Bool {
-        if let stopQuestion {
-            return stopQuestion.isAsked(in: settings)
-        }
-        return false
+        return asking.asksBeforeStopping
     }
 
     /// The question the alert shows. Only ever presented when
@@ -179,7 +177,7 @@ struct TaskProgressView: View {
             takesTheCancelKeys: takesTheCancelKeys,
             cancelIsShowing: cancelIsShowing,
             runIsUnderWay: runIsUnderWay,
-            isAskingToStop: isAskingToStop,
+            isAskingToStop: asking.isAsking,
             windowIsKey: controlActiveState == .key,
             textIsBeingEdited: textEditing.isEditingText
         )
@@ -285,23 +283,18 @@ struct TaskProgressView: View {
     /// stayed live, and a held Escape repeating within one frame ran Cancel
     /// three times (#988 review).
     func pressCancel() {
-        if asksBeforeStopping {
-            if runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt) {
-                dontAskAgain = false
-                isAskingToStop = true
-            }
-            return
+        let taskCanStillBeStopped: Bool = runIsUnderWay && !cancelOnce.hasBeenPressed(forRunStartedAt: runner.startedAt)
+        let stopsNow: Bool = asking.pressCancel(taskCanStillBeStopped: taskCanStillBeStopped)
+        if stopsNow {
+            stopTheTask()
         }
-        stopTheTask()
     }
 
     /// The stopping button in the question: a ticked "Don't ask again"
     /// turns this question off (only now, never on Cancel), then the task
     /// stops.
     func chooseStop() {
-        if let stopQuestion, runIsUnderWay {
-            stopQuestion.stopWasChosen(dontAskAgainTicked: dontAskAgain, in: settings)
-        }
+        asking.chooseStop()
         stopTheTask()
     }
 
@@ -412,16 +405,17 @@ struct TaskProgressView: View {
                                 // The other button is Cancel ("Always use 'Cancel' to title a
                                 // button that cancels the alert's action"), with Escape and
                                 // Command-Period.
-                                .alert(questionShown.title, isPresented: $isAskingToStop) {
+                                .alert(questionShown.title, isPresented: $asking.isAsking) {
                                     Button(questionShown.stopButton) {
                                         chooseStop()
                                     }
-                                    .keyboardShortcut(.defaultAction)
+                                    .keyboardShortcut(asking.stopButtonShortcut)
                                     .accessibilityIdentifier(questionShown.stopButtonIdentifier)
                                     // Cancel remembers nothing, the box included (ruling 3).
                                     Button(questionShown.cancelButton, role: .cancel) {
+                                        asking.chooseCancel()
                                     }
-                                    .keyboardShortcut(.cancelAction)
+                                    .keyboardShortcut(asking.cancelButtonShortcut)
                                     .accessibilityIdentifier(questionShown.cancelButtonIdentifier)
                                 } message: {
                                     Text(questionShown.message)
@@ -431,7 +425,7 @@ struct TaskProgressView: View {
                                 // suppression toggle applies to every dialog presented within
                                 // the view it is on (#731), and the panel's other questions are
                                 // presented from the panel as a whole.
-                                .dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $dontAskAgain)
+                                .dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $asking.dontAskAgain)
                             }
                         }
                     } else if let exitCode = runner.lastExitCode {
@@ -660,7 +654,7 @@ struct TaskProgressView: View {
             // A deploy that ends while its question is open has nothing
             // left to stop: the question goes.
             if !runIsUnderWay {
-                isAskingToStop = false
+                asking.taskEnded()
             }
         }
         .onChange(of: runner.isAwaitingInput) {

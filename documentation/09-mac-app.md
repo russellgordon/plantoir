@@ -1228,7 +1228,7 @@ applies to every dialog presented within the view it is on, so it appeared on
 this alert too (#731, found driving this piece) — ticking it silently turned
 the add-ons offer off. The offer is now presented from a view of its own
 behind the content (`ObsidianAddOnsOfferDialog.offerHost`), and
-`testOnlyTheAddOnsOfferCarriesASuppressionToggle` holds that there is one
+`testEachSuppressionToggleIsTheAddOnsOffersOrTheStopQuestions` holds that there is one
 toggle for it in the app's views, there (the only other is the stop
 questions' box on the progress panel's Cancel, #988). Every answer is remembered by alert key in
 `~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
@@ -1766,8 +1766,10 @@ key and Command-Period." They are the grouped form's switches, as the
 Obsidian and Assistant panes draw theirs (Toggles: "Within a grouped form,
 consider using a mini switch"; "In general, don't replace a checkbox with a
 switch"). Each change, from the box or the pane, writes one
-`stop question setting changed` line (`appliesOn: mac` in the contract until
-Windows has the questions). Rejected: one setting for both (above), and
+`stop question setting changed` line. Windows owes it with the questions
+([#1009](https://github.com/russellgordon/plantoir/issues/1009)) and holds it
+in `NamedGapLedger` until then; never `appliesOn`, which is for a permanent
+difference (`contracts/README.md` → "Named gaps"). Rejected: one setting for both (above), and
 Xcode's "Reset all questions" button, which says nothing about which
 question it brings back.
 
@@ -1803,7 +1805,10 @@ Escape and Command-Period stop that task at once; and a share still asks
 with the deploy's question off, Return choosing Stop Share. They take the front from
 the person at the Mac, so they are **opt-in**: `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`
 on the `xcodebuild` line, on a Mac nobody is using; without it they skip and
-say so, and the rule and source tests run. Bringing the host forward goes
+say so, and the rule and source tests run. The merge gate on the main Mac
+runs them after the suite (`vm-tools/gate-here.sh`, a `keys:` line that is
+RED on any failure), except while the person is at that Mac's keyboard,
+when the line reads `keys: SKIPPED, screen in use`. Bringing the host forward goes
 through Launch Services when macOS refuses `activate` (cooperative
 activation, no accessibility grant), which makes the accessory host a
 regular app; `tearDown` makes it an accessory again
@@ -1811,7 +1816,9 @@ regular app; `tearDown` makes it an accessory again
 active app with that window key (a locked screen, #315), those tests skip and
 say so. With Keyboard Navigation on, AppKit puts the focus in the Filter
 box when the window becomes key, so the box owns Escape until the teacher
-clicks elsewhere; the tests start with focus in no box. Measured on the main Mac with Keyboard Navigation on and off
+clicks elsewhere; the tests start with focus in no box, and
+`testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst` records that case
+as it is (skipped with Keyboard Navigation off). Measured on the main Mac with Keyboard Navigation on and off
 (`AppleKeyboardUIMode` 3 and unset), the same results. Source checks: the key
 is on the visible Cancel, and nothing in `Views/Console` is a representable
 or a responder. Only the rule's own test
@@ -1819,7 +1826,14 @@ or a responder. Only the rule's own test
 typing condition is taken out; the pressed-key test passes either way, as
 above.
 
-`StopQuestionTests` (in every suite) holds the rest without a key: both on by
+`StopQuestionTests` (in every suite) holds the rest without a key. The
+question's open state and its box are a small `@Observable` model,
+`StopQuestionAsking`, whose `chooseStop()` and `chooseCancel()` the alert's
+buttons call (the fourth review: before it, Cancel-remembers-nothing was
+held only by a source check). Its tests: ticked then Cancel leaves the
+setting on, writes nothing and opens unticked next time; ticked then Stop
+turns off that question only; with a question off Cancel stops at once;
+Return's key is the stopping button's. Also: both on by
 default, the tick counts only with the stop, each setting silences only its
 own question, the Settings rows turn each back on and write their line, the
 answers are remembered apart, Stopping is the pane's first section, and the
@@ -1833,8 +1847,8 @@ Cancel on Escape, a "Don't ask again" box that counts only with the stop,
 one setting per question, and both turned back on in the Deploying part of
 Settings. The words are Mac-only (`DeployStopWording`, `ShareStopWording`,
 `StopQuestionSettingsWording`), not yet in `contracts/`; the trail event
-`stop question setting changed` is in `activityTrail.mustRecord` with
-`appliesOn: mac`.
+`stop question setting changed` is in `activityTrail.mustRecord`, held on
+Windows by `NamedGapLedger` against #1009.
 
 ## Red and orange: the colours of a problem, measured (#994)
 

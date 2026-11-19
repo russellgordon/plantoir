@@ -1166,10 +1166,9 @@
       },
       {
         "event": "stop question setting changed",
-        "appliesOn": ["mac"],
         "carries": "which question (\"Ask before stopping a deploy\" or \"Ask before stopping a share of unit plans\"), on or off, and where: the question's own Don't ask again box, ticked with Stop Deploy or Stop Share (Cancel remembers nothing and writes nothing), or Settings > Deploying > Stopping. One line per change; opening the pane writes nothing.",
         "line": "Ask before stopping a deploy off, from Don't ask again in “Stop the deploy?”",
-        "why": "#988. While a question is off, Cancel, Escape and Command-Period stop that task at once, so \"Escape stopped my deploy without asking\" is answered by when, and where, the question was turned off. Mac only until the Windows app gains the questions (#979 stage 3)."
+        "why": "#988. While a question is off, Cancel, Escape and Command-Period stop that task at once, so \"Escape stopped my deploy without asking\" is answered by when, and where, the question was turned off. Windows owes it with the questions themselves (#1009), held there in NamedGapLedger until then."
       },
       {
         "event": "asked to close Obsidian to open a course",

@@ -37,7 +37,8 @@ import XCTest
 /// `TEST_RUNNER_PLANTOIR_KEY_TESTS=1`): bringing the host forward takes the
 /// front from the person at the Mac, and a key they type meanwhile goes to
 /// the test host. Without it the pressed-key tests skip, saying so, and the
-/// rule and source tests below still run.
+/// rule and source tests below still run. The merge gate runs them after the
+/// suite (`vm-tools/gate-here.sh`), unless the screen is in use.
 ///
 /// Measured failing before #988: the panel's Cancel carried no key, so both
 /// keys reached nothing.
@@ -223,7 +224,7 @@ final class ProgressCancelKeysTests: XCTestCase {
     /// The window, built as the app builds its own (a hosting controller as
     /// content), made the key window of the active app, with the panel
     /// appearing after it is up. Skips when the host cannot take the front.
-    func keyWindow(ledger: Ledger, runner: ScriptRunner, takesTheCancelKeys: Bool = true, stopQuestion: StopQuestion? = nil) throws -> NSWindow {
+    func keyWindow(ledger: Ledger, runner: ScriptRunner, takesTheCancelKeys: Bool = true, stopQuestion: StopQuestion? = nil, keepsAppKitsFocus: Bool = false) throws -> NSWindow {
         let window: NSWindow = NSWindow(
             contentRect: NSRect(x: -7000, y: -7000, width: 900, height: 500),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -276,10 +277,17 @@ final class ProgressCancelKeysTests: XCTestCase {
         // focus when the window becomes key (measured on the main Mac):
         // the box then owns Escape, as it should. These tests start with
         // focus in no box, as after a click on the panel; the box's own
-        // case is `testEscapeInATextFieldIsTheFields`.
-        _ = window.makeFirstResponder(nil)
-        settle(0.3)
+        // cases are `testEscapeInATextFieldIsTheFields` and
+        // `testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst`.
+        if !keepsAppKitsFocus {
+            _ = window.makeFirstResponder(nil)
+            if !runUntil(timeout: 3, { !KeyWindowTextEditing.shared.isEditingText }) {
+                XCTFail("focus left the Filter box but the watch still read it as being edited")
+            }
+        }
         ledger.showsPanel = true
+        // The panel's SwiftUI Cancel is not an AppKit view a test can wait
+        // for, so this one wait stays timed.
         settle(0.7)
         return window
     }
@@ -397,8 +405,15 @@ final class ProgressCancelKeysTests: XCTestCase {
         let contentView: NSView = try XCTUnwrap(window.contentView)
         let field: NSTextField = try XCTUnwrap(findTextField(in: contentView), "the Filter field")
         XCTAssertTrue(window.makeFirstResponder(field), "the field took focus")
-        settle(0.4)
-        XCTAssertTrue(window.firstResponder is NSText, "the field is being edited")
+        XCTAssertTrue(runUntil(timeout: 3) { window.firstResponder is NSText }, "the field is being edited")
+        // The watch follows the KEY window, and reads false while none is
+        // (run c4, 2026-11-19: another app took the front here, so the
+        // window resigned key and the watch, rightly, saw no editing). A
+        // window that is no longer key proves nothing about the keys.
+        _ = runUntil(timeout: 3) { KeyWindowTextEditing.shared.isEditingText || !window.isKeyWindow }
+        if !window.isKeyWindow {
+            throw XCTSkip("Another app took the front while the field took focus (#846), so the window was no longer key.")
+        }
         XCTAssertTrue(KeyWindowTextEditing.shared.isEditingText, "the watch saw the field being edited")
         try press(.escape)
         settle(0.7)
@@ -410,10 +425,36 @@ final class ProgressCancelKeysTests: XCTestCase {
         XCTAssertEqual(ledger.cancelCount, 0, "Command-Period in the field stopped the running task")
         // Focus leaves the field: the key is Cancel's again.
         _ = window.makeFirstResponder(nil)
-        settle(0.4)
-        XCTAssertFalse(KeyWindowTextEditing.shared.isEditingText, "the watch saw the editing end")
+        XCTAssertTrue(runUntil(timeout: 3) { !KeyWindowTextEditing.shared.isEditingText }, "the watch saw the editing end")
+        settle(0.3)
         try press(.escape)
         XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "Escape stops the task again once no box is being typed in")
+    }
+
+    /// What happens today with Keyboard Navigation on and no click yet
+    /// (the fourth #988 review): AppKit gives the window's first text box
+    /// the focus when the window becomes key (the app's own sidebar Filter
+    /// field, `SidebarView`), so Escape is the box's and the running task
+    /// keeps running until the teacher clicks somewhere else. This records
+    /// the behaviour; whether it should change is Russell's question.
+    func testWithKeyboardNavigationOnTheFilterFieldHasEscapeFirst() throws {
+        if !NSApp.isFullKeyboardAccessEnabled {
+            throw XCTSkip("Keyboard Navigation is off (System Settings > Keyboard), so AppKit gives no box the focus when the window becomes key.")
+        }
+        let ledger: Ledger = Ledger()
+        let runner: ScriptRunner = runningRunner()
+        let window: NSWindow = try keyWindow(ledger: ledger, runner: runner, keepsAppKitsFocus: true)
+        XCTAssertTrue(window.firstResponder is NSText, "with Keyboard Navigation on, the Filter box has the focus once the window is key")
+        XCTAssertTrue(runUntil(timeout: 3) { KeyWindowTextEditing.shared.isEditingText }, "the watch reads the box as being typed in")
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.fieldEscapeCount == 1 }, "Escape went to the box")
+        settle(0.3)
+        XCTAssertEqual(ledger.cancelCount, 0, "Escape did not stop the task while the box had the focus")
+        // A click elsewhere (focus in no box) gives the key back to Cancel.
+        _ = window.makeFirstResponder(nil)
+        XCTAssertTrue(runUntil(timeout: 3) { !KeyWindowTextEditing.shared.isEditingText })
+        try press(.escape)
+        XCTAssertTrue(runUntil(timeout: 3) { ledger.cancelCount == 1 }, "after the click, Escape stops the task")
     }
 
     /// A sheet in front: Escape is the sheet's, and a sheet that has no use
@@ -448,10 +489,10 @@ final class ProgressCancelKeysTests: XCTestCase {
         for key in [Key.escape, Key.commandPeriod] {
             ledger.showsAlert = true
             XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet?.isKeyWindow == true }, "the alert is in front")
-            settle(0.5)
+            XCTAssertTrue(runUntil(timeout: 3) { alertButtons(in: window)["Cancel"] != nil }, "the alert's Cancel is drawn")
             try press(key)
             XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet == nil }, "\(key) closed the alert")
-            settle(0.5)
+            XCTAssertTrue(runUntil(timeout: 3) { window.isKeyWindow }, "the window is key again")
         }
         XCTAssertEqual(ledger.alertCancelCount, 2, "the alert's Cancel took both keys")
         XCTAssertEqual(ledger.cancelCount, 0, "a key in an alert stopped the task behind it")
@@ -717,8 +758,14 @@ final class ProgressCancelKeysTests: XCTestCase {
         guard let window = WorkspaceModel.windowModels.first?.window else {
             throw XCTSkip("No app window is registered in this run")
         }
-        let controller: String = window.contentViewController.map { (shown: NSViewController) -> String in String(describing: type(of: shown)) } ?? "none"
-        let content: String = window.contentView.map { (shown: NSView) -> String in String(describing: type(of: shown)) } ?? "none"
+        var controller: String = "none"
+        if let shownController = window.contentViewController {
+            controller = String(describing: type(of: shownController))
+        }
+        var content: String = "none"
+        if let shownContent = window.contentView {
+            content = String(describing: type(of: shownContent))
+        }
         print("PROGRESS-CANCEL-KEYS app window: controller=\(controller.prefix(80)) content=\(content.prefix(80))")
         print("PROGRESS-CANCEL-KEYS Keyboard Navigation on: \(NSApp.isFullKeyboardAccessEnabled)")
         XCTAssertNotNil(window.contentViewController, "the app's window has a content view controller")

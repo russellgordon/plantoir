@@ -395,7 +395,7 @@ final class SectionProblemsTests: XCTestCase {
     /// There is ONE suppression toggle for it in the app's views, inside the
     /// offer's own host, and none in the section's view (the stop questions'
     /// box, #988, is the only other).
-    func testOnlyTheAddOnsOfferCarriesASuppressionToggle() throws {
+    func testEachSuppressionToggleIsTheAddOnsOffersOrTheStopQuestions() throws {
         let main: String = try readSource("QuartzTeachers/Views/MainWindowView.swift")
         let offer: String = try body(of: "private struct ObsidianAddOnsOfferDialog: ViewModifier {", in: main)
         let host: String = try body(of: "private var offerHost: some View {", in: offer)

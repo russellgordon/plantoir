@@ -56,22 +56,121 @@ final class StopQuestionTests: XCTestCase {
         XCTAssertTrue(trailText().contains(StopQuestion.trailLine(for: .deploy, asked: false, from: .dontAskAgain)), trailText())
     }
 
-    /// Cancel never reaches the setting: the panel's Cancel in the question
-    /// has an empty action, and only the stopping button reads the box.
-    func testCancelInTheQuestionRemembersNothing() throws {
+    /// The question's buttons call the model, and the box is the model's:
+    /// what each button remembers is then what the `StopQuestionAsking`
+    /// tests below prove.
+    func testTheQuestionsButtonsAndBoxAreTheModels() throws {
         let source: String = try String(contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Console/TaskProgressView.swift"), encoding: .utf8)
         let code: String = TextFieldStyleScanTests.codeWithoutComments(source)
         XCTAssertTrue(code.contains("Button(questionShown.stopButton) {\n                                        chooseStop()"), "the stopping button reads the box")
-        XCTAssertTrue(code.contains("Button(questionShown.cancelButton, role: .cancel) {\n                                    }"), "the question's Cancel does nothing")
-        XCTAssertEqual(code.components(separatedBy: "stopWasChosen(").count - 1, 1, "one place remembers the box: chooseStop")
+        XCTAssertTrue(code.contains("func chooseStop() {\n        asking.chooseStop()\n        stopTheTask()"), "Stop: the model, then the stop")
+        XCTAssertTrue(code.contains("Button(questionShown.cancelButton, role: .cancel) {\n                                        asking.chooseCancel()\n                                    }"), "the question's Cancel is the model's")
+        XCTAssertTrue(code.contains(".keyboardShortcut(asking.stopButtonShortcut)"), "the stopping button's key is the model's")
+        XCTAssertTrue(code.contains(".keyboardShortcut(asking.cancelButtonShortcut)"), "the question's Cancel's key is the model's")
+        XCTAssertTrue(code.contains("isPresented: $asking.isAsking"), "the question shows while the model asks")
+        XCTAssertEqual(code.components(separatedBy: "stopWasChosen(").count - 1, 0, "only the model remembers the box")
         // The Cancel button's modifiers run from its identifier to the end
         // of the `if cancelIsShowing` block: the question and its box are
         // both there, so the box is on the button and nowhere wider.
         let afterTheCancel: String = try XCTUnwrap(code.components(separatedBy: ".accessibilityIdentifier(\"taskCancelButton\")").dropFirst().first)
         let buttonChain: String = try XCTUnwrap(afterTheCancel.components(separatedBy: "} else if let exitCode = runner.lastExitCode").first)
-        let onTheCancel: Bool = buttonChain.contains(".alert(questionShown.title") && buttonChain.contains(".dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $dontAskAgain)")
+        let onTheCancel: Bool = buttonChain.contains(".alert(questionShown.title") && buttonChain.contains(".dialogSuppressionToggle(StopQuestionSettingsWording.dontAskAgain, isSuppressed: $asking.dontAskAgain)")
         XCTAssertEqual(code.components(separatedBy: ".dialogSuppressionToggle(").count - 1, 1, "one box in the panel")
         XCTAssertTrue(onTheCancel, "the box is on the panel's Cancel, so it reaches only the stop question (#731)")
+    }
+
+    // MARK: - Tests: the question while it is asked (StopQuestionAsking)
+
+    /// Ticked, then Cancel: the setting stays on, nothing is written to the
+    /// trail, nothing stops, and the box starts unticked when the question
+    /// opens again.
+    func testTickedThenCancelRemembersNothing() throws {
+        let settings: AppSettings = try freshSettings()
+        let asking: StopQuestionAsking = StopQuestionAsking(question: .deploy, settings: settings)
+        XCTAssertFalse(asking.pressCancel(taskCanStillBeStopped: true), "the deploy asks first and does not stop yet")
+        XCTAssertTrue(asking.isAsking)
+        XCTAssertFalse(asking.dontAskAgain, "the box starts unticked")
+        asking.dontAskAgain = true
+        asking.chooseCancel()
+        XCTAssertFalse(asking.isAsking, "Cancel closed the question")
+        XCTAssertTrue(settings.asksBeforeStoppingADeploy, "the tick with Cancel was not remembered")
+        XCTAssertTrue(settings.asksBeforeStoppingAShare)
+        XCTAssertFalse(trailText().contains("Ask before stopping"), "Cancel wrote nothing: \(trailText())")
+        XCTAssertFalse(asking.pressCancel(taskCanStillBeStopped: true), "the next press asks again")
+        XCTAssertTrue(asking.isAsking)
+        XCTAssertFalse(asking.dontAskAgain, "the box is unticked again")
+    }
+
+    /// Ticked, then Stop: that question is off, the other is still on, and
+    /// one trail line says where it was turned off.
+    func testTickedThenStopTurnsOffThatQuestionOnly() throws {
+        for question in [StopQuestion.deploy, StopQuestion.share] {
+            let settings: AppSettings = try freshSettings()
+            StopQuestion.deploy.setAsked(true, in: settings, from: .settings)
+            StopQuestion.share.setAsked(true, in: settings, from: .settings)
+            let trailBefore: String = trailText()
+            let asking: StopQuestionAsking = StopQuestionAsking(question: question, settings: settings)
+            XCTAssertFalse(asking.pressCancel(taskCanStillBeStopped: true))
+            asking.dontAskAgain = true
+            asking.chooseStop()
+            XCTAssertFalse(asking.isAsking)
+            XCTAssertFalse(question.isAsked(in: settings), "\(question): the tick with Stop turned it off")
+            let other: StopQuestion = question == .deploy ? StopQuestion.share : StopQuestion.deploy
+            XCTAssertTrue(other.isAsked(in: settings), "\(question): the other question is still asked")
+            let written: String = String(trailText().dropFirst(trailBefore.count))
+            XCTAssertTrue(written.contains(StopQuestion.trailLine(for: question, asked: false, from: .dontAskAgain)), written)
+            XCTAssertFalse(written.contains(StopQuestion.trailLine(for: other, asked: false, from: .dontAskAgain)), written)
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        }
+    }
+
+    /// Unticked, then Stop: nothing is remembered.
+    func testUntickedThenStopChangesNothing() throws {
+        let settings: AppSettings = try freshSettings()
+        let asking: StopQuestionAsking = StopQuestionAsking(question: .share, settings: settings)
+        XCTAssertFalse(asking.pressCancel(taskCanStillBeStopped: true))
+        asking.chooseStop()
+        XCTAssertTrue(settings.asksBeforeStoppingAShare)
+        XCTAssertFalse(trailText().contains("Ask before stopping"), trailText())
+    }
+
+    /// With a question off, Cancel stops at once and nothing is asked; a
+    /// preview, with no question, the same.
+    func testWithTheQuestionOffTheStopHappensAtOnce() throws {
+        let settings: AppSettings = try freshSettings()
+        StopQuestion.deploy.setAsked(false, in: settings, from: .settings)
+        let deploy: StopQuestionAsking = StopQuestionAsking(question: .deploy, settings: settings)
+        XCTAssertTrue(deploy.pressCancel(taskCanStillBeStopped: true), "the deploy stops at once")
+        XCTAssertFalse(deploy.isAsking, "nothing was asked")
+        let share: StopQuestionAsking = StopQuestionAsking(question: .share, settings: settings)
+        XCTAssertFalse(share.pressCancel(taskCanStillBeStopped: true), "the share's question is still on")
+        XCTAssertTrue(share.isAsking)
+        let preview: StopQuestionAsking = StopQuestionAsking(question: nil, settings: settings)
+        XCTAssertTrue(preview.pressCancel(taskCanStillBeStopped: true), "a preview stops at once")
+        XCTAssertFalse(preview.isAsking)
+    }
+
+    /// A task that can no longer be stopped (already stopped, or ended)
+    /// opens no question; one that ends while it is open closes it.
+    func testNoQuestionForATaskThatCannotStop() throws {
+        let settings: AppSettings = try freshSettings()
+        let asking: StopQuestionAsking = StopQuestionAsking(question: .deploy, settings: settings)
+        XCTAssertFalse(asking.pressCancel(taskCanStillBeStopped: false))
+        XCTAssertFalse(asking.isAsking, "nothing to stop, nothing asked")
+        XCTAssertFalse(asking.pressCancel(taskCanStillBeStopped: true))
+        asking.taskEnded()
+        XCTAssertFalse(asking.isAsking, "the question went when the task ended")
+        XCTAssertTrue(settings.asksBeforeStoppingADeploy)
+    }
+
+    /// Return is the stopping button's, the default; Escape and
+    /// Command-Period are Cancel's.
+    func testReturnsDefaultIsStop() throws {
+        let asking: StopQuestionAsking = StopQuestionAsking(question: .deploy, settings: try freshSettings())
+        XCTAssertEqual(asking.stopButtonShortcut, KeyboardShortcut.defaultAction)
+        XCTAssertEqual(asking.stopButtonShortcut.key, KeyEquivalent.return)
+        XCTAssertEqual(asking.cancelButtonShortcut, KeyboardShortcut.cancelAction)
+        XCTAssertEqual(asking.cancelButtonShortcut.key, KeyEquivalent.escape)
     }
 
     /// Each setting silences only its own question.
