@@ -205,14 +205,9 @@ final class StartOfYearPlanTableTests: XCTestCase {
         // is enough for Go to have started. Its first step, before anything
         // it awaits, leaves the ready stage (`goAhead` sets `.working`), so
         // a Return that had reached Go would have been seen above.
-        var goButton: NSButton?
-        for view in StartOfYearPlanTableTests.allViews(in: host.window.contentView) {
-            if let button = view as? NSButton, button.title == StartOfYearWording.goButton {
-                goButton = button
-            }
-        }
-        let go: NSButton = try XCTUnwrap(goButton, "no Put These into Draft button")
-        go.performClick(nil)
+        // Pressed through its accessibility action, as a click would (the
+        // SwiftUI button is not found as an `NSButton` by its title here).
+        XCTAssertTrue(AccessibilityInspector.press(identifier: "startOfYearGo"), "Put These into Draft could not be pressed")
         await StartOfYearPlanTableTests.runWhatTheKeyStarted(in: host)
         if case .ready = model.stage {
             XCTFail("a click on Go had not started it after the settling the Return checks rely on")
