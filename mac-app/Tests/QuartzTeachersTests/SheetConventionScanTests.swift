@@ -160,8 +160,11 @@ final class SheetConventionScanTests: XCTestCase {
                 continue
             }
             // `.keyboardShortcut(.cancelAction)`, or the same key taken off
-            // while a picker field's list is open (Copy a Page, the wizard).
-            if !button.chain.contains(".keyboardShortcut(") || !button.chain.contains(".cancelAction)") {
+            // while a picker field's list is open (Copy a Page, the wizard)
+            // or while a course is being made (the wizard, Russell's ruling
+            // on #987): `? .cancelAction : nil`.
+            let bound: Bool = button.chain.contains(".cancelAction)") || button.chain.contains("? .cancelAction : nil)")
+            if !button.chain.contains(".keyboardShortcut(") || !bound {
                 problems.append(button.location + " is a Cancel with no .keyboardShortcut(.cancelAction)")
             }
         }
@@ -227,7 +230,17 @@ final class SheetConventionScanTests: XCTestCase {
             }
         }
         XCTAssertEqual(createChains.count, 1, "Create Course")
-        XCTAssertTrue(createChains.first?.contains("isTheDefault: formIsComplete") == true, "Create Course is the default once the form is complete (D32): \(createChains)")
+        XCTAssertTrue(createChains.first?.contains("isTheDefault: NewCourseWizardView.createCourseIsTheDefault(") == true, "Create Course is the default once the form is complete (D32): \(createChains)")
+        XCTAssertTrue(createChains.first?.contains("formIsComplete: formIsComplete") == true, "Create Course waits for the form (D32): \(createChains)")
+        XCTAssertTrue(createChains.first?.contains("suggestionsAreShown: courseCodeSuggestionsAreShown") == true, "Create Course gives Return up to the course-code list (#987 review): \(createChains)")
+        var cancelChains: [String] = []
+        for button in SheetConventionScanTests.chains(of: "Button(", in: wizard, file: "NewCourseWizardView.swift") {
+            if button.chain.contains("\"wizardCloseButton\"") {
+                cancelChains.append(button.chain)
+            }
+        }
+        XCTAssertEqual(cancelChains.count, 1, "the wizard's Cancel")
+        XCTAssertTrue(cancelChains.first?.contains(".keyboardShortcut(escapeIsCancelNow ? .cancelAction : nil)") == true, "the wizard's Cancel follows cancelAnswersEscape: \(cancelChains)")
         XCTAssertFalse(createChains.first?.contains(".prominentButton(") == true, "Create Course no longer looks like the default without being one (D32)")
     }
 

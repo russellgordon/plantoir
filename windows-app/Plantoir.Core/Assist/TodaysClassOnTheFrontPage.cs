@@ -41,7 +41,8 @@ public static class TodaysClassOnTheFrontPage
     public static string Because(ClassNoun noun, string shown) =>
         $"Today’s {Noun(noun)} is published, but the front page still shows {shown}.";
     public const string Show = "Show on Front Page";
-    public const string NotToday = "Not Today";
+    /// <summary>The decline: "Not Now" on an offer Plantoir raised by itself (#987; it was "Not Today"). The key keeps its name.</summary>
+    public const string NotToday = "Not Now";
     public const string NotChangedTitle = "The Front Page Was Not Changed";
     public static string NoLongerOffered(ClassNoun noun) =>
         $"The front page or today’s {Noun(noun)} changed while you were deciding, so it was left as it is.";

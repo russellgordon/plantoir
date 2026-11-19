@@ -355,6 +355,37 @@ struct NewCourseWizardView: View {
         return workspace.workspaceURL != nil
     }
 
+    /// Whether Create Course takes Return (#987): once the form is complete
+    /// (D32), and not while the course-code list is shown, where Return
+    /// chooses the highlighted code (the #987 review). A default button's
+    /// key equivalent is offered the press before the focused field's
+    /// `onKeyPress`, so with both, Return created the course instead.
+    static func createCourseIsTheDefault(formIsComplete: Bool, suggestionsAreShown: Bool) -> Bool {
+        if suggestionsAreShown {
+            return false
+        }
+        return formIsComplete
+    }
+
+    /// Whether the Cancel button answers Escape and Command-Period (#987):
+    /// not while the course-code list is shown (the field's Escape puts it
+    /// away first), and not while the course is being made (Russell,
+    /// 2026-11-18: Escape does nothing then, as before #987).
+    static func cancelAnswersEscape(suggestionsAreShown: Bool, isCreating: Bool) -> Bool {
+        if suggestionsAreShown || isCreating {
+            return false
+        }
+        return true
+    }
+
+    /// `cancelAnswersEscape` for the sheet as it stands.
+    var escapeIsCancelNow: Bool {
+        return NewCourseWizardView.cancelAnswersEscape(
+            suggestionsAreShown: courseCodeSuggestionsAreShown,
+            isCreating: creator.isCreating
+        )
+    }
+
     /// The problem with the code as typed, live.
     ///
     /// Shown under the field AND checked again at Create, so the explanation
@@ -978,10 +1009,16 @@ struct NewCourseWizardView: View {
                 // is always bottom-right, per macOS convention.
                 if !hasStarted || creator.isCreating {
                     // Escape and Command-Period, the same way as every
-                    // Cancel since #987 — except while the course-code list
-                    // is open, when the first Escape is the field's, to put
-                    // the list away (`PickerEscape`): a key equivalent on
-                    // the button would be offered the press first.
+                    // Cancel since #987, until Create Course is pressed —
+                    // except while the course-code list is open, when the
+                    // first Escape is the field's, to put the list away
+                    // (`PickerEscape`): a key equivalent on the button would
+                    // be offered the press first. While the course is being
+                    // made Escape does nothing, as before #987 (Russell,
+                    // 2026-11-18): the button still stops it when clicked,
+                    // but a stray Escape must not end a course part way.
+                    // Once it has finished, Escape closes the sheet again
+                    // (`interactiveDismissDisabled` lifts).
                     Button("Cancel", role: .cancel) {
                         if creator.isCreating {
                             creator.cancel()
@@ -989,7 +1026,7 @@ struct NewCourseWizardView: View {
                         workspace.reloadCourses()
                         dismiss()
                     }
-                    .keyboardShortcut(courseCodeSuggestionsAreShown ? nil : .cancelAction)
+                    .keyboardShortcut(escapeIsCancelNow ? .cancelAction : nil)
                     .accessibilityIdentifier("wizardCloseButton")
                 }
 
@@ -1033,7 +1070,19 @@ struct NewCourseWizardView: View {
                     // by the code with its name empty (#457, the HIG sweep's
                     // review, measured 2026-10-08). The accent comes off
                     // while it is not the default or cannot be pressed.
-                    .defaultButton(isEnabled: !workspace.folderIsGettingReady, isTheDefault: formIsComplete)
+                    // And not while the course-code list is shown (#987
+                    // review): a default button's Return is offered to the
+                    // window before the field's `onKeyPress`, so it would
+                    // create the course where the teacher meant to choose
+                    // the highlighted code (measured,
+                    // `QuestionKeysTests.testReturnInTheCodeFieldChoosesTheSuggestion`).
+                    .defaultButton(
+                        isEnabled: !workspace.folderIsGettingReady,
+                        isTheDefault: NewCourseWizardView.createCourseIsTheDefault(
+                            formIsComplete: formIsComplete,
+                            suggestionsAreShown: courseCodeSuggestionsAreShown
+                        )
+                    )
                     .help(workspace.folderReadinessReason ?? "")
                     .accessibilityIdentifier("createCourseButton")
                 } else {
@@ -1704,9 +1753,11 @@ struct NewCourseWizardView: View {
 
     /// Return pressed in the field: takes the highlighted row if the
     /// teacher has walked to one. Returns false otherwise, so Return
-    /// goes on to the sheet — which has no default button, so it does
-    /// nothing there (#457, the HIG sweep's review: as the default,
-    /// Create Course was pressed with the form unread).
+    /// goes on to the sheet, whose Create Course takes it only once the
+    /// form is complete and the list is away (#987,
+    /// `createCourseIsTheDefault`; #457, the HIG sweep's review: as the
+    /// default from the start, Create Course was pressed with the form
+    /// unread).
     func commitCourseCodeHighlight() -> Bool {
         guard courseCodeSuggestionsAreShown, let entry = highlightedCourseCodeEntry else {
             return false

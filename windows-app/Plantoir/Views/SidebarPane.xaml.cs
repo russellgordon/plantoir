@@ -1164,7 +1164,7 @@ public sealed partial class SidebarPane : UserControl
             // side moves), so the row keeps the one route to it.
             menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
                                      Selecting(row, () => AskWhenToDeploy(course, number, existing: when))));
-            menu.Items.Add(MenuItem("Remove Scheduled Deploy…", Glyphs.Remove,
+            menu.Items.Add(MenuItem(ScheduledDeployRemovalWording.MenuItem, Glyphs.Remove,
                                      Selecting(row, () => ConfirmCancelScheduledDeploy(course, number, when))));
         }
         else
@@ -1372,15 +1372,17 @@ public sealed partial class SidebarPane : UserControl
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // scheduledDeployCancellation.removingOne (#987): Cancel answers
+        // Escape, and neither button is the default, so Enter does nothing.
+        // Apple's HIG, Alerts: "Note that you don't want to make a Cancel
+        // button the default button."
         var dialog = new ContentDialog
         {
-            Title = "Remove the scheduled deploy?",
-            Content = $"{course.Code} Section {number} is set to deploy automatically at " +
-                      $"{when:h:mm tt} on {when:dddd d MMMM}. Removing it means it will not go out then, " +
-                      "and the site stays as it is until you deploy it yourself.",
-            PrimaryButtonText = "Remove",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
+            Title = ScheduledDeployRemovalWording.Question,
+            Content = ScheduledDeployRemovalWording.Message(course.Code, number, $"{when:h:mm tt}", $"{when:dddd d MMMM}"),
+            PrimaryButtonText = ScheduledDeployRemovalWording.RemoveButton,
+            CloseButtonText = ScheduledDeployRemovalWording.CancelButton,
+            DefaultButton = ContentDialogButton.None,
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;

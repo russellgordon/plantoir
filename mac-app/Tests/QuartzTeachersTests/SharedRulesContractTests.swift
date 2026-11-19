@@ -1161,7 +1161,9 @@ final class SharedRulesContractTests: XCTestCase {
                 let question: String = try XCTUnwrap(words["question"]).replacingOccurrences(of: "{assistant}", with: each.displayName)
                 XCTAssertEqual(AssistModelLibrary.removeQuestion(for: each), question)
                 let size: String = ByteCountFormatter.string(fromByteCount: each.downloadBytes, countStyle: .file)
-                let message: String = try XCTUnwrap(words["message"]).replacingOccurrences(of: "{size}", with: size)
+                let message: String = try XCTUnwrap(words["message"])
+                    .replacingOccurrences(of: "{size}", with: size)
+                    .replacingOccurrences(of: "{machine}", with: "Mac")
                 XCTAssertEqual(AssistModelLibrary.removeMessage(for: each), message)
             }
             XCTAssertEqual(AssistModelLibrary.removeButton, words["removeButton"])

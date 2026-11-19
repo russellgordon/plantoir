@@ -1719,6 +1719,18 @@ with no problem, a name typed, section numbers, a class-page word and, for a
 club, a class folder, each as `startCreation` would accept it. Until then the
 button is plain and Return does nothing, because a Return typed in the code
 field with the rest unread once made a club named by its code (#457's review).
+Nor is it the default while the course-code list is shown
+(`NewCourseWizardView.createCourseIsTheDefault`, the #987 review): a default
+button is offered Return before the field's `onKeyPress`, so Return with a
+code highlighted made the course instead of choosing the code. Measured, and
+pinned by `QuestionKeysTests.testReturnInTheCodeFieldChoosesTheSuggestion`,
+which presses Return in the wizard's own `CourseCodePickerView` beside a
+Create Course that follows the wizard's rule (and failed with the rule that
+looked at the form alone). **Escape while the course is being made does
+nothing** (Russell, 2026-11-18, on the #987 review), as before #987: the
+wizard's Cancel answers Escape and Command-Period until Create Course is
+pressed and, through the sheet, again once the course is made; a click on
+Cancel still stops the making (`NewCourseWizardView.cancelAnswersEscape`).
 
 **Order.** Cancel leads and the action or default trails in every row:
 "Always place the default button on the trailing side of a row"; "Cancel
@@ -1762,7 +1774,9 @@ contract key keeps its name) → Not Now; Later (Reopen Obsidian, and Share
 Again after Change Password) → Not Now. D9: the assistant's dates offer's Yes
 → Add Dates… (`AssistWording.giveDatesButton`): "Aim for a one- or two-word
 title that describes the result", "avoiding 'Yes' and 'No'", and the ellipsis
-because it opens the class-dates sheet (Buttons ▸ macOS). Left as they were,
+because it opens the class-dates sheet (Buttons ▸ macOS). Its decline, Cancel
+until the #987 review, is Not Now (`AssistWording.declineDatesButton`): the
+offer is one the assistant raised by itself. Left as they were,
 and listed as questions: the links checklist's Not Now (the same sheet opens
 by itself after a build and from the menu), ruled since: it stays as it is
 until #991 stops that sheet opening by itself. The scheduled deploy's question
@@ -1803,7 +1817,18 @@ downloaded assistant).
 "Cancel", `order`, `default` null, `escape`, `firstButtonByQuestion` gone,
 the cases' `expectCancelButton`), `obsidianAddOnsForFigures.wording.later` and
 `unitPlanning`'s `later` ("Not Now"), `todaysClassOnTheFrontPage.wording.notToday`
-("Not Now"), and `assist-wording.json`'s new `giveDatesButton`.
+("Not Now"), `assist-wording.json`'s new `giveDatesButton` and
+`declineDatesButton`, `scheduledDeployCancellation.removingOne`, and
+`assistantModelChoice.removal` (`asksFirst`, `words`, whose message carries
+`{machine}`). Since the #987 review the Windows app says them too: the quit
+question's Cancel with no default button, Not Now on today's class and on
+Reopen Obsidian, the scheduled deploy's removal question in
+`ScheduledDeployRemovalWording` with no default, and Remove… beside a
+downloaded assistant asking first (`AssistModelRemovalWording`), each read
+from the contract by `QuitConfirmationTests`, `TodaysClassContractTests`,
+`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. Still owed
+under #979: the dates card's titles, and the ContentDialog's fixed button
+order (its Close button always trails).
 
 ## A section's Coverage tab (#793)
 

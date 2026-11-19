@@ -73,6 +73,7 @@
     "datesToReDateForAMeeting" : "Re-dating a section puts its meetings onto the days it meets, so it needs those days first.",
     "datesToReplace" : "Replacing the class dates on file for {course} Section {section}.",
     "datesToReplaceForAMeeting" : "Replacing the meeting dates on file for {course} Section {section}.",
+    "declineDatesButton" : "Not Now",
     "deployAccepted" : "Deploy",
     "deployApproval" : "This happens now. Students will see what is deployed. Be certain to review changes you have made.",
     "deployClosedAnOpenPreview" : "If a preview of {course} Section {section} was open in Plantoir, deploying closed it — press Preview there to open it again.",

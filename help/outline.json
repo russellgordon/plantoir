@@ -2169,7 +2169,7 @@
       "Plantoir > Settings > Deploying: a Netlify part and a Cloudflare Pages part",
       "The status line: Connected, the end date where Cloudflare gives one, or what is wrong; Check Again",
       "Change Token...: the same steps a first deploy shows, then Check and Save; Cancel waits while the token is checked",
-      "A new token that cannot reach your class websites: Keep My Old Token (or Don't Save It), or Use the New Token",
+      "A new token that cannot reach your class websites: Cancel, or Use the New Token",
       "Remove Token, and what it means for a deploy set for later",
       "The Deploy screen's warning when a Cloudflare token ends in under 30 days, with Open Settings..."
      ],
@@ -2213,7 +2213,7 @@
        "shows": "The question asked when a new token cannot reach some class websites",
        "labels": [
         "The sections",
-        "Keep My Old Token",
+        "Cancel",
         "Use the New Token"
        ],
        "scene": "deploy-tokens-2"
@@ -4461,10 +4461,10 @@
      "anchor": "quitting",
      "title": "Quitting while something is running",
      "question": "Plantoir asked before quitting: what happens if I quit anyway?",
-     "about": "The quit question: what Plantoir asks about, Keep Working and Quit Anyway, and when it never asks.",
+     "about": "The quit question: what Plantoir asks about, Cancel and Quit Anyway, and when it never asks.",
      "steps": [
       "What Plantoir asks about: deploying, building a preview until its page first answers, saving a copy of a course, sharing unit plans",
-      "Keep Working (the default) or Quit Anyway, and what each does",
+      "Cancel or Quit Anyway, and what each does",
       "When it never asks: a preview that is only open, another program's work, and logging out, restarting or shutting down"
      ],
      "scenes": 1,
@@ -4496,7 +4496,7 @@
       {
        "shows": "The question Plantoir asks when quitting during a deploy",
        "labels": [
-        "Keep Working",
+        "Cancel",
         "Quit Anyway"
        ],
        "scene": "quitting-1"

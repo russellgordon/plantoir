@@ -1496,6 +1496,12 @@ nonisolated enum AssistWording {
     /// too, so one title serves both.
     static let giveDatesButton: String = "Add Dates…"
 
+    /// The button that declines `mayIAskForYourDates` (#987 review): "Not
+    /// Now", because the card is an offer Plantoir raised by itself, and
+    /// "Not Now" is the title for those (Russell's ruling Q2 on #975;
+    /// "Cancel" is for an action the teacher started). It was "Cancel".
+    static let declineDatesButton: String = "Not Now"
+
     /// The same question in the course's own noun (#267). Only the card in
     /// the window says it this way: the sentences that carry the question
     /// back to the model keep `mayIAskForYourDates` as it is.

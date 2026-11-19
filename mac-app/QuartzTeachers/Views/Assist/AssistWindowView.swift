@@ -838,7 +838,7 @@ private struct AssistDatesOfferView: View {
             // above and every sheet's (#457, the HIG sweep).
             HStack {
                 Spacer(minLength: 0)
-                Button(AssistWording.cancelled, action: decline)
+                Button(AssistWording.declineDatesButton, action: decline)
                     .accessibilityIdentifier("assistNoDatesButton")
                 Button(AssistWording.giveDatesButton, action: accept)
                     .keyboardShortcut(.defaultAction)

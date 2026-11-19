@@ -55,7 +55,7 @@ public class ReferenceInterfaceTests
         string sidebar = Source("Plantoir", "Views", "SidebarPane.Reference.cs");
         string courseMenu = Between(sidebar, "private MenuFlyout ReferenceCourseMenu(", "private MenuFlyout ReferenceSectionMenu(");
         string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "// ---- The calm note");
-        foreach (string door in new[] { "Remove Scheduled Deploy", "ConfirmCancelScheduledDeploy", "TaskScheduling" })
+        foreach (string door in new[] { "Remove Scheduled Deploy", "ScheduledDeployRemovalWording", "ConfirmCancelScheduledDeploy", "TaskScheduling" })
         {
             Assert.DoesNotContain(door, sectionMenu);
             Assert.DoesNotContain(door, courseMenu);

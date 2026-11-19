@@ -190,19 +190,69 @@ final class StartOfYearPlanTableTests: XCTestCase {
             guard case .ready = model.stage else {
                 return XCTFail("the sheet is not ready to be answered")
             }
+            // What decides it: no button in the sheet answers Return.
+            XCTAssertEqual(StartOfYearPlanTableTests.buttonsAnsweringReturn(in: host.window), [],
+                           "a button takes Return (table focused: \(focusTheTable))")
             host.press(keyCode: 36, characters: "\r")
-            var waited: Int = 0
-            while waited < 10 {
-                // Go would start a Task on the main actor; give it the
-                // chance it had when Return was Go.
-                try await Task.sleep(for: .milliseconds(100))
-                host.pump(0.05)
-                waited += 1
-            }
+            await StartOfYearPlanTableTests.runWhatTheKeyStarted(in: host)
             guard case .ready = model.stage else {
                 return XCTFail("Return went ahead (table focused: \(focusTheTable), notice: \(model.notice ?? "none"))")
             }
         }
+
+        // The positive check (#987 review), in place of the timed wait this
+        // test had: Go clicked, and the same settling as after Return above,
+        // is enough for Go to have started. Its first step, before anything
+        // it awaits, leaves the ready stage (`goAhead` sets `.working`), so
+        // a Return that had reached Go would have been seen above.
+        var goButton: NSButton?
+        for view in StartOfYearPlanTableTests.allViews(in: host.window.contentView) {
+            if let button = view as? NSButton, button.title == StartOfYearWording.goButton {
+                goButton = button
+            }
+        }
+        let go: NSButton = try XCTUnwrap(goButton, "no Put These into Draft button")
+        go.performClick(nil)
+        await StartOfYearPlanTableTests.runWhatTheKeyStarted(in: host)
+        if case .ready = model.stage {
+            XCTFail("a click on Go had not started it after the settling the Return checks rely on")
+        }
+    }
+
+    /// Lets everything a key press could have started run: the run loop's
+    /// turn that delivers the button's action, then the main actor's queued
+    /// work (a `Task { @MainActor in }` from the action), which a run loop
+    /// turned inside a test on the main actor never reaches.
+    static func runWhatTheKeyStarted(in host: TableHost) async {
+        var turn: Int = 0
+        while turn < 3 {
+            host.pump(0)
+            await Task.yield()
+            turn += 1
+        }
+    }
+
+    /// Every view under `view`, `view` first.
+    static func allViews(in view: NSView?) -> [NSView] {
+        guard let view else {
+            return []
+        }
+        var found: [NSView] = [view]
+        for child in view.subviews {
+            found.append(contentsOf: allViews(in: child))
+        }
+        return found
+    }
+
+    /// The titles of the buttons in `window` whose key is Return.
+    static func buttonsAnsweringReturn(in window: NSWindow) -> [String] {
+        var titles: [String] = []
+        for view in allViews(in: window.contentView) {
+            if let button = view as? NSButton, button.keyEquivalent == "\r" {
+                titles.append(button.title)
+            }
+        }
+        return titles
     }
 
     // MARK: - The height budget

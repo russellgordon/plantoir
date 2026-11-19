@@ -264,6 +264,62 @@ final class QuestionKeysTests: XCTestCase {
         }
     }
 
+    /// The New Course wizard's course-code field beside its Create Course,
+    /// in a sheet (#987 review). The field is the wizard's own
+    /// `CourseCodePickerView`, and Create Course takes Return by the
+    /// wizard's own rule, `NewCourseWizardView.createCourseIsTheDefault`,
+    /// with the form complete. `answers.showing` is whether the list is
+    /// shown: choosing the highlighted code puts it away, as the wizard's
+    /// `selectCourseCodeSuggestion` does. `answers.answer` says what Return
+    /// did: "chose ICS3U", then "created".
+    struct CodeFieldPage: View {
+
+        // MARK: - Stored properties
+
+        let answers: Answers
+
+        @State var sheetIsShown: Bool = true
+
+        @State var courseCode: String = "ICS"
+
+        @State var fieldIsFocused: Bool = true
+
+        // MARK: - Body
+
+        var body: some View {
+            Color.white
+                .sheet(isPresented: $sheetIsShown) {
+                    VStack {
+                        CourseCodePickerView(
+                            courseCode: $courseCode,
+                            isFocused: $fieldIsFocused,
+                            onCommitHighlight: {
+                                if !answers.showing {
+                                    return false
+                                }
+                                courseCode = "ICS3U"
+                                answers.answer = "chose ICS3U"
+                                answers.showing = false
+                                return true
+                            }
+                        )
+                        Button("Create Course") {
+                            answers.answer = "created"
+                        }
+                        .defaultButton(
+                            isEnabled: true,
+                            isTheDefault: NewCourseWizardView.createCourseIsTheDefault(
+                                formIsComplete: true,
+                                suggestionsAreShown: answers.showing
+                            )
+                        )
+                    }
+                    .frame(width: 400, height: 200)
+                    .padding()
+                }
+        }
+    }
+
     /// The share's console, presented as `PlanShareBar` presents it.
     struct ConsolePage: View {
 
@@ -461,6 +517,12 @@ final class QuestionKeysTests: XCTestCase {
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertTrue(afterReturn.stillAsked(), "\(what): Return closed the question")
         XCTAssertFalse(afterReturn.wentAhead(), "\(what): Return went ahead")
+        // The positive check (#987 review): the same question, still up,
+        // answers a key, so Return's nothing is the question's and not a
+        // key that never reached it.
+        press(.escape, in: afterReturn.window)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterReturn.stillAsked() }, "\(what): after Return, Escape did not reach the question")
+        XCTAssertFalse(afterReturn.wentAhead(), "\(what): Escape after Return went ahead")
         close(afterReturn.window)
 
         let afterEscape: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
@@ -485,6 +547,11 @@ final class QuestionKeysTests: XCTestCase {
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertTrue(answers.showing, "\(what): Return closed the sheet")
         XCTAssertEqual(answers.answer, "", "\(what): Return answered the question")
+        // The positive check (#987 review): the sheet Return left alone
+        // answers Escape with its Cancel, so the key reached it.
+        press(.escape, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(what): after Return, Escape did not reach the sheet")
+        XCTAssertEqual(answers.answer, "cancel", "\(what): Escape after Return")
         close(window)
     }
 
@@ -849,6 +916,10 @@ final class QuestionKeysTests: XCTestCase {
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertTrue(afterReturn.showing, "Return closed the two-lists sheet")
         XCTAssertEqual(afterReturn.answer, "", "Return answered the two-lists sheet")
+        // The positive check (#987 review): the same sheet answers Escape.
+        press(.escape, in: returnWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterReturn.showing }, "after Return, Escape did not reach the two-lists sheet")
+        XCTAssertEqual(afterReturn.answer, "cancel", "Escape after Return on the two-lists sheet")
         close(returnWindow)
 
         let afterEscape: Answers = Answers()
@@ -859,19 +930,58 @@ final class QuestionKeysTests: XCTestCase {
         close(escapeWindow)
     }
 
-    /// Command-Period on the two-lists sheet runs its Cancel or leaves it
-    /// open, and never shares (#987): its Cancel tells the share it was not
-    /// answered, so a close that skipped it would leave the share waiting.
+    /// Command-Period on the two-lists sheet is its Cancel, and never
+    /// shares (#987; Keyboards: "Command-Period: Cancel an operation"): its
+    /// Cancel tells the share it was not answered, so a close that skipped
+    /// it would leave the share waiting. A Command-Period that did nothing
+    /// fails here too (#987 review).
     func testCommandPeriodOnTheTwoListsSheetNeverShares() {
         let answers: Answers = Answers()
         let window: NSWindow = windowShowing(ListsPage(answers: answers))
         press(.commandPeriod, in: window)
-        _ = runUntil(timeout: 1) { !answers.showing }
+        XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "Command-Period did not close the two-lists sheet")
         XCTAssertNotEqual(answers.answer, "share", "Command-Period shared")
-        if !answers.showing {
-            XCTAssertEqual(answers.answer, "cancel", "Command-Period closed the two-lists sheet without its Cancel")
-        }
+        XCTAssertEqual(answers.answer, "cancel", "Command-Period closed the two-lists sheet without its Cancel")
         close(window)
+    }
+
+    /// Return in the wizard's course-code field with a code highlighted
+    /// chooses that code, and does not create the course (#987 review): a
+    /// default button is offered Return before the field's `onKeyPress`.
+    /// With the list put away and the form complete, Return is Create
+    /// Course (D32): the positive check, in the same sheet.
+    func testReturnInTheCodeFieldChoosesTheSuggestion() {
+        let answers: Answers = Answers()
+        let window: NSWindow = windowShowing(CodeFieldPage(answers: answers))
+        if let sheet = window.attachedSheet {
+            for view in allViews(in: sheet.contentView) {
+                if let field = view as? NSTextField, field.isEditable {
+                    sheet.makeFirstResponder(field)
+                }
+            }
+        }
+        _ = runUntil(timeout: 0.3) { false }
+        press(.returnKey, in: window)
+        _ = runUntil(timeout: 1) { !answers.answer.isEmpty }
+        XCTAssertEqual(answers.answer, "chose ICS3U", "Return with a code highlighted")
+        XCTAssertFalse(answers.showing, "the list did not go away")
+        _ = runUntil(timeout: 0.5) { false }
+        press(.returnKey, in: window)
+        XCTAssertTrue(runUntil(timeout: 2) { answers.answer == "created" }, "with the list away, Return is not Create Course")
+        close(window)
+    }
+
+    /// The wizard's two key rules (#987): Create Course takes Return once
+    /// the form is complete and the course-code list is away; Cancel takes
+    /// Escape except while the list is shown or the course is being made
+    /// (Russell, 2026-11-18).
+    func testTheWizardsKeyRules() {
+        XCTAssertTrue(NewCourseWizardView.createCourseIsTheDefault(formIsComplete: true, suggestionsAreShown: false))
+        XCTAssertFalse(NewCourseWizardView.createCourseIsTheDefault(formIsComplete: true, suggestionsAreShown: true))
+        XCTAssertFalse(NewCourseWizardView.createCourseIsTheDefault(formIsComplete: false, suggestionsAreShown: false))
+        XCTAssertTrue(NewCourseWizardView.cancelAnswersEscape(suggestionsAreShown: false, isCreating: false))
+        XCTAssertFalse(NewCourseWizardView.cancelAnswersEscape(suggestionsAreShown: true, isCreating: false))
+        XCTAssertFalse(NewCourseWizardView.cancelAnswersEscape(suggestionsAreShown: false, isCreating: true))
     }
 
     /// "Set up {tool}?" (#987, D3): going ahead loses no work, so Download

@@ -7174,8 +7174,8 @@ half old and half new until the app next ran — and a launcher typed at a
 prompt, or (before #477) a scheduled run, hashed and built from that mix.
 
 **What it does.** `MainWindow.AskBeforeQuittingThroughWork` (the Closing
-handler) asks the #231 quit question FIRST, unchanged — Keep Working leaves
-everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
+handler) asks the #231 quit question FIRST — Cancel (Keep Working until #987,
+and no longer the default since) leaves everything as it was. Then, when the close quits the app (`App.ClosingThisQuits`:
 the last window) and a copy is WRITING (`ToolchainReadiness.AnyCopyIsWriting`),
 it cancels the close synchronously, before any await, opens the banner at
 once (the one-second delay treated as passed) — the "Getting this folder

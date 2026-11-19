@@ -37,6 +37,14 @@ final class QuitAlertKeysTests: XCTestCase {
     /// Puts the quit question up on a window off the screen, presses `key`,
     /// and returns what was chosen, or nil while the question still stands.
     private func answer(after key: Key) -> QuitConfirmation.Choice? {
+        let answers: [QuitConfirmation.Choice?] = answers(after: [key])
+        return answers.first ?? nil
+    }
+
+    /// Puts the quit question up once and presses each of `keys` in turn,
+    /// returning what had been chosen after each (nil while the question
+    /// still stood).
+    private func answers(after keys: [Key]) -> [QuitConfirmation.Choice?] {
         let window: NSWindow = NSWindow(
             contentRect: NSRect(x: -7000, y: -7000, width: 600, height: 400),
             styleMask: [.titled], backing: .buffered, defer: false
@@ -53,6 +61,24 @@ final class QuitAlertKeysTests: XCTestCase {
         XCTAssertTrue(runUntil(timeout: 3) { window.attachedSheet != nil }, "the quit question opened")
         _ = runUntil(timeout: 0.3) { false }
         let sheet: NSWindow = alert.window
+        var answeredAfterEach: [QuitConfirmation.Choice?] = []
+        for key in keys {
+            send(key, to: sheet)
+            _ = runUntil(timeout: 1) { chosen != nil }
+            answeredAfterEach.append(chosen)
+        }
+        // Each answer was read above, before the sheet is ended here, which
+        // answers it too.
+        if window.attachedSheet != nil {
+            window.endSheet(sheet)
+            _ = runUntil(timeout: 1) { window.attachedSheet == nil }
+        }
+        window.orderOut(nil)
+        return answeredAfterEach
+    }
+
+    /// Sends `key` to the quit question's window.
+    private func send(_ key: Key, to sheet: NSWindow) {
         let characters: String
         let code: UInt16
         var modifiers: NSEvent.ModifierFlags = []
@@ -78,15 +104,6 @@ final class QuitAlertKeysTests: XCTestCase {
                 sheet.sendEvent(event)
             }
         }
-        _ = runUntil(timeout: 1) { chosen != nil }
-        // Read before the sheet is ended below, which answers it too.
-        let answered: QuitConfirmation.Choice? = chosen
-        if window.attachedSheet != nil {
-            window.endSheet(sheet)
-            _ = runUntil(timeout: 1) { window.attachedSheet == nil }
-        }
-        window.orderOut(nil)
-        return answered
     }
 
     // MARK: - Tests
@@ -116,7 +133,14 @@ final class QuitAlertKeysTests: XCTestCase {
         XCTAssertEqual(answer(after: .commandPeriod), .keepWorking)
     }
 
+    /// Return answers nothing, and then Escape, on the same question, is
+    /// Cancel: the positive check that the keys reach it (#987 review).
     func testReturnAnswersNothing() {
-        XCTAssertNil(answer(after: .returnKey), "Return answered the quit question")
+        let answered: [QuitConfirmation.Choice?] = answers(after: [.returnKey, .escape])
+        XCTAssertEqual(answered.count, 2)
+        if answered.count == 2 {
+            XCTAssertNil(answered[0], "Return answered the quit question")
+            XCTAssertEqual(answered[1], .keepWorking, "after Return, Escape did not reach the quit question")
+        }
     }
 }
