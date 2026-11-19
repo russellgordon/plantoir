@@ -301,13 +301,15 @@ appliesOn windows):
   RELEASING.md). `update found` says "; marked important" by the same rule.
 - **An important offer is shown even when the newest version was skipped.**
   A remembered skip was given to an offer that had a Skip button.
-- **The offer shows Install and Reopen alone.** Esc is handled by the dialog
-  itself (`PreviewKeyDown` → `Hide`), because what a `ContentDialog` with no
-  Close button does on Esc was not measured. **The handler is unproved too**
-  until the first cut that passes `--critical-versions`, which RELEASING.md
-  asks to check, and a window the teacher cannot
-  leave was rejected (Russell's ruling on the plan, 2026-10-08). Esc is "not
-  now", written on the trail, and the next daily check offers it again. An
+- **The offer shows Install and Reopen alone.** A window the teacher cannot
+  leave was rejected (Russell's ruling on the plan, 2026-10-08), so Esc must
+  close it. Until #979 the dialog caught Esc itself (`PreviewKeyDown` →
+  `Hide`), because what a `ContentDialog` with no Close button does on Esc
+  had not been measured; it has now (#979, on the Windows VM): WinUI closes
+  it with no answer, so the catcher, a hidden key catcher, was deleted, and
+  `UpdateOfferUiTests` presses Esc on an important offer from a test feed in
+  a Debug build. Esc is "not now", written on the trail, and the next daily
+  check offers it again. An
   important offer never remembers a skip.
 - **Rejected:** trapping the teacher in the offer (cancelling `Closing`), and
   honouring a skip given before the mark. Not changed: the install gate, the

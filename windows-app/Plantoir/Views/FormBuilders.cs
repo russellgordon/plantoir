@@ -173,8 +173,10 @@ public static class FormBuilders
     /// The confirmation a consequential removal asks first; true means go
     /// ahead.
     ///
-    /// <para>The DEFAULT button is Cancel. Enter on a dialog that appeared
-    /// under the pointer must not delete a folder.</para>
+    /// <para>No button is the default and the focus starts on Cancel
+    /// (#979; the mac's Remove alert, role .destructive): Enter on a dialog
+    /// that appeared under the pointer must not delete a folder, and a
+    /// Cancel is never the default (Apple's HIG, Alerts).</para>
     /// </summary>
     public static async Task<bool> ConfirmRemoval(XamlRoot? root, string title, string message)
     {
@@ -185,9 +187,9 @@ public static class FormBuilders
             Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
             PrimaryButtonText = "Remove",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
             XamlRoot = root,
         };
+        DialogButtons.AskWithNoDefault(dialog);
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 

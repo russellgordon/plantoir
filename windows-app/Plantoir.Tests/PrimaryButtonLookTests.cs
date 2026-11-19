@@ -16,10 +16,26 @@ public class PrimaryButtonLookTests
     }
 
     [Fact]
-    public void CreateCourse_NeverTakesEnter_AndWearsTheAccentOnlyWhileItCanBePressed()
+    public void CreateCourse_UntilItIsTheDefault_TakesNoEnterAndWearsNoAccent()
     {
-        Assert.Equal(new PrimaryButtonLook.Look(DefaultChoice.None, true), PrimaryButtonLook.For(true, PrimaryKind.NeverTakesEnter));
-        Assert.Equal(new PrimaryButtonLook.Look(DefaultChoice.None, false), PrimaryButtonLook.For(false, PrimaryKind.NeverTakesEnter));
+        // The #979 review, as #987 on the mac: an accent Enter does not press
+        // looks like the default and is not, so the accent comes off too.
+        Assert.Equal(new PrimaryButtonLook.Look(DefaultChoice.None, false), PrimaryButtonLook.For(true, PrimaryKind.NotTheDefaultYet));
+        Assert.Equal(new PrimaryButtonLook.Look(DefaultChoice.None, false), PrimaryButtonLook.For(false, PrimaryKind.NotTheDefaultYet));
+    }
+
+    [Theory]
+    [InlineData(PrimaryKind.TakesEnterWhenEnabled)]
+    [InlineData(PrimaryKind.NotTheDefaultYet)]
+    [InlineData(PrimaryKind.NotTheDefault)]
+    public void NoButtonWearsTheAccentWithoutBeingTheDefault(PrimaryKind kind)
+    {
+        foreach (bool enabled in new[] { true, false })
+        {
+            var look = PrimaryButtonLook.For(enabled, kind);
+            Assert.False(look.AccentStyle && look.Default != DefaultChoice.Primary,
+                         $"{kind}, enabled {enabled}: the accent without being the default");
+        }
     }
 
     [Theory]
@@ -30,7 +46,7 @@ public class PrimaryButtonLookTests
 
     [Theory]
     [InlineData(PrimaryKind.TakesEnterWhenEnabled)]
-    [InlineData(PrimaryKind.NeverTakesEnter)]
+    [InlineData(PrimaryKind.NotTheDefaultYet)]
     [InlineData(PrimaryKind.NotTheDefault)]
     public void ADisabledButton_IsNeverTheDefaultAndNeverAccented(PrimaryKind kind)
     {

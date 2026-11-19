@@ -458,9 +458,9 @@ public sealed class AssistantSettingsPane
             },
             PrimaryButtonText = AssistModelRemovalWording.RemoveButton,
             CloseButtonText = AssistModelRemovalWording.CancelButton,
-            DefaultButton = ContentDialogButton.None,
             XamlRoot = root,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // #987 D22: Remove takes no Enter; the focus starts on Cancel (#979)
         AutomationProperties.SetAutomationId(dialog, "assistantRemoveQuestion");
         try
         {

@@ -56,7 +56,7 @@ public class RemovalQuestionsContractTests
         Assert.Contains("Content = ScheduledDeployRemovalWording.Message(", question);
         Assert.Contains("PrimaryButtonText = ScheduledDeployRemovalWording.RemoveButton,", question);
         Assert.Contains("CloseButtonText = ScheduledDeployRemovalWording.CancelButton,", question);
-        Assert.Contains("DefaultButton = ContentDialogButton.None,", question);
+        Assert.Contains("DialogButtons.AskWithNoDefault(dialog);", question);   // no default, the focus on Cancel (#979)
         // Both doors to it say the command's words.
         Assert.Contains("MenuItem(ScheduledDeployRemovalWording.MenuItem,", sidebar);
         Assert.Contains("Add(section, ScheduledDeployRemovalWording.MenuItem,", Source("MainWindow.Menus.cs"));
@@ -86,7 +86,7 @@ public class RemovalQuestionsContractTests
         string question = Between(pane, "private static async Task AskThenRemove(", "store.Remove();");
         Assert.Contains("PrimaryButtonText = AssistModelRemovalWording.RemoveButton,", question);
         Assert.Contains("CloseButtonText = AssistModelRemovalWording.CancelButton,", question);
-        Assert.Contains("DefaultButton = ContentDialogButton.None,", question);
+        Assert.Contains("DialogButtons.AskWithNoDefault(dialog);", question);   // no default, the focus on Cancel (#979)
         Assert.Contains("!= ContentDialogResult.Primary) return;", question);
     }
 }
