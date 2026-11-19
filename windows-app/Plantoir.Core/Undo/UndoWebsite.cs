@@ -62,7 +62,7 @@ public static class UndoWebsite
     // yyyyMMddTHHmmssZ-<destination>.json, the whole name. Anything else
     // (a write in progress, .<name>.<pid>.tmp, a misnamed file) is not a fragment.
     private static readonly Regex FragmentName =
-        new(@"^(\d{8}T\d{6}Z)-(.+)\.json$", RegexOptions.CultureInvariant);
+        new(@"^([0-9]{8}T[0-9]{6}Z)-(.+)\.json$", RegexOptions.CultureInvariant);   // ASCII digits only, as the Mac's isASCII && isNumber
 
     /// <summary>
     /// The contract's destination for one of Windows' <c>course_config.json</c>
@@ -189,7 +189,7 @@ public static class UndoWebsite
         string[] parts = opPath.Split('/');
         if (parts.Length < 3 || parts[0] != "courses" || parts[1].Length == 0) return null;
         string rest = string.Join('/', parts, 2, parts.Length - 2);
-        if (!rest.EndsWith(".md", StringComparison.Ordinal) || rest.Length == 3) return null;
+        if (!rest.EndsWith(".md", StringComparison.OrdinalIgnoreCase) || rest.Length == 3) return null;   // any case, as the Mac lowercases first
         return Composed(rest[..^3]);
     }
 
