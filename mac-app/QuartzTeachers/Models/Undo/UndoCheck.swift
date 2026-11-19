@@ -739,10 +739,15 @@ nonisolated enum UndoSwap {
                         refusal = .fileIsInUse(path: target.relativePath)
                     }
                 } else if UndoTreeReading.read(at: asideURL).listingSha != listingSha {
-                    // Put back as it is; if its place was taken in that
-                    // instant it stays aside, hidden and whole, never deleted.
-                    _ = UndoSwap.renameExclusively(asideURL, onto: target.url)
-                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                    // Put back as it is: a change since. If its place was taken
+                    // in that instant it stays aside, hidden and whole, never
+                    // deleted, and the refusal is cannotTellNow, which never
+                    // clears the list (the second hard review, MEDIUM 3).
+                    if UndoSwap.renameExclusively(asideURL, onto: target.url) {
+                        refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                    } else {
+                        refusal = .cannotTellNow(path: target.relativePath)
+                    }
                 } else {
                     originals[index] = asideURL
                 }

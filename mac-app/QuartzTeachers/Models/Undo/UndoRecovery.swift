@@ -188,6 +188,28 @@ nonisolated enum UndoRecovery {
         return allGone
     }
 
+    /// Every tree op's folder of this step that a staged `-orig` name still
+    /// holds beside it, by its place, with the hidden name.
+    static func foldersKeptAside(of step: UndoStep, root: URL) -> [String: String] {
+        var kept: [String: String] = [:]
+        for op in step.ops where op.knownKind == .createTree || op.knownKind == .removeTree {
+            guard let path = op.path else {
+                continue
+            }
+            let place: URL = root.appendingPathComponent(path)
+            let folder: URL = place.deletingLastPathComponent()
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+                continue
+            }
+            for name in names where name.hasPrefix("." + place.lastPathComponent + UndoSwap.stagedMarker + "\(step.seq)-") {
+                if UndoSwap.placeOfStagedName(name) == place.lastPathComponent && UndoSwap.isAFolderSetAside(folder.appendingPathComponent(name)) {
+                    kept[path] = name
+                }
+            }
+        }
+        return kept
+    }
+
     /// Whether a step holds a `recompute` op.
     static func keepsAFileTrue(_ step: UndoStep) -> Bool {
         for op in step.ops where op.knownKind == .recompute {
@@ -312,7 +334,22 @@ nonisolated enum UndoRecovery {
         // Which state the work was moving FROM, and TO.
         let startedFromBefore: Bool = phase == .begin || phase == .redoing
         let startState: UndoOpState = startedFromBefore ? .before : .after
-        let files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places)
+        var files: [(path: String, state: UndoOpState)] = fileStates(of: step, root: root, places: places)
+        // A teacher's folder still set aside after the tidying (it was
+        // changed while it was aside) is IN THE WAY: never settled as if the
+        // folder were gone, and named on the trail with where it is kept
+        // (the second hard review of U2b, MEDIUM 3).
+        let keptAside: [String: String] = UndoRecovery.foldersKeptAside(of: step, root: root)
+        if !keptAside.isEmpty {
+            var judged: [(path: String, state: UndoOpState)] = []
+            for file in files {
+                judged.append((path: file.path, state: keptAside[file.path] != nil ? .neither : file.state))
+            }
+            files = judged
+            for (place, hiddenName) in keptAside {
+                UndoTrailHook.keptAFolderAsideLine?(step.course ?? "", step.section, place, hiddenName)
+            }
+        }
         // A file that could not be read now is never judged changed by hand:
         // the step is left as it is and tried again on the schedule, as for
         // a file in use (the director's ruling on U2b's review).

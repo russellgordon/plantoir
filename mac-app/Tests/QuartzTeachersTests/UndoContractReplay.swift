@@ -1174,7 +1174,7 @@ nonisolated enum UndoContractReplay {
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
-        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy",
+        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1340,6 +1340,12 @@ nonisolated enum UndoContractReplay {
             if testCase["contentRemovedBeforeRecovery"] as? Bool == true {
                 try FileManager.default.removeItem(at: dying.contentFolderURL)
             }
+            if testCase["changeTheFolderSetAside"] as? Bool == true {
+                // A file saved into the teacher's folder while the dead
+                // process had it set aside.
+                let aside: URL = UndoSwap.besideURL(for: root.appendingPathComponent(UndoContractKinds.extraFolder), label: "\(workSeq)-apply", role: "orig")
+                try Data("saved while it was aside\n".utf8).write(to: aside.appendingPathComponent("new.md"))
+            }
             if testCase["deployBeforeRecovery"] as? Bool == true {
                 // A deploy wrote a new marker in the place the move emptied.
                 try? FileManager.default.removeItem(at: root.appendingPathComponent(UndoContractKinds.markerFrom))
@@ -1398,7 +1404,12 @@ nonisolated enum UndoContractReplay {
                 failures.append("recoveryCases '\(name)': the preference is \(places.read(UndoContractKinds.preference)), not \(wanted)")
             }
             let leftovers: [String] = UndoContractKinds.stagedLeftovers(in: root)
-            if withATree && !leftovers.isEmpty {
+            if let wanted = testCase["keptAside"] as? Bool {
+                let stillAside: Bool = !leftovers.isEmpty
+                if stillAside != wanted {
+                    failures.append("recoveryCases '\(name)': a folder kept aside is \(stillAside) (\(leftovers))")
+                }
+            } else if withATree && !leftovers.isEmpty {
                 failures.append("recoveryCases '\(name)': staged items left: \(leftovers)")
             }
             if let heldChange {
@@ -1478,7 +1489,7 @@ nonisolated enum UndoContractReplay {
                     failures.append("recoveryCases '\(name)': undo came to \(outcome), not \(undo)")
                 }
             }
-            if mode == .live && !alive && reachable && staysBeside(root) {
+            if mode == .live && !alive && reachable && testCase["keptAside"] as? Bool != true && staysBeside(root) {
                 failures.append("recoveryCases '\(name)': recovery left a staged file beside a page")
             }
         }

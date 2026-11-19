@@ -73,6 +73,12 @@ nonisolated enum UndoTrail {
                 UndoTrail.couldNotRecordLine(action: action, course: course, section: section, mode: mode, why: why)
             )
         }
+        UndoTrailHook.keptAFolderAsideLine = { course, section, place, hiddenName in
+            ActivityTrail.note(
+                .undoKeptAFolderAside,
+                UndoTrail.keptAFolderAsideLine(course: course, section: section, place: place, hiddenName: hiddenName)
+            )
+        }
         UndoTrailHook.rolledBackLine = { course, section, phase, files in
             ActivityTrail.note(
                 .undoRolledBack,
@@ -107,6 +113,17 @@ nonisolated enum UndoTrail {
         let counted: String = inTheWay == 1 ? "1 file" : "\(inTheWay) files"
         return rolledBackLine(course: course, section: section, phase: phase, files: putBack)
             + ", found \(counted) changed by hand since, and cleared the list"
+    }
+
+    /// `ICS3U/1 · the undo list kept the folder courses/ICS3U/made aside,
+    /// hidden as .made.plantoir-undo-3-redo-orig, because it was changed
+    /// while a change that stopped had set it aside`.
+    static func keptAFolderAsideLine(course: String, section: Int?, place: String, hiddenName: String) -> String {
+        var line: String = course
+        if let section {
+            line += "/\(section)"
+        }
+        return line + " · the undo list kept the folder \(place) aside, hidden as \(hiddenName), because it was changed while a change that stopped had set it aside"
     }
 
     /// `ICS3U/1 · the undo list put back 2 files left part way by a change

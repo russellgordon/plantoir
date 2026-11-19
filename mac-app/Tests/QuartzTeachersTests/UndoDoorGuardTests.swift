@@ -173,4 +173,40 @@ final class UndoDoorGuardTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), [])
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("courses/TST1O/a.md").path))
     }
+
+    /// The second hard review of U2b, MEDIUM 3 (probe T): a Redo of a
+    /// removed folder that dies with the folder aside, a file saved into it
+    /// meanwhile: recovery keeps it aside, whole, and records the step
+    /// interrupted, never settled as if the folder were gone. FAILED on
+    /// 211f8d213, which settled the redo as done.
+    func testAFolderChangedWhileAsideIsInTheWayNotSettled() async throws {
+        let made = try UndoContractReplay.scratch(under: parent, named: "t")
+        let root: URL = made.root
+        try UndoContractReplay.write("precious\n", to: "courses/TST1O/made/a.md", in: root)
+        let folder: URL = root.appendingPathComponent("courses/TST1O/made")
+        guard case .tree(let listing, let contents) = UndoTreeReading.read(at: folder, keepingContents: true) else {
+            return XCTFail("no listing")
+        }
+        var blobs: [Data] = [listing.data]
+        for (_, data) in contents {
+            blobs.append(data)
+        }
+        let op: UndoOp = UndoOp.tree(.removeTree, path: "courses/TST1O/made", listing: listing)
+        let journal: UndoJournal = UndoJournal(folderURL: made.journalFolder)
+        XCTAssertEqual(JournaledWrite.perform(ops: UndoContractKinds.draft(ops: [op], blobs: blobs, root: root, action: "removeFolder"), in: journal, mode: .live, places: UndoMemoryPlaces()), .applied(seq: 1))
+        XCTAssertEqual(journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces()), .undone(seq: 1))
+        UndoKillPoints.hook = { point in point == .beforeSwap(0) }
+        _ = journal.redoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+        UndoKillPoints.hook = nil
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "1-redo", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+        try Data("saved during the walk\n".utf8).write(to: aside.appendingPathComponent("new.md"))
+        let later: UndoJournal = UndoJournal(folderURL: made.journalFolder, processIsAlive: { _ in false })
+
+        await UndoRecovery.recoverAndRederive(later, resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+
+        XCTAssertEqual(try later.read().records[1]?.phase, .interrupted)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("new.md").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+    }
 }
