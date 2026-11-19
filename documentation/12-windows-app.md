@@ -14729,20 +14729,27 @@ found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
   the review: 3,000 of 3,000 moved under a concurrent maker), greying Undo
   for that folder for good. `Read()` now takes the identity (volume serial,
   file index) from the SAME handle it read the bytes through, and
-  `SetAside(inspected)` moves only that file; the file moved is checked
-  again after the move and goes straight back if the name was replaced in
-  between. `AGoodFileThatReplacedTheOneInspectedIsNeverMovedAside` uses a
-  seam after the move to make a third file at the name, as the review's race
-  did; the old test that set aside a GOOD file is rewritten so the identifier
-  is written into the same file the look found empty.
+  `SetAside(inspected)` opens the name once with delete access (sharing
+  everything), compares THAT handle with the identity inspected, reads it
+  again, and renames through it (`SetFileInformationByHandle`,
+  `FileRenameInfo`, never replacing). The first fix compared by path and
+  then moved by path, which the review's second round showed still lets
+  another process set the damaged file aside and make a good one between
+  the two, so the good one was moved (and a move back fails once a third has
+  made its own). Through the handle, what is moved is provably the file
+  inspected, wherever it now is. `AFileSetAsideByAnotherProcessBetweenThe
+  CheckAndTheRenameIsNeverTheGoodOne` runs exactly that interleaving
+  through a seam between the check and the rename. A creator still writing
+  holds its file with no sharing, so the open fails and nothing moves. The
+  mac's equivalent (compare and rename by descriptor) is #1004, item 1.
 - **M1, a page gone with its drive.** A page whose folder is not there reads
   `Absent`, which is `changedSince`, and ruling 13 would clear the whole list.
   `UndoCheck.Plan` takes `folderIsReachable` and asks it again when every page
   in the way is absent; when the folder cannot be reached the answer is
   `FolderCannotBeReached` (greyed, nothing cleared). W2's door must pass it.
-  It is cross-platform (an unplugged volume on the mac): proposed to the mac
-  as a case, "a page absent while its working folder cannot be reached is
-  not changed since".
+  This follows the rule the mac adopts in U2b (#899): a failed read or a
+  folder that cannot be reached is "cannot tell now", refused without
+  clearing the list.
 - **M2, a stale reading.** A reading that is not fresh holds the LAST state
   read (empty on a first read) beside the segments on the disk now, and
   deletion decided from that mix made live blobs deletable. Pruning and
@@ -14753,12 +14760,16 @@ found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
   is right, but recovery (W3) writes pages, and a live process of another
   version might still be swapping files: `RecoveryMaySettle(null)` is false.
   Proposed to the mac as a `recoveryCases` row.
-- **M4, a `madeAt` that does not parse** (an offset instead of `Z`). The step
-  is unreadable, and its time was the oldest moment there is, so it expired at
-  once: no barrier, pruned on the next step. It now takes its begin line's
-  `at`, else the clock: it stands as a barrier and is not pruned for age.
-  Proposed to the mac as a case (the contract does not say what the time of
-  such a step is).
+- **M4, a `madeAt` that does not parse.** Its time was the oldest moment
+  there is, so it expired at once: no barrier, pruned on the next step. It
+  now does what the mac's `effectiveTimes` does: it carries the previous
+  step's time, or has none, and a step with none never ages out (it stands
+  as a barrier and is not pruned for age). The first fix took the begin's
+  `at`, else the clock, which made that step and every later one never age
+  out; the second round removed it. A `madeAt` (or `at`) with an offset such
+  as `+00:00` IS a moment, read into UTC as the mac's `UndoMoment.date`
+  reads it; before, Windows made such a step unreadable. Settling this for
+  both in the contract is #1004, item 4.
 
 **The mac's U2a read rule**, applied at the same time: a file of the list that
 is there and cannot be opened or read is never an empty or shorter list. A
@@ -14767,6 +14778,10 @@ segment gone since the listing makes the reading not fresh; only an older
 segment pruned since the listing is passed over. A blob that is there and
 cannot be read throws `UndoListUnreadableException` (never content missing,
 which clears the list), and so does a content folder that cannot be listed.
+Neither folder is asked `Directory.Exists` first, which answers false for a
+folder it could not look at: only `DirectoryNotFoundException` is "not
+there". Here Windows is stricter than the mac today: a newest segment gone,
+and these listings, are #1004 items 2 and the closing paragraph.
 `UndoJournal` takes an `open` seam for the tests of each.
 
 **Known differences to KNOW** (not to do): a key twice in one object is read

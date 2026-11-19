@@ -94,15 +94,18 @@ internal sealed class UndoJournal
     internal IReadOnlyList<(int Number, string Path)> Segments()
     {
         var found = new List<(int, string)>();
-        if (!Directory.Exists(Folder)) return found;
         try
         {
+            // No Directory.Exists first: it answers false for a folder it could
+            // not look at, which would make an error an empty list. Only a
+            // folder that is not there is no segments.
             foreach (string path in Directory.EnumerateFiles(Folder, "journal-*.jsonl"))
             {
                 Match match = SegmentName.Match(Path.GetFileName(path));
                 if (match.Success) found.Add((int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture), path));
             }
         }
+        catch (DirectoryNotFoundException) { return found; }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             throw new UndoListUnreadableException("The list's folder could not be listed.", error);
@@ -176,9 +179,9 @@ internal sealed class UndoJournal
     {
         string content = Path.Combine(Folder, "content");
         var names = new List<string>();
-        if (!Directory.Exists(content)) return names;
         try
         {
+            // As in Segments: only a content folder that is not there is no blobs.
             foreach (string folder in Directory.EnumerateDirectories(content))
             {
                 foreach (string file in Directory.EnumerateFiles(folder))
@@ -188,6 +191,7 @@ internal sealed class UndoJournal
                 }
             }
         }
+        catch (DirectoryNotFoundException) { return names; }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             throw new UndoListUnreadableException("The list's content folder could not be listed.", error);
@@ -252,13 +256,6 @@ internal sealed class UndoJournal
 internal static class UndoJournalChecks
 {
     /// <summary>
-    /// Whether a step's process is still running, by the liveness rule the
-    /// work leases already use (<c>WorkLease.OwnerIsAlive</c>: the id, then the
-    /// process table's name and start time). A step with no process it can
-    /// read is judged gone, so content-based recovery can settle it and it is
-    /// never left in flight for ever.
-    /// </summary>
-    /// <summary>
     /// Whether recovery (W3), which writes pages, may settle a step in flight
     /// for its process being gone. A step whose process this version cannot
     /// identify (no <c>process</c>, or one whose shape it does not know) is
@@ -270,6 +267,13 @@ internal static class UndoJournalChecks
     /// </summary>
     internal static bool RecoveryMaySettle(UndoProcess? process) => process is not null && !ProcessIsAlive(process);
 
+    /// <summary>
+    /// Whether a step's process is still running, by the liveness rule the
+    /// work leases already use (<c>WorkLease.OwnerIsAlive</c>: the id, then the
+    /// process table's name and start time). A step with no process it can
+    /// read is judged gone for the offer and for pruning, so it is never left
+    /// in flight for ever; recovery asks <see cref="RecoveryMaySettle"/>.
+    /// </summary>
     internal static bool ProcessIsAlive(UndoProcess? process) =>
         process is not null && process.Pid is > 0 and <= int.MaxValue
         && WorkLease.OwnerIsAlive((int)process.Pid, process.Name, process.Started, "undo");

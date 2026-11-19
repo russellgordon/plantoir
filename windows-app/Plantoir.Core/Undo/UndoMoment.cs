@@ -7,11 +7,15 @@ namespace Plantoir.Core.Undo;
 /// UTC, ISO 8601, to the second, <c>2026-11-13T21:04:05Z</c>; a reader also
 /// accepts fractions of a second (#899, W1).
 ///
-/// <para>Invariant culture always, and a trailing <c>Z</c> required: a moment
-/// with an offset, or a local time, is not one this format writes, and reading
-/// it as UTC would move a step's time by hours. A moment that does not parse
-/// is treated as absent by the caller (an <c>at</c> is optional on read), never
-/// guessed at.</para>
+/// <para>Invariant culture always. Read as the Mac's <c>UndoMoment.date</c>
+/// reads (an ISO 8601 internet date-time): a trailing <c>Z</c>, or an offset
+/// such as <c>+00:00</c> or <c>-05:00</c>, which is turned into UTC; fractions
+/// of a second with either (the W1 review's second round: Windows made such a
+/// step unreadable where the Mac reads it). A local time with neither is not
+/// a moment: reading it as UTC would move a step's time by hours. A moment
+/// that does not parse is treated as absent by the caller (an <c>at</c> is
+/// optional on read), never guessed at. Writers still write only the
+/// <c>Z</c> spelling.</para>
 /// </summary>
 internal static class UndoMoment
 {
@@ -19,6 +23,8 @@ internal static class UndoMoment
     [
         "yyyy-MM-dd'T'HH:mm:ss'Z'",
         "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'",
+        "yyyy-MM-dd'T'HH:mm:sszzz",
+        "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz",
     ];
 
     /// <summary>The moment, or null when the text is not the journal's spelling of one.</summary>

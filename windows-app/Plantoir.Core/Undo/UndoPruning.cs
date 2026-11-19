@@ -43,13 +43,14 @@ internal static class UndoPruning
     {
         var actions = new List<UndoPruneAction>();
         bool trustTheClock = folded.NewestWritten is not { } newest || newest - now <= UndoLimits.ClockTolerance;
-        Dictionary<long, DateTimeOffset> times = UndoLimits.StepTimes(folded, now);
+        Dictionary<long, DateTimeOffset> times = UndoLimits.StepTimes(folded);
         var listed = folded.OnTheList.ToList();
         int remaining = listed.Count;
         foreach (UndoFoldedStep step in listed)
         {
             bool tooMany = remaining > UndoLimits.StepsKept;
-            bool tooOld = trustTheClock && times[step.Seq] < now - (UndoLimits.DaysKept + UndoLimits.Grace);
+            bool tooOld = trustTheClock && times.TryGetValue(step.Seq, out DateTimeOffset time)
+                          && time < now - (UndoLimits.DaysKept + UndoLimits.Grace);   // no time: never too old
             if (step.IsInFlight)
             {
                 if (isAlive(step.Process) || (!tooMany && !tooOld)) break;

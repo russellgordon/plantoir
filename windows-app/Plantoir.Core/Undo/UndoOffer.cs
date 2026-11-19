@@ -60,19 +60,21 @@ internal static class UndoLimits
     /// the steps before it. Taken over every step in seq order, as the
     /// reference model does.
     /// </summary>
-    internal static Dictionary<long, DateTimeOffset> StepTimes(UndoFolded folded, DateTimeOffset now)
+    internal static Dictionary<long, DateTimeOffset> StepTimes(UndoFolded folded)
     {
         var times = new Dictionary<long, DateTimeOffset>();
         DateTimeOffset? running = null;
         foreach (UndoFoldedStep step in folded.Steps.Values)
         {
-            // A madeAt that cannot be read (the step is then unreadable) takes
-            // its begin line's at, else the clock: never the oldest moment
-            // there is, which made such a step expired at once, so it was no
-            // barrier and was pruned on the next step (the W1 review's M4).
-            DateTimeOffset made = step.Step.MadeAt ?? step.BeganAt ?? now;
-            if (running is null || made > running) running = made;
-            times[step.Seq] = running.Value;
+            // A madeAt that is not a moment (the step is then unreadable)
+            // gives the step no time of its own: it carries the previous
+            // step's time, or none, as the Mac's effectiveTimes does. A step
+            // with no time never ages out. Before the W1 review it was the
+            // oldest moment there is (expired at once: no barrier, pruned on
+            // the next step); the first fix's "else the clock" made it and
+            // every later step never age out (the review's second round).
+            if (step.Step.MadeAt is { } made && (running is null || made > running)) running = made;
+            if (running is { } time) times[step.Seq] = time;
         }
         return times;
     }
@@ -96,7 +98,7 @@ internal static class UndoLimits
     internal static UndoOffered Offer(UndoFolded folded, DateTimeOffset now,
                                       Func<UndoProcess?, bool> isAlive, Func<UndoStep, bool> canReach)
     {
-        Dictionary<long, DateTimeOffset> times = StepTimes(folded, now);
+        Dictionary<long, DateTimeOffset> times = StepTimes(folded);
         DateTimeOffset judged = JudgedAt(now, times.Values);
         var listed = folded.OnTheList.ToList();
 
@@ -104,7 +106,7 @@ internal static class UndoLimits
         long expired = 0;
         foreach (UndoFoldedStep step in listed)
         {
-            if (times[step.Seq] < judged - DaysKept) expired = step.Seq;
+            if (times.TryGetValue(step.Seq, out DateTimeOffset time) && time < judged - DaysKept) expired = step.Seq;
         }
         var remaining = listed.Where(step => step.Seq > expired).ToList();
         int skip = Math.Max(0, remaining.Count - StepsKept);

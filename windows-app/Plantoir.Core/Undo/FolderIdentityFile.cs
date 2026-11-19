@@ -27,9 +27,11 @@ namespace Plantoir.Core.Undo;
 /// because FAT keeps a modification time to two seconds). Otherwise it is set
 /// aside as <c>folder-id.unreadable-&lt;uuid&gt;</c>, only while it is still
 /// the file inspected (the same file on its volume, by the identity the read
-/// took from its own handle: the W1 review's H1), and a file found to hold
-/// an identifier once it is aside is put back with a move that fails if the
-/// name has been taken: a good identifier is never moved away.</para>
+/// took from its own handle: the W1 review's H1), and it is renamed aside
+/// through the very handle that was compared and read again, so the file
+/// moved is always the one inspected and a good file another process made
+/// at the name is never moved (the review's second round; see
+/// <see cref="SetAside"/>).</para>
 ///
 /// <para>Nothing in the app calls this yet: the first step recorded in a folder
 /// makes its <c>folder-id</c> (W2's door, W4's start-up for
@@ -194,62 +196,57 @@ internal sealed class FolderIdentityFile
     /// Sets an unreadable file aside, only while it is still the file
     /// <paramref name="inspectedByTheRead"/> names: the identity
     /// <see cref="Read"/> took from the handle it found the file unreadable
-    /// through. Returns an identifier when the file set aside turns out to
-    /// hold one and was put back (or the name now holds one); otherwise null,
-    /// and the caller looks again.
+    /// through. Returns an identifier when the file at the name turns out to
+    /// hold one by now; otherwise null, and the caller looks again.
     ///
-    /// <para>Before the W1 review's H1 this took the identity at the moment
-    /// of the call and compared the file with itself, so the guard always
-    /// passed: a GOOD file another process had just made in place of the
-    /// damaged one was moved aside, and when a third made a new one before the
-    /// put-back, every step recorded under the good identifier could never
-    /// reach its folder again (measured by the review: 3,000 moved of 3,000).
-    /// Now a file that is not the one inspected is left where it is, and the
-    /// file moved is checked once more after the move: if the name was
-    /// replaced in the microseconds between the comparison and the move, the
-    /// file moved aside is not the one inspected and goes straight back.</para>
+    /// <para>The name is opened ONCE, asking for delete access and sharing
+    /// everything, and that one handle is compared with the identity
+    /// inspected, read again (still no identifier in it), and renamed aside
+    /// through (<c>SetFileInformationByHandle</c>, <c>FileRenameInfo</c>, never
+    /// replacing a name). So what is moved is provably the file inspected,
+    /// wherever another process has moved it meanwhile, and a good file
+    /// another process made at the name is never touched. A creator still
+    /// writing its file holds it with no sharing, so the open fails and
+    /// nothing moves; nothing writes into a finished identifier file.</para>
+    ///
+    /// <para>Rejected, by the W1 review's two rounds: taking the identity at
+    /// the moment of the call (it compared the file with itself, and a good
+    /// identifier was set aside 3,000 times of 3,000 under a concurrent
+    /// maker); comparing by path and then moving by path (another process
+    /// could set the damaged file aside and make a good one between the two,
+    /// and the good one was moved; a move back fails once a third has made its
+    /// own, stranding every step under the good identifier).</para>
     /// </summary>
     internal string? SetAside((ulong Volume, ulong Index)? inspectedByTheRead)
     {
         if (inspectedByTheRead is not { } inspected) return null;   // the read opened nothing: nothing to set aside
         string aside = FilePath + ".unreadable-" + Guid.NewGuid().ToString("D");
+        using SafeFileHandle handle = CreateFileW(LongPath(FilePath), GenericRead | DeleteAccess,
+            FileShareRead | FileShareWrite | FileShareDelete, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        if (handle.IsInvalid) return null;   // gone, held with no sharing (a creator at work), or denied: look again
+        if (IdentityOf(handle) != inspected) return null;   // another process replaced it: look again
+
+        byte[] bytes;
         try
         {
-            if (FileIdentity(FilePath) != inspected) return null;   // another process replaced it: look again
-            _betweenCheckAndRename?.Invoke();
-            File.Move(FilePath, aside, overwrite: false);
+            long length = RandomAccess.GetLength(handle);
+            if (length > 4096) length = 4096;   // an identifier file is 37 bytes; more is damaged whatever it holds
+            bytes = new byte[length];
+            int read = 0;
+            while (read < bytes.Length)
+            {
+                int got = RandomAccess.Read(handle, bytes.AsSpan(read), read);
+                if (got == 0) break;
+                read += got;
+            }
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+        if (IdentifierIn(new UTF8Encoding(false, false).GetString(bytes)) is { } held) return held;   // it holds one by now
 
-        if (FileIdentity(aside) != inspected)
-        {
-            // Replaced between the comparison and the move: what was moved is
-            // somebody else's file, never ours to set aside.
-            try
-            {
-                File.Move(aside, FilePath, overwrite: false);
-                return null;
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-        }
-
-        // The file now aside: if another process wrote an identifier into it
-        // between our look and the move, it goes back.
-        string? held = null;
-        try { held = IdentifierIn(new UTF8Encoding(false, false).GetString(File.ReadAllBytes(aside))); } catch { }
-        if (held is null) return null;
-        try
-        {
-            File.Move(aside, FilePath, overwrite: false);
-            return held;
-        }
-        catch (IOException)
-        {
-            // The name has been taken meanwhile: that file is the answer.
-            return Read() is { Outcome: Outcome.Identifier } answer ? answer.Identifier : null;
-        }
+        _betweenCheckAndRename?.Invoke();
+        RenameThrough(handle, Path.GetFullPath(aside));
+        return null;
     }
 
     // ---- Windows -------------------------------------------------------------
@@ -297,4 +294,45 @@ internal sealed class FolderIdentityFile
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CreateHardLinkW(string fileName, string existingFileName, IntPtr securityAttributes);
+
+    private const uint GenericRead = 0x80000000;
+    private const uint DeleteAccess = 0x00010000;
+    private const uint FileShareRead = 1, FileShareWrite = 2, FileShareDelete = 4;
+    private const uint OpenExisting = 3;
+    private const int FileRenameInfoClass = 3;
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern SafeFileHandle CreateFileW(string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes,
+                                                     uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(SafeFileHandle file, int informationClass, IntPtr information, uint size);
+
+    /// <summary>
+    /// Renames the file an open handle is on to <paramref name="newPath"/> (a
+    /// full path), never replacing a file there: <c>FILE_RENAME_INFO</c> is a
+    /// replace flag (padded to a pointer), the root directory (none), the
+    /// name's length in bytes, then the name. False when it is refused.
+    /// </summary>
+    private static bool RenameThrough(SafeFileHandle handle, string newPath)
+    {
+        string name = LongPath(newPath);
+        int rootOffset = IntPtr.Size;                 // after the 4-byte flag, aligned to a pointer
+        int lengthOffset = rootOffset + IntPtr.Size;
+        int nameOffset = lengthOffset + sizeof(uint);
+        int nameBytes = name.Length * sizeof(char);
+        int size = nameOffset + nameBytes + sizeof(char);
+        IntPtr buffer = Marshal.AllocHGlobal(size);
+        try
+        {
+            for (int offset = 0; offset < size; offset++) Marshal.WriteByte(buffer, offset, 0);   // no replace, no root
+            Marshal.WriteInt32(buffer, lengthOffset, nameBytes);
+            Marshal.Copy(name.ToCharArray(), 0, buffer + nameOffset, name.Length);
+            return SetFileInformationByHandle(handle, FileRenameInfoClass, buffer, (uint)size);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
 }
