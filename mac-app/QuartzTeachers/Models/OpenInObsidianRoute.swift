@@ -144,15 +144,17 @@ struct ObsidianOpening {
     }
 
     /// Opens a folder in Obsidian — registering the course first when
-    /// Obsidian has never seen it.
-    var open: @MainActor (_ folder: URL, _ vault: URL) -> Void = { folder, vault in
-        FolderActions.openInObsidian(revealing: folder, vaultURL: vault)
+    /// Obsidian has never seen it and is not running. False: nothing was
+    /// handed over, because Obsidian is running and would have to close
+    /// first (#995); the route asks.
+    var open: @MainActor (_ folder: URL, _ vault: URL) -> Bool = { folder, vault in
+        return FolderActions.openInObsidian(revealing: folder, vaultURL: vault)
     }
 
     /// Opens one page in Obsidian (#518) — the page's own door, since the
     /// folder door looks for `<page>/index.md` and opens the vault instead.
-    var openPage: @MainActor (_ page: URL, _ vault: URL) -> Void = { page, vault in
-        FolderActions.openPageInObsidian(page, vaultURL: vault)
+    var openPage: @MainActor (_ page: URL, _ vault: URL) -> Bool = { page, vault in
+        return FolderActions.openPageInObsidian(page, vaultURL: vault)
     }
 
     /// The address below its root of the page a section's preview is
@@ -175,9 +177,10 @@ struct ObsidianOpening {
 
     /// The answer "Close Obsidian and Open" (#995): closes Obsidian, adds the
     /// course to its list and opens again what it had on screen. Called only
-    /// from that answer, never on a press.
-    var closeAndRegister: @MainActor (_ vault: URL) async -> Void = { vault in
-        await FolderActions.closeObsidianAndRegister(vaultURL: vault)
+    /// from that answer, never on a press. Answers whether Obsidian closed;
+    /// when it did not, nothing was written and `target` was opened as it is.
+    var closeAndRegister: @MainActor (_ target: URL, _ vault: URL) async -> Bool = { target, vault in
+        return await FolderActions.closeObsidianAndRegister(vaultURL: vault, target: target)
     }
 
     /// Opens these vaults again, in order.
@@ -435,12 +438,25 @@ extension WorkspaceModel {
     /// "Close Obsidian to open {course}?" was answered (#995). Close Obsidian
     /// and Open closes it, adds the course to its list and opens what was
     /// asked for; Cancel opens nothing and closes nothing.
+    ///
+    /// Asked again at the answer: if Obsidian has quit meanwhile, or now
+    /// knows the course, it simply opens, and nothing is closed. If
+    /// Obsidian does not close, nothing is written and the file is opened
+    /// as it is (`FolderActions.closeObsidianAndRegister`).
     func answerObsidianClosing(_ request: ObsidianClosingRequest, closeObsidian: Bool) async {
         obsidianClosingRequest = nil
         if !closeObsidian {
             return
         }
-        await obsidianOpening.closeAndRegister(request.course.directoryURL)
+        let target: URL = WorkspaceModel.obsidianTarget(request.folder, page: request.page, course: request.course)
+        if !mustCloseObsidian(toOpen: target) {
+            openObsidian(request.folder, page: request.page, course: request.course)
+            return
+        }
+        let closed: Bool = await obsidianOpening.closeAndRegister(target, request.course.directoryURL)
+        if !closed {
+            return
+        }
         handToObsidian(request.folder, page: request.page, course: request.course)
     }
 
@@ -508,31 +524,48 @@ extension WorkspaceModel {
     /// never seen — nothing is opened or closed, and the question
     /// "Close Obsidian to open {course}?" waits instead
     /// (`obsidianClosingRequest`). Plantoir never closes Obsidian unasked.
+    ///
+    /// Obsidian starting between this check and the open is caught too: the
+    /// open then hands nothing over and answers false, and the question is
+    /// asked instead of the press doing nothing.
     private func openObsidian(_ folder: URL, page: URL?, course: Course) {
-        var target: URL = FolderActions.obsidianTarget(forFolder: folder, vaultURL: course.directoryURL)
-        if let page {
-            target = FolderActions.pageTarget(page, vaultURL: course.directoryURL)
-        }
-        if ObsidianClosingRule.mustAsk(
-            targetPath: target.path,
-            obsidianRunning: obsidianOpening.isRunning(),
-            registryData: obsidianOpening.registryData()
-        ) {
+        let target: URL = WorkspaceModel.obsidianTarget(folder, page: page, course: course)
+        if mustCloseObsidian(toOpen: target) {
             obsidianClosingRequest = ObsidianClosingRequest(course: course, folder: folder, page: page)
             return
         }
-        handToObsidian(folder, page: page, course: course)
+        if !handToObsidian(folder, page: page, course: course) {
+            obsidianClosingRequest = ObsidianClosingRequest(course: course, folder: folder, page: page)
+        }
+    }
+
+    /// The file Obsidian is handed: the page, or the folder's own page.
+    private static func obsidianTarget(_ folder: URL, page: URL?, course: Course) -> URL {
+        if let page {
+            return FolderActions.pageTarget(page, vaultURL: course.directoryURL)
+        }
+        return FolderActions.obsidianTarget(forFolder: folder, vaultURL: course.directoryURL)
+    }
+
+    /// `ObsidianClosingRule.mustAsk`, read now.
+    private func mustCloseObsidian(toOpen target: URL) -> Bool {
+        return ObsidianClosingRule.mustAsk(
+            targetPath: target.path,
+            obsidianRunning: obsidianOpening.isRunning(),
+            registryData: obsidianOpening.registryData()
+        )
     }
 
     /// The one place Open in Obsidian hands Obsidian something: the page the
     /// section's preview was showing when there is one (#518), the folder
     /// (its front page, or the course) otherwise.
-    private func handToObsidian(_ folder: URL, page: URL?, course: Course) {
+    /// False: nothing was handed over, because Obsidian would have to close.
+    @discardableResult
+    private func handToObsidian(_ folder: URL, page: URL?, course: Course) -> Bool {
         if let page {
-            obsidianOpening.openPage(page, course.directoryURL)
-            return
+            return obsidianOpening.openPage(page, course.directoryURL)
         }
-        obsidianOpening.open(folder, course.directoryURL)
+        return obsidianOpening.open(folder, course.directoryURL)
     }
 
     /// A section's press (#518): the file behind the page its preview is

@@ -1146,6 +1146,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             log.opened.append(folder.path)
             let entries: [String] = (try? FileManager.default.contentsOfDirectory(atPath: vault.appendingPathComponent(".obsidian/plugins").path)) ?? []
             log.pluginsAtOpen.append(entries.sorted())
+            return true
         }
         opening.quitAndWait = {
             log.quits += 1

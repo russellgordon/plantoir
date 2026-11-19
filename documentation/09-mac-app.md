@@ -1620,8 +1620,11 @@ value wrapped. The test fails on that version and passes on this one.
 
 **The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
 shape inside its dialog. When Obsidian is running, Add Them closes the whole of
-Obsidian, so any OTHER course open in it closes too, and only this course
-opens again; the sentence said neither. `offerWhileOpen` and
+Obsidian, so any OTHER course open in it closes too; the sentence did not
+say so. (This said "and only this course opens again" until #995: the code
+reopens every course the list marks open, this one last, and only this one
+when the list cannot be read; `opensAgainValue` now says "{course}, and each
+other course Plantoir saw open in it".) `offerWhileOpen` and
 `offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
 line as "label: value" (`closesLabel`/`closesValue`,
 `opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
@@ -8872,8 +8875,17 @@ question asks rather than closing straight away (it used to close at once).
 **Words and cases:** `contracts/shared-rules.json` → `obsidianNeverClosedUnasked`
 (`closeCases`, `wording`, `knownLimits`, `rejected`). Tests:
 `ObsidianNeverClosedUnaskedTests`, and `ObsidianFigureAddOnsTests.testAddThemChecksAgainWhenAnswered`
-(changed on purpose: it asserted the old unasked close). Windows is brought to
-match in stage 3 of #975; its tests do not read the new key yet.
+(changed on purpose: it asserted the old unasked close). Windows owes the same
+under #1003 (v2.0.0); its tests do not read the new key yet. The add-ons
+offer's step 6 in `obsidianAddOnsForFigures.sequence` says the same.
+
+**Asked again at the answer** (review of #995): if Obsidian has quit or now
+knows the course, it just opens. If Obsidian does not close after the wait,
+nothing is written under it and the file is opened as it is, the way the
+add-ons' reopen does (`FolderActions.closeObsidianAndRegister` answers
+whether it closed). And if Obsidian starts between the route's check and the
+open, `FolderActions.open` hands nothing over and answers false, and the
+route asks instead of the press doing nothing.
 
 **Rejected:** opening the course without registering it (Obsidian shows its
 own "vault not found"); registering under a running Obsidian (the addition is

@@ -169,6 +169,97 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         XCTAssertEqual(made.log.closes, [])
     }
 
+    /// Review LOW 3: Obsidian started between the route's check and the
+    /// open. The open hands nothing over, and the question is asked rather
+    /// than the press doing nothing.
+    func testObsidianStartingAfterTheCheckStillAsks() throws {
+        let made: Driven = try drive()
+        made.log.running = false
+        made.log.openHandsOver = false
+        XCTAssertFalse(made.workspace.openInObsidian(course: made.course, sectionNumber: nil))
+        XCTAssertNotNil(made.workspace.obsidianClosingRequest, "the press did nothing at all")
+        XCTAssertEqual(made.log.closes, [])
+    }
+
+    /// Review LOW 2: at the answer the situation is read again. Obsidian
+    /// quit meanwhile, or came to know the course: it just opens, and
+    /// nothing is closed.
+    func testTheAnswerLooksAgainBeforeClosing() async throws {
+        let made: Driven = try drive()
+        made.log.running = true
+        made.log.registryVaults = []
+        made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
+        let request: ObsidianClosingRequest = try XCTUnwrap(made.workspace.obsidianClosingRequest)
+        made.log.running = false
+        await made.workspace.answerObsidianClosing(request, closeObsidian: true)
+        XCTAssertEqual(made.log.closes, [], "closed an Obsidian that had already quit")
+        XCTAssertEqual(made.log.opened, [made.course.directoryURL.path])
+
+        made.log.running = true
+        made.log.registryVaults = []
+        made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
+        let second: ObsidianClosingRequest = try XCTUnwrap(made.workspace.obsidianClosingRequest)
+        made.log.registryVaults = [made.course.directoryURL.path]
+        await made.workspace.answerObsidianClosing(second, closeObsidian: true)
+        XCTAssertEqual(made.log.closes, [], "closed an Obsidian that already knew the course")
+        XCTAssertEqual(made.log.opened.count, 2)
+    }
+
+    /// Review LOW 1, the route's half: Obsidian did not close, so the
+    /// route hands it nothing more.
+    func testAnObsidianThatDoesNotCloseIsHandedNothingMore() async throws {
+        let made: Driven = try drive()
+        made.log.running = true
+        made.log.registryVaults = []
+        made.log.closeSucceeds = false
+        made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
+        let request: ObsidianClosingRequest = try XCTUnwrap(made.workspace.obsidianClosingRequest)
+        await made.workspace.answerObsidianClosing(request, closeObsidian: true)
+        XCTAssertEqual(made.log.closes, [made.course.directoryURL.path])
+        XCTAssertEqual(made.log.opened, [])
+        XCTAssertEqual(made.log.registryVaults, [])
+    }
+
+    /// Review LOW 1, FolderActions' half: after the quit, a still-running
+    /// Obsidian is never written under; the file opens as it is. Once it is
+    /// gone, the list is written and what was on screen opens again.
+    func testCloseAndRegisterWritesNothingUnderAnObsidianThatStayed() async throws {
+        let vault: URL = URL(fileURLWithPath: "/w/MPM2D")
+        let target: URL = URL(fileURLWithPath: "/w/MPM2D/index.md")
+        var registered: [String] = []
+        var reopened: [[String]] = []
+        var openedAsItIs: [String] = []
+        var quits: Int = 0
+        let stayed: Bool = await FolderActions.closeObsidianAndRegister(
+            vaultURL: vault, target: target,
+            vaultsOnScreen: { return ["/w/ICS3U"] },
+            quit: { quits += 1 },
+            stillRunning: { return true },
+            register: { url in registered.append(url.path) },
+            reopen: { paths in reopened.append(paths) },
+            openAsItIs: { url in openedAsItIs.append(url.path) }
+        )
+        XCTAssertFalse(stayed)
+        XCTAssertEqual(quits, 1)
+        XCTAssertEqual(registered, [], "written under a running Obsidian")
+        XCTAssertEqual(reopened, [])
+        XCTAssertEqual(openedAsItIs, [target.path])
+
+        let closed: Bool = await FolderActions.closeObsidianAndRegister(
+            vaultURL: vault, target: target,
+            vaultsOnScreen: { return ["/w/ICS3U"] },
+            quit: { quits += 1 },
+            stillRunning: { return false },
+            register: { url in registered.append(url.path) },
+            reopen: { paths in reopened.append(paths) },
+            openAsItIs: { url in openedAsItIs.append(url.path) }
+        )
+        XCTAssertTrue(closed)
+        XCTAssertEqual(registered, [vault.path])
+        XCTAssertEqual(reopened, [["/w/ICS3U"]])
+        XCTAssertEqual(openedAsItIs, [target.path], "opened as it is only when it stayed")
+    }
+
     // MARK: - Nothing else can close it
 
     /// The only code that closes Obsidian is the answer to a question that
@@ -233,6 +324,12 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         var closes: [String] = []
         var running: Bool = false
         var registryVaults: [String] = []
+        /// False: the open finds Obsidian running and hands nothing over,
+        /// as `FolderActions.open` does when Obsidian started after the
+        /// route's check.
+        var openHandsOver: Bool = true
+        /// False: Obsidian did not close when asked to.
+        var closeSucceeds: Bool = true
     }
 
     struct Driven {
@@ -268,17 +365,30 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
             return try? ObsidianFigureAddOnsTests.registry(vaults: log.registryVaults, open: true)
         }
         opening.open = { folder, _ in
+            if !log.openHandsOver {
+                return false
+            }
             log.opened.append(folder.path)
+            return true
         }
         opening.openPage = { page, _ in
+            if !log.openHandsOver {
+                return false
+            }
             log.openedPages.append(page.path)
+            return true
         }
         opening.quitAndWait = {
             log.closes.append("quit")
         }
-        opening.closeAndRegister = { vault in
+        opening.closeAndRegister = { _, vault in
             log.closes.append(vault.path)
+            if !log.closeSucceeds {
+                return false
+            }
             log.registryVaults.append(vault.path)
+            log.running = true
+            return true
         }
         opening.reopen = { _ in }
         opening.previewedAddress = { _, _, _ in

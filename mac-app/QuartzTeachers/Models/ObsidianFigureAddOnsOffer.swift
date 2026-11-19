@@ -58,11 +58,14 @@ nonisolated enum ObsidianFigureAddOnsWording {
 
     /// The facts under either sentence, a line each (#834, Russell on #742):
     /// Add Them closes the whole of Obsidian, so every other course open in
-    /// it closes too, and only this course opens again.
+    /// it closes too. What opens again is every course Obsidian's list marks
+    /// open, this one last (`reopenObsidianWithAddOns`), which is none but
+    /// this one when the list cannot be read. Until #995 the value said
+    /// "{course} only", which was true only in that second case.
     static let closesLabel: String = "Closes"
     static let closesValue: String = "Obsidian, with every course open in it, not only {course}"
     static let opensAgainLabel: String = "Opens again"
-    static let opensAgainValue: String = "{course} only"
+    static let opensAgainValue: String = "{course}, and each other course Plantoir saw open in it"
     static let keptLabel: String = "Kept"
     static let keptValue: String = "Everything you have written"
 
