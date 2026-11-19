@@ -375,7 +375,9 @@ nonisolated enum JournaledWrite {
             if case .refused(let refusal) = plan {
                 return .refused(refusal)
             }
-            return .refused(.notReadable)
+            // Content the step needs is in the list and cannot be read just
+            // now: nothing was changed, and the step is not made.
+            return .couldNotRecordTheStep
         }
         switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places) {
         case .refused(let refusal):
@@ -955,6 +957,17 @@ nonisolated enum UndoKillPoints {
     /// network home that drops mid-read does (`UndoFileReads`). Set only by
     /// tests.
     nonisolated(unsafe) static var readOfTheListFails: (() -> Bool)?
+
+    /// Answers true to make opening this file of the list (a segment, a
+    /// blob, or a working folder's identifier file) fail as a failing disk,
+    /// a permission or too many open files does (`UndoFileReads.openFile`):
+    /// never as a file that is gone. Set only by tests.
+    nonisolated(unsafe) static var openFails: ((URL) -> Bool)?
+
+    /// Answers an error number to make keeping the original at this index
+    /// fail as the copy a volume without hard links falls back to does
+    /// (`UndoSwap.keep`); nil lets it go ahead. Set only by tests.
+    nonisolated(unsafe) static var keepingTheOriginalFails: ((Int) -> Int32?)?
 
     // MARK: - Functions
 

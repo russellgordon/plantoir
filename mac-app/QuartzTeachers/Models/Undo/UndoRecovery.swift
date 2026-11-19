@@ -314,6 +314,13 @@ nonisolated enum UndoRecovery {
                 }
                 let back: UndoDirection = startedFromBefore ? .backward : .forward
                 let plan: UndoPlan = UndoCheck.plan(opsToPutBack, direction: back, root: root, journal: writer.journal, places: places)
+                if plan == .listUnreadable {
+                    // Content it needs cannot be read just now: never
+                    // closed for it, tried again on the schedule, as for a
+                    // swap that was refused.
+                    swapRefused = true
+                    return nil
+                }
                 guard case .ready(let targets, _) = plan else {
                     // It can never be put back: closed, never left in flight.
                     var leftPartWay: [String] = Array(endPaths).sorted()

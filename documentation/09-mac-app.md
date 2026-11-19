@@ -19072,7 +19072,24 @@ the list is unreadable for that attempt, so a step in shadow goes ahead
 without a record (a trail line, "the list could not be read"), and a live
 step, Undo or Redo is refused before anything changes. A tail that cannot
 be read makes the remembered fold untrusted, so the next read is a whole
-one. Not reproduced on a real failing disk; the seam
+one. The review of U2a found the same hole one step earlier: a segment
+that could not be OPENED (EIO, EACCES, EMFILE) was skipped as if it were
+gone, and a failed seek read as an empty segment, so a fold missing its
+newest segment passed as valid, would have reused step numbers and let
+Undo act on an older step past a newer one. Now `UndoFileReads.openFile`
+answers nil only for a file that is gone (a segment pruned since it was
+listed), and throws for everything else; the torn-line cut, the tail
+check, the blobs and the folder's identifier file all open through it. A
+blob that is there and cannot be read is the list unavailable, never
+`contentMissing` (which clears the list for good); an identifier file that
+cannot be read is never set aside (that would give the folder a new
+identifier and put every step under the old one out of reach). Left as
+they are, and why: the fold's size and file-number checks (a failure only
+makes the fold untrusted, and the whole read then throws), a page that
+cannot be read (`UndoItem.read` calls it neither, so changed since: a
+teacher's page, not the list, and a question for U7 before the switch),
+the published-pages record (`cannotTell`), and the blob sweep's listing
+(it then deletes nothing). Not reproduced on a real failing disk; the seam
 `UndoKillPoints.readOfTheListFails` proves the path
 (`UndoJournalCoreTests.testAReadThatFailsIsAnUnreadableList`).
 
@@ -19342,7 +19359,12 @@ somewhere. Like a file in use it changes nothing on the list: the step is
 still offered, and nothing is cleared or dropped. Every failure of the
 staging step is this word (making the folder, the exclusive create, the
 write, the flush): none of them is another program holding the target,
-which only a rename can meet. The `stepCases` row `stagingFailsAt` pins it,
+which only a rename can meet. Keeping the original before the swap is the
+same word when it fails for room or permission (`UndoSwap.isRoomOrPermission`:
+on a volume without hard links the original is copied, and the copy can
+fill the disk); anything else there stays `fileIsInUse` (the review of
+U2a, LOW 1). Recovery retries a `couldNotWrite` swap on the schedule a
+file in use has. The `stepCases` row `stagingFailsAt` pins it,
 through a test seam (`UndoKillPoints.stagingWriteFailsAt`) that creates the
 staged file and then fails as a full disk does; the disk image itself is
 not in the suite.

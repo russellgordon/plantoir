@@ -186,6 +186,10 @@ nonisolated enum UndoCheck {
         var working: [String: UndoItem] = [:]
         var inTheWay: [String] = []
         var missingContentPath: String? = nil
+        // Paths whose content is missing from the list: a later op on one
+        // cannot be judged, because what the earlier op would have left
+        // there is unknown (the review of U2a, LOW 2).
+        var pathsWithMissingContent: Set<String> = []
         var recomputes: [UndoOp] = []
         var wholeTargets: [UndoSwapTarget] = []
 
@@ -211,7 +215,13 @@ nonisolated enum UndoCheck {
                     }
                     continue
                 }
-                guard let target = UndoCheck.wholeTarget(op, direction: direction, root: root, journal: journal) else {
+                let wholeOrNil: UndoSwapTarget?
+                do {
+                    wholeOrNil = try UndoCheck.wholeTarget(op, direction: direction, root: root, journal: journal)
+                } catch {
+                    return .listUnreadable
+                }
+                guard let target = wholeOrNil else {
                     if missingContentPath == nil {
                         missingContentPath = op.placeName
                     }
@@ -229,6 +239,9 @@ nonisolated enum UndoCheck {
                 working[path] = item
                 pathsInOrder.append(path)
             }
+            if pathsWithMissingContent.contains(path) {
+                continue
+            }
             let current: UndoItem = working[path] ?? .absent
             let state: UndoOpState = UndoCheck.state(of: op, in: current)
             let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
@@ -241,7 +254,15 @@ nonisolated enum UndoCheck {
                 }
                 continue
             }
-            guard let moved = UndoCheck.moved(op, from: current, direction: direction, journal: journal) else {
+            let movedOrNil: UndoItem?
+            do {
+                movedOrNil = try UndoCheck.moved(op, from: current, direction: direction, journal: journal)
+            } catch {
+                // Content that is there and cannot be read: the list is
+                // unreadable for this attempt, never content missing.
+                return .listUnreadable
+            }
+            guard let moved = movedOrNil else {
                 if kind != .writeFile {
                     // As the step left it, yet it cannot be placed (the
                     // front matter block a line lives in is gone, a hunk or
@@ -258,6 +279,7 @@ nonisolated enum UndoCheck {
                 if missingContentPath == nil {
                     missingContentPath = path
                 }
+                pathsWithMissingContent.insert(path)
                 continue
             }
             working[path] = moved
@@ -292,14 +314,15 @@ nonisolated enum UndoCheck {
 
     /// The content after moving one op one way, or nil when a blob it needs
     /// is missing or the text cannot be read or placed.
-    static func moved(_ op: UndoOp, from item: UndoItem, direction: UndoDirection, journal: UndoJournal) -> UndoItem? {
+    /// Throws when a blob it needs is there and cannot be read.
+    static func moved(_ op: UndoOp, from item: UndoItem, direction: UndoDirection, journal: UndoJournal) throws -> UndoItem? {
         switch op.knownKind {
         case .writeFile:
             let wanted: String? = direction == .backward ? op.beforeSha : op.afterSha
             guard let wanted else {
                 return .absent
             }
-            guard let data = journal.readBlob(sha: wanted) else {
+            guard let data = try journal.blobContent(sha: wanted) else {
                 return nil
             }
             return .file(data)
@@ -323,8 +346,9 @@ nonisolated enum UndoCheck {
     }
 
     /// The one change a move, a tree or an external op makes going this
-    /// way, or nil when content it needs is missing from the list.
-    static func wholeTarget(_ op: UndoOp, direction: UndoDirection, root: URL, journal: UndoJournal) -> UndoSwapTarget? {
+    /// way, or nil when content it needs is missing from the list. Throws
+    /// when content it needs is there and cannot be read.
+    static func wholeTarget(_ op: UndoOp, direction: UndoDirection, root: URL, journal: UndoJournal) throws -> UndoSwapTarget? {
         switch op.knownKind {
         case .move:
             guard let from = op.from, let to = op.to else {
@@ -346,13 +370,13 @@ nonisolated enum UndoCheck {
             if !makes {
                 return UndoSwapTarget(url: url, relativePath: path, change: .takeTree(listingSha: listingSha))
             }
-            guard let listingData = journal.readBlob(sha: listingSha),
+            guard let listingData = try journal.blobContent(sha: listingSha),
                   let listing = UndoTreeListing.parse(listingData), listing.sha == listingSha else {
                 return nil
             }
             var contents: [String: Data] = [:]
             for file in listing.files {
-                guard let data = journal.readBlob(sha: file.sha) else {
+                guard let data = try journal.blobContent(sha: file.sha) else {
                     return nil
                 }
                 contents[file.path] = data
@@ -379,6 +403,9 @@ nonisolated enum UndoCheck {
 nonisolated enum UndoPlan: Equatable, Sendable {
     case ready(targets: [UndoSwapTarget], recomputes: [UndoOp])
     case refused(UndoRefusal)
+    /// Content the step needs is there and cannot be read (a failing disk):
+    /// refused for this attempt, the list left as it is.
+    case listUnreadable
 }
 
 /// One change to make: a file's content swapped (what it must still hold,
@@ -683,7 +710,18 @@ nonisolated enum UndoSwap {
         if now != .absent {
             let originalURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
             try? FileManager.default.removeItem(at: originalURL)
-            if !UndoSwap.keep(target.url, as: originalURL) {
+            var keptFailure: Int32? = UndoKillPoints.keepingTheOriginalFails?(index)
+            if keptFailure == nil {
+                keptFailure = UndoSwap.keep(target.url, as: originalURL)
+            }
+            if let keptFailure {
+                _ = UndoSwap.removeStaged(originalURL)
+                // On a volume without hard links the original is COPIED,
+                // and a copy can fail for room or permission: the same word
+                // as a staging write that fails (the review of U2a, LOW 1).
+                if UndoSwap.isRoomOrPermission(keptFailure) {
+                    return .couldNotWrite(path: target.relativePath)
+                }
                 return .fileIsInUse(path: target.relativePath)
             }
             originals[index] = originalURL
@@ -761,9 +799,16 @@ nonisolated enum UndoSwap {
         return result == 0
     }
 
+    /// Whether an error number says the disk is full or the folder will not
+    /// take a new file, rather than that a file is held.
+    static func isRoomOrPermission(_ failure: Int32) -> Bool {
+        return failure == ENOSPC || failure == EDQUOT || failure == EROFS || failure == EACCES || failure == EPERM
+    }
+
     /// Keeps the original under a second name: a hard link where the volume
     /// has them, a copy (data, mode, extended attributes) where it does not.
-    static func keep(_ url: URL, as keptURL: URL) -> Bool {
+    /// Nil when it was kept, otherwise the error number of the last try.
+    static func keep(_ url: URL, as keptURL: URL) -> Int32? {
         let linked: Int32 = url.withUnsafeFileSystemRepresentation { fromPath in
             return keptURL.withUnsafeFileSystemRepresentation { toPath in
                 guard let fromPath, let toPath else {
@@ -773,7 +818,7 @@ nonisolated enum UndoSwap {
             }
         }
         if linked == 0 {
-            return true
+            return nil
         }
         let flags: copyfile_flags_t = copyfile_flags_t(COPYFILE_DATA | COPYFILE_SECURITY | COPYFILE_XATTR)
         let copied: Int32 = url.withUnsafeFileSystemRepresentation { fromPath in
@@ -781,10 +826,14 @@ nonisolated enum UndoSwap {
                 guard let fromPath, let toPath else {
                     return -1
                 }
-                return copyfile(fromPath, toPath, nil, flags)
+                let result: Int32 = copyfile(fromPath, toPath, nil, flags)
+                return result == 0 ? 0 : errno
             }
         }
-        return copied == 0
+        if copied == 0 {
+            return nil
+        }
+        return copied
     }
 
     /// Removes one of the swap's OWN staged files. A kept original copied
@@ -829,7 +878,15 @@ nonisolated enum UndoSwap {
             }
         }
         for folder in folders {
-            guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            let names: [String]
+            do {
+                names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+            } catch CocoaError.fileReadNoSuchFile {
+                // The folder is gone, and whatever was staged in it.
+                continue
+            } catch {
+                // Not known to be tidied: a later try looks again.
+                allGone = false
                 continue
             }
             for name in names where UndoSwap.isStaged(name, label: label) {
