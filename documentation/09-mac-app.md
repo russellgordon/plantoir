@@ -19469,12 +19469,18 @@ off.
   that is refused puts it back whole (`UndoOpKindsTests`); a folder to make
   is built beside its place and renamed in, never over anything. A process
   that dies with a folder set aside never has it deleted by recovery's
-  tidying, as a staged file is: it is renamed back where it was when that
-  place is free (and recovery then judges the step as the work found it),
-  and left aside, whole, when something holds its place
-  (`UndoOpKindsTests.testAFolderSetAsideByADeadProcessIsPutBackNeverDeleted`).
-  The list's copy of the content is never the only one while the folder
-  still exists. `heldBy` (content held in a backup zip) is U5's.
+  tidying, as a staged file is: the folder is the teacher's own, so it is
+  renamed back into its place whenever that place is free, whatever it now
+  holds (the director's rule after U2b's third review: an earlier rule that
+  kept a changed folder hidden left the teacher's new file unseen for good).
+  If it is as the step recorded, recovery judges the step as the work left
+  it; if it changed while aside, it is in the way, the step is recorded
+  interrupted and the list cleared, and the trail line "undo found a folder
+  set aside" says what changed. When something else now holds its place,
+  both are left as they are, the step is recorded interrupted, the line
+  names both, and the step is not looked at again for it; what becomes of
+  the hidden folder then is parked for Russell (U7).
+  `heldBy` (content held in a backup zip) is U5's.
 - **`external`**: something outside every working folder, `<family>:<name>`;
   this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
   (`UndoAppPreferences`), and a step of external ops alone needs no working

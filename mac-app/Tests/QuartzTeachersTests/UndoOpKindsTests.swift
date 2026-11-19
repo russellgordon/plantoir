@@ -188,8 +188,9 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
     }
 
-    /// And when something now holds its place, the folder is left aside,
-    /// still whole, rather than deleted.
+    /// And when something now holds its place, both are left as they are,
+    /// the folder aside and whole, never deleted; the tidying counts that as
+    /// done, so it is not looked at again at every lock.
     func testAFolderSetAsideIsLeftWhenItsPlaceIsTaken() throws {
         let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
         let folder: URL = root.appendingPathComponent("made", isDirectory: true)
@@ -199,15 +200,18 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        XCTAssertFalse(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
+        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("a.md").path))
 
         XCTAssertEqual(try Data(contentsOf: aside.appendingPathComponent("a.md")), Data("kept\n".utf8))
     }
 
-    /// The hard review of U2b, MEDIUM 3 (probe E): an aside folder changed
-    /// since it was set aside is never put in the teacher's place; it stays
-    /// aside, hidden and whole. FAILED on c1c0624e5, which put it back.
-    func testAChangedAsideFolderIsNeverPutInTheTeachersPlace() throws {
+    /// The director's rule after U2b's third review (probe D), replacing
+    /// "keep a changed folder aside": a folder set aside is the teacher's
+    /// own, and goes back in its place whenever that place is free, changed
+    /// or not; recovery then finds it in the way. FAILED on 1d0d5c2dd, which
+    /// left it hidden for good.
+    func testAChangedAsideFolderGoesBackInItsFreePlace() throws {
         let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
         let folder: URL = root.appendingPathComponent("made", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -219,10 +223,13 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
         try Data("half\n".utf8).write(to: aside.appendingPathComponent("stray.md"))
 
-        XCTAssertFalse(UndoSwap.tidyLeftovers(label: "5-redo", beside: [folder], asideListings: [folder.standardizedFileURL.path: listing.sha]))
+        var found: [UndoAsideFolder] = []
+        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-redo", beside: [folder], asideListings: [folder.standardizedFileURL.path: listing.sha], onAside: { aside in found.append(aside) }))
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("stray.md").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("stray.md").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
+        XCTAssertEqual(found.first?.putBack, true)
+        XCTAssertEqual(found.first?.matched, false)
     }
 
     /// MEDIUM 3 (probe D): a recovery's own aside folder is never given a

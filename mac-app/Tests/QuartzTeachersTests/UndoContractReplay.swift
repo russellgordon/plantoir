@@ -1174,7 +1174,7 @@ nonisolated enum UndoContractReplay {
         "handEdit", "cleared", "pathsNamed", "moveFolderBeforeRecovery", "wholeFile",
         "contentRemovedBeforeRecovery", "fileInUseDuringRecovery", "anotherStepInFlight", "stepInFlight",
         "afterAnOrdinaryStep", "withAMove", "deployBeforeRecovery", "markers", "rederived", "why",
-        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside",
+        "withATree", "withAPreference", "folderKept", "preference", "recoveredBy", "changeTheFolderSetAside", "keptAside", "somethingInItsPlace",
     ]
 
     static func runRecoveryCases(under parent: URL) async throws -> (cases: Int, failures: [String]) {
@@ -1345,6 +1345,9 @@ nonisolated enum UndoContractReplay {
                 // process had it set aside.
                 let aside: URL = UndoSwap.besideURL(for: root.appendingPathComponent(UndoContractKinds.extraFolder), label: "\(workSeq)-apply", role: "orig")
                 try Data("saved while it was aside\n".utf8).write(to: aside.appendingPathComponent("new.md"))
+            }
+            if testCase["somethingInItsPlace"] as? Bool == true {
+                try write("someone else's\n", to: UndoContractKinds.extraFolder + "/other.md", in: root)
             }
             if testCase["deployBeforeRecovery"] as? Bool == true {
                 // A deploy wrote a new marker in the place the move emptied.

@@ -1111,11 +1111,11 @@ nonisolated enum UndoTrailHook {
     /// back and how many were in the way. The list was cleared.
     nonisolated(unsafe) static var interruptedLine: ((_ course: String, _ section: Int?, _ phase: UndoPhase, _ putBack: Int, _ inTheWay: Int) -> Void)?
 
-    /// Recovery found a teacher's folder set aside by a dead process that
-    /// was changed while it was aside, and kept it there, hidden and whole:
-    /// the course and section, the folder's place inside the working folder,
-    /// and the hidden name it is kept under.
-    nonisolated(unsafe) static var keptAFolderAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String) -> Void)?
+    /// Recovery found a teacher's folder set aside by a dead process: put
+    /// back in its place though it changed while aside (with what changed),
+    /// or left aside because something else now holds its place (both
+    /// named). The course and section, its place, its hidden name.
+    nonisolated(unsafe) static var foundAFolderSetAsideLine: ((_ course: String, _ section: Int?, _ place: String, _ hiddenName: String, _ putBack: Bool, _ changes: String) -> Void)?
 
     // MARK: - Functions
 

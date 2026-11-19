@@ -182,11 +182,81 @@ nonisolated enum UndoRecovery {
         }
         var allGone: Bool = true
         for work in ["apply", "undo", "redo"] {
-            if !UndoSwap.tidyLeftovers(label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root)) {
+            if !UndoSwap.tidyLeftovers(
+                label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root),
+                onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: nil) }
+            ) {
                 allGone = false
             }
         }
         return allGone
+    }
+
+    /// The trail line for a teacher's folder found set aside: put back
+    /// changed (what changed, counted against the step's record when the
+    /// list still holds it), or left aside because something else holds its
+    /// place (both named). A folder put back as recorded needs no line.
+    static func noteAnAsideFolder(_ found: UndoAsideFolder, of step: UndoStep, root: URL, journal: UndoJournal?) {
+        if found.putBack && found.matched {
+            return
+        }
+        var place: String = found.place.lastPathComponent
+        let rootPath: String = root.standardizedFileURL.path + "/"
+        let full: String = found.place.standardizedFileURL.path
+        if full.hasPrefix(rootPath) {
+            place = String(full.dropFirst(rootPath.count))
+        }
+        var changes: String = ""
+        if found.putBack {
+            changes = UndoRecovery.whatChanged(at: found.place, against: step, place: place, journal: journal)
+        }
+        UndoTrailHook.foundAFolderSetAsideLine?(step.course ?? "", step.section, place, found.hiddenName, found.putBack, changes)
+    }
+
+    /// "1 file added, 2 changed" against the step's recorded listing, or
+    /// "changed" when the list no longer holds it.
+    static func whatChanged(at url: URL, against step: UndoStep, place: String, journal: UndoJournal?) -> String {
+        var recordedSha: String? = nil
+        for op in step.ops where op.path == place {
+            recordedSha = op.listingSha
+        }
+        guard let journal, let recordedSha, let data = try? journal.blobContent(sha: recordedSha),
+              let recorded = UndoTreeListing.parse(data),
+              case .tree(let now, _) = UndoTreeReading.read(at: url) else {
+            return "changed"
+        }
+        var before: [String: String] = [:]
+        for file in recorded.files {
+            before[file.path] = file.sha
+        }
+        var added: Int = 0
+        var changed: Int = 0
+        var seen: Set<String> = []
+        for file in now.files {
+            seen.insert(file.path)
+            if let sha = before[file.path] {
+                if sha != file.sha {
+                    changed += 1
+                }
+            } else {
+                added += 1
+            }
+        }
+        var removed: Int = 0
+        for (path, _) in before where !seen.contains(path) {
+            removed += 1
+        }
+        var parts: [String] = []
+        if added > 0 {
+            parts.append(added == 1 ? "1 file added" : "\(added) files added")
+        }
+        if changed > 0 {
+            parts.append(changed == 1 ? "1 changed" : "\(changed) changed")
+        }
+        if removed > 0 {
+            parts.append(removed == 1 ? "1 removed" : "\(removed) removed")
+        }
+        return parts.isEmpty ? "changed" : parts.joined(separator: ", ")
     }
 
     /// Every tree op's folder of this step that a staged `-orig` name still
@@ -329,7 +399,10 @@ nonisolated enum UndoRecovery {
             }
         }
         if mode == .live {
-            UndoSwap.tidyLeftovers(label: label, beside: urls, asideListings: asideListings(of: step, root: root))
+            UndoSwap.tidyLeftovers(
+                label: label, beside: urls, asideListings: asideListings(of: step, root: root),
+                onAside: { found in UndoRecovery.noteAnAsideFolder(found, of: step, root: root, journal: writer.journal) }
+            )
         }
 
         // Which state the work was moving FROM, and TO.
@@ -347,9 +420,7 @@ nonisolated enum UndoRecovery {
                 judged.append((path: file.path, state: keptAside[file.path] != nil ? .neither : file.state))
             }
             files = judged
-            for (place, hiddenName) in keptAside {
-                UndoTrailHook.keptAFolderAsideLine?(step.course ?? "", step.section, place, hiddenName)
-            }
+            _ = keptAside
         }
         // A file that could not be read now is never judged changed by hand:
         // the step is left as it is and tried again on the schedule, as for

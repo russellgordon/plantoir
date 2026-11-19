@@ -988,7 +988,12 @@ nonisolated enum UndoSwap {
     /// to the LAST marker, so a recovery's own `-recover-orig` is read as
     /// the same place.
     @discardableResult
-    static func tidyLeftovers(label: String, beside urls: [URL], asideListings: [String: String] = [:]) -> Bool {
+    static func tidyLeftovers(
+        label: String,
+        beside urls: [URL],
+        asideListings: [String: String] = [:],
+        onAside: ((UndoAsideFolder) -> Void)? = nil
+    ) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
         for url in urls {
@@ -1017,11 +1022,26 @@ nonisolated enum UndoSwap {
                         allGone = false
                         continue
                     }
+                    // It is the teacher's own folder: put back in its place
+                    // whenever that place is free, WHATEVER its listing, so
+                    // nothing of the teacher's is ever left under a hidden
+                    // name while its own place is free (the director's rule
+                    // after U2b's third review, replacing "keep a changed one
+                    // aside"). Whether it matches the step's record decides
+                    // what recovery then makes of the step, not where the
+                    // folder goes. When something else holds its place, both
+                    // are left as they are, and that is deliberate: it is not
+                    // a leftover to look for again.
                     let originalURL: URL = folder.appendingPathComponent(original)
                     let recorded: String? = asideListings[originalURL.standardizedFileURL.path]
-                    let provablyTheSame: Bool = recorded != nil
-                        && UndoTreeReading.read(at: stagedURL).listingSha == recorded
-                    if !provablyTheSame || !UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
+                    let matched: Bool = recorded != nil && UndoTreeReading.read(at: stagedURL).listingSha == recorded
+                    if UndoTreeReading.read(at: originalURL) != .absent {
+                        onAside?(UndoAsideFolder(place: originalURL, hiddenName: name, putBack: false, matched: matched))
+                        continue
+                    }
+                    if UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
+                        onAside?(UndoAsideFolder(place: originalURL, hiddenName: name, putBack: true, matched: matched))
+                    } else {
                         allGone = false
                     }
                     continue
@@ -1033,6 +1053,25 @@ nonisolated enum UndoSwap {
         }
         return allGone
     }
+}
+
+/// A teacher's folder recovery found set aside by a dead process.
+nonisolated struct UndoAsideFolder: Equatable, Sendable {
+
+    // MARK: - Stored properties
+
+    /// Where it belongs.
+    let place: URL
+
+    /// The hidden name it was found under.
+    let hiddenName: String
+
+    /// True when it was put back in its place; false when something else
+    /// holds that place, and it was left aside.
+    let putBack: Bool
+
+    /// Whether its listing was the one the step recorded.
+    let matched: Bool
 }
 
 /// How an undo or a redo went.

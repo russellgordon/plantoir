@@ -206,7 +206,9 @@ final class UndoDoorGuardTests: XCTestCase {
         await UndoRecovery.recoverAndRederive(later, resolveRoot: { _ in root }, places: UndoMemoryPlaces())
 
         XCTAssertEqual(try later.read().records[1]?.phase, .interrupted)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("new.md").path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+        // The director's rule after the third review: back in its own place,
+        // the teacher's new file with it, nothing left hidden.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("new.md").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
     }
 }

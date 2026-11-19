@@ -73,10 +73,10 @@ nonisolated enum UndoTrail {
                 UndoTrail.couldNotRecordLine(action: action, course: course, section: section, mode: mode, why: why)
             )
         }
-        UndoTrailHook.keptAFolderAsideLine = { course, section, place, hiddenName in
+        UndoTrailHook.foundAFolderSetAsideLine = { course, section, place, hiddenName, putBack, changes in
             ActivityTrail.note(
-                .undoKeptAFolderAside,
-                UndoTrail.keptAFolderAsideLine(course: course, section: section, place: place, hiddenName: hiddenName)
+                .undoFoundAFolderSetAside,
+                UndoTrail.foundAFolderSetAsideLine(course: course, section: section, place: place, hiddenName: hiddenName, putBack: putBack, changes: changes)
             )
         }
         UndoTrailHook.rolledBackLine = { course, section, phase, files in
@@ -115,15 +115,20 @@ nonisolated enum UndoTrail {
             + ", found \(counted) changed by hand since, and cleared the list"
     }
 
-    /// `ICS3U/1 · the undo list kept the folder courses/ICS3U/made aside,
-    /// hidden as .made.plantoir-undo-3-redo-orig, because it was changed
-    /// while a change that stopped had set it aside`.
-    static func keptAFolderAsideLine(course: String, section: Int?, place: String, hiddenName: String) -> String {
+    /// `ICS3U/1 · the undo list put the folder courses/ICS3U/made back in
+    /// its place; it changed while a change that stopped had set it aside
+    /// (1 file added)`, or `… left the folder courses/ICS3U/made aside,
+    /// hidden as .made.plantoir-undo-3-redo-orig, because something else now
+    /// holds courses/ICS3U/made`.
+    static func foundAFolderSetAsideLine(course: String, section: Int?, place: String, hiddenName: String, putBack: Bool, changes: String) -> String {
         var line: String = course
         if let section {
             line += "/\(section)"
         }
-        return line + " · the undo list kept the folder \(place) aside, hidden as \(hiddenName), because it was changed while a change that stopped had set it aside"
+        if putBack {
+            return line + " · the undo list put the folder \(place) back in its place; it changed while a change that stopped had set it aside (\(changes))"
+        }
+        return line + " · the undo list left the folder \(place) aside, hidden as \(hiddenName), because something else now holds \(place)"
     }
 
     /// `ICS3U/1 · the undo list put back 2 files left part way by a change

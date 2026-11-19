@@ -533,7 +533,7 @@ internal static class NamedGapLedger
              "Cloudflare token end date learned"),
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
-        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back", "undo kept a folder aside"),
+        Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back", "undo found a folder set aside"),
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),
