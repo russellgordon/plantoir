@@ -23,7 +23,9 @@ public class AboutDialogLinksSourceTests
     public void NoLinkIsInsideASentence()
     {
         string source = AboutDialog();
-        Assert.DoesNotContain("new Hyperlink", source);
+        // A Hyperlink (not a HyperlinkButton) is an inline run inside a
+        // TextBlock's sentence; the old panel built its links that way.
+        Assert.False(Regex.IsMatch(source, @"new Hyperlink(?!Button)"), "a link is built inside a sentence (new Hyperlink)");
         Assert.DoesNotContain("Inlines.Add", source);
     }
 
@@ -42,7 +44,7 @@ public class AboutDialogLinksSourceTests
         };
         foreach (var (words, id) in expected)
         {
-            string call = "Link(\"[^\"]+\", " + Regex.Escape(words) + ", \"" + id + "\"";
+            string call = @"Link\(""[^""]+"", " + Regex.Escape(words) + @", """ + id + @"""";
             Assert.True(Regex.IsMatch(source, call), $"no link of its own reads {words} ({id})");
         }
         // Six links and no seventh: every Link( call names one of the six.
