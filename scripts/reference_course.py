@@ -160,10 +160,27 @@ def is_reference(course_dir) -> bool:
     module docstring. The parsed form is consulted as well, for the one shape
     text cannot see: a key spelled with JSON escapes.
     """
-    text = _config_text(course_dir)
+    return is_reference_in(_config_text(course_dir))
+
+
+def is_reference_in(text: str) -> bool:
+    """
+    `is_reference`, asked of settings text already read.
+
+    A build reads `course_config.json` once and answers every question from
+    that one reading (#999), so it asks this rather than opening the file
+    again: a Save landing mid-build could otherwise make the build freeze a
+    course its own settings say is ordinary, or the reverse.
+    """
     if re.search(MARKER_PATTERN, text) is not None:
         return True
-    return _config(course_dir).get(MARKER_KEY) is True
+    try:
+        loaded = json.loads(text)
+    except ValueError:
+        return False
+    if not isinstance(loaded, dict):
+        return False
+    return loaded.get(MARKER_KEY) is True
 
 
 def cannot_tell(course_dir) -> bool:
@@ -189,7 +206,14 @@ def cannot_tell(course_dir) -> bool:
             text = handle.read()
     except OSError:
         return True
+    return cannot_tell_from(text)
 
+
+def cannot_tell_from(text: str) -> bool:
+    """
+    `cannot_tell`, asked of settings text already read (a file that was
+    there and opened). A build asks this of its one reading (#999).
+    """
     # A spelling somebody plainly MEANT as the marker: `1`, `"true"`, a key
     # written with \u escapes. The app reads a real JSON boolean and nothing
     # else, so it treats these as ordinary courses — which is safe only
