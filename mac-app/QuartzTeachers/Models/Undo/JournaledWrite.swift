@@ -234,7 +234,7 @@ nonisolated enum JournaledWrite {
             return .stoppedByATest
         }
 
-        switch UndoSwap.swap(targets, label: "\(seq)-apply") {
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", root: draft.workingFolderURL) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)
@@ -398,7 +398,7 @@ nonisolated enum JournaledWrite {
             // now: nothing was changed, and the step is not made.
             return .couldNotRecordTheStep
         }
-        switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places) {
+        switch UndoSwap.swap(targets, label: "\(seq)-apply", places: places, root: draft.workingFolderURL) {
         case .refused(let refusal):
             finish(seq: seq, with: .failed, phase: .begin, reason: "refused", in: journal, mode: mode)
             return .refused(refusal)

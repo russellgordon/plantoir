@@ -220,6 +220,22 @@ nonisolated enum UndoCheck {
                 recomputes.append(op)
                 continue
             }
+            // Every place it names still inside the working folder, links
+            // resolved: a folder on its path replaced by a link to outside
+            // since the step was made is a change since, judged here before
+            // anything is read through it (the second hard review of U2b,
+            // MEDIUM 2). changedSince rather than cannotTell: the place was
+            // read, and it is no longer the teacher's folder.
+            var leavesTheFolder: Bool = false
+            for place in op.pathsNamed where !UndoPlaces.staysInside(root, place) {
+                leavesTheFolder = true
+            }
+            if leavesTheFolder {
+                if !inTheWay.contains(op.placeName) {
+                    inTheWay.append(op.placeName)
+                }
+                continue
+            }
             if op.isWhole {
                 let state: UndoOpState = UndoCheck.wholeState(of: op, root: root, places: places)
                 let verdict: UndoCheckVerdict = UndoCheck.verdict(for: state, direction: direction)
@@ -537,7 +553,8 @@ nonisolated enum UndoSwap {
     static func swap(
         _ targets: [UndoSwapTarget],
         label: String,
-        places: UndoExternalPlaces = UndoAppPreferences()
+        places: UndoExternalPlaces = UndoAppPreferences(),
+        root: URL? = nil
     ) -> UndoSwapResult {
         var staged: [URL?] = []
         var originals: [URL?] = []
@@ -668,7 +685,16 @@ nonisolated enum UndoSwap {
                 return .refused(.fileIsInUse(path: target.relativePath))
             }
             var refusal: UndoRefusal? = nil
+            // Inside the working folder, its links resolved, at the moment of
+            // the change (the second hard review of U2b, MEDIUM 2): a folder
+            // on the path replaced by a link since the check is a change
+            // since, and nothing moves through it.
+            if let root, !UndoSwap.staysInside(target, root: root) {
+                refusal = .changedSince(firstPath: target.relativePath, others: 0)
+            }
             switch target.change {
+            case _ where refusal != nil:
+                break
             case .file:
                 refusal = UndoSwap.swapAFile(target, index: index, label: label, staged: &staged, originals: &originals)
             case .moveHere(let from, _, let op):
@@ -745,6 +771,19 @@ nonisolated enum UndoSwap {
             UndoFiles.syncFolder(target.url.deletingLastPathComponent())
         }
         return .swapped
+    }
+
+    /// Whether every place a change touches is still inside the working
+    /// folder, links resolved.
+    static func staysInside(_ target: UndoSwapTarget, root: URL) -> Bool {
+        switch target.change {
+        case .setExternal:
+            return true
+        case .moveHere(_, let fromPath, _):
+            return UndoPlaces.staysInside(root, fromPath) && UndoPlaces.staysInside(root, target.relativePath)
+        default:
+            return UndoPlaces.staysInside(root, target.relativePath)
+        }
     }
 
     /// One file's swap: re-read, keep the original, rename the new content
@@ -1195,7 +1234,7 @@ nonisolated extension UndoJournal {
 
         // 4. Swap, then re-derive the files kept true by a rule.
         let label: String = "\(seq)-" + (direction == .backward ? "undo" : "redo")
-        switch UndoSwap.swap(targets, label: label, places: places) {
+        switch UndoSwap.swap(targets, label: label, places: places, root: root) {
         case .refused(let refusal):
             JournaledWrite.finish(seq: seq, with: .failed, phase: phase, reason: "refused", in: self, mode: .live)
             // Caught at the swap rather than the check: the same hand edit,

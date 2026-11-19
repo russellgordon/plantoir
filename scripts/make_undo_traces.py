@@ -718,9 +718,19 @@ def plan(ops, backward, pages_by_path, content_missing=False):
     in_the_way = []
     whole_changes = {}
     wanted_from = "after" if backward else "before"
+    linked = pages_by_path.get(LINKED_OUTSIDE, set())
     for op in ordered:
         kind = op["kind"]
         if kind == "recompute":
+            continue
+        places = [op[key] for key in ("path", "from", "to") if key in op]
+        if any(place == folder or place.startswith(folder + "/") for place in places for folder in linked):
+            # A place that now leads outside the working folder through a
+            # link: a change since, nothing moved (the second hard review of
+            # U2b, MEDIUM 2).
+            place = op.get("path") or op.get("from")
+            if place not in in_the_way:
+                in_the_way.append(place)
             continue
         if kind in WHOLE_KINDS:
             # Judged whole against what is there (opKinds.wholeOps).
@@ -783,6 +793,7 @@ def plan(ops, backward, pages_by_path, content_missing=False):
 
 
 WHOLE_KINDS = ("move", "createTree", "removeTree", "external")
+LINKED_OUTSIDE = "\0linkedOutside"
 
 
 def page_item(value):
@@ -878,6 +889,7 @@ class Model:
         self.unreachable = set()   # working folders that cannot be reached
         self.content_removed = False   # the list's content/ was taken away
         self.maintainer_registered = True   # UndoMaintainers has a runner
+        self.linked_outside = set()   # folders replaced by a link to outside
         self.rederived = 0   # how many times a recompute's runner ran
 
     # -- the fold -----------------------------------------------------
@@ -1112,7 +1124,7 @@ class Model:
             return ("notAvailable",)
         if self.holds_a_recompute(undo) and not self.maintainer_registered:
             return ("notAvailable",)
-        result = plan(undo["ops"], True, self.pages, self.content_removed)
+        result = plan(undo["ops"], True, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed)
         if result[0] == "contentMissing" and not UNDO_REFUSED_FOR_MISSING_CONTENT_CLEARS:
             return result
         if result[0] in ("changedSince", "contentMissing"):
@@ -1141,7 +1153,7 @@ class Model:
             return ("notAvailable",)
         if self.holds_a_recompute(candidate) and not self.maintainer_registered:
             return ("notAvailable",)
-        result = plan(candidate["ops"], False, self.pages, self.content_removed)
+        result = plan(candidate["ops"], False, dict(self.pages, **{LINKED_OUTSIDE: self.linked_outside}), self.content_removed)
         if result[0] in ("changedSince", "contentMissing"):
             if not dry:
                 # Ruling 20: refused once, then only the redo branch goes.

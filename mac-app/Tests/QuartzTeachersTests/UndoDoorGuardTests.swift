@@ -150,4 +150,27 @@ final class UndoDoorGuardTests: XCTestCase {
         XCTAssertEqual(try later.read().records[1]?.phase, .done)
         XCTAssertEqual(UndoContractReplay.takeTheRederived(), ["courses/TST1O/section1/index.md#1"])
     }
+
+    /// The second hard review of U2b, MEDIUM 2: a folder on a step's path
+    /// replaced by a link to outside AFTER the door: Undo moves nothing out.
+    /// FAILED on 211f8d213, which moved the page into the outside folder.
+    func testUndoNeverMovesAFileOutThroughALinkMadeAfterTheDoor() throws {
+        let made = try UndoContractReplay.scratch(under: parent, named: "l")
+        let root: URL = made.root
+        try UndoContractReplay.write("page\n", to: "courses/TST1O/old/a.md", in: root)
+        let move: UndoOp = UndoOp.moveFile(from: "courses/TST1O/old/a.md", to: "courses/TST1O/a.md", sha: UndoHash.sha256(of: Data("page\n".utf8)))
+        let journal: UndoJournal = UndoJournal(folderURL: made.journalFolder)
+        XCTAssertEqual(JournaledWrite.perform(ops: UndoContractKinds.draft(ops: [move], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: UndoMemoryPlaces()), .applied(seq: 1))
+        let oldFolder: URL = root.appendingPathComponent("courses/TST1O/old")
+        try FileManager.default.removeItem(at: oldFolder)
+        let outside: URL = parent.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: oldFolder, withDestinationURL: outside)
+
+        let undone: UndoOutcome = journal.undoNewest(resolveRoot: { _ in root }, places: UndoMemoryPlaces())
+
+        XCTAssertEqual(undone, .refused(.changedSince(firstPath: "courses/TST1O/old/a.md", others: 0), clearedTheList: true))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("courses/TST1O/a.md").path))
+    }
 }

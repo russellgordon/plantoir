@@ -451,7 +451,7 @@ class ContractCaseTests(unittest.TestCase):
 
     STACK_KEYS = {"name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
                   "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-                  "blobKept", "interrupted", "markers", "folderKept", "rederived"}
+                  "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside"}
 
     MARKER_FROM = "courses/TST1O/.netlify_sites/section1.json"
     MARKER_TO = "courses/TST1O/.netlify_sites/section1.previous.json"
@@ -513,6 +513,15 @@ class ContractCaseTests(unittest.TestCase):
         if call == "changeThePreferenceByHand":
             pages[self.PREFERENCE] = "z"
             return None
+        if call == "moveThePageAside":
+            source, destination = "courses/TST1O/old/a.md", "courses/TST1O/a.md"
+            if pages.get(source) is None and pages.get(destination) is None:
+                pages[source] = "page\n"
+            return model.ops_step([{"kind": "move", "from": source, "to": destination, "sha": traces.sha("page\n")}])
+        if call == "linkItsOldFolderOutside":
+            model.linked_outside.add("courses/TST1O/old")
+            pages.pop("courses/TST1O/old/a.md", None)
+            return None
         if call == "forgetTheMaintainer":
             model.maintainer_registered = False
             return None
@@ -530,7 +539,7 @@ class ContractCaseTests(unittest.TestCase):
 
     KIND_CALLS = ("moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
                   "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
-                  "changeThePreferenceByHand", "forgetTheMaintainer")
+                  "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside")
 
     def test_stack_cases(self):
         folder_b = "@B/"

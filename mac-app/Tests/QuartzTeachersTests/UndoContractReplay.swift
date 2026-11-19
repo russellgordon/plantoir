@@ -675,7 +675,7 @@ nonisolated enum UndoContractReplay {
     static let stackKeys: Set<String> = [
         "name", "calls", "head", "redo", "onTheList", "onTheListCount", "oldestOnTheList",
         "expectLast", "cleared", "clearedSeq", "linesWritten", "onTheDisk", "physicallyPruned",
-        "blobKept", "interrupted", "markers", "folderKept", "rederived",
+        "blobKept", "interrupted", "markers", "folderKept", "rederived", "nothingMovedOutside",
     ]
 
     /// Holds a step begun from inside a hook, so the case can finish it.
@@ -1060,6 +1060,12 @@ nonisolated enum UndoContractReplay {
             }
             if let kept = testCase["folderKept"] as? Bool, UndoContractKinds.folderIsThere(in: root) != kept {
                 failures.append("stackCases '\(name)': the folder is there: \(!kept)")
+            }
+            if testCase["nothingMovedOutside"] as? Bool == true {
+                let outsideNames: [String] = (try? FileManager.default.contentsOfDirectory(atPath: UndoContractKinds.outside(of: root).path)) ?? []
+                if !outsideNames.isEmpty {
+                    failures.append("stackCases '\(name)': moved out of the working folder: \(outsideNames)")
+                }
             }
             let rederived: Int = takeTheRederived().count
             if let wanted = int(testCase["rederived"]), rederived != wanted {

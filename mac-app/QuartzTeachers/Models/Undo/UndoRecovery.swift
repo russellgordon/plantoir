@@ -403,7 +403,7 @@ nonisolated enum UndoRecovery {
                     UndoTrailHook.interruptedLine?(step.course ?? "", step.section, phase, 0, leftPartWay.count)
                     return UndoRecoveryResult(seq: step.seq, phase: phase, outcome: .interrupted(filesInTheWay: leftPartWay.count, filesPutBack: 0))
                 }
-                if UndoSwap.swap(targets, label: label + "-recover", places: places) != UndoSwapResult.swapped {
+                if UndoSwap.swap(targets, label: label + "-recover", places: places, root: root) != UndoSwapResult.swapped {
                     // A file in use: tried again on the schedule.
                     swapRefused = true
                     return nil

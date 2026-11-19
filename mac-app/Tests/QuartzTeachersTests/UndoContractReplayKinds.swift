@@ -25,8 +25,16 @@ nonisolated enum UndoContractKinds {
     static let calls: Set<String> = [
         "moveTheMarker", "deployANewMarker", "makeAFolder", "addAFileToTheFolder", "removeTheFolder",
         "editTheSettings", "editTheSettingsByHand", "editAHunk", "setAPreference",
-        "changeThePreferenceByHand", "forgetTheMaintainer",
+        "changeThePreferenceByHand", "forgetTheMaintainer", "moveThePageAside", "linkItsOldFolderOutside",
     ]
+
+    static let asidePage: String = "courses/TST1O/old/a.md"
+    static let asidePageMoved: String = "courses/TST1O/a.md"
+
+    /// Where `linkItsOldFolderOutside` points: beside the working folder.
+    static func outside(of root: URL) -> URL {
+        return root.deletingLastPathComponent().appendingPathComponent("outside", isDirectory: true)
+    }
 
     // MARK: - Functions
 
@@ -146,6 +154,21 @@ nonisolated enum UndoContractKinds {
             return word(JournaledWrite.perform(ops: draft(ops: [op], blobs: [], root: nil, action: "setPreference"), in: journal, mode: .live, places: places))
         case "changeThePreferenceByHand":
             _ = places.write(preference, .string("z"))
+            return nil
+        case "moveThePageAside":
+            if text(at: asidePage, in: root) == nil {
+                try UndoContractReplay.write("page\n", to: asidePage, in: root)
+            }
+            let op: UndoOp = UndoOp.moveFile(from: asidePage, to: asidePageMoved, sha: UndoHash.sha256(of: Data("page\n".utf8)))
+            return word(JournaledWrite.perform(ops: draft(ops: [op], blobs: [], root: root, action: "rollOver"), in: journal, mode: .live, places: places))
+        case "linkItsOldFolderOutside":
+            // The folder the page was moved out of, replaced by a link to a
+            // folder outside the working folder (the second hard review of
+            // U2b, MEDIUM 2).
+            let old: URL = root.appendingPathComponent("courses/TST1O/old")
+            try? FileManager.default.removeItem(at: old)
+            try FileManager.default.createDirectory(at: outside(of: root), withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: old, withDestinationURL: outside(of: root))
             return nil
         case "forgetTheMaintainer":
             UndoMaintainers.forget("sectionFrontPage")
