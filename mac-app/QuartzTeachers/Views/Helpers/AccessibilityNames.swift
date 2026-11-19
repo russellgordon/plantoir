@@ -9,7 +9,7 @@ import Foundation
 /// has one, or a plain two- or three-word label, and never the control's
 /// kind ("button", "pop-up"), which VoiceOver says by itself. Kept in one
 /// place so the wording review (#1001) can read them all together.
-enum AccessibilityNames {
+nonisolated enum AccessibilityNames {
 
     // MARK: - Stored properties
 

@@ -17,6 +17,7 @@ import XCTest
 /// lives deep inside a sheet that needs a whole course to draw, the check
 /// reads the view's source for the modifier that names it; each of those
 /// fails on the code before #993.
+@MainActor
 final class AccessibilityNamesTests: XCTestCase {
 
     // MARK: - Functions
