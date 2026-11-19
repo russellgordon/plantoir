@@ -33,6 +33,20 @@ struct TaskProgressView: View {
     let allLegs: [MultiDestinationDeployRunner.Leg]?
     let onCancel: (() -> Void)?
 
+    /// True while this panel is the thing in front, so Escape and
+    /// Command-Period press its Cancel (#988, the HIG review's D6).
+    /// Keyboards: "Esc: Cancel the current action or process";
+    /// "Command-Period: Cancel an operation." Progress indicators: "When
+    /// it's feasible, let people halt processing."
+    ///
+    /// False where something else covers the panel: the section window's
+    /// preview draws its site OVER this panel while the preview serves, and
+    /// there Escape belongs to the web page (a page's own Escape, a video
+    /// leaving full screen), never to stopping the preview underneath it.
+    /// `SectionDetailView.progressPanelTakesTheCancelKeys` decides it there;
+    /// everywhere else the panel is in front whenever it shows.
+    let takesTheCancelKeys: Bool
+
     /// TESTS ONLY: told the height the folder publish's render note was
     /// actually drawn at, so a test can say whether it kept every line
     /// (#213). Nothing else can: the accessibility tree does not reach a
@@ -55,6 +69,7 @@ struct TaskProgressView: View {
         title: String,
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
+        takesTheCancelKeys: Bool = true,
         hidesSiteLink: Bool = false,
         allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil,
@@ -64,6 +79,7 @@ struct TaskProgressView: View {
         self.runner = runner
         self.title = title
         self.canCancel = canCancel
+        self.takesTheCancelKeys = takesTheCancelKeys
         self.hidesSiteLink = hidesSiteLink
         self.allLegs = allLegs
         self.onCancel = onCancel
@@ -240,6 +256,12 @@ struct TaskProgressView: View {
                                     }
                                 }
                                 .buttonStyle(.bordered)
+                                // Escape, and Command-Period with it (#988).
+                                // A key equivalent, not `.onExitCommand`,
+                                // which fires only while something in the
+                                // panel holds the keys, and with Keyboard
+                                // Navigation off nothing here does (#973).
+                                .keyboardShortcut(takesTheCancelKeys ? KeyboardShortcut.cancelAction : nil)
                                 .accessibilityIdentifier("taskCancelButton")
                             }
                         }

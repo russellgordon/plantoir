@@ -2098,6 +2098,7 @@ struct SectionDetailView: View {
                         TaskProgressView(
                             runner: deployRunner.activeRunner,
                             title: deployProgressTitle,
+                            takesTheCancelKeys: SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: previewURL != nil),
                             hidesSiteLink: deployRunner.legs.count > 1,
                             allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
                             onCancel: {
@@ -2113,6 +2114,7 @@ struct SectionDetailView: View {
                 TaskProgressView(
                     runner: previewRunner,
                     title: previewTaskTitle,
+                    takesTheCancelKeys: SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing: previewURL != nil),
                     onCancel: {
                         cancelPreview()
                     }
@@ -2312,6 +2314,16 @@ struct SectionDetailView: View {
     /// publish on screen forever, so starting a preview afterwards left
     /// the publish's own summary sitting there as though nothing had
     /// happened.
+    /// Whether Escape and Command-Period stop the task in the progress
+    /// panel (#988, the HIG review's D6): only while no preview's site is
+    /// drawn over the panel (`websiteLayers`). Once the site shows, Escape is
+    /// the web page's, and stopping the preview stays with the Section menu's
+    /// Stop Preview and the toolbar button. Static so a test can read the
+    /// rule without building this view.
+    static func progressPanelTakesTheCancelKeys(previewIsShowing: Bool) -> Bool {
+        return !previewIsShowing
+    }
+
     static func showsDeployProgress(previewIsRunning: Bool, deployIsRunning: Bool, previewStartedAt: Date?, deployStartedAt: Date?) -> Bool {
         if previewIsRunning {
             return false

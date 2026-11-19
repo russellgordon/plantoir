@@ -1665,6 +1665,42 @@ function and pinned in the wizard's source (`CourseCodeSuggestionsPlacementTests
 the drawn wizard was not measured, because SwiftUI's text is not an AppKit view
 a unit test can read a frame from.
 
+## Escape and Command-Period stop a running preview or deploy (#988)
+
+The progress panel's Cancel (`TaskProgressView`, `taskCancelButton`) carries
+`.keyboardShortcut(.cancelAction)`, so Escape and Command-Period press it while
+a preview builds, a deploy runs, or the plan share's console works. Until #988
+it carried no key, and the HIG review (#975, finding D6) found both keys did
+nothing with Keyboard Navigation on or off; with it off, the button could not
+be reached from the keyboard at all. Keyboards
+(https://developer.apple.com/design/human-interface-guidelines/keyboards):
+"Esc: Cancel the current action or process"; "Command-Period: Cancel an
+operation." Progress indicators: "When it's feasible, let people halt
+processing." The key does exactly what clicking does: no question first, as
+the click has none.
+
+**Only while the panel is in front.** In the section window the preview's site
+is drawn OVER the panel once it serves (`websiteLayers`), and the runner is
+still running then. A key on the hidden Cancel would make Escape on a web page
+(closing a page's own pop-up, leaving full-screen video) stop the preview. So
+`TaskProgressView.takesTheCancelKeys` is false while `previewURL` is set, by
+`SectionDetailView.progressPanelTakesTheCancelKeys(previewIsShowing:)`; the
+Section menu's Stop Preview and the toolbar button stop a showing preview, as
+before. Other tabs (Coverage, Problems) do not hold the panel at all (#793), so
+neither key reaches it there.
+
+**A key equivalent, not `.onExitCommand`**, for the reason #973 measured:
+`.onExitCommand` fires only while something inside the view holds the keys,
+and with Keyboard Navigation off nothing in the panel does. No menu item or
+shortcut was added: those are #990's.
+
+`ProgressCancelKeysTests` presses each key on the panel drawn in an off-screen
+window and counts the Cancel closure: once per key, not again on a second
+press, and never while `takesTheCancelKeys` is false. Measured failing without
+the `.keyboardShortcut` line. **For Windows (stage 3):** the progress panel's
+Cancel takes Escape while the panel is in front, and not while the preview's
+site covers it.
+
 ## A section's Coverage tab (#793)
 
 **Its layout (#831, #832).** The tab's content sits in `TabArea`, which

@@ -59,6 +59,12 @@ A preview shows the pages as they were when it was made. A change you make to a 
 
 While a preview runs, the {{control:previewButton}} button and menu item are named {{control:stopPreview}}. Press it to end the preview. The window then says {{control:noPreviewRunning}}.
 
+While Plantoir is still making the website, before it shows, {{control:cancel}} in the window stops the preview too.
+
+{{mac}}
+The Escape key and Command-Period press {{control:cancel}} as well, until the website shows.
+{{/mac}}
+
 Deploying the section also stops its preview.
 
 ## Choose where a preview opens

@@ -27,10 +27,14 @@ To deploy a section is to send its website to where students read it. A deploy c
 1. In the sidebar, select the section.
 2. Press {{control:deployButton}} in the toolbar, or choose {{menu:deploy}} ({{key:deploy}}).
 3. If a sheet titled {{control:laterClassesTitle}} opens, answer it. Plantoir asks only when published classes are dated after the next class. [Classes dated after the next class, at Deploy](page:later-classes) says what the ticks mean.
-4. Wait while Plantoir makes the website and sends it. The section's window says what is happening. If the section's preview was running, it is stopped.
+4. Wait while Plantoir makes the website and sends it. The section's window says what is happening. If the section's preview was running, it is stopped. To stop the deploy, press {{control:cancel}} in the window.
 
 {{picture:deploy-2}}
 alt: The section's window during a deploy, with a line that says what is happening now.
+
+{{mac}}
+The Escape key and Command-Period press {{control:cancel}} as well.
+{{/mac}}
 
 5. Read the result when the window says the deploy is done.
    - For Netlify or Cloudflare Pages, it says that your website is live, and shows the website's address as a link.
