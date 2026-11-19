@@ -48,17 +48,21 @@ internal sealed class FolderIdentityFile
     private readonly TimeProvider _clock;
     private readonly Func<string, string, bool>? _hardLink;
     private readonly Action? _betweenCheckAndRename;
+    private readonly Action? _afterRename;
 
     /// <param name="path">The identifier file's full path.</param>
     /// <param name="clock">The clock "less than ten seconds ago" is judged by.</param>
     /// <param name="hardLink">A seam: link the first path's file onto the second name; false when the volume has no hard links. The real call by default.</param>
     /// <param name="betweenCheckAndRename">A seam for tests: runs after the file is found to be the one inspected and before it is renamed aside, where another process could set it aside and make a new one.</param>
-    internal FolderIdentityFile(string path, TimeProvider clock, Func<string, string, bool>? hardLink = null, Action? betweenCheckAndRename = null)
+    /// <param name="afterRename">A seam for tests: runs straight after the rename aside, where a third process could find the name free and make its own file there.</param>
+    internal FolderIdentityFile(string path, TimeProvider clock, Func<string, string, bool>? hardLink = null,
+                                Action? betweenCheckAndRename = null, Action? afterRename = null)
     {
         FilePath = path;
         _clock = clock;
         _hardLink = hardLink;
         _betweenCheckAndRename = betweenCheckAndRename;
+        _afterRename = afterRename;
     }
 
     internal string FilePath { get; }
@@ -246,6 +250,7 @@ internal sealed class FolderIdentityFile
 
         _betweenCheckAndRename?.Invoke();
         RenameThrough(handle, Path.GetFullPath(aside));
+        _afterRename?.Invoke();
         return null;
     }
 

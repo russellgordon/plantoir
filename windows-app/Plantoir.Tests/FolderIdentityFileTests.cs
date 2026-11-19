@@ -179,6 +179,14 @@ public sealed class FolderIdentityFileTests : IDisposable
         // process sets that same damaged file aside and makes a good one, G.
         // What this process renames must be the file it inspected, wherever it
         // now is, never G: the rename goes through the handle it compared.
+        //
+        // The third maker (the round-two fix review): straight after this
+        // process's rename, a third process finds the name free if, and only
+        // if, G was the file moved, and makes its own identifier there. Without
+        // it, a rename by path moved G aside, saw it was not the file inspected
+        // and moved it back unharmed, so this test passed with the fix
+        // reverted. With it, the move back is refused, G is stranded aside, and
+        // the name holds the third identifier: every step under G is lost.
         Directory.CreateDirectory(Path.GetDirectoryName(IdPath)!);
         File.WriteAllText(IdPath, "not an identifier\n");
         FolderIdentityFile.Answer look = File_().Read();
@@ -191,7 +199,8 @@ public sealed class FolderIdentityFileTests : IDisposable
             {
                 File.Move(IdPath, theirs);
                 File.WriteAllText(IdPath, good + "\n");
-            });
+            },
+            afterRename: () => File_().MakeExclusively());   // the third maker: makes one only if the name is free
         racing.SetAside(look.Inspected);
 
         Assert.Equal(good + "\n", File.ReadAllText(IdPath));
