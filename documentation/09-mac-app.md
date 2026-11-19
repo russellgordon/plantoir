@@ -20090,7 +20090,7 @@ repetitive animations".
   words. Other placeholder-only fields remain (the assistant's composer,
   Class Dates' Google Sheet link, the sidebar's course-code rename field,
   Course Settings' folder path, the list editor's New name, the console's
-  answer fields); they are listed on #993 for the next pass.
+  answer fields), not yet checked live; they are for the next pass.
 - **Decorative icons are hidden.** An `info.circle` (or the token notice's
   triangle) beside a sentence that says everything is `accessibilityHidden`,
   so VoiceOver reads the sentence alone.
