@@ -164,7 +164,8 @@ public class PreviewAppearanceTests
             .First(e => e!["event"]!.ToString() == "cloudflare project made again")!["marker"]!;
         var examples = marker["examples"]!.AsArray().Select(e => e!.ToString()).ToList();
         var first = CloudflareProjectRemade.Parse(examples[0])!;
-        Assert.Equal(("ICS4U", 1, "ics4u-s1-2026-gordon", "ics4u-s1-2026-gordon.pages.dev"),
+        // The example's invented surname since the mac's #891 (#920 item 5).
+        Assert.Equal(("ICS4U", 1, "ics4u-s1-2026-quillfeather", "ics4u-s1-2026-quillfeather.pages.dev"),
                      (first.Course, first.Section, first.Project, first.Address));
         var spaced = CloudflareProjectRemade.Parse(examples[1])!;
         Assert.Equal("AP CALC", spaced.Course);
