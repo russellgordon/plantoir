@@ -232,7 +232,12 @@
       <_PlantoirRuntimeWranglerPattern>&quot;wrangler&quot;\s*:\s*&quot;$(_PlantoirRuntimeWrangler.Replace('.', '\.'))&quot;</_PlantoirRuntimeWranglerPattern>
       <_PlantoirRuntimePython>3.14.10</_PlantoirRuntimePython>
       <_PlantoirRuntimePythonPattern>&quot;python&quot;\s*:\s*&quot;$(_PlantoirRuntimePython.Replace('.', '\.'))&quot;</_PlantoirRuntimePythonPattern>
+      <!-- #965: vcruntime140.dll beside node.exe (contracts/toolchain.json -> windowsNodeVcRuntime). -->
+      <_PlantoirRuntimeVcRuntime>14.51.36247.0</_PlantoirRuntimeVcRuntime>
+      <_PlantoirRuntimeVcRuntimePattern>&quot;nodeVcRuntime&quot;\s*:\s*&quot;$(_PlantoirRuntimeVcRuntime.Replace('.', '\.'))&quot;</_PlantoirRuntimeVcRuntimePattern>
     </PropertyGroup>
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirRuntimeManifest), $(_PlantoirRuntimeVcRuntimePattern)))"
+           Text="windows-app\Vendor\runtime does not carry the Visual C++ runtime $(_PlantoirRuntimeVcRuntime) beside node.exe (#965; its manifest.json has no such nodeVcRuntime), so its native modules would not load on a PC without the Visual C++ redistributable. Re-run windows-app\Vendor\fetch-runtime.ps1 (it places the one file, no download) and build again." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirRuntimeManifest), $(_PlantoirRuntimePythonPattern)))"
            Text="windows-app\Vendor\runtime does not carry Python $(_PlantoirRuntimePython) (its manifest.json names another). Delete windows-app\Vendor\runtime, re-run windows-app\Vendor\fetch-runtime.ps1 (a full fetch, about 600 MB) and build again." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirRuntimeManifest), $(_PlantoirRuntimeNodePattern)))"
