@@ -19465,7 +19465,7 @@ off.
   The list's copy of the content is never the only one while the folder
   still exists. `heldBy` (content held in a backup zip) is U5's.
 - **`external`**: something outside every working folder, `<family>:<name>`;
-  this version knows `preference:<name>`, the app's own `UserDefaults`
+  this version knows `preference:<name>`, the app's own preferences store (`PlantoirDefaults.shared`, which follows `--state-dir`)
   (`UndoAppPreferences`), and a step of external ops alone needs no working
   folder. It is set last, after every file has gone in, and re-read first.
   The LaunchAgent of a scheduled deploy (ruling 23) and Obsidian's vault

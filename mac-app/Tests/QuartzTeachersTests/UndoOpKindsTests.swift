@@ -70,19 +70,19 @@ final class UndoOpKindsTests: XCTestCase {
     func testAPreferenceIsUndoneAndRedoneThroughTheList() throws {
         let key: String = "undoOpKindsTests-\(UUID().uuidString)"
         defer {
-            UserDefaults.standard.removeObject(forKey: key)
+            PlantoirDefaults.shared.removeObject(forKey: key)
         }
-        UserDefaults.standard.set("before", forKey: key)
+        PlantoirDefaults.shared.set("before", forKey: key)
         let journal: UndoJournal = UndoJournal(folderURL: scratchURL.appendingPathComponent("undo", isDirectory: true))
         let op: UndoOp = UndoOp.external(target: "preference:" + key, before: .string("before"), after: .string("after"))
         let draft: UndoOpsDraft = UndoContractKinds.draft(ops: [op], blobs: [], root: nil, action: "setPreference")
 
         XCTAssertEqual(JournaledWrite.perform(ops: draft, in: journal, mode: .live), .applied(seq: 1))
-        XCTAssertEqual(UserDefaults.standard.string(forKey: key), "after")
+        XCTAssertEqual(PlantoirDefaults.shared.string(forKey: key), "after")
         XCTAssertEqual(journal.undoNewest(), .undone(seq: 1))
-        XCTAssertEqual(UserDefaults.standard.string(forKey: key), "before")
+        XCTAssertEqual(PlantoirDefaults.shared.string(forKey: key), "before")
         XCTAssertEqual(journal.redoNewest(), .redone(seq: 1))
-        XCTAssertEqual(UserDefaults.standard.string(forKey: key), "after")
+        XCTAssertEqual(PlantoirDefaults.shared.string(forKey: key), "after")
     }
 
     /// A move is one rename that never replaces: with something already at

@@ -797,7 +797,7 @@ nonisolated protocol UndoExternalPlaces: Sendable {
     func write(_ target: String, _ value: UndoJSON?) -> Bool
 }
 
-/// The app's own preferences (`UserDefaults.standard`), named
+/// The app's own preferences (`PlantoirDefaults.shared`, the one store, which follows `--state-dir`), named
 /// `preference:<key>`.
 nonisolated struct UndoAppPreferences: UndoExternalPlaces {
 
@@ -816,7 +816,7 @@ nonisolated struct UndoAppPreferences: UndoExternalPlaces {
         guard let key = UndoAppPreferences.preferenceKey(target) else {
             return .cannotTell
         }
-        guard let stored = UserDefaults.standard.object(forKey: key) else {
+        guard let stored = PlantoirDefaults.shared.object(forKey: key) else {
             return .notSet
         }
         guard let value = UndoJSON.from(foundation: stored) else {
@@ -830,14 +830,14 @@ nonisolated struct UndoAppPreferences: UndoExternalPlaces {
             return false
         }
         guard let value else {
-            UserDefaults.standard.removeObject(forKey: key)
+            PlantoirDefaults.shared.removeObject(forKey: key)
             return true
         }
         if !PropertyListSerialization.propertyList(value.foundation(), isValidFor: .binary) {
             // A JSON null, or an object holding one: no preference holds it.
             return false
         }
-        UserDefaults.standard.set(value.foundation(), forKey: key)
+        PlantoirDefaults.shared.set(value.foundation(), forKey: key)
         return true
     }
 }
