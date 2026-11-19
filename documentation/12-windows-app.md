@@ -14939,9 +14939,11 @@ and nothing in the app calls it yet.
   check reads asking only to READ and sharing everything
   (`FileShare.ReadWrite | FileShare.Delete`), never with write or delete
   access. A page held with no read sharing, a cloud file not available
-  offline or a network error is `CannotReadNow`, and it ends as the
-  contract's `fileIsInUse` ends: refused, named, nothing on the list changed
-  (the plan review's M3). It is NEVER `changedSince`, which would clear the
+  offline or a network error is `CannotReadNow`, refused, named, nothing on
+  the list changed (the plan review's M3). Since U2b's contract (2026-11-19)
+  it ends in one of two ways: a sharing or lock violation (32, 33) as the
+  contract's `fileIsInUse` ends, every other failed read as its `cannotTell`
+  (refusal `cannotTellNow`); see "What U2b's rows met here" above. It is NEVER `changedSince`, which would clear the
   whole list under ruling 13 for a file that was merely busy. The contract
   has no case for it yet: the tests are named `Proposed_*`, and the proposed
   authored cases (with a failing staging write and the read-only bit) are a
@@ -14989,6 +14991,30 @@ after every line. The traces' writer (`settingEntry`) and the op derivation
 lock, no staged swap, no flush, one process. Each count is asserted at or
 above its value today, so a list cannot silently fall to zero.
 
+**What U2b's rows met here (2026-11-19).** With the mac's U2b in the
+contract, this reader takes its six kinds for kinds it does not know, as
+the plan has W1 do, so their rows are held on the named-gap ledger against
+#899 for W6 (`NamedGapLedger` → `UndoCheckCases`, `UndoStackCases`,
+`UndoTraces`): 69 `checkCases` (every row of a U2 kind whose verdict is not
+`notReadable` both ways, or whose `current` is a shape this test cannot
+place yet: a move's `atFrom`/`atTo`, a `tree`, a `preference`), U2b's 19
+`stackCases` (each needs a call or a key the replay does not know) and the
+15 traces that hold a `move`. A held row is not skipped: a held check case
+must still be answered `notReadable` both ways, its op must still be one
+this reader cannot read, and it fails the day it is answered as the
+contract says; a held stack case or trace must still stop at the call or
+key it is held for (a held trace is asserted call by call up to its first
+`move`), and fails the day it plays through. U2b's two `cannotBeRead` rows
+on kinds W1 reads ("a page that is there and cannot be read just now (no
+permission)", "whole file: cannot be read just now") were W1's and are
+built: a read refused for any reason but a sharing or lock violation (32,
+33) is now `cannotTell`, refused `cannotTellNow` with the list kept, in the
+mac's order (a page in the way, then a page that cannot be read, then
+content missing); a sharing or lock violation stays "in use", which
+`rule.recovery` names apart. The test makes such a page unreadable through
+`UndoCurrent.Read`'s seam (access denied), since an ACL that denies reading
+is not reliable over SSH with an administrator's token.
+
 **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
 .NET 9, the system NTFS volume, other agents of the run sharing the CPU, so
 the spread is wide): a whole read, fold and offer of one segment, by a scratch
@@ -15025,7 +15051,8 @@ readable (4); the next number counted from readable lines only (4).
 
 **Rejected:** a typed deserialiser (the mac's first bug: it threw and the line
 was skipped); a fourth verdict word of Windows' own for a failed read (M3: the
-contract's `fileIsInUse` already says what happens); probing a page with an
+contract's `fileIsInUse` already said what happens, and since U2b its
+`cannotTell` says it for every failed read but a held file); probing a page with an
 exclusive open to find holders (M2: every page Obsidian has open would be
 refused); `File.ReadAllText` anywhere in a check (it drops a BOM and replaces
 bad bytes without a word); a culture-aware compare anywhere (it calls a

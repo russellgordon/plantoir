@@ -34,13 +34,34 @@ public sealed class UndoStackContractTests
         Assert.Equal(UndoContract.Undo.GetProperty("stackCases").GetArrayLength(), Cases().Count());
     }
 
+    /// <summary>Every case held open by name (U2's op kinds, W6) is a case the contract still has.</summary>
+    [Fact]
+    public void EveryHeldStackCaseIsStillInTheContract() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoStackCases, Cases().Select(row => (string)row[0]));
+
+    /// <summary>
+    /// Every case, asserted in full. A case the ledger holds open (a call or
+    /// a key of U2's op kinds, which W6 brings) must still stop at that call
+    /// or key, and goes from the ledger the day it passes.
+    /// </summary>
     [Theory]
     [MemberData(nameof(Cases))]
     public void EveryStackCase(string name)
     {
+        if (NamedGapLedger.Holding(NamedGapLedger.UndoStackCases, name) is { } held)
+        {
+            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => WalkTheCase(name), "this replay does not know", "this replay does not check");
+            return;
+        }
+        WalkTheCase(name);
+    }
+
+    private static void WalkTheCase(string name)
+    {
         JsonElement stackCase = UndoContract.Undo.GetProperty("stackCases").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
-        foreach (JsonProperty key in stackCase.EnumerateObject()) Assert.Contains(key.Name, KeysChecked);
+        foreach (JsonProperty key in stackCase.EnumerateObject())
+            Assert.True(KeysChecked.Contains(key.Name), "a key this replay does not check: " + key.Name);
 
         using var scribe = new UndoScribe();
         var replay = new StackReplay(scribe);

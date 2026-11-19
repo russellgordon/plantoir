@@ -60,6 +60,22 @@ public sealed class UndoCheckContractTests : IDisposable
         return UndoFormat.ReadOp(document.RootElement);
     }
 
+    /// <summary>
+    /// The case's <c>current</c> as this test can place it: one place
+    /// holding text, bytes, an empty folder or nothing. A move's two sides
+    /// (<c>atFrom</c>, <c>atTo</c>), a <c>tree</c> and an external op's
+    /// <c>preference</c> are U2's shapes, placed once W6 reads their kinds.
+    /// </summary>
+    private static bool CanBePlacedHere(JsonElement checkCase)
+    {
+        JsonElement current = checkCase.GetProperty("current");
+        foreach (string shape in new[] { "text", "bytesHex", "folder", "absent" })
+        {
+            if (current.TryGetProperty(shape, out _)) return true;
+        }
+        return false;
+    }
+
     /// <summary>Puts the case's <c>current</c> on the disk at the op's path and returns the full path.</summary>
     private string Place(JsonElement checkCase)
     {
@@ -73,16 +89,66 @@ public sealed class UndoCheckContractTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// What a reader of the disk sees at the case's place. <c>cannotBeRead</c>
+    /// (on the mac and in Python, the permissions taken away) is the open
+    /// refused with access denied, as <c>FileStream</c> throws it
+    /// (<see cref="UnauthorizedAccessException"/>, 0x80070005), through
+    /// <see cref="UndoCurrent.Read"/>'s seam: an ACL that denies reading is not
+    /// used because this suite also runs over SSH with an administrator's token,
+    /// where such tests are skipped (the W5 review's note).
+    /// </summary>
+    private static UndoCurrent ReadAsTheCaseHasIt(JsonElement checkCase, string path)
+    {
+        bool cannotBeRead = checkCase.GetProperty("current").TryGetProperty("cannotBeRead", out JsonElement flag) && flag.GetBoolean();
+        if (!cannotBeRead) return UndoCurrent.Read(path);
+        Assert.True(File.Exists(path), "a place that cannot be read is one that is there");
+        return UndoCurrent.Read(path, _ => throw new UnauthorizedAccessException("denied, as the case has it") { HResult = unchecked((int)0x80070005) });
+    }
+
+    /// <summary>Every case held open by name (an op of U2's kinds, which W6 brings) is a case the contract still has.</summary>
+    [Fact]
+    public void EveryHeldCheckCaseIsStillInTheContract() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoCheckCases, Cases().Select(row => (string)row[0]));
+
+    /// <summary>
+    /// Every case, its undo and redo verdicts exactly as the contract gives
+    /// them. A case the ledger holds open (its op is one of U2's kinds, which
+    /// this reader does not know until W6) must still be answered
+    /// <c>notReadable</c> both ways, the contract's rule for a kind a reader
+    /// does not know (never guessed at, never a reason to clear), and must
+    /// still differ from the contract; it goes from the ledger the day it is
+    /// answered as the contract says.
+    /// </summary>
     [Theory]
     [MemberData(nameof(Cases))]
     public void EveryCheckCase(string name)
     {
         JsonElement checkCase = CaseNamed(name);
         UndoOp op = OpOf(checkCase);
-        UndoCurrent current = UndoCurrent.Read(Place(checkCase));
+        NamedGapLedger.Entry? held = NamedGapLedger.Holding(NamedGapLedger.UndoCheckCases, name);
+        if (held is not null)
+        {
+            // The op of a held case must still be one this reader does not know.
+            Assert.False(op.Readable, NamedGapLedger.ClosedMessage(held));
+            if (!CanBePlacedHere(checkCase)) return;   // U2's shapes of `current`: placed by W6
+        }
+        UndoCurrent current = ReadAsTheCaseHasIt(checkCase, Place(checkCase));
         UndoOpState state = UndoCheck.StateOf(op, current);
-        Assert.Equal(checkCase.GetProperty("undo").GetString(), UndoContract.Spelled(UndoCheck.UndoVerdictOf(state)));
-        Assert.Equal(checkCase.GetProperty("redo").GetString(), UndoContract.Spelled(UndoCheck.RedoVerdictOf(state)));
+        string undo = UndoContract.Spelled(UndoCheck.UndoVerdictOf(state));
+        string redo = UndoContract.Spelled(UndoCheck.RedoVerdictOf(state));
+        string expectedUndo = checkCase.GetProperty("undo").GetString()!;
+        string expectedRedo = checkCase.GetProperty("redo").GetString()!;
+        if (held is not null)
+        {
+            Assert.False(undo == expectedUndo && redo == expectedRedo, NamedGapLedger.ClosedMessage(held));
+            Assert.True(undo == "notReadable" && redo == "notReadable",
+                $"\"{name}\" is held open (#{held.Issue}) because its op's kind is not read here yet, so it must be " +
+                $"answered notReadable both ways, never guessed at; it was answered {undo} and {redo}");
+            return;
+        }
+        Assert.Equal(expectedUndo, undo);
+        Assert.Equal(expectedRedo, redo);
     }
 
     /// <summary>
@@ -164,18 +230,48 @@ public sealed class UndoCheckContractTests : IDisposable
     /// share that dropped, fails the read with an I/O error of its own: also
     /// cannot-read-now, never changed since (a seam stands in for OneDrive,
     /// which this suite must not touch).
+    ///
+    /// <para>Since U2b's contract (checkCasesHow's <c>cannotTell</c>, the director's
+    /// ruling confirmed by Russell, 2026-11-19), every such failure except a
+    /// lock or sharing violation is <c>cannotTell</c>, refused
+    /// <c>cannotTellNow</c>; a lock violation (another program holds a range of
+    /// the file) stays "in use", which <c>rule.recovery</c> names apart.</para>
     /// </summary>
     [Theory]
-    [InlineData(362)]   // ERROR_CLOUD_FILE_PROVIDER_NOT_RUNNING
-    [InlineData(395)]   // ERROR_CLOUD_FILE_ACCESS_DENIED
-    [InlineData(64)]    // ERROR_NETNAME_DELETED
-    [InlineData(33)]    // ERROR_LOCK_VIOLATION
-    public void Proposed_ACloudOrNetworkReadFailureIsNeverChangedSince(int error)
+    [InlineData(362, "cannotTell")]    // ERROR_CLOUD_FILE_PROVIDER_NOT_RUNNING
+    [InlineData(395, "cannotTell")]    // ERROR_CLOUD_FILE_ACCESS_DENIED
+    [InlineData(64, "cannotTell")]     // ERROR_NETNAME_DELETED
+    [InlineData(33, "fileIsInUse")]    // ERROR_LOCK_VIOLATION
+    public void Proposed_ACloudOrNetworkReadFailureIsNeverChangedSince(int error, string verdict)
     {
         string path = ThePageAsTheStepLeftIt();
         UndoCurrent current = UndoCurrent.Read(path, _ => throw new IOException("seam", unchecked((int)0x80070000) | error));
         Assert.Equal(error, Assert.IsType<UndoCurrent.CannotReadNow>(current).ErrorCode);
-        Assert.Equal(UndoVerdict.FileIsInUse, UndoCheck.UndoVerdictOf(UndoCheck.StateOf(ThePublishLineOp(), current)));
+        Assert.Equal(verdict, UndoContract.Spelled(UndoCheck.UndoVerdictOf(UndoCheck.StateOf(ThePublishLineOp(), current))));
+        Assert.Equal(verdict, UndoContract.Spelled(UndoCheck.RedoVerdictOf(UndoCheck.StateOf(ThePublishLineOp(), current))));
+    }
+
+    /// <summary>
+    /// A step with a page that cannot be read now and nothing in the way is
+    /// refused cannotTellNow, naming the page, and a page in the way still
+    /// settles it first (the mac's order: changed since, cannot tell, content
+    /// missing).
+    /// </summary>
+    [Fact]
+    public void APageThatCannotBeReadNowIsRefusedCannotTellUnlessAPageIsInTheWay()
+    {
+        UndoOp first = ThePublishLineOp() with { Path = "a.md" };
+        UndoOp second = ThePublishLineOp() with { Path = "b.md" };
+        var refused = UndoCheck.Plan([first, second], backward: true,
+            relative => relative == "a.md" ? new UndoCurrent.CannotReadNow(5) : UndoCurrent.Read(ThePageAsTheStepLeftIt()),
+            _ => null);
+        Assert.Equal("a.md", Assert.IsType<UndoCheck.PlanResult.CannotTellNow>(refused).Path);
+
+        string changed = "---\ntitle: Unit 1, Day 1\npublish: true # by hand\n---\n";
+        var inTheWay = UndoCheck.Plan([first, second], backward: true,
+            relative => relative == "a.md" ? new UndoCurrent.CannotReadNow(5) : new UndoCurrent.Bytes(Encoding.UTF8.GetBytes(changed)),
+            _ => null);
+        Assert.Equal("b.md", Assert.IsType<UndoCheck.PlanResult.ChangedSince>(inTheWay).First);
     }
 
     /// <summary>

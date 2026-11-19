@@ -47,9 +47,30 @@ public sealed class UndoTraceContractTests
         Assert.Equal([0xEF, 0xBB, 0xBF], fixture.Single(page => page.Id == "p6").Bytes[..3]);
     }
 
+    /// <summary>Every trace held open by name (it holds U2's <c>move</c>, which W6 brings) is a trace the contract still has.</summary>
+    [Fact]
+    public void EveryHeldTraceIsStillInTheContract() =>
+        NamedGapLedger.StillNamed(NamedGapLedger.UndoTraces, Traces().Select(row => (string)row[0]));
+
+    /// <summary>
+    /// Every trace, every call. A trace the ledger holds open is replayed and
+    /// asserted call by call exactly as any other up to its first call this
+    /// replay does not know, and must still stop there; it goes from the
+    /// ledger the day it plays through.
+    /// </summary>
     [Theory]
     [MemberData(nameof(Traces))]
     public void EveryCallOfEveryTrace(string name)
+    {
+        if (NamedGapLedger.Holding(NamedGapLedger.UndoTraces, name) is { } held)
+        {
+            NamedGapLedger.HeldCaseStillStopsAtItsGap(held, () => ReplayTheTrace(name), "a call this replay does not know");
+            return;
+        }
+        ReplayTheTrace(name);
+    }
+
+    private static void ReplayTheTrace(string name)
     {
         JsonElement trace = UndoContract.Traces.RootElement.GetProperty("traces").EnumerateArray()
             .Single(candidate => candidate.GetProperty("name").GetString() == name);
