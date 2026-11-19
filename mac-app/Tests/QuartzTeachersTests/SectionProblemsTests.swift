@@ -341,7 +341,14 @@ final class SectionProblemsTests: XCTestCase {
         XCTAssertFalse(view.contains("TabView"), "the site's web view never leaves its container")
         let sidebar: String = try readSource("QuartzTeachers/Views/SidebarView.swift")
         let label: String = try body(of: "func sectionRowLabel(", in: sidebar)
-        XCTAssertEqual(label.components(separatedBy: "Image(systemName: \"exclamationmark.triangle").count - 1, 1,
+        // Since #994 the glyph is drawn by its own view, so it can follow a
+        // selected row's colour: ONE badge in the row, and ONE glyph in it.
+        XCTAssertEqual(label.components(separatedBy: "SectionRowWarningBadge()").count - 1, 1,
+                       "one warning badge on a row")
+        XCTAssertEqual(label.components(separatedBy: "Image(systemName: \"exclamationmark.triangle").count - 1, 0,
+                       "the row draws no warning glyph of its own beside the badge")
+        let badge: String = try body(of: "struct SectionRowWarningBadge: View {", in: sidebar)
+        XCTAssertEqual(badge.components(separatedBy: "Image(systemName: \"exclamationmark.triangle").count - 1, 1,
                        "one warning glyph on a row")
     }
 

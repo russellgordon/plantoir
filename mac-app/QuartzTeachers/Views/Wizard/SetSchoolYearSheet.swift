@@ -73,8 +73,7 @@ struct SetSchoolYearSheet: View {
             }
 
             if let entryProblem {
-                Text(entryProblem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(entryProblem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("setSchoolYearProblem")
             }

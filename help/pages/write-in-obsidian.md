@@ -3,6 +3,7 @@ id: write-in-obsidian
 checked: 2.0.0
 covers:
 - mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift
+- mac-app/QuartzTeachers/Models/ObsidianClosingQuestion.swift
 - mac-app/QuartzTeachers/App/SubjectMenus.swift
 - contracts/shared-rules.json
 - mac-app/Tests/Goldens/menu-bar.txt
@@ -28,6 +29,17 @@ The pages of a course are written in Obsidian, a separate app for notes. This pa
 
 {{picture:write-in-obsidian-1}}
 alt: A section selected in Plantoir's sidebar, with the Open in Obsidian button marked in the toolbar.
+
+### The first time Obsidian opens a course
+
+Obsidian keeps a list of the courses it has opened. It can add a course to that list only while it is closed. So the first time you open a course from Plantoir while Obsidian is open, Plantoir asks before it closes Obsidian.
+
+- {{control:obsidianCloseAndOpen}} closes Obsidian, adds the course, and opens Obsidian again. Everything you have written is kept.
+- {{control:obsidianClosingCancel}} leaves Obsidian as it is, and the course does not open.
+
+Plantoir never closes Obsidian without asking.
+
+### The page Obsidian opens on
 
 When the section's preview is showing a page, Obsidian opens on that same page. This works for a hidden page too. With a course selected in place of a section, {{menu:courseOpenInObsidian}} opens the course.
 

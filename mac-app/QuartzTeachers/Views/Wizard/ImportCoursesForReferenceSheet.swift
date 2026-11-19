@@ -442,8 +442,7 @@ struct ImportCoursesForReferenceSheet: View {
             .fixedSize(horizontal: false, vertical: true)
 
             if let entryProblem {
-                Text(entryProblem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(entryProblem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("importProblem")
             }
@@ -488,9 +487,8 @@ struct ImportCoursesForReferenceSheet: View {
                     // Why this one cannot come across, beside the row it is
                     // about rather than as one sentence under the list.
                     if let trouble = troubleByCourse[course.id] {
-                        Text(trouble)
+                        StatusColour.blocking.sentence(trouble)
                             .font(.callout)
-                            .foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("importTrouble-\(course.folderName)")
                         // The one answer to the shelf rule's refusal (#572).
@@ -500,9 +498,8 @@ struct ImportCoursesForReferenceSheet: View {
                             }
                             .accessibilityIdentifier("replaceReferenceCourseButton")
                             if let replaceRefusal {
-                                Text(replaceRefusal)
+                                StatusColour.blocking.sentence(replaceRefusal)
                                     .font(.callout)
-                                    .foregroundStyle(.orange)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .accessibilityIdentifier("replaceRefusal")
                             }
@@ -551,23 +548,21 @@ struct ImportCoursesForReferenceSheet: View {
         if let facts = course.olderLayout {
             if let sentence = OlderCourseLayout.sentence(about: facts.shared) {
                 let isShort: Bool = facts.shared.state == .notFound || facts.shared.state == .partlyFound
-                Text(sentence)
+                StatusColour.sentence(sentence, wornAs: isShort ? .warning : nil)
                     .font(.callout)
-                    .foregroundStyle(isShort ? Color.orange : Color.secondary)
+                    .foregroundStyle(isShort ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.secondary))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("importShared-\(course.folderName)")
             }
             if let warning = facts.chosenWarning {
-                Text(warning)
+                StatusColour.warning.sentence(warning)
                     .font(.callout)
-                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("importSharedWarning-\(course.folderName)")
             }
             if let problem = sharedPickProblem[course.id] {
-                Text(problem)
+                StatusColour.blocking.sentence(problem)
                     .font(.callout)
-                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("importSharedProblem-\(course.folderName)")
             }

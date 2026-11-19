@@ -82,8 +82,7 @@ struct ReferenceGroupNameSheet: View {
                 }
 
             if let problem, !name.isEmpty || pressProblem != nil {
-                Text(problem)
-                    .foregroundStyle(.orange)
+                StatusColour.blocking.sentence(problem)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("referenceGroupNameProblem")
             }

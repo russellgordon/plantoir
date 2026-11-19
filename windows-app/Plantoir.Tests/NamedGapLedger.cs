@@ -348,9 +348,7 @@ internal static class NamedGapLedger
     private const string Reason824 = "sharing a course's unit plans (with #848's look before a share) is #824's piece of v2.0.0, not built here yet";
     private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
     private const string Reason827 = "the groups a teacher makes on the reference shelf are #827's piece of v2.0.0, not built here yet";
-    private const string Reason828 = "the launchers refusing an overlapping build of a section (#729), and what the app reads from that refusal, are #828's piece of v2.0.0, not built here yet";
     private const string Reason884 = "GitHub Copilot as a third outside assistant (the mac's #783) is #884's piece of v2.0.0; Windows has no Copilot door yet";
-    private const string Reason854 = "#835's first part (a hold from a scheduled deploy named as one that is running, not 'set for later') is #854's piece of v2.0.0, not built here yet";
 
     // #884's first part (2026-11-13): the mac's #783 and #850 merged into dev.
     private const string Reason884Door = "GitHub Copilot as a third outside door (its launcher, detection, menu items and buttons) is #884's piece of v2.0.0, not built here yet";
@@ -378,6 +376,7 @@ internal static class NamedGapLedger
     // The same hold, brought up to dev 39d83a0a7 (2026-11-18): stack 14's #901 piece 901a and #952.
     private const string Reason901 = "a built site that leaves off the course's files no published page uses, with its trail line and the build that stops at the follow limit (the mac's #901 piece 901a, shared code in build_site.py and site_files.py), is #901's piece of v2.0.0 to check and finish on Windows; until it lands this app records no 'site leaves off files' line and explains no follow-limit stop (the raw output is shown, the contract's honest fallback)";
     private const string Reason921NetlifyStep = "the Netlify token's TTL step now says that the next deploy names a saved token that no longer works and that Settings shows whether it still works (the mac's #696, corrected by #952); Windows' Settings shows neither until #921 lands, so its older words for that step are the true ones here";
+    private const string Reason1003 = "Plantoir never closing Obsidian without asking (the mac's #995, shared-rules.json obsidianNeverClosedUnasked) is #1003's piece of v2.0.0; until it lands Windows asks no closing question, so it has no answer to record";
     private const string Reason899 ="Undo and Redo (#899; Windows' first piece is #949) records nothing on Windows yet: U1 is the journal's reader and writer with no action wired, so there is no step to fail to record and none to roll back";
 
     /// <summary>
@@ -423,47 +422,28 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 824, V200, Reason824,
              "unit plans shared", "unit plan share refused", "unit plan sharing stopped", "unit plan password changed"),
 
-        // ---- step 0: assist-wording.json → wording
-        Owed(AssistWordingKeys, 828, V200, Reason828, "deployRefusedWhileItsSectionIsBeingBuilt"),
-        Owed(AssistWordingSaidDifferently, 854, V200, Reason854,
-             "courseIsBeingBuiltElsewhere", "deployRefusedWhileALaterDeployWorks"),
+        // ---- step 0: assist-wording.json → wording. #828's
+        // deployRefusedWhileItsSectionIsBeingBuilt and #854's two sentences
+        // in #835's words (courseIsBeingBuiltElsewhere,
+        // deployRefusedWhileALaterDeployWorks) landed with 828a.
 
         // ---- step 0: app-rules.json → credentials and launcher flags
+        // (#828's --for-deploy landed with 828a)
         Owed(CredentialPromptCases, 824, V200, Reason824,
              "Choose a username for these unit plans: ",
              "Please choose a username of 1 to 32 letters, digits, dots, dashes or underscores: ",
              "Choose a password for these unit plans (8 to 64 characters): ",
              "Please choose a password of 8 to 64 letters, digits, spaces or symbols: "),
         Owed(CredentialRequestNames, 824, V200, Reason824, "unitPlanUsername", "unitPlanPassword"),
-        Owed(PreviewLauncherFlags, 828, V200, Reason828, "--for-deploy"),
         Owed(DeployLauncherExtras, 824, V200, Reason824,
              "--plans", "--protect", "--remove-password", "--change-password", "--send-answer-keys-openly",
              "--password-only", "--include-answer-keys", "--stop-sharing", "--year"),
 
-        // ---- step 0: shared-rules.json → deployWhileItsSectionDeploys
-        Owed(LauncherRefusalSentences, 828, V200, Reason828, "buildingDeploy", "buildingBuild"),
-        Owed(LauncherRefusalSentences, 854, V200, Reason854, "laterDeploy", "laterBuild"),
-
-        // ---- step 0: the launcher runner's rows. #828: fifteen launcherCases
-        // rows (seven cases on each launcher, one preview case) and the two
-        // "already being built" sentences on each launcher. #854: the two
-        // "later" sentences and the "later" trail line on each launcher.
-        Owed(LauncherRunnerRows, 828, V200, Reason828,
-             Row("previewWhileItsSectionDeploys", "a deploy's build leg (--build-only --for-deploy) is a deploy")),
-        Owed(LauncherRunnerRows, 828, V200, Reason828, BothLaunchers("deployWhileItsSectionDeploys",
-             "a deploy's build leg (--build-only --for-deploy) in this folder refuses a deploy",
-             "a deploy's build leg refuses the build leg of another deploy",
-             "a rebuild (--build-only, no --for-deploy) refuses a deploy, in words that say built",
-             "a deploy's own build leg held up by a rebuild says it cannot be deployed",
-             "a rebuild refuses another build of the section",
-             "a rebuild whose working folder cannot be asked still counts",
-             "two builds started by the same app are not one family").ToArray()),
-        Owed(LauncherRunnerRows, 828, V200, Reason828,
-             BothLaunchers("deployWhileItsSectionDeploys.sentences", "buildingDeploy", "buildingBuild").ToArray()),
-        Owed(LauncherRunnerRows, 854, V200, Reason854,
-             BothLaunchers("deployWhileItsSectionDeploys.sentences", "laterDeploy", "laterBuild").ToArray()),
-        Owed(LauncherRunnerRows, 854, V200, Reason854,
-             BothLaunchers("activityTrail", "launcherLineWhenALaterDeployIsStillWorking").ToArray()),
+        // ---- step 0: shared-rules.json → deployWhileItsSectionDeploys, and
+        // the launcher runner's rows: none held open. #828's fifteen
+        // launcherCases rows, its two "already being built" sentences and
+        // their rows, and #854's two "later" sentences, their rows and the
+        // "later" trail line all landed with 828a (2026-11-13).
 
         // ---- step 0: the reference shelf (#823, #827)
         Owed(ShelfCodeCases, 827, V200, Reason827,
@@ -534,6 +514,7 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 936, V200, Reason936,
              "files for the site downloaded", "files for the site could not be downloaded"),
         Owed(ActivityTrailEvents, 899, V200, Reason899, "undo could not record a step", "undo rolled back"),
+        Owed(ActivityTrailEvents, 1003, V200, Reason1003, "asked to close Obsidian to open a course"),
         Owed(MachineWordUsedIn, 921, V200, Reason921, "shared-rules.json:deployTokens.words.problemCouldNotSave"),
         Owed(CredentialRequestsSaidDifferently, 921, V200, Reason921, "cloudflareToken"),
         Owed(CredentialRequestsSaidDifferently, 920, V200, Reason920, "teacherSurname", "siteName", "siteNameConflict"),

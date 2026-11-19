@@ -117,8 +117,7 @@ struct KeepACopyForReferenceSheet: View {
 
             if let entryProblem {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(entryProblem)
-                        .foregroundStyle(.orange)
+                    StatusColour.blocking.sentence(entryProblem)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("keepACopyProblem")
                     // Beside the shelf rule's refusal, and only there

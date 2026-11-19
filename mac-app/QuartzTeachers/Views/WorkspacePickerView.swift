@@ -33,10 +33,9 @@ struct WorkspacePickerView: View {
             }
 
             if let problem = workspace.workspaceProblem {
-                Text(problem)
+                StatusColour.blocking.sentence(problem)
                     .frame(maxWidth: 460)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.red)
             }
 
             // Why the folder this window was about to open is not open: a

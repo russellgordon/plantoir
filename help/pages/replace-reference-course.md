@@ -22,7 +22,7 @@ Replace It puts a newer copy of a course in place of the one already on the {{co
 
 ## Where Replace It appears
 
-Two reference courses with the same code cannot share a school year or a group. When a new copy would clash with one already on the shelf, an orange sentence says you already have that course there. The {{control:referenceCourseReplaceItButton}} button is beside it. This happens in three places:
+Two reference courses with the same code cannot share a school year or a group. When a new copy would clash with one already on the shelf, a sentence says you already have that course there. The {{control:referenceCourseReplaceItButton}} button is beside it. This happens in three places:
 
 - the sheet that {{menu:courseKeepACopyForReference}} opens;
 - each row of the sheet that {{menu:fileImportCoursesForReference}} opens;

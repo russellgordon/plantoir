@@ -52,8 +52,8 @@ The look of the website is not copied. The new section's emoji, colour scheme, f
 ## If it does not work
 
 - **{{menu:addSection}} is greyed.** The course is kept for reference, or it is being previewed or deployed. Stop the preview, or wait for the deploy to finish.
-- **Orange text says the section already exists.** Choose a number the course does not have.
-- **Orange text says a folder for that section is already on this {{machine}}.** Plantoir will not write over it, because it may hold work you want to keep. Move that folder aside first, then add the section.
+- **A sentence under the number says the section already exists.** Choose a number the course does not have.
+- **A sentence under the number says a folder for that section is already on this {{machine}}.** Plantoir will not write over it, because it may hold work you want to keep. Move that folder aside first, then add the section.
 
 {{assistant}}
 {{menu:addSection}} is also greyed while Claude, Codex or GitHub Copilot is open on the course from Plantoir. Finish with the assistant first.
