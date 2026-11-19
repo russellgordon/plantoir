@@ -187,9 +187,9 @@ struct CopyPageSheet: View {
                     Text(problem)
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("copyPageProblem")
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("copyPageProblem")
             }
 
             buttons
