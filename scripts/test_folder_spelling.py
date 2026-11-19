@@ -27,6 +27,7 @@ like the launcher tests beside it. Run with:
 """
 
 import json
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import os
 import re
 import stat

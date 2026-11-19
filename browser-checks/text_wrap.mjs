@@ -45,10 +45,10 @@
 //
 //   node browser-checks/text_wrap.mjs <chrome> <Wrap Fixture page url>
 
-import { spawn } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, pageUrl] = process.argv.slice(2)
 if (!chromePath || !pageUrl) {
@@ -66,7 +66,7 @@ const URL_LINE = 101
 const SENTINEL = "plantoir-text-wrap-check: nothing copied yet"
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-text-wrap-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1512,900",
   "--use-mock-keychain", "--password-store=basic",

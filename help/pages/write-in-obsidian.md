@@ -40,7 +40,7 @@ When the section's preview is showing a page, Obsidian opens on that same page. 
 {{picture:write-in-obsidian-2}}
 alt: Obsidian with a class page open from the All Classes folder, and the page's settings at the top of the page.
 
-If the page for the next class does not exist yet, make it in Plantoir first. See [Add the next class](page:add-next-class). [Class pages: Unit 1, Day 1](page:class-pages) says how these pages are named and dated.
+If the page for the next class does not exist yet, make it in Plantoir first. See [Add a class](page:add-next-class). [Class pages: Unit 1, Day 1](page:class-pages) says how these pages are named and dated.
 
 ## Write the page
 
@@ -54,7 +54,7 @@ Write the page as ordinary notes, under its settings.
 1. In Plantoir, select the section and press {{control:previewButton}}. The section's website opens in Plantoir's window.
 2. If a preview was already running, choose {{menu:rebuildPreview}}. A preview shows the pages as they were when it was made. A change made since is not in it.
 
-The preview shows only the pages that are published for the section. A class page made with {{menu:addNextClass}} starts unpublished. Publish it when it is written, and it appears in the preview. [Preview a section](page:preview) has more.
+The preview shows only the pages that are published for the section. A class page made with {{menu:addClass}} starts unpublished. Publish it when it is written, and it appears in the preview. [Preview a section](page:preview) has more.
 
 Students see the page after two more things: the page is published for their section, and the section is deployed. [Publishing and deploying](page:publish-and-deploy) explains both.
 

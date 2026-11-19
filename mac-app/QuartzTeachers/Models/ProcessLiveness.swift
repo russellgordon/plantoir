@@ -147,7 +147,7 @@ nonisolated enum ProcessLiveness {
                 }
             }
             if let recordedStart = recordedStart, !recordedStart.isEmpty {
-                if recordedStart != startTime {
+                if !ProcessLiveness.startsMatch(recorded: recordedStart, running: startTime) {
                     return false
                 }
             }
@@ -184,6 +184,25 @@ nonisolated enum ProcessLiveness {
         let recordedKept: String = String(recorded.prefix(ProcessLiveness.namesAreKeptTo))
         let runningKept: String = String(running.prefix(ProcessLiveness.namesAreKeptTo))
         return recordedKept.lowercased() == runningKept.lowercased()
+    }
+
+    /// Whether the start a lease recorded is the start the system reports.
+    ///
+    /// Exact, as text, for the start this app writes (`startTimeText`). A
+    /// start with no point in it is WHOLE SECONDS, the most a launcher can
+    /// read of its own start from a shell (deploy.sh since #829, which takes
+    /// `ps -o lstart`): it is compared with the running process's whole
+    /// seconds, the text before the point, never as a prefix of the whole
+    /// text (`workLeases.liveness`, the #829 cases).
+    static func startsMatch(recorded: String, running: String) -> Bool {
+        if recorded.contains(".") {
+            return recorded == running
+        }
+        var runningSeconds: String = running
+        if let point = running.firstIndex(of: ".") {
+            runningSeconds = String(running[running.startIndex..<point])
+        }
+        return recorded == runningSeconds
     }
 
     /// Asks `kill(pid, 0)`, which sends nothing and says whether the id is in

@@ -13,6 +13,7 @@ final class BuildFreshnessTests: XCTestCase {
         let courseURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cq4t-fresh-\(UUID().uuidString)")
             .appendingPathComponent("ICS3U")
+        removeWhenTestEnds(courseURL.deletingLastPathComponent())
         let sectionURL: URL = courseURL.appendingPathComponent("section1")
         try FileManager.default.createDirectory(at: sectionURL, withIntermediateDirectories: true)
         try Data("# lesson\n".utf8).write(to: sectionURL.appendingPathComponent("index.md"))

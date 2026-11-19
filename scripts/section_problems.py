@@ -96,6 +96,7 @@ _MAKERS = {
     "runnableCodeShownAsPlainCode": site_health.site_disagreements_finding,
     "quizzesReadDifferently": site_health.quizzes_read_differently_finding,
     "geogebraSketchesNotReady": site_health.geogebra_finding,
+    "phetSimulationsNotReady": site_health.phet_finding,
 }
 
 

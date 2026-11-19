@@ -61,6 +61,12 @@ struct IsolatedLaunch {
     /// (XCUITest leaves it running after a test that did not quit it).
     nonisolated(unsafe) static var lastLaunched: XCUIApplication?
 
+    /// The copies of the app this runner launched and that are still
+    /// running, each by its id and the moment it started, so a later process
+    /// given the same id is never taken for one of them (#978c). A record is
+    /// dropped once its process has ended.
+    nonisolated(unsafe) static var copiesLaunchedHere: Set<ProcessStamp> = []
+
     // MARK: - Computed properties
 
     /// The trail this launch writes: the redirected one.
@@ -92,6 +98,11 @@ struct IsolatedLaunch {
     /// `workspace` nil means the one named by this runner's own
     /// `UITEST_WORKSPACE`, or a fresh fixture — so plain Cmd-U needs no setup.
     ///
+    /// When the test ends, `UITestFolders` quits the app and then removes the
+    /// state folder, and the fixture if this made it (#978). A `workspace`
+    /// handed in is the caller's: made through `UITestFolders.makeFixture()`
+    /// it goes too, and the one `UITEST_WORKSPACE` names is never removed.
+    ///
     /// `linkRealAssistantWeights` links each real `*.gguf` into the state
     /// folder, ONE FILE AT A TIME: a link to the whole models folder would let
     /// a Settings "Remove" delete the teacher's real weights and put a
@@ -109,12 +120,14 @@ struct IsolatedLaunch {
         } else if let fixturePath = ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] {
             workspaceURL = URL(fileURLWithPath: fixturePath)
         } else {
-            workspaceURL = try FixtureWorkspace.materialize()
+            workspaceURL = try UITestFolders.makeFixture()
         }
 
         let stateDirectory: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("plantoir-state-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+        UITestFolders.removeWhenThisTestEnds(stateDirectory)
+        UITestFolders.removeWhenThisTestEnds(UITestFolders.preferencesFolder(forStateDirectory: stateDirectory))
 
         // The frame goes in the ARGUMENT domain, which outranks the saved one
         // for reading and is never written: every launch opens at 1100×720
@@ -140,14 +153,158 @@ struct IsolatedLaunch {
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = workspaceURL.path
         application.launchArguments += arguments
+        // XCUITest's launch ends any running copy of the bundle it launches,
+        // so a copy at that path this runner did not start means the test
+        // fails here, before any launch, and the copy is never quit (#978c).
+        forgetCopiesThatHaveEnded()
+        try refuseToLaunchOverACopyThisRunnerDidNotStart(among: runningCopiesOfTheAppUnderTest())
+        // The tripwire: every other Plantoir, wherever it was opened from,
+        // must still be the same process once the launch has returned.
+        let otherCopiesBefore: [OtherCopy] = otherCopiesRunningNow()
+        // Registered before the launch, so an app that starts and then
+        // fails the test is still quit before its folders go (#978).
+        UITestFolders.quitWhenThisTestEnds(application)
         application.launch()
         lastLaunched = application
+        recordTheCopyLaunched(withStateDirectory: stateDirectory)
+        failIfTheLaunchEndedAnyOf(otherCopiesBefore)
         return IsolatedLaunch(
             application: application,
             stateDirectory: stateDirectory,
             workspaceURL: workspaceURL,
             modelChoiceNote: modelChoiceNote
         )
+    }
+
+    /// The app bundle this runner launches: the `Plantoir.app` beside the
+    /// runner's own bundle in the build's products folder, which is where
+    /// Xcode puts the UI target's target application.
+    static var appUnderTestURL: URL {
+        return Bundle.main.bundleURL.deletingLastPathComponent()
+            .appendingPathComponent("Plantoir.app", isDirectory: true)
+    }
+
+    /// This account's running copies of Plantoir, wherever each was opened
+    /// from: `/Applications`, the Dock, a build folder, the debugger.
+    static func runningCopiesOfPlantoir() -> [NSRunningApplication] {
+        let running: [NSRunningApplication] = NSRunningApplication.runningApplications(
+            withBundleIdentifier: "ca.russellgordon.Plantoir"
+        )
+        var copies: [NSRunningApplication] = []
+        for application in running {
+            if LaunchProcesses.owner(ofProcess: application.processIdentifier) == getuid() {
+                copies.append(application)
+            }
+        }
+        return copies
+    }
+
+    /// This account's running copies of the app opened from the bundle this
+    /// runner launches.
+    static func runningCopiesOfTheAppUnderTest() -> [NSRunningApplication] {
+        let targetPath: String = appUnderTestURL.standardizedFileURL.resolvingSymlinksInPath().path
+        var copies: [NSRunningApplication] = []
+        for application in runningCopiesOfPlantoir() {
+            guard let bundleURL = application.bundleURL else {
+                continue
+            }
+            if bundleURL.standardizedFileURL.resolvingSymlinksInPath().path == targetPath {
+                copies.append(application)
+            }
+        }
+        return copies
+    }
+
+    /// True when the running process is one this runner launched: its id and
+    /// its start time match a record.
+    static func isACopyLaunchedHere(_ processIdentifier: Int32) -> Bool {
+        guard let stamp = LaunchProcesses.stamp(ofProcess: processIdentifier) else {
+            return false
+        }
+        return copiesLaunchedHere.contains(stamp)
+    }
+
+    /// Records the copy this launch started: the running Plantoir whose
+    /// arguments name this launch's own state folder, by its id and start
+    /// time. Only that process, never every copy at the bundle's path.
+    static func recordTheCopyLaunched(withStateDirectory stateDirectory: URL) {
+        for copy in runningCopiesOfPlantoir() {
+            let copyArguments: [String] = LaunchProcesses.arguments(ofProcess: copy.processIdentifier)
+            if LaunchProcesses.argumentsName(copyArguments, folder: stateDirectory.path) == false {
+                continue
+            }
+            if let stamp = LaunchProcesses.stamp(ofProcess: copy.processIdentifier) {
+                copiesLaunchedHere.insert(stamp)
+            }
+        }
+    }
+
+    /// Drops the record of every launched copy whose process has ended: no
+    /// process holds its id any more, or the one that does started at
+    /// another moment.
+    static func forgetCopiesThatHaveEnded() {
+        var stillRunning: Set<ProcessStamp> = []
+        for recorded in copiesLaunchedHere {
+            if LaunchProcesses.stamp(ofProcess: recorded.processIdentifier) == recorded {
+                stillRunning.insert(recorded)
+            }
+        }
+        copiesLaunchedHere = stillRunning
+    }
+
+    /// Fails the test, before anything is launched, when a copy of the app
+    /// under test is running that this runner did not launch: a teacher's
+    /// copy opened from the Dock when the Dock points at this same build, or
+    /// one under Xcode's debugger. XCUITest's `launch()` would end it, and a
+    /// run never ends a Plantoir it did not start; it is never quit here.
+    /// Not a skip (Russell, 2026-11-18): the test reports, loudly, that it
+    /// could not run.
+    static func refuseToLaunchOverACopyThisRunnerDidNotStart(among copies: [NSRunningApplication]) throws {
+        var described: [String] = []
+        for copy in copies {
+            if isACopyLaunchedHere(copy.processIdentifier) == false {
+                described.append("pid \(copy.processIdentifier)")
+            }
+        }
+        if described.isEmpty == false {
+            let message: String = "Not launched: a Plantoir this run did not start is open from \(appUnderTestURL.path) "
+                + "(\(described.joined(separator: ", "))), and launching the app under test would end it. "
+                + "This run will not end a Plantoir it did not start; whoever opened that copy must close it."
+            XCTFail(message)
+            throw ForeignCopyAtTheBuildPath(message: message)
+        }
+    }
+
+    /// Every running Plantoir this run did not launch, wherever it was
+    /// opened from, by its id, start time and path.
+    static func otherCopiesRunningNow() -> [OtherCopy] {
+        var others: [OtherCopy] = []
+        for copy in runningCopiesOfPlantoir() {
+            guard let stamp = LaunchProcesses.stamp(ofProcess: copy.processIdentifier) else {
+                continue
+            }
+            if copiesLaunchedHere.contains(stamp) {
+                continue
+            }
+            others.append(OtherCopy(stamp: stamp, path: copy.bundleURL?.path ?? "?"))
+        }
+        return others
+    }
+
+    /// The tripwire (#978c): fails the test, loudly, for each Plantoir that
+    /// was running before the launch, was not this run's, and is no longer
+    /// the same process after it. It does not rest on any measurement of
+    /// what XCUITest ends; it only checks that nothing else was ended.
+    static func failIfTheLaunchEndedAnyOf(_ otherCopiesBefore: [OtherCopy]) {
+        for other in otherCopiesBefore {
+            let now: ProcessStamp? = LaunchProcesses.stamp(ofProcess: other.stamp.processIdentifier)
+            if now != other.stamp {
+                XCTFail(
+                    "The UI test launch ended a Plantoir this run did not start: pid "
+                    + "\(other.stamp.processIdentifier) at \(other.path) was running before the launch and is gone after it."
+                )
+            }
+        }
     }
 
     /// The lines of the redirected trail, or none when it is not there yet.
@@ -224,5 +381,29 @@ struct IsolatedLaunch {
         }
         let parsed: Any? = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)
         return (parsed as? [String: Any])?[key]
+    }
+}
+
+/// A Plantoir this run did not launch, as it was just before a launch.
+struct OtherCopy {
+
+    // MARK: - Stored properties
+
+    let stamp: ProcessStamp
+    let path: String
+}
+
+/// Thrown, after the failure is recorded, to stop a test from launching over
+/// a copy of the app it did not start.
+struct ForeignCopyAtTheBuildPath: Error, CustomStringConvertible {
+
+    // MARK: - Stored properties
+
+    let message: String
+
+    // MARK: - Computed properties
+
+    var description: String {
+        return message
     }
 }

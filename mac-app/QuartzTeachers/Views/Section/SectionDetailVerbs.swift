@@ -176,12 +176,37 @@ extension SectionDetailView {
             model.classRows = SectionVerbSheetModel.classRows(course: course, sectionNumber: sectionNumber)
             model.chosenClass = model.classRows.first?.title ?? ""
             verbSheet = model
-        case .addNextClass:
+        case .addClass:
+            // #897: how the class is added, then (for a copy) which class and
+            // the plan. Each way is one change, and Undo Last Change takes it
+            // away whole.
             if askForDatesFirst(before: item) {
                 return
             }
-            runAtOnce(SectionVerbs.addNextClass(course: course.code, section: sectionNumber), item: item, verbs: verbs,
-                      title: AssistWording.menuAddNextClassTitle(noun: course.configuration.classNoun))
+            let model: SectionVerbSheetModel = SectionVerbSheetModel(
+                kind: .addClass, course: course, sectionNumber: sectionNumber,
+                title: AssistWording.menuAddClassTitle(
+                    course: course.displayCode, section: String(sectionNumber), noun: course.configuration.classNoun
+                ),
+                item: item
+            )
+            model.addClassFacts = SectionVerbs.addClassFacts(forSection: sectionNumber, in: course)
+            model.way = model.availableWays.first
+            model.sourceRows = SectionVerbSheetModel.sourceRows(course: course, sectionNumber: sectionNumber)
+            verbSheet = model
+        case .rollOverToANewYear:
+            // #897 piece B: the dates, the website question where there is a
+            // website (nothing chosen), then the plan.
+            if askForDatesFirst(before: item) {
+                return
+            }
+            let model: SectionVerbSheetModel = SectionVerbSheetModel(
+                kind: .rollOver, course: course, sectionNumber: sectionNumber,
+                title: AssistWording.menuRollOverTitle(course: course.displayCode, section: String(sectionNumber)),
+                item: item
+            )
+            model.rollOver = RollOverFromTheMenu.choice(forSection: sectionNumber, in: course, today: CalendarDay.today())
+            verbSheet = model
         case .undoLastChange:
             runAtOnce(SectionVerbs.undoLastChange(), item: item, verbs: verbs, title: AssistWording.menuUndoLastChangeTitle)
         case .rebuildPreview:
@@ -198,7 +223,7 @@ extension SectionDetailView {
         }
     }
 
-    /// Add Next Class, Re-date Classes… and Make Room for Classes… need the
+    /// Add Class…, Re-date Classes…, Roll Over to a New Year… and Make Room for Classes… need the
     /// section's class dates. With none on file, THIS window asks for them
     /// first — its own Class Dates sheet, never the assistant's prompt, which
     /// only the assistant's window shows (#457's plan review, blocker 1) —
@@ -212,9 +237,9 @@ extension SectionDetailView {
             kind: .classDates, course: course, sectionNumber: sectionNumber, title: "", item: .classDates
         )
         switch item {
-        case .addNextClass:
+        case .addClass:
             model.reason = AssistWording.datesForTheNextPage(noun: noun)
-        case .reDateClasses:
+        case .reDateClasses, .rollOverToANewYear:
             model.reason = AssistWording.datesToReDate(noun: noun)
         default:
             model.reason = AssistWording.datesToMakeRoom(noun: noun)
@@ -228,11 +253,11 @@ extension SectionDetailView {
         return true
     }
 
-    /// Undo Last Change, Rebuild Preview and Add Next Class: no plan, so they
+    /// Undo Last Change and Rebuild Preview: no plan, so they
     /// run at once, and what they said is shown — except a Rebuild Preview
     /// that is rebuilding, which the teacher is watching happen.
     ///
-    /// Undo Last Change and Add Next Class show their sheet AT ONCE, working
+    /// Undo Last Change shows its sheet AT ONCE, working
     /// — a copy of the course is saved first, seconds for a big one (#351) —
     /// and it turns into the answer. Rebuild Preview shows nothing while it
     /// rebuilds: the teacher is watching that happen.
@@ -355,6 +380,12 @@ extension SectionDetailView {
         case .reDateClasses:
             planCall = SectionVerbs.reDateClasses(course: code, section: sectionNumber, planning: true)
             model.pendingCall = SectionVerbs.reDateClasses(course: code, section: sectionNumber, planning: false)
+        case .rollOver:
+            guard let website = model.rollOver.websiteSent else {
+                return
+            }
+            planCall = SectionVerbs.rollOver(course: code, section: sectionNumber, website: website, planning: true)
+            model.pendingCall = SectionVerbs.rollOver(course: code, section: sectionNumber, website: website, planning: false)
         case .makeRoom:
             var unit: Int = 1
             var atDay: Int = 1
@@ -367,6 +398,30 @@ extension SectionDetailView {
             )
             model.pendingCall = SectionVerbs.makeRoom(
                 course: code, section: sectionNumber, unit: unit, atDay: atDay, howMany: model.howMany, planning: false
+            )
+        case .addClass:
+            // The next class in this unit and a new unit have no plan: each
+            // is added at once, as Add Next Class was (Russell's decision 11:
+            // the page arrives hidden and can be undone), and the sheet
+            // shows the answer.
+            if model.way == .nextInThisUnit {
+                model.pendingCall = SectionVerbs.addNextClass(course: code, section: sectionNumber)
+                goAhead(model)
+                return
+            }
+            if model.way == .inANewUnit {
+                model.pendingCall = SectionVerbs.addNextClassInANewUnit(course: code, section: sectionNumber)
+                goAhead(model)
+                return
+            }
+            guard model.way == .asACopyOfAClass, let sourcePath = model.chosenSource else {
+                return
+            }
+            planCall = SectionVerbs.duplicateAsNextClass(
+                course: code, section: sectionNumber, sourcePath: sourcePath, planning: true
+            )
+            model.pendingCall = SectionVerbs.duplicateAsNextClass(
+                course: code, section: sectionNumber, sourcePath: sourcePath, planning: false
             )
         default:
             return
@@ -454,6 +509,20 @@ extension SectionDetailView {
             return count == 1 ? "1 page ticked" : "\(count) pages ticked"
         case .makeRoom:
             return model.howMany == 1 ? "room for 1" : "room for \(model.howMany)"
+        case .rollOver:
+            return RollOverFromTheMenu.counts(model.rollOver.website, sent: model.rollOver.websiteSent ?? "")
+        case .addClass:
+            // How it was added, never the class's title (#897).
+            switch model.way {
+            case .nextInThisUnit:
+                return "the next class in this unit"
+            case .inANewUnit:
+                return "in a new unit"
+            case .asACopyOfAClass:
+                return "as a copy of a class"
+            case nil:
+                return ""
+            }
         default:
             return ""
         }

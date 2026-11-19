@@ -119,6 +119,35 @@ final class HelperProgramsTests: XCTestCase {
         XCTAssertEqual(overridden["HOME"], "/Users/pretend", "only the trail moves, never HOME")
     }
 
+    /// Every launcher the app starts is told the app holds the work leases
+    /// (#829), by this process's own id, replacing an inherited value: a
+    /// deploy.sh started from Terminal by some other copy must never be told
+    /// THIS app holds its leases, and the app's own children must take none.
+    /// The name is the contract's (`workLeases.launcherLeases.variable`).
+    func testEveryLauncherIsToldThisAppHoldsTheLeases() throws {
+        let home: URL = URL(fileURLWithPath: "/Users/pretend")
+        let fresh: [String: String] = HelperPrograms.environment(
+            basedOn: ["HOME": "/Users/pretend"], inHomeFolder: home, bundledHelpers: nil
+        )
+        XCTAssertEqual(fresh[HelperPrograms.leasesHeldByVariable], String(getpid()))
+        let overridden: [String: String] = HelperPrograms.environment(
+            basedOn: ["HOME": "/Users/pretend", HelperPrograms.leasesHeldByVariable: "1"],
+            inHomeFolder: home, bundledHelpers: nil, leaseHolder: 4321
+        )
+        XCTAssertEqual(overridden[HelperPrograms.leasesHeldByVariable], "4321")
+
+        let contractURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let rules: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: contractURL)) as? [String: Any]
+        )
+        let leases: [String: Any] = try XCTUnwrap(rules["workLeases"] as? [String: Any])
+        let launchers: [String: Any] = try XCTUnwrap(leases["launcherLeases"] as? [String: Any])
+        XCTAssertEqual(launchers["variable"] as? String, HelperPrograms.leasesHeldByVariable)
+    }
+
     /// Left to its default, the folder is the one `ActivityTrail` writes to
     /// right now — under a test run, the test's throwaway trail — so the
     /// unit suite's real launchers never write into the teacher's trail.

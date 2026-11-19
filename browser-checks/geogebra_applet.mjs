@@ -107,13 +107,13 @@
 // Kept OUT of scripts/ like print_handout.mjs: it needs a browser on the Mac,
 // not the image. No packages: Node 22's own WebSocket.
 
-import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { createServer } from "node:http"
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
 import { gzipSync } from "node:zlib"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, siteFolder, pageA, pageB, sketchFile, quizPage] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pageA || !pageB || !sketchFile) {
@@ -202,7 +202,7 @@ const origin = `http://[::1]:${server.address().port}`
 const urlOf = (page) => origin + (page.startsWith("/") ? "" : "/") + page
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-geogebra-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1400,1000",
   "--use-mock-keychain", "--password-store=basic", "--enable-unsafe-swiftshader",

@@ -23,48 +23,51 @@ final class PreviewBuildWait {
     /// Whether the window is waiting for its preview to appear.
     private(set) var isWaiting: Bool = false
 
-    /// The record this wait put in `CourseActivity`, while it has one.
+    /// The claim this wait holds on `CourseActivity`'s record, while it has
+    /// one.
     ///
     /// Kept rather than rebuilt from the window's folder at the end, because
     /// the window's note of its folder is also written by a deploy: by the
     /// time the wait ends it could name another folder, and ending the wrong
-    /// record leaves the right one behind for ever.
-    private(set) var recorded: CourseActivity.PreviewBuildRecord?
+    /// record leaves the right one behind for ever. A CLAIM since #812, not
+    /// the record: ending it leaves another window's start, or the
+    /// assistant's rebuild, still recorded.
+    private(set) var claim: CourseActivity.PreviewBuildClaim?
+
+    // MARK: - Computed properties
+
+    /// The record this wait put in `CourseActivity`, while it has one.
+    var recorded: CourseActivity.PreviewBuildRecord? {
+        return claim?.record
+    }
 
     // MARK: - Functions
 
     /// The wait begins, and ⌘Q is told a preview of this section is being
     /// built. A wait already under way is ended first, so a second press can
-    /// never leave the first record behind.
+    /// never leave the first record behind. (A second press while this
+    /// window's own start is still under way never reaches here:
+    /// `PreviewStartRecords.begin` answers `.alreadyStarting` first, #812.)
     func begin(folderPath: String, courseCode: String, sectionNumber: Int) {
         end()
-        let record: CourseActivity.PreviewBuildRecord = CourseActivity.PreviewBuildRecord(
+        claim = CourseActivity.beginPreviewBuildClaim(
             folderPath: folderPath,
             courseCode: courseCode,
             sectionNumber: sectionNumber
         )
-        CourseActivity.beginPreviewBuild(
-            folderPath: record.folderPath,
-            courseCode: record.courseCode,
-            sectionNumber: record.sectionNumber
-        )
-        recorded = record
         isWaiting = true
     }
 
     /// The wait is over, however it ended — the page answered, the run ended,
     /// it was stopped, or the outer time limit ran out. Safe to call when
-    /// nothing is waiting, and twice.
+    /// nothing is waiting, and twice. Ends this wait's own claim and nobody
+    /// else's (#812).
     func end() {
         isWaiting = false
-        guard let record = recorded else {
+        guard let held = claim else {
             return
         }
-        CourseActivity.endPreviewBuild(
-            folderPath: record.folderPath,
-            courseCode: record.courseCode,
-            sectionNumber: record.sectionNumber
-        )
-        recorded = nil
+        CourseActivity.endPreviewBuild(held)
+        claim = nil
     }
 }

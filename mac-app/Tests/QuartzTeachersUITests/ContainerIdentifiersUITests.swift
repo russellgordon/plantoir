@@ -21,7 +21,7 @@ final class ContainerIdentifiersUITests: XCTestCase {
         guard ProcessInfo.processInfo.environment["PLANTOIR_UI_TESTS"] == "1" else {
             throw XCTSkip("Opt-in: set PLANTOIR_UI_TESTS=1. This drives the real app and needs the foreground.")
         }
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
         let backupsURL: URL = fixtureURL.appendingPathComponent("courses/_backups/EXC2O")
         try FileManager.default.createDirectory(at: backupsURL, withIntermediateDirectories: true)
         try Data(repeating: 7, count: 4096).write(
@@ -56,7 +56,7 @@ final class ContainerIdentifiersUITests: XCTestCase {
         guard ProcessInfo.processInfo.environment["PLANTOIR_UI_TESTS"] == "1" else {
             throw XCTSkip("Opt-in: set PLANTOIR_UI_TESTS=1. This drives the real app and needs the foreground.")
         }
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
         // Two published classes, so the plan has something after Day 1 and
         // Go is offered (the shape AssistantRolloverUITests writes).
         let classesURL: URL = fixtureURL.appendingPathComponent("courses/EXC2O/section1/All Classes")

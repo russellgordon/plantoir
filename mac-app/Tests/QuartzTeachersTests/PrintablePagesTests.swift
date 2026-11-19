@@ -134,7 +134,7 @@ final class PrintablePagesTests: XCTestCase {
     }
 
     func testBlanksAreWrittenInPrintOrderAndAnEmptySchoolNameRemovesTheKey() {
-        let course: CourseConfiguration = configuration(["print_school_name": "Lakefield"])
+        let course: CourseConfiguration = configuration(["print_school_name": "Juniper"])
         course.printBlanks = ["class_number", "name"]
         XCTAssertEqual(course.values["print_blanks"] as? [String], ["name", "class_number"])
         course.printSchoolName = "   "
@@ -159,15 +159,15 @@ final class PrintablePagesTests: XCTestCase {
     }
 
     func testTheSchoolNameIsSetChangedOrClearedAndNeverNamed() {
-        let set: String? = SettingsSaveNotice.printingClause(before: snapshot(), after: snapshot("Lakefield College School"))
+        let set: String? = SettingsSaveNotice.printingClause(before: snapshot(), after: snapshot("Juniper Hollow Collegiate"))
         XCTAssertEqual(set, "school name set")
         let changed: String? = SettingsSaveNotice.printingClause(
-            before: snapshot("Lakefield"), after: snapshot("Lakefield College School"))
+            before: snapshot("Juniper"), after: snapshot("Juniper Hollow Collegiate"))
         XCTAssertEqual(changed, "school name changed")
-        let cleared: String? = SettingsSaveNotice.printingClause(before: snapshot("Lakefield"), after: snapshot())
+        let cleared: String? = SettingsSaveNotice.printingClause(before: snapshot("Juniper"), after: snapshot())
         XCTAssertEqual(cleared, "school name cleared")
         for line in [set, changed, cleared] {
-            XCTAssertFalse((line ?? "").contains("Lakefield"), "the trail must never carry the school's name")
+            XCTAssertFalse((line ?? "").contains("Juniper"), "the trail must never carry the school's name")
         }
     }
 
@@ -191,7 +191,7 @@ final class PrintablePagesTests: XCTestCase {
         let line: String = SettingsSaveNotice.trailLine(
             courseCode: "ICS3U", hiddenBefore: [], hiddenAfter: [],
             result: CourseConfiguration.WriteResult(), notice: nil,
-            printingBefore: snapshot(), printingAfter: snapshot("Lakefield")
+            printingBefore: snapshot(), printingAfter: snapshot("Juniper")
         )
         XCTAssertEqual(line, "saved the settings for ICS3U; printing: school name set")
     }

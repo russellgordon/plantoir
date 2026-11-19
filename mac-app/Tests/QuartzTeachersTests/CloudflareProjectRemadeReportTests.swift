@@ -76,14 +76,14 @@ final class CloudflareProjectRemadeReportTests: XCTestCase {
         XCTAssertEqual(lines.count, 2)
         XCTAssertEqual(
             CloudflareProjectRemadeReport.reports(in: lines[0]),
-            [CloudflareProjectRemadeReport(place: "ICS4U/1", project: "ics4u-s1-2026-gordon", address: "ics4u-s1-2026-gordon.pages.dev")]
+            [CloudflareProjectRemadeReport(place: "ICS4U/1", project: "ics4u-s1-2026-quillfeather", address: "ics4u-s1-2026-quillfeather.pages.dev")]
         )
         let spaced: [CloudflareProjectRemadeReport] = CloudflareProjectRemadeReport.reports(in: lines[1])
         XCTAssertEqual(spaced.count, 1, "a course whose code has a space must not drop the line")
         XCTAssertEqual(
             spaced.first?.trailSentence,
-            "AP CALC/2 · the Cloudflare project ap-calc-s2-2026-gordon was not in this Cloudflare account, "
-                + "so it was made again; the website is now at ap-calc-s2-2026-gordon-7x2.pages.dev"
+            "AP CALC/2 · the Cloudflare project ap-calc-s2-2026-quillfeather was not in this Cloudflare account, "
+                + "so it was made again; the website is now at ap-calc-s2-2026-quillfeather-7x2.pages.dev"
         )
     }
 
@@ -93,12 +93,12 @@ final class CloudflareProjectRemadeReportTests: XCTestCase {
     /// the line reaches the trail, and never the console a teacher reads.
     func testARunRecordsItAndHidesTheLine() throws {
         let runner: ScriptRunner = ScriptRunner()
-        runner.receiveOutput(" Using this section's existing Cloudflare project: ics4u-s1-2026-gordon\r\n")
+        runner.receiveOutput(" Using this section's existing Cloudflare project: ics4u-s1-2026-quillfeather\r\n")
         runner.receiveOutput(try examples()[0] + "\r\n")
         XCTAssertFalse(runner.transcript.displayText.contains(CloudflareProjectRemadeReport.markerPrefix))
         XCTAssertTrue(trailText().contains(
-            "ICS4U/1 · the Cloudflare project ics4u-s1-2026-gordon was not in this Cloudflare account, "
-                + "so it was made again; the website is now at ics4u-s1-2026-gordon.pages.dev"
+            "ICS4U/1 · the Cloudflare project ics4u-s1-2026-quillfeather was not in this Cloudflare account, "
+                + "so it was made again; the website is now at ics4u-s1-2026-quillfeather.pages.dev"
         ), trailText())
     }
 
@@ -115,7 +115,7 @@ final class CloudflareProjectRemadeReportTests: XCTestCase {
             fromByteOffset: 0,
             inHomeFolder: home
         )
-        XCTAssertTrue(trailText().contains("ICS4U/1 · the Cloudflare project ics4u-s1-2026-gordon was not in this"), trailText())
+        XCTAssertTrue(trailText().contains("ICS4U/1 · the Cloudflare project ics4u-s1-2026-quillfeather was not in this"), trailText())
     }
 
     /// Nothing but a place, a project name and a host name can reach the

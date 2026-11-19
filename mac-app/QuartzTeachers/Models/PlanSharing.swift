@@ -329,7 +329,8 @@ nonisolated enum PlanSharing {
     }
 
     /// The public-address warning as #834's question: the title asks, one
-    /// sentence, the rows, Cancel the default and Escape.
+    /// sentence, the rows, then Cancel (Escape) and Share Without a Password
+    /// (no key); no button is the default (#973).
     static func warningQuestion(shared: Int, heldBack: Int, keysInShared: Int) -> FactsQuestion {
         return FactsQuestion(
             title: PlanSharingWording.crawlerWarningTitle,

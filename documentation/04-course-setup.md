@@ -230,9 +230,7 @@ whether the payload's expectations are fetched at all.
 **Both apps' wizards let the teacher decline a skeleton, and the structure
 editor must follow them in BOTH directions.** Turning "Start from a
 <subject> skeleton" ON adopts that subject's five lists; turning it OFF puts
-the defaults back — the LCS variants for the two shared lists when the
-terminology switch is on, the plain defaults for the two per-section lists,
-which have no LCS variant — for each list still EQUAL to what the adoption
+the defaults back for each list still EQUAL to what the adoption
 put there, and leaves the rest as the teacher left them — except the marks
 pool, which is kept where the teacher ticked it but narrowed to the folders
 the course will actually have (below). With nothing adopted there is nothing
@@ -263,12 +261,13 @@ folders with none of its pages, while `course_config.json` said
 `use_skeleton: false`. A wizard that lies about what it is about to make is
 a worse product than one that never asked.
 
-The rule and its seventeen cases are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+The rule and its fifteen cases (seventeen until #891 removed the terminology switch and its two) are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `wizard.skeletonToggle`, run on the mac by `SharedRulesContractTests`;
 `WizardStructureTests` covers what cases cannot reach — the pieces the rule
 is assembled from, and a scan proving the toggle is WIRED, a control with no
-handler being the original bug. Three things about it are decisions rather than
-mechanics; the fourth is what to know before reading a green run as coverage:
+handler being the original bug. Two things about it are decisions rather than
+mechanics (three until #891 removed the terminology switch); the third is what
+to know before reading a green run as coverage:
 
 - **A list is recognised as untouched by VALUE, not by a dirty flag.** A
   list edited and then edited BACK to exactly what the adoption set is
@@ -278,11 +277,6 @@ mechanics; the fourth is what to know before reading a green run as coverage:
   Per-list dirty flags were rejected: a flag has to be got right in every
   editing path and gets one wrong the first time a list is changed from
   somewhere new, which value equality cannot.
-- **The LCS switch rewrites the two SHARED lists**, so flipping it after an
-  adoption leaves them unequal to the snapshot and they stay exactly as the
-  switch left them, while the per-section lists still go back. Re-taking the
-  snapshot on a terminology flip would make the restore delete the College
-  Board folder the teacher had just asked for.
 - **The marks pool can never name a folder that has just left the editor**,
   and it takes TWO rules to keep that true: a pool still equal to the
   adoption's is re-inferred over the restored folders, and a pool the teacher
@@ -300,11 +294,10 @@ mechanics; the fourth is what to know before reading a green run as coverage:
   it.) The two apps reach the same answer from
   opposite ends: the mac narrows inside the restore, Windows leaves the pool
   and narrows it on every read (`CurrentGradedFolders`) and again when the
-  file is written. The mac narrows ONCE MORE as the file is written, for the
-  one path the editor does not cover: the terminology switch takes `College
-  Board Curriculum` out of the folder list without asking the marks pool, so
-  a teacher who had ticked it would otherwise have it written into a course
-  that has no such folder.
+  file is written. The mac narrows ONCE MORE as the file is written, for any
+  path the editor does not cover. Until #891 one such path was a terminology
+  switch that took `College Board Curriculum` out of the folder list without
+  asking the marks pool; the switch is gone and the net stays.
 - **Two of the five lists cannot tell one answer from another for most
   codes**, which matters when reading a green run as coverage: every bundled
   family ships `per_section_folders` of exactly `["All Classes"]`, the
@@ -447,7 +440,9 @@ reference course this way, and what was rejected, is `09-mac-app.md` →
   why the main README recommends iTerm2 over Apple's Terminal. The 43
   schemes come from `support/colour_schemes.json`. Different sections get
   different schemes so a teacher (and their students) can tell sections
-  apart at a glance.
+  apart at a glance. The picker starts on the section's own scheme, so a
+  re-run with Return keeps it. One entry in the file is offered only to a section that already uses it: see
+  "Grove Colours: one scheme, two ids" below.
 - **Fonts**: a curated list of six Google-Font header/body pairings plus
   system-font and custom options, and six monospaced code fonts. Choices are
   stored under a course-wide `default` with per-section overrides.
@@ -470,7 +465,7 @@ example content is being installed, this whole step is skipped.
 
 **In both apps' wizards this step and the skeleton question are one
 thing**, and the editor follows the toggle both ways: declining the skeleton
-puts the factory (or LCS) defaults back into every list the teacher has not
+puts the factory defaults back into every list the teacher has not
 edited since it was adopted, so what the four lists show is what
 `course_config.json` will carry and what will be created on disk. Step 0b
 has the rule, what it deliberately costs, and where its cases live.
@@ -2386,3 +2381,46 @@ Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
 ---
 
 [◀ Previous: Launcher Scripts](03-launcher-scripts.md) · [Back to index](README.md) · [Next: The Build Pipeline ▶](05-build-pipeline.md)
+
+## Grove Colours: one scheme, two ids (#891)
+
+Until 2.0.0 one colour scheme was named for a school and stored under an id
+that named it too. Russell ruled on 2026-11-13 that it stays, renamed
+"Grove Colours" and offered to everyone; that a course already using it looks
+exactly the same; and that neither opening its settings nor re-running set-up
+rewrites its colours. The same day he removed the wizard switch and the
+command-line question that offered that school's own folder and file names
+(`use_lcs_terminology`, now retired: `08-course-config-reference.md`).
+
+**What landed.** `support/colour_schemes.json` holds two entries with the same
+name and colours: `grove-colours`, listed, which every new pick writes; and the
+older entry under its older id, with `"listed": false` and
+`"sameAs": "grove-colours"`. No lookup changed: the build's website colours
+(`find_scheme_by_id`), the Coverage tab (`coverage_tab_scheme_colours`), the
+sharing card (`social_card._load_scheme_colors`) and the command-line
+picker's starting place find either id exactly as before. Only the pickers
+filter: every listed scheme, and the unlisted one only for a section whose own
+scheme it is, in Grove Colours' place, so the name shows once and the section's
+own id is selected (`setup_course.schemes_to_list`, the mac's
+`ColourSchemeCatalog.schemesToList`). Showing a list writes nothing. The rule
+and its cases are `shared-rules.json` → `colourSchemePicker`.
+
+**Measured** (the #891 plan and its review, on copies of the repository):
+with the older entry deleted, the build, the card and the Coverage tab gave
+the default colours (False, False, False) and the command-line picker started
+on the first scheme, so Return wrote `quartz-standard`. With the two entries,
+all three readers give both ids the same colours, and Return on a re-run keeps
+the stored id (`scripts/test_grove_colours.py`, `test_setup_school_terms.py`).
+On this Mac 5 of 44 section entries in built configurations named the older id.
+
+**Rejected.** Deleting the entry (the faults above). Keeping only the older id
+under the new name: every new course would write the school's name into its
+settings. One entry with the new id and a `formerIds` list read by every
+lookup: six readers on two platforms must agree, and a Windows build carrying
+the new scheme list before its code matched a former id would show the first
+scheme as chosen and write `quartz-standard` at the next touch; with two
+entries a lagging app can only show the name twice. Rewriting existing
+configurations to the new id: a file changed behind the teacher's back.
+
+The older id stays in one shipped data file and in the courses that chose it.
+That cannot change without rewriting those files.

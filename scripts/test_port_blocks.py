@@ -32,6 +32,7 @@ Pure stdlib. Run with:
 """
 
 import json
+import launcher_test_trail  # noqa: E402  every launcher run here keeps its trail in a temp folder (#738)
 import os
 import re
 import stat
@@ -1908,7 +1909,8 @@ class TheRealListings(unittest.TestCase):
         block = between(launcher_text("setup.sh"), BLOCK_START, BLOCK_END)
         program = "set -euo pipefail\n" + function_named(block, function) + function + "\n"
         result = subprocess.run([BASH, "-c", program], capture_output=True, timeout=60,
-                                env={"PATH": "/usr/sbin:/usr/bin:/bin", "HOME": os.environ.get("HOME", "/tmp")})
+                                env={"PATH": "/usr/sbin:/usr/bin:/bin", "HOME": os.environ.get("HOME", "/tmp"),
+                                     "PLANTOIR_TRAIL_DIR": launcher_test_trail.FOLDER})
         self.assertEqual(result.returncode, 0, output_of(result))
         found = set()
         for line in result.stdout.decode("utf-8").splitlines():

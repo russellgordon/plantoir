@@ -24,6 +24,23 @@ this CANNOT be run on the host. verify.sh runs it in the image:
     docker run --rm -v "$(pwd)/scripts/test_dates_follow_the_class.py:/opt/scripts/test_dates_follow_the_class.py:ro" \
       quartz-teacher:dev-test python3 /opt/scripts/test_dates_follow_the_class.py
 """
+# ---- runs in the image (#907) ----
+# verify.sh runs this file's tests in the image, where python-frontmatter and
+# the PyYAML it reads with are installed. Run directly on a Mac whose Python
+# has neither, it says so in one line and exits 77, so a caller can tell it
+# from a failure (1). Anywhere else, the image and Windows' fetched runtime
+# included, a missing module stays the failure it is. A mode that needs
+# neither module is let through: `--site`, test_page_sources.py's, which
+# verify.sh runs on the host after its build.
+import sys as _sys
+if _sys.platform == "darwin" and _sys.argv[1:2] != ["--site"]:
+    try:
+        import frontmatter as _frontmatter  # noqa: F401
+    except ModuleNotFoundError as _missing:
+        print(f"{_sys.argv[0].replace(chr(92), '/').rsplit('/', 1)[-1]}: needs the module {_missing.name}, which this Python does not have; verify.sh runs it in the image, where it is installed (exit 77)")
+        _sys.exit(77)
+# ---- end of runs in the image ----
+
 import os
 import shutil
 import sys

@@ -25,6 +25,7 @@ moves fails the test rather than skipping it. Run with:
     python3 scripts/test_deploy_sh_plans.py
 """
 import datetime as dt
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import json
 import os
 import shutil
@@ -38,6 +39,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_deploy_sh_questions import HAS_BASH, NOBODY, ON_A_MAC, REPOSITORY_ROOT  # noqa: E402
+from test_deploy_sh_questions import no_request_was_made, the_network_refused  # noqa: E402
 from test_preview_while_deploying import FAKE_PS_FOR_THE_REAL_LAUNCHER, PretendMac  # noqa: E402
 
 SHARE = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))["unitPlanning"]["share"]
@@ -130,11 +132,12 @@ def a_folder(tmp: str, config: dict | None = None) -> Path:
 
 
 def run(folder: Path, arguments: list, answer: str = "", extra_env: dict | None = None):
-    environment = dict(os.environ, USER=NOBODY, STUB=str(folder / "stub"))
+    environment = the_network_refused(folder, dict(os.environ, USER=NOBODY, STUB=str(folder / "stub")))
     environment.update(extra_env or {})
     done = subprocess.run(["bash", str(folder / "deploy.sh"), "SNC2D", "--plans", "--image", "unused:tag"] + arguments,
                           capture_output=True, timeout=180, cwd=str(folder), input=answer.encode("utf-8"),
                           env=environment)
+    no_request_was_made(folder)
     return done.returncode, done.stdout.decode("utf-8", "replace") + done.stderr.decode("utf-8", "replace")
 
 
@@ -183,7 +186,8 @@ class PlansModeTests(unittest.TestCase):
                 with self.subTest(flag=flag):
                     done = subprocess.run(["bash", str(folder / "deploy.sh"), "SNC2D", "1", flag, "--image", "x"],
                                           capture_output=True, text=True, cwd=str(folder), timeout=60,
-                                          env=dict(os.environ, USER=NOBODY, STUB=str(folder / "stub")))
+                                          env=the_network_refused(folder, dict(os.environ, USER=NOBODY, STUB=str(folder / "stub"))))
+                    no_request_was_made(folder)
                     self.assertEqual(done.returncode, 1)
                     self.assertIn(f"❌ {flag} is for sharing unit plans: use it with --plans.", done.stdout)
 
@@ -237,7 +241,7 @@ class PlansModeTests(unittest.TestCase):
             (other / "course_config.json").write_text('{"course_code": "ICS3U"}', encoding="utf-8")
             (folder / "stub" / "plan_item_SNC2D").write_text("snc:Password-for-SNC2D")
             (folder / "stub" / "plan_item_ICS3U").write_text("ics:Password-for-ICS3U")
-            environment = dict(os.environ, USER=NOBODY, STUB=str(folder / "stub"))
+            environment = the_network_refused(folder, dict(os.environ, USER=NOBODY, STUB=str(folder / "stub")))
             runs = []
             for course in ("SNC2D", "ICS3U"):
                 runs.append(subprocess.Popen(
@@ -248,6 +252,7 @@ class PlansModeTests(unittest.TestCase):
             for run in runs:
                 out = run.communicate(timeout=180)[0].decode("utf-8", "replace")
                 self.assertEqual(run.returncode, 0, out)
+            no_request_was_made(folder)
             files = []
             for line in docker_args(folder).splitlines():
                 if "share_plan.py" in line:

@@ -667,7 +667,7 @@ final class QuartzTeachersUITests: XCTestCase {
     /// frame-sampling assertions here are not trustworthy — the visual
     /// result needs a human eye.
     func testRestartingAPreviewReturnsToTheProgressView() throws {
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
 
         let publicURL: URL = builtSiteURL(in: fixtureURL, sectionNumber: 1)
         try writeStubPreviewScript(in: fixtureURL, buildingInto: publicURL)
@@ -708,7 +708,7 @@ final class QuartzTeachersUITests: XCTestCase {
     /// reproduces the shape of a real deploy — a burst of output, then a
     /// prompt it never answers — and the sidebar must still be there.
     func testInterfaceSurvivesPublishing() throws {
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
 
         // A built site so publishing does not trigger a rebuild first.
         let publicURL: URL = fixtureURL
@@ -760,7 +760,7 @@ final class QuartzTeachersUITests: XCTestCase {
     /// `aPressStartsALauncher` in
     /// `shared-rules.json` → `returningToASectionMidDeploy.cases` describe.
     func testReturningToASectionMidDeployShowsTheDeploy() throws {
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
 
         // A built site so the deploy does not rebuild first — the stub
         // `deploy.sh` is the only launcher this test runs.
