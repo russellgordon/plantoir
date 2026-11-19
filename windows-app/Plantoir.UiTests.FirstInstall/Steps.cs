@@ -107,13 +107,13 @@ internal static class Steps_
         // Edge writes the mark as the download completes, a moment after the
         // file has its name; asked again for up to half a minute.
         string zone = "";
-        Program.Watch.WaitFor(() => (zone = ZoneOf(found)).Contains("ZoneId=", StringComparison.Ordinal),
+        Program.Watch.WaitFor(() => (zone = ZoneOf(found, Answer)).Contains("ZoneId=", StringComparison.Ordinal),
                               TimeSpan.FromSeconds(30));
         string zoneLine = zone.Split('\n').FirstOrDefault(line => line.StartsWith("ZoneId", StringComparison.Ordinal))?.Trim() ?? zone.Trim();
         Program.Note($"downloaded {Path.GetFileName(found)}, {size:N0} bytes; its mark of the web: {zoneLine}");
         if (!zone.Contains("ZoneId=3", StringComparison.Ordinal))
             throw Stopped.Driver($"the download carries no \"from the internet\" mark ({zoneLine}), so SmartScreen would not be exercised");
-        Program.Note("its signature: " + SignatureOf(found));
+        Program.Note("its signature: " + SignatureOf(found, Answer));
         Program.Shot("downloaded");
         CloseBrowser();
         return found;
@@ -124,7 +124,7 @@ internal static class Steps_
     /// directly, and through PowerShell's -Stream if the runtime refuses the
     /// stream path; the reason is kept when neither can read it.
     /// </summary>
-    private static string ZoneOf(string file)
+    private static string ZoneOf(string file, Action<SeenWindow, string>? answer)
     {
         string why;
         try { return File.ReadAllText(file + ":Zone.Identifier"); }
@@ -133,12 +133,11 @@ internal static class Steps_
         {
             var start = new ProcessStartInfo("powershell.exe", $"-NoProfile -Command \"Get-Content -Raw -Stream Zone.Identifier -LiteralPath '{file}'\"")
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            using var process = Process.Start(start)!;
-            string text = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(30000);
+            var (text, errors) = RunWatched(start, TimeSpan.FromSeconds(30), answer);
             if (text.Contains("ZoneId=", StringComparison.Ordinal)) return text;
-            why += "; PowerShell read: " + text.Trim() + process.StandardError.ReadToEnd().Trim();
+            why += "; PowerShell read: " + text.Trim() + errors.Trim();
         }
+        catch (Stopped) { throw; }
         catch (Exception error) { why += "; PowerShell: " + error.Message; }
         return "(no mark read: " + why + ")";
     }
@@ -149,19 +148,51 @@ internal static class Steps_
     /// file signed by a publisher with reputation is let through without a
     /// question.
     /// </summary>
-    private static string SignatureOf(string file)
+    private static string SignatureOf(string file, Action<SeenWindow, string>? answer)
     {
         try
         {
             var start = new ProcessStartInfo("powershell.exe",
                 $"-NoProfile -Command \"$s = Get-AuthenticodeSignature -LiteralPath '{file}'; '' + $s.Status + '; ' + $s.SignerCertificate.Subject + '; issued by ' + $s.SignerCertificate.Issuer\"")
             { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            using var process = Process.Start(start)!;
-            string text = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit(30000);
-            return text.Length > 0 ? text : "(none read) " + process.StandardError.ReadToEnd().Trim();
+            var (output, errors) = RunWatched(start, TimeSpan.FromSeconds(30), answer);
+            string text = output.Trim();
+            return text.Length > 0 ? text : "(none read) " + errors.Trim();
         }
+        catch (Stopped) { throw; }
         catch (Exception error) { return "(could not read: " + error.Message + ")"; }
+    }
+
+    /// <summary>
+    /// Runs a short command and returns what it printed, looking at the
+    /// desktop once a second while it runs. Round six of #976: the signature
+    /// check, a PowerShell call of about ten seconds under emulation, was made
+    /// with no look at all, and every full run's record showed a gap of 10 to
+    /// 15 s in Download, over <see cref="WindowRules.MaxLookGap"/> (runs
+    /// win-rehearsal-2026-11-18-232648 and -233358). A command still running
+    /// after <paramref name="within"/> is ended.
+    /// </summary>
+    private static (string Output, string Errors) RunWatched(ProcessStartInfo start, TimeSpan within, Action<SeenWindow, string>? answer)
+    {
+        using var process = Process.Start(start)!;
+        Task<string> output = process.StandardOutput.ReadToEndAsync();
+        Task<string> errors = process.StandardError.ReadToEndAsync();
+        var until = DateTime.UtcNow + within;
+        bool exited = false;
+        while (!exited)
+        {
+            Program.Watch.Check(answer);
+            exited = process.WaitForExit(1000);
+            if (!exited && DateTime.UtcNow >= until) break;
+        }
+        if (!exited)
+        {
+            try { process.Kill(); } catch { }
+        }
+        string printed = output.Wait(TimeSpan.FromSeconds(5)) ? output.Result : "";
+        string complaints = errors.Wait(TimeSpan.FromSeconds(5)) ? errors.Result : "";
+        if (!exited) complaints += $" (still running after {within.TotalSeconds:0} s; ended)";
+        return (printed, complaints);
     }
 
     private static bool IsBrowserWindow(SeenWindow window) =>
