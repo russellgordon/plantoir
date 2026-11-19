@@ -48,8 +48,8 @@ struct TaskConsoleView: View {
                         Label(ScriptRunner.closedForADeployOutcome, systemImage: "stop.circle.fill")
                             .foregroundStyle(.secondary)
                     } else {
-                        Label("Failed (exit \(exitCode))", systemImage: "xmark.circle.fill")
-                            .foregroundStyle(StatusColour.blocking.color)
+                        Label("Failed (exit \(exitCode))", systemImage: StatusColour.blocking.filledSymbolName)
+                            .foregroundStyle(StatusColour.blocking.style)
                     }
                 }
             }

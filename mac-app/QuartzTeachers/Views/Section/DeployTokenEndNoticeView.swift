@@ -24,7 +24,7 @@ struct DeployTokenEndNoticeView: View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(StatusColour.warning.color)
+                    .foregroundStyle(StatusColour.warning.style)
                 Text(sentence)
                     .font(.callout)
                 Spacer()

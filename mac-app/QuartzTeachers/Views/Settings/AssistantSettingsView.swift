@@ -125,7 +125,7 @@ struct AssistantSettingsView: View {
             if let caution = library.confirmationCaution {
                 Label(caution, systemImage: "exclamationmark.triangle")
                     .font(.callout)
-                    .foregroundStyle(StatusColour.warning.color)
+                    .foregroundStyle(StatusColour.warning.style)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("assistantConfirmationCaution")
             }
@@ -183,7 +183,7 @@ struct AssistantSettingsView: View {
                     if let caution = choice.caution(for: library.budget) {
                         Label(caution, systemImage: "exclamationmark.triangle")
                             .font(.callout)
-                            .foregroundStyle(StatusColour.warning.color)
+                            .foregroundStyle(StatusColour.warning.style)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("assistantChoiceCaution" + identifier(for: choice))
                     }

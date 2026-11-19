@@ -39,6 +39,20 @@ struct AddSectionSheet: View {
         return SectionAdder.entryProblem(entry, existing: existingSections, courseCode: course.displayCode)
     }
 
+    /// What kind of problem the line under the field is (#994): a press of
+    /// Add that failed, or a number that cannot be added, stops the teacher
+    /// (red); a remark about a number that can be added is a caution
+    /// (orange); nil when there is nothing to say.
+    var entryProblemKind: StatusColour? {
+        if entryProblem == nil {
+            return nil
+        }
+        if addProblem != nil || !canAdd {
+            return .blocking
+        }
+        return .warning
+    }
+
     var canAdd: Bool {
         return SectionAdder.entryIsAddable(entry, existing: existingSections)
     }
@@ -97,11 +111,8 @@ struct AddSectionSheet: View {
 
             // The warning keeps a reserved line so the sheet does not jump
             // as it appears and disappears.
-            // A number that cannot be added stops the teacher (red); a
-            // remark about one that can is a caution (orange) (#994).
-            StatusColour.sentence(entryProblem ?? " ", wornAs: entryProblem == nil ? nil : (canAdd ? .warning : .blocking))
+            StatusColour.sentence(entryProblem ?? " ", wornAs: entryProblemKind)
                 .font(.caption)
-                .foregroundStyle(canAdd ? StatusColour.warning.color : StatusColour.blocking.color)
                 .frame(minHeight: 26, alignment: .topLeading)
                 .accessibilityIdentifier("addSectionWarning")
 

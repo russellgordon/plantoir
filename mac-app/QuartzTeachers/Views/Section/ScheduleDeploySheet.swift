@@ -97,12 +97,16 @@ struct ScheduleDeploySheet: View {
                 // A plan that cannot be scheduled stops the teacher going
                 // ahead (Schedule is greyed), so it is said in the stopping
                 // red with its symbol (#994).
-                StatusColour.sentence(
-                    shown.plan?.description ?? shown.unreadable ?? "",
-                    wornAs: shown.plan?.isSchedulable == true ? nil : .blocking
-                )
+                // Selectable, so the symbol sits beside the words and is not
+                // copied with them.
+                Group {
+                    if shown.plan?.isSchedulable == true {
+                        Text(shown.plan?.description ?? shown.unreadable ?? "")
+                    } else {
+                        StatusLine(kind: .blocking, words: shown.plan?.description ?? shown.unreadable ?? "")
+                    }
+                }
                     .font(.callout)
-                    .foregroundStyle(shown.plan?.isSchedulable == true ? Color.primary : StatusColour.blocking.color)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
                     .accessibilityIdentifier("scheduleDeployPlan")

@@ -46,7 +46,7 @@ struct DeployTokenRows: View {
                         .controlSize(.small)
                 }
                 StatusColour.sentence(panel.statusLine(), wornAs: statusNeedsAttention ? .warning : nil)
-                    .foregroundStyle(statusNeedsAttention ? StatusColour.warning.color : Color.primary)
+                    .foregroundStyle(statusNeedsAttention ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.primary))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("\(panel.destination.rawValue)TokenStatus")
             }

@@ -402,9 +402,9 @@ struct CourseSettingsView: View {
                     StatusColour.blocking.sentence(saveProblem)
                         .font(.callout)
                 } else if saveIsHeldBack, let holdingProblem {
-                    Text(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
+                    // It stops Save, so the stopping red and its symbol (#994).
+                    StatusColour.blocking.sentence(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
                         .font(.callout)
-                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("saveHeldBackReason")
                 }

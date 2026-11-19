@@ -61,7 +61,7 @@ struct ToolchainReadinessNoticeContentView: View {
         HStack(alignment: .top, spacing: 10) {
             if hasFailed {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(StatusColour.warning.color)
+                    .foregroundStyle(StatusColour.warning.style)
             } else {
                 ProgressView()
                     .controlSize(.small)

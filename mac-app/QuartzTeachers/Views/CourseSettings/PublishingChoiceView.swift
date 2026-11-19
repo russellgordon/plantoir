@@ -346,7 +346,13 @@ private struct CloudflareDetailFields: View {
                 built = built + Text(PublishingDestinations.accountIDCanWait + " ").foregroundStyle(.secondary)
             }
         }
-        return built + Text(PublishingDestinations.cloudflareSizeNote).foregroundStyle(StatusColour.warning.color)
+        // The 25 MB fact is a caution, so it leads with the caution symbol
+        // too (#994); when the ID's sentence is a caution as well, one
+        // symbol at the start of the block says it for both.
+        if accountProblem != nil && saysTheIDCanWait {
+            return built + Text(PublishingDestinations.cloudflareSizeNote).foregroundStyle(StatusColour.warning.style)
+        }
+        return built + StatusColour.warning.sentence(PublishingDestinations.cloudflareSizeNote)
     }
 
     // MARK: - Body

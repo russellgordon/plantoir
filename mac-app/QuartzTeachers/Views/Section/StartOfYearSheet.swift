@@ -446,7 +446,7 @@ struct StartOfYearSheet: View {
         }
         ForEach(plan.warnings(), id: \.self) { (warning: String) in
             Label(warning, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(StatusColour.warning.color)
+                .foregroundStyle(StatusColour.warning.style)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

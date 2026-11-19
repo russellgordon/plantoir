@@ -550,7 +550,7 @@ struct ImportCoursesForReferenceSheet: View {
                 let isShort: Bool = facts.shared.state == .notFound || facts.shared.state == .partlyFound
                 StatusColour.sentence(sentence, wornAs: isShort ? .warning : nil)
                     .font(.callout)
-                    .foregroundStyle(isShort ? StatusColour.warning.color : Color.secondary)
+                    .foregroundStyle(isShort ? AnyShapeStyle(StatusColour.warning.style) : AnyShapeStyle(Color.secondary))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("importShared-\(course.folderName)")
             }

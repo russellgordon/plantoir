@@ -9,10 +9,10 @@ import XCTest
 /// red, which are not.
 ///
 /// The numbers are WCAG contrast ratios, the measure the HIG's Accessibility
-/// page uses: at least 4.5:1 for text up to 17 points. They are computed from
-/// the colour values; no system setting is changed. Each colour's value is
-/// taken for all four variants (Light, Dark, and each with Increase
-/// Contrast) and resolved in the matching appearance.
+/// page uses: at least 4.5:1 for text up to 17 points. No system setting is
+/// changed: each of the four values (Light, Dark, and each with Increase
+/// Contrast) is read from the Color Set in the asset catalog, which is what
+/// ships, and the contrast is computed from it.
 @MainActor
 final class StatusColourTests: XCTestCase {
 
@@ -33,26 +33,27 @@ final class StatusColourTests: XCTestCase {
     /// grouped Form row's grey with margin to spare.
     let lightBackgrounds: [String] = ["FFFFFF", "ECECEC", "E0E0E0"]
 
-    /// The same in Dark: the window background, and a grouped Form row up to
-    /// the lightest grey macOS draws one in.
-    let darkBackgrounds: [String] = ["1E1E1E", "2D2D2D", "3A3A3A"]
+    /// The same in Dark: the window background, a grouped Form row, and
+    /// #3C3C3C, the lightest dark grey the app draws a sentence on (the
+    /// review's figure, 2026-11-19).
+    let darkBackgrounds: [String] = ["1E1E1E", "2D2D2D", "3C3C3C"]
 
-    // MARK: - Contrast in every appearance
+    // MARK: - Contrast of every value that ships
 
-    /// The caution orange: 4.5:1 or more on every background, in all four
-    /// appearances. The system orange it replaces measures 2.31:1 on white.
-    func testTheCautionOrangeIsReadableInEveryAppearance() {
-        assertReadable(StatusColour.warning)
+    /// The caution orange: 4.5:1 or more on every background in all four
+    /// variants, and 7:1 with Increase Contrast. The system orange it
+    /// replaces measures 2.31:1 on white.
+    func testTheCautionOrangeIsReadableInEveryVariant() throws {
+        try assertReadable(StatusColour.warning)
     }
 
-    /// The stopping red: 4.5:1 or more on every background, in all four
-    /// appearances. The system red it replaces measures 3.57:1 on white,
+    /// The stopping red, the same. The system red measures 3.57:1 on white,
     /// and 3.31:1 on a dark Form row.
-    func testTheStoppingRedIsReadableInEveryAppearance() {
-        assertReadable(StatusColour.blocking)
+    func testTheStoppingRedIsReadableInEveryVariant() throws {
+        try assertReadable(StatusColour.blocking)
     }
 
-    /// The system colours fail the same check, so the test above is not
+    /// The system colours fail the same check, so the tests above are not
     /// passing for a reason that has nothing to do with the values chosen.
     func testTheSystemColoursFailTheSameCheckInLight() {
         let light: NSAppearance = NSAppearance(named: .aqua)!
@@ -65,39 +66,58 @@ final class StatusColourTests: XCTestCase {
         XCTAssertLessThan(redRatio, minimum, red)
     }
 
-    /// Increase Contrast must make a real difference in Light, where the
-    /// default values are the ones nearest the minimum.
-    func testIncreaseContrastIsDarkerStillInLight() {
-        let light: NSAppearance = NSAppearance(named: .aqua)!
+    /// Increase Contrast has a value of its own in Light and in Dark, and in
+    /// Light it is the stronger of the two.
+    func testIncreaseContrastHasItsOwnStrongerValues() throws {
         for kind in [StatusColour.warning, StatusColour.blocking] {
-            let normal: String = StatusColourTests.hex(of: kind.value(for: .light), in: light)
-            let increased: String = StatusColourTests.hex(of: kind.value(for: .lightIncreasedContrast), in: light)
+            let values: [String: String] = try StatusColourTests.assetValues(of: kind)
             let kindName: String = "\(kind)"
-            let normalRatio: Double = StatusColourTests.contrastRatio(normal, "FFFFFF")
-            let increasedRatio: Double = StatusColourTests.contrastRatio(increased, "FFFFFF")
-            XCTAssertNotEqual(normal, increased, "\(kindName) has no Increase Contrast variant")
-            XCTAssertGreaterThan(
-                increasedRatio, normalRatio,
-                "\(kindName): Increase Contrast must be the stronger of the two"
-            )
+            let light: String = try XCTUnwrap(values["light"], kindName)
+            let lightIncreased: String = try XCTUnwrap(values["lightIncreasedContrast"], kindName)
+            let dark: String = try XCTUnwrap(values["dark"], kindName)
+            let darkIncreased: String = try XCTUnwrap(values["darkIncreasedContrast"], kindName)
+            XCTAssertNotEqual(light, lightIncreased, kindName)
+            XCTAssertNotEqual(dark, darkIncreased, kindName)
+            let normalRatio: Double = StatusColourTests.contrastRatio(light, "FFFFFF")
+            let increasedRatio: Double = StatusColourTests.contrastRatio(lightIncreased, "FFFFFF")
+            XCTAssertGreaterThan(increasedRatio, normalRatio, kindName)
         }
     }
 
-    /// Light or Dark comes from the appearance, and Increase Contrast from
-    /// the system setting, giving the four variants. (An appearance named
-    /// `.accessibilityHighContrastAqua` reports itself as `.aqua` on current
-    /// macOS, which is why the setting is not read from the appearance.)
-    func testEachAppearanceAndSettingIsReadAsItsOwnVariant() {
-        let light: NSAppearance = NSAppearance(named: .aqua)!
-        let dark: NSAppearance = NSAppearance(named: .darkAqua)!
-        let plainLight: StatusColour.AppearanceVariant = StatusColour.variant(of: light, increasedContrast: false)
-        let plainDark: StatusColour.AppearanceVariant = StatusColour.variant(of: dark, increasedContrast: false)
-        let strongLight: StatusColour.AppearanceVariant = StatusColour.variant(of: light, increasedContrast: true)
-        let strongDark: StatusColour.AppearanceVariant = StatusColour.variant(of: dark, increasedContrast: true)
-        XCTAssertEqual(plainLight, .light)
-        XCTAssertEqual(plainDark, .dark)
-        XCTAssertEqual(strongLight, .lightIncreasedContrast)
-        XCTAssertEqual(strongDark, .darkIncreasedContrast)
+    /// The colour the app draws is the Color Set's: resolved in Light and
+    /// in Dark it gives the catalog's Light and Dark values. (Increase
+    /// Contrast is the system's to apply to an asset colour; on current
+    /// macOS an appearance made as `.accessibilityHighContrastAqua` reports
+    /// itself as plain Aqua, so the high-contrast values are checked from
+    /// the catalog above, not by resolving here.)
+    func testTheAppDrawsTheColorSetsValues() throws {
+        for kind in [StatusColour.warning, StatusColour.blocking] {
+            let values: [String: String] = try StatusColourTests.assetValues(of: kind)
+            let kindName: String = "\(kind)"
+            let colour: NSColor = try XCTUnwrap(NSColor(named: kind.assetName), "\(kindName) is in the asset catalog")
+            let drawnLight: String = StatusColourTests.hex(of: colour, in: NSAppearance(named: .aqua)!)
+            let drawnDark: String = StatusColourTests.hex(of: colour, in: NSAppearance(named: .darkAqua)!)
+            XCTAssertEqual(drawnLight, values["light"], kindName)
+            XCTAssertEqual(drawnDark, values["dark"], kindName)
+        }
+    }
+
+    /// The caution stays orange in every variant, and the stop stays red:
+    /// their hues are far apart, so the two read as two kinds. (The darkest
+    /// orange, Light with Increase Contrast, is #983C00: the brightest
+    /// orange that reaches 7:1 on white. It is dark, so its symbol carries
+    /// the kind as much as its hue.)
+    func testTheCautionStaysOrangeAndTheStopStaysRed() throws {
+        let orange: [String: String] = try StatusColourTests.assetValues(of: .warning)
+        let red: [String: String] = try StatusColourTests.assetValues(of: .blocking)
+        for (variant, value) in orange {
+            let hue: Double = StatusColourTests.hue(of: value)
+            XCTAssertTrue(hue >= 18 && hue <= 40, "orange \(variant) #\(value) has hue \(hue)")
+        }
+        for (variant, value) in red {
+            let hue: Double = StatusColourTests.hue(of: value)
+            XCTAssertTrue(hue >= 340 || hue <= 4, "red \(variant) #\(value) has hue \(hue)")
+        }
     }
 
     // MARK: - Colour is never the only sign
@@ -109,86 +129,136 @@ final class StatusColourTests: XCTestCase {
         let cautionSymbol: String = StatusColour.warning.symbolName
         let stopSymbol: String = StatusColour.blocking.symbolName
         XCTAssertNotEqual(cautionSymbol, stopSymbol)
-        let cautionImage: NSImage? = NSImage(systemSymbolName: cautionSymbol, accessibilityDescription: nil)
-        let stopImage: NSImage? = NSImage(systemSymbolName: stopSymbol, accessibilityDescription: nil)
-        XCTAssertNotNil(cautionImage, cautionSymbol)
-        XCTAssertNotNil(stopImage, stopSymbol)
+        for name in [cautionSymbol, stopSymbol, StatusColour.warning.filledSymbolName, StatusColour.blocking.filledSymbolName] {
+            let image: NSImage? = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+            XCTAssertNotNil(image, name)
+        }
     }
 
-    // MARK: - The sidebar's stopped-deploy badge (D38)
+    // MARK: - On a selected row (D38)
 
-    /// On a selected row the badge takes the row's own colour (white on the
-    /// blue selection, 5.37:1), as the row's words do; the orange measured
-    /// 1.45:1 there. On an unselected row it wears the caution orange.
-    func testTheBadgeFollowsASelectedRow() {
-        let followsWhenSelected: Bool = SidebarView.warningBadgeFollowsTheRow(prominence: .increased)
-        let followsWhenNot: Bool = SidebarView.warningBadgeFollowsTheRow(prominence: .standard)
+    /// On a selected row a status colour gives way to the row's own text
+    /// colour (white on the blue selection, 5.37:1), as the row's words do;
+    /// the orange measured 1.45:1 there in the sidebar and 1.13:1 in the
+    /// documents table.
+    func testAStatusColourFollowsASelectedRow() {
+        let followsWhenSelected: Bool = StatusColour.followsTheRow(prominence: .increased)
+        let followsWhenNot: Bool = StatusColour.followsTheRow(prominence: .standard)
         XCTAssertTrue(followsWhenSelected)
         XCTAssertFalse(followsWhenNot)
     }
 
+    /// The documents table is AppKit: its caution symbol follows the row
+    /// through the cell's background style, which AppKit sets as the row's
+    /// selection changes.
+    func testTheTableCellsSymbolFollowsASelectedRow() {
+        let cell: StatusTintedTableCellView = StatusTintedTableCellView()
+        let image: NSImageView = NSImageView()
+        cell.imageView = image
+        cell.backgroundStyle = .emphasized
+        let light: NSAppearance = NSAppearance(named: .aqua)!
+        let selectedTint: NSColor = image.contentTintColor ?? NSColor.clear
+        cell.backgroundStyle = .normal
+        let plainTint: NSColor = image.contentTintColor ?? NSColor.clear
+        let selectedHex: String = StatusColourTests.hex(of: selectedTint, in: light)
+        let plainHex: String = StatusColourTests.hex(of: plainTint, in: light)
+        let whiteHex: String = StatusColourTests.hex(of: NSColor.alternateSelectedControlTextColor, in: light)
+        let orangeHex: String = StatusColourTests.hex(of: StatusColour.warning.nsColor, in: light)
+        XCTAssertEqual(selectedHex, whiteHex)
+        XCTAssertEqual(plainHex, orangeHex)
+        XCTAssertNotEqual(selectedHex, plainHex)
+    }
+
     // MARK: - Nothing goes back to the system orange or red
 
-    /// Every sentence and caution symbol in the app's views takes its colour
-    /// from `StatusColour`. A view that writes `.orange` or `.red` again is
-    /// back below 4.5:1 in Light, so this fails on it. One use is left, and
-    /// is named: the Assistant window's Deploy button tint, a button and not
-    /// a sentence (reported with #994, not changed by it).
-    func testNoViewUsesTheSystemOrangeOrRedForASentence() throws {
-        let viewsFolder: URL = ActivityTrailWiringTests.productSourceFolderURL()
-            .appendingPathComponent("Views", isDirectory: true)
-        let files: [URL] = ActivityTrailWiringTests.swiftFiles(under: viewsFolder)
-        XCTAssertGreaterThan(files.count, 50, "the scan found the views")
-        let forbidden: [String] = [
-            ".foregroundStyle(.orange)",
-            ".foregroundStyle(.red)",
-            "Color.orange",
-            "Color.red",
-            ".systemOrange",
-            ".systemRed",
+    /// Every orange or red the app target draws comes from `StatusColour`.
+    /// The scan covers every Swift file under `QuartzTeachers/` and every
+    /// way a system orange or red is written: `.orange` and `.red` wherever
+    /// they appear (`.foregroundStyle(.red)`, `.tint(.orange)`,
+    /// `return … .red`, `.fill(.orange)`, `.foregroundColor(.red)`,
+    /// `Color.orange`, `NSColor.red`), and `systemOrange` and `systemRed`.
+    /// Comment lines are skipped. The exemptions are named below, each with
+    /// its reason, and an exemption that no longer matches fails too.
+    func testNothingInTheAppUsesTheSystemOrangeOrRed() throws {
+        let productFolder: URL = ActivityTrailWiringTests.productSourceFolderURL()
+        let files: [URL] = ActivityTrailWiringTests.swiftFiles(under: productFolder)
+        XCTAssertGreaterThan(files.count, 100, "the scan found the app's sources")
+        let systemColour: NSRegularExpression = try NSRegularExpression(
+            pattern: "(^|[^A-Za-z0-9_])\\.(orange|red)\\b|system(Orange|Red)\\b"
+        )
+        // File name, then a piece of the line, then why it is allowed.
+        let exemptions: [(String, String, String)] = [
+            ("AssistWindowView.swift", ".tint(isDeploy ? .orange : .accentColor)",
+             "the Deploy button's tint: a button, not a status; its contrast (2.31:1) is a separate issue"),
+            ("TaskProgressView.swift", "Label(\"Cancelled\"",
+             "a status, not a problem: kept as it was (review of #994)"),
+            ("TaskProgressView.swift", "Label(\"Waiting for your answer…\"",
+             "a status, not a problem: kept as it was (review of #994)"),
+            ("TaskProgressView.swift", "Label(\"Cancelling…\"",
+             "a status, not a problem: kept as it was (review of #994)"),
         ]
+        var exemptionsUsed: Set<Int> = []
         var offences: [String] = []
         for file in files {
-            if file.lastPathComponent == "StatusColour.swift" {
-                continue
-            }
             let text: String = try String(contentsOf: file, encoding: .utf8)
+            let lines: [String] = text.components(separatedBy: "\n")
             var lineNumber: Int = 0
-            for line in text.components(separatedBy: "\n") {
+            for line in lines {
                 lineNumber += 1
-                for pattern in forbidden {
-                    if line.contains(pattern) {
-                        offences.append("\(file.lastPathComponent):\(lineNumber): \(pattern)")
+                let trimmed: String = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("//") {
+                    continue
+                }
+                let range: NSRange = NSRange(line.startIndex..<line.endIndex, in: line)
+                if systemColour.firstMatch(in: line, range: range) == nil {
+                    continue
+                }
+                var exempted: Bool = false
+                var index: Int = 0
+                for (fileName, piece, _) in exemptions {
+                    if file.lastPathComponent == fileName && StatusColourTests.line(lineNumber, of: lines, orTheTwoAboveContain: piece) {
+                        exempted = true
+                        exemptionsUsed.insert(index)
                     }
+                    index += 1
+                }
+                if !exempted {
+                    offences.append("\(file.lastPathComponent):\(lineNumber): \(trimmed)")
                 }
             }
         }
         let report: String = offences.joined(separator: "\n")
         XCTAssertEqual(offences, [], report)
+        var index: Int = 0
+        for (fileName, piece, _) in exemptions {
+            let used: Bool = exemptionsUsed.contains(index)
+            XCTAssertTrue(used, "the exemption for \(fileName) (\(piece)) matches nothing now; remove it")
+            index += 1
+        }
     }
 
     // MARK: - Functions
 
-    /// Fails for every background the colour is below the minimum on, in
-    /// every appearance, naming the appearance, the value and the ratio.
-    func assertReadable(_ kind: StatusColour, file: StaticString = #filePath, line: UInt = #line) {
-        let cases: [(StatusColour.AppearanceVariant, NSAppearance.Name, [String], Bool)] = [
-            (.light, .aqua, lightBackgrounds, false),
-            (.lightIncreasedContrast, .aqua, lightBackgrounds, true),
-            (.dark, .darkAqua, darkBackgrounds, false),
-            (.darkIncreasedContrast, .darkAqua, darkBackgrounds, true),
-        ]
+    /// Fails for every background a value is below the minimum on, in every
+    /// variant, naming the variant, the value and the ratio.
+    func assertReadable(_ kind: StatusColour, file: StaticString = #filePath, line: UInt = #line) throws {
+        let values: [String: String] = try StatusColourTests.assetValues(of: kind)
         let kindName: String = "\(kind)"
         let minimum: Double = minimumRatio
         let increasedMinimum: Double = increasedContrastRatio
-        for (variant, name, backgrounds, isIncreased) in cases {
-            let appearance: NSAppearance = NSAppearance(named: name)!
-            let foreground: String = StatusColourTests.hex(of: kind.value(for: variant), in: appearance)
+        let cases: [(String, [String], Bool)] = [
+            ("light", lightBackgrounds, false),
+            ("lightIncreasedContrast", lightBackgrounds, true),
+            ("dark", darkBackgrounds, false),
+            ("darkIncreasedContrast", darkBackgrounds, true),
+        ]
+        for (variant, backgrounds, isIncreased) in cases {
+            let foreground: String = try XCTUnwrap(values[variant], "\(kindName) has no \(variant) value")
             for background in backgrounds {
                 let ratio: Double = StatusColourTests.contrastRatio(foreground, background)
                 XCTAssertGreaterThanOrEqual(
                     ratio, minimum,
-                    "\(kindName) in \(variant): #\(foreground) on #\(background) is \(ratio)",
+                    "\(kindName) \(variant): #\(foreground) on #\(background) is \(ratio)",
                     file: file, line: line
                 )
             }
@@ -197,11 +267,74 @@ final class StatusColourTests: XCTestCase {
                 let ratio: Double = StatusColourTests.contrastRatio(foreground, plainest)
                 XCTAssertGreaterThanOrEqual(
                     ratio, increasedMinimum,
-                    "\(kindName) in \(variant): #\(foreground) on #\(plainest) is \(ratio)",
+                    "\(kindName) \(variant): #\(foreground) on #\(plainest) is \(ratio)",
                     file: file, line: line
                 )
             }
         }
+    }
+
+    /// Whether a line, or one of the two above it, contains a piece of text
+    /// (a modifier usually sits a line or two under the view it colours).
+    static func line(_ number: Int, of lines: [String], orTheTwoAboveContain piece: String) -> Bool {
+        var index: Int = number - 1
+        let lowest: Int = max(0, number - 3)
+        while index >= lowest {
+            if lines[index].contains(piece) {
+                return true
+            }
+            index -= 1
+        }
+        return false
+    }
+
+    /// The four values of a Color Set, as six hex digits keyed by variant
+    /// ("light", "lightIncreasedContrast", "dark", "darkIncreasedContrast"),
+    /// read from the asset catalog's source.
+    static func assetValues(of kind: StatusColour) throws -> [String: String] {
+        let url: URL = ActivityTrailWiringTests.productSourceFolderURL()
+            .appendingPathComponent("StatusColours.xcassets", isDirectory: true)
+            .appendingPathComponent(kind.assetName + ".colorset", isDirectory: true)
+            .appendingPathComponent("Contents.json")
+        let data: Data = try Data(contentsOf: url)
+        let root: [String: Any] = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let colours: [[String: Any]] = try XCTUnwrap(root["colors"] as? [[String: Any]])
+        var result: [String: String] = [:]
+        for entry in colours {
+            var isDark: Bool = false
+            var isHigh: Bool = false
+            for appearance in (entry["appearances"] as? [[String: String]]) ?? [] {
+                if appearance["appearance"] == "luminosity" && appearance["value"] == "dark" {
+                    isDark = true
+                }
+                if appearance["appearance"] == "contrast" && appearance["value"] == "high" {
+                    isHigh = true
+                }
+            }
+            let colour: [String: Any] = try XCTUnwrap(entry["color"] as? [String: Any])
+            let components: [String: String] = try XCTUnwrap(colour["components"] as? [String: String])
+            var hex: String = ""
+            for channel in ["red", "green", "blue"] {
+                let written: String = try XCTUnwrap(components[channel])
+                hex += written.replacingOccurrences(of: "0x", with: "").uppercased()
+            }
+            var key: String = isDark ? "dark" : "light"
+            if isHigh {
+                key += "IncreasedContrast"
+            }
+            result[key] = hex
+        }
+        return result
+    }
+
+    /// The hue, in degrees, of six hex digits.
+    static func hue(of hex: String) -> Double {
+        let characters: [Character] = Array(hex)
+        let red: Double = Double(Int(String(characters[0...1]), radix: 16) ?? 0) / 255.0
+        let green: Double = Double(Int(String(characters[2...3]), radix: 16) ?? 0) / 255.0
+        let blue: Double = Double(Int(String(characters[4...5]), radix: 16) ?? 0) / 255.0
+        let colour: NSColor = NSColor(srgbRed: red, green: green, blue: blue, alpha: 1.0)
+        return Double(colour.hueComponent) * 360.0
     }
 
     /// The colour as six hex digits, resolved in an appearance.

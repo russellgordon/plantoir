@@ -218,7 +218,7 @@ struct CoverageTabView: View {
         if CoverageTabWording.cautionLines.contains(line) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(StatusColour.warning.color)
+                    .foregroundStyle(StatusColour.warning.style)
                     .accessibilityLabel(CoverageTabWording.cautionLabel)
                 words
                     .font(.callout)

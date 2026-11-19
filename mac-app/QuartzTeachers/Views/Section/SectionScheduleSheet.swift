@@ -128,7 +128,9 @@ struct SectionScheduleSheet: View {
 
             if let failure {
                 ScrollView {
-                    StatusColour.blocking.sentence(failure)
+                    // Selectable, so the symbol sits beside the words and is
+                    // not copied with them (#994).
+                    StatusLine(kind: .blocking, words: failure)
                         .font(.callout)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
