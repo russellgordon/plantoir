@@ -148,34 +148,17 @@ enum TemporaryFolders {
     }
 
     /// Clears the flags on `path` and, if it is a real folder, on everything
-    /// inside, checking each item without following it before touching it.
-    /// A link met on the way has its own flags cleared (`lchflags` never
-    /// follows) and is not entered, so the walk cannot be led outside.
-    ///
-    /// What remains: a folder swapped for a link between its check here and
-    /// the listing of it would be listed through the link, and the items
-    /// found there would have their flags cleared (never removed; the
-    /// removal does not follow links). That needs something writing inside
-    /// the user's own temp folder during the few microseconds between the two.
+    /// inside, by file descriptor (`UserFlagClearing`, shared with the UI
+    /// target): the folder is opened once without following a link, and
+    /// every entry inside is opened relative to it, a link as the link
+    /// itself. No path is resolved twice, so an entry swapped for a link at
+    /// any moment cannot lead the walk into the link's target.
     static func unlockWithoutFollowingLinks(_ path: String, entryType: FileAttributeType) {
-        lchflags(path, 0)
-        if entryType != FileAttributeType.typeDirectory {
+        if entryType == FileAttributeType.typeDirectory {
+            UserFlagClearing.clearFlags(inFolderAtPath: path)
             return
         }
-        guard let childNames = try? FileManager.default.contentsOfDirectory(atPath: path) else {
-            return
-        }
-        for childName in childNames {
-            let childPath: String = path + "/" + childName
-            guard let childType = entryTypeWithoutFollowing(childPath) else {
-                continue
-            }
-            if childType == FileAttributeType.typeSymbolicLink {
-                lchflags(childPath, 0)
-                continue
-            }
-            unlockWithoutFollowingLinks(childPath, entryType: childType)
-        }
+        UserFlagClearing.clearFlags(onEntryAtPath: path)
     }
 
     /// For a helper with no test case to hand (`AssistFixture.makeRunner`,
@@ -252,9 +235,13 @@ enum TemporaryFolders {
 /// started) after `testBundleDidFinish`, the last callback the bundle gets.
 /// So the run's folders are removed there, which catches nearly everything,
 /// and whatever the host makes again afterwards is removed by the NEXT run,
-/// at its start, by name alone: every one of these folders carries its
-/// run's process id in its name, and a folder whose process has gone
-/// (`kill(pid, 0)` answers `ESRCH`) cannot be written by it any more.
+/// at its start, by name alone: every one of these folders ends with its
+/// run's `RealHome.testRunIdentifier`, `<pid>-<UUID>`, and a folder whose
+/// process has gone (`kill(pid, 0)` answers `ESRCH`) cannot be written by it
+/// any more. The UUID is what makes a name belong to ONE run: a later run
+/// given the same pid makes names with its own UUID, so it never writes
+/// into, inherits or loses an earlier run's folders, and a folder it makes
+/// while a sweep is going is not one the sweep listed.
 /// Nothing is written to say what a run made, and nothing is read back.
 ///
 /// Registered from the bundle's principal class (`PlantoirTestBundleSetup`).
@@ -262,8 +249,9 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
 
     // MARK: - Nested types
 
-    /// One shape of run-folder name: a stem, the process id, and (for the
-    /// one folder that also takes a UUID) `-<UUID>`.
+    /// One shape of run-folder name: a stem, the process id, and, when
+    /// `endsWithUUID`, `-<UUID>` (every name this run makes, since the
+    /// run's UUID went into all of them).
     struct RunFolderNameShape: Equatable {
 
         // MARK: - Stored properties
@@ -281,7 +269,7 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
     /// per-run folders so it is attributable to its process.
     static let restingFolderURLForThisRun: URL = FileManager.default.temporaryDirectory
         .appendingPathComponent(
-            "plantoir-resting-folder-under-test-\(ProcessInfo.processInfo.processIdentifier)",
+            "plantoir-resting-folder-under-test-" + RealHome.testRunIdentifier,
             isDirectory: true
         )
 
@@ -366,7 +354,7 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
     /// The ONE list of name shapes, read from this run's own folders
     /// (`runFolders`), which are where the names are made: so the shapes
     /// recognised can never drift from the names given. Each name is a
-    /// stem, this process's id, and, for `Plantoir-tests-`, `-<UUID>`.
+    /// stem, this process's id and `-<UUID>` (`RealHome.testRunIdentifier`).
     static func runFolderNameShapes() -> [RunFolderNameShape] {
         let ownProcessText: String = String(ProcessInfo.processInfo.processIdentifier)
         var shapes: [RunFolderNameShape] = []
@@ -458,7 +446,9 @@ final class TemporaryFolderSweeper: NSObject, XCTestObservation {
     /// entry is removed without following a link.
     ///
     /// Two runs going at once under one account (a gate and another test
-    /// run) each leave the other's folders, because the other is alive.
+    /// run) each leave the other's folders, because the other is alive. A
+    /// new run given a dead run's pid after the check below makes names
+    /// with its own UUID, which are not in the listing being worked through.
     static func removeWhatFinishedRunsLeft(inFolder folder: URL, exceptProcess ownProcess: Int32) {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
             return

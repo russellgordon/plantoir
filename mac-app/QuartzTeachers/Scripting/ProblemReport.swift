@@ -699,12 +699,13 @@ nonisolated struct ProblemReportStore {
 
     /// One folder per test RUN rather than per call, so that a test which
     /// writes and then reads back still finds what it wrote. The process id
-    /// is in the name, like the other per-run folders' (`…-under-test-<pid>`),
-    /// so the next run can tell this one has finished and remove what it
-    /// left (#978).
+    /// and the run's UUID are in the name, like the other per-run folders'
+    /// (`…-under-test-<pid>-<UUID>`, `RealHome.testRunIdentifier`), so the
+    /// next run can tell this one has finished and remove what it left, and
+    /// no later run given the same pid shares it (#978).
     static let throwawayFolderURL: URL = FileManager.default.temporaryDirectory
         .appendingPathComponent(
-            "Plantoir-tests-\(ProcessInfo.processInfo.processIdentifier)-" + UUID().uuidString,
+            "Plantoir-tests-" + RealHome.testRunIdentifier,
             isDirectory: true
         )
 

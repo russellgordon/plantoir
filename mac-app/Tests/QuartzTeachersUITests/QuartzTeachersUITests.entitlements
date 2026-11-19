@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- #978: the UI test runner is sandboxed and may write only inside its
+	     container. A state-folder launch's preferences live in
+	     /private/tmp/plantoir-state-preferences-<16 hex> (the only place the
+	     preferences daemon honours a path suite), so the runner needs write
+	     access there to remove them. UITestFolders removes only that exact
+	     shape, built from a state folder this run made. -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+	<array>
+		<string>/private/tmp/</string>
+	</array>
+</dict>
+</plist>
