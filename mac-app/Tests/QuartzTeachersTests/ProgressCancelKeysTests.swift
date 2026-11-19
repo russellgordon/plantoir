@@ -519,4 +519,52 @@ final class ProgressCancelKeysTests: XCTestCase {
         }
         XCTAssertEqual(asking, 1, "exactly the deploy's panel asks first")
     }
+
+    func testZZDiagnose() {
+        let runner: ScriptRunner = runningRunner()
+        let ledger: CancelLedger = CancelLedger()
+        let window: NSWindow = windowShowing(panel(runner: runner, ledger: ledger, takesTheCancelKeys: true))
+        var lines: [String] = []
+        var current: NSResponder? = window.firstResponder
+        while let r = current {
+            lines.append("chain: \(type(of: r))")
+            if let c = r as? CancelOperationResponder {
+                lines.append("  enabled \(c.isEnabled) takes \(c.takesCancelOperation()) hasClosure \(c.pressCancel != nil)")
+            }
+            current = r.nextResponder
+        }
+        guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53) else { return }
+        let handled: Bool = window.performKeyEquivalent(with: event)
+        lines.append("pke handled \(handled) count \(ledger.cancelCount)")
+        window.sendEvent(event)
+        _ = runUntil(timeout: 0.3) { false }
+        lines.append("after sendEvent count \(ledger.cancelCount)")
+        let tried: Bool = window.firstResponder?.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: nil) ?? false
+        lines.append("tryToPerform from first responder \(tried) count \(ledger.cancelCount)")
+        // A plain AppKit window with the responder put in by hand.
+        let plain: NSWindow = NSWindow(contentRect: NSRect(x: -7000, y: -7000, width: 200, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
+        plain.isReleasedWhenClosed = false
+        plain.orderFrontRegardless()
+        let byHand: CancelOperationResponder = CancelOperationResponder()
+        var heard: Int = 0
+        byHand.pressCancel = {
+            heard += 1
+        }
+        byHand.isEnabled = true
+        byHand.install(in: plain)
+        lines.append("plain first responder \(String(describing: plain.firstResponder.map { (r: NSResponder) -> String in String(describing: type(of: r)) }))")
+        if let plainEvent = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: plain.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53) {
+            let pkeHandled: Bool = plain.performKeyEquivalent(with: plainEvent)
+            plain.sendEvent(plainEvent)
+            lines.append("plain pke \(pkeHandled) heard after sendEvent \(heard)")
+            plain.keyDown(with: plainEvent)
+            lines.append("plain heard after keyDown \(heard)")
+        }
+        let triedPlain: Bool = plain.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: nil)
+        lines.append("plain tryToPerform \(triedPlain) heard \(heard)")
+        lines.append("plain responds \(byHand.responds(to: #selector(NSResponder.cancelOperation(_:)))) takes \(byHand.takesCancelOperation())")
+        plain.orderOut(nil)
+        XCTFail(lines.joined(separator: "\n"))
+        close(window)
+    }
 }
