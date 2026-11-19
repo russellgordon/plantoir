@@ -259,6 +259,17 @@ dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
 
+**A runtime fetched before #965 needs `fetch-runtime.ps1` once more.** The
+build refuses it ("does not carry the Visual C++ runtime ... beside
+node.exe", or, for a runtime that has the `node.exe` copy only, "not beside
+the native modules that import it"); the re-run copies one file,
+`vcruntime140.dll`, from `runtime\python` to beside `node.exe` and beside
+the lightningcss and Typst compiler modules in `runtime\quartz\node_modules`,
+with no download. Without it the website builder's native modules do not
+load on a PC that lacks the Visual C++ redistributable, and the development
+PC, which has it, would never show it (`documentation/12-windows-app.md` →
+"The Visual C++ runtime beside node.exe (#965)").
+
 **Read the TOTALS line, not the exit code.** `dotnet test` exits 1 for a failing
 test, for a test host that DIED underneath the run, and for a project that did
 not compile; only the output tells them apart, and a dead host prints no totals
