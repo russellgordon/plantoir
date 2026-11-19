@@ -62,6 +62,8 @@ struct ScheduleDeploySheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                        // Decorative: the sentence beside it says it all (#993, D20).
+                        .accessibilityHidden(true)
                     Text(notice)
                         .font(.callout)
                         .fixedSize(horizontal: false, vertical: true)
@@ -82,6 +84,8 @@ struct ScheduleDeploySheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
+                        // Decorative: the sentence beside it says it all (#993, D20).
+                        .accessibilityHidden(true)
                     Text(netlifyNote)
                         .font(.callout)
                         .foregroundStyle(.secondary)

@@ -741,6 +741,9 @@ struct SidebarView: View {
                             SidebarView.clockIdentifier(courseCode: courseCode, sectionNumber: sectionNumber)
                         )
                         .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
+                        // The same sentence twice, as on the warning badge
+                        // above (#993, D18).
+                        .accessibilityLabel(Text(SidebarView.scheduledDeployTooltip(for: scheduledFor)))
                 }
             }
         } else {
@@ -838,6 +841,8 @@ struct SidebarView: View {
             TextField("Filter", text: $workspace.filterText)
                 .borderedTextField()
                 .controlSize(.small)
+                // Its placeholder is not a name (#993, D18): the same word.
+                .accessibilityLabel(Text("Filter"))
                 .accessibilityIdentifier("courseFilterField")
         }
         .padding(.horizontal, 8)

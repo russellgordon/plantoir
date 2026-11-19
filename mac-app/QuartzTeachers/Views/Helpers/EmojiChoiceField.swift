@@ -42,6 +42,8 @@ struct EmojiChoiceField: View {
                     .frame(width: 44)
                     .multilineTextAlignment(.center)
                     .focused($fieldHasFocus)
+                    // Named by the row it sits in (#993, D40).
+                    .accessibilityLabel(Text(label))
                     .accessibilityIdentifier("emojiChoiceField")
                     .onChange(of: entry) {
                         acceptLatestEmoji()
@@ -66,6 +68,9 @@ struct EmojiChoiceField: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Choose any emoji")
+                // Named, not left to the symbol, which VoiceOver read as
+                // "face.smiling" (#993, D18).
+                .accessibilityLabel(Text(AccessibilityNames.chooseEmoji))
                 .accessibilityIdentifier("emojiPaletteButton")
             }
         }

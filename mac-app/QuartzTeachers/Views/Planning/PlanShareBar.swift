@@ -261,12 +261,16 @@ struct PlanShareBar: View {
     @ViewBuilder
     func statusLines(_ marker: PlanSharing.Marker) -> some View {
         switch PlanSharing.barStatus(for: marker) {
+        // The three lines that say the share may not be what the teacher
+        // expects wear the caution's colour and triangle (#993, D19), so
+        // they are told apart from the plain status lines by more than
+        // their words; VoiceOver hears the sentence alone.
         case .unfinished:
-            Text(PlanSharingWording.lastShareUnfinished)
+            StatusColour.warning.sentence(PlanSharingWording.lastShareUnfinished)
                 .font(.callout)
                 .accessibilityIdentifier("planShareUnfinished")
         case .stopping:
-            Text(PlanSharingWording.stopUnconfirmed)
+            StatusColour.warning.sentence(PlanSharingWording.stopUnconfirmed)
                 .font(.callout)
                 .accessibilityIdentifier("planShareStopping")
         case .protected:
@@ -278,7 +282,7 @@ struct PlanShareBar: View {
         }
         if PlanSharing.showsNewPasswordWaiting(marker) {
             // Said in words on the bar, never in a tooltip only (#833).
-            Text(PlanSharingWording.newPasswordNotInUse)
+            StatusColour.warning.sentence(PlanSharingWording.newPasswordNotInUse)
                 .font(.callout)
                 .accessibilityIdentifier("planShareNewPasswordWaiting")
         }

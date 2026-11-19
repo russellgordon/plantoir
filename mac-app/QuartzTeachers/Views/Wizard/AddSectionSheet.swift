@@ -85,6 +85,7 @@ struct AddSectionSheet: View {
                     .borderedTextField()
                     .frame(width: 56)
                     .multilineTextAlignment(.trailing)
+                    .accessibilityLabel(Text(AccessibilityNames.sectionNumber))
                     .accessibilityIdentifier("addSectionNumberField")
                     .onChange(of: entry) {
                         // Integer entry only: anything that is not a digit
@@ -106,6 +107,8 @@ struct AddSectionSheet: View {
                     step(by: -1)
                 })
                 .labelsHidden()
+                // Its own title names it; a label as well made VoiceOver
+                // say "Section number, Section number" (#993 review).
                 .accessibilityIdentifier("addSectionStepper")
             }
 

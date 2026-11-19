@@ -481,6 +481,9 @@ struct AssistWindowView: View {
             }
             .buttonStyle(.plain)
             .disabled(!isSendAvailable)
+            // Named, not left to the symbol, which VoiceOver read as
+            // "Arrow Up Circle" (#993, D17).
+            .accessibilityLabel(Text(AccessibilityNames.send))
             .accessibilityIdentifier("assistSendButton")
         }
         .padding(.horizontal, 12)

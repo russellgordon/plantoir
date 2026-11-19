@@ -1128,6 +1128,7 @@ struct NewCourseWizardView: View {
                     Text("British Columbia").tag("BC")
                 }
                 .pickerStyle(.segmented)
+                .accessibilityLabel(Text("Province"))
                 .accessibilityIdentifier("wizardProvincePicker")
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -1228,6 +1229,7 @@ struct NewCourseWizardView: View {
                             // and all four fields became the same height
                             // by construction.
                             TextField("", text: $courseName)
+                                .accessibilityLabel(Text(WizardWording.panelWords(isClub: isClubCourse).nameLabel))
                                 .accessibilityIdentifier("wizardCourseNameField")
                                 .borderedTextField()
                         }
@@ -1270,6 +1272,7 @@ struct NewCourseWizardView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         LabeledContent("Short label") {
                             TextField("", text: $customShortName)
+                                .accessibilityLabel(Text("Short label"))
                                 .accessibilityIdentifier("wizardCustomShortNameField")
                                 .borderedTextField()
                         }
@@ -1298,6 +1301,7 @@ struct NewCourseWizardView: View {
                         LabeledContent("Timetable section numbers") {
                             // See Course Name's own note.
                             TextField("", text: $sectionNumbersText)
+                                .accessibilityLabel(Text("Timetable section numbers"))
                                 .accessibilityIdentifier("wizardSectionNumbersField")
                                 .borderedTextField()
                         }
@@ -1328,6 +1332,8 @@ struct NewCourseWizardView: View {
                 if ExampleContentCatalog.hasContent(forCode: courseCode) && !makesAReferenceCourse {
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle("Pre-populate course with example content", isOn: $prepopulatesExampleContent)
+                            // The visible title, said explicitly (#993, D18).
+                            .accessibilityLabel(Text("Pre-populate course with example content"))
                             .accessibilityIdentifier("prepopulateToggle")
                         ExampleCaption("Working pages written for this course — keep, edit, or delete them as you build your own site. The example content also chooses the course's folders and files, so they fit the pages.")
                     }
@@ -1408,6 +1414,7 @@ struct NewCourseWizardView: View {
                         // the map is a perfectly reasonable choice.
                         Toggle("Include the curriculum coverage map", isOn: $includesCurriculumCoverage)
                             .disabled(!curriculumPagesOffered || !includesCurriculumPages)
+                            .accessibilityLabel(Text("Include the curriculum coverage map"))
                             .accessibilityIdentifier("curriculumCoverageToggle")
                         ExampleCaption("A page showing every expectation coloured by how many pages address it — red in September, greener as the year goes on. Linked from Key Links, and kept out of the sidebar.")
                     }
@@ -1449,10 +1456,12 @@ struct NewCourseWizardView: View {
                 )
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Show section marker in the site title", isOn: $showsSectionMarker)
+                        .accessibilityLabel(Text("Show section marker in the site title"))
                     ExampleCaption(WizardWording.panelWords(isClub: isClubCourse).sectionMarkerCaption)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("Show the grade in the site title", isOn: $showsGradeInTitle)
+                        .accessibilityLabel(Text("Show the grade in the site title"))
                     if let warning = CourseConfiguration.gradeInTitleWarning(
                         courseName: courseName,
                         courseCode: courseCode.trimmingCharacters(in: .whitespaces).uppercased(),
@@ -1475,7 +1484,9 @@ struct NewCourseWizardView: View {
                     Text("Chevron or folder name").tag(true)
                     Text("Chevron only (name opens the folder)").tag(false)
                 }
+                .accessibilityLabel(Text("Sidebar folders expand when clicking"))
                 Toggle("Show page read-time estimates to students", isOn: $showReadingTime)
+                    .accessibilityLabel(Text("Show page read-time estimates to students"))
             } header: {
                 FormSectionHeader("Behaviour")
             }
@@ -1498,6 +1509,7 @@ struct NewCourseWizardView: View {
                             }
                         ))
                         .borderedTextField()
+                        .accessibilityLabel(Text(WizardWording.clubClassFolderLabel))
                         .accessibilityIdentifier("clubClassFolderField")
                     }
                     if let problem = NewCourseWizardView.clubClassFolderProblem(
@@ -1510,11 +1522,13 @@ struct NewCourseWizardView: View {
                     LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
                         TextField("", text: $frontPageHeading)
                             .borderedTextField()
+                            .accessibilityLabel(Text(WizardWording.clubFrontPageHeadingLabel))
                             .accessibilityIdentifier("clubFrontPageHeadingField")
                     }
                     LabeledContent(WizardWording.clubPageWordLabel) {
                         TextField("", text: $unitWord)
                             .borderedTextField()
+                            .accessibilityLabel(Text(WizardWording.clubPageWordLabel))
                             .accessibilityIdentifier("unitWordField")
                     }
                     if let problem = ClassPageTerm.problem(with: unitWord) {
@@ -1537,6 +1551,7 @@ struct NewCourseWizardView: View {
                 LabeledContent(UnitWordRenameWording.fieldLabel) {
                     TextField("", text: $unitWord, prompt: Text(ClassPageTerm.standard))
                         .borderedTextField()
+                        .accessibilityLabel(Text(UnitWordRenameWording.fieldLabel))
                         .accessibilityIdentifier("unitWordField")
                 }
                 if let problem = ClassPageTerm.problem(with: unitWord) {

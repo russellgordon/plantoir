@@ -112,6 +112,7 @@ struct KeepACopyForReferenceSheet: View {
             LabeledContent("Folder name") {
                 TextField("", text: $folderName, prompt: Text("Folder name"))
                     .borderedTextField()
+                    .accessibilityLabel(Text("Folder name"))
                     .accessibilityIdentifier("keepACopyFolderName")
             }
 
