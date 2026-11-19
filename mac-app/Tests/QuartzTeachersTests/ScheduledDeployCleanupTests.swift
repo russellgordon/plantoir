@@ -502,6 +502,31 @@ final class ScheduledDeployCleanupTests: XCTestCase {
         )
     }
 
+    // MARK: - Removing one by hand (#987)
+
+    /// The command, the question and its buttons say Remove, as the
+    /// contract does (#987, Russell 2026-11-18), and only the button that backs
+    /// out says Cancel.
+    func testRemovingAScheduledDeploySaysRemove() throws {
+        let rule: [String: Any] = try Self.section("scheduledDeployCancellation")
+        let removing: [String: Any] = try XCTUnwrap(rule["removingOne"] as? [String: Any])
+        let words: [String: String] = try XCTUnwrap(removing["words"] as? [String: String])
+        XCTAssertEqual(words["menuItem"], ScheduledDeployRemovalWording.menuItem)
+        XCTAssertEqual(words["question"], ScheduledDeployRemovalWording.question)
+        XCTAssertEqual(words["cancelButton"], ScheduledDeployRemovalWording.cancelButton)
+        XCTAssertEqual(words["removeButton"], ScheduledDeployRemovalWording.removeButton)
+        XCTAssertEqual(words["messageWithoutTime"], ScheduledDeployRemovalWording.messageWithoutTime)
+        var message: String = try XCTUnwrap(words["message"])
+        message = message.replacingOccurrences(of: "{course}", with: "ICS3U")
+        message = message.replacingOccurrences(of: "{section}", with: "2")
+        message = message.replacingOccurrences(of: "{time}", with: "6:30 AM")
+        message = message.replacingOccurrences(of: "{day}", with: "Monday")
+        XCTAssertEqual(ScheduledDeployRemovalWording.message(courseCode: "ICS3U", sectionNumber: 2, time: "6:30 AM", day: "Monday"), message)
+        for each in [ScheduledDeployRemovalWording.menuItem, ScheduledDeployRemovalWording.question, ScheduledDeployRemovalWording.removeButton] {
+            XCTAssertFalse(each.lowercased().contains("cancel"), "\(each) says cancel")
+        }
+    }
+
     // MARK: - How late is too late
 
     func testEveryLatenessCaseInTheContractHolds() throws {

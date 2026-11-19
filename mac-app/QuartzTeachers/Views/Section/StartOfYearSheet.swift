@@ -626,7 +626,17 @@ struct StartOfYearSheet: View {
                         await model.goAhead()
                     }
                 }
-                .defaultButton(isEnabled: !plan.changesNothing)
+                // Not the default (#987, D39, Russell's ruling Q-B on
+                // #975): putting classes into draft takes them from students
+                // at the next deploy, so it counts as able to lose work, and
+                // a Return pressed under the sheet's own warning does
+                // nothing. Buttons ▸ Role: "Don't assign the primary role to
+                // a button that performs a destructive action, even if that
+                // action is the most likely choice." Alerts: "If you want to
+                // encourage people to read an alert and not just
+                // automatically press Return to dismiss it, avoid making any
+                // button the default button." Escape is still Cancel.
+                .defaultButton(isEnabled: !plan.changesNothing, isTheDefault: false)
                 .accessibilityIdentifier("startOfYearGo")
             case .undoReady(_, let putBack, _):
                 Button("Cancel", role: .cancel) {
@@ -644,6 +654,7 @@ struct StartOfYearSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 .disabled(true)
             case .done:
                 Button(StartOfYearWording.undoButtonAfterward) {

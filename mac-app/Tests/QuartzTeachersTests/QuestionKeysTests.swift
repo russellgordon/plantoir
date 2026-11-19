@@ -25,6 +25,11 @@ import XCTest
 /// already closed on Escape (SwiftUI closes a sheet that has no Cancel of
 /// its own), measured, so it is pinned here and not changed.
 ///
+/// **Since #987 (Russell's rulings Q1 and Q3 on #975)** the risky facts
+/// questions' go-ahead is no longer red (it was chosen on purpose), the
+/// two-lists sheet has no default button (Cancel is Escape), and "Set up
+/// {tool}?" has Download and Set Up as its default.
+///
 /// **Since #834** Replace It…, Remove Group and Start the Groups Again are
 /// `FactsQuestionSheet`s, and since #833 so are the public-address warning
 /// and the dialog after Change Password. **Since #973 (Russell, 2026-11-15,
@@ -228,6 +233,93 @@ final class QuestionKeysTests: XCTestCase {
         )
     }
 
+    /// "Set up {tool}?", presented as Settings ▸ Other Assistants presents
+    /// it (#987, D3): its closures write their answer, and the system closing
+    /// the sheet (Command-Period) only clears the item, as `confirming = nil`
+    /// does there.
+    struct SetUpPage: View {
+
+        // MARK: - Stored properties
+
+        let answers: Answers
+
+        // MARK: - Body
+
+        var body: some View {
+            @Bindable var answers = answers
+            Color.white
+                .sheet(isPresented: $answers.showing) {
+                    AssistantSetUpSheet(
+                        agent: AssistantSetUp.codex,
+                        setUp: {
+                            answers.answer = "setUp"
+                            answers.showing = false
+                        },
+                        cancel: {
+                            answers.answer = "cancel"
+                            answers.showing = false
+                        }
+                    )
+                }
+        }
+    }
+
+    /// The New Course wizard's course-code field beside its Create Course,
+    /// in a sheet (#987 review). The field is the wizard's own
+    /// `CourseCodePickerView`, and Create Course takes Return by the
+    /// wizard's own rule, `NewCourseWizardView.createCourseIsTheDefault`,
+    /// with the form complete. `answers.showing` is whether the list is
+    /// shown: choosing the highlighted code puts it away, as the wizard's
+    /// `selectCourseCodeSuggestion` does. `answers.answer` says what Return
+    /// did: "chose ICS3U", then "created".
+    struct CodeFieldPage: View {
+
+        // MARK: - Stored properties
+
+        let answers: Answers
+
+        @State var sheetIsShown: Bool = true
+
+        @State var courseCode: String = "ICS"
+
+        @State var fieldIsFocused: Bool = true
+
+        // MARK: - Body
+
+        var body: some View {
+            Color.white
+                .sheet(isPresented: $sheetIsShown) {
+                    VStack {
+                        CourseCodePickerView(
+                            courseCode: $courseCode,
+                            isFocused: $fieldIsFocused,
+                            onCommitHighlight: {
+                                if !answers.showing {
+                                    return false
+                                }
+                                courseCode = "ICS3U"
+                                answers.answer = "chose ICS3U"
+                                answers.showing = false
+                                return true
+                            }
+                        )
+                        Button("Create Course") {
+                            answers.answer = "created"
+                        }
+                        .defaultButton(
+                            isEnabled: true,
+                            isTheDefault: NewCourseWizardView.createCourseIsTheDefault(
+                                formIsComplete: true,
+                                suggestionsAreShown: answers.showing
+                            )
+                        )
+                    }
+                    .frame(width: 400, height: 200)
+                    .padding()
+                }
+        }
+    }
+
     /// The share's console, presented as `PlanShareBar` presents it.
     struct ConsolePage: View {
 
@@ -425,6 +517,12 @@ final class QuestionKeysTests: XCTestCase {
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertTrue(afterReturn.stillAsked(), "\(what): Return closed the question")
         XCTAssertFalse(afterReturn.wentAhead(), "\(what): Return went ahead")
+        // The positive check (#987 review): the same question, still up,
+        // answers a key, so Return's nothing is the question's and not a
+        // key that never reached it.
+        press(.escape, in: afterReturn.window)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterReturn.stillAsked() }, "\(what): after Return, Escape did not reach the question")
+        XCTAssertFalse(afterReturn.wentAhead(), "\(what): Escape after Return went ahead")
         close(afterReturn.window)
 
         let afterEscape: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
@@ -449,6 +547,11 @@ final class QuestionKeysTests: XCTestCase {
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertTrue(answers.showing, "\(what): Return closed the sheet")
         XCTAssertEqual(answers.answer, "", "\(what): Return answered the question")
+        // The positive check (#987 review): the sheet Return left alone
+        // answers Escape with its Cancel, so the key reached it.
+        press(.escape, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(what): after Return, Escape did not reach the sheet")
+        XCTAssertEqual(answers.answer, "cancel", "\(what): Escape after Return")
         close(window)
     }
 
@@ -803,15 +906,127 @@ final class QuestionKeysTests: XCTestCase {
         checkTheAnswer(to: question, goAheadIsTheDefault: true, key: Key.escape, is: "cancel", what: "after Change Password")
     }
 
-    func testTheTwoListsSheetTakesReturnAndEscapeAsCancel() {
-        for key in [Key.returnKey, Key.escape] {
-            let answers: Answers = Answers()
-            let window: NSWindow = windowShowing(ListsPage(answers: answers))
-            press(key, in: window)
-            XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(key) did not close the two-lists sheet")
-            XCTAssertEqual(answers.answer, "cancel", "\(key) on the two-lists sheet is Cancel")
-            close(window)
+    /// The two-lists sheet (#987, D4): no button is the default, so Return
+    /// shares nothing and the sheet stays; Escape is Cancel. Until #987
+    /// Cancel was the default and Return cancelled.
+    func testTheTwoListsSheetHasNoDefaultAndEscapeIsCancel() {
+        let afterReturn: Answers = Answers()
+        let returnWindow: NSWindow = windowShowing(ListsPage(answers: afterReturn))
+        press(.returnKey, in: returnWindow)
+        _ = runUntil(timeout: 0.5) { false }
+        XCTAssertTrue(afterReturn.showing, "Return closed the two-lists sheet")
+        XCTAssertEqual(afterReturn.answer, "", "Return answered the two-lists sheet")
+        // The positive check (#987 review): the same sheet answers Escape.
+        press(.escape, in: returnWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterReturn.showing }, "after Return, Escape did not reach the two-lists sheet")
+        XCTAssertEqual(afterReturn.answer, "cancel", "Escape after Return on the two-lists sheet")
+        close(returnWindow)
+
+        let afterEscape: Answers = Answers()
+        let escapeWindow: NSWindow = windowShowing(ListsPage(answers: afterEscape))
+        press(.escape, in: escapeWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterEscape.showing }, "Escape did not close the two-lists sheet")
+        XCTAssertEqual(afterEscape.answer, "cancel", "Escape on the two-lists sheet is Cancel")
+        close(escapeWindow)
+    }
+
+    /// Command-Period on the two-lists sheet is its Cancel, and never
+    /// shares (#987; Keyboards: "Command-Period: Cancel an operation"): its
+    /// Cancel tells the share it was not answered, so a close that skipped
+    /// it would leave the share waiting. A Command-Period that did nothing
+    /// fails here too (#987 review).
+    func testCommandPeriodOnTheTwoListsSheetNeverShares() {
+        let answers: Answers = Answers()
+        let window: NSWindow = windowShowing(ListsPage(answers: answers))
+        press(.commandPeriod, in: window)
+        XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "Command-Period did not close the two-lists sheet")
+        XCTAssertNotEqual(answers.answer, "share", "Command-Period shared")
+        XCTAssertEqual(answers.answer, "cancel", "Command-Period closed the two-lists sheet without its Cancel")
+        close(window)
+    }
+
+    /// Return in the wizard's course-code field with a code highlighted
+    /// chooses that code, and does not create the course (#987 review): a
+    /// default button is offered Return before the field's `onKeyPress`.
+    /// With the list put away and the form complete, Return is Create
+    /// Course (D32): the positive check, in the same sheet.
+    func testReturnInTheCodeFieldChoosesTheSuggestion() {
+        let answers: Answers = Answers()
+        let window: NSWindow = windowShowing(CodeFieldPage(answers: answers))
+        if let sheet = window.attachedSheet {
+            for view in allViews(in: sheet.contentView) {
+                if let field = view as? NSTextField, field.isEditable {
+                    sheet.makeFirstResponder(field)
+                }
+            }
         }
+        _ = runUntil(timeout: 0.3) { false }
+        press(.returnKey, in: window)
+        _ = runUntil(timeout: 1) { !answers.answer.isEmpty }
+        XCTAssertEqual(answers.answer, "chose ICS3U", "Return with a code highlighted")
+        XCTAssertFalse(answers.showing, "the list did not go away")
+        _ = runUntil(timeout: 0.5) { false }
+        press(.returnKey, in: window)
+        XCTAssertTrue(runUntil(timeout: 2) { answers.answer == "created" }, "with the list away, Return is not Create Course")
+        close(window)
+    }
+
+    /// The wizard's two key rules (#987): Create Course takes Return once
+    /// the form is complete and the course-code list is away; Cancel takes
+    /// Escape except while the list is shown or the course is being made
+    /// (Russell, 2026-11-18).
+    func testTheWizardsKeyRules() {
+        XCTAssertTrue(NewCourseWizardView.createCourseIsTheDefault(formIsComplete: true, suggestionsAreShown: false))
+        XCTAssertFalse(NewCourseWizardView.createCourseIsTheDefault(formIsComplete: true, suggestionsAreShown: true))
+        XCTAssertFalse(NewCourseWizardView.createCourseIsTheDefault(formIsComplete: false, suggestionsAreShown: false))
+        XCTAssertTrue(NewCourseWizardView.cancelAnswersEscape(suggestionsAreShown: false, isCreating: false))
+        XCTAssertFalse(NewCourseWizardView.cancelAnswersEscape(suggestionsAreShown: true, isCreating: false))
+        XCTAssertFalse(NewCourseWizardView.cancelAnswersEscape(suggestionsAreShown: false, isCreating: true))
+    }
+
+    /// "Set up {tool}?" (#987, D3): going ahead loses no work, so Download
+    /// and Set Up is the default and takes Return; Cancel takes Escape; and
+    /// Command-Period closes it without setting anything up.
+    func testReturnSetsUpAndEscapeCancelsOnTheSetUpQuestion() {
+        let afterReturn: Answers = Answers()
+        let returnWindow: NSWindow = windowShowing(SetUpPage(answers: afterReturn))
+        let keys: [String: String] = buttonKeys(in: returnWindow)
+        if let goAhead = keys[AssistantSetUpWording.confirmButton] {
+            XCTAssertEqual(goAhead, "\r", "Download and Set Up is not the default (\(keys))")
+        }
+        if let cancel = keys[AssistantSetUpWording.cancelButton] {
+            XCTAssertEqual(cancel, "\u{1b}", "Cancel is not Escape (\(keys))")
+        }
+        press(.returnKey, in: returnWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterReturn.showing }, "Return did not answer the set-up question")
+        XCTAssertEqual(afterReturn.answer, "setUp", "Return on the set-up question")
+        close(returnWindow)
+
+        let afterEscape: Answers = Answers()
+        let escapeWindow: NSWindow = windowShowing(SetUpPage(answers: afterEscape))
+        press(.escape, in: escapeWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterEscape.showing }, "Escape did not close the set-up question")
+        XCTAssertEqual(afterEscape.answer, "cancel", "Escape on the set-up question is Cancel")
+        close(escapeWindow)
+
+        let afterPeriod: Answers = Answers()
+        let periodWindow: NSWindow = windowShowing(SetUpPage(answers: afterPeriod))
+        press(.commandPeriod, in: periodWindow)
+        XCTAssertTrue(runUntil(timeout: 3) { !afterPeriod.showing }, "Command-Period did not close the set-up question")
+        XCTAssertNotEqual(afterPeriod.answer, "setUp", "Command-Period set the assistant up")
+        close(periodWindow)
+    }
+
+    /// The facts sheet's go-ahead is not red on a risky question (#987,
+    /// Russell's ruling Q1 on #975): the teacher chose it deliberately.
+    /// Read from the source, since SwiftUI draws a sheet's plain button
+    /// without an `NSButton` to ask.
+    func testTheRiskyGoAheadIsNotRed() throws {
+        let file: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views/Helpers/FactsQuestionSheet.swift")
+        let code: String = TextFieldStyleScanTests.codeWithoutComments(try String(contentsOf: file, encoding: .utf8))
+        XCTAssertFalse(code.contains(".destructive"), "a facts question's go-ahead is drawn red")
     }
 
     /// Already true before #832; kept so a Cancel added to the console

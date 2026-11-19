@@ -1065,6 +1065,7 @@ struct SectionDetailView: View {
                     Button(FrontPageWording.notToday, role: .cancel) {
                         answerTodaysClass(offer, show: false)
                     }
+                    .keyboardShortcut(.cancelAction)
                 case .refusal:
                     Button("OK") { }
                 }
@@ -1150,6 +1151,7 @@ struct SectionDetailView: View {
                     ), role: .cancel) {
                         answerTheProblemsAlert("Not Now")
                     }
+                    .keyboardShortcut(.cancelAction)
                 case .outcome:
                     if repairOutcome?.canRebuild == true {
                         Button("Preview Again") {

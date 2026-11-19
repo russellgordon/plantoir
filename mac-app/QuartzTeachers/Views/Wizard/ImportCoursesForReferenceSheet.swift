@@ -334,6 +334,10 @@ struct ImportCoursesForReferenceSheet: View {
             await readTheFolder()
         }
         .onDisappear {
+            // A sheet closed while copying, by Escape, Command-Period or any
+            // other route, stops the import as Stop does (#987: D5's one case
+            // where closing was not the same as the cancelling button).
+            run?.cancel()
             if let openedZipFolderURL {
                 ReferenceZipSource.remove(openedZipFolderURL)
             }
@@ -367,6 +371,7 @@ struct ImportCoursesForReferenceSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
             }
         }
     }
@@ -378,7 +383,12 @@ struct ImportCoursesForReferenceSheet: View {
                 .accessibilityIdentifier("importRefusal")
             HStack {
                 Spacer()
-                Button("OK", role: .cancel) {
+                // The one button of an informational stage: OK, the default
+                // (Alerts: "In informational alerts only, you can use 'OK'
+                // for acceptance"). No cancel role since #987, where every
+                // cancel-role button answers Escape: a button has one key,
+                // and Escape still closes the sheet, which is all OK does.
+                Button("OK") {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -443,6 +453,7 @@ struct ImportCoursesForReferenceSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button(ReferenceImportWording.importButton) {
                     startImporting()
                 }
@@ -602,6 +613,7 @@ struct ImportCoursesForReferenceSheet: View {
                 Button("Stop", role: .cancel) {
                     run?.cancel()
                 }
+                .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("importStopButton")
             }
         }

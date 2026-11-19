@@ -76,7 +76,9 @@ nonisolated enum ObsidianFigureAddOnsWording {
     static let reopenTitle: String = "Reopen Obsidian to show diagrams and graphs?"
     static let reopenMessage: String = "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”."
     static let reopen: String = "Reopen Obsidian"
-    static let later: String = "Later"
+    /// "Not Now" on an offer Plantoir raised by itself (#987, Russell's
+    /// ruling Q2 on #975). It was "Later".
+    static let later: String = "Not Now"
 
     /// Plantoir ▸ Settings ▸ Obsidian.
     static let paneTitle: String = "Obsidian"

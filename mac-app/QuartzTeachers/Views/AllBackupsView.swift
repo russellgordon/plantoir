@@ -102,6 +102,7 @@ struct AllBackupsView: View {
                 }
                 Button("Cancel", role: .cancel) {
                 }
+                .keyboardShortcut(.cancelAction)
             } message: { items in
                 Text(deleteConfirmationMessage(for: items))
             }

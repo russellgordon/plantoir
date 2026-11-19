@@ -202,16 +202,14 @@ struct SectionMenu: Commands {
         return AppSettings.shared.previewOpensAt
     }
 
-    /// "Cancel Deploy at 6:30 AM…" when it can be used — the context menu's
-    /// own title — and "Cancel Deploy at…" whenever it is greyed, with no
-    /// time (Russell's decision 4): a course kept for reference, a sheet up,
-    /// or nothing scheduled.
+    /// "Remove Scheduled Deploy…", the same whether or not it can be used
+    /// (#987, Russell 2026-11-18: the verb for taking away a scheduled
+    /// deploy is Remove, not Cancel, so the question's own Cancel is not a
+    /// second "cancel"). It was "Cancel Deploy at 6:30 AM…", and "Cancel
+    /// Deploy at…" while greyed; the time is in the question it opens and
+    /// on the sidebar's clock.
     var cancelTitle: String {
-        let canCancel: Bool = SubjectMenuRules.enabledItems(situation).contains(.cancelScheduledDeploy)
-        if canCancel, let scheduledFor = sidebar?.scheduledFor, situation.row == .section {
-            return "Cancel Deploy at \(ScheduledDeploy.timeText(scheduledFor))…"
-        }
-        return "Cancel Deploy at…"
+        return ScheduledDeployRemovalWording.menuItem
     }
 
     // MARK: - Body

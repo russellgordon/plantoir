@@ -613,7 +613,10 @@ nonisolated enum PlanSharingWording {
     static let whatChangesItValue: String = "Sharing these plans again"
     static let earlierYearsLabel: String = "Earlier years"
     static let earlierYearsValue: String = "Keep the password they were shared with"
-    static let later: String = "Later"
+    /// "Not Now" on an offer Plantoir raised by itself (#987, Russell's
+    /// ruling Q2 on #975): Plantoir asks this after Change Password. It was
+    /// "Later".
+    static let later: String = "Not Now"
     static let newPasswordNotInUse: String = "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
 
     // MARK: - Computed properties
