@@ -246,6 +246,19 @@ class AWorkingFolder:
                 result.stderr.decode("utf-8", "replace"))
 
 
+def _with_the_value(value: str) -> dict:
+    """The environment with a case's value in PLANTOIR_TEST_VALUE.
+
+    The value goes to bash in the environment, not as an argument, because
+    Git Bash on Windows reads its own command line again before bash sees
+    it: `{"a":"b"}` arrived empty, `a"b` as `a\\b` and `{a:b}` as `a:b`
+    (measured by Windows' fourth hold, #921). An environment variable
+    arrives as it was set on both platforms."""
+    environment = dict(os.environ)
+    environment["PLANTOIR_TEST_VALUE"] = value
+    return environment
+
+
 class ThePasteRule(unittest.TestCase):
 
     def setUp(self):
@@ -255,12 +268,13 @@ class ThePasteRule(unittest.TestCase):
 
     def test_every_paste_case(self):
         rule = _cut_from_deploy_sh("token_paste_rule")
-        script = rule + '\nif tidy_pasted_token "$1"; then printf "token\\0%s" "$TIDIED_TOKEN"; else printf "problem\\0%s" "$TOKEN_PASTE_PROBLEM"; fi\n'
+        script = rule + '\nif tidy_pasted_token "$PLANTOIR_TEST_VALUE"; then printf "token\\0%s" "$TIDIED_TOKEN"; else printf "problem\\0%s" "$TOKEN_PASTE_PROBLEM"; fi\n'
         cases = _section("paste", "cases")
         self.assertGreaterEqual(len(cases), 15)
         for case in cases:
             with self.subTest(case=case["name"]):
-                result = subprocess.run(self.shell + ["-c", script, "_", case["pasted"]],
+                result = subprocess.run(self.shell + ["-c", script],
+                                        env=_with_the_value(case["pasted"]),
                                         capture_output=True, timeout=30)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 kind, value = result.stdout.decode("utf-8").split("\0")
@@ -276,10 +290,11 @@ class TheEndDateReading(unittest.TestCase):
 
     def test_every_reading_case(self):
         reading = _cut_from_deploy_sh("token_end_reading")
-        script = reading + '\nprintf "%s\\0%s" "$(cloudflare_token_status_word "$1")" "$(cloudflare_token_end "$1")"\n'
+        script = reading + '\nprintf "%s\\0%s" "$(cloudflare_token_status_word "$PLANTOIR_TEST_VALUE")" "$(cloudflare_token_end "$PLANTOIR_TEST_VALUE")"\n'
         for case in _section("endDate", "reading", "cases"):
             with self.subTest(case=case["name"]):
-                result = subprocess.run(self.shell + ["-c", script, "_", case["body"]],
+                result = subprocess.run(self.shell + ["-c", script],
+                                        env=_with_the_value(case["body"]),
                                         capture_output=True, timeout=30)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 status, ends = result.stdout.decode("utf-8").split("\0")
