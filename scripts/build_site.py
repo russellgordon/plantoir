@@ -8187,8 +8187,14 @@ def _settings_file_bytes(data: dict) -> bytes:
     """The settings as preflight's write-back writes them: two-space indent,
     non-ASCII kept, one closing newline. The build's reading takes these bytes
     when preflight changed the settings, so the copies inside the site are
-    exactly what was written (#999)."""
-    return (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    exactly what was written (#999).
+
+    Line ends are the platform's, as the text-mode write this replaced gave
+    (CRLF on Windows), so a file preflight writes is byte for byte what it
+    was before #999. JSON's own escaping means no line end occurs inside a
+    value, so only the breaks between lines change."""
+    text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    return text.replace("\n", os.linesep).encode("utf-8")
 
 
 class BuildSettings:
