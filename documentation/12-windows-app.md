@@ -14499,6 +14499,21 @@ is the step's, never deleted (`undo.rule.recovery`, `recoveryCases` with
 changes when the step would not read back readable, names a path outside
 the working folder (links resolved), or names a blob it was not given.
 
+Three more rules from the second and third reviews bind Windows, each in
+the contract: **who settles a front-page step** (a dead step with a
+`recompute` is settled only by a recovery that re-derives what it settles;
+a recovery inside another write's lock leaves it in flight; `rule.recovery`,
+`recoveryCases` with `recoveredBy`); **containment is checked at every
+change**, not only at the door (every place inside the working folder with
+junctions and links resolved, at plan time and immediately before each
+rename or write; a place that leads outside is `changedSince`;
+`rule.stagedThenSwapped`, `stackCases`); and **a folder set aside is the
+teacher's own** (renamed back whenever its place is free, whatever it holds,
+and in the way when it changed; left untouched and recorded when its place
+is taken; the trail event `undo found a folder set aside`, held in
+`NamedGapLedger` under #899 until Windows writes Undo lines; `recoveryCases`
+with `changeTheFolderSetAside` and `somethingInItsPlace`).
+
 Six things in the format are easy to get wrong and are the reason it was
 revised:
 
