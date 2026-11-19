@@ -13,6 +13,7 @@ import XCTest
 /// the colour values; no system setting is changed. Increase Contrast reaches
 /// an app as the high-contrast appearance names, so each colour is resolved
 /// under all four.
+@MainActor
 final class StatusColourTests: XCTestCase {
 
     // MARK: - Stored properties
@@ -57,8 +58,11 @@ final class StatusColourTests: XCTestCase {
         let light: NSAppearance = NSAppearance(named: .aqua)!
         let orange: String = StatusColourTests.hex(of: NSColor.systemOrange, in: light)
         let red: String = StatusColourTests.hex(of: NSColor.systemRed, in: light)
-        XCTAssertLessThan(StatusColourTests.contrastRatio(orange, "FFFFFF"), minimumRatio, orange)
-        XCTAssertLessThan(StatusColourTests.contrastRatio(red, "FFFFFF"), minimumRatio, red)
+        let minimum: Double = minimumRatio
+        let orangeRatio: Double = StatusColourTests.contrastRatio(orange, "FFFFFF")
+        let redRatio: Double = StatusColourTests.contrastRatio(red, "FFFFFF")
+        XCTAssertLessThan(orangeRatio, minimum, orange)
+        XCTAssertLessThan(redRatio, minimum, red)
     }
 
     /// Increase Contrast must make a real difference in Light, where the
@@ -69,25 +73,31 @@ final class StatusColourTests: XCTestCase {
         for kind in [StatusColour.warning, StatusColour.blocking] {
             let normal: String = StatusColourTests.hex(of: kind.nsColor, in: light)
             let increased: String = StatusColourTests.hex(of: kind.nsColor, in: lightIncreased)
-            XCTAssertNotEqual(normal, increased, "\(kind) has no Increase Contrast variant")
+            let kindName: String = "\(kind)"
+            let normalRatio: Double = StatusColourTests.contrastRatio(normal, "FFFFFF")
+            let increasedRatio: Double = StatusColourTests.contrastRatio(increased, "FFFFFF")
+            XCTAssertNotEqual(normal, increased, "\(kindName) has no Increase Contrast variant")
             XCTAssertGreaterThan(
-                StatusColourTests.contrastRatio(increased, "FFFFFF"),
-                StatusColourTests.contrastRatio(normal, "FFFFFF"),
-                "\(kind): Increase Contrast must be the stronger of the two"
+                increasedRatio, normalRatio,
+                "\(kindName): Increase Contrast must be the stronger of the two"
             )
         }
     }
 
     /// The four appearance names map to the four variants.
     func testEachAppearanceIsReadAsItsOwnVariant() {
-        XCTAssertEqual(StatusColour.variant(of: NSAppearance(named: .aqua)!), .light)
-        XCTAssertEqual(StatusColour.variant(of: NSAppearance(named: .darkAqua)!), .dark)
-        XCTAssertEqual(
-            StatusColour.variant(of: NSAppearance(named: .accessibilityHighContrastAqua)!), .lightIncreasedContrast
+        let light: StatusColour.AppearanceVariant = StatusColour.variant(of: NSAppearance(named: .aqua)!)
+        let dark: StatusColour.AppearanceVariant = StatusColour.variant(of: NSAppearance(named: .darkAqua)!)
+        let lightIncreased: StatusColour.AppearanceVariant = StatusColour.variant(
+            of: NSAppearance(named: .accessibilityHighContrastAqua)!
         )
-        XCTAssertEqual(
-            StatusColour.variant(of: NSAppearance(named: .accessibilityHighContrastDarkAqua)!), .darkIncreasedContrast
+        let darkIncreased: StatusColour.AppearanceVariant = StatusColour.variant(
+            of: NSAppearance(named: .accessibilityHighContrastDarkAqua)!
         )
+        XCTAssertEqual(light, .light)
+        XCTAssertEqual(dark, .dark)
+        XCTAssertEqual(lightIncreased, .lightIncreasedContrast)
+        XCTAssertEqual(darkIncreased, .darkIncreasedContrast)
     }
 
     // MARK: - Colour is never the only sign
@@ -96,9 +106,13 @@ final class StatusColourTests: XCTestCase {
     /// teacher who cannot tell the two colours apart can still tell the two
     /// kinds apart (HIG, Color, "Inclusive color").
     func testTheTwoKindsCarryDifferentSymbols() {
-        XCTAssertNotEqual(StatusColour.warning.symbolName, StatusColour.blocking.symbolName)
-        XCTAssertNotNil(NSImage(systemSymbolName: StatusColour.warning.symbolName, accessibilityDescription: nil))
-        XCTAssertNotNil(NSImage(systemSymbolName: StatusColour.blocking.symbolName, accessibilityDescription: nil))
+        let cautionSymbol: String = StatusColour.warning.symbolName
+        let stopSymbol: String = StatusColour.blocking.symbolName
+        XCTAssertNotEqual(cautionSymbol, stopSymbol)
+        let cautionImage: NSImage? = NSImage(systemSymbolName: cautionSymbol, accessibilityDescription: nil)
+        let stopImage: NSImage? = NSImage(systemSymbolName: stopSymbol, accessibilityDescription: nil)
+        XCTAssertNotNil(cautionImage, cautionSymbol)
+        XCTAssertNotNil(stopImage, stopSymbol)
     }
 
     // MARK: - The sidebar's stopped-deploy badge (D38)
@@ -107,8 +121,10 @@ final class StatusColourTests: XCTestCase {
     /// blue selection, 5.37:1), as the row's words do; the orange measured
     /// 1.45:1 there. On an unselected row it wears the caution orange.
     func testTheBadgeFollowsASelectedRow() {
-        XCTAssertTrue(SidebarView.warningBadgeFollowsTheRow(prominence: .increased))
-        XCTAssertFalse(SidebarView.warningBadgeFollowsTheRow(prominence: .standard))
+        let followsWhenSelected: Bool = SidebarView.warningBadgeFollowsTheRow(prominence: .increased)
+        let followsWhenNot: Bool = SidebarView.warningBadgeFollowsTheRow(prominence: .standard)
+        XCTAssertTrue(followsWhenSelected)
+        XCTAssertFalse(followsWhenNot)
     }
 
     // MARK: - Nothing goes back to the system orange or red
@@ -147,7 +163,8 @@ final class StatusColourTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(offences, [], offences.joined(separator: "\n"))
+        let report: String = offences.joined(separator: "\n")
+        XCTAssertEqual(offences, [], report)
     }
 
     // MARK: - Functions
@@ -161,14 +178,17 @@ final class StatusColourTests: XCTestCase {
             (.darkAqua, darkBackgrounds, false),
             (.accessibilityHighContrastDarkAqua, darkBackgrounds, true),
         ]
+        let kindName: String = "\(kind)"
+        let minimum: Double = minimumRatio
+        let increasedMinimum: Double = increasedContrastRatio
         for (name, backgrounds, isIncreased) in cases {
             let appearance: NSAppearance = NSAppearance(named: name)!
             let foreground: String = StatusColourTests.hex(of: kind.nsColor, in: appearance)
             for background in backgrounds {
                 let ratio: Double = StatusColourTests.contrastRatio(foreground, background)
                 XCTAssertGreaterThanOrEqual(
-                    ratio, minimumRatio,
-                    "\(kind) in \(name.rawValue): #\(foreground) on #\(background) is \(ratio)",
+                    ratio, minimum,
+                    "\(kindName) in \(name.rawValue): #\(foreground) on #\(background) is \(ratio)",
                     file: file, line: line
                 )
             }
@@ -176,8 +196,8 @@ final class StatusColourTests: XCTestCase {
                 let plainest: String = backgrounds[0]
                 let ratio: Double = StatusColourTests.contrastRatio(foreground, plainest)
                 XCTAssertGreaterThanOrEqual(
-                    ratio, increasedContrastRatio,
-                    "\(kind) in \(name.rawValue): #\(foreground) on #\(plainest) is \(ratio)",
+                    ratio, increasedMinimum,
+                    "\(kindName) in \(name.rawValue): #\(foreground) on #\(plainest) is \(ratio)",
                     file: file, line: line
                 )
             }
