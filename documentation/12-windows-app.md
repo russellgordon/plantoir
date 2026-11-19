@@ -10577,7 +10577,14 @@ elevated):
 5. A trim to the measured set (`trim.remove` / `mustKeep`): from
    1,874,323,927 B to 533,231,069 B. The VC++ runtime DLLs from the runtime
    MSI (`trim.vcRuntime`) go beside the tools, because a PC without the
-   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140.
+   redistributable lacks VCRUNTIME140, VCRUNTIME140_1 and MSVCP140. The
+   website builder's runtime does the same for Node since #965
+   (`vcruntime140.dll` beside `runtime\node\node.exe`; "The Visual C++
+   runtime beside node.exe (#965)", below). **Both are app-local copies, and
+   Windows Update never patches them**: they are refreshed only when a new
+   Plantoir (or a new Swift pin) ships. Revisit `swiftWindows` →
+   `trim.vcRuntime` and `windowsNodeVcRuntime` together whenever Node,
+   Python, the Swift pin or a native module moves.
 6. The mac's own wasm SDK pin (92,760,992 B), unpacked with `tar.exe`, and
    binaryen version_133 x86_64-windows (111,045,528 B), of which only
    `wasm-opt.exe` is kept, OUTSIDE the toolchain's `bin`.
@@ -12952,6 +12959,80 @@ and a base bump rebuilds every Mac. Staying, which the owner ruled out on
 which makes this the lowest-risk splice. It was not chosen: python.org never
 built or tested that pairing, and 3.11.9 stays nine releases behind on
 CPython's own security fixes.
+
+## The Visual C++ runtime beside node.exe (#965)
+
+Written 2026-11-19 for [#965](https://github.com/russellgordon/plantoir/issues/965).
+The contract half is `contracts/toolchain.json` → `windowsNodeVcRuntime`
+(the file, its version, size and SHA-256, the libraries every Windows has,
+why, what is not carried, the licence, what was rejected). The mac owes
+nothing: its builder runs in the Linux image.
+
+**What happened.** On a clean Windows 11 (Parallels, ARM64, x64 emulation,
+`C:\Windows\System32\vcruntime140.dll` absent) the released 1.9.3 installed
+and opened, and the first preview stopped with `ERR_DLOPEN_FAILED` at the
+Typst compiler's `.node` (the first-install rehearsal, #976, on every clean
+machine tried). Windows looks for a module's libraries in the folder of the
+program that loads it (`node.exe`'s), the system folders and PATH. The
+installed app carried one copy of `vcruntime140.dll`, in `runtime\python`,
+which is on no PATH the launchers set.
+
+**What the modules import, measured 2026-11-19** by reading the import and
+delay-load tables of every native file in the runtime (fetched on the
+development PC from `dev`, all `x64`):
+
+| File | Visual C++ runtime imported | Everything else |
+|---|---|---|
+| `lightningcss.win32-x64-msvc.node` (linked with MSVC 14.43) | `VCRUNTIME140.dll` | Windows' own (kernel32, ntdll, advapi32, bcrypt, bcryptprimitives, UCRT `api-ms-win-crt-*`) |
+| `typst-ts-node-compiler.win32-x64-msvc.node` (MSVC 14.42) | `VCRUNTIME140.dll` | Windows' own |
+| `simple-git.win32-x64-msvc.node` | none | Windows' own |
+| both `sharp-win32-x64*.node` | none | `libvips-42.dll` and `libvips-cpp*.dll` beside it (which import only Windows' own and UCRT), and `node.exe` (delay-loaded) |
+| `node.exe` 22.23.4 | none | Windows' own |
+| `workerd.exe` (wrangler's local Workers runtime; an executable, not a module) | `MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1` | not covered by a copy beside `node.exe`: an executable looks in its own folder. Plantoir's Pages deploy is not known to start it; not measured on a clean machine |
+
+So exactly one file is carried: `vcruntime140.dll`. `vcruntime140_1.dll`
+and `msvcp140.dll` are imported by no module (Russell's ruling: carry only
+what is imported).
+
+**What landed.**
+- `fetch-runtime.ps1` → `Install-NodeVcRuntime` copies `vcruntime140.dll`
+  from `runtime\python` (the Python 3.14.10 embeddable zip, already checked
+  by SHA-256; the file is Microsoft's, Authenticode-signed, version
+  14.51.36247.0, newer than the 14.43 and 14.42 toolsets the modules were
+  built with) to `runtime\node`, and checks it by SHA-256 and size before and
+  after. The manifest records `nodeVcRuntime`. A runtime made before #965 is
+  repaired in place, one file and no download; a Python bump that brings
+  another copy refuses until the contract and the three `$NodeVcRuntime*`
+  lines move with it.
+- `Plantoir.csproj` → `CheckNativeRuntimeManifest` refuses a runtime whose
+  manifest has no `nodeVcRuntime` at that version, so a release cannot ship
+  without it.
+- The installer needs no change: `runtime\` is published whole, and
+  `[InstallDelete]` already empties `{app}\runtime\node` before the new one
+  is copied, so an upgrade gets exactly this copy.
+- `THIRD_PARTY_LICENSES.md` has the licence row (Microsoft's redistributable
+  code terms; the file is on the list an application may carry).
+- `NativeModuleImportsTests`: every `.node` file in a fetched runtime, and
+  every library beside it that it pulls in, finds each import beside itself,
+  beside `node.exe`, or on `windowsSystemLibraries`, a named list that
+  deliberately holds no Visual C++ runtime name (a test says so). This fails
+  on a pre-#965 runtime on ANY PC, the development PC included, which loading
+  the modules there could not do (its System32 has the redistributable).
+  Source checks hold the recipe's three pin lines and the build's guard to
+  the contract.
+
+**Updates are ours now.** An app-local copy is not patched by Windows Update.
+It is refreshed only when a new Plantoir ships, so revisit
+`windowsNodeVcRuntime` when Node, Python or a native module moves (beside the
+Swift tools' own copies, `swiftWindows` → `trim.vcRuntime`). On a PC that has
+the redistributable, Node loads this copy (its own folder comes first) and the
+system's is untouched.
+
+**Rejected.** Adding `runtime\python` to PATH in the three launchers (smaller,
+but it leans on Python's copy and on every Node being started by a launcher).
+Fetching `VC_redist.x64.exe` and unpacking it: a WiX Burn bundle, so a second
+unpacker (as `swift_windows_fetch.py` carves the Swift installer) for one
+178,616-byte file the pinned Python zip already carries, signed by Microsoft.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 
