@@ -999,8 +999,8 @@ struct SectionVerbSheet: View {
                 Text("\(model.howMany)")
                     .monospacedDigit()
             }
-            .accessibilityLabel(Text(AccessibilityNames.makeRoomHowMany))
             .accessibilityValue(Text("\(model.howMany)"))
+            .accessibilityLabel(Text(AccessibilityNames.makeRoomHowMany))
             .accessibilityIdentifier("sectionVerbSheetHowMany")
         case .addClass:
             // One line per way, in the contract's order; a way this section

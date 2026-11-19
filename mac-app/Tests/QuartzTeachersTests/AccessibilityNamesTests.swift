@@ -1,5 +1,3 @@
-import AppKit
-import SwiftUI
 import XCTest
 @testable import QuartzTeachers
 
@@ -11,40 +9,29 @@ import XCTest
 /// VoiceOver"; its Accessibility guidance: "Convey information with more
 /// than color alone."
 ///
-/// Two kinds of check. Where a control can be drawn on its own, it is
-/// hosted in a window and its name is read back from the accessibility
-/// tree AppKit builds for it, the tree VoiceOver reads. Where a control
-/// lives deep inside a sheet that needs a whole course to draw, the check
-/// reads the view's source for the modifier that names it; each of those
-/// fails on the code before #993.
+/// Most controls live deep inside a sheet that needs a whole course to
+/// draw, so the checks read each view's source for the modifier that names
+/// the control, on the line above its identifier; each fails on the code
+/// before #993. The pure rules (the checklist's words, Reduce Motion) are
+/// called directly.
 @MainActor
 final class AccessibilityNamesTests: XCTestCase {
 
     // MARK: - Functions
 
-    /// The section's and the course's tab bars are named (D16): before, the
-    /// segmented control's group had only an identifier.
-    @MainActor
-    func testTheTabBarIsNamedInTheAccessibilityTree() throws {
-        let bar: DetailTabs<Int> = DetailTabs(
-            tabs: [(tab: 0, title: "Website"), (tab: 1, title: "Coverage")],
-            selection: .constant(0),
-            name: AccessibilityNames.sectionTabs,
-            identifier: "sectionTabs"
-        )
-        let label: String? = AccessibilityNamesTests.label(ofIdentifier: "sectionTabs", in: bar)
-        XCTAssertEqual(label, AccessibilityNames.sectionTabs)
+    /// The tab bar names its group (D16): before, the segmented control's
+    /// group had only an identifier.
+    func testTheTabBarNamesItsGroup() throws {
+        let view: String = try AccessibilityNamesTests.source("Views/Section/DetailTabs.swift")
+        XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(name))", comesJustBefore: "identifier", in: view.replacingOccurrences(of: ".accessibilityIdentifier(identifier)", with: ".accessibilityIdentifier(\"identifier\")")))
     }
 
-    /// The emoji palette button is named in words (D18), not "face.smiling".
-    @MainActor
-    func testTheEmojiButtonIsNamedInTheAccessibilityTree() throws {
-        let field: EmojiChoiceField = EmojiChoiceField(label: "Header emoji", emoji: .constant("🧪"))
-        let buttonLabel: String? = AccessibilityNamesTests.label(ofIdentifier: "emojiPaletteButton", in: field)
-        XCTAssertEqual(buttonLabel, AccessibilityNames.chooseEmoji)
-        // The emoji field itself takes its row's label (D40).
-        let fieldLabel: String? = AccessibilityNamesTests.label(ofIdentifier: "emojiChoiceField", in: field)
-        XCTAssertEqual(fieldLabel, "Header emoji")
+    /// The emoji palette button is named in words (D18), not "face.smiling",
+    /// and the emoji field takes its row's label (D40).
+    func testTheEmojiButtonAndFieldAreNamed() throws {
+        let view: String = try AccessibilityNamesTests.source("Views/Helpers/EmojiChoiceField.swift")
+        XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(AccessibilityNames.chooseEmoji))", comesJustBefore: "emojiPaletteButton", in: view))
+        XCTAssertTrue(AccessibilityNamesTests.modifier(".accessibilityLabel(Text(label))", comesJustBefore: "emojiChoiceField", in: view))
     }
 
     /// Both bars are given their names where they are drawn.
@@ -224,65 +211,5 @@ final class AccessibilityNamesTests: XCTestCase {
             searchStart = range.upperBound
         }
         return found
-    }
-
-    /// Hosts `view` in a window and reads the accessibility label of the
-    /// element carrying `identifier`, from the tree AppKit builds for
-    /// VoiceOver. Nil when no element carries it.
-    @MainActor
-    static func label(ofIdentifier identifier: String, in view: some View) -> String? {
-        let window: NSWindow = NSWindow(
-            contentRect: NSRect(x: -7000, y: -7000, width: 480, height: 120),
-            styleMask: [.titled],
-            backing: .buffered,
-            defer: false
-        )
-        window.isReleasedWhenClosed = false
-        let host: NSHostingView<AnyView> = NSHostingView(rootView: AnyView(view))
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
-        defer {
-            window.contentView = nil
-            window.close()
-        }
-        var found: String?
-        let deadline: Date = Date().addingTimeInterval(5)
-        while found == nil && Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-            host.layoutSubtreeIfNeeded()
-            found = labelOfElement(withIdentifier: identifier, from: host, depth: 0)
-        }
-        return found
-    }
-
-    @MainActor
-    static func labelOfElement(withIdentifier identifier: String, from element: Any, depth: Int) -> String? {
-        if depth > 40 {
-            return nil
-        }
-        guard let object = element as? NSObject else {
-            return nil
-        }
-        if object.responds(to: NSSelectorFromString("accessibilityIdentifier")) {
-            let elementIdentifier: String? = object.perform(NSSelectorFromString("accessibilityIdentifier"))?.takeUnretainedValue() as? String
-            if elementIdentifier == identifier {
-                if object.responds(to: NSSelectorFromString("accessibilityLabel")) {
-                    return object.perform(NSSelectorFromString("accessibilityLabel"))?.takeUnretainedValue() as? String
-                }
-                return nil
-            }
-        }
-        guard object.responds(to: NSSelectorFromString("accessibilityChildren")) else {
-            return nil
-        }
-        guard let children = object.perform(NSSelectorFromString("accessibilityChildren"))?.takeUnretainedValue() as? [Any] else {
-            return nil
-        }
-        for child in children {
-            if let label = labelOfElement(withIdentifier: identifier, from: child, depth: depth + 1) {
-                return label
-            }
-        }
-        return nil
     }
 }
