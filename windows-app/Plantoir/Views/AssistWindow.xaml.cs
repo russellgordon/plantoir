@@ -228,10 +228,11 @@ public sealed partial class AssistWindow : Window
             },
             PrimaryButtonText = AssistSectionRestore.GoAheadTitle(_section),
             CloseButtonText = "Cancel",
-            // The safe answer is the default: this discards work.
-            DefaultButton = ContentDialogButton.Close,
             XamlRoot = Root.XamlRoot,
         };
+        // This discards work: no button is the default (the mac's D1, #987),
+        // and the focus starts on Cancel, so Enter is never the put-back (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         ContentDialogResult choice;
         try { choice = await dialog.ShowAsync(); }
         catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }

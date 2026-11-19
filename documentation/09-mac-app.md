@@ -1921,9 +1921,16 @@ Reopen Obsidian, the scheduled deploy's removal question in
 `ScheduledDeployRemovalWording` with no default, and Remove… beside a
 downloaded assistant asking first (`AssistModelRemovalWording`), each read
 from the contract by `QuitConfirmationTests`, `TodaysClassContractTests`,
-`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. Still owed
-under #979: the dates card's titles, and the ContentDialog's fixed button
-order (its Close button always trails).
+`ObsidianFigureAddOnsTests` and `RemovalQuestionsContractTests`. The dates
+card's titles followed with the #987 merge. #979 then brought the rest of
+the Windows questions into line (no Cancel is the default; a question with no
+default opens with the focus on Cancel, since WinUI otherwise focuses the
+go-ahead and Enter pressed it, measured; the wizard's Create Course default
+and its Escape while making): [12 → "The question dialogs' keys
+(#979)"](12-windows-app.md#the-question-dialogs-keys-979-the-macs-973-and-987).
+Two differences are parked with Russell there: the ContentDialog's fixed
+button order (its Close button always trails), and Enter on a question with
+no default pressing the focused Cancel rather than nothing.
 
 ## A section's Coverage tab (#793)
 

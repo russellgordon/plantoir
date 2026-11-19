@@ -19,6 +19,17 @@ Branch `issue/993b-about-window-links`. Built and tested on the Windows VM (Para
 - As Russell ruled for the mac (option A): the sponsor sentence whole and plain with "Quartz" and "Sponsor Jacky Zhao on GitHub" beneath it; Icon, Design and Made with as label-and-value rows like Website and Email. Each of the six links is a `HyperlinkButton` of its own with an AutomationId, in place of inline `Hyperlink`s.
 - `AboutDialogLinksSourceTests` (4 facts) and `AboutDialogLinksUiTests` (opens Help ▸ About Plantoir; six Hyperlink elements, enabled and focusable, Tab reaches each). Details: documentation/12, "The About panel's links (#993, the mac's D46)".
 
+## 2026-11-19 — the question dialogs' keys follow the mac's #973 and #987 (#979)
+
+Branch `issue/979-windows-question-dialogs`. Proven on the Windows VM (Windows 11 ARM64 in Parallels, the x64 app under emulation), not yet on the PC.
+
+- **Measured first:** the quit question, with no default since #987, opened with the focus on Quit Anyway, so Enter quit; WinUI focuses the first button in the row when nothing in the content can take the focus. Escape while a course was being made closed the wizard; Enter on a complete form made nothing.
+- `DialogButtons.AskWithNoDefault`: no default, the focus moved to Cancel when the dialog opens. Twelve questions use it; eight of them had Cancel as the default until now (Remove, the three deletes, the assistant's put-back, a list entry's Remove, Get Ready's go-ahead, and Get Ready's undo when nothing would go back, whose Undo is otherwise the default).
+- New Course: Create Course is the default once the form is complete and no code list is drawn; Escape does nothing while the course is being made (`QuestionKeys`, the mac's two rules).
+- Tests: `QuestionDialogScanTests` (unit), `QuestionDialogKeysUiTests` (4 real-key tests, 3 red before, 4 green after). Ledger: nothing held for #973 or #987, so nothing removed.
+- Ruled by Russell (2026-11-19): keep Windows' own button order, go-ahead left and Cancel right; on a question with no default the focus starts on Cancel and Enter or Space cancels. `documentation/12-windows-app.md` → "The question dialogs' keys (#979)".
+- **After the review (NOT CLEAN, two MEDIUM, four LOW), 8e099e291:** the wizard's `LayoutRoot` Escape catcher is gone: while the course is made Cancel is the Secondary button and `Closing` refuses a close with no answer (measured on the VM: Escape does nothing then, a click on Cancel stops it, Escape closes afterwards). Create Course is plain (`PrimaryKind.NotTheDefaultYet`, no default, no accent) until it is the default. The update offer's Escape catcher is deleted (Escape still closes it, `UpdateOfferUiTests`). Undo Getting Ready is greyed when nothing would go back. `AskWithNoDefault` keeps the go-ahead out of the tab order until the dialog is open, so it never holds the first focus. The scan sees `new() { }` dialogs.
+
 ## 2026-11-19 — Undo and Redo: the mac's U2b rows met by the W1 reader (#899)
 
 Branch `issue/899-u2b-op-kinds` (the mac's U2b, with `dev` merged in). Lenovo 20QES70500 over SSH.

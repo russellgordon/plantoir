@@ -776,6 +776,8 @@ public sealed partial class SidebarPane : UserControl
             CloseButtonText = going.Count == 0 ? "OK" : "Cancel",
             DefaultButton = ContentDialogButton.Close,
         };
+        // A delete that cannot be undone: no default, the focus on Cancel (#979; the mac's destructive alert).
+        if (going.Count > 0) DialogButtons.AskWithNoDefault(dialog);
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
@@ -1382,8 +1384,8 @@ public sealed partial class SidebarPane : UserControl
             Content = ScheduledDeployRemovalWording.Message(course.Code, number, $"{when:h:mm tt}", $"{when:dddd d MMMM}"),
             PrimaryButtonText = ScheduledDeployRemovalWording.RemoveButton,
             CloseButtonText = ScheduledDeployRemovalWording.CancelButton,
-            DefaultButton = ContentDialogButton.None,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // the focus starts on Cancel, so Enter is never Remove (#979)
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
@@ -1626,8 +1628,10 @@ public sealed partial class SidebarPane : UserControl
             Content = message,
             PrimaryButtonText = "Remove",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        // The mac's Remove alert (role .destructive): Return does nothing, Escape is Cancel.
+        // Here: no default, and the focus starts on Cancel (#979).
+        DialogButtons.AskWithNoDefault(dialog);
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
@@ -1796,8 +1800,8 @@ public sealed partial class SidebarPane : UserControl
             Content = consequence,
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // deleted for good: no default, the focus on Cancel (#979)
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         if (askedIn is null) return;
@@ -1854,8 +1858,8 @@ public sealed partial class SidebarPane : UserControl
             Content = consequence,
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close,
         };
+        DialogButtons.AskWithNoDefault(dialog);   // deleted for good: no default, the focus on Cancel (#979)
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
         try
