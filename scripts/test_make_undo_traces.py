@@ -137,10 +137,10 @@ class GeneratorTests(unittest.TestCase):
             calls = trace["calls"]
             self.assertGreaterEqual(len(calls), traces.SHORTEST, trace["name"])
             for call in calls:
-                self.assertIn(call["call"], ("step", "undo", "redo", "handEdit", "note"), call)
+                self.assertIn(call["call"], ("step", "undo", "redo", "handEdit", "note", "move"), call)
                 self.assertIn("head", call)
                 self.assertIn("redo", call)
-                if call["call"] in ("step", "undo", "redo"):
+                if call["call"] in ("step", "undo", "redo", "move"):
                     self.assertIn("expect", call)
 
     def test_a_refused_redo_drops_only_the_redo(self):
@@ -166,7 +166,7 @@ class GeneratorTests(unittest.TestCase):
         for wanted in [("step", "applied"), ("step", "changedNothing"), ("undo", "undone"),
                        ("undo", "changedSince"), ("undo", "nothingToUndo"), ("redo", "redone"),
                        ("redo", "nothingToRedo"), ("handEdit", "body"), ("handEdit", "sameLine"),
-                       ("handEdit", "otherKey"), ("note", None), ("redo", "changedSince")]:
+                       ("handEdit", "otherKey"), ("note", None), ("redo", "changedSince"), ("move", "applied")]:
             self.assertIn(wanted, seen)
         for call, _ in seen:
             self.assertNotEqual(call, "clear", "a deploy or a share of unit plans clears nothing (rulings 17 and 18)")

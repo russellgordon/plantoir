@@ -335,6 +335,19 @@ nonisolated enum UndoContractReplay {
                             failures.append("\(where_): the refused redo cleared the list (ruling 20 drops only the redo)")
                         }
                     }
+                case "move":
+                    // U2: the page moved aside as one `move`, through the
+                    // door that plans a step's ops forward.
+                    let from: String = pathOfPage[string(call["page"]) ?? ""] ?? ""
+                    let content: Data = UndoItem.read(at: root.appendingPathComponent(from)).data ?? Data()
+                    let op: UndoOp = UndoOp.moveFile(from: from, to: string(call["to"]) ?? "", sha: UndoHash.sha256(of: content))
+                    let outcome: JournaledWriteOutcome = JournaledWrite.perform(
+                        ops: UndoContractKinds.draft(ops: [op], blobs: [], root: root, action: "movePage"),
+                        in: journal, mode: .live
+                    )
+                    if outcome != .applied(seq: int(call["seq"]) ?? -1) {
+                        failures.append("\(where_): move came to \(outcome), not applied \(int(call["seq"]) ?? -1)")
+                    }
                 case "handEdit":
                     try handEdit(string(call["kind"]) ?? "", at: pathOfPage[string(call["page"]) ?? ""] ?? "", in: root)
                 case "note":
