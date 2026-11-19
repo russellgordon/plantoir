@@ -27,7 +27,9 @@ final class HitAreaTests: XCTestCase {
         // this the test measures whatever folder the teacher happened to
         // leave the app in — and an empty one shows the folder picker,
         // which has no sidebar and therefore no buttons to measure.
-        workspace.chooseWorkspace(at: try FixtureWorkspace.materialize())
+        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        removeWhenTestEndsAfterTheWindowLetsGo(fixtureURL)
+        workspace.chooseWorkspace(at: fixtureURL)
         try await Task.sleep(for: .milliseconds(500))
 
         for identifier in ["addCourseButton", "removeSelectedButton"] {

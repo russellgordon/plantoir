@@ -517,7 +517,7 @@ enum SpecialFolderRenamer {
         )
         // ONE OF the course's curriculum folders (#128) — the declared ones
         // and the ones it resolves to, the second read from the disk by the
-        // caller (`foldersWithPages`), so a scratch LCS course renaming the
+        // caller (`foldersWithPages`), so a scratch two-curricula course renaming the
         // Ontario folder its map comes from is recognised even though the
         // by-name rule would have picked College Board.
         let declaredCurriculum: [String] = CurriculumFolderRule.declaredFolders(

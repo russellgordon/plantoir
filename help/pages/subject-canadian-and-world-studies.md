@@ -70,13 +70,15 @@ Two of the examples below are in CHC2D only: the film, and the question students
 {{picture:subject-canadian-and-world-studies-1}}
 alt: The part named A film to practise on, on the page Photographs on the class website, with the film's player and the questions under it.
 
-The film is not copied into the course. The player loads from YouTube when a student opens the page, and the film plays when the student presses play. So it needs an internet connection. The page tells students so, under the film.
+The film is not copied into the course. The player loads from YouTube as the student scrolls near it, from the address YouTube gives for its privacy-enhanced mode. The film plays when the student presses play. So it needs an internet connection. The page tells students so, under the film.
 
 On the page, the film is its address on a line of its own, in the form used for a picture:
 
 ```text wrap
 ![](https://www.youtube.com/watch?v=Bx5wri9LHpc)
 ```
+
+See [Put a video on a page](page:videos).
 
 - **A question students check themselves.** CHC2D's page Newspapers and Propaganda, in Sources, has one under the heading Check the idea. It asks what a recruiting poster from the First World War is evidence of, and gives four choices. A student picks one and presses {{control:quizCheck}}, or presses {{control:quizShowAnswer}}. An explanation named Why appears after the student answers. Nothing a student answers reaches you. See [Questions students check themselves](page:quizzes).
 

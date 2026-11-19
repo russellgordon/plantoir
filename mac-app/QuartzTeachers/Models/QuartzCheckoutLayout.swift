@@ -299,7 +299,7 @@ nonisolated enum QuartzCheckoutLayout {
         /// A folder holding several courses' folders of websites.
         case severalCourses
         /// A folder whose courses' shortcut folders are one level further
-        /// down still: the school year's folder, `LCS/2024-25`, whose
+        /// down still: the school year's folder, `JHC/2024-25`, whose
         /// `Old ICS3U/Class Websites` holds the shortcuts.
         case coursesFurtherDown
         /// A shortcut chosen on its own that cannot be read through.

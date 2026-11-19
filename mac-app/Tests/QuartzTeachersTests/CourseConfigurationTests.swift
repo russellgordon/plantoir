@@ -43,6 +43,7 @@ final class CourseConfigurationTests: XCTestCase {
         let data: Data = try JSONSerialization.data(withJSONObject: dictionary, options: [.prettyPrinted, .sortedKeys])
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("course_config_test_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try data.write(to: fileURL)
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
         return (configuration: configuration, fileURL: fileURL)
@@ -74,6 +75,8 @@ final class CourseConfigurationTests: XCTestCase {
 
         let outputURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("course_config_out_\(UUID().uuidString).json")
+
+        removeWhenTestEnds(outputURL)
         try configuration.write(to: outputURL)
 
         let writtenData: Data = try Data(contentsOf: outputURL)
@@ -224,6 +227,7 @@ final class CourseConfigurationTests: XCTestCase {
         let data: Data = try JSONSerialization.data(withJSONObject: dictionary, options: [.prettyPrinted, .sortedKeys])
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("course_config_sorted_test_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try data.write(to: fileURL)
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
 
@@ -287,6 +291,7 @@ final class CourseConfigurationTests: XCTestCase {
         let data: Data = try JSONSerialization.data(withJSONObject: dictionary, options: [.prettyPrinted, .sortedKeys])
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("course_config_excluded_test_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try data.write(to: fileURL)
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
 
@@ -295,6 +300,8 @@ final class CourseConfigurationTests: XCTestCase {
 
         let outputURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("course_config_excluded_out_\(UUID().uuidString).json")
+
+        removeWhenTestEnds(outputURL)
         try configuration.write(to: outputURL)
 
         let writtenData: Data = try Data(contentsOf: outputURL)

@@ -73,10 +73,17 @@ nonisolated enum RealHome {
     /// it wrote. Never created here: it exists only once something writes
     /// into it.
     static let homeWhileTesting: URL = FileManager.default.temporaryDirectory
-        .appendingPathComponent(
-            "plantoir-home-under-test-\(ProcessInfo.processInfo.processIdentifier)",
-            isDirectory: true
-        )
+        .appendingPathComponent("plantoir-home-under-test-" + testRunIdentifier, isDirectory: true)
+
+    /// What makes a test run's throwaway folders its own: the process id,
+    /// then a UUID made once per process, `<pid>-<UUID>`. Every per-run
+    /// folder name ends with it (#978): the pid lets the next run tell that
+    /// this one has finished, and the UUID means a later run that is given
+    /// the same pid can never write into, inherit, or collide with this
+    /// run's folders. Read only by the throwaway folders' names, which are
+    /// read only under tests (`isInsideTestBundle`, or a UI test with no
+    /// state folder); a teacher's app never asks.
+    static let testRunIdentifier: String = String(ProcessInfo.processInfo.processIdentifier) + "-" + UUID().uuidString
 
     /// The flag that hands the app a folder to use as its home (#154). The
     /// same word Windows' app answers, where it replaces one app folder;

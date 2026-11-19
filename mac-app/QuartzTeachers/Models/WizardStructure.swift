@@ -14,7 +14,7 @@ import Foundation
 /// The restore is list by list, against a SNAPSHOT of what the adoption put
 /// there: a list the teacher has edited since is theirs and is left exactly as
 /// it is, and only the untouched ones go back. Equality is by VALUE rather
-/// than a dirty flag — see `restoringDefaults(in:adopted:usesLCSTerminology:)`
+/// than a dirty flag — see `restoringDefaults(in:adopted:)`
 /// for what that buys and what it costs.
 ///
 /// Pure on purpose: the view owns `@State`, which never takes on a view that
@@ -60,10 +60,8 @@ enum WizardStructure {
     }
 
     /// The other direction: the toggle went off, so each list the teacher has
-    /// NOT touched since the adoption goes back to the factory default — the
-    /// LCS variant for the two shared lists when the terminology switch is on,
-    /// since that is what a brand-new course with that switch would have
-    /// opened with.
+    /// NOT touched since the adoption goes back to the factory default, which
+    /// is what a brand-new course would have opened with.
     ///
     /// - Parameter adopted: what the last adoption put into the editor, or nil
     ///   when nothing has been adopted — in which case there is nothing to
@@ -78,10 +76,6 @@ enum WizardStructure {
     ///   intended: what is on screen is what the adoption put there, and a
     ///   teacher cannot see the difference between a list they never touched
     ///   and one they have put back.
-    /// - The two shared lists are what the LCS switch REWRITES, so flipping it
-    ///   after an adoption leaves them unequal to the snapshot and they stay
-    ///   as the switch left them. The per-section lists, which have no LCS
-    ///   variant, still go back.
     /// - The marks pool can never name a folder that has just left the
     ///   editor, and it takes two rules to keep that true. A pool still equal
     ///   to the adoption's is RE-INFERRED over the restored folders; a pool
@@ -101,8 +95,7 @@ enum WizardStructure {
     ///   (`CurrentGradedFolders`) and again when the file is written.
     static func restoringDefaults(
         in current: Lists,
-        adopted: Lists?,
-        usesLCSTerminology: Bool
+        adopted: Lists?
     ) -> Lists {
         guard let adopted else {
             return current
@@ -110,21 +103,14 @@ enum WizardStructure {
 
         var sharedFolders: [String] = current.sharedFolders
         if current.sharedFolders == adopted.sharedFolders {
-            sharedFolders = usesLCSTerminology
-                ? WizardDefaults.lcsSharedFolders
-                : WizardDefaults.sharedFolders
+            sharedFolders = WizardDefaults.sharedFolders
         }
 
         var sharedFiles: [String] = current.sharedFiles
         if current.sharedFiles == adopted.sharedFiles {
-            sharedFiles = usesLCSTerminology
-                ? WizardDefaults.lcsSharedFiles
-                : WizardDefaults.sharedFiles
+            sharedFiles = WizardDefaults.sharedFiles
         }
 
-        // No LCS variant exists for either per-section list: the terminology
-        // switch changes only the shared ones, so these go back to the plain
-        // defaults whatever it is set to.
         var perSectionFolders: [String] = current.perSectionFolders
         if current.perSectionFolders == adopted.perSectionFolders {
             perSectionFolders = WizardDefaults.perSectionFolders

@@ -60,10 +60,10 @@ the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
   `starters/Handout - Answers.tex`, or `starters/Quiz.tex` with
   `starters/Quiz - Solutions.tex` for a quiz or test. Copy them, never edit
   them here.
-- **Where the files go: never inside `courses/`.** Every file in a course
-  folder that is not a page is copied to the class website when it is
-  built, so a `.tex` source or an answer key kept there is one students can
-  download. The sources, their `- Answers` wrappers and every PDF live in
+- **Where the files go: never inside `courses/`.** A file in a course
+  folder that is not a page goes on the class website as soon as a page
+  students can see links to it or shows it, so a `.tex` source or an answer
+  key kept there is one link away from being one students can download. The sources, their `- Answers` wrappers and every PDF live in
   one folder per course, outside the course, and the course remembers it:
   - **Read `courses/<CODE>/.internal/handouts/handouts.json` first.** If it
     is there and the folder it names exists, use that folder, and say it
@@ -900,8 +900,9 @@ topic, and other topics keep their answers from the start.
      the tools, preview each section and search for its title). Do not
      give the copy a `printPdf` yet. A page hidden this way is dropped by
      the build before it writes anything, so its text is on no page, in no
-     search and in no link of the site; but EVERY file in the course's
-     `Media` folder is copied to the site whatever links to it. So **`Name - with Answers.pdf` stays in the handouts folder,
+     search and in no link of the site, and a file only it uses is not on
+     the site either; but a file in `Media` goes on the site as soon as ANY
+     page students can see links to it. So **`Name - with Answers.pdf` stays in the handouts folder,
      outside the course, for the whole hints period**: copying it into
      `Media` is a step of the swap, below. Only `Name - with Hints.pdf`
      goes into `Media` now.

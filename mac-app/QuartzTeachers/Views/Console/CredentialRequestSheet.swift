@@ -24,6 +24,26 @@ struct CredentialRequestSheet: View {
     /// these instructions themselves and nothing is paused.
     var confirmTitle: String = "Continue"
 
+    /// The title, when it is not the request's own: Settings ▸ Deploying's
+    /// Change Token… says "Change the Netlify Token" rather than "Connect to
+    /// Netlify" (#696).
+    var title: String? = nil
+
+    /// What is wrong with the last answer, said under the field: Settings'
+    /// Change Token… keeps the sheet open with the reason when a new token
+    /// was not saved (#696). Nil during a deploy, which says it in the
+    /// console instead.
+    var problem: String? = nil
+
+    /// True while the answer is being checked: the buttons wait and
+    /// `busyMessage` says what is happening (#696).
+    var isBusy: Bool = false
+    var busyMessage: String = ""
+
+    /// The Help page a Help button at the foot of the sheet opens, or nil
+    /// for none (#696, the plan's #839 P5 button on the settings sheet).
+    var helpAnchor: String? = nil
+
     /// What to do with the finished answer, and with a change of mind.
     let onSend: (String) -> Void
     let onCancel: () -> Void
@@ -98,21 +118,49 @@ struct CredentialRequestSheet: View {
                 }
             }
 
+            if isBusy {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(busyMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("credentialBusy")
+            } else if let problem {
+                Text(problem)
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("credentialProblem")
+            }
+
             HStack {
+                if let helpAnchor {
+                    HelpLink {
+                        PlantoirHelpPage.open(anchor: helpAnchor)
+                    }
+                    .accessibilityIdentifier("credentialHelpButton")
+                }
                 Spacer()
+                // Waits while the answer is being checked (#696, review W2):
+                // Settings' check may already have saved the token by the
+                // time Cancel is pressed, and closing the sheet then would
+                // hide a save that landed.
                 Button("Cancel", role: .cancel) {
                     onCancel()
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(isBusy)
                 Button(confirmTitle) {
                     sendAnswer()
                 }
-                .defaultButton(isEnabled: !tidiedAnswer.isEmpty)
+                .defaultButton(isEnabled: !tidiedAnswer.isEmpty && !isBusy)
                 .accessibilityIdentifier("credentialSendButton")
             }
         }
         .padding([.horizontal, .bottom], 20)
-        .sheetTitle(request.title, explanation: {
+        .sheetTitle(title ?? request.title, explanation: {
             Text(request.explanation)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.secondary)
@@ -124,6 +172,7 @@ struct CredentialRequestSheet: View {
         // read off the real tree as "credentialSheet" and could not be found.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("credentialSheet")
+        .interactiveDismissDisabled(isBusy)
         .onAppear {
             answer = initialAnswer
         }
@@ -132,7 +181,7 @@ struct CredentialRequestSheet: View {
     // MARK: - Functions
 
     func sendAnswer() {
-        if tidiedAnswer.isEmpty {
+        if tidiedAnswer.isEmpty || isBusy {
             return
         }
         onSend(tidiedAnswer)

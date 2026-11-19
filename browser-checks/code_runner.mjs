@@ -60,13 +60,13 @@
 //
 //   node browser-checks/code_runner.mjs <chrome> <site folder> <page path> <second page path> [<autorun page path>]
 
-import { spawn } from "node:child_process"
 import { headersFor } from "../support/quartz/cli/plantoirIsolation.mjs"
 import { createServer } from "node:http"
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, siteFolder, pagePath, secondPath, autorunPath] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pagePath || !secondPath) {
@@ -135,7 +135,7 @@ function serve(mode) {
 }
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-runner-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1280,900",
   "--use-mock-keychain", "--password-store=basic",

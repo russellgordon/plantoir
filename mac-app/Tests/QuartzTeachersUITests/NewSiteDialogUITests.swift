@@ -74,7 +74,7 @@ final class NewSiteDialogUITests: XCTestCase {
 
     func testAFirstPublishAsksOnceFillsInTheAddressAndCancelStopsIt() throws {
         let contract: CredentialContract = try CredentialContract.read()
-        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        let fixtureURL: URL = try UITestFolders.makeFixture()
         for section in [1, 2] {
             let publicURL: URL = fixtureURL
                 .appendingPathComponent("courses/EXC2O/.merged_output/section\(section)/public")

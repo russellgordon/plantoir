@@ -1166,7 +1166,7 @@ function Run-Launcher {
 # inside the brackets varies with the course.
 $script:ExpectedQuestions = @(
     '^First time setup\.\.\. what is your last name\? \(letters only\):$',
-    "^Please enter letters only for your last name \(e\.g\., 'Gordon'\):$",
+    "^Please enter letters only for your last name \(e\.g\., 'Quillfeather'\):$",
     '^Enter Netlify site name \[[^\]]*\]:$',
     "^Choose a different Netlify site name \(or 'q' to cancel\) \[[^\]]*\]:$"
 )

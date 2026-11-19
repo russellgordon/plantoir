@@ -39,6 +39,21 @@ enum CourseActivity {
         let sectionNumber: Int
     }
 
+    /// One start's hold on a section's preview-build record (#812).
+    ///
+    /// Several things can say the same section is being built at once: the
+    /// window whose start is waiting for a stop, another window on the same
+    /// section whose press is about to be refused, and the assistant's own
+    /// rebuild with no window. Each holds its own claim and ends only that
+    /// claim, so the one that ends first never takes the record away from
+    /// one still building. A section is being built while ANY claim on it
+    /// is held. This is the shape the Windows app has had from the start
+    /// (`CourseActivity.BeginPreviewBuild` there returns one token per start).
+    struct PreviewBuildClaim: Equatable {
+        let record: PreviewBuildRecord
+        let owner: UUID
+    }
+
     /// A course whose folder is being ZIPPED — a backup, or the archive made
     /// before a restore or a removal (#351). Recorded because the zip runs
     /// off the main actor now: the window stays live for the minute it can
@@ -90,7 +105,9 @@ enum CourseActivity {
     @Observable
     final class Store {
         var activePublishes: [PublishRecord] = []
-        var activePreviewBuilds: [PreviewBuildRecord] = []
+        /// Every claim on a preview-build record, one per start that holds
+        /// one (#812). Read as `activePreviewBuilds`, the distinct records.
+        var previewBuildClaims: [PreviewBuildClaim] = []
         var activeCopies: [CopyRecord] = []
         var activePlanWork: [PlanWorkRecord] = []
     }
@@ -113,8 +130,17 @@ enum CourseActivity {
     /// `courseIsBusy` and `coursePublishIsRunning` deliberately do not look
     /// here: a preview already counts for those through its lease, and a
     /// menu item greyed out "until preview completed" is about the lease.
+    ///
+    /// One record per section however many claims it has (#812): one section
+    /// being built is one fact to a teacher who asks to quit.
     static var activePreviewBuilds: [PreviewBuildRecord] {
-        return store.activePreviewBuilds
+        var records: [PreviewBuildRecord] = []
+        for claim in store.previewBuildClaims {
+            if !records.contains(claim.record) {
+                records.append(claim.record)
+            }
+        }
+        return records
     }
 
     /// The courses being zipped right now, across all windows (#351).
@@ -218,51 +244,81 @@ enum CourseActivity {
         WorkLeaseRegistry.reconcile()
     }
 
-    /// Records that a preview of one section has started building.
+    /// Records that a preview of one section has started building, and
+    /// returns this start's own claim on the record (#812): end it with
+    /// `endPreviewBuild(_:)`, which leaves every other claim alone.
     ///
-    /// Recording the same section twice keeps ONE record. A section has at
-    /// most one preview per folder (its lease sees to that), and the one
-    /// other thing that builds it — the assistant's rebuild with no window —
-    /// is the same fact to a teacher who asks to quit: that section's preview
-    /// is being built.
-    static func beginPreviewBuild(folderPath: String, courseCode: String, sectionNumber: Int) {
-        let record: PreviewBuildRecord = PreviewBuildRecord(
-            folderPath: folderPath,
-            courseCode: courseCode,
-            sectionNumber: sectionNumber
+    /// Every start that can be refused, or can outlive another start of the
+    /// same section, takes a claim: a section window's wait
+    /// (`PreviewBuildWait`) and the assistant's rebuild with no window
+    /// (`AssistSiteWork.rebuildPreview`).
+    static func beginPreviewBuildClaim(folderPath: String, courseCode: String, sectionNumber: Int) -> PreviewBuildClaim {
+        let claim: PreviewBuildClaim = PreviewBuildClaim(
+            record: PreviewBuildRecord(
+                folderPath: folderPath,
+                courseCode: courseCode,
+                sectionNumber: sectionNumber
+            ),
+            owner: UUID()
         )
-        for existing in activePreviewBuilds {
-            if existing == record {
-                return
+        store.previewBuildClaims.append(claim)
+        WorkLeaseRegistry.reconcile()
+        return claim
+    }
+
+    /// Ends one start's claim, however that start ended. Safe to call twice,
+    /// and when the claim has already gone: ending a claim that is not held
+    /// changes nothing.
+    static func endPreviewBuild(_ claim: PreviewBuildClaim) {
+        var remaining: [PreviewBuildClaim] = []
+        var found: Bool = false
+        for existing in store.previewBuildClaims {
+            if existing == claim {
+                found = true
+            } else {
+                remaining.append(existing)
             }
         }
-        store.activePreviewBuilds.append(record)
+        if !found {
+            return
+        }
+        store.previewBuildClaims = remaining
         WorkLeaseRegistry.reconcile()
     }
 
-    /// Records that a section's preview is no longer being built, however it
-    /// ended — and is safe to call when nothing was recorded, or twice.
+    /// Records that a preview of one section has started building, with a
+    /// claim nobody keeps.
     ///
-    /// **Idempotent on purpose, unlike `endPublish`.** It is called from more
-    /// than one ending of the same build (the view's own change of state, its
-    /// disappearance, and the lease being handed back), because SwiftUI does
-    /// not reliably deliver a change to a view that is being torn down — and a
-    /// record that outlives its build makes EVERY later ⌘Q ask about a
-    /// preview that is not being built. Removing every match is what makes a
-    /// second call harmless.
+    /// Recording the same section twice keeps ONE record. For tests and for
+    /// a caller that ends the section's build as a whole; product code that
+    /// can be refused, or outlive another start, uses
+    /// `beginPreviewBuildClaim` instead (#812).
+    static func beginPreviewBuild(folderPath: String, courseCode: String, sectionNumber: Int) {
+        _ = beginPreviewBuildClaim(folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber)
+    }
+
+    /// Records that a section's preview is no longer being built by ANYONE:
+    /// every claim on it is ended. Safe to call when nothing was recorded,
+    /// or twice.
+    ///
+    /// **Not for a start ending.** This used to be the only way to end a
+    /// record, and a start that was refused (a second press, or a press in
+    /// another window) ended the record of the start that was still
+    /// building, so ⌘Q quit through that build without asking (#812). A
+    /// start ends its own claim with `endPreviewBuild(_:)`.
     static func endPreviewBuild(folderPath: String, courseCode: String, sectionNumber: Int) {
         let finished: PreviewBuildRecord = PreviewBuildRecord(
             folderPath: folderPath,
             courseCode: courseCode,
             sectionNumber: sectionNumber
         )
-        var remaining: [PreviewBuildRecord] = []
-        for existing in activePreviewBuilds {
-            if existing != finished {
+        var remaining: [PreviewBuildClaim] = []
+        for existing in store.previewBuildClaims {
+            if existing.record != finished {
                 remaining.append(existing)
             }
         }
-        store.activePreviewBuilds = remaining
+        store.previewBuildClaims = remaining
         WorkLeaseRegistry.reconcile()
     }
 
@@ -511,7 +567,7 @@ enum CourseActivity {
     /// Starts from nothing — for tests.
     static func reset() {
         store.activePublishes = []
-        store.activePreviewBuilds = []
+        store.previewBuildClaims = []
         store.activeCopies = []
         store.activePlanWork = []
         WorkLeaseRegistry.reconcile()

@@ -1785,8 +1785,8 @@ bring; such a build shows its rows on the next build instead.
 
 Until #128 a course had ONE coverage map, built from ONE folder, and its
 expectation pages had to be named like `A1.1`. A course keeping both an
-`Ontario Curriculum` and a `College Board Curriculum` folder (every LCS course
-has both) got a map from Ontario only, while Course Settings and "Folders
+`Ontario Curriculum` and a `College Board Curriculum` folder (every course made with the
+terminology switch the wizard offered until #891 has both) got a map from Ontario only, while Course Settings and "Folders
 Plantoir uses" named College Board — and College Board's pages, named `1.A`,
 were never expectations to the build at all (#90, measured on this Mac
 2026-09-06). Now every curriculum folder the course DECLARES that holds an
@@ -1804,7 +1804,7 @@ ONE folder: the alphabetically first top-level folder whose name mentions
 piece), and only if there is none, the first holding any expectation page.
 That preference is the fix for the implementation review's finding 1,
 measured: with the widened code rule and a plain alphabetical scan, a scratch
-LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
+two-curricula course whose `College Board Curriculum` held `1.A` pages had Ontario's map
 silently replaced by College Board's under the same title, because `College`
 sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
 pages, nothing declared) holds it byte for byte to what 92a7099a built. The scan is a FALLBACK, never additive:
@@ -1820,8 +1820,8 @@ folder the scan found — is always `Curriculum Coverage`; every other map is
 (`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
 its address and every link to it, byte for byte (the goldens in
 `test_coverage_maps.py` were captured from origin/dev 92a7099a before any edit:
-a `Curriculum/` course and the LCS default, Ontario with pages and College
-Board empty), and a course that declares a second folder later gets a SECOND
+a `Curriculum/` course and a two-curricula course, Ontario with pages and
+College Board empty), and a course that declares a second folder later gets a SECOND
 page rather than two renamed ones. Only a non-primary title is written quoted
 in the page's frontmatter, because a folder's name can carry a colon.
 
@@ -1911,7 +1911,7 @@ SHARED folders on disk for expectation pages
 (`CurriculumFolderRule.foldersWithPages`): while the map is on only the LAST
 folder with a map is refused, the others ask first
 (`removeCurriculumFolderWithItsMapConfirmation`), and a folder with no pages is
-an ordinary folder — on the LCS default, Ontario (which holds the map) is the
+an ordinary folder — on a two-curricula course, Ontario (which holds the map) is the
 one refused, where the by-name rule used to protect the empty College Board.
 While no folder holds a page they fall back to the single by-name folder, so
 an empty new course is protected exactly as before. Both apps OFFER to declare
@@ -1936,8 +1936,8 @@ the first tick never drops the map the scan found. A rename of any of them mater
 - A per-map switch: one switch covers every map; a teacher who wants one map
   fewer unticks the folder.
 - Bulk-migrating existing configs, and dropping the legacy key's READ.
-- A health finding for "a curriculum folder with no pages": every LCS course
-  not teaching AP would be nagged on day one.
+- A health finding for "a curriculum folder with no pages": every two-curricula
+  course not teaching AP would be nagged on day one.
 - `1.A.1`/`CRD-1.A.1` (essential knowledge): not measured on a real course.
 
 **Known limits.** A code in two folders counts on both maps (matching is by
@@ -2478,7 +2478,42 @@ build costs a minute, a reused stale one publishes last week's site.
    last built by every reader: no time a reader can see is later than the
    build's. A deploy, or Deploy pressed, while the build is still dated ahead
    rebuilds and closes the window. Recorded in `knownLimits` as a decision; a
-   fingerprint that needs no clock is a later piece.
+   fingerprint that needs no clock is a later piece
+   ([#800](https://github.com/russellgordon/plantoir/issues/800)).
+
+   **Re-measured for #800 on 2026-11-14** (stack11, Apple M4 Pro, APFS,
+   macOS 26.6), before anything was built for it: a build dated 2 s ahead,
+   then an edit, a deletion or a rename; asked at once both
+   `toolchain_paths.why_build_before_deploying` and deploy.sh's cut-out reader
+   say `clock`, asked 2.5 s later both reuse, three of three. What the later
+   piece can start from: a file and a folder stat'ed inside the website
+   builder (virtiofs bind mount) and on the host give the same size and the
+   same modification and change times to the nanosecond, but different
+   inodes (748865 inside, 381942590 outside), so a digest of the walk must
+   leave the inode out; BSD `stat -f %Fm` prints seconds and nine fractional
+   digits for every time, whole seconds included (`1767243600.000000000`),
+   which is Python's `st_mtime_ns` with a point in it, so deploy.sh can
+   compute the same text with no host Python. **Why #800 was not built in
+   the v2.0.0 batch with #829 and #904:** it is a writer (the build, inside
+   the builder) and five readers in four languages (toolchain_paths,
+   deploy.sh, the scheduled shell, `BuildFreshness` in Swift and in C#), with
+   a new case shape (real time passing the build's date) in two harnesses,
+   and Windows' #799, unmerged then, was rewriting the same walk
+   (`BuildFreshness.ChangedSince`, `test_build_freshness_reuse.py`). #799 has
+   no fingerprint of its own: it is this rule on Windows. #799 has landed
+   (it is in dev since d75c36543), so #800's digest is to be computed in
+   that same walk, by each reader.
+
+   **What a teacher sees while the limit stands:** the deploy reports
+   success and students get the last build's pages. It needs a clock that was
+   AHEAD while the build was made and later went back (set by hand, or
+   corrected by the network after it ran ahead); a synced, restored or
+   `cp -p` file is still caught, because its change time is local and
+   current. **Parity the digest owes beyond the time format** (the #829/#904
+   implementation review): the walk order and the Unicode form of file names
+   must match between BSD `find` and Python, since APFS keeps a name as it
+   was written. Sized by that review at about 8 to 10 agent-hours on the mac
+   and 4 to 5 on Windows.
 6. **Changed means strictly later.** A save at the very instant the build
    started reads as built, as before.
 
@@ -2840,9 +2875,11 @@ see the reason for.
       leg of a Netlify-primary course; such a course still rebuilds once per
       leg for the address ("Known extra builds").
     - **The address a leg is built for is its OWN CUSTOM DOMAIN when the
-      course records one** (`deploy.leg_custom_domain`: `custom_domains.
-      sections.section<N>[<leg's type>]`, or the older bare string for the
-      primary alone, as `contracts/file-formats.json` says), else the
+      course records one** (`deploy.leg_custom_domain`, which asks
+      `custom_domains.for_destination`, the one Python reader since #904:
+      `custom_domains.sections.section<N>[<leg's type>]`, or the older bare
+      string for the primary alone, as `contracts/file-formats.json` →
+      `customDomainReading` says), else the
       service's host. #799's third review measured why (H1): Cloudflare's
       record only ever names `<project>.pages.dev` (a custom domain lives in
       the project's own `domains`, which nothing here reads), so the first
@@ -2979,10 +3016,14 @@ section picks them up on its next build:
    edit to `quartz.layout.ts`, so nothing rewrites the wrapped line. A stale
    contract makes step 4 print a warning, never stop the build.
 
-The PDF itself needs no copying: Quartz's Assets emitter already copies every
-non-page file in `content/` (Media included, through the build's link to it)
-to the site at Quartz's slug of its path. Measured on a real course: 179 PDFs
-under `Media/`, `&` and spaces included, at exactly that slug.
+The PDF itself needs no copying: the site's file emitter copies a non-page
+file in `content/` (Media included, through the build's link to it) to the
+site at Quartz's slug of its path. Measured on a real course: 179 PDFs under
+`Media/`, `&` and spaces included, at exactly that slug. Since #901 it does so
+only when a page students can see uses the file, and a page's own PDF counts:
+`siteFilesRules.printPdfPath` is the one function the Print button and the
+emitter both read ("A site carries only the files its published pages use"
+below). So the PDF of a hidden answers page (#859) is not on the site.
 
 **Compatibility:** none of this changes a page that does not opt in — verify.sh
 plants one and checks it (06 → F, "Compatibility").
@@ -3330,7 +3371,8 @@ whole design:
    `blockNotPrepared`, the same choice the line makes) and the code the site
    read. The line itself is byte for byte what it was.
 2. **An emitter gathers.** `support/quartz/plugins/emitters/plantoirSiteSaid.ts`
-   (exported and put before `Plugin.Assets()` by `_wire_emitters_index` and
+   (exported and put before the assets line, `Plugin.Assets()` or since
+   #901 `Plugin.PlantoirAssets()`, by `_wire_emitters_index` and
    `_wire_site_said_emitter`, each with its own idempotency check, so a
    section wired for My Progress before #567 gets it) writes no file. On its
    FIRST emit in the process it gathers every page's blocks, pages in
@@ -3819,10 +3861,14 @@ on geogebra.org (`material_id:`, fetched once and kept — item 9).
    `private/a.ggb` left out, `Private/f.ggb` and `U/private/b.ggb`
    published), or with any part of its path starting with a dot (the file
    walk skips those). Said once as `fileNotFound`, never found here and then
-   missing on the site. **Nothing is copied:** Quartz's Assets emitter already publishes
-   every file under `content/` that is not a page, at `slugifyFilePath` of
-   its path, so the manifest records the path in `content/` and the
-   transformer makes the address with that same function. Measured on the
+   missing on the site. **Nothing is copied:** the site's file emitter
+   publishes a file under `content/` that is not a page at `slugifyFilePath`
+   of its path, so the manifest records the path in `content/` and the
+   transformer makes the address with that same function. Since #901 the
+   emitter carries a file only when a published page uses it, so the
+   transformer declares the sketch's file (`file.data.plantoirFiles`); the
+   sketch's address in `data-geogebra` is from the JSON's own `root`, never
+   from the page. Measured on the
    slope-angle sketch: 1,594,544 bytes on the site once, plus its 32,484-byte
    thumbnail — against 3,221,572 had it been copied into `static/` as well.
    **Rejected:** copying it (twice the bytes); taking the source out of
@@ -3938,6 +3984,302 @@ commands on the same page 40 ms; after Quartz's page change 253–259 ms;
 cross-origin isolated the same; 0 refusals, 0 requests off the site. The
 slope-angle sketch (1.6 MB, with its picture): 698–769 ms, 18 requests,
 10,644,945 bytes (4,473,431 compressed).
+
+## Files downloaded when a page first uses them (#674, v2.0.0)
+
+Some of what a class site carries is too large to put in the website
+builder and is not Plantoir's to ship: a PhET simulation (#674, 2.6 to
+4.8 MB each, 127 of them) and, with #679, the sounds a tune names (about
+2 MB each, 128 of them, 239 MB in all). Russell's rulings of 2026-11-13
+(on #674, and on #679 for sounds) are the same for both: downloaded to the
+teacher's computer on the first build whose pages use one, kept, copied
+into the site from there, and a build with no internet that needs one it
+does not have STOPS. `scripts/kept_downloads.py` is that rule, once, for
+every kind; the contract is `contracts/shared-rules.json` → `keptDownloads`
+and `scripts/test_phet.py` runs every case.
+
+1. **Where: `.downloaded/<kind>/` in the working folder's builds folder.**
+   `~/Library/Application Support/Plantoir/builds/<folder id>/.downloaded/`
+   on a Mac, `%LOCALAPPDATA%\Plantoir\builds\<folder id>\.downloaded\`
+   on Windows, beside the courses' built sites. `root_for(course_dir)` finds
+   it from the build's own layout: `PLANTOIR_BUILD_ROOT` when it is set
+   (Windows), else the folder the course's `.merged_output` link points into
+   (the Mac), else, for a course whose `.merged_output` is still a real
+   folder, inside it, so nothing is written among the teacher's notes. One
+   copy serves every course and section of the working folder: a simulation
+   used by SNC1W and SPH3U is downloaded once (measured in
+   `test_one_download_serves_two_pages_and_two_courses`: the second course's
+   build asks nothing). The Mac's website builder reads it at the same
+   absolute path through the builds folder's mount, so nothing new is
+   mounted and the folder is under the home folder, which is all the Colima
+   VM can see.
+   - **Rejected: per course**, as `.geogebra-cache` is. Each course would
+     download the same file, and the clears that keep `.geogebra-cache` name
+     one folder in five launchers and two apps (#789); a folder beside the
+     courses is cleared by none of them.
+   - **Rejected: a folder for the whole computer** under Application
+     Support. The Mac's builder sees only its two mounts, and a mount cannot
+     be added to a builder that exists without making it again.
+   - **Rejected: inside the course or the working folder.** It would sync to
+     the teacher's cloud drive, be backed up, show in Obsidian, and travel
+     with a copied folder.
+   - **Rejected: in the image.** A site uses a handful of 127 simulations
+     or 128 sounds, and PhET's files are not Plantoir's to ship (ruling).
+2. **An entry** is `<kind>/<name>/<version>/`: the files and `kept.json`
+   (each file's SHA-256 and size, where it came from, when, and what the kind
+   keeps, such as a simulation's titles by language). It is written into a
+   hidden folder beside it and **renamed into place**, so two sections built
+   at once (#835b) never read half of one; the second to finish throws its
+   copy away and uses the first's. A name or version is lower-case letters,
+   digits, dots, dashes and underscores, so a download can never name a path
+   outside the folder.
+3. **Pinned, and checked every time.** Every file's SHA-256 and size are
+   checked against `kept.json` every time an entry is used (a 3 MB
+   simulation takes a few milliseconds); an entry that fails is thrown away
+   and counts as not downloaded. A kind whose hashes are known in advance
+   passes them (#679: `contracts/toolchain.json` → `pins`) and a download
+   that does not match is refused before anything is kept. PhET publishes no
+   checksum (measured: no header, no file), so a simulation is pinned by the
+   version PhET's metadata names and the SHA-256 of what was checked and
+   kept; from then on every build uses that copy byte for byte.
+4. **Never refreshed on its own; pruned when unused.** A site must not
+   change under a teacher mid-unit, and a build must not need the internet
+   once it has what its pages use. Every build that uses an entry touches
+   its `kept.json`; one untouched for 90 days (`figures.PRUNE_DAYS`, the
+   rule diagrams and GeoGebra's copies follow) goes. Known limits: a newer
+   PhET version reaches a site only after the kept one is pruned or its
+   folder removed by hand; a course left unbuilt over the summer (close to
+   90 days) needs the internet for its first build in September, and may get
+   a newer version; and the copies belong to ONE working folder on ONE
+   computer, since the builds folder is named by a hash of the working
+   folder's path, so a working folder moved or renamed, copied to a new
+   computer, or opened on the other platform starts with nothing kept, and
+   its next build that shows a simulation needs the internet, or stops.
+   Help says to preview once with the internet after moving a working folder
+   or changing computers. Rejected: keeping the copies inside the working
+   folder so they travel with it (they would sync to the teacher's cloud
+   drive and show in Obsidian; `keptDownloads.where.rejected`).
+5. **Asking** (`Fetcher`). https only, to the kind's own hosts; a redirect
+   anywhere else is refused, so a school's sign-in page is not followed. A
+   body larger than 20 MB, or shorter than its `Content-Length`, is refused
+   (GeoGebra's lesson: `read(n)` returns short, and a cut-off chunked body
+   raises `IncompleteRead`, which is not an `OSError`). Each failure is
+   sorted: `notFound` for 404 or 410, `offline` for everything else; whether
+   what came is what was asked for (`damaged`) is the kind's own check.
+   **`Accept: */*`, never `text/html`**, measured 2026-11-13 against
+   phet.colorado.edu: with `Accept: text/html` (curl's and a browser's
+   user agent alike), and with Python's urllib, which sends no Accept, the
+   simulation came back with a Cloudflare Web Analytics script added before
+   `</body>` (`static.cloudflareinsights.com/beacon.min.js`); with `*/*`
+   none of six requests did. The file is cleaned anyway (PhET's item 4).
+6. **The stop** (`keptDownloads.stop`). A build whose pages students can see
+   use something of a kind that is not kept and cannot be downloaded now
+   stops before Quartz runs, exit 1, with nothing written to the site, so the
+   site built last stays as it was. It prints `❌` and the first line for the
+   reason (it begins with the course code, so both apps' failure
+   explanations lift it), then one indented line per place it is used
+   (`“gas-properties” on “Unit 3/Gas Laws”`), at most ten and then
+   `and N more`, then the marker. The apps turn the lines into one sentence
+   (`app-rules.json` → `failureExplanations`, five cases). A preview stops,
+   a deploy stops, and a scheduled deploy stops at its hour with nobody
+   there (`scheduledPublishStopped`'s line records it), which is why Help
+   says to preview once after adding a simulation, before scheduling.
+
+   **A fault in the pass itself stops too** (`notReady`,
+   `phetFences.stop.passFails`). An answer of a shape nobody foresaw that
+   slips past the checks, a full disk, a folder that cannot be written: when
+   any page students can see shows a simulation, the build stops with
+   `keptDownloads.stop.first.notReady` (which ends with the Help menu's
+   Report a Problem item, `help/menu-paths.json` → `helpReportAProblem`,
+   in the form the app's other sentences already give it), naming each
+   simulation and page it can still find. When the visibility rule itself is
+   what failed, every Markdown file of the course is read as text for its
+   fences; when even that cannot be told, it stops naming nothing (`{what}`
+   is then the kind's several with no number). With no simulation on any
+   such page the build carries on, since nothing is missing. The console
+   line before it gives the plain reason only (a full disk's own words),
+   never a path and never Python's name for the fault: any other fault
+   prints the line with no reason in brackets (the fix review measured
+   `AttributeError` and its kind reaching the console). Found by the implementation review: until then the pass
+   caught every error, printed one console line and let the build make a
+   site with every phet block left as code, exit 0, which is the fault the
+   ruling's stop exists to prevent, reached by another road. GeoGebra's
+   catch-all, which the code had copied, is right for GeoGebra, whose ruling
+   is the opposite one. The answer shape the review measured reaching it
+   (`projects` holding a string) is now `damaged` in `PhetSite.metadata`
+   itself (`phetFences.stop` case "PhET answers in a shape nobody
+   foresaw"). Rejected: a folder problem in place of the stop (the site
+   would still build without the simulation), and reusing `damaged` (its
+   sentence tells a teacher with a full disk to reconnect).
+7. **The marker** `PLANTOIR_DOWNLOADED:` (`keptDownloads.marker`), one line
+   per kind per build, only when something was downloaded or the build
+   stopped: counts, bytes, seconds and a reason, never a page or a file of
+   the teacher's. Both apps read it into the trail as `files for the site
+   downloaded` and `files for the site could not be downloaded`
+   (`KeptDownloadsReport` on the Mac). It is one of
+   `machineLineLength.bounded`.
+8. **What #679 calls, unchanged** (`keptDownloads.forTheMusicPiece`): a
+   kind `sounds` in `keptDownloads.kinds`;
+   `kept_downloads.Fetcher(<its hosts>)` to download;
+   `kept_downloads.Store(kept_downloads.root_for(course_dir), "sounds")`,
+   `.put(name, version, files, expected=<the pinned SHA-256s>)` and
+   `.get(name, version, expected=...)`; `.prune(now)` once its pass is
+   done, as `phet.prepare` does; and when a sound is missing and cannot be
+   downloaded, `kept_downloads.stop_lines("sounds", ...)` then
+   `kept_downloads.marker_line(...)`, printed before `sys.exit(1)` as
+   `build_site._stop_for_phet` does. One more table gains the kind: each
+   app's words for a kind (`KeptDownloadsReport.kindWords` on the Mac, its
+   counterpart on Windows), because
+   `KeptDownloadsReportTests.testTheWordsAreTheContracts` holds that table's
+   keys to `keptDownloads.kinds`. Not the folder, not the apps' sweep
+   exception, not the trail events and not the failure explanation change.
+9. **The apps' sweep keeps it.** `BuildOutputLocation.discardBuildsForMissingCourses`
+   removes every entry of a working folder's builds folder that is not a
+   course or `working-folder.txt`; since #674 it keeps `.downloaded` too
+   (`buildOutputLocation.keptDownloadsSurviveTheSweep`, two cases), or the
+   next build would need the internet again, or stop. Windows owes the same
+   in `BuildOutputLocation.cs` (its `windows` issue). The sweeps that remove
+   a WHOLE builds folder (a working folder that is gone, #722; a second
+   spelling's copy, #189) take it with them, which is right.
+
+## PhET simulations: what the build does (#674, v2.0.0)
+
+A teacher writes a ` ```phet ` fence naming a simulation (`sim:
+gas-properties`, or its address on phet.colorado.edu) and students get a
+card with the simulation's picture, its title, the teacher's description
+(`alt:`) and a button; a tap opens it in place from the class site's own
+copy (06 → S). The split is GeoGebra's: **Python prepares and Quartz
+places.** `scripts/phet.py` does everything that can fail; the contract is
+`contracts/shared-rules.json` → `phetFences`.
+
+1. **When.** ALWAYS section, straight after GeoGebra's pass and BEFORE the
+   folder checks (`build_site._prepare_phet`). It is the one pass that can
+   stop a build (item 6), and stops before anything is said or wired.
+2. **Which pages.** One scan for the word `phet` anywhere in the page's
+   text, which also finds `phet.colorado.edu` for the pasted-frame note
+   (item 8); `simulations_on_page` then reads each kept page exactly. The
+   gate's own visibility rule, as figures and GeoGebra. Rejected: a scan per
+   fence opener (` ```phet `, `~~~phet`), as GeoGebra's. CommonMark lets
+   spaces stand between a fence and its language, the site reads ` ``` phet `
+   as a simulation, and the opener scans skipped that page, so it deployed
+   with no simulation and nothing said so (measured by the fix review,
+   2026-11-13). `phetFences.fences.cases` carries both spaced shapes, and
+   `FenceTests` checks that the scan keeps every case with a simulation.
+   GeoGebra has the same gap; it is a follow-up issue, not this piece.
+3. **Reading a fence** (`read_fence`, `phetFences.settings`, eleven cases).
+   Every line is `key: value`; the keys are `sim`, `alt`, `locale`,
+   `screens`; anything else is left out with a note. `sim` takes the name or
+   an address (`simNames`, eleven cases). `locale` is any of `fr`, `fr-CA`,
+   `fr_CA` and is written as PhET writes it. `screens` is distinct whole
+   numbers from 1. Rejected: `height:` (a simulation scales itself to its
+   box, and the box has the simulation's own shape), and every other of
+   PhET's public settings (the ruling: a page may set only the language and
+   the screens).
+4. **The language** (`phetFences.locale`, seven cases): the fence's, else
+   the course's (`course_config.json` → `locale`), against the simulation's
+   own languages: that language and region, else the language, else English
+   with a note. ONE all-languages file per simulation (the director's
+   direction, 2026-11-13), so a language change never downloads anything.
+   Measured 2026-11-13: 127 HTML simulations, 121 with French.
+5. **Finding the copy, or downloading it** (`phetFences.download`). A kept
+   simulation needs nothing (0 requests, measured in the "kept, and no
+   internet" case). Otherwise: the metadata for that one simulation (8,316
+   bytes, 0.09 to 0.14 s on this Mac's line), which names its project, its
+   current version and its title in each language; the all-languages file AT
+   THAT VERSION (`/sims/html/<sim>/<version>/<sim>_all.html`, an address
+   that stays downloadable: `natural-selection/1.5.4` answered 200 while
+   1.5.17 was current); its 600 px picture (none is not an error). What came
+   is **cleaned** of what PhET's servers add on the way
+   (`download.removedOnTheWay`: the analytics script of item 5 above;
+   measured, gas-properties 1.1.12 came as 3,046,765 bytes with it and
+   3,046,404 without, and with it taken out the two are byte for byte the
+   same, SHA-256 `11440b2a…fc34f24`), then **checked**: a web page, at most
+   20 MB, holding PhET's licence line, the production marker and PhET's own
+   brand (a PhET-iO build carries another; the words `phet-io` appear 11 to
+   65 times in ordinary builds and are not a test), and no script from
+   another site. Then kept (`keptDownloads.entries`). Sizes measured
+   2026-11-13: gas-properties 3,046,404 bytes (986,328 gzipped, the size the
+   button names), projectile-motion 4,759,792 (1,367,293); a picture
+   124,133. Times: 0.14 s for gas-properties on this Mac's line; a school
+   line was not measured.
+6. **The stop** (`phetFences.stop`, eight cases; `keptDownloads.stop`). Not
+   kept, and PhET cannot be reached (no answer, a refusal, a timeout, a
+   server error, a redirect elsewhere, a cut-off body): the build stops,
+   `offline`. Not kept, and what came is not a simulation (a captive portal's
+   sign-in page): stops, `damaged`, nothing kept. **This is the opposite of
+   GeoGebra's choice**, where a geogebra.org sketch that cannot be fetched is
+   a folder problem and the page shows its lines. The reason is Russell's
+   ruling of 2026-11-13: a site that says it built and shows no simulation
+   where the page promises one is the fault this prevents; no stand-in card.
+7. **A wrong name is a folder problem, not a stop**
+   (`phetSimulationsNotReady`, `simulationNotFound`): the internet was
+   there, the next build will not fix a misspelling, and the Problems tab
+   names the page and line, with up to three close names from PhET's whole
+   list (asked only then). The fence stays the code block it was. A wrong
+   name is only PhET's own answer for one, an `error` with no projects
+   (measured for a misspelt name); an empty answer of any other shape (`{}`,
+   `null`, no projects, a project naming no such simulation) is `damaged`
+   and stops, since reading it as a misspelling would deploy the page
+   without its simulation under a Problems row that blames the teacher
+   (the fix review's finding, 2026-11-13). The other
+   problems (`simulationNotNamed`, `simulationNotUnderstood`,
+   `screensNotUnderstood`, `localeNotUnderstood`) are read from the fence
+   alone. None is repairable.
+8. **A pasted PhET frame** (an `<iframe>` from phet.colorado.edu, which the
+   page-authoring guidance taught until #674) keeps working; the build says
+   on a `plantoir: note:` line that it reports to PhET and Google from every
+   student's browser and that a phet block shows the site's own copy.
+   Rejected: rewriting it (the teacher's HTML), or adding `yotta=false` to
+   it (it would still load from PhET).
+9. **What the site gets** (`phetFences.siteCarries`). For each simulation a
+   page shows: `quartz/static/phet/<sim>/index.html` (the kept file byte for
+   byte; `index.html` so every host answers `/static/phet/<sim>/` with no
+   redirect), `screenshot.png`, and `ABOUT.txt` (title, version, PhET's
+   credit line, the licence and terms addresses, where and when it came
+   from). The folder is emptied of simulations no page shows and removed
+   when none is, so a site with no simulation carries none. The manifest,
+   `quartz/plantoir-phet/manifest.json`, is by page then fence key (each
+   entry: the simulation, its title in the page's language, the
+   description, the address query, the folder, the picture and its size, the
+   button's size). **For #901** (a site carries only what pages link to): a
+   simulation is linked by its card, a `figure.pl-phet` whose `data-phet`
+   names `static/phet/<sim>/` and whose `<img>` names the picture; #901 must
+   keep the folder while any built page holds such a card.
+10. **The address** (`phetFences.address`): the frame's query always starts
+    `yotta=false&allowLinks=false`, then `locale=`, then `screens=`. Measured
+    2026-11-13 in headless Chromium 1243 and WebKit 2359 with every request
+    off the test host refused: PhET's defaults ask four other addresses as a
+    simulation opens (Google Tag Manager, two of PhET's `yotta` reports and
+    an `http://` update check); `yotta=false` stops all four. A case that
+    drops either fixed setting fails both suites.
+11. **Isolation.** `static/phet` is one of
+    `codeRunnerBlocks.isolation.engineFolders`, so every file in it carries
+    COEP `require-corp` on a publish whose page is isolated for live input,
+    and in the preview (`plantoirIsolation.mjs`'s `ENGINE_FOLDERS`, which a
+    test compares with the contract). Measured by the planner and again here:
+    with no header the frame never opens on an isolated page, in either
+    engine; with it, it opens.
+12. **Netlify's policy** needs no change: `netlify_badge.py` hashes the
+    inline scripts of every built page, the simulation's included. Measured
+    on a site with gas-properties: 22 hashes and a policy line of 1,247
+    characters, sent with every file of the site. Each simulation adds about
+    21 hashes (none shared between gas-properties and projectile-motion,
+    measured by the planner). Netlify takes a long header whole, measured
+    on 2026-11-14 with a credentialed test site (documentation/07): a site
+    of 20 stand-in simulations carrying 421 script hashes wrote one policy
+    line of 22,766 characters, and Netlify took the deploy and sent that
+    line whole, once, with each of three answers checked. The fallback,
+    kept for a site past where Netlify's limit lies (not measured), is to
+    move each simulation's inline scripts into files beside it.
+13. **Image.** `scripts/` and `support/` change, so every working folder
+    makes its builder again once; no layer and no download are added to the
+    image.
+
+Windows inherits all of it (the Python runs in its runtime's Python, which
+already fetches geogebra.org sketches). It owes the sweep exception, the
+trail lines from the marker, the failure explanation cases, the Problems
+tab's label, and one real first download measured on the PC (its `windows`
+issue).
 
 ## Self-check quizzes: what the build does (#563, v1.8.0)
 
@@ -4667,6 +5009,526 @@ the measurements and what was rejected are in
 [`09-mac-app.md`](09-mac-app.md) → "A preview that never appears"; the numbers
 and sentences are in `contracts/app-rules.json` →
 `previewPorts.whenThePreviewNeverAppears`.
+
+## A site carries only the files its published pages use (#901)
+
+Russell's ruling, 2026-11-13: "We should only copy files into the built site
+that are linked from published pages." Until then Quartz's own Assets emitter
+copied EVERY file in `content/` that is not a page: every picture, PDF and
+video in Media, and every non-page file in the shared and per-section
+folders, went to every section's website, whether a published page used it
+or not. An answer key beside a hidden page, last year's test and a draft
+handout were all on the live site at a guessable address. The contract is
+`contracts/shared-rules.json` → `siteFiles`; this section is the why.
+
+### Measured
+
+On the 26 built sites on the owner's Mac (2026-11-14, `scripts/site_files.py`'s
+reader, counts only; a course file approximated as any file in `public/`
+that is not a page, not under `static/`, and not one of Quartz's own root
+files): **4,321 course files carried, 1,389 (32%) named by no built page.**
+Of those 1,389, 1,378 are mentioned nowhere in the site's text, so the
+check's mention-anywhere rule could take them out, and 11 are mentioned
+(usually a file name in a page's prose or the search index). The planner's
+reader found 1,387 of 4,306; the difference is GeoGebra's sketch address,
+which the planner resolved from the page and is from the site's root (plan
+review 901-2: all 12 sketch files on those sites are used). On the largest
+site, deleting one referenced file from a copy made the check report one
+hole, and repairing put it back and left none.
+
+### How a file is chosen: the emitter decides, from what Quartz resolved
+
+`support/quartz/plugins/emitters/plantoirAssets.ts` replaces `Plugin.Assets()`
+in every section's `quartz.config.ts`, in its place
+(`build_site._wire_site_files_emitter`, ALWAYS section, idempotent, marker
+`PLANTOIR-SITE-FILES`). The two emitters wired before the assets line
+(`_wire_progress_emitter`, `_wire_site_said_emitter`) accept either line
+(`_assets_anchor`), so a section swapped before a later emitter existed still
+takes it. The rules are in `siteFilesRules.ts` beside it, with no imports, so
+they run on their own. It walks `content/` with Assets' own glob (`**`, so a
+file with no extension is offered, which `ctx.allFiles`' `**/*.*` leaves
+out: plan review 901-4) and writes each file at Assets' own address
+(`slugifyFilePath`), so a carried file is exactly where it always was.
+
+A published page uses a file when:
+
+- **its tree names it in a place that holds an address.** The tree is the
+  one Quartz built, after `CrawlLinks`, so a wikilink resolves the way Quartz
+  resolved it (shortest path, two files with one name included) and nothing
+  is reimplemented. Raw HTML is in the tree too (`ofm.ts` runs `rehype-raw`
+  first) and keeps the teacher's own address, so more than the four
+  attributes Quartz rewrites are read: `<source src>`, `<track src>`,
+  `poster`, `srcset`, `<object data>`, `<embed src>`, SVG's `href`,
+  `style="…url(…)"` and a `<style>` element's `url(…)` (plan review 901-5).
+  Which attributes, on which elements, and how each is read is ONE list,
+  `siteFiles.addresses`, followed by both readers (below, "Only where an
+  address is held"). On the 27 sites none of the raw-HTML group names a
+  course file today; the cases protect the future.
+- **Plantoir draws it outside the tree.** The Print button's PDF
+  (`printPdfPath`, the one function `PlantoirMetaLine.tsx` and the emitter
+  both use), a GeoGebra sketch (the transformer declares the file on
+  `file.data.plantoirFiles`, the declare rule a later feature follows), and
+  the footer (`quartz/plantoir_site_files.json`, written by the build on every
+  build, lists the footer's addresses; the emitter resolves them from every
+  page).
+- **it is always carried:** the root `favicon.ico` the build writes into
+  `content/`.
+
+A file reached only through a hidden page is not carried: Quartz renders a
+hidden page embedded in a published one as nothing. A file a CARRIED file
+loads is carried too: a teacher's own HTML page in a frame keeps its script,
+its stylesheet and its pictures, and a stylesheet keeps its pictures and its
+imports (below, "A file a carried file loads"). A JavaScript file is never
+read. A reference matches only letter for letter after decoding; a match by case or Unicode
+form is the teacher's own broken link on both sides (901-6: none of 530
+unmatched references matched that way).
+
+### The second reading, after the build
+
+`scripts/site_files.py` never trusts the emitter. It reads the BUILT site:
+every built page, Head included, at the places `siteFiles.addresses` names,
+again in Python, resolved from the page's address, compared with the course's files (Assets' walk:
+not a page, no dotted names, not under `private`, `templates` or
+`.obsidian`, symlinks followed). It ports `slugifyFilePath`;
+`siteFiles.slugCases` are run through the port here and through Quartz's own
+function in the image, so the two cannot drift.
+
+- **A hole** (a page names a course file the site lacks) is PUT BACK and the
+  teacher is told, one line per file (`words.putBack`, or
+  `words.putBackPreview` on a preview, where nothing reaches the website
+  until the next deploy). The sentence says a page USES the file, which is
+  true because only a place that holds an address counts. Russell's ruling on #901: the build
+  goes on, the teacher is told, and a trail line is written. Rejected:
+  stopping the build; having no second check.
+- **An exposure** (a course file in the site no built page names) is counted
+  as `unreferenced`. It is taken out only when every reading agrees that
+  nothing which stays names it (`check.exposure`, rewritten after 901a's
+  Fable sweep, below): the check's reader does not name it, and no text file
+  that stays on the site mentions its name in any spelling the emitter's
+  reading could decode to it. Where the readings disagree the file STAYS and
+  is counted, which fails the gates. Mention-anywhere alone is too weak for
+  a gate (plan review 901-7: `contentIndex.json` holds every page's text),
+  so the gates fail on `unreferenced`, not on `takenOut`.
+- Every safety count above zero is a FAILURE in `verify.sh` and the tests,
+  and so is `assetsEmitter: "quartz"` (the swap could not be made, so Quartz's
+  own emitter ran and the check sorted the files after the build: plan
+  review 901-8; since the Fable sweep it takes out by the same rule as with
+  Plantoir's emitter, so a file whose name a page's text mentions stays and
+  is deployed: "What the round 4 review found", below). In the field they
+  keep a page whole.
+
+**Where it runs, and why there.** On a build for deploying,
+`_check_mirror_and_mark` runs the check on the container's `public/` after
+Quartz returns, BEFORE the mirror to the host and before
+`_mark_build_finished`; a check that raises prints a `plantoir: error:` line
+and leaves the build unmarked, so the next deploy builds again (plan review
+901-3). A preview cannot be fixed up mid-serve (901-1): Quartz runs its
+emitters at once, and the root `index.html` is written while files are still
+being copied, so a check at its first change would read late files as holes.
+So the section's `quartz/build.ts` writes `.plantoir-emit-done` beside
+`public/` once every emitter of the first build has finished
+(`patches/build.ts`, and `patch_quartz_build_done_marker` for a section
+copied before it), the build removes it before Quartz starts, and the
+preview's watcher mirrors and checks NOTHING until it appears. The check then
+runs once on the `public/` the server serves (Quartz's server reads from
+disk, so a put-back file is served) and the mirror follows. A `build.ts` that
+cannot be given the line skips the preview's check and says so once.
+
+### What a teacher reads, and the trail
+
+`siteFiles.words`, printed in the console: the first build of a section that
+leaves anything off says what changed and why, once, in a preview's own words
+on a preview (the live site keeps the files until the next deploy, 901-11);
+a later build says the count only when it changed; a put-back file is said
+on every build it happens. "First" is no `.site-files.json` beside the built
+site (`file-formats.json` → `siteFilesRecord`, counts only). Russell has not
+ruled on how often this is said (the plan's question 2); it is built as
+recommended, every sentence named in `siteFiles.words`.
+
+The build prints one `PLANTOIR_SITE_FILES:` line (counts only) and both apps
+write `site leaves off files no published page uses` from it when it is the
+first, the count changed, a safety count is above zero (`unreferenced`
+included: a file no page names that the check kept because the site's text
+mentions it is exactly what a problem report needs), or Quartz's own emitter
+ran. The line says how many could not be put back and how many no page names
+but were kept because the site's text mentions them (`unreferenced` less
+`takenOut`) only when those counts are not zero (`notZero` in the event's
+`mustRecord` entry; until 901a's fix review it said `unreferenced` itself as
+"found on the website that no page names", which counted the files already
+taken out, so "5 taken out, 5 found on the website" read as if five were
+still there) (`SiteFilesReport` on the mac, from a run's console and a
+scheduled deploy's record, as `KeptDownloadsReport`). A deploy typed in
+Terminal writes no such line, as `PLANTOIR_DOWNLOADED:` writes none: the plan
+had `deploy.sh` write it, which would double every line for a deploy the app
+starts, and is listed under `siteFiles.knownLimits` instead.
+
+### Only where an address is held (901a's implementation review)
+
+The first build of 901a tried EVERY attribute value as an address in both
+readers, and its first word as well (for `srcset`). The review measured two
+faults on real launchers, both from that rule:
+
+- **A false put-back that published an answer key.** A published page whose
+  text began "r901-answerkey-beside.pdf will be posted after the test." had
+  the answer key beside it put back and deployed, and the teacher was told
+  a page used it. Quartz's Head writes a page's opening text into
+  `<meta name="description" content>`, `og:description`,
+  `twitter:description` and `og:image:alt`; the check read `content` as an
+  address. The emitter never saw it (Head is not in the tree), so the two
+  readers disagreed and the check "repaired" the emitter's correct answer.
+- **A file carried for its alt text or a link's title.** `![key.pdf is the
+  key](pic.png)` and `[a link](https://example.org "key.pdf")` carried
+  `key.pdf`; the Python check made the same over-read, so the two agreed
+  and no gate saw it.
+
+The fix is one list in the contract, `siteFiles.addresses`: each attribute
+that holds an address, the elements it holds one on (a `<div src>` loads
+nothing), and how it is read (`address`, `srcset`, `css`, `geogebraSketch`,
+`jsonUrl`, `fromSiteRoot`); the `<meta>` names whose content is defined to be
+an address (`og:image`, `twitter:image` and the like); and `neverAddresses`.
+The data-* attributes in it are the ones the site's own scripts read as
+addresses (a grep of `components/scripts` for `dataset` reads):
+`data-geogebra`, `data-phet` and `data-runner-wasm`. The emitter is handed
+the list in `quartz/plantoir_site_files.json`, so it is written once; without
+the side file the emitter reads no attribute and the check puts back every
+used file, which the gates fail on.
+
+Two readers written one from the other share their mistakes, so the tests
+read a third way. `siteFiles.addressFixture` is a small built site with 41
+files its pages use (20 of them added by the fix review's round, below) and
+16 they only mention (alt, title, aria-label, a description, `og:image:alt`,
+a `<div src>`, a data attribute nobody reads, text, a comment, code, a
+script, a `<meta>` whose property is not an address, a carried page's alt
+text and text, a file only a script loads, a file beside a carried page).
+`scripts/test_site_files.py` derives its needed set with `site_files`'
+reader, and again with a reader of its own (an element table written from
+the HTML and SVG standards over a small DOM it builds, its own CSS
+tokenizer, its own refresh reading and its own depth-first walk of the
+carried files), and both must equal `NEEDED_BY_HAND`, the needed addresses
+written out in the test itself, which the fixture's `needed` must equal as
+well. The fix review found the first version of this third reading agreed
+with the other two by construction: its element table had the contract's
+elements and attributes and the same `url()`-only CSS rule, so a form all
+three missed passed. The expected set is now typed by hand, never derived
+from the contract's list. The image's check parses the same pages
+with Quartz's own HTML parser and runs `addressesThePagesUse` on them, and
+pins every attribute's `property` against Quartz's `property-information`.
+The image's check also writes the description meta tags into each case's
+built page from the page's text, as Head does, so a case like the review's
+can fail there.
+
+Measured on the tip's files (copies under the run's scratch folder,
+`901a/round2/old/`): with the tip's `siteFilesRules.ts` the Node check
+failed 13 rows (the alt-text, title and raw-HTML cases at both emits, the
+check counting each as unreferenced, and the fixture); with the tip's
+`site_files.py` the Python test failed 18 (every description and
+alt/title/aria/div/data case put back, the fixture, the PhET and
+program cases, the gate test). Rejected: keeping the every-attribute reader
+and adding a list of attributes to skip (a deny list misses the next
+text-bearing attribute; the review's two faults were both of that kind);
+stripping `<head>` before the check reads a page (the sharing picture and
+the favicon link are in it, and Head could gain an address-bearing tag);
+writing the list twice, once in each language, with a test pinning them (a
+second copy is a second answer).
+
+`<iframe srcdoc>` (a page inside an attribute), a script's own `fetch`, and a
+sharing picture written as an absolute address on the section's domain are
+read by neither reader (`siteFiles.knownLimits`).
+
+### A file a carried file loads, and the forms the readers missed (901a's fix review)
+
+The fix review measured, through the real launchers, that both readers read
+only built pages, so a course file's own addresses were never followed. A
+page with `<iframe src="../../Media/r901-frame.html">` had the frame carried
+and served, and the `r901-frame.js` it loads answered 404, with its picture
+off as well; a carried stylesheet's `url(p-css-inner.png)` was off too.
+Under Quartz's own Assets all of them were on the site, `putBack` stayed 0,
+and nothing was said. The likely shape in the field is a teacher's HTML
+export in Media shown in a frame. The director ruled that a file loaded by a
+carried file is carried, because a file wrongly left out breaks a student's
+page silently, which is the worse direction.
+
+`siteFiles.followed`: a carried file whose content path ends in `.html`,
+`.htm`, `.svg` or `.css` is read from `content/`, HTML and SVG at the same
+places as a built page (by the same reader: Quartz's own HTML parser in the
+emitter, `hast-util-from-html`, which `plantoirFigures.ts` already uses; the
+check's own parser in Python), CSS by the CSS reading. Each address is
+resolved from the carried file's OWN address, which for a course `.html`
+file is its name without `.html` in the same folder, so `frame.js` beside it
+resolves beside it. Only an address that names a course file is followed: one
+on another site, an anchor, or one that names no course file is never read.
+The walk is breadth first from every file the pages use, with a visited set,
+in both readers (`siteFilesRules.followCarriedFiles`,
+`site_files.follow_carried_files`). The limits this round shipped with
+(depth 16, 10,000 files, and every course file carried past either) were
+replaced after the Fable sweep: see "What the Fable sweep found" below.
+
+JavaScript is not read: a file only a script loads (a p5.js sketch's
+`loadImage('cat.png')`) is left off, and `siteFiles.knownLimits` says how a
+teacher meets it and how to name the file so it is carried (a Help line
+says so too). Reading a script for strings would carry every name it
+mentions, an answer key included, which is the exposure #901 exists to stop.
+
+Rejected: carrying a carried HTML file's whole folder (the review's option
+b: it carries a teacher's whole export folder, drafts and answer keys beside
+it, and still misses a picture in another folder); only a `knownLimits` line
+(option c: the page breaks with nothing said); following in the check alone,
+which would put the files back on every build and fail the gates for a
+correct page.
+
+The same review found four forms all three readings missed, each measured
+off through a real build: `<style>@import "x.css"</style>` (the string form),
+`image-set("x.png" 1x)`, SVG's `<feImage href>`, and `<meta
+http-equiv="refresh" content="N; url=x.pdf">`. Both readers now read every
+string after `@import` and every string directly inside an `image-set(` or
+`-webkit-image-set(` (a `url(...)` inside it was already read; a
+`type("image/avif")` is one level deeper and is not an address), list
+`feimage` and `script` (SVG's own script) for `href` and `xlink:href`, and
+read a refresh's address (`addresses.metaHttpEquiv`, `addresses.reads.refresh`).
+A `<meta>` with both a `property` and a `name` is read by its `property` in
+both readers (`addresses.metaRule`): the check had taken whichever came first
+in the source.
+
+`<form action="x.html">` names nothing (the review's M5): the site serves a
+course `.html` file at its name without `.html`, and only a page's links,
+pictures and frames are rewritten to that name. It was broken before #901,
+and the same is true of a `.html` address inside a carried HTML file; both
+are in `knownLimits`.
+
+Measured on the tip's files (copies under the run's scratch folder,
+`901a/round3/old/`): with the tip's `siteFilesRules.ts`, `plantoirAssets.ts`
+and `site_files.py`, the Node check (run against a scratch copy of Quartz's
+sources with a darwin esbuild 0.19.12, not the image's 0.25.1; the image row
+in `verify.sh` is the gate) failed 13 rows: the four new courses at both
+emits and in the check, and the fixture. With the tip's `site_files.py` the
+Python test failed 14 (four `checkCases`, the fixture twice, the six
+following tests, the missing side file's line, and the deploy's build, which
+now hands the check whether the side file was written).
+
+### What the Fable sweep found, and what changed (901a's fourth round)
+
+The Fable sweep of the third round measured two faults, both in that round's
+own additions.
+
+**The check took out a picture a student's page needed.** A published page
+framed `Media/frame.html`, which held `<img src="pics\cat.png">`. The emitter
+carried `Media/pics/cat.png` (a browser, and the emitter's WHATWG `URL`, read
+a backslash as a slash). The check's `urljoin` did not, so it named nothing,
+and its mention search did not read the carried page (it is in `public/`
+with no ending, and `.htm` and `.svg` were not in its list), so it took the
+picture out: `takenOut 1`, nothing said to the teacher. The argument that
+"taking out cannot make a hole" had stopped holding the moment the emitter
+began reading files the mention search did not.
+
+Two changes, each with contract cases:
+
+- **One reading of an address, written once** (`siteFiles.resolve`, its
+  `steps` and `resolveCases`, 37 cases, 24 of them new). Both readers drop
+  the controls and spaces at the edges, drop tabs and line breaks inside,
+  read a backslash as a slash, treat `%2e` spellings of `.` and `..` as dot
+  segments, drop the query and fragment, decode percent escapes as UTF-8
+  (`decodeURIComponent` used to throw on `100%.png`, so the emitter read
+  nothing there), read a run of slashes as one (Python's `urljoin` already
+  merged them and the browser's `URL` did not, so `pics//cat.png` was a put
+  back on every build), and compare letter for letter (`exactMatch`, kept:
+  case and Unicode form stay as written). Whitespace is named character by
+  character in both, because Python's `strip()` and JavaScript's `trim()`
+  disagree on U+001C to U+001F, U+0085 and U+FEFF. Measured over the 24 new
+  cases on Python 3.11.13 and 3.14.4 against the TypeScript under Node 22.6:
+  0 differences; the tip's Python read 9 of them differently.
+- **The mention search reads what stays** (`check.exposure`). Its text is
+  every file the site made, every course file the check names (by the
+  content path's ending, so a course `.html` file in `public/` without its
+  ending is read), and in turn every mentioned course file that is text
+  itself. The name is looked for as written and as the emitter's reading
+  would decode it (character references, JSON `\u` escapes, dropped tabs and
+  line breaks, percent escapes), with case and Unicode form folded, so a
+  spelling difference keeps a file. A file is taken out only when the reader
+  and the search agree nothing that stays names it; where they disagree it
+  stays and is counted in `unreferenced`, which fails the gates. The rule
+  that took every unreferenced file out unread when Quartz's own emitter ran
+  is retired with it, for the same reason.
+
+The proof is a generated set (`siteFiles.disagreeingShapes`): 28 ways of
+writing one picture's address (backslashes, `%2e%2e`, `./`, doubled slashes,
+upper- and lower-case escapes, the other Unicode form, another case, a query,
+an anchor, a tab, a line break, character references, `%2F`) in 13
+containers (a framed page's picture, link, `srcset`, style attribute, style
+element, SVG image, object, poster and refresh, an attribute neither reader
+reads, a script's text, a linked stylesheet, an SVG shown in an object): 364
+runs. Measured with the emitter's rules under Node and Quartz's own parser,
+then the check over what the emitter carried:
+
+| | holes | unreferenced | put back |
+|---|---:|---:|---:|
+| the tip's emitter and check | 70 | 77 | 11 |
+| this round's emitter, the tip's check | 70 | 77 | 0 |
+| this round's emitter and check (3.11 and 3.14) | 0 | 0 | 0 |
+
+The emitter carried the picture in 278 of the 364. `test_site_files.py`
+puts the picture on the site in every run as if it had been carried, and the
+check must never take it out while it takes out a decoy no file names; with
+the tip's `site_files.py` it failed 172 subtests. The image runs the
+emitter's own rules over the same set and fails on any count above zero
+(147 failures with the tip's check). The sweep's reproduction is a
+`checkCase`, with four more for the mention search.
+
+**A depth limit an ordinary course reaches, and a limit that published
+everything.** Seventeen `.htm` slides, each linking the next, passed the old
+depth of 16; the emitter then carried every course file, the unlinked answer
+key included, the check raised, and `_check_mirror_and_mark` still mirrored
+the site, which deployed with exit 0, no marker and no trail line, on every
+later deploy too. The depth limit is gone from both readers (the visited set
+ends the walk, and the walk reads no more files than the course holds); a
+chain of 40 is followed to its end in both. The count limit
+(`followed.limits.files`, 50,000) is the emitter's only: past it the emitter
+writes `followed.stopFile` beside `public/` and throws, Quartz exits
+non-zero, and `build_site._stop_if_the_follow_limit_was_reached` prints
+`words.followLimitStopped` (or its preview form), the marker's stopped line
+(`marker.stoppedRule`, which the apps write as `lineWhenStopped`) and exits
+1, so nothing is mirrored, marked or deployed. The check has no limit of its
+own: it runs only on a build the emitter finished.
+
+The figure: the 26 built sites measured on 2026-11-14 carried 4,321 course
+files together, so the largest carried fewer, and the HTML, SVG and CSS files
+this limit counts fewer still; 50,000 is more than eleven times that total.
+The largest site's own count was not recorded and this round could not
+re-read the sites, so re-measuring it (counts only) is listed as a deferred
+check. Parsing 50,000 pages of 3.7 KB with `hast-util-from-html` is about 7
+seconds (0.147 ms a page over 3,000 pages on the owner's Mac at a load
+average of 5), so the limit costs nothing in time.
+
+Rejected: carrying every file past the limit (it publishes every answer key,
+quietly); a depth limit; a count limit in the check as well (it could only
+stop a build the emitter had already read, and in a preview it would have to
+stop a server another process runs); folding case and Unicode form when
+matching (`exactMatch` was measured at 0 of 530 unmatched references, and a
+preview on a Mac now shows the same missing picture the host would).
+
+Parser differences that remain, measured with an `<img>` inside each element
+of a carried page on Pythons 3.11.13, 3.12.11, 3.13.7 and 3.14.4 against the
+emitter: Python reads an address the emitter does not inside `<template>`,
+`<select>` and a repeated attribute on every version, and inside
+`<textarea>`, `<title>`, `<xmp>`, `<noembed>`, `<plaintext>` and an
+`<iframe>`'s text on 3.11 and 3.12 (a put-back, said, and a failed gate);
+the emitter reads one Python does not in `<image>` outside an SVG, in
+`<noframes>` on 3.14, and in an SVG `<title>` on 3.13 and 3.14 (kept and
+counted). The image runs 3.11 and Windows' runtime 3.14.10, so one course can
+count differently on the two platforms; `knownLimits` says so and a
+follow-up proposes one reading.
+
+### What the round 4 review found, and what changed (901a's fifth round)
+
+The review found nothing wrong and four small things, all fixed here.
+
+**What the fallback costs (I1).** When Plantoir's emitter is not in play (a
+section's `quartz.config.ts` does not hold `Plugin.Assets(),` exactly once,
+so `build_site._wire_site_files_emitter` leaves it alone) Quartz's own
+Assets copies every course file, and the check takes out only what nothing
+on the site mentions (`check.exposure`). So a file a page merely names in
+its text IS deployed. Measured on a real Quartz 4.5.0 build: a page whose
+opening text read "answerkey.pdf and Media/solutions.pdf will be shared
+after the quiz" (Quartz writes that text into `contentIndex.json` and the
+page's description) kept both PDFs on the site through Quartz's Assets,
+`unreferenced` 15 and `takenOut` 4. Through Plantoir's emitter both were
+left off. The fallback's count fails the gates and writes the trail line,
+but a deploy in the field still goes ahead. The previous round's rule took
+all 19 unreferenced files out, those two PDFs among them, but also
+`style.css` and pictures a page loads, so it made holes, and it stays
+retired. The move to Quartz 5 (#512) must keep the swap holding before it
+merges, or this becomes every section's path. `words.emitterNotSwapped`,
+the line the build prints in the fallback, said every unused file was taken
+off; it now says a file a page's text names stays.
+
+**The stop's remedy was wrong (I2).** `words.followLimitStopped` and its
+preview form told the teacher to move a folder of unused web pages out of
+the course. The walk starts only from what published pages use
+(`followed.rule`), so unused pages are never counted and moving them changes
+nothing. Both sentences now say the pages students can see lead to too many
+of the course's own web pages, that hiding the pages that show or link to
+them lets the site build, and to choose Report a Problem. The limit is not
+reachable by any course measured (the 39 ready-made courses hold 9,841 files
+and no HTML, SVG or CSS file among them; the skeletons hold none of 2,389).
+The app now lifts the sentence out of the build's output
+(`FailureExplainer.followLimitStopExplanation`, an `app-rules.json` →
+`failureExplanations` case each for a deploy and a preview), so a teacher
+reads it without Quartz's "Failed to emit from plugin" and the deploy's
+non-zero exit around it (M2).
+
+**One more address both readers must read alike (M3).** `pics//../x.png`
+(and `pics\\..\x.png`, a doubled Windows backslash) is `pics/x.png` to a
+browser and to the emitter's WHATWG `URL`, because `..` removes the segment
+before it even when that segment is empty. Python's `urljoin` read
+`x.png`, so the check put back a file no browser loads and kept the right
+one as unreferenced. `site_files.resolved_from_page` now resolves dot
+segments by the WHATWG path rules itself
+(`_path_resolved_as_a_browser_does`) instead of through `urljoin`. Two
+`resolveCases` pin it (39 in all), and both failed with the previous
+`site_files.py`. Measured against Node 22.6's `URL` over 63,000 generated
+addresses (up to four segments from `a`, empty, `.`, `..`, `%2e`, `%2E%2e`,
+`.%2e`, `x.png`, a space and `%41`, relative and rooted, on three pages): no
+difference except the empty address, which both readers read as no address.
+A NUL in an address remains a parser difference (`knownLimits`).
+
+**A page that is not UTF-8 (M4).** Both readers already read a carried file
+as UTF-8 with U+FFFD for each byte that is not, and never skip it; this is
+now a rule (`siteFiles.readAsUtf8`) and a case (`cases`, a windows-1252 page
+in a frame written with `fileBytes`), run by `test_site_files.py` and, in
+the image, through the emitter's own read. An ASCII address in such a page
+is carried. An accented name in it, and every address in a UTF-16 page, is
+left off by both readers, where a browser could load it; that is a
+`knownLimits` line with a follow-up (read the page's own charset and byte
+order mark as a browser does). Rejected for now: detecting the encoding in
+both readers, because two detectors that disagree would be one more
+difference between them, and a teacher's export in UTF-16 has not been met.
+
+**The inline script line (M1).** `knownLimits` said mention-anywhere keeps a
+file a page's script fetches; that holds only when the script writes the
+name out in full. A name it builds from pieces was taken out in the
+fallback, measured.
+
+### When the side file could not be written
+
+Measured by the fix review (the side file made a directory inside a
+container): the build exits 0, every file a page uses is put back, and the
+site is whole. The emitter reads no attribute without it, so the check puts
+back every used file. It is written on every build (ALWAYS section) from the
+same toolchain as the emitter, so only a failed write leaves it missing; a
+scheduled deploy from an older `.toolchain` runs the older image's Assets
+path, which copies everything. The warning used to say only the footer was
+affected; it now says every file a page uses will be put back
+(`words.sideFileNotWritten`), and after the check the build says ONE line,
+`words.sideFileMissingPutBackSeveral` (`…One` for one file, `…Preview…` in a preview), with the count and
+that the site is complete, instead of a line per file (the review counted 66;
+since the Fable sweep each counted sentence has a form for one file and one
+for several, `words.counted`).
+A file that could not be put back is said on its own line, and then the site
+is not called complete. `verify.sh`'s main-build row fails on
+`sideFileNotWritten`, as on every put-back. It clears at the next build that
+can write the file: every build writes it, and a build after the toolchain
+refreshes runs in a new container with a fresh scaffold.
+
+### Preview and deploy agree
+
+Both run the same emitter in the same Quartz build, and the check runs on
+both, so a preview shows exactly the files a deploy sends (ticked means
+included, #694). Removal reaches every host: the host mirror and a folder
+deploy use `--delete`, and Netlify's and Cloudflare's deploys are full
+manifests. Older deploys on both hosts can still hold a file a newer deploy
+leaves off; deleting them is piece 901c (Russell: both hosts).
+
+### Rejected
+
+The plan's table, kept in `siteFiles.rejected`: choosing the files in Python
+before Quartz (Python would have to resolve wikilinks as Quartz does, and
+taking files out of `content/` changes `allSlugs`); deleting from `public/`
+in Python after the build (a preview serves while it builds); `ignorePatterns`
+listing every unused file; walking only the Markdown tree (drops the Print
+button's PDFs and the sketches); refusing the build on a hole (ruled); a
+setting to keep the old behaviour. Quartz 5's own `publishAssets:
+"referenced"` is deferred to the move (#512); the cases name content paths
+and Quartz's addresses rather than this emitter, so they can judge that
+option, and its lower-case slugs, when the move comes.
 
 ## The “ — Edited” marker: knowing a section has changed since it published
 
@@ -5442,6 +6304,13 @@ does — diagnosis only); keeping it inside `public/` (every deploy route ships
 `public/`).
 
 ## `Media` is mirrored WHOLE, so a picture is uploaded before its page is
+
+**No longer true of the SITE since #901**, and kept for the record: the build
+tree still holds `Media` entire, but the site's file emitter now copies a
+file into `public/` only when a published page uses it ("A site carries only
+the files its published pages use (#901)" above), so a picture that arrives
+in `Media` is NOT on the site until a page that shows it is published. What
+follows describes the behaviour before #901.
 
 Every build copies the course's `Media` folder into the build tree entire —
 not the subset the published pages happen to name. So a picture that arrives

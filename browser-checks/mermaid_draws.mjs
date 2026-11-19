@@ -26,11 +26,11 @@
 //
 //   node browser-checks/mermaid_draws.mjs <chrome> <site folder> <page path>
 
-import { spawn } from "node:child_process"
 import { createServer } from "node:http"
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { extname, join, normalize } from "node:path"
+import { spawnBrowser } from "./lib/own_processes.mjs"
 
 const [chromePath, siteFolder, pagePath] = process.argv.slice(2)
 if (!chromePath || !siteFolder || !pagePath) {
@@ -124,7 +124,7 @@ await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
 const pageUrl = `http://127.0.0.1:${server.address().port}${pagePath.startsWith("/") ? "" : "/"}${pagePath}`
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-mermaid-check-"))
-const chrome = spawn(chromePath, [
+const chrome = spawnBrowser(chromePath, [
   "--headless=new", "--remote-debugging-port=0", `--user-data-dir=${join(work, "profile")}`,
   "--no-first-run", "--no-default-browser-check", "--window-size=1512,900",
   "--use-mock-keychain", "--password-store=basic",

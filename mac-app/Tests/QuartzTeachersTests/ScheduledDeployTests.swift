@@ -35,6 +35,7 @@ final class ScheduledDeployTests: XCTestCase {
         workspaceURL = root.appendingPathComponent("workspace")
         try FileManager.default.createDirectory(at: agentsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
+        removeWhenTestEnds(root)
         try "#!/usr/bin/env bash\nexit 0\n".write(
             to: workspaceURL.appendingPathComponent("deploy.sh"),
             atomically: true,

@@ -19,6 +19,7 @@ and macOS process ids, which Git Bash on a Windows machine would misread
     python3 scripts/test_getting_ready_turn.py
 """
 import json
+import launcher_test_trail  # noqa: E402,F401  every launcher run here keeps its trail in a temp folder (#738)
 import os
 import shutil
 import stat

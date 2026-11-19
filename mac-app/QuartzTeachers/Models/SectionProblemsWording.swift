@@ -88,6 +88,7 @@ nonisolated enum SectionProblemsWording {
         "runnableCodeShownAsPlainCode": "Runnable code",
         "quizzesReadDifferently": "Self-check question",
         "geogebraSketchesNotReady": "GeoGebra sketch",
+        "phetSimulationsNotReady": "Science simulation",
         "filesTooLargeForCloudflare": "File too large",
     ]
 
@@ -108,6 +109,7 @@ nonisolated enum SectionProblemsWording {
         "runnableCodeShownAsPlainCode": "page",
         "quizzesReadDifferently": "page",
         "geogebraSketchesNotReady": "page",
+        "phetSimulationsNotReady": "page",
         "filesTooLargeForCloudflare": "section",
     ]
 

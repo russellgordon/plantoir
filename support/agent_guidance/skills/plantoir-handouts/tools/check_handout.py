@@ -871,8 +871,9 @@ def check_files(source, text, problems):
     stem = source.stem
     parts = [part.lower() for part in source.resolve().parts]
     if "courses" in parts[:-1]:
-        problems.append(("courses-folder", 0, "the source is inside a courses folder: every file there that is not a "
-                                              "page is copied to the class website, so keep it outside courses/"))
+        problems.append(("courses-folder", 0, "the source is inside a courses folder: a file there goes on the class "
+                                              "website as soon as a published page links to it, so keep it outside "
+                                              "courses/"))
     assessment = "\\score" in text or (folder / (stem + " - Solutions.tex")).exists()
     answers_wrappers = []
     for name in wrapper_names(stem):

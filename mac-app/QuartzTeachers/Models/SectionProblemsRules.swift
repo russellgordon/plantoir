@@ -32,6 +32,7 @@ nonisolated enum SectionProblemsRules {
         "runnableCodeShownAsPlainCode",
         "quizzesReadDifferently",
         "geogebraSketchesNotReady",
+        "phetSimulationsNotReady",
     ]
 
     /// `sectionProblems.rowState.notAboutThePage`: reasons that say something

@@ -33,15 +33,26 @@ public class WizardSkeletonToggleTests
         Assert.Equal(Strings(lists["factory"]!["sharedFiles"]), WizardDefaults.SharedFiles);
         Assert.Equal(Strings(lists["factory"]!["perSectionFolders"]), WizardDefaults.PerSectionFolders);
         Assert.Equal(Strings(lists["factory"]!["perSectionFiles"]), WizardDefaults.PerSectionFiles);
-        Assert.Equal(Strings(lists["lcs"]!["sharedFolders"]), WizardDefaults.LcsSharedFolders);
-        Assert.Equal(Strings(lists["lcs"]!["sharedFiles"]), WizardDefaults.LcsSharedFiles);
+        // Since the mac's #891 (cadd8eb11) the contract has no school's list:
+        // the terminology switch is gone, so its lists are the factory's alone.
+        // This app keeps its switch until #920 removes it (#920 item 2), and
+        // nothing in the contract names that list any more, so it is compared
+        // only while the contract still carries one.
+        Assert.Equal(new[] { "factory" }, lists.AsObject().Where(pair => pair.Value is JsonObject).Select(pair => pair.Key).Where(key => key != "lcs").ToArray());
+        if (lists["lcs"] is { } lcs)
+        {
+            Assert.Equal(Strings(lcs["sharedFolders"]), WizardDefaults.LcsSharedFolders);
+            Assert.Equal(Strings(lcs["sharedFiles"]), WizardDefaults.LcsSharedFiles);
+        }
     }
 
     [Fact]
     public void EveryCaseLeavesTheEditorAsTheContractSays()
     {
         var cases = Toggle["cases"]!.AsArray();
-        Assert.True(cases.Count >= 17, $"wizard.skeletonToggle lost cases: {cases.Count} (17 when this was written)");
+        // 17 until the mac's #891 took out the two cases with the switch on;
+        // contracts/README.md's census says 15.
+        Assert.True(cases.Count >= 15, $"wizard.skeletonToggle lost cases: {cases.Count} (15 since #891)");
 
         var failures = cases.SelectMany(c => Run(c!)).ToList();
         Assert.True(failures.Count == 0, string.Join("\n", failures));
@@ -72,7 +83,9 @@ public class WizardSkeletonToggleTests
         var given = c["given"]!;
         string code = given["courseCode"]?.ToString() ?? Toggle["courseCode"]!.ToString();
         string otherCode = Toggle["otherCourseCode"]!.ToString();
-        bool lcs = given["usesLCSTerminology"]!.GetValue<bool>();
+        // ABSENT MEANS OFF: since the mac's #891 no case carries the switch,
+        // because there is none; a case that still does is read as before.
+        bool lcs = given["usesLCSTerminology"]?.GetValue<bool>() ?? false;
         // ABSENT MEANS TRUE: where a new wizard opens.
         bool taking = given["takesExampleContent"]?.GetValue<bool>() ?? true;
         bool toggleOn = true;

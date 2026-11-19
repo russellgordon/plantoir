@@ -270,11 +270,13 @@ nonisolated enum ObsidianFigureAddOns {
     /// a folder whose name starts with a dot (`.obsidian`, `.trash`,
     /// `.merged_output`) and pages iCloud has not downloaded (`isEvicted`, so
     /// the scan never forces a download). A cheap byte test comes first, and
-    /// it stops as soon as every kind is found.
+    /// it stops as soon as every kind is found. Every page's bytes come
+    /// through `readPage`, once, so a test can count the reads (#905).
     static func kindsUsed(
         inCourseAt courseURL: URL,
         among kinds: Set<String>,
-        isEvicted: (URL) -> Bool = ObsidianFigureAddOns.pageIsEvicted
+        isEvicted: (URL) -> Bool = ObsidianFigureAddOns.pageIsEvicted,
+        readPage: (URL) -> Data? = ObsidianFigureAddOns.readPage
     ) -> Set<String> {
         var found: Set<String> = []
         guard let walker = FileManager.default.enumerator(
@@ -298,7 +300,7 @@ nonisolated enum ObsidianFigureAddOns {
             if isEvicted(fileURL) {
                 continue
             }
-            guard let data = try? Data(contentsOf: fileURL) else {
+            guard let data = readPage(fileURL) else {
                 continue
             }
             var stillToFind: Set<String> = []
@@ -319,6 +321,12 @@ nonisolated enum ObsidianFigureAddOns {
             }
         }
         return found
+    }
+
+    /// A page's bytes, or nil when it cannot be read: the scan's one way
+    /// of reading a page.
+    static func readPage(_ fileURL: URL) -> Data? {
+        return try? Data(contentsOf: fileURL)
     }
 
     /// Whether macOS holds only a placeholder for the page (iCloud

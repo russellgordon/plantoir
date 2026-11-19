@@ -34,9 +34,9 @@ Plantoir puts four things together, with hyphens between them:
 | The course's code, in small letters | `mcv4u` |
 | The letter s and the section's number | `s1` |
 | The calendar year at the first deploy | `2026` |
-| Your surname | `gordon` |
+| Your surname | `quillfeather` |
 
-Together they make `mcv4u-s1-2026-gordon`. On Netlify the website's address ends in `netlify.app`. On Cloudflare Pages it ends in `pages.dev`.
+Together they make `mcv4u-s1-2026-quillfeather`. On Netlify the website's address ends in `netlify.app`. On Cloudflare Pages it ends in `pages.dev`.
 
 ## The surname question
 
@@ -53,7 +53,7 @@ At a section's first deploy to Netlify, a sheet titled {{control:websiteAddressS
 
 1. Read the name in the {{control:websiteAddressSheetAddressField}} field. Plantoir has filled it in from the four parts above.
 2. Keep it, or type another. You may put your school's abbreviation in front. The sheet gives the rule:
-   {{say:app-rules#credentialRequests.requests[5].steps[2]}}
+   {{say:app-rules#credentialRequests.requests[5].steps[2] ~ Use only lowercase letters, numbers}}
 3. Press {{control:credentialSheetContinueButton}}.
 
 {{picture:site-address-1}}

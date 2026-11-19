@@ -64,6 +64,7 @@ enum AssistFixture {
         let fileManager: FileManager = FileManager.default
         let root: URL = fileManager.temporaryDirectory
             .appendingPathComponent("assist-tools-\(UUID().uuidString)")
+        TemporaryFolders.removeWhenThisTestEnds(root)
         let courseURL: URL = root.appendingPathComponent("courses").appendingPathComponent("ICS3U")
         try fileManager.createDirectory(
             at: courseURL.appendingPathComponent("section1/All Classes"), withIntermediateDirectories: true
@@ -328,9 +329,10 @@ enum AssistFixture {
     @MainActor
     static func makeSectionNeedingReDating(
         withMarker: Bool = false,
+        surface: AssistToolRunner.Surface = .local,
         for testCase: XCTestCase
     ) throws -> Made {
-        let made: Made = try makeRunner(hasDeployedBefore: withMarker)
+        let made: Made = try makeRunner(hasDeployedBefore: withMarker, surface: surface)
         try keepScheduledPublishingInside(made.root, for: testCase)
 
         let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
