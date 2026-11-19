@@ -204,7 +204,7 @@ final class UndoWriterScanTests: XCTestCase {
         "Models/TodaysClassOnTheFrontPage.swift": (3, "waitsFor: U3"),
         "Models/ToolchainCopyMarker.swift": (3, "notAStep: the toolchain mirror"),
         "Models/ToolchainFingerprints.swift": (7, "notAStep: the toolchain mirror's index"),
-        "Models/Undo/UndoCheck.swift": (15, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place"),
+        "Models/Undo/UndoCheck.swift": (16, "door: the staged swaps of an undo, a redo and recovery, and U2's rename that never replaces, a folder renamed aside and one made beside its place, a folder taken out deleted only after its rename to -gone"),
         "Models/Undo/UndoJournal.swift": (19, "door: the list itself, outside every working folder"),
         "Models/Undo/UndoLock.swift": (1, "door: the list's own lock file"),
         "Models/Undo/UndoOpKinds.swift": (4, "door: a folder a redo of createTree (or an undo of removeTree) makes under its staged name, from the list's content"),
