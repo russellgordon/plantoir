@@ -1983,6 +1983,75 @@ sides, the accept loop, the reads and writes, HttpClient's continuations
 and the timers, so it would change nothing. A dedicated server thread
 instead of `Task.Run` — the client side starves too, so it cures half.
 
+### A red that is a busy PC: the shared Python limit and one refused write (#916)
+
+Two more reds of the same family turned three gate runs red on 2026-11-13/14,
+while several agents ran suites and filtered runs on this PC (Lenovo
+20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200) at once. Both fixes are
+test code only.
+
+**`PythonToolchainTests` stopped healthy files at 180 s.** The limit is there
+to stop a HUNG file with its name, not to judge speed, and three files met
+it doing nothing wrong: `test_starting_content_prompts.py` (116 s and 151 s
+under load), `test_no_stored_credentials.py` (71 s beside one other test
+host, 193 s beside more) and `test_shared_writes_two_at_once.py`. Timed one
+after another under the suite lock on 2026-11-14 with the runtime's Python
+3.14.10, the way the runner starts them, all 119 files took 10 min 41 s and
+every one passed; the seven at 30 s or more:
+
+| File | Alone |
+|---|---|
+| `test_graded_folders_new_course.py` | 78.5 s |
+| `test_starting_content_prompts.py` | 68.5 s |
+| `test_shared_writes_two_at_once.py` | 59.8 s |
+| `test_deploy_sh_destination.py` | 46.1 s |
+| `test_share_plan.py` | 45.1 s |
+| `test_marking_comments.py` | 44.6 s |
+| `test_no_stored_credentials.py` | 33.8 s |
+
+The worst slowdown seen under load is 5.7 times (33.8 s to 193 s), which
+would take the slowest file to about 450 s. **The limit is now 600 s for
+every file** (`PythonToolchainTests.Limit`): above anything load has
+produced, and a hung file still stops the run inside ten minutes. A timeout
+says the file, the limit and how long it ran, and, for a file in
+`KnownSlowFiles` (the table above), that a busy PC is the likely cause; for
+any other file, to suspect a hang first. `AHungFileIsStoppedAtTheLimitAndNamed`
+proves the limit still bites: a file that sleeps 300 s, written into a
+`RunOwnedTempFolders` folder (never into `scripts/`, which both platforms
+run), is stopped at a 15 s limit with exit 124 and that sentence (15 s, not
+2, so a cold interpreter on a loaded PC still prints before it is stopped).
+**Nothing bounds the class's TOTAL time:** there is no `.runsettings`,
+`--blame-hang-timeout` or session timeout under `windows-app/`, so if every
+file hung (an interpreter that wedges at start, say) the run would take
+119 × 600 s, about 20 hours (about 6 at 180 s). The realistic case, one
+hung file, costs ten minutes and names its file; a hang common to every file
+shows in the first file's message. **Rejected:** a per-file
+allowance table, because it is kept in step by hand with a folder the mac
+adds files to, and the third file stopped that night was in no earlier
+measurement, so the table would have missed exactly the file that needed it
+(`KnownSlowFiles` only words the message; every file gets the same limit).
+Splitting the slow files' scans in shared Python, because it changes files
+the mac's `verify.sh` runs, for no gain to a teacher.
+
+**`LastViewedPagesTests.OnlyTheNewestAreKept` read `Actual: "P3"` once.** It
+wrote 503 entries through `LastViewedPages.Remember` and ignored what each
+call returned. The stamps were never the cause: each is injected, a minute
+apart, and the same test with every stamp EQUAL passes (newest-first order is
+kept by `Insert(0)` and a stable sort). What fails it is one refused write:
+`Remember` saves through a temporary file and a rename onto
+`last-viewed-pages.json`, and a rename onto a file something else holds open
+(a scanner reading the file just written is the usual holder) throws, is
+caught, and returns false. One entry fewer means only P1 and P2 are pushed
+out, so P3 survives at the second assertion. Reproduced with a scratch test,
+not committed: holding the file open (`FileShare.Read`) for write 502 gives
+`Assert.Null() Failure … Actual: "P3"` exactly. The test now SEEDS the 500
+kept entries in one write of its own, oldest first (so the order is also
+proved to come from the stamps, not the file), and sends only the three that
+evict through `Remember`, each asserted to have written and retried up to
+five times; 23 s became under a second. The product's behaviour, one
+remembered page silently not saved when the file is held, is a separate
+matter and is not changed here.
+
 ### And when the failure IS real: a red contract test is a handover
 
 Everything above is about telling a genuine failure from a crash or an empty
@@ -2435,7 +2504,8 @@ alone afterwards, they passed in 116 s and 193 s, the second already over
 the limit with one other suite running. One repository scan in the second
 file took 57.9 s over 15,274 files, `help/` is not among its costliest
 files, and the merge grew the repository by 0.6% in bytes, so the merge did
-not cause it (see "A red that is a clock", above). The same method as the
+not cause it (see "A red that is a clock", above). *(Since #916 the limit is
+600 s, with these files' times alone: "A red that is a busy PC", above.)* The same method as the
 two sections above: nothing a teacher sees today differs, and every red is
 held by name against the open `windows` issue that builds it.
 
@@ -14028,6 +14098,344 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## A deployed folder opened in the browser (#889, the mac's #850)
+
+The mac's #850 (`09-mac-app.md` → "A deployed folder opened in the browser
+(#850)" has the design, what a teacher sees and the rulings) comes to Windows
+in two halves, as unit planning did. **889a**, this section, is Core only:
+the resolver, the address, the offer rule, the server and the registry of
+shows, with every contract case over a real socket. Nothing a teacher sees
+changed, and no `NamedGapLedger` entry was removed: the six #889 entries
+(three trail events, `stopShowingDeployedFolder`, `deployedFolderReady`,
+`deployedFolderShown`) close with **889b**, which builds the window, the
+menus, quit, the trail lines and the UI tests on the surface below, after
+884a's Copilot items (the three new `subjectMenus.cases` name
+`sectionReviseWithCopilot`).
+
+### The surface 889b calls (none of it changes for 889b)
+
+All in `Plantoir.Core/Models`:
+
+- **Whether Open in Browser is offered for a section, and why not:**
+  `DeployedFolderOffer.LookUp(course, sectionNumber, workingFolder)` →
+  `Lookup(Facts, Decision, SectionFolder)`. It reads the SAVED
+  `course_config.json`, the disk, this app's own deploy of the section
+  (`CourseActivity.IsPublishingSection`) and any other program's `publish`
+  lease on the course (`WorkLease.IsHeld`). Call it on the events
+  `offeredWhen` names, never on a clock. `Decision.Kind` is `Offered`,
+  `Greyed` (with `ReasonKey` `deployIsRunning`, `folderNotFound` or
+  `notDeployedYet`) or `Absent`; `DeployedFolderOffer.Sentence(reasonKey)`
+  is the sentence to show (`CourseActivity.AvailableOnceDeployCompleted`,
+  named as a constant by this piece, for a deploy under way).
+- **The words:** `DeployedFolderWording` (all sixteen `wording` keys;
+  `Notice(section)` fills the notice).
+- **Start, or open again:** `DeployedFolderShows.Shared.OpenAsync(sectionFolder,
+  course, section, workingFolder, from, openInBrowser)` → `OpenOutcome(Address,
+  Why)`. `sectionFolder` is `Lookup.SectionFolder`; `from` is a
+  `DeployedFolderFrom` (`Result`, `SectionMenu`, `Toolbar`, `Sidebar`);
+  `openInBrowser` is the window's handing of the address to the browser
+  (`ExternalLinks`) and says whether it took it. A null `Address` with a
+  `Why` is a failure to show `couldNotOpen` for; a null `Address` with no
+  `Why` is a Stop pressed while it started (show nothing).
+- **Stop:** `Stop(course, section, workingFolder)` (the notice's Stop and the
+  menu item: every show of the section, and a start still under way);
+  `StopEverything()` from the quit path, synchronous.
+- **What is being shown:** `ShowFor(course, section, workingFolder)` (null, or
+  the `Show` with its `Address`), `Shows`, `Count` (for
+  `QuitConfirmation.UnderWay`'s `deployedFoldersShown`, which never asks),
+  `FolderWentAway(…)` and `DismissFolderWentAway(…)` for the
+  `stoppedFolderGone` line and its Dismiss.
+- **Redraw:** the `Changed` event (a show started or stopped, a folder went
+  away). **The trail:** the `Happened` event carries a
+  `DeployedFolderHappening` (`Opened` with `From`, `AlreadyOpen`,
+  `AddressMoved`; `Stopped` with `Reason`, `Requests`, `Missing`;
+  `CouldNotOpen` with `Why`), each with the course, the section and its
+  `TrailLine`, the contract's sentence, held against the three
+  `activityTrail.mustRecord` templates by `DeployedFolderShowsTests`. 889b
+  adds the three `ActivityTrail.Event` members and writes
+  `ActivityTrail.Note(event, happening.TrailLine, course, section)`. No
+  address or path is in any of them, and this Core writes no trail line
+  itself. Both events are raised on whatever thread caused them (a
+  listener's own thread when a folder goes or a listener ends): marshal to
+  the dispatcher.
+- **The remembered port:** `AppSettings.DeployedFolderPorts` (canonical path
+  → port). 889b calls `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))` once at start-up; until
+  then ports are remembered in the process only. `SettingsDeployedFolderPorts`
+  reads its own copy and writes and saves `App.Settings` only through that
+  action, on the UI thread, as the rest of the app saves it (the
+  implementation review's L3: the first version wrote `AppSettings.Current`,
+  a SECOND copy of the settings loaded from disk, from a pool thread, and its
+  save would have written over `App.Settings`' and been written over in
+  turn). A port that had to move is remembered where it moved to and tried
+  first next time, the usual one (the hash's) after it, as `address.rule`
+  says: the remembered port first, then the block from the hash.
+- **Never throws at its caller's expense:** a subscriber of `Changed` or
+  `Happened` that throws is called on its own and its exception dropped
+  (the implementation review's M1: an unguarded `Changed` on the listener's
+  own thread, when a folder went or a listener ended, ENDED THE PROCESS,
+  0xE0434352; shown again here against the unguarded copy: "Test host process
+  crashed: Unhandled exception").
+  `ASubscriberThatThrowsLeavesTheAppAliveAndTheShowStopped`.
+- **"Opened" goes on the trail only after the browser took the address**
+  (the review's L4): a Stop pressed while it started leaves no line at all,
+  and a browser that refuses a NEW show leaves one line, "could not open …
+  the browser did not open it", with nothing left running
+  (`OpenedIsSaidOnlyAfterTheBrowserTookTheAddress`).
+- **Saved settings that cannot be read** make the item absent, never offered
+  on the window's unsaved copy (the review's L7).
+
+### Who serves it: a TcpListener of the app's own
+
+`DeployedFolderServer` is a `TcpListener` on `IPAddress.Loopback` with the
+app's own small HTTP/1.1 reader, as the mac's `NWListener` is raw TCP (the
+plan's D5, upheld by its review). `ExclusiveAddressUse` is set before it
+starts, so no other program can bind the same address beside it, even asking
+to share (`ItListensOnTheLoopbackAddressAloneAndExclusively`).
+
+**Rejected, measured by the planner on this PC** (2026-11-13, Windows
+PowerShell 5.1's `HttpListener`, which is HTTP.sys as .NET 9's is): an
+`HttpListener` on `http://127.0.0.1:<port>/`, as the issue first suggested.
+Unelevated it starts on `127.0.0.1` and `localhost` (and is refused `+`), but
+HTTP.sys answers some requests ITSELF before the app sees them: `/../x` is
+**403** (the contract allows 400 or 404), a request line of 8,300 bytes and
+headers of 16,500 are **400** (the contract says 414 and 431; its limits are
+machine-wide registry values only an administrator can change), it does not
+check `Host` at all for a `127.0.0.1` prefix (so the exact check is the
+app's anyway), and it gives the app no connection to close when every place
+is taken. Four contract cases could not be met, and the contract would have
+had to loosen for Windows. `netsh int ipv4 show excludedportrange
+protocol=tcp` showed nothing reserved in or near 41000-41399 (5357,
+50000-50059, 50131; the dynamic range from 49152). Also rejected: Kestrel (a
+framework reference of several MB in a self-contained app, and its
+connection cap refuses the newcomer, which `limits` forbids) and a Python
+`http.server` (a second process, and it answers 404 for every page link:
+5,869 of 8,811 links below).
+
+**Which folder** (the plan review's M5): `DeployedFolderOffer.SectionFolder`
+mirrors `deploy.ps1`'s `Resolve-PublishFolder` plus deploy.ps1's own
+`[IO.Path]::Combine($folderAsked.TrimEnd('\','/'), "section{N}")`: the
+setting trimmed (the trim `DeployCommand.Arguments` makes before handing it
+over); a drive and a separator, or a UNC path, made full; a drive-relative
+(`C:out`) or root-relative (`\out`) path refused, so it is "not found"
+rather than a folder resolved against the app's current folder; anything
+else taken from the working folder. `DeployedFolderOfferTests` walks the
+portable `folderPublishTarget.cases`, and also cuts the launcher's own
+function out of `deploy.ps1` and runs it in Windows PowerShell 5.1 beside
+the app's on sixteen settings (`TheAppResolvesTheFolderExactlyAsDeployPs1Does`),
+so a change to either side that the other has not made fails.
+
+**How a request is answered** (`DeployedFolderResolver`) follows the mac's
+rules case for case; the Windows parts:
+
+- **790a's disk layer, reused** (the plan review's M8), not a second one:
+  `ILocalFiles` gained one member, `List(path)`, and every file is opened
+  ONCE through `WindowsLocalFiles.Open` (links followed); that handle's own
+  `GetFinalPathNameByHandle` must be inside the folder's final path
+  (`LocalSiteGuard.IsWithin`), it must be an ordinary disk file, and its
+  bytes are read from the same handle, so a junction swapped between the
+  check and the read changes nothing. `LocalSiteGuard.IsAcceptableSegment`
+  refuses devices (COM0 and LPT0 too), a colon (so no alternate data
+  stream), and a trailing dot or space; the resolver adds a leading dot and
+  `_headers` / `_redirects`.
+- **Every name is matched against its folder's listing**, exactly after NFC:
+  NTFS ignores case and expands 8.3 short names, a strict host does neither,
+  so `/concepts/` does not find `Concepts\`, and the short name of
+  `Long Folder Name` finds nothing (`AnEightDotThreeShortNameFindsNothing`;
+  8.3 names are on for this PC's C:).
+- **The raw target is read**, decoded ONCE and strictly: the request is read
+  as Latin-1 (one char per byte), so a raw UTF-8 name arrives as its bytes,
+  and broken escapes or bytes that are not UTF-8 are refused.
+- **Both link cases run through the seam on this account**, which cannot
+  make a FILE symbolic link (WinError 1314, Developer Mode off):
+  `DiskWithLinks` lays the case's links over the real disk and asks
+  `WindowsLocalFiles` at the place each leads, so the containment check on
+  the opened handle is what refuses them. Over a socket, the folder link is
+  a real junction; only `TheFileLinkCaseOverASocket` skips, by name.
+- **Every folder and file looked at on the way must be inside the folder's
+  real path**, not only the one served (the implementation review's L1): a
+  junction inside the folder that leads out answered 308 to `/junc` when the
+  outside folder held an `index.html`, which told a caller that file exists.
+  It now answers exactly as a missing path does, status and body
+  (`AJunctionLeadingOutAnswersAsAMissingPathDoes`, over a real junction; red
+  with the check taken out, `/junc: 308`).
+
+**Limits.** 64 connections; when every place is taken the connection quiet
+longest is RESET to make room (a reset, not a graceful close, which would
+wait behind bytes a stalled reader never takes); a request line over 8 KiB
+is 414, headers over 16 KiB 431; 10 s to send the headers and 30 s idle
+between requests; each piece of an answer (256 KiB) must be taken within
+30 s or the connection is reset. Sockets are `NoDelay`: an answer is its
+head and then its body, and with Nagle the second send waited for the
+client's delayed acknowledgement of the first (measured below). **Each
+listener and each connection has a thread of its own**, with blocking calls
+whose deadlines are the socket's own `ReceiveTimeout` and `SendTimeout`,
+rather than tasks on the thread pool: with the pool starved (the full suite,
+below), a task-based first version left a plain GET unanswered for 20 s and
+fired the 10 s header deadline late. At most 65 background threads a show.
+**An answer over 1 MiB (a video) is sent through a send buffer of one
+piece** rather than Windows' autotuned one: with autotuning the system took
+so much of a 200 MB answer into its buffers that 64 readers that never read
+were still not blocked at 47 s while another suite ran, so the piece
+deadline never started; with one piece they are reset at 30 s. Not for
+every answer: set on every connection it cost about 130 ms a request (the
+ENG2D crawl below took 38.8 s instead of 4.8 s), so pages keep the
+system's buffer.
+
+**The address.** `DeployedFolderAddress.CanonicalPath` is the folder's
+ON-DISK spelling (`GetFinalPathNameByHandle`, `\\?\` taken off), because the
+hash is of the spelling: `C:\Users\teacher\Sites\ics3u\section1` starts at
+41143 and its lower-case spelling at 41047 (`AWindowsPathHashesByItsSpelling`,
+against the planner's independent FNV-1a). The remembered port first, then
+the block from the hash. **A port another program holds on 127.0.0.1 OR on
+0.0.0.0 is passed over** before binding (`IsHeldByAnotherListener`, from the
+system's listener table): measured on this PC, an exclusive bind to
+`127.0.0.1:41399` SUCCEEDED while another socket held `0.0.0.0:41399`, and
+would then have taken that program's loopback connections. A second copy of
+Plantoir on the same folder finds the first copy's port held and shows the
+folder at the next one, the trail saying the address moved
+(`ASecondCopyOfPlantoirShowsTheSameFolderAtTheNextAddress`). Two sections
+can be shown at once, each at its own address (`QuittingStopsEveryShowAtOnce`).
+
+**A known limit, accepted as on the mac** (Russell, 2026-11-13): every
+account on this PC, in any session (fast user switching, Remote Desktop),
+can reach `127.0.0.1:<port>` while a folder is shown, as it can a preview.
+Shared school PCs make that more likely here than on a teacher's own Mac.
+No other computer can: a connection to this PC's network address is refused
+(`TheNetworkAddressIsRefused`, 192.168.1.81).
+
+**Lifetime.** `Stop` closes the listener and every connection and frees the
+port, and the same folder gets the same address back at once, even when a
+request the server closed first left TIME_WAIT on its side (measured: an
+exclusive rebind succeeds; `StopFreesThePortAndTheSameAddressComesBack`).
+Nothing is written to disk and no lease is taken, so a Plantoir that is
+force-killed leaves nothing to clean up: Windows closes its sockets with it.
+
+### Measured (2026-11-13, Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200)
+
+- **No firewall prompt for a loopback-only listener**, measured where a
+  prompt COULD appear: from a program path the firewall has never seen
+  (this worktree's own `testhost.exe` has a rule now, below, so a count
+  around it can no longer show a new prompt). `DeployedFolderProbe.exe`, a
+  console program of a few lines that starts the product's
+  `DeployedFolderServer` with the real block's candidates on a built site,
+  asks it for `/` and stops, copied to a newly named folder: it listened on
+  `127.0.0.1:41050` alone (`Get-NetTCPConnection` while it ran) and answered
+  200; `Get-NetFirewallApplicationFilter` listed 0 entries for its path
+  before and after, 585 rules before and after, no rule-added event (2097)
+  in the firewall's log, and the `PickerHost` processes the same two (the
+  prompts below). The same held for a copy of the test output at a new
+  path running the server's and the registry's 34 tests. Read with
+  `Get-NetTCPConnection`, `Get-NetFirewallRule`,
+  `Get-NetFirewallApplicationFilter` and `Get-WinEvent` only; nothing added,
+  nothing removed, nothing elevated. `TheListenersOwnEndpointIsTheLoopbackAddress`
+  reads the listener's own `LocalEndpoint`, and the source rule
+  `TheServerBindsTheLoopbackAddressAndNothingElse` allows one
+  `new TcpListener(IPAddress.Loopback, port)` in the server's file and no
+  wildcard, IPv6, dual-mode, `localhost`, prefix or `Bind` form (shown red
+  on a copy that bound `IPAddress.Any`, run alone so nothing listened), and
+  no `IPAddress.Any` bind in any of the deployed folder's test files.
+- **A listen on 0.0.0.0 DOES raise it, and this piece did so twice by
+  mistake**, neither from the product's listener: at 22:22, a hand
+  measurement in Windows PowerShell that bound
+  `[IPAddress]::Any` port 41399 to see whether a loopback bind could sit
+  beside it (the `powershell.exe` prompt and rules); at 22:28, a first
+  version of `APortAnotherProgramHoldsOnEveryAddressIsPassedOver` that
+  stood the other program in with a real `new TcpListener(IPAddress.Any, 0)`
+  (this worktree's `testhost.exe`; that version was never committed, the
+  first commit at 22:31 already had the stand-in). Each prompt's
+  `PickerHost` process started within two seconds of its pair of inbound
+  "Query User" BLOCK rules (TCP and UDP) in the firewall's log. Both
+  prompts are still on the desktop and the four rules are still there:
+  closing a prompt was refused to this session, and removing a rule needs
+  an administrator. The test now stands the other program in through
+  `DeployedFolderServer.ActiveListeners` and binds nothing. So: never bind
+  anything but `127.0.0.1` in a test here.
+- **The crawl** (`browser-checks/crawl_deployed_folder.py --url`, against
+  the server started in-process by the opt-in `DeployedFolderCrawlMeasurement`,
+  on copies of two sites built on this PC): ICS3U section 1, 399 pages,
+  8,811 links, 403 addresses, **0 not found** in 6.4 s; ENG2D section 2, 275
+  pages, 6,334 links, 284 addresses, 5 not found in 4.7 s, all five a link
+  to `Exercises/Media-Analysis-Practice`, a page that build does not hold (a
+  link to a page not published: missing on any host). On the final,
+  threaded server, with another suite running: 9.6 s and 5.0 s. The must-fail, the
+  same folders through `python -m http.server`: **5,869** and **3,252** not
+  found. Before `NoDelay` the ENG2D crawl took **43.9 s** (about 155 ms a
+  request: Nagle and the delayed acknowledgement); after, 5.5 s. The
+  resolver alone answers 200 pages in 481 to 573 ms. One ICS3U crawl of
+  files copied seconds before took 57.4 s; not explained, and not seen again.
+- **The deadlines over a socket:** a connection that sent only its request
+  line closed at 10 s; 64 readers of a 200 MB file that never read were all
+  reset by about 30 s (`ReadersThatStopReadingDoNotShutTheSiteOut`), while a
+  normal request was answered at once.
+- **Must-fails**, each by putting a plausible wrong version of the one rule
+  in place and running the tests (the originals copied back, the tree clean
+  after): a Host check by prefix (`Host: another port`, `Host: a name that
+  starts with the address`, through the resolver and over a socket); a
+  case-blind name match (the three `case counts` cases, both ways); no
+  containment check on the opened handle (both link cases through the seam,
+  the folder link over a socket); no join of a second press
+  (`TwoQuickPressesStartOneShowAndStopEndsIt`); a Stop while starting
+  ignored (`StopWhileStartingEndsItOnceStartedAndLeavesNothingListening`);
+  the drive-relative refusal dropped (`ADriveOrRootRelativeFolderIsNotFound`,
+  `TheAppResolvesTheFolderExactlyAsDeployPs1Does`); the 0.0.0.0 pass-over
+  dropped (`APortAnotherProgramHoldsOnEveryAddressIsPassedOver`); the
+  newcomer refused instead of making room (`AConnectionPastTheMaximumMakesRoom`
+  and the readers test); no send deadline (the readers test: 63 readers
+  still open at 47 s). **Under the full suite's load** (3,925 tests sharing
+  the thread pool) the first full run failed three of these wall-clock tests:
+  a plain GET unanswered within 20 s, the header deadline not closed by
+  15 s, the readers reset at 42.8 s instead of by 40; a second run, with
+  those classes alone, lost two answers of the resolution cases over a
+  socket (no answer in 20 s). That was the server's own work waiting for
+  pool threads, so the server moved to threads of its own (above), and the
+  server, registry and readers classes also run in their own collection
+  with parallelism off (`DeployedFolderTimings`), with the over-socket
+  resolution cases and the PowerShell 5.1 resolver test
+  (`DeployedFolderLauncherFolderTests`) since the review's L5. The readers
+  test's clock starts once all 64 places are taken, and it asserts the
+  contract's case as written (A stalled reader closed within 40 s, and not
+  before the 30 s piece deadline), then every reader gone within 30 s more.
+  **Not measured** (the review's L2): a program listening dual-mode on
+  `[::]:<port>` is not passed over the way one on 0.0.0.0 is; measuring it
+  needs a non-loopback bind, which raises the firewall's prompt. And one fault the tests
+  found in the first version:
+  a request that found the folder gone stopped the show from inside its own
+  answer, so the browser got a reset instead of the 404; the folder going is
+  now reported after the answer has gone.
+
+### What 889b owes
+
+The window, menus, quit and trail on the surface above: the toolbar's and
+Section ▸ Open in Browser opening the preview while one shows and the
+deployed folder otherwise (`previewHelp` / `help` / the greyed reason as the
+tooltip and the Narrator name), Open in Browser beside Show in File Explorer
+under a finished folder deploy (single and multi-destination) with
+`renderNote` in place of `publishedFolderRenderNote`'s sentence, the section
+row's context menu, the notice with Stop and `stopHint`, `stoppedFolderGone`
+with Dismiss, the `couldNotOpen` dialog; `subjectMenus`' item, situation
+keys and three cases; `QuitConfirmation.UnderWay` gaining
+`deployedFoldersShown` and the quit path calling `StopEverything`; the three
+`ActivityTrail.Event` members written from `Happened`; the six ledger
+entries removed; and the UI tests, through a browser seam that never opens a
+real browser. No `--serve-deployed-folder` flag: the crawl runs against the
+in-process server.
+
+Also owed by 889b, from the surface above and the fixes review:
+
+- **Once at start-up**, `DeployedFolderShows.Shared.RememberPortsIn(App.Settings,
+  action => dispatcher.TryEnqueue(() => action()))`, and
+  `DeployedFolderShows.Diagnostic = App.LogDiagnostic`. Without the first,
+  ports are remembered for the session only.
+- **Marshal both events** (`Changed`, `Happened`) to the dispatcher before
+  touching a control: they arrive on a listener's thread when a folder goes
+  or a listener ends. A handler that throws is dropped and written to the
+  diagnostic log; it does not end the app, but its redraw is lost.
+- **The fixes review's L-c, to build:** the press that STARTED a show stops
+  it when the browser refuses only if no other press has joined it; a press
+  handed a show re-checks `ShowFor` afterwards, so it never opens the
+  address of a show that was stopped meanwhile.
 
 ## Undo and Redo: the journal Windows owes (#899, piece U1)
 
