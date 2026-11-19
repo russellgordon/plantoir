@@ -66,8 +66,13 @@ internal static class UndoLimits
         DateTimeOffset? running = null;
         foreach (UndoFoldedStep step in folded.Steps.Values)
         {
-            if (step.Step.MadeAt is { } made && (running is null || made > running)) running = made;
-            times[step.Seq] = running ?? DateTimeOffset.MinValue;
+            // A madeAt that cannot be read (the step is then unreadable) takes
+            // its begin line's at, else the clock: never the oldest moment
+            // there is, which made such a step expired at once, so it was no
+            // barrier and was pruned on the next step (the W1 review's M4).
+            DateTimeOffset made = step.Step.MadeAt ?? step.BeganAt ?? now;
+            if (running is null || made > running) running = made;
+            times[step.Seq] = running.Value;
         }
         return times;
     }

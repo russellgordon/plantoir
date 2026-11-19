@@ -277,7 +277,21 @@ internal static class UndoCheck
             }
         }
 
-        if (inTheWay.Count > 0) return new PlanResult.ChangedSince(inTheWay[0], inTheWay.Count - 1);
+        if (inTheWay.Count > 0)
+        {
+            // A page that is simply not there while the folder cannot be
+            // reached is a drive or share gone between the reach check and
+            // the plan, not a change by hand: asked again before ruling 13
+            // clears the whole list for it (the W1 review's M1).
+            bool everyOneIsGone = true;
+            foreach (string path in inTheWay)
+            {
+                if (original[path] is not UndoCurrent.Absent) everyOneIsGone = false;
+            }
+            if (everyOneIsGone && folderIsReachable is not null && !folderIsReachable())
+                return new PlanResult.FolderCannotBeReached(inTheWay[0]);
+            return new PlanResult.ChangedSince(inTheWay[0], inTheWay.Count - 1);
+        }
         if (missing is not null) return new PlanResult.ContentMissing(missing);
         if (inUse is not null) return new PlanResult.FileIsInUse(inUse);
 

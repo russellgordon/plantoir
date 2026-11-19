@@ -86,30 +86,53 @@ internal sealed class UndoJournal
 
     internal DateTimeOffset Now => Clock.GetUtcNow();
 
-    /// <summary>The segments on the disk, oldest first.</summary>
+    /// <summary>
+    /// The segments on the disk, oldest first. A folder that is not there is
+    /// no segments; one that is there and cannot be listed throws
+    /// <see cref="UndoListUnreadableException"/>, never an empty list.
+    /// </summary>
     internal IReadOnlyList<(int Number, string Path)> Segments()
     {
         var found = new List<(int, string)>();
         if (!Directory.Exists(Folder)) return found;
-        foreach (string path in Directory.EnumerateFiles(Folder, "journal-*.jsonl"))
+        try
         {
-            Match match = SegmentName.Match(Path.GetFileName(path));
-            if (match.Success) found.Add((int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture), path));
+            foreach (string path in Directory.EnumerateFiles(Folder, "journal-*.jsonl"))
+            {
+                Match match = SegmentName.Match(Path.GetFileName(path));
+                if (match.Success) found.Add((int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture), path));
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw new UndoListUnreadableException("The list's folder could not be listed.", error);
         }
         found.Sort((a, b) => a.Item1.CompareTo(b.Item1));
         return found;
     }
 
-    /// <summary>Reads and folds the whole journal.</summary>
+    /// <summary>
+    /// Reads and folds the whole journal. A file of the list that is there
+    /// and cannot be read, a folder that cannot be listed, or a NEWEST segment
+    /// gone since the listing makes a reading that is not fresh (the mac's
+    /// U2a read rule: never an empty or shorter list); only an older segment
+    /// pruned since the listing is passed over.
+    /// </summary>
     internal UndoReading Read()
     {
-        var segments = Segments();
+        IReadOnlyList<(int Number, string Path)> segments;
+        try { segments = Segments(); }
+        catch (UndoListUnreadableException)
+        {
+            return new UndoReading { Folded = _lastRead, IsFresh = false };
+        }
         var folded = new UndoFolded();
         long place = 0;
         long torn = 0;
-        foreach ((int number, string path) in segments)
+        for (int index = 0; index < segments.Count; index++)
         {
-            byte[]? bytes = ReadShared(path);
+            (int number, string path) = segments[index];
+            byte[]? bytes = ReadShared(path, goneIsEmpty: index < segments.Count - 1);
             if (bytes is null)
                 return new UndoReading { Folded = _lastRead, IsFresh = false, SegmentsOnDisk = segments.Select(s => s.Number).ToList() };
             int start = 0;
@@ -128,8 +151,19 @@ internal sealed class UndoJournal
     /// <summary>The list as offered now, by this journal's own clock, liveness and reach.</summary>
     internal UndoOffered Offer(UndoFolded folded) => UndoLimits.Offer(folded, Now, IsAlive, CanReach);
 
-    /// <summary>The list as offered now, from one reading.</summary>
-    internal UndoOffered Offer(UndoReading reading) => Offer(reading.Folded);
+    /// <summary>
+    /// The list as offered now, from one reading. A reading that is not fresh
+    /// offers neither Undo nor Redo (greyed, plain "Undo", ruling 10): its fold
+    /// is the last state read, and on a first read that is an empty list that
+    /// would say "Nothing to undo" (the W1 review's M2).
+    /// </summary>
+    internal UndoOffered Offer(UndoReading reading)
+    {
+        UndoOffered offered = Offer(reading.Folded);
+        if (reading.IsFresh) return offered;
+        var greyed = new UndoAnswer(UndoAnswerKind.NotAvailable);
+        return offered with { Undo = greyed, Redo = greyed };
+    }
 
     /// <summary>What pruning would write now (a decision only), from one reading.</summary>
     internal IReadOnlyList<UndoPruneAction> Pruning(UndoReading reading) => UndoPruning.Decide(reading, Now, IsAlive);
@@ -143,28 +177,45 @@ internal sealed class UndoJournal
         string content = Path.Combine(Folder, "content");
         var names = new List<string>();
         if (!Directory.Exists(content)) return names;
-        foreach (string folder in Directory.EnumerateDirectories(content))
+        try
         {
-            foreach (string file in Directory.EnumerateFiles(folder))
+            foreach (string folder in Directory.EnumerateDirectories(content))
             {
-                string name = Path.GetFileName(file);
-                if (UndoFormat.IsBlobName(name)) names.Add(name);
+                foreach (string file in Directory.EnumerateFiles(folder))
+                {
+                    string name = Path.GetFileName(file);
+                    if (UndoFormat.IsBlobName(name)) names.Add(name);
+                }
             }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw new UndoListUnreadableException("The list's content folder could not be listed.", error);
         }
         return names;
     }
 
-    /// <summary>A blob's bytes, or null when it is missing or its bytes do not hash to its name (treated as missing).</summary>
+    /// <summary>
+    /// A blob's bytes, or null when it is gone or its bytes do not hash to its
+    /// name (treated as missing). One that is there and cannot be read throws
+    /// <see cref="UndoListUnreadableException"/>: never content missing, which
+    /// clears the list (the mac's U2a read rule).
+    /// </summary>
     internal byte[]? Blob(string name)
     {
         if (!UndoFormat.IsBlobName(name)) return null;
         string path = Path.Combine(Folder, "content", name[..2], name);
-        byte[]? bytes = ReadShared(path);
+        byte[]? bytes = ReadShared(path, goneIsEmpty: false, goneIsNull: true, out bool cannotRead);
+        if (cannotRead) throw new UndoListUnreadableException("A content file of the list could not be read.");
         return bytes is not null && string.Equals(UndoCheck.Sha(bytes), name, StringComparison.Ordinal) ? bytes : null;
     }
 
-    private byte[]? ReadShared(string path)
+    /// <summary>A segment's bytes: empty when it is gone and <paramref name="goneIsEmpty"/> (an older segment pruned since the listing), otherwise null for anything that is not a read.</summary>
+    private byte[]? ReadShared(string path, bool goneIsEmpty) => ReadShared(path, goneIsEmpty, goneIsNull: false, out _);
+
+    private byte[]? ReadShared(string path, bool goneIsEmpty, bool goneIsNull, out bool cannotRead)
     {
+        cannotRead = false;
         long deadline = Environment.TickCount64 + (long)_readRetry.TotalMilliseconds;
         while (true)
         {
@@ -177,15 +228,22 @@ internal sealed class UndoJournal
                 stream.CopyTo(memory);
                 return memory.ToArray();
             }
-            catch (FileNotFoundException) { return []; }      // deleted from the oldest end between the listing and the read
-            catch (DirectoryNotFoundException) { return null; }
+            catch (Exception gone) when (gone is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // Deleted from the oldest end between the listing and the read:
+                // passed over only for an older segment, never the newest.
+                if (goneIsEmpty) return [];
+                if (goneIsNull) return null;
+                cannotRead = true;
+                return null;
+            }
             catch (IOException exception) when ((exception.HResult & 0xFFFF) is 32 or 33)
             {
-                if (Environment.TickCount64 >= deadline) return null;
+                if (Environment.TickCount64 >= deadline) { cannotRead = true; return null; }
                 Thread.Sleep(20);
             }
-            catch (IOException) { return null; }
-            catch (UnauthorizedAccessException) { return null; }
+            catch (IOException) { cannotRead = true; return null; }
+            catch (UnauthorizedAccessException) { cannotRead = true; return null; }
         }
     }
 }
@@ -200,7 +258,17 @@ internal static class UndoJournalChecks
     /// read is judged gone, so content-based recovery can settle it and it is
     /// never left in flight for ever.
     /// </summary>
-    internal static bool RecoveryMaySettle(UndoProcess? process) => !ProcessIsAlive(process);
+    /// <summary>
+    /// Whether recovery (W3), which writes pages, may settle a step in flight
+    /// for its process being gone. A step whose process this version cannot
+    /// identify (no <c>process</c>, or one whose shape it does not know) is
+    /// judged gone for the offer and for pruning, so nothing is in flight for
+    /// ever, but NEVER settled by recovery: a live process of another version
+    /// may still be swapping its files outside the lock (the W1 review's M3,
+    /// proposed to the mac as a <c>recoveryCases</c> row). Pruning closes it
+    /// once it is past the limits.
+    /// </summary>
+    internal static bool RecoveryMaySettle(UndoProcess? process) => process is not null && !ProcessIsAlive(process);
 
     internal static bool ProcessIsAlive(UndoProcess? process) =>
         process is not null && process.Pid is > 0 and <= int.MaxValue

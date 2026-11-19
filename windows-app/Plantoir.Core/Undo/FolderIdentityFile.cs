@@ -26,7 +26,8 @@ namespace Plantoir.Core.Undo;
 /// less than ten seconds ago: a creator is at work, not yet (ten, not two,
 /// because FAT keeps a modification time to two seconds). Otherwise it is set
 /// aside as <c>folder-id.unreadable-&lt;uuid&gt;</c>, only while it is still
-/// the file inspected (the same file on its volume), and a file found to hold
+/// the file inspected (the same file on its volume, by the identity the read
+/// took from its own handle: the W1 review's H1), and a file found to hold
 /// an identifier once it is aside is put back with a move that fails if the
 /// name has been taken: a good identifier is never moved away.</para>
 ///
@@ -86,9 +87,13 @@ internal sealed class FolderIdentityFile
     {
         byte[] bytes;
         DateTime written;
+        (ulong Volume, ulong Index)? inspected;
         try
         {
             using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            // The identity of THIS file, from the handle its bytes are read
+            // through: what SetAside later compares with (the W1 review's H1).
+            inspected = IdentityOf(stream.SafeFileHandle);
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
             bytes = memory.ToArray();
@@ -101,10 +106,10 @@ internal sealed class FolderIdentityFile
 
         string text;
         try { text = new UTF8Encoding(false, true).GetString(bytes); }
-        catch (DecoderFallbackException) { return new Answer(Outcome.Unreadable); }
-        if (IdentifierIn(text) is { } id) return new Answer(Outcome.Identifier, id);
-        if (bytes.Length == 0 && _clock.GetUtcNow().UtcDateTime - written < CreatorAtWork) return new Answer(Outcome.NotYet);
-        return new Answer(Outcome.Unreadable);
+        catch (DecoderFallbackException) { return new Answer(Outcome.Unreadable, null, inspected); }
+        if (IdentifierIn(text) is { } id) return new Answer(Outcome.Identifier, id, inspected);
+        if (bytes.Length == 0 && _clock.GetUtcNow().UtcDateTime - written < CreatorAtWork) return new Answer(Outcome.NotYet, null, inspected);
+        return new Answer(Outcome.Unreadable, null, inspected);
     }
 
     /// <summary>
@@ -187,14 +192,26 @@ internal sealed class FolderIdentityFile
 
     /// <summary>
     /// Sets an unreadable file aside, only while it is still the file
-    /// inspected. Returns an identifier when the file set aside turns out to
+    /// <paramref name="inspectedByTheRead"/> names: the identity
+    /// <see cref="Read"/> took from the handle it found the file unreadable
+    /// through. Returns an identifier when the file set aside turns out to
     /// hold one and was put back (or the name now holds one); otherwise null,
-    /// and the caller makes a new one.
+    /// and the caller looks again.
+    ///
+    /// <para>Before the W1 review's H1 this took the identity at the moment
+    /// of the call and compared the file with itself, so the guard always
+    /// passed: a GOOD file another process had just made in place of the
+    /// damaged one was moved aside, and when a third made a new one before the
+    /// put-back, every step recorded under the good identifier could never
+    /// reach its folder again (measured by the review: 3,000 moved of 3,000).
+    /// Now a file that is not the one inspected is left where it is, and the
+    /// file moved is checked once more after the move: if the name was
+    /// replaced in the microseconds between the comparison and the move, the
+    /// file moved aside is not the one inspected and goes straight back.</para>
     /// </summary>
     internal string? SetAside((ulong Volume, ulong Index)? inspectedByTheRead)
     {
-        (ulong Volume, ulong Index)? inspected = FileIdentity(FilePath);
-        if (inspected is null) return null;
+        if (inspectedByTheRead is not { } inspected) return null;   // the read opened nothing: nothing to set aside
         string aside = FilePath + ".unreadable-" + Guid.NewGuid().ToString("D");
         try
         {
@@ -204,6 +221,19 @@ internal sealed class FolderIdentityFile
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+
+        if (FileIdentity(aside) != inspected)
+        {
+            // Replaced between the comparison and the move: what was moved is
+            // somebody else's file, never ours to set aside.
+            try
+            {
+                File.Move(aside, FilePath, overwrite: false);
+                return null;
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
 
         // The file now aside: if another process wrote an identifier into it
         // between our look and the move, it goes back.
@@ -230,10 +260,16 @@ internal sealed class FolderIdentityFile
         try
         {
             using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            if (!GetFileInformationByHandle(handle, out ByHandleFileInformation info)) return null;
-            return (info.VolumeSerialNumber, ((ulong)info.FileIndexHigh << 32) | info.FileIndexLow);
+            return IdentityOf(handle);
         }
         catch { return null; }
+    }
+
+    /// <summary>The volume serial and 64-bit index of the file an open handle is on.</summary>
+    private static (ulong Volume, ulong Index)? IdentityOf(SafeFileHandle handle)
+    {
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation info)) return null;
+        return (info.VolumeSerialNumber, ((ulong)info.FileIndexHigh << 32) | info.FileIndexLow);
     }
 
     /// <summary>A raw P/Invoke path is not given <c>\\?\</c> by .NET: past 259 characters it must be.</summary>

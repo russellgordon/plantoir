@@ -14650,8 +14650,10 @@ and nothing in the app calls it yet.
   split at LF only (a CR before it is JSON white space); bytes after the last
   LF are a torn line and are not counted. Liveness is `WorkLease.OwnerIsAlive`'s
   rule (`UndoJournalChecks.ProcessIsAlive`; `WorkLease.StartMoment` did not
-  need to change); a step with no readable `process` is judged gone, so
-  recovery can settle it by content and nothing stays in flight for ever.
+  need to change); a step with no readable `process` is judged gone for the
+  offer and for pruning, so nothing stays in flight for ever, but
+  `UndoJournalChecks.RecoveryMaySettle` says recovery never settles it (the
+  review's M3, below).
   Reach is "the folder is at `pathAtTheTime` and its `folder-id` is the
   step's"; U7 adds the recent folders.
 
@@ -14715,6 +14717,57 @@ precomposed é equal to a decomposed one); a static journal, a static clock or
 a static switch (H1: test classes run in parallel); changing
 `PageVisibilityReader` for the BOM case (L5: its publish-path callers pass
 text with no BOM).
+
+**The implementation review's fixes (2026-11-19).** The review (Opus,
+2026-11-14, `reviews\899-w1-impl-review.md` of the v2.0.0 Windows run)
+found 1 HIGH and 4 MEDIUM; each has a test that failed before its fix:
+
+- **H1, a good `folder-id` set aside.** `SetAside` took the file's identity
+  at the moment of the call and compared the file with itself, so the
+  "still the file inspected" guard always passed, and a good identifier
+  another process had just made could be moved aside and lost (measured by
+  the review: 3,000 of 3,000 moved under a concurrent maker), greying Undo
+  for that folder for good. `Read()` now takes the identity (volume serial,
+  file index) from the SAME handle it read the bytes through, and
+  `SetAside(inspected)` moves only that file; the file moved is checked
+  again after the move and goes straight back if the name was replaced in
+  between. `AGoodFileThatReplacedTheOneInspectedIsNeverMovedAside` uses a
+  seam after the move to make a third file at the name, as the review's race
+  did; the old test that set aside a GOOD file is rewritten so the identifier
+  is written into the same file the look found empty.
+- **M1, a page gone with its drive.** A page whose folder is not there reads
+  `Absent`, which is `changedSince`, and ruling 13 would clear the whole list.
+  `UndoCheck.Plan` takes `folderIsReachable` and asks it again when every page
+  in the way is absent; when the folder cannot be reached the answer is
+  `FolderCannotBeReached` (greyed, nothing cleared). W2's door must pass it.
+  It is cross-platform (an unplugged volume on the mac): proposed to the mac
+  as a case, "a page absent while its working folder cannot be reached is
+  not changed since".
+- **M2, a stale reading.** A reading that is not fresh holds the LAST state
+  read (empty on a first read) beside the segments on the disk now, and
+  deletion decided from that mix made live blobs deletable. Pruning and
+  deletion now take one `UndoReading` (fold and segments from the same read)
+  and decide nothing from one that is not fresh; `UndoJournal.Offer(reading)`
+  greys both Undo and Redo for it rather than saying "Nothing to undo".
+- **M3, a process that cannot be identified.** Judged gone for pruning, which
+  is right, but recovery (W3) writes pages, and a live process of another
+  version might still be swapping files: `RecoveryMaySettle(null)` is false.
+  Proposed to the mac as a `recoveryCases` row.
+- **M4, a `madeAt` that does not parse** (an offset instead of `Z`). The step
+  is unreadable, and its time was the oldest moment there is, so it expired at
+  once: no barrier, pruned on the next step. It now takes its begin line's
+  `at`, else the clock: it stands as a barrier and is not pruned for age.
+  Proposed to the mac as a case (the contract does not say what the time of
+  such a step is).
+
+**The mac's U2a read rule**, applied at the same time: a file of the list that
+is there and cannot be opened or read is never an empty or shorter list. A
+segment that cannot be read, a folder that cannot be listed, or a NEWEST
+segment gone since the listing makes the reading not fresh; only an older
+segment pruned since the listing is passed over. A blob that is there and
+cannot be read throws `UndoListUnreadableException` (never content missing,
+which clears the list), and so does a content folder that cannot be listed.
+`UndoJournal` takes an `open` seam for the tests of each.
 
 **Known differences to KNOW** (not to do): a key twice in one object is read
 as unreadable at that level (JSON does not say which is meant); a

@@ -31,8 +31,13 @@ internal static class UndoPruning
     /// step still in flight in that run is closed there rather than stopping
     /// the run; a running one stops it.
     /// </summary>
+    /// <remarks>
+    /// From one reading only, and nothing from one that is not fresh: its fold
+    /// is the last state read, beside a disk that has moved on (the W1
+    /// review's M2).
+    /// </remarks>
     internal static IReadOnlyList<UndoPruneAction> Decide(UndoReading reading, DateTimeOffset now, Func<UndoProcess?, bool> isAlive) =>
-        Decide(reading.Folded, now, isAlive);
+        reading.IsFresh ? Decide(reading.Folded, now, isAlive) : [];
 
     private static IReadOnlyList<UndoPruneAction> Decide(UndoFolded folded, DateTimeOffset now, Func<UndoProcess?, bool> isAlive)
     {
@@ -80,8 +85,15 @@ internal static class UndoPruning
     /// <para>A blob goes when no step on the list names it and nothing this
     /// version cannot read, in a segment still kept, holds its name.</para>
     /// </summary>
+    /// <remarks>
+    /// The fold and the segments come from the SAME reading, so they can never
+    /// be mixed; a reading that is not fresh deletes nothing. Before the W1
+    /// review's M2 a stale (on a first read, empty) fold beside the segments
+    /// and blobs on the disk now made a step's blobs, a redo entry's and an
+    /// unreadable line's all deletable.
+    /// </remarks>
     internal static UndoDeletion Deletable(UndoReading reading, IReadOnlyCollection<string> blobsOnDisk, DateTimeOffset now) =>
-        Deletable(reading.Folded, reading.SegmentsOnDisk, blobsOnDisk, now);
+        reading.IsFresh ? Deletable(reading.Folded, reading.SegmentsOnDisk, blobsOnDisk, now) : new UndoDeletion([], []);
 
     private static UndoDeletion Deletable(UndoFolded folded, IReadOnlyCollection<int> segmentsOnDisk,
                                           IReadOnlyCollection<string> blobsOnDisk, DateTimeOffset now)
