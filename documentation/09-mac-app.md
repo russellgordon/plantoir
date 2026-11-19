@@ -1715,9 +1715,8 @@ window would otherwise hold itself, and hands it back when they are not (every
 other key it is sent goes on to the window). `CancelOperationInstaller`, a
 representable that draws nothing, takes no clicks and carries no key, joins
 and removes it as AppKit's view life cycle says the panel joins and leaves a
-window: a responder kept in the panel's `@State` and installed through
-`WindowAccessor` stayed in the chain after the panel went, and Escape still
-stopped the task (`988-classes-6`). It hears the message only when nothing
+window, and `updateNSView` gives the responder the panel's current state on
+every update, with no `@State` copy to keep in step. It hears the message only when nothing
 nearer the focus answered it, and it answers only while the Cancel button shows, the run is under way, nothing
 covers the panel (below), and `somethingElseWantsTheKey(in:)` is false: text
 being edited (`NSText`, the field editor every text field, search field and

@@ -240,9 +240,7 @@ final class CancelOperationResponder: NSResponder {
 /// view life cycle is the one that says, exactly, when the panel joins and
 /// leaves a window (`viewDidMoveToWindow`, `dismantleNSView`), and
 /// `updateNSView` hands the responder the panel's current state on every
-/// update. Measured: a responder kept in the panel's `@State` and installed
-/// from `WindowAccessor` stayed in the chain after the panel had gone, and
-/// Escape still stopped the task (`988-classes-6`).
+/// update, so there is no copy of the panel's state to keep in step.
 struct CancelOperationInstaller: NSViewRepresentable {
 
     // MARK: - Stored properties

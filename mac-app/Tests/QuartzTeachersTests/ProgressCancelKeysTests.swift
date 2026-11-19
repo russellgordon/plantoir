@@ -333,14 +333,7 @@ final class ProgressCancelKeysTests: XCTestCase {
         let runner: ScriptRunner = runningRunner()
         let ledger: CancelLedger = CancelLedger()
         let shows: PanelShows = PanelShows()
-        let view = VStack {
-            if shows.panel {
-                panel(runner: runner, ledger: ledger, takesTheCancelKeys: true)
-            } else {
-                Color.clear.frame(width: 700, height: 400)
-            }
-        }
-        let window: NSWindow = windowShowing(view)
+        let window: NSWindow = windowShowing(PanelOrNothing(shows: shows, runner: runner, ledger: ledger))
         XCTAssertTrue(ProgressCancelKeysTests.chainHoldsAResponder(window), "the panel put its responder into the window's chain")
         var current: NSResponder? = window.contentView?.nextResponder
         while let responder = current {
@@ -358,6 +351,36 @@ final class ProgressCancelKeysTests: XCTestCase {
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertEqual(ledger.cancelCount, 0, "with the panel gone, Escape stops nothing")
         close(window)
+    }
+
+    /// The panel, or nothing once `shows.panel` is false: a view of its own,
+    /// so the change is observed (a `VStack` built in the test function reads
+    /// the flag once and never redraws).
+    struct PanelOrNothing: View {
+
+        // MARK: - Stored properties
+
+        let shows: PanelShows
+        let runner: ScriptRunner
+        let ledger: CancelLedger
+
+        // MARK: - Body
+
+        var body: some View {
+            if shows.panel {
+                TaskProgressView(
+                    runner: runner,
+                    title: "Previewing EXC2O Section 1",
+                    onCancel: {
+                        ledger.cancelCount += 1
+                        runner.wasCancelled = true
+                    }
+                )
+                .frame(width: 700, height: 400)
+            } else {
+                Color.clear.frame(width: 700, height: 400)
+            }
+        }
     }
 
     /// Whether the panel is drawn, for the test above.
