@@ -36,6 +36,12 @@ struct CourseSettingsView: View {
     /// Whether this window is key, read only to notice it BECOMING key.
     @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
 
+    /// The window's model: How I Teach opens through its Obsidian route
+    /// (#995). Optional because the form is also built outside any window
+    /// (`CourseDetailView.planningCommands`, and tests), where a required
+    /// environment object stops the process; in a window there always is one.
+    @Environment(WorkspaceModel.self) var workspace: WorkspaceModel?
+
 
     // MARK: - Body
 
@@ -716,7 +722,9 @@ struct CourseSettingsView: View {
         howITeachProblem = nil
         do {
             let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: course)
-            FolderActions.openPageInObsidian(page.url, vaultURL: course.directoryURL)
+            // Through the route's question (#995): a course Obsidian has never
+            // seen is added only once the teacher agrees to close Obsidian.
+            workspace?.openHowITeachPageInObsidian(page.url, course: course)
             if page.created {
                 marksWalkGeneration += 1
             }

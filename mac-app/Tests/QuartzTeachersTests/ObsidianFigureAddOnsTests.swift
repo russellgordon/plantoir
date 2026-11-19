@@ -818,6 +818,10 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
 
     /// Fixes review N2: the course opened in Obsidian WHILE the offer was up —
     /// Add Them asks again and goes the reopen way, never writing under it.
+    /// Since #995 (D21, ruling Q13) the reopen way ASKS before it closes
+    /// Obsidian: the button pressed said "Add Them", not that Obsidian would
+    /// close, so the reopen question comes up and nothing is closed until it
+    /// is answered. (Until #995 this asserted one quit straight away.)
     func testAddThemChecksAgainWhenAnswered() async throws {
         let made: Driven = try drive(answer: .notAsked)
         made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
@@ -828,7 +832,11 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         made.log.openVaults = [made.course.directoryURL.path]
         made.log.quitCloses = false
         await made.workspace.answerObsidianAddOnsOffer(request, .addThem)
-        XCTAssertEqual(made.log.quits, 1, "the reopen way")
+        XCTAssertEqual(made.log.quits, 0, "Obsidian closed by a button that did not say so")
+        XCTAssertEqual(made.log.opened, [])
+        let reopen: ObsidianAddOnsRequest = try XCTUnwrap(made.workspace.obsidianReopenRequest, "the reopen question asks first")
+        await made.workspace.answerObsidianReopen(reopen, reopen: true)
+        XCTAssertEqual(made.log.quits, 1, "the reopen way, once asked")
         XCTAssertFalse(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins").path),
                        "written under an Obsidian opened while the offer was up")
     }
@@ -1138,6 +1146,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             log.opened.append(folder.path)
             let entries: [String] = (try? FileManager.default.contentsOfDirectory(atPath: vault.appendingPathComponent(".obsidian/plugins").path)) ?? []
             log.pluginsAtOpen.append(entries.sorted())
+            return true
         }
         opening.quitAndWait = {
             log.quits += 1
