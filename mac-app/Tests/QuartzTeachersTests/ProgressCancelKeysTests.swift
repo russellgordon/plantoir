@@ -342,13 +342,18 @@ final class ProgressCancelKeysTests: XCTestCase {
         }
         let window: NSWindow = windowShowing(view)
         XCTAssertTrue(ProgressCancelKeysTests.chainHoldsAResponder(window), "the panel put its responder into the window's chain")
-        var current: NSResponder? = window.nextResponder
+        var current: NSResponder? = window.contentView?.nextResponder
         while let responder = current {
             XCTAssertFalse(responder is CancelOperationResponder && responder is NSView, "the responder is not a view")
             current = responder.nextResponder
         }
+        // With focus nowhere, the window's own first-responder place is the
+        // responder's while the keys are live (NSWindow answers
+        // cancelOperation itself, measured in 988-diag-3).
+        XCTAssertTrue(window.firstResponder is CancelOperationResponder, "focus nowhere: the responder holds the window's own place")
         shows.panel = false
         XCTAssertTrue(runUntil(timeout: 2) { !ProgressCancelKeysTests.chainHoldsAResponder(window) }, "the responder left the chain with the panel")
+        XCTAssertTrue(window.firstResponder === window, "the window has its own place back")
         press(.escape, in: window)
         _ = runUntil(timeout: 0.5) { false }
         XCTAssertEqual(ledger.cancelCount, 0, "with the panel gone, Escape stops nothing")
@@ -365,7 +370,7 @@ final class ProgressCancelKeysTests: XCTestCase {
     }
 
     static func chainHoldsAResponder(_ window: NSWindow) -> Bool {
-        var current: NSResponder? = window.nextResponder
+        var current: NSResponder? = window.contentView?.nextResponder
         while let responder = current {
             if responder is CancelOperationResponder {
                 return true
@@ -378,17 +383,24 @@ final class ProgressCancelKeysTests: XCTestCase {
     /// The responder takes itself out of the chain and leaves the rest
     /// joined up as it was.
     func testUninstallLeavesTheChainAsItWas() {
-        let window: NSWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 10, height: 10), styleMask: [.titled], backing: .buffered, defer: true)
+        let window: NSWindow = NSWindow(contentRect: NSRect(x: -7000, y: -7000, width: 10, height: 10), styleMask: [.titled], backing: .buffered, defer: true)
         window.isReleasedWhenClosed = false
-        let after: NSResponder = NSResponder()
-        window.nextResponder = after
+        let content: NSView = NSView()
+        window.contentView = content
+        XCTAssertTrue(content.nextResponder === window)
         let responder: CancelOperationResponder = CancelOperationResponder()
         responder.install(in: window)
         responder.install(in: window)
-        XCTAssertTrue(window.nextResponder === responder)
-        XCTAssertTrue(responder.nextResponder === after, "installed twice, it is in the chain once")
+        XCTAssertTrue(content.nextResponder === responder)
+        XCTAssertTrue(responder.nextResponder === window, "installed twice, it is in the chain once, before the window")
+        responder.isEnabled = true
+        XCTAssertTrue(window.firstResponder === responder, "live, it holds the window's own place")
+        responder.isEnabled = false
+        XCTAssertTrue(window.firstResponder === window, "not live, it gives the place back")
+        responder.isEnabled = true
         responder.uninstall()
-        XCTAssertTrue(window.nextResponder === after)
+        XCTAssertTrue(content.nextResponder === window)
+        XCTAssertTrue(window.firstResponder === window)
         XCTAssertFalse(CancelOperationResponder.chain(of: window, contains: responder))
     }
 
@@ -518,48 +530,5 @@ final class ProgressCancelKeysTests: XCTestCase {
             }
         }
         XCTAssertEqual(asking, 1, "exactly the deploy's panel asks first")
-    }
-
-    func testZZDiagnose() {
-        var lines: [String] = []
-        lines.append("NSWindow responds cancelOperation: \(NSWindow.instancesRespond(to: #selector(NSResponder.cancelOperation(_:))))")
-        lines.append("NSView responds: \(NSView.instancesRespond(to: #selector(NSResponder.cancelOperation(_:))))")
-        lines.append("NSHostingView responds: \(NSHostingView<Color>.instancesRespond(to: #selector(NSResponder.cancelOperation(_:))))")
-        for variant in ["window", "content", "selfFirst"] {
-            for key in [Key.escape, Key.commandPeriod] {
-                let window: NSWindow = NSWindow(contentRect: NSRect(x: -7000, y: -7000, width: 300, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
-                window.isReleasedWhenClosed = false
-                let hosting: NSHostingView<Color> = NSHostingView(rootView: Color.white)
-                window.contentView = hosting
-                window.orderFrontRegardless()
-                _ = runUntil(timeout: 0.3) { false }
-                let responder: CancelOperationResponder = CancelOperationResponder()
-                var heard: Int = 0
-                responder.pressCancel = {
-                    heard += 1
-                }
-                responder.isEnabled = true
-                responder.install(in: window)
-                // Move it before the window: content view -> responder -> window.
-                window.nextResponder = responder.nextResponder
-                responder.nextResponder = window
-                hosting.nextResponder = responder
-                var made: Bool = true
-                if variant == "content" {
-                    made = window.makeFirstResponder(hosting)
-                } else if variant == "selfFirst" {
-                    made = window.makeFirstResponder(responder)
-                }
-                let first: String = window.firstResponder.map { (r: NSResponder) -> String in String(describing: type(of: r)) } ?? "nil"
-                press(key, in: window)
-                _ = runUntil(timeout: 0.2) { false }
-                let viaKey: Int = heard
-                let tried: Bool = window.firstResponder?.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: nil) ?? false
-                lines.append("\(variant) \(key): made \(made) first \(first) heardViaKey \(viaKey) tryToPerform \(tried) heardTotal \(heard)")
-                window.orderOut(nil)
-                window.contentView = nil
-            }
-        }
-        XCTFail(lines.joined(separator: "\n"))
     }
 }

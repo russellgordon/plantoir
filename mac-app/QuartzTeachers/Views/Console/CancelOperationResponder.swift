@@ -43,13 +43,25 @@ final class CancelOncePerRun {
 /// operation." AppKit turns both keys into one action message,
 /// `cancelOperation(_:)`, sent to the window's first responder and passed up
 /// the responder chain until something answers it. This object is not a
-/// view and draws nothing: it is put into the chain just after the window,
-/// so it hears the message only when nothing nearer the focus answered it
-/// first. A text field being edited, a sheet, an alert or a popover keep
-/// Escape for themselves: the first three are their own key windows or
-/// answer the message before it reaches here, and the checks in
-/// `somethingElseWantsTheKey(in:)` catch the field editor and child windows
-/// that let it pass (Command-Period in a field, for one).
+/// view and draws nothing.
+///
+/// Where it sits, measured on the second Mac on 2026-11-19 (`988-diag-3`):
+/// `NSWindow` itself answers `cancelOperation(_:)` and does nothing with
+/// it, so a responder AFTER the window never hears it. So this one sits
+/// between the window's content view and the window, and hears the message
+/// whenever focus is anywhere in the window's views and nothing nearer the
+/// focus answered first. With focus nowhere (Keyboard Navigation off, the
+/// macOS default) the window is its own first responder and the message
+/// starts AT the window; so while the keys are live, this responder takes
+/// the window's first-responder place whenever the window would hold it
+/// itself, and gives it back when they are not. Every other key it is sent
+/// goes on to the window, as before.
+///
+/// A text field being edited, a sheet, an alert or a popover keep Escape
+/// for themselves: the field editor is then the first responder, sheets,
+/// alerts and popovers are windows of their own, and
+/// `somethingElseWantsTheKey(in:)` turns the message away in the cases that
+/// let it pass (Command-Period in a field, for one).
 ///
 /// Replaces `CancelKeyCatcher`, an invisible view that took the keys as a
 /// key equivalent: the kind of hidden key-carrying control Russell rejected
@@ -60,7 +72,11 @@ final class CancelOperationResponder: NSResponder {
 
     /// False whenever the panel's Cancel is not showing, or something
     /// covers the panel (`TaskProgressView.takesTheCancelKeys`).
-    var isEnabled: Bool = false
+    var isEnabled: Bool = false {
+        didSet {
+            holdTheWindowsOwnPlaceIfLive()
+        }
+    }
 
     /// What Escape and Command-Period do: what clicking Cancel does.
     var pressCancel: (() -> Void)?
@@ -68,18 +84,35 @@ final class CancelOperationResponder: NSResponder {
     /// The window whose chain this sits in, while it is in one.
     private(set) weak var window: NSWindow?
 
+    /// The content view this sits after, while it is in a chain.
+    private weak var contentView: NSView?
+
+    /// Watches the window's first responder, so this can take the window's
+    /// own place when focus leaves every view.
+    private var firstResponderWatch: NSKeyValueObservation?
+
     // MARK: - Functions
 
-    /// Puts this responder into `window`'s chain, just after the window
-    /// itself. Doing it twice for the same window changes nothing.
+    /// Puts this responder into `window`'s chain, between its content view
+    /// and the window. Doing it twice for the same window changes nothing.
     func install(in window: NSWindow) {
-        if self.window === window && CancelOperationResponder.chain(of: window, contains: self) {
+        guard let content = window.contentView else {
+            return
+        }
+        if self.window === window && contentView === content && content.nextResponder === self {
             return
         }
         uninstall()
-        self.nextResponder = window.nextResponder
-        window.nextResponder = self
+        self.nextResponder = content.nextResponder
+        content.nextResponder = self
         self.window = window
+        self.contentView = content
+        firstResponderWatch = window.observe(\.firstResponder, options: [.new]) { [weak self] (_: NSWindow, _: NSKeyValueObservedChange<NSResponder?>) in
+            MainActor.assumeIsolated {
+                self?.holdTheWindowsOwnPlaceIfLive()
+            }
+        }
+        holdTheWindowsOwnPlaceIfLive()
     }
 
     /// Puts this responder back into the window it was last in, if that
@@ -90,26 +123,44 @@ final class CancelOperationResponder: NSResponder {
         }
     }
 
-    /// Takes this responder out of its window's chain, leaving the rest of
-    /// the chain joined up as it was.
+    /// Takes this responder out of its window's chain, leaving the chain
+    /// joined up as it was, and gives the window back its own place.
     func uninstall() {
-        guard let window else {
-            return
+        firstResponderWatch?.invalidate()
+        firstResponderWatch = nil
+        if let window, window.firstResponder === self {
+            _ = window.makeFirstResponder(nil)
         }
-        var previous: NSResponder = window
-        while let next = previous.nextResponder {
-            if next === self {
-                previous.nextResponder = self.nextResponder
-                break
-            }
-            previous = next
+        if let contentView, contentView.nextResponder === self {
+            contentView.nextResponder = self.nextResponder
         }
         self.nextResponder = nil
+        self.contentView = nil
     }
 
-    /// Whether `responder` is somewhere in the chain after `window`.
+    /// While the keys are live and the window would be its own first
+    /// responder, this takes that place, so the message starts below the
+    /// window; otherwise it hands the place back.
+    func holdTheWindowsOwnPlaceIfLive() {
+        guard let window, contentView != nil else {
+            return
+        }
+        if isEnabled {
+            if window.firstResponder === window {
+                _ = window.makeFirstResponder(self)
+            }
+        } else if window.firstResponder === self {
+            _ = window.makeFirstResponder(nil)
+        }
+    }
+
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+
+    /// Whether `responder` sits in the chain after `window`'s content view.
     static func chain(of window: NSWindow, contains responder: NSResponder) -> Bool {
-        var current: NSResponder? = window.nextResponder
+        var current: NSResponder? = window.contentView?.nextResponder
         while let found = current {
             if found === responder {
                 return true
