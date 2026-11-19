@@ -149,10 +149,13 @@ final class UndoOpKindsTests: XCTestCase {
         let folder: URL = root.appendingPathComponent("made", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try Data("kept\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        guard case .tree(let listing, _) = UndoTreeReading.read(at: folder) else {
+            return XCTFail("no listing")
+        }
         let aside: URL = UndoSwap.besideURL(for: folder, label: "5-undo", role: "orig")
         XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
 
-        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
+        XCTAssertTrue(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder], asideListings: [folder.standardizedFileURL.path: listing.sha]))
 
         XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("a.md")), Data("kept\n".utf8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: aside.path))
@@ -172,6 +175,48 @@ final class UndoOpKindsTests: XCTestCase {
         XCTAssertFalse(UndoSwap.tidyLeftovers(label: "5-undo", beside: [folder]))
 
         XCTAssertEqual(try Data(contentsOf: aside.appendingPathComponent("a.md")), Data("kept\n".utf8))
+    }
+
+    /// The hard review of U2b, MEDIUM 3 (probe E): an aside folder changed
+    /// since it was set aside is never put in the teacher's place; it stays
+    /// aside, hidden and whole. FAILED on c1c0624e5, which put it back.
+    func testAChangedAsideFolderIsNeverPutInTheTeachersPlace() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("one\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        guard case .tree(let listing, _) = UndoTreeReading.read(at: folder) else {
+            return XCTFail("no listing")
+        }
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "5-redo", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+        try Data("half\n".utf8).write(to: aside.appendingPathComponent("stray.md"))
+
+        XCTAssertFalse(UndoSwap.tidyLeftovers(label: "5-redo", beside: [folder], asideListings: [folder.standardizedFileURL.path: listing.sha]))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: aside.appendingPathComponent("stray.md").path))
+    }
+
+    /// MEDIUM 3 (probe D): a recovery's own aside folder is never given a
+    /// visible working name. FAILED on c1c0624e5, which renamed it to
+    /// `made.plantoir-undo-5-apply-recover-orig`.
+    func testARecoverysAsideFolderIsNeverGivenAVisibleName() throws {
+        let root: URL = scratchURL.appendingPathComponent("wf3", isDirectory: true)
+        let folder: URL = root.appendingPathComponent("made", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("kept\n".utf8).write(to: folder.appendingPathComponent("a.md"))
+        guard case .tree(let listing, _) = UndoTreeReading.read(at: folder) else {
+            return XCTFail("no listing")
+        }
+        let aside: URL = UndoSwap.besideURL(for: folder, label: "5-apply-recover", role: "orig")
+        XCTAssertTrue(UndoSwap.renameExclusively(folder, onto: aside))
+
+        _ = UndoSwap.tidyLeftovers(label: "5-apply", beside: [folder], asideListings: [folder.standardizedFileURL.path: listing.sha])
+
+        let names: [String] = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        XCTAssertEqual(names, ["made"], "put back in its own place, under its own name")
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("a.md")), Data("kept\n".utf8))
     }
 
     /// Without a runner for its maintainer, a step holding a `recompute` is

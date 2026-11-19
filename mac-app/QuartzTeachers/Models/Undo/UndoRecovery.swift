@@ -144,11 +144,23 @@ nonisolated enum UndoRecovery {
         }
         var allGone: Bool = true
         for work in ["apply", "undo", "redo"] {
-            if !UndoSwap.tidyLeftovers(label: "\(step.seq)-\(work)", beside: urls) {
+            if !UndoSwap.tidyLeftovers(label: "\(step.seq)-\(work)", beside: urls, asideListings: asideListings(of: step, root: root)) {
                 allGone = false
             }
         }
         return allGone
+    }
+
+    /// The listing each tree op of a step recorded, by its folder's path:
+    /// what a folder set aside must still be for recovery to put it back.
+    static func asideListings(of step: UndoStep, root: URL) -> [String: String] {
+        var listings: [String: String] = [:]
+        for op in step.ops where op.knownKind == .createTree || op.knownKind == .removeTree {
+            if let path = op.path, let listingSha = op.listingSha {
+                listings[root.appendingPathComponent(path).standardizedFileURL.path] = listingSha
+            }
+        }
+        return listings
     }
 
     /// Where each file of a step stands: before, after or neither.
@@ -247,7 +259,7 @@ nonisolated enum UndoRecovery {
             }
         }
         if mode == .live {
-            UndoSwap.tidyLeftovers(label: label, beside: urls)
+            UndoSwap.tidyLeftovers(label: label, beside: urls, asideListings: asideListings(of: step, root: root))
         }
 
         // Which state the work was moving FROM, and TO.

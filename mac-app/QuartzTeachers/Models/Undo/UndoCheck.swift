@@ -659,16 +659,25 @@ nonisolated enum UndoSwap {
                     refusal = .fileIsInUse(path: target.relativePath)
                 }
             case .takeTree(let listingSha):
-                if UndoTreeReading.read(at: target.url).listingSha != listingSha {
-                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
-                } else {
-                    let asideURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
-                    _ = UndoSwap.removeStaged(asideURL)
-                    if UndoSwap.renameExclusively(target.url, onto: asideURL) {
-                        originals[index] = asideURL
+                // Renamed aside FIRST, then its listing checked where nobody
+                // else writes into it: a file added while the folder was
+                // being walked can no longer go aside unseen and be deleted
+                // with it (the hard review of U2b, MEDIUM 4). A folder that
+                // differs is put back as it is and the take-out refused.
+                let asideURL: URL = UndoSwap.besideURL(for: target.url, label: label, role: "orig")
+                if UndoSwap.isAFolderSetAside(asideURL) || !UndoSwap.renameExclusively(target.url, onto: asideURL) {
+                    if UndoTreeReading.read(at: target.url).listingSha != listingSha {
+                        refusal = .changedSince(firstPath: target.relativePath, others: 0)
                     } else {
                         refusal = .fileIsInUse(path: target.relativePath)
                     }
+                } else if UndoTreeReading.read(at: asideURL).listingSha != listingSha {
+                    // Put back as it is; if its place was taken in that
+                    // instant it stays aside, hidden and whole, never deleted.
+                    _ = UndoSwap.renameExclusively(asideURL, onto: target.url)
+                    refusal = .changedSince(firstPath: target.relativePath, others: 0)
+                } else {
+                    originals[index] = asideURL
                 }
             case .setExternal(let externalTarget, let expected, let value):
                 if !UndoCheck.externalMatches(places.read(externalTarget), expected) {
@@ -767,6 +776,16 @@ nonisolated enum UndoSwap {
     static func besideURL(for target: URL, label: String, role: String) -> URL {
         let name: String = "." + target.lastPathComponent + stagedMarker + label + "-" + role
         return target.deletingLastPathComponent().appendingPathComponent(name)
+    }
+
+    /// The place a staged name stands beside: the name between its leading
+    /// dot and its LAST `.plantoir-undo-`, or nil.
+    static func placeOfStagedName(_ name: String) -> String? {
+        guard name.hasPrefix("."), let marker = name.range(of: stagedMarker, options: .backwards) else {
+            return nil
+        }
+        let place: String = String(name[name.index(after: name.startIndex)..<marker.lowerBound])
+        return place.isEmpty ? nil : place
     }
 
     /// Whether a staged item is a folder kept aside as an original (`-orig`):
@@ -870,8 +889,18 @@ nonisolated enum UndoSwap {
     /// Removes what a swap for this label left beside these files. True
     /// when nothing of it is left (a file another program holds, or one
     /// made immutable, stays until a later try).
+    ///
+    /// A FOLDER set aside (`-orig`, a tree taken out) is never deleted here:
+    /// it is put back only when `asideListings` names its place with the
+    /// listing the step recorded and the folder still has exactly that
+    /// listing, and its place is free; otherwise it is left aside, hidden
+    /// under its dot name, whole (the hard review of U2b, MEDIUM 3: a
+    /// changed folder never lands in the teacher's place, and a working
+    /// name is never exposed). Its place is read from the name itself, up
+    /// to the LAST marker, so a recovery's own `-recover-orig` is read as
+    /// the same place.
     @discardableResult
-    static func tidyLeftovers(label: String, beside urls: [URL]) -> Bool {
+    static func tidyLeftovers(label: String, beside urls: [URL], asideListings: [String: String] = [:]) -> Bool {
         var allGone: Bool = true
         var folders: [URL] = []
         for url in urls {
@@ -895,20 +924,16 @@ nonisolated enum UndoSwap {
             for name in names where UndoSwap.isStaged(name, label: label) {
                 let stagedURL: URL = folder.appendingPathComponent(name)
                 if UndoSwap.isAFolderSetAside(stagedURL) {
-                    // A teacher's folder a dead process renamed aside (a
-                    // tree taken out, U2): never deleted here. Put back
-                    // where it was when that place is free, so recovery
-                    // judges it as the work found it; otherwise left aside.
-                    let suffix: String = stagedMarker + label + "-orig"
-                    var original: String = name
-                    if original.hasSuffix(suffix) {
-                        original = String(original.dropLast(suffix.count))
-                    }
-                    if original.hasPrefix(".") {
-                        original = String(original.dropFirst())
+                    // A teacher's folder a dead process renamed aside.
+                    guard let original = UndoSwap.placeOfStagedName(name) else {
+                        allGone = false
+                        continue
                     }
                     let originalURL: URL = folder.appendingPathComponent(original)
-                    if original.isEmpty || !UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
+                    let recorded: String? = asideListings[originalURL.standardizedFileURL.path]
+                    let provablyTheSame: Bool = recorded != nil
+                        && UndoTreeReading.read(at: stagedURL).listingSha == recorded
+                    if !provablyTheSame || !UndoSwap.renameExclusively(stagedURL, onto: originalURL) {
                         allGone = false
                     }
                     continue
