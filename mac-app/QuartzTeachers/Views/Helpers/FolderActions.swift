@@ -114,30 +114,39 @@ enum FolderActions {
     }
 
     /// The answer "Close Obsidian and Open" (#995): closes Obsidian, adds
-    /// the course to its list while it is closed, and opens again every
-    /// vault it had on screen. The caller then opens the course itself,
-    /// which is registered by then. Called ONLY from that answer.
+    /// the course to its list while it is closed, and opens again what it
+    /// had open. The caller then opens the course itself, which is
+    /// registered by then. Called ONLY from that answer.
+    ///
+    /// What opens again is every vault Obsidian's list marks open, read
+    /// before the quit — the add-ons' reopen's own rule
+    /// (`ObsidianFigureAddOnsOffer.vaultsOpen`, #495 review B1), so a hidden
+    /// Obsidian's courses come back too and the two questions' "Opens
+    /// again" lines say the same true thing (#995 second review).
     ///
     /// If Obsidian is still running after the wait (a question of its own
     /// on screen), nothing is written under it — it would write its own
-    /// list back over ours — and `target` is opened as it is, the way the
-    /// add-ons' reopen does (`reopenObsidianWithAddOns`). Answers whether
-    /// Obsidian closed. The steps are replaceable so a test can drive the
-    /// rule without an Obsidian; the defaults are the real thing.
+    /// list back over ours — and nothing is handed to it either: it does
+    /// not know the course, so a link would only show its own error. The
+    /// route notes that on the trail. Answers whether Obsidian closed. The
+    /// steps are replaceable so a test can drive the rule without an
+    /// Obsidian; the defaults are the real thing.
     static func closeObsidianAndRegister(
         vaultURL: URL,
-        target: URL,
-        vaultsOnScreen: () -> [String] = { return FolderActions.openVaultPathsNow },
+        vaultsMarkedOpen: () -> [String] = {
+            return ObsidianFigureAddOnsOffer.vaultsOpen(
+                obsidianRunning: FolderActions.obsidianIsRunning,
+                registryData: try? Data(contentsOf: FolderActions.obsidianRegistryFileURL)
+            )
+        },
         quit: () async -> Void = { await FolderActions.quitObsidianAndWait() },
         stillRunning: () -> Bool = { return FolderActions.obsidianIsRunning },
         register: (URL) -> Void = { vault in FolderActions.registerWithDefaults(vaultURL: vault) },
-        reopen: ([String]) -> Void = { paths in FolderActions.reopenVaults(paths) },
-        openAsItIs: (URL) -> Void = { file in FolderActions.openLinkAsItIs(file) }
+        reopen: ([String]) -> Void = { paths in FolderActions.reopenVaults(paths) }
     ) async -> Bool {
-        let wereOpen: [String] = vaultsOnScreen()
+        let wereOpen: [String] = vaultsMarkedOpen()
         await quit()
         if stillRunning() {
-            openAsItIs(target)
             return false
         }
         register(vaultURL)
@@ -151,13 +160,6 @@ enum FolderActions {
         FolderActions.seedObsidianDefaultsIfMissing(inVault: vaultURL)
         FolderActions.enableAutoRevealInLayout(ofVault: vaultURL)
         FolderActions.registerVault(at: vaultURL)
-    }
-
-    /// Hands Obsidian the link for a file without registering anything.
-    static func openLinkAsItIs(_ file: URL) {
-        if let link = FolderActions.obsidianURL(forFolder: file) {
-            NSWorkspace.shared.open(link)
-        }
     }
 
     /// Whether Obsidian is running right now.

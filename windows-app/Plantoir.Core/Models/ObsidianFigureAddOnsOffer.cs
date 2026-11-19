@@ -48,12 +48,12 @@ public static class ObsidianFigureAddOnsWording
     // The three facts under either lead, each a "Label: value" line of the
     // message, in closingRule's order (#834, Windows #843): Add Them closes
     // the whole of Obsidian, other courses included, and opens again every
-    // course the list marks open, this one last (only this one when the list
-    // cannot be read): the mac's #995 corrected "{course} only".
+    // vault the list marks open, then this course (only this one when the
+    // list cannot be read): the mac's #995 corrected "{course} only".
     public const string ClosesLabel = "Closes";
     public const string ClosesValue = "Obsidian, with every course open in it, not only {course}";
     public const string OpensAgainLabel = "Opens again";
-    public const string OpensAgainValue = "{course}, and each other course Plantoir saw open in it";
+    public const string OpensAgainValue = "{course}, and everything else Obsidian had open";
     public const string KeptLabel = "Kept";
     public const string KeptValue = "Everything you have written";
     public const string OfferAdd = "Add Them";

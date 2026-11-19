@@ -551,6 +551,8 @@ private struct ObsidianClosingAlert: ViewModifier {
                     await workspace.answerObsidianClosing(shown, closeObsidian: false)
                 }
             }
+            // Escape always cancels (#987's rule for every question).
+            .keyboardShortcut(.cancelAction)
         } message: { shown in
             Text(ObsidianClosingWording.messageText(course: shown.course.code))
         }

@@ -178,9 +178,9 @@ struct ObsidianOpening {
     /// The answer "Close Obsidian and Open" (#995): closes Obsidian, adds the
     /// course to its list and opens again what it had on screen. Called only
     /// from that answer, never on a press. Answers whether Obsidian closed;
-    /// when it did not, nothing was written and `target` was opened as it is.
-    var closeAndRegister: @MainActor (_ target: URL, _ vault: URL) async -> Bool = { target, vault in
-        return await FolderActions.closeObsidianAndRegister(vaultURL: vault, target: target)
+    /// when it did not, nothing was written and nothing handed over.
+    var closeAndRegister: @MainActor (_ vault: URL) async -> Bool = { vault in
+        return await FolderActions.closeObsidianAndRegister(vaultURL: vault)
     }
 
     /// Opens these vaults again, in order.
@@ -441,23 +441,37 @@ extension WorkspaceModel {
     ///
     /// Asked again at the answer: if Obsidian has quit meanwhile, or now
     /// knows the course, it simply opens, and nothing is closed. If
-    /// Obsidian does not close, nothing is written and the file is opened
-    /// as it is (`FolderActions.closeObsidianAndRegister`).
+    /// Obsidian does not close, nothing is written and nothing is handed
+    /// to it (`FolderActions.closeObsidianAndRegister`); if it closed but
+    /// the course still cannot be handed over (its list could not be
+    /// written), nothing more is tried. Every answer leaves its line on the
+    /// trail (`ObsidianClosingTrail`). Neither failure says anything on
+    /// screen: the route has no report for a course that could not be
+    /// opened in Obsidian, and designing one is Russell's (#995's second
+    /// morning question).
     func answerObsidianClosing(_ request: ObsidianClosingRequest, closeObsidian: Bool) async {
         obsidianClosingRequest = nil
+        let code: String = request.course.code
         if !closeObsidian {
+            ActivityTrail.note(.obsidianClosingAsked, ObsidianClosingTrail.line(.cancelled, course: code))
             return
         }
         let target: URL = WorkspaceModel.obsidianTarget(request.folder, page: request.page, course: request.course)
         if !mustCloseObsidian(toOpen: target) {
+            ActivityTrail.note(.obsidianClosingAsked, ObsidianClosingTrail.line(.notNeeded, course: code))
             openObsidian(request.folder, page: request.page, course: request.course)
             return
         }
-        let closed: Bool = await obsidianOpening.closeAndRegister(target, request.course.directoryURL)
+        let closed: Bool = await obsidianOpening.closeAndRegister(request.course.directoryURL)
         if !closed {
+            ActivityTrail.note(.obsidianClosingAsked, ObsidianClosingTrail.line(.didNotClose, course: code))
             return
         }
-        handToObsidian(request.folder, page: request.page, course: request.course)
+        if !handToObsidian(request.folder, page: request.page, course: request.course) {
+            ActivityTrail.note(.obsidianClosingAsked, ObsidianClosingTrail.line(.notAdded, course: code))
+            return
+        }
+        ActivityTrail.note(.obsidianClosingAsked, ObsidianClosingTrail.line(.opened, course: code))
     }
 
     /// Course Settings' How I Teach row (#329): the page, through the same

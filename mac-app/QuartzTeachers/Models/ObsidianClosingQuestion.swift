@@ -36,7 +36,7 @@ nonisolated enum ObsidianClosingWording {
     static let closesLabel: String = "Closes"
     static let closesValue: String = "Obsidian, with every course open in it"
     static let opensAgainLabel: String = "Opens again"
-    static let opensAgainValue: String = "{course}, and each course Obsidian had on screen"
+    static let opensAgainValue: String = "{course}, and everything else Obsidian had open"
     static let keptLabel: String = "Kept"
     static let keptValue: String = "Everything you have written"
 
@@ -66,6 +66,38 @@ nonisolated enum ObsidianClosingWording {
 
     static func filling(_ sentence: String, course: String) -> String {
         return sentence.replacingOccurrences(of: "{course}", with: course)
+    }
+}
+
+/// What each answer to the question leaves on the trail (#995):
+/// `contracts/shared-rules.json` → `obsidianNeverClosedUnasked.trail`.
+nonisolated enum ObsidianClosingTrail {
+
+    // MARK: - Types
+
+    enum Outcome: String, CaseIterable, Sendable {
+        case opened
+        case cancelled
+        case notNeeded
+        case didNotClose
+        case notAdded
+    }
+
+    // MARK: - Functions
+
+    static func line(_ outcome: Outcome, course: String) -> String {
+        switch outcome {
+        case .opened:
+            return course + " · closed Obsidian to add the course to its list, and opened it"
+        case .cancelled:
+            return course + " · chose Cancel: Obsidian was not closed and the course did not open"
+        case .notNeeded:
+            return course + " · opened in Obsidian without closing it: by the answer, Obsidian had quit or knew the course"
+        case .didNotClose:
+            return course + " · Obsidian did not close, so the course was not added to its list and did not open"
+        case .notAdded:
+            return course + " · Obsidian closed, but the course could not be added to its list, so it did not open"
+        }
     }
 }
 

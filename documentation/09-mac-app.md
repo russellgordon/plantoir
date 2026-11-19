@@ -1622,8 +1622,8 @@ shape inside its dialog. When Obsidian is running, Add Them closes the whole of
 Obsidian, so any OTHER course open in it closes too; the sentence did not
 say so. (This said "and only this course opens again" until #995: the code
 reopens every course the list marks open, this one last, and only this one
-when the list cannot be read; `opensAgainValue` now says "{course}, and each
-other course Plantoir saw open in it".) `offerWhileOpen` and
+when the list cannot be read; `opensAgainValue` now says "{course}, and
+everything else Obsidian had open", the closing question's words too.) `offerWhileOpen` and
 `offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
 line as "label: value" (`closesLabel`/`closesValue`,
 `opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
@@ -9049,13 +9049,25 @@ question asks rather than closing straight away (it used to close at once).
 under #1003 (v2.0.0); its tests do not read the new key yet. The add-ons
 offer's step 6 in `obsidianAddOnsForFigures.sequence` says the same.
 
-**Asked again at the answer** (review of #995): if Obsidian has quit or now
+**Asked again at the answer** (reviews of #995): if Obsidian has quit or now
 knows the course, it just opens. If Obsidian does not close after the wait,
-nothing is written under it and the file is opened as it is, the way the
-add-ons' reopen does (`FolderActions.closeObsidianAndRegister` answers
-whether it closed). And if Obsidian starts between the route's check and the
+nothing is written under it and nothing is handed to it: it does not know
+the course, so a link would only show Obsidian's own error
+(`FolderActions.closeObsidianAndRegister` answers whether it closed). If it
+closed but the hand-over still fails (the list could not be written), nothing
+more is tried. Both failures are on the trail only ("asked to close Obsidian
+to open a course", `obsidianNeverClosedUnasked.trail`): the route has no
+on-screen report for a course that could not be opened in Obsidian, and
+designing one is Russell's (a morning question, recommending the nearest
+existing words). And if Obsidian starts between the route's check and the
 open, `FolderActions.open` hands nothing over and answers false, and the
-route asks instead of the press doing nothing.
+route asks instead of the press doing nothing. What opens again after the
+close is every vault Obsidian's list marks open, read before the quit — the
+add-ons' reopen's own rule — so both questions' "Opens again" lines read
+"{course}, and everything else Obsidian had open". It replaced
+`openVaultPathsNow` (a window on screen required), which left a hidden
+Obsidian's courses closed. "Everything", not "each course": a vault can be a
+parent folder.
 
 **Rejected:** opening the course without registering it (Obsidian shows its
 own "vault not found"); registering under a running Obsidian (the addition is
@@ -9063,9 +9075,8 @@ lost when it quits); folding the question into the add-ons offer (Not Now
 opens Obsidian too, so all three answers would have to carry the closing).
 
 **Left as it was, for Russell:** the reopen question's "Reopen Obsidian"
-button (#995's morning question). No trail line is written for the question:
-a new `activityTrail.mustRecord` event needs Windows to declare it or a
-ledger entry owned by an open `windows` issue, and none exists yet.
+button (#995's morning question). The trail event "asked to close Obsidian to
+open a course" is held open on Windows in `NamedGapLedger.cs`, owned by #1003.
 
 ## Open in Obsidian opens the page the preview shows (#518)
 

@@ -61,7 +61,7 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         let message: String = ObsidianClosingWording.messageText(course: "MPM2D")
         let expected: String = ObsidianClosingWording.filling(ObsidianClosingWording.message, course: "MPM2D")
             + "\n\nCloses: Obsidian, with every course open in it"
-            + "\nOpens again: MPM2D, and each course Obsidian had on screen"
+            + "\nOpens again: MPM2D, and everything else Obsidian had open"
             + "\nKept: Everything you have written"
         XCTAssertEqual(message, expected)
         // The go-ahead buttons say Obsidian closes (ruling Q13), and Cancel
@@ -69,6 +69,19 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         XCTAssertTrue(ObsidianClosingWording.closeAndOpen.hasPrefix("Close Obsidian"))
         XCTAssertTrue(ObsidianClosingWording.offerAddClosingObsidian.hasPrefix("Close Obsidian"))
         XCTAssertEqual(ObsidianClosingWording.cancel, "Cancel")
+        // Second review, LOW 3: both questions that close Obsidian say what
+        // opens again in the same words, because both reopen what
+        // Obsidian's list marks open.
+        XCTAssertEqual(ObsidianClosingWording.opensAgainValue, ObsidianFigureAddOnsWording.opensAgainValue)
+    }
+
+    func testTheTrailLinesAreTheContracts() throws {
+        let trail: [String: Any] = try XCTUnwrap(try ObsidianNeverClosedUnaskedTests.rules()["trail"] as? [String: Any])
+        for outcome in ObsidianClosingTrail.Outcome.allCases {
+            let words: String = try XCTUnwrap(trail[outcome.rawValue] as? String, outcome.rawValue)
+            XCTAssertEqual(ObsidianClosingWording.filling(words, course: "MPM2D"), ObsidianClosingTrail.line(outcome, course: "MPM2D"), outcome.rawValue)
+        }
+        XCTAssertEqual(trail.count, ObsidianClosingTrail.Outcome.allCases.count + 1, "every line, and its note")
     }
 
     /// The words never name the machinery (CLAUDE.md rule 1, and the add-ons
@@ -120,6 +133,7 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         XCTAssertNil(made.workspace.obsidianClosingRequest)
         XCTAssertEqual(made.log.opened, [], "Cancel opened something")
         XCTAssertEqual(made.log.closes, [], "Cancel closed Obsidian")
+        XCTAssertTrue(ObsidianNeverClosedUnaskedTests.trail().contains(ObsidianClosingTrail.line(.cancelled, course: made.course.code)))
 
         made.workspace.openInObsidian(course: made.course, sectionNumber: 1)
         let second: ObsidianClosingRequest = try XCTUnwrap(made.workspace.obsidianClosingRequest)
@@ -127,6 +141,7 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         XCTAssertEqual(made.log.closes, [made.course.directoryURL.path], "closed once, for this course")
         XCTAssertEqual(made.log.opened, [made.course.sectionDirectoryURL(forSection: 1).path], "then the section opened")
         XCTAssertNil(made.workspace.obsidianClosingRequest)
+        XCTAssertTrue(ObsidianNeverClosedUnaskedTests.trail().contains(ObsidianClosingTrail.line(.opened, course: made.course.code)))
     }
 
     /// The assistant's press waits for the answer like any other.
@@ -194,6 +209,7 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         await made.workspace.answerObsidianClosing(request, closeObsidian: true)
         XCTAssertEqual(made.log.closes, [], "closed an Obsidian that had already quit")
         XCTAssertEqual(made.log.opened, [made.course.directoryURL.path])
+        XCTAssertTrue(ObsidianNeverClosedUnaskedTests.trail().contains(ObsidianClosingTrail.line(.notNeeded, course: made.course.code)))
 
         made.log.running = true
         made.log.registryVaults = []
@@ -205,8 +221,9 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         XCTAssertEqual(made.log.opened.count, 2)
     }
 
-    /// Review LOW 1, the route's half: Obsidian did not close, so the
-    /// route hands it nothing more.
+    /// Review LOW 1 and the second review's MEDIUM, the route's half:
+    /// Obsidian did not close, so it is handed nothing — it does not know
+    /// the course — and the trail says why.
     func testAnObsidianThatDoesNotCloseIsHandedNothingMore() async throws {
         let made: Driven = try drive()
         made.log.running = true
@@ -218,46 +235,71 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         XCTAssertEqual(made.log.closes, [made.course.directoryURL.path])
         XCTAssertEqual(made.log.opened, [])
         XCTAssertEqual(made.log.registryVaults, [])
+        XCTAssertTrue(ObsidianNeverClosedUnaskedTests.trail().contains(ObsidianClosingTrail.line(.didNotClose, course: made.course.code)))
     }
 
-    /// Review LOW 1, FolderActions' half: after the quit, a still-running
-    /// Obsidian is never written under; the file opens as it is. Once it is
-    /// gone, the list is written and what was on screen opens again.
+    /// Second review, LOW 2: Obsidian closed, but the hand-over still
+    /// failed (its list could not be written). Nothing more is tried, and
+    /// the trail says so.
+    func testAHandOverThatFailsAfterTheCloseIsNoted() async throws {
+        let made: Driven = try drive()
+        made.log.running = true
+        made.log.registryVaults = []
+        made.workspace.openInObsidian(course: made.course, sectionNumber: nil)
+        let request: ObsidianClosingRequest = try XCTUnwrap(made.workspace.obsidianClosingRequest)
+        made.log.openHandsOver = false
+        await made.workspace.answerObsidianClosing(request, closeObsidian: true)
+        XCTAssertEqual(made.log.closes, [made.course.directoryURL.path], "closed once, never twice")
+        XCTAssertEqual(made.log.opened, [])
+        XCTAssertNil(made.workspace.obsidianClosingRequest, "not asked again in a loop")
+        XCTAssertTrue(ObsidianNeverClosedUnaskedTests.trail().contains(ObsidianClosingTrail.line(.notAdded, course: made.course.code)))
+    }
+
+    /// Review LOW 1 and the second review's MEDIUM, FolderActions' half:
+    /// after the quit, a still-running Obsidian is never written under and
+    /// never handed the course. Once it is gone, the list is written and
+    /// everything its list marked open opens again.
     func testCloseAndRegisterWritesNothingUnderAnObsidianThatStayed() async throws {
         let vault: URL = URL(fileURLWithPath: "/w/MPM2D")
-        let target: URL = URL(fileURLWithPath: "/w/MPM2D/index.md")
         var registered: [String] = []
         var reopened: [[String]] = []
-        var openedAsItIs: [String] = []
         var quits: Int = 0
         let stayed: Bool = await FolderActions.closeObsidianAndRegister(
-            vaultURL: vault, target: target,
-            vaultsOnScreen: { return ["/w/ICS3U"] },
+            vaultURL: vault,
+            vaultsMarkedOpen: { return ["/w/ICS3U", "/w/Notes"] },
             quit: { quits += 1 },
             stillRunning: { return true },
             register: { url in registered.append(url.path) },
-            reopen: { paths in reopened.append(paths) },
-            openAsItIs: { url in openedAsItIs.append(url.path) }
+            reopen: { paths in reopened.append(paths) }
         )
         XCTAssertFalse(stayed)
         XCTAssertEqual(quits, 1)
         XCTAssertEqual(registered, [], "written under a running Obsidian")
-        XCTAssertEqual(reopened, [])
-        XCTAssertEqual(openedAsItIs, [target.path])
+        XCTAssertEqual(reopened, [], "handed a running Obsidian something")
 
         let closed: Bool = await FolderActions.closeObsidianAndRegister(
-            vaultURL: vault, target: target,
-            vaultsOnScreen: { return ["/w/ICS3U"] },
+            vaultURL: vault,
+            vaultsMarkedOpen: { return ["/w/ICS3U", "/w/Notes"] },
             quit: { quits += 1 },
             stillRunning: { return false },
             register: { url in registered.append(url.path) },
-            reopen: { paths in reopened.append(paths) },
-            openAsItIs: { url in openedAsItIs.append(url.path) }
+            reopen: { paths in reopened.append(paths) }
         )
         XCTAssertTrue(closed)
         XCTAssertEqual(registered, [vault.path])
-        XCTAssertEqual(reopened, [["/w/ICS3U"]])
-        XCTAssertEqual(openedAsItIs, [target.path], "opened as it is only when it stayed")
+        XCTAssertEqual(reopened, [["/w/ICS3U", "/w/Notes"]], "everything the list marked open, not only what had a window")
+    }
+
+    /// What opens again is read the add-ons' reopen's way: every vault the
+    /// list marks open while Obsidian runs, hidden or not.
+    func testWhatOpensAgainIsWhatTheListMarksOpen() throws {
+        let source: String = TextFieldStyleScanTests.codeWithoutComments(try String(
+            contentsOf: UserFacingLabelWordsTests.macAppRoot().appendingPathComponent("QuartzTeachers/Views/Helpers/FolderActions.swift"),
+            encoding: .utf8
+        ))
+        let body: String = try XCTUnwrap(ObsidianNeverClosedUnaskedTests.body(of: "static func closeObsidianAndRegister(", in: source))
+        XCTAssertTrue(body.contains("ObsidianFigureAddOnsOffer.vaultsOpen("))
+        XCTAssertFalse(body.contains("openVaultPathsNow"), "a hidden Obsidian's courses would stay closed")
     }
 
     // MARK: - Nothing else can close it
@@ -381,7 +423,7 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
         opening.quitAndWait = {
             log.closes.append("quit")
         }
-        opening.closeAndRegister = { _, vault in
+        opening.closeAndRegister = { vault in
             log.closes.append(vault.path)
             if !log.closeSucceeds {
                 return false
@@ -420,6 +462,10 @@ final class ObsidianNeverClosedUnaskedTests: XCTestCase {
             index = code.index(after: index)
         }
         return nil
+    }
+
+    static func trail() -> String {
+        return ActivityTrail.store.activityText(includingPrompts: false)
     }
 
     static func rules() throws -> [String: Any] {
