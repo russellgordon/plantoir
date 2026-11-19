@@ -224,9 +224,10 @@ struct CourseCodePickerView: View {
             // popup open the arrows still move the insertion point and
             // Return goes on to the sheet — the keys keep their ordinary
             // meanings rather than being swallowed whenever this field
-            // happens to have focus. (The wizard has NO default button,
-            // since the HIG sweep's review measured a Return here creating
-            // the course with the form unread — `NewCourseWizardView`.)
+            // happens to have focus. (The wizard's Create Course is the
+            // default button only once the form is complete, since a Return
+            // here once created the course with the form unread — #457's
+            // review, #987, `NewCourseWizardView.formIsComplete`.)
             .onKeyPress(.upArrow) {
                 onMoveHighlight(-1) ? .handled : .ignored
             }

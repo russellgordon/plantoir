@@ -1520,6 +1520,14 @@
       "refusedWhileAnyAssistantWindowIsOpen": true,
       "messageNamesTheSectionToClose": true,
       "theCurrentlyChosenOneMayBeRemoved": true,
+      "asksFirst": true,
+      "asksFirstWhy": "#987 (finding D22; Apple's HIG, Alerts: when people take an uncommon destructive action that they can't undo, it's important to display an alert in case they initiated the action accidentally). Remove… beside a download asks words.question, with words.message under it; Cancel answers Escape and Command-Period, and Remove takes no Return.",
+      "words": {
+        "question": "Remove {assistant}?",
+        "message": "Its {size} download is deleted from this Mac. To use it again, download it again here.",
+        "removeButton": "Remove",
+        "fill": "{assistant} is the assistant's name in a sentence (the small assistant, the larger assistant); {size} is its download's size as the platform writes a file size."
+      },
       "why": "The refusal is about ANY open assistant, not about whether that window happens to use that rung: working out which file is genuinely mapped means tracking state neither app keeps, and getting it wrong deletes weights out from under a running engine. Removing the CHOSEN one is allowed on purpose - it is not a broken state, it is the state every machine is in before its first download, and refusing would trap a teacher who wants their disk space back behind a choice they did not want to change."
     },
     "guidance": {
@@ -15141,15 +15149,16 @@
     "neverAskWhen": "The quit came from the system rather than from the teacher: log out, restart, shut down, and the 'are you sure?' forms of each. A question raised there blocks the log out until the Mac gives up on the app and names it as the one that would not quit. Everything is left running instead, which is the same answer the quit path reaches on its own when it finds work in flight.",
     "buttons": {
       "titles": {
-        "keepWorking": "Keep Working",
+        "keepWorking": "Cancel",
         "quitAnyway": "Quit Anyway"
       },
-      "firstButtonByQuestion": {
-        "whileAnAssistantIsSetUp": "Finish Setting Up"
-      },
-      "firstButtonByQuestionWhy": "#855, Russell 2026-11-13 evening: the quit question while an outside assistant is being set up has its own first button, Finish Setting Up, which means keepWorking. It is used when set-ups are the only work under way (the question then names them); with a publish, a preview build or a copy also under way the question names those and keeps Keep Working. The meanings and their order never change: only the first title does. Each case may say expectFirstButton.",
-      "default": "keepWorking",
-      "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
+      "titlesWhy": "#987 (Apple's HIG, Alerts): \"Always use 'Cancel' to title a button that cancels the alert's action.\" keepWorking was titled Keep Working, and Finish Setting Up while set-ups were all that was under way (#855); with no button titled Cancel, Escape had no button (finding D7). Both questions now say Cancel.",
+      "order": ["keepWorking", "quitAnyway"],
+      "orderWhy": "Leading to trailing, as the teacher sees them (#987). Alerts: \"Cancel buttons are typically on the leading side of a row.\" On the mac NSAlert puts the first button it is given on the trailing side, so it is given quitAnyway first.",
+      "default": null,
+      "defaultWhy": "No button is the default (#987), so a Return pressed without reading does nothing. Alerts: \"Note that you don't want to make a Cancel button the default button\"; Buttons, Role: \"Don't assign the primary role to a button that performs a destructive action\", and quitting can leave a deploy part way. Until #987 keepWorking was the default. Whether quitAnyway should take Return (Alerts' Empty Trash sentence, for an action chosen on purpose) is an open question for Russell on #987.",
+      "escape": "keepWorking",
+      "escapeWhy": "Escape and Command-Period are Cancel, which is keepWorking. Alerts: \"Provide alternative ways to cancel an alert\", pressing Escape or Command-Period.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
@@ -15797,7 +15806,7 @@
       ]
     },
     "whileAnAssistantIsSetUp": {
-      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with its own first button (buttons.firstButtonByQuestion: Finish Setting Up, which is keepWorking) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
+      "rule": "#855. A set-up of Claude Code, Codex or GitHub Copilot under way makes quitting ask, with Cancel (keepWorking; its own first button, Finish Setting Up, until #987) and Quit Anyway. Quit Anyway asks the set-up to end, gives it at most outsideAgents.setUp.quitGraceMilliseconds, and then ends its whole process group outright before the app goes, and its record stays installing, so the next launch completes it if what it needed is there and is the maker's, or takes away what it had added (outsideAgents.setUp.record.atLaunch): which is what message promises.",
       "words": {
         "settingUpOne": "setting up {tool}",
         "settingUpSeveral": "setting up {n} assistants",
@@ -15828,7 +15837,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Keep Working",
+        "expectCancelButton": "Cancel",
         "why": "The case this exists for."
       },
       {
@@ -15938,7 +15947,7 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Finish Setting Up",
+        "expectCancelButton": "Cancel",
         "why": "#855 (Russell, 2026-11-13). A set-up stopped part way can leave a half-written program in the home folder; the teacher is asked, and Quit Anyway stops it for the next launch to settle. assistantsBeingSetUp is 0 when a case leaves it out."
       },
       {
@@ -15965,8 +15974,8 @@
           "quitReason": "theTeacherAskedToQuit"
         },
         "expectAsk": true,
-        "expectFirstButton": "Keep Working",
-        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website, so it keeps Keep Working; Finish Setting Up is only for a question about set-ups alone (buttons.firstButtonByQuestionWhy)."
+        "expectCancelButton": "Cancel",
+        "why": "#855 (fix review 4): the question names the deploy, whose loss reaches the class website. Until #987 that kept Keep Working where a question about set-ups alone said Finish Setting Up; both say Cancel now (buttons.titlesWhy)."
       }
     ]
   },
@@ -27243,9 +27252,8 @@
       "unreachableTitle": "That token cannot reach {count} of your class websites",
       "unreachableTitleOne": "That token cannot reach one of your class websites",
       "unreachableMessage": "Deployed with your old token: {sections}. A deploy with this one would make a new website at a new address, so students' links would stop working. The token may belong to another {service} account.",
-      "keepOldToken": "Keep My Old Token",
+      "cancelButton": "Cancel",
       "useNewToken": "Use the New Token",
-      "dontSaveNewToken": "Don't Save It",
       "placeSection": "{course} section {section}",
       "placeUnitPlans": "{course} unit plans for {year}",
       "deployScreenEndsSoon": "The Cloudflare token ends on {date}. Make a new one and change it in {deployingSettings} before then.",
@@ -27255,10 +27263,10 @@
     "placeholders": {
       "rule": "Two placeholders the words and the deploy-time lines carry besides {service}, {date}, {count}, {sections}, {course}, {section} and {year}. The computer's name is the contract's own machine placeholder (specialNames.platformWording.machine). {deployingSettings} is the path to the Deploying settings, which differs by platform; each app puts in its own (review W5).",
       "deployingSettings": {"mac": "Plantoir ▸ Settings ▸ Deploying", "windows": "File ▸ Settings ▸ Deploying"},
-      "apps": "dontSaveNewToken replaces keepOldToken on the question when no token was saved before the change (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
+      "apps": "The unreachable question's buttons (#987, Apple's HIG, Alerts): cancelButton, which answers Escape and Command-Period, then useNewToken, drawn as destructive; neither is the default, so Return does nothing, because the new token would move students' links. cancelButton replaced keepOldToken (\"Keep My Old Token\") and dontSaveNewToken (\"Don't Save It\"): \"Always use 'Cancel' to title a button that cancels the alert's action.\" Its trail line still depends on whether a token was saved before the change: keptOld when one was, refused with tokenCannotReachSites when none was (review M7). notAnswered (answerShape.fields.answer) is shown with statusNotAnswered and problemNotAnswered (review M2)."
     },
     "trail": {
-      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Don't Save It writes the refused line with tokenCannotReachSites rather than keptOld.",
+      "rule": "Five events (activityTrail.mustRecord): token changed in Settings, token removed in Settings, token change refused in Settings, old token kept in Settings, and the Cloudflare token's end date learned. Each carries the destination and, where it applies, the problem key, how many sections could not be reached, or the end date and what read it ({source}: sourceSettings, sourceDeploy or sourceScheduledDeploy). The end-date line is written only when the date the app keeps changes, so a deploy that reads the same date again writes nothing (review I4). Never the token, the Account ID, a site's name or an address. When no token was saved before the change, Cancel on the unreachable question writes the refused line with tokenCannotReachSites rather than keptOld.",
       "lines": {
         "changed": "Settings ▸ Deploying — changed the {service} token",
         "changedAnyway": "Settings ▸ Deploying — changed the {service} token, though it cannot reach {count} class website(s)",
@@ -37768,7 +37776,7 @@
       "reopenTitle": "Reopen Obsidian to show diagrams and graphs?",
       "reopenMessage": "{course} has diagrams or graphs that Obsidian can't draw yet. Obsidian sees the add-ons that draw them only when it opens the course again, so it closes and opens again. What you've written is kept.\n\nIf Obsidian asks whether you trust the author, click “Trust author and enable plugins”.",
       "reopen": "Reopen Obsidian",
-      "later": "Later",
+      "later": "Not Now",
       "paneTitle": "Obsidian",
       "settingLabel": "Add the add-ons that draw diagrams and graphs to courses that have them",
       "settingFooter": "Plantoir adds them when you open such a course in Obsidian from Plantoir, and after you preview it. The first time each course opens with them, Obsidian asks whether you trust its author: click “Trust author and enable plugins” — pressing Return chooses “Browse vault in Restricted Mode”. If a course still shows a drawing's text, open Obsidian's Settings ▸ “Community plugins” and click “Exit Restricted mode”. Turning this off adds nothing new and leaves what was added in place."
@@ -43761,7 +43769,7 @@
         "whatChangesItValue": "Sharing these plans again",
         "earlierYearsLabel": "Earlier years",
         "earlierYearsValue": "Keep the password they were shared with",
-        "later": "Later",
+        "later": "Not Now",
         "newPasswordNotInUse": "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
       },
       "refusals": {

@@ -1486,6 +1486,16 @@ nonisolated enum AssistWording {
     /// is the same courtesy every other write in the window already gets.
     static let mayIAskForYourDates: String = "May I ask you for your class dates?"
 
+    /// The button that says yes to `mayIAskForYourDates` (#987, D9): it was
+    /// "Yes". Alerts: "Aim for a one- or two-word title that describes the
+    /// result of selecting the button"; "In informational alerts only, you
+    /// can use 'OK' for acceptance, avoiding 'Yes' and 'No.'" The result is
+    /// the class-dates sheet, so the title ends in an ellipsis (Buttons ▸
+    /// macOS: "Append a trailing ellipsis to the title when a push button
+    /// opens another window, view, or app."). "Dates" is the noun in a club
+    /// too, so one title serves both.
+    static let giveDatesButton: String = "Add Dates…"
+
     /// The same question in the course's own noun (#267). Only the card in
     /// the window says it this way: the sentences that carry the question
     /// back to the model keep `mayIAskForYourDates` as it is.

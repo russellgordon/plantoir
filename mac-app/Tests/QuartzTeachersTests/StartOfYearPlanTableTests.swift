@@ -161,13 +161,16 @@ final class StartOfYearPlanTableTests: XCTestCase {
                        "the table's frame and its rows disagree: a scroll inside, or an empty band")
     }
 
-    /// Return is Go while the table has focus — the table must not swallow
-    /// the sheet's default key. The backup is made to fail, so the press is
-    /// seen by the sheet refusing and nothing is written. (Escape goes
-    /// through `dismiss`, which this host cannot observe; the opt-in
-    /// `ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+    /// Return does NOT press Put These into Draft (#987, D39, Russell's
+    /// ruling Q-B on #975), with the table focused or not: the sheet's own
+    /// warning says students lose classes, so no button is the default.
+    /// Until #987 Return was Go, and this test pinned that the table did not
+    /// swallow it. The backup is made to fail, so a press that did reach Go
+    /// would show as the sheet refusing; nothing is written either way.
+    /// (Escape goes through `dismiss`, which this host cannot observe; the
+    /// opt-in `ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
     /// presses it in the running app, after clicking the table's header.)
-    func testReturnGoesWhileTheTableHasFocus() async throws {
+    func testReturnDoesNotPutThePagesIntoDraft() async throws {
         let made = try AssistFixture.makeRunner()
         defer {
             try? FileManager.default.removeItem(at: made.root)
@@ -179,23 +182,27 @@ final class StartOfYearPlanTableTests: XCTestCase {
             host.close()
         }
         let table: NSTableView = try XCTUnwrap(host.tables().first)
-        host.select(row: 1, in: table)
-        XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
-        host.press(keyCode: 36, characters: "\r")
-        var waited: Int = 0
-        while waited < 20 {
-            if case .problem = model.stage {
-                break
+        for focusTheTable in [false, true] {
+            if focusTheTable {
+                host.select(row: 1, in: table)
+                XCTAssertTrue(host.window.firstResponder === table, "the table did not take focus")
             }
-            // Go starts a Task on the main actor; let it run.
-            try await Task.sleep(for: .milliseconds(100))
-            host.pump(0.05)
-            waited += 1
+            guard case .ready = model.stage else {
+                return XCTFail("the sheet is not ready to be answered")
+            }
+            host.press(keyCode: 36, characters: "\r")
+            var waited: Int = 0
+            while waited < 10 {
+                // Go would start a Task on the main actor; give it the
+                // chance it had when Return was Go.
+                try await Task.sleep(for: .milliseconds(100))
+                host.pump(0.05)
+                waited += 1
+            }
+            guard case .ready = model.stage else {
+                return XCTFail("Return went ahead (table focused: \(focusTheTable), notice: \(model.notice ?? "none"))")
+            }
         }
-        guard case .problem(let sentence) = model.stage else {
-            return XCTFail("Return did not reach Go with the table focused (notice: \(model.notice ?? "none"))")
-        }
-        XCTAssertEqual(sentence, StartOfYearWording.backupFailed(course: "ICS3U"))
     }
 
     // MARK: - The height budget

@@ -411,6 +411,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { request in
             Text(request.message)
         }
@@ -424,6 +425,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { item in
             Text(restoreMessage(for: item))
         }
@@ -445,12 +447,14 @@ struct SidebarView: View {
                 }
                 Button("Cancel", role: .cancel) {
                 }
+                .keyboardShortcut(.cancelAction)
             } else {
                 Button("Restore") {
                     Task { await workspace.restoreBackup(item) }
                 }
                 Button("Cancel", role: .cancel) {
                 }
+                .keyboardShortcut(.cancelAction)
             }
         } message: { item in
             if let sectionNumber = workspace.backupRestoreOfferedSection {
@@ -481,6 +485,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { item in
             Text(singleBackupDeleteMessage(for: item))
         }
@@ -494,6 +499,7 @@ struct SidebarView: View {
             }
             Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { item in
             // The app knows what deleting would leave behind — the live
             // course, another archive or backup, or nothing at all — so
@@ -610,8 +616,13 @@ struct SidebarView: View {
             Button("Cancel It", role: .destructive) {
                 cancelScheduledDeploy(request)
             }
-            Button("Leave It Scheduled", role: .cancel) {
+            // Cancel, not "Leave It Scheduled" (#987): the teacher started
+            // this.
+            // Alerts: "Always use 'Cancel' to title a button that cancels the
+            // alert's action."
+            Button("Cancel", role: .cancel) {
             }
+            .keyboardShortcut(.cancelAction)
         } message: { request in
             Text(cancelMessage(for: request))
         }
@@ -2866,6 +2877,7 @@ private struct CourseRenameAlerts: ViewModifier {
                 Button("Cancel", role: .cancel) {
                     workspace.obsidianRenameRequest = nil
                 }
+                .keyboardShortcut(.cancelAction)
             } message: { request in
                 Text(CourseRenamer.obsidianQuestion(openVaultCount: request.openVaultPaths.count))
             }

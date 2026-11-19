@@ -535,6 +535,7 @@ enum AssistContract {
             "linkedClassStaysVisibleForAMeeting": AssistPublishPlan.stayingVisibleLine(
                 title: "Week 4", reason: .aClassOfItsOwn, noun: .meeting
             ),
+            "giveDatesButton": AssistWording.giveDatesButton,
             "mayIAskForYourDates": AssistWording.mayIAskForYourDates(for: .class),
             "mayIAskForYourDatesForAMeeting": AssistWording.mayIAskForYourDates(for: .meeting),
             "datesNotGivenYet": AssistWording.datesNotGivenYet(for: .class),

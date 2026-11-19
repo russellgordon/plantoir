@@ -115,11 +115,131 @@ final class SheetConventionScanTests: XCTestCase {
         }
     }
 
+    // MARK: - Escape and Cancel (#987)
+
+    /// Cancel buttons allowed NOT to answer Escape, by a fragment of their
+    /// arguments, with the reason.
+    ///
+    /// - The lone OK of the folder-refused alert and the dismissal of the
+    ///   repair's outcome, which can be an alert's only button: given
+    ///   Escape, a lone button may lose Return, and it is the answer either
+    ///   way. Their titles are #996's and #987's question, not their keys.
+    /// - The task console's pending question: the progress panel's keys are
+    ///   #988's piece.
+    static let cancelWithoutEscapeAllowed: [String] = [
+        "WorkingFolderReachWording.alertOKButton",
+        "afterARepair: true",
+        "TaskProgressView.swift",
+    ]
+
+    /// Every Cancel answers Escape and Command-Period, bound the same way
+    /// everywhere (#987, as #973 settled for the facts sheets): a button
+    /// with `role: .cancel` carries `.keyboardShortcut(.cancelAction)`.
+    /// Keyboards: "Esc: Cancel the current action or process";
+    /// "Command-Period: Cancel an operation." Until #987 Cancel was bound by
+    /// `.cancelAction`, by `.onExitCommand` only, or by the role only
+    /// (inventory inconsistency 2); `.onExitCommand` alone does not fire with
+    /// Keyboard Navigation off (#973). In an alert the key changes nothing
+    /// (`AlertKeysTests`), so alerts follow the same rule.
+    func testEveryCancelAnswersEscape() throws {
+        let buttons: [Chain] = try SheetConventionScanTests.allButtons()
+        var cancels: Int = 0
+        var problems: [String] = []
+        for button in buttons {
+            if !button.arguments.contains("role: .cancel") {
+                continue
+            }
+            cancels += 1
+            var allowed: Bool = false
+            for fragment in SheetConventionScanTests.cancelWithoutEscapeAllowed {
+                if button.arguments.contains(fragment) || button.location.hasPrefix(fragment) {
+                    allowed = true
+                }
+            }
+            if allowed {
+                continue
+            }
+            // `.keyboardShortcut(.cancelAction)`, or the same key taken off
+            // while a picker field's list is open (Copy a Page, the wizard).
+            if !button.chain.contains(".keyboardShortcut(") || !button.chain.contains(".cancelAction)") {
+                problems.append(button.location + " is a Cancel with no .keyboardShortcut(.cancelAction)")
+            }
+        }
+        XCTAssertGreaterThanOrEqual(cancels, 40, "The scan found only \(cancels) Cancel buttons; its pattern has stopped matching")
+        XCTAssertEqual(problems, [], "Every Cancel answers Escape (#987)")
+    }
+
+    /// No Cancel is the default button (#987, D1 to D4). Alerts: "Note that
+    /// you don't want to make a Cancel button the default button." A button
+    /// has one key, so a Cancel holding Return left Escape with no button
+    /// (#832).
+    func testNoCancelIsTheDefault() throws {
+        var problems: [String] = []
+        for button in try SheetConventionScanTests.allButtons() {
+            if button.arguments.contains("role: .cancel") && SheetConventionScanTests.hasDefaultShortcut(button.chain) {
+                problems.append(button.location + " is a Cancel and the default button")
+            }
+        }
+        XCTAssertEqual(problems, [], "Cancel is never the default (#987)")
+    }
+
+    /// A button titled Cancel has the cancel role (#987), so the rule above
+    /// sees it, VoiceOver and the system know it, and an alert orders it.
+    /// The progress panel's Cancel is #988's.
+    func testEveryButtonTitledCancelHasTheCancelRole() throws {
+        var problems: [String] = []
+        for button in try SheetConventionScanTests.allButtons() {
+            // The assistant's approval card sits in its window, not in a
+            // question sheet or an alert, and #987 left its keys alone.
+            if button.location.hasPrefix("AssistWindowView.swift") && button.arguments.contains("action: decline") {
+                continue
+            }
+            if !button.arguments.hasPrefix("(\"Cancel\"") || button.location.hasPrefix("TaskProgressView.swift") {
+                continue
+            }
+            if !button.arguments.contains("role: .cancel") {
+                problems.append(button.location + " is titled Cancel without role: .cancel")
+            }
+        }
+        XCTAssertEqual(problems, [], "A Cancel has the cancel role (#987)")
+    }
+
+    /// The actions #987 took the default from, and Create Course, which it
+    /// made the default once the form is complete, read as written: a scan,
+    /// since these sheets need a whole course to draw.
+    func testTheDefaultsRuledOnInNineEightySevenAreAsWritten() throws {
+        let views: URL = TextFieldStyleScanTests.viewsURL()
+        let getReady: String = try String(contentsOf: views.appendingPathComponent("Section/StartOfYearSheet.swift"), encoding: .utf8)
+        var goChains: [String] = []
+        for button in SheetConventionScanTests.chains(of: "Button(", in: getReady, file: "StartOfYearSheet.swift") {
+            if button.arguments.contains("StartOfYearWording.goButton") {
+                goChains.append(button.chain)
+            }
+        }
+        XCTAssertEqual(goChains.count, 1, "Put These into Draft")
+        XCTAssertTrue(goChains.first?.contains("isTheDefault: false") == true, "Put These into Draft is not the default (D39): \(goChains)")
+
+        let wizard: String = try String(contentsOf: views.appendingPathComponent("Wizard/NewCourseWizardView.swift"), encoding: .utf8)
+        var createChains: [String] = []
+        for button in SheetConventionScanTests.chains(of: "Button(", in: wizard, file: "NewCourseWizardView.swift") {
+            if button.chain.contains("\"createCourseButton\"") {
+                createChains.append(button.chain)
+            }
+        }
+        XCTAssertEqual(createChains.count, 1, "Create Course")
+        XCTAssertTrue(createChains.first?.contains("isTheDefault: formIsComplete") == true, "Create Course is the default once the form is complete (D32): \(createChains)")
+        XCTAssertFalse(createChains.first?.contains(".prominentButton(") == true, "Create Course no longer looks like the default without being one (D32)")
+    }
+
     // MARK: - Helpers
 
     struct Chain {
         var location: String
         var chain: String
+
+        /// What is written between the call's own parentheses, or "" for
+        /// the trailing-closure form (#987).
+        var arguments: String = ""
     }
 
     struct Block {
@@ -265,7 +385,16 @@ final class SheetConventionScanTests: XCTestCase {
                 end = cursor
             }
             let chain: String = String(original[chainStart..<max(chainStart, end)])
-            result.append(Chain(location: file + ":" + String(lineNumber(of: start, in: original)), chain: chain))
+            var arguments: String = ""
+            if let open = argumentsAt[position] {
+                let close: Int = TextFieldStyleScanTests.closing(from: open, in: masked, open: "(", close: ")")
+                arguments = String(original[open..<close])
+            }
+            result.append(Chain(
+                location: file + ":" + String(lineNumber(of: start, in: original)),
+                chain: chain,
+                arguments: arguments
+            ))
         }
         return result
     }
