@@ -115,6 +115,7 @@ struct ScheduleDeploySheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("scheduleDeployCancelButton")
 
                 Button("Schedule") {

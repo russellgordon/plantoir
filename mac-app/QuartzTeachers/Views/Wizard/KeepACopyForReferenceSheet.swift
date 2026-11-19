@@ -159,6 +159,7 @@ struct KeepACopyForReferenceSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button("Keep a Copy") {
                     keepACopy()
                 }

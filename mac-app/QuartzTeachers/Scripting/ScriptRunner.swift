@@ -928,6 +928,9 @@ class ScriptRunner {
         // What this build downloaded for its pages the first time they used
         // it, or why it stopped without it (#674).
         KeptDownloadsReport.noteOnTheTrail(from: text)
+        // Which course files this build's site leaves off, and anything the
+        // check after the build put back or took out (#901).
+        SiteFilesReport.noteOnTheTrail(from: text)
         // A How I Teach page the course had listed for the website, kept off
         // it by this build (#209).
         HowITeachKeptOffReport.noteOnTheTrail(from: text)

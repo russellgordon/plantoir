@@ -369,9 +369,14 @@ private struct LockedPagesNoteAlert: ViewModifier {
             Button("Open in Obsidian") {
                 workspace.openInObsidianAfterTheNote(shown)
             }
-            Button("Not Now", role: .cancel) {
+            // Cancel, not "Not Now" (#987): the teacher chose Open in
+            // Obsidian, and this note stands in front of it.
+            // Alerts: "Always use 'Cancel' to title a button that cancels the
+            // alert's action."
+            Button("Cancel", role: .cancel) {
                 workspace.lockedPagesNoteRequest = nil
             }
+            .keyboardShortcut(.cancelAction)
         } message: { _ in
             // No warning icon and no "cannot": a teacher who kept this course
             // for reference asked for it, so it reads as a fact.
@@ -444,6 +449,7 @@ private struct ObsidianAddOnsOfferDialog: ViewModifier {
                     await workspace.answerObsidianAddOnsOffer(shown, answered)
                 }
             }
+            .keyboardShortcut(.cancelAction)
         } message: { shown in
             Text(ObsidianFigureAddOnsWording.offerText(course: shown.course.code, openState: shown.openState))
         }
@@ -494,6 +500,7 @@ private struct ObsidianReopenAlert: ViewModifier {
                     await workspace.answerObsidianReopen(shown, reopen: false)
                 }
             }
+            .keyboardShortcut(.cancelAction)
         } message: { shown in
             Text(ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.reopenMessage, course: shown.course.code))
         }

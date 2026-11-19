@@ -18,6 +18,7 @@ final class AdditionalDeployTargetsTests: XCTestCase {
         let data: Data = try JSONSerialization.data(withJSONObject: values, options: [.prettyPrinted, .sortedKeys])
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("additional_targets_config_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try data.write(to: fileURL)
         return try CourseConfiguration(contentsOf: fileURL)
     }
@@ -45,6 +46,7 @@ final class AdditionalDeployTargetsTests: XCTestCase {
         let configuration: CourseConfiguration = try roundTripped(["course_code": "ICS3U", "deploy_target": "netlify"])
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("unchanged_\(UUID().uuidString).json")
+        removeWhenTestEnds(fileURL)
         try configuration.write(to: fileURL)
 
         let written: String = try String(contentsOf: fileURL, encoding: .utf8)
@@ -63,6 +65,8 @@ final class AdditionalDeployTargetsTests: XCTestCase {
 
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("roundtrip_\(UUID().uuidString).json")
+
+        removeWhenTestEnds(fileURL)
         try configuration.write(to: fileURL)
         let reread: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
 
@@ -90,6 +94,8 @@ final class AdditionalDeployTargetsTests: XCTestCase {
 
         let fileURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("preserve_\(UUID().uuidString).json")
+
+        removeWhenTestEnds(fileURL)
         try configuration.write(to: fileURL)
         let reread: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
 

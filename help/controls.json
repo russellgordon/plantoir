@@ -114,7 +114,7 @@
    "windows": null
   },
   "notToday": {
-   "label": "Not Today",
+   "label": "Not Now",
    "mac": {
     "say": "class-planning#todaysClassOnTheFrontPage.wording.notToday"
    },
@@ -260,10 +260,24 @@
    },
    "windows": null
   },
-  "addNextClassTitle": {
-   "label": "Add next class",
+  "addClassWayNextInThisUnit": {
+   "label": "As the next class in the unit under way",
    "mac": {
-    "say": "assist-wording#wording.menuAddNextClassTitle"
+    "say": "assist-wording#wording.menuAddClassNextInThisUnit"
+   },
+   "windows": null
+  },
+  "addClassWayInANewUnit": {
+   "label": "In a new unit, as its first class",
+   "mac": {
+    "say": "assist-wording#wording.menuAddClassInANewUnit"
+   },
+   "windows": null
+  },
+  "addClassWayAsACopy": {
+   "label": "As a copy of a class in this section",
+   "mac": {
+    "say": "assist-wording#wording.menuAddClassAsACopy"
    },
    "windows": null
   },
@@ -372,24 +386,24 @@
    },
    "windows": null
   },
-  "cancelScheduledDeployQuestion": {
-   "label": "Cancel this scheduled deploy?",
+  "removeScheduledDeployQuestion": {
+   "label": "Remove the scheduled deploy?",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.question"
    },
    "windows": null
   },
-  "cancelIt": {
-   "label": "Cancel It",
+  "removeScheduledDeployButton": {
+   "label": "Remove",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.removeButton"
    },
    "windows": null
   },
-  "leaveItScheduled": {
-   "label": "Leave It Scheduled",
+  "removeScheduledDeployCancel": {
+   "label": "Cancel",
    "mac": {
-    "file": "mac-app/QuartzTeachers/Views/SidebarView.swift"
+    "say": "shared-rules#scheduledDeployCancellation.removingOne.words.cancelButton"
    },
    "windows": null
   },
@@ -702,7 +716,7 @@
    "windows": null
   },
   "addOnsLater": {
-   "label": "Later",
+   "label": "Not Now",
    "mac": {
     "say": "shared-rules#obsidianAddOnsForFigures.wording.later"
    },
@@ -1535,9 +1549,9 @@
    "windows": null
   },
   "deployTokensKeepMyOldToken": {
-   "label": "Keep My Old Token",
+   "label": "Cancel",
    "mac": {
-    "say": "shared-rules#deployTokens.words.keepOldToken"
+    "say": "shared-rules#deployTokens.words.cancelButton"
    },
    "windows": null
   },
@@ -1545,13 +1559,6 @@
    "label": "Use the New Token",
    "mac": {
     "say": "shared-rules#deployTokens.words.useNewToken"
-   },
-   "windows": null
-  },
-  "deployTokensDontSaveIt": {
-   "label": "Don't Save It",
-   "mac": {
-    "say": "shared-rules#deployTokens.words.dontSaveNewToken"
    },
    "windows": null
   },
@@ -2375,7 +2382,7 @@
    "windows": null
   },
   "quitQuestionKeepWorkingButton": {
-   "label": "Keep Working",
+   "label": "Cancel",
    "mac": {
     "wording": "QuitConfirmation.keepWorkingButton"
    },
@@ -2494,7 +2501,7 @@
    "windows": null
   },
   "assistantRemoveButton": {
-   "label": "Remove",
+   "label": "Remove…",
    "mac": {
     "file": "mac-app/QuartzTeachers/Views/Settings/AssistantSettingsView.swift"
    },

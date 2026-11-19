@@ -58,7 +58,7 @@ In the example, Section 2 meets one school day after Section 1. Unit 1, Day 13 i
 
 ## Making the next class page
 
-Choose {{menu:addClass}}. Plantoir makes the next numbered page in the selected section. [Add the next class](page:add-next-class) has the steps.
+Choose {{menu:addClass}}. A sheet asks how the class should be added. It can be the next class in the unit under way, the first class of a new unit, or a copy of an earlier class. Plantoir then makes the page in the selected section, named and dated. [Add a class](page:add-next-class) has the steps.
 
 ## Most Recent Class on the front page
 

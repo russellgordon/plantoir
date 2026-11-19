@@ -84,6 +84,7 @@ struct SetSchoolYearSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Button("Set School Year") {
                     setSchoolYear()
                 }

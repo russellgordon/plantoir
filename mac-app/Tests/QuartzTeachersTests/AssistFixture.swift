@@ -64,6 +64,7 @@ enum AssistFixture {
         let fileManager: FileManager = FileManager.default
         let root: URL = fileManager.temporaryDirectory
             .appendingPathComponent("assist-tools-\(UUID().uuidString)")
+        TemporaryFolders.removeWhenThisTestEnds(root)
         let courseURL: URL = root.appendingPathComponent("courses").appendingPathComponent("ICS3U")
         try fileManager.createDirectory(
             at: courseURL.appendingPathComponent("section1/All Classes"), withIntermediateDirectories: true

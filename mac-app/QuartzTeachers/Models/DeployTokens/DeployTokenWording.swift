@@ -67,9 +67,12 @@ nonisolated enum DeployTokenWording {
     nonisolated static let unreachableTitleOne: String = "That token cannot reach one of your class websites"
     nonisolated static let unreachableMessage: String =
         "Deployed with your old token: {sections}. A deploy with this one would make a new website at a new address, so students' links would stop working. The token may belong to another {service} account."
-    nonisolated static let keepOldToken: String = "Keep My Old Token"
+    /// The question's button that backs out (#987): "Keep My Old Token", or
+    /// "Don't Save It" when there was none, until then. The teacher started
+    /// the change, so it is Cancel. Alerts: "Always use 'Cancel' to title a
+    /// button that cancels the alert's action."
+    nonisolated static let cancelButton: String = "Cancel"
     nonisolated static let useNewToken: String = "Use the New Token"
-    nonisolated static let dontSaveNewToken: String = "Don't Save It"
     nonisolated static let placeSection: String = "{course} section {section}"
     nonisolated static let placeUnitPlans: String = "{course} unit plans for {year}"
     nonisolated static let deployScreenEndsSoon: String =
@@ -133,9 +136,8 @@ nonisolated enum DeployTokenWording {
             "unreachableTitle": unreachableTitle,
             "unreachableTitleOne": unreachableTitleOne,
             "unreachableMessage": unreachableMessage,
-            "keepOldToken": keepOldToken,
+            "cancelButton": cancelButton,
             "useNewToken": useNewToken,
-            "dontSaveNewToken": dontSaveNewToken,
             "placeSection": placeSection,
             "placeUnitPlans": placeUnitPlans,
             "deployScreenEndsSoon": deployScreenEndsSoon,

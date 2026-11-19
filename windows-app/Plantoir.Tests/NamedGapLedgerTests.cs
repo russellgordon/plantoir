@@ -336,6 +336,23 @@ public class NamedGapLedgerTests
         Assert.Contains("the contract no longer names it", withdrawn.Message);
     }
 
+    /// <summary>
+    /// The renamed-menu-item area (the fourth hold, 2026-11-14): each entry has
+    /// exactly one older name, and no older name is left without its entry,
+    /// so the map cannot outlive the hold it serves.
+    /// </summary>
+    [Fact]
+    public void EveryItemHeldUnderAnOlderNameHasOneAndOnlyThose()
+    {
+        var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItemsUnderAnOlderName)
+            .Select(entry => entry.Key).OrderBy(key => key, StringComparer.Ordinal).ToList();
+        Assert.Equal(held, NamedGapLedger.SubjectMenuItemsOlderNames.Keys.OrderBy(key => key, StringComparer.Ordinal).ToList());
+        // An item held as missing outright is taken out of every comparison
+        // before its older name is read, so holding it here too would hold nothing.
+        var missing = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItems).Select(entry => entry.Key).ToHashSet();
+        Assert.Empty(held.Where(missing.Contains));
+    }
+
     private static System.Collections.Generic.List<string> Problems(
         System.Collections.Generic.IEnumerable<NamedGapLedger.Entry> entries, string baseline, string described)
     {

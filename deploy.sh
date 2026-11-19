@@ -3235,7 +3235,8 @@ this computer.
      what you get back if you skip this does not mention accounts at all.
   6. Under "TTL", set the end date to after the end of your school year —
      next July is a safe choice — or leave it with no end date. An expired
-     token stops your deploys working, with nothing to say why.
+     token stops your deploys working. The next deploy then says the saved
+     token no longer works, and clears it.
   7. Choose "Continue to summary", then "Create Token".
   8. Copy the long code Cloudflare shows you — it is only shown once — and
      paste it below. Nothing appears as you paste; that is normal.
@@ -3405,10 +3406,11 @@ this computer.
   2. Choose "New access token".
   3. Describe it as something you will recognise later, such as
      "Class websites".
-  4. Change the expiry — it starts at 7 days. A token that expires stops
-     your deploys working, with nothing on screen to say why, so set a
-     date after the end of your school year: next July is a safe choice.
-     Choose "No expiration" instead if it is offered.
+  4. Change the expiry — it starts at 7 days. Set a date after the end of
+     your school year: next July is a safe choice. Choose "No expiration"
+     instead if it is offered. An expired token stops your deploys working.
+     The next deploy then says the saved token no longer works, and clears
+     it.
   5. Choose "Generate token", then copy the long code Netlify shows you —
      it is only shown once.
   6. Paste it below. Nothing appears as you paste; that is normal.
