@@ -138,6 +138,29 @@ final class AboutWindowLinksTests: XCTestCase {
         }
     }
 
+    /// Every link can be pressed by an assistive app, whether Keyboard
+    /// Navigation is on or off. With it off, macOS moves Tab only between
+    /// text fields and lists in every app, so a person who cannot use the
+    /// pointer reaches a link the way the HIG gives them: VoiceOver, whose
+    /// rotor lists the window's links ("Support the VoiceOver rotor"), or
+    /// Full Keyboard Access ("navigate and activate windows, menus,
+    /// controls, and system features using only the keyboard"). Both
+    /// activate a link through its press action, which this reads; it does
+    /// not skip with Keyboard Navigation off.
+    func testEveryAboutLinkCanBePressedByAnAssistiveApp() throws {
+        let hosted = try hostTheAboutView()
+        defer {
+            hosted.host.close()
+        }
+        let read: AccessibilityTree = AccessibilityTree(ofWindowTitled: hosted.title)
+        for expected in expectedLinks {
+            guard let link = read.element(identifiedAs: expected.identifier) else {
+                continue
+            }
+            XCTAssertTrue(link.actions.contains("AXPress"), "an assistive app cannot press \(expected.words): its actions are \(link.actions)")
+        }
+    }
+
     /// With Keyboard Navigation on (System Settings ▸ Keyboard), Tab
     /// stops once on each of the six links and then comes round again.
     /// Inline Markdown links are never stops: with them back, Tab stops

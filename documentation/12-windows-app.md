@@ -13565,11 +13565,19 @@ The design, the ruling (option A of `vm-tools/reference/993-about-window-design.
 and the reasons are the mac's: `09-mac-app.md` → "The About window's links
 (D46, #993's second piece)". This section says where Windows does it.
 
-**What was wrong.** `AboutDialog.cs` built "Quartz", "sponsoring him on
-GitHub", "Phosphor Icons" and "Russell Gordon" as inline `Hyperlink`s inside
-a `TextBlock`'s sentences. An inline link is a text range, not an element of
-its own with a name a screen reader lists and the words a keyboard user Tabs
-to.
+**What was there, and why it changed.** `AboutDialog.cs` built "Quartz",
+"sponsoring him on GitHub", "Phosphor Icons" and "Russell Gordon" as inline
+`Hyperlink`s inside a `TextBlock`'s sentences. Unlike the mac's inline
+Markdown links, these were NOT broken for a screen reader or a keyboard:
+measured on the Windows VM on 2026-11-19 with the old panel put back in a
+scratch copy, UI Automation gave all six links as enabled, keyboard-focusable
+Hyperlink elements with their own words, and Tab from Website reached Email,
+Quartz, "sponsoring him on GitHub", Phosphor Icons, Russell Gordon, Close and
+round again. The change on Windows is the ruling's last line, "the Windows
+About panel follows": the same layout and words as the mac, not a fix of a
+Windows fault. An inline `Hyperlink` takes no AutomationId (asking UI
+Automation for one throws `PropertyNotSupportedException`), which is the one
+thing the old panel could not give a test to find each link by.
 
 **Where it is now.** All six links are `HyperlinkButton`s of their own, made
 by one helper, `Link(uri, words, automationId)`, which gives each an
@@ -13592,7 +13600,14 @@ gives it to a screen reader: exactly six elements of control type Hyperlink,
 each with its own words, enabled, keyboard-focusable and on screen, then
 presses Tab from the dialog's first stop until every one of the six has held
 the focus. Measured on the Windows VM (Parallels, Windows 11 Pro ARM64, the
-app win-x64 under emulation), 2026-11-19: 1 of 1 passed, 17 s. Nothing is
+app win-x64 under emulation), 2026-11-19: 1 of 1 passed, 17 s. Against the
+old panel (put back in a scratch copy on the VM, 2026-11-19) the four source
+tests fail ("a link is built inside a sentence (new Hyperlink)", "no link of
+its own reads "https://plantoir.app" (aboutWebsiteLink)", and the rows and
+the sentence not found), and the UI test fails with "the About panel has no
+aboutWebsiteLink". Read that UI failure for what it is: the old panel passes
+the count of six, enabled, focusable and Tab parts, and fails only on the
+AutomationIds and the sponsor link's new words. Nothing is
 pressed, so no browser or mail program opens.
 
 ## Windows never closes Obsidian unasked (#1003, the mac's #995)

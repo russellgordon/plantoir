@@ -20326,7 +20326,14 @@ repetitive animations".
   `AccessibilityTree`: each link by identifier (`aboutQuartzLink` and the
   rest) is an enabled link with its own words, the window holds exactly
   those six, the sentence is read whole, the credits' labels are words of
-  their own, and with Keyboard Navigation on, Tab stops once on each of the six and
+  their own, every link offers the press action an assistive app uses (VoiceOver's
+  rotor, Full Keyboard Access), which is how the HIG has a person reach it
+  with Keyboard Navigation off, when macOS moves Tab only between text
+  fields and lists (that test runs in both modes; measured live in an
+  isolated debug build on 2026-11-19 with Keyboard Navigation off, Tab
+  left the focus on the window and reached no link, and each of the six
+  offered AXPress), and with Keyboard
+  Navigation on, Tab stops once on each of the six and
   comes round again (that test skips, saying why, with it off; in the test
   host the accessibility API names no focused element, so it counts the
   window's first responders, and the words of each stop were read live). With the inline links put
@@ -20351,7 +20358,9 @@ repetitive animations".
   place of inline `Hyperlink`s, the same words and rows; its source is
   pinned by `AboutDialogLinksSourceTests`, what UI Automation gives a
   screen reader and where Tab goes by `AboutDialogLinksUiTests`
-  (`12-windows-app.md` → "The About panel's links"), and the sentence holds the word
+  (`12-windows-app.md` → "The About panel's links"; there the inline links
+  were already enabled, focusable and reached by Tab, measured, so Windows
+  changed to follow the mac's layout, not to fix a fault), and the sentence holds the word
   "Quartz" through a constant so the label scan's one exception (the bare
   credit name) still covers it.
 - **Tests read what the app exposes.** `AccessibilityTreeTests` hosts the
