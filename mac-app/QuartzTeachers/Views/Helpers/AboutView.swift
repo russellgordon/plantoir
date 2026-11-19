@@ -145,10 +145,13 @@ struct AboutView: View {
         .padding(outerPadding)
         .frame(width: panelWidth, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
-        // Without this, the window opens with a focus ring around the
-        // support link — the panel has nothing else to focus. The links
-        // still work; they just stop being haloed on arrival.
-        .focusEffectDisabled()
+        // No `.focusEffectDisabled()` (#993b). It was added on 2026-08-10
+        // so the window did not open with a ring around its one link; with
+        // six links Tab reaches under Keyboard Navigation, it hid where the
+        // focus was (measured: Tab moved through all six with no ring). The
+        // HIG's Focus and Selection page: "Rely on system-provided focus
+        // effects" and "Indicate focus using visual appearances that are
+        // consistent with the platform."
     }
 
     /// The application icon itself — the compiled artwork macOS shows in

@@ -20132,9 +20132,22 @@ repetitive animations".
   `AccessibilityTree`: each link by identifier (`aboutQuartzLink` and the
   rest) is an enabled link with its own words, the window holds exactly
   those six, the sentence is read whole, the credits' labels are words of
-  their own, and with Keyboard Navigation on, Tab reaches the six in order
-  (that test skips, saying why, with it off). With the inline links put
-  back the first two fail. Rejected: splitting each sentence around its
+  their own, and with Keyboard Navigation on, Tab stops once on each of the six and
+  comes round again (that test skips, saying why, with it off; in the test
+  host the accessibility API names no focused element, so it counts the
+  window's first responders, and the words of each stop were read live). With the inline links put
+  back (measured 2026-11-19, `dev`'s `AboutView` in place of this one) four of
+  the five fail: no link has its identifier, four read as disabled, the
+  credits have no labels of their own, and Tab stops only twice. The window's `.focusEffectDisabled()` (added
+  2026-08-10 so the window did not open with a ring around its one link)
+  is gone: measured live in an isolated debug build with Keyboard
+  Navigation on, Tab moved through all six links with no ring drawn on
+  any, so a keyboard user could not see where they were. The HIG's Focus
+  and Selection page asks to "rely on system-provided focus effects" and to
+  "indicate focus using visual appearances that are consistent with the
+  platform". The cost is the ring that macOS draws around the Website link
+  when the window opens with Keyboard Navigation on; with it off no link
+  takes focus and nothing is drawn. Rejected: splitting each sentence around its
   link (SwiftUI wraps mixed `Text` and `Link` pieces as blocks, so the
   sentence breaks oddly at larger text sizes), a row of four link buttons
   (reads as actions, wider than the window at larger sizes), and hiding the
