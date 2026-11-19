@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = keptDownloadsStopExplanation(in: output) {
             return reason
         }
+        if let reason = followLimitStopExplanation(in: output) {
+            return reason
+        }
         if let reason = sectionIsBeingDeployedExplanation(in: output) {
             return reason
         }
@@ -147,6 +150,29 @@ struct FailureExplainer {
             return filledInOnePass(keptDownloadsStopExplained, values: [
                 "first": first, "items": items.joined(separator: "; ")
             ])
+        }
+        return nil
+    }
+
+    /// The words both forms of the build's stop at the follow limit carry
+    /// (#901, piece 901a): `shared-rules.json` → `siteFiles.words`
+    /// `followLimitStopped` and `followLimitStoppedPreview`. Quartz's own
+    /// error line above them (`siteFiles.followed.limitReached`) does not
+    /// carry them. Pinned to the contract by
+    /// `SiteFilesReportTests.testTheFollowLimitStopsMarkerIsInBothOfTheContractsSentences`.
+    static let followLimitStopMarker: String = "of the course's own web pages and stylesheets, which is more than the website builder reads"
+
+    /// A build the site's emitter stopped at the follow limit (#901,
+    /// `siteFiles.followed.limitsRule`): the build's own sentence LIFTED, as
+    /// the kept-for-reference refusal is, so the teacher reads it without
+    /// the website builder's error and the deploy's exit status around it
+    /// (901a round 4 review, M2). Pinned by the `failureExplanations` cases.
+    static func followLimitStopExplanation(in output: String) -> String? {
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard line.contains(followLimitStopMarker) else {
+                continue
+            }
+            return liftedSentence(from: line)
         }
         return nil
     }

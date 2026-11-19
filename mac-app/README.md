@@ -150,9 +150,13 @@ reasons.** Why, and what was rejected:
 and a window on another Space or a locked screen (#249, #315)".
 
 > **Tip:** stop any copy of the app running under Xcode's debugger (⏹)
-> before running the UI tests — a debugged instance cannot be terminated
-> by the test runner, which fails the first UI test with
-> "Failed to terminate ca.russellgordon.Plantoir".
+> before running the in-process tests — a debugged instance cannot be
+> terminated by the test runner, which fails the first test with
+> "Failed to terminate ca.russellgordon.Plantoir". The XCUITest target
+> below never ends a copy it did not launch: a copy opened from the same
+> build folder (the Dock, the debugger) makes each test that launches the
+> app fail before launching, saying so, and a test fails if its launch ever
+> ends any other copy (#978c).
 
 **The test bundle changes one thing about AppKit, on purpose.** Its
 `NSPrincipalClass` (`INFOPLIST_KEY_NSPrincipalClass` in `project.yml`) is
@@ -196,6 +200,8 @@ from its environment), so these tests run stub launchers only. The marketing
 captures (`MarketingScreenshotTests`) are the named exception — they drive the
 real toolchain and still write the real trail. `UITestLaunchTripwireTests`, in
 the unit suite, fails if any other UI test creates an `XCUIApplication` itself.
+When each test ends, `UITestFolders` quits the app it launched and only then
+removes that test's state folder and fixture (#978).
 `StateDirectoryUITests` proves the redirect through the window and SKIPS while
 another Plantoir is running — quit yours first. Why, and what was measured:
 `documentation/09-mac-app.md` → "Testing: the UI target keeps its state in

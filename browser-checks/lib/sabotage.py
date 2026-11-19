@@ -152,8 +152,14 @@ def geogebra_dialog(site: Path) -> str:
     # The must-fail geogebra_applet.mjs item 10 has used since #755, done
     # by the page itself once the file sketch is open: one of GeoGebra's
     # dialogs is brought up and REMOVED, with its shade, never closed.
+    # The page says a sabotage is due from its first moment, on <html>, so
+    # the drag row waits for it however late the sketch's API turns up: the
+    # figure's own marker is set only once the sketch is open, and a drag
+    # that looked in the gap before it was set met an unbroken sketch and
+    # passed (#974, once in a run on the second Mac).
     add_script(site, "Sketch", "geogebra-dialog.js", """
 (() => {
+  document.documentElement.dataset.renderedSabotage = "dialog pending"
   const removeTheOldWay = (figure) => {
     const box = figure.querySelector(".pl-geogebra-applet")
     const api = box && window[box.id.replace(/-box$/, "")]
@@ -165,6 +171,7 @@ def geogebra_dialog(site: Path) -> str:
       for (const shade of Array.from(document.querySelectorAll(".gwt-PopupPanelGlass"))) shade.remove()
       watcher.disconnect()
       figure.dataset.renderedSabotage = "dialog removed"
+      document.documentElement.dataset.renderedSabotage = "dialog removed"
     })
     watcher.observe(box, { childList: true, subtree: true })
     api.setErrorDialogsActive(true)

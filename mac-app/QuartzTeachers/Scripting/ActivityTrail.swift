@@ -1652,6 +1652,17 @@ nonisolated enum ActivityTrail {
         /// computer and could not be downloaded (`keptDownloads.stop`): how
         /// many of what kind, and why, as offline, damaged or notReady.
         case filesForTheSiteCouldNotBeDownloaded = "files for the site could not be downloaded"
+
+        // ---- The course's files a site carries (#901) ----
+
+        /// A build left course files off its site because no page students
+        /// can see uses them: how many, and the check's two safety counts
+        /// (files a page needed that were put back, files no page named that
+        /// were taken out), read from the build's `PLANTOIR_SITE_FILES:` line
+        /// by `SiteFilesReport`. Written on the first such build of a
+        /// section, when the count changes, and whenever a safety count is
+        /// above zero. Counts only: never a file's name.
+        case siteLeavesOffFilesNoPublishedPageUses = "site leaves off files no published page uses"
     }
 
     // MARK: - Stored properties

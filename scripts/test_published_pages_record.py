@@ -228,7 +228,7 @@ class TheBuildsListTests(unittest.TestCase):
         written = source.index("_write_visible_places(host_output_dir")
         self.assertGreater(written, source.index('"build", "--concurrency", "1"]'),
                            "The list is written before the site is built")
-        self.assertGreater(written, source.index("if _sync_public_to_host(output_dir, host_output_dir):"),
+        self.assertGreater(written, source.index("if _check_mirror_and_mark(output_dir, host_output_dir,"),
                            "The list is written before the site was mirrored")
         self.assertEqual(source.count("_write_visible_places("), 1, "Written from more than one place")
 

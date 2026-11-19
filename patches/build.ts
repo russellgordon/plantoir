@@ -96,6 +96,10 @@ async function buildQuartz(argv: Argv, mut: Mutex, clientRefresh: () => void) {
   const filteredContent = filterContent(ctx, parsedFiles)
 
   await emitContent(ctx, filteredContent)
+  // PLANTOIR-EMIT-DONE (#901): every emitter has finished, so the site is whole.
+  // A preview's check (scripts/site_files.py) waits for this file before it reads
+  // the site, because index.html is written while files are still being copied.
+  await (await import("fs/promises")).writeFile(path.join(output, "..", ".plantoir-emit-done"), ctx.buildId).catch(() => {})
   console.log(chalk.green(`Done processing ${markdownPaths.length} files in ${perf.timeSince()}`))
   release()
 
